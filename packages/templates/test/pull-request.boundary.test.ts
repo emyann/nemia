@@ -81,10 +81,14 @@ const renders = (): Promise<Record<'round' | 'labelled' | 'local', Rendered>> =>
 const RETRY = 'nemia retry r-1 implement --recheck';
 
 /**
- * The line a refusal no change to the branch answers ends with, so a try retried on its own stops for the person; a refusal the work
- * answers carries none.
+ * What a refusal no change to the branch answers exits with: the code build's and quick's `implement` name in their
+ * `checkFailurePolicy:` (`PERSONS_EXIT`, `sdlc/carried/exec.ts`), so the run files no try on it and waits on the person. A refusal the
+ * work answers exits 1.
  */
-const PERSONS = /^nemia (pr|ci): not the work: /m;
+const PERSONS = 78;
+
+/** The line a person's refusal ended with before its exit said it: no refusal prints it now. */
+const TAGGED = /not the work/;
 
 /** A place to push from: a scratch repository on `branch`, its `origin` a bare repository, and a stub `gh` answering `rules`. */
 function placed({ branch = 'wf/r-1/run', remote = true } = {}): { repo: string; bare: string | undefined; branch: string; gh: Gh } {
@@ -226,18 +230,18 @@ test("REFUSED: a HEAD that is on no run's branch, or on the remote's default bra
 test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authenticated, each naming what to type', () => {
   const none = placed({ remote: false });
   const r = pr(none, 'push');
-  assert.equal(r.code, 1, r.out);
+  assert.equal(r.code, PERSONS, r.out);
   assert.match(r.err, /has no `origin` remote/);
   assert.match(r.err, /git remote -v/);
-  assert.match(r.err, PERSONS, 'a person adds the remote');
+  assert.doesNotMatch(r.err, TAGGED, 'a person adds the remote');
   assert.deepEqual(r.calls, [], 'the remote is read before gh');
 
   const at = placed();
   at.gh.answers([{ when: 'auth status', status: 1, err: 'You are not logged into any GitHub hosts.' }, ...passing(at.repo)]);
   const unauthed = pr(at, 'push');
-  assert.equal(unauthed.code, 1, unauthed.out);
+  assert.equal(unauthed.code, PERSONS, unauthed.out);
   assert.match(unauthed.err, /is not authenticated here: run `gh auth login`/);
-  assert.match(unauthed.err, PERSONS, 'a person logs gh in');
+  assert.doesNotMatch(unauthed.err, TAGGED, 'a person logs gh in');
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
 
   const gitAlone = scratch('wf-pr-nogh-');
@@ -248,10 +252,10 @@ test('REFUSED: no origin remote, no gh on the PATH, and a gh that is not authent
     encoding: 'utf8',
     timeout: 60_000,
   });
-  assert.equal(missing.status, 1, missing.stdout);
+  assert.equal(missing.status, PERSONS, 'a person installs gh');
   assert.match(missing.stderr, /no `gh` on the PATH/);
   assert.match(missing.stderr, /gh auth login/);
-  assert.match(missing.stderr, PERSONS, 'a person installs gh');
+  assert.doesNotMatch(missing.stderr, TAGGED, 'the exit says whose it is, no line does');
 });
 
 test('REFUSED, never forced: a tip on origin that HEAD does not hold; origin keeps it, and the refusal names the merge', () => {
@@ -266,7 +270,7 @@ test('REFUSED, never forced: a tip on origin that HEAD does not hold; origin kee
   assert.equal(r.code, 1, r.out);
   assert.match(r.err, /was rejected, and this script never forces a push/);
   assert.match(r.err, /git merge main-worktree\/HEAD/);
-  assert.doesNotMatch(r.err, PERSONS, 'the merge that answers it is the work');
+  assert.notEqual(r.code, PERSONS, 'the merge that answers it is the work');
   assert.equal(tip(at.bare!, at.branch), theirs, "origin's tip is the one it had");
   assert.notEqual(mine, theirs);
 });
@@ -276,10 +280,10 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
   const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
   at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: listed(head, { isDraft: true }) }]);
   const draft = pr(at, 'open', ['--title', 'x', '--body-file', body(), '--labels', '']);
-  assert.equal(draft.code, 1, draft.out);
+  assert.equal(draft.code, PERSONS, draft.out);
   assert.match(draft.err, /#7 is a draft/);
   assert.match(draft.err, /gh pr ready 7/);
-  assert.match(draft.err, PERSONS, 'a person marks it ready');
+  assert.doesNotMatch(draft.err, TAGGED, 'a person marks it ready');
   assert.equal(tip(at.bare!, at.branch), null, 'no push follows a draft');
   assert.equal(asked(draft.calls, 'api').length, 0);
 
@@ -290,11 +294,11 @@ test('REFUSED: a draft pull request, or one based on another branch than the rem
     { when: 'pr list', out: listed(at2, { baseRefName: 'release' }) },
   ]);
   const based = pr(other, 'open', ['--title', 'x', '--body-file', body(), '--labels', '']);
-  assert.equal(based.code, 1, based.out);
+  assert.equal(based.code, PERSONS, based.out);
   assert.ok(based.err.includes('#7 is based on `release`'), based.err);
   assert.ok(based.err.includes("the remote's default branch `main`"), based.err);
   assert.match(based.err, /gh pr edit 7 --base main/);
-  assert.match(based.err, PERSONS, 'a person moves its base');
+  assert.doesNotMatch(based.err, TAGGED, 'a person moves its base');
   assert.ok(based.err.includes('gh api -X PATCH repos/{owner}/{repo}/pulls/7 -f base=main'), based.err);
 });
 
@@ -307,11 +311,11 @@ test('REFUSED: two open pull requests for one branch, naming the close a person 
   ]);
   at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: two }]);
   const r = pr(at, 'push');
-  assert.equal(r.code, 1, r.out);
+  assert.equal(r.code, PERSONS, r.out);
   assert.ok(r.err.includes('2 open pull requests have wf/r-1/run'), r.err);
   assert.ok(r.err.includes('(#7, #8)'), r.err);
   assert.match(r.err, /gh pr close <number>/);
-  assert.match(r.err, PERSONS, 'a person closes one');
+  assert.doesNotMatch(r.err, TAGGED, 'a person closes one');
 });
 
 test("push pushes the hand-off commit and proves the pull request's head is the commit the check judges", () => {
@@ -351,7 +355,7 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.match(stale.err, /0 s after the push/, 'a head elsewhere for the bound is refused, saying how long');
   assert.ok(stale.err.includes('pull-request.ts" open --title'), stale.err);
   assert.ok(stale.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), stale.err);
-  assert.doesNotMatch(stale.err, PERSONS, 'the open that answers it is the work');
+  assert.notEqual(stale.code, PERSONS, 'the open that answers it is the work');
 
   const none = placed();
   none.gh.answers([...passing(none.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
@@ -360,7 +364,7 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.ok(unopened.err.includes('no open pull request has wf/r-1/run as its head'), unopened.err);
   assert.ok(unopened.err.includes('pull-request.ts" open --title'), unopened.err);
   assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
-  assert.doesNotMatch(unopened.err, PERSONS, 'the open that answers it is the work');
+  assert.notEqual(unopened.code, PERSONS, 'the open that answers it is the work');
 });
 
 /** The rules a factory's `pullRequestLabels` gives `push --labels`, in the tests below: two values of one key, each its own label. */
@@ -456,10 +460,10 @@ test('REFUSED, before anything is pushed: a rule that is not <key>=<value>:<labe
   ]) {
     const at = labelled([]);
     const r = pr(at, 'push', args, { WF_LABELS: JSON.stringify({ work: 'fix' }) });
-    assert.equal(r.code, 1, `${args.join(' ')}: ${r.out}`);
+    assert.equal(r.code, PERSONS, `${args.join(' ')}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `a refusal of the script's, not a crash:\n${r.err}`);
     assert.match(r.err, /--labels/, 'naming the flag');
-    assert.match(r.err, PERSONS, `${args.join(' ')}: the factory's rules are a person's`);
+    assert.doesNotMatch(r.err, TAGGED, `${args.join(' ')}: the factory's rules are a person's`);
     assert.equal(tip(at.bare!, at.branch), null, `${args.join(' ')}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), []);
   }
@@ -469,9 +473,9 @@ test('REFUSED, before anything is pushed: a WF_LABELS that is not a JSON object 
   for (const said of ['work=fix', '[]', '"fix"', 'null', JSON.stringify({ work: 1 })]) {
     const at = labelled([]);
     const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: said });
-    assert.equal(r.code, 1, `${said}: ${r.out}`);
+    assert.equal(r.code, PERSONS, `${said}: ${r.out}`);
     assert.match(r.err, /WF_LABELS/, 'naming the variable');
-    assert.match(r.err, PERSONS, `${said}: the run's labels as given are a person's`);
+    assert.doesNotMatch(r.err, TAGGED, `${said}: the run's labels as given are a person's`);
     assert.equal(tip(at.bare!, at.branch), null, `${said}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), []);
   }
@@ -480,23 +484,23 @@ test('REFUSED, before anything is pushed: a WF_LABELS that is not a JSON object 
 test('REFUSED, before anything is pushed: a label the rules give that the repository lacks, naming it and the create that answers it', () => {
   const at = labelled([], { when: 'repos/{owner}/{repo}/labels', out: 'fix\nbug' });
   const r = pr(at, 'push', ['--labels', RULES], { WF_LABELS: JSON.stringify({ work: 'fix' }) });
-  assert.equal(r.code, 1, r.out);
+  assert.equal(r.code, PERSONS, r.out);
   assert.match(r.err, /internal/, 'naming the label');
   assert.match(r.err, /gh label create/, 'and the command that makes it');
-  assert.match(r.err, PERSONS, "the repository's labels are a person's");
+  assert.doesNotMatch(r.err, TAGGED, "the repository's labels are a person's");
   assert.equal(tip(at.bare!, at.branch), null, 'nothing is pushed');
   assert.deepEqual(labelCalls(r.calls), []);
 });
 
-test('REFUSED, exit 2 before anything is pushed: a run whose labels match none of the rules, naming the key, its values and the relabel', () => {
+test("REFUSED, a person's exit before anything is pushed: a run whose labels match none of the rules, naming the key, its values and the relabel", () => {
   for (const verb of ['push', 'open'] as const) {
     const at = labelled(['fix', 'bug']);
     const args = verb === 'push' ? ['--labels', RULES] : ['--title', 'The card', '--body-file', body(), '--labels', RULES];
     const r = pr(at, verb, args, { WF_LABELS: JSON.stringify({ work: 'chore', area: 'api' }) });
-    assert.equal(r.code, 2, `${verb}: ${r.out}`);
+    assert.equal(r.code, PERSONS, `${verb}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `${verb}: a refusal of the script's, not a crash:\n${r.err}`);
     for (const word of ['work', 'fix', 'cleanup', 'nemia label run']) assert.ok(r.err.includes(word), `${verb}: naming ${word}:\n${r.err}`);
-    assert.match(r.err, PERSONS, `${verb}: a person labels the run`);
+    assert.doesNotMatch(r.err, TAGGED, `${verb}: a person labels the run`);
     assert.equal(tip(at.bare!, at.branch), null, `${verb}: nothing is pushed`);
     assert.deepEqual(labelCalls(r.calls), [], `${verb}: no label is added or removed`);
     assert.equal(asked(r.calls, 'pr', 'create').length + asked(r.calls, 'api', '-X', 'PATCH').length, 0, `${verb}: nothing is opened`);
@@ -565,17 +569,23 @@ test('open with --labels "", or with rules and no WF_LABELS from an older daemon
 });
 
 test('REFUSED, before anything is pushed or created: open with no --labels, a malformed rule, a WF_LABELS that is no object, a label the repository lacks', () => {
-  const cases: [string[], Record<string, string>, Rule | undefined][] = [
-    [opening(), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined],
-    [opening('--labels', 'work=fix'), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined],
-    [opening('--labels', RULES), { WF_LABELS: '[]' }, undefined],
-    [opening('--labels', RULES), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, { when: 'repos/{owner}/{repo}/labels', out: 'fix\nbug' }],
+  const cases: [string[], Record<string, string>, Rule | undefined, number][] = [
+    [opening(), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined, 1],
+    [opening('--labels', 'work=fix'), { WF_LABELS: JSON.stringify({ work: 'fix' }) }, undefined, PERSONS],
+    [opening('--labels', RULES), { WF_LABELS: '[]' }, undefined, PERSONS],
+    [
+      opening('--labels', RULES),
+      { WF_LABELS: JSON.stringify({ work: 'fix' }) },
+      { when: 'repos/{owner}/{repo}/labels', out: 'fix\nbug' },
+      PERSONS,
+    ],
   ];
-  for (const [args, more, repo] of cases) {
+  for (const [args, more, repo, code] of cases) {
     const at = unopened();
     if (repo) at.gh.answers([repo, ...passing(at.repo).filter((rule) => rule.when !== 'pr list'), { when: 'pr list', out: '[]' }]);
     const r = pr(at, 'open', args, more);
-    assert.equal(r.code, 1, `${args.slice(4).join(' ')}: ${r.out}`);
+    const whose = code === PERSONS ? "the rules, the run's labels and the repository's are a person's" : 'the open line is typed again';
+    assert.equal(r.code, code, `${args.slice(4).join(' ')}: ${whose}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia pr: '), `a refusal of the script's, not a crash:\n${r.err}`);
     assert.equal(tip(at.bare!, at.branch), null, `${args.slice(4).join(' ')}: nothing is pushed`);
     assert.equal(asked(r.calls, 'pr', 'create').length, 0, 'nothing is created');
@@ -610,7 +620,7 @@ test('wait reads mergeable again while GitHub computes it, polls the ci context 
   assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
   assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
   assert.ok(conflicting.err.includes('pull-request.ts" open --title'), `and the push of the round again:\n${conflicting.err}`);
-  assert.doesNotMatch(conflicting.err, PERSONS, 'the merge of the base that answers it is the work');
+  assert.notEqual(conflicting.code, PERSONS, 'the merge of the base that answers it is the work');
 });
 
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
@@ -703,14 +713,22 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
     'each failing job is read by its id, the gathering `ci` last',
   );
 
-  for (const conclusion of ['CANCELLED', 'SKIPPED', 'TIMED_OUT']) {
+  for (const [conclusion, code] of [
+    ['CANCELLED', PERSONS],
+    ['SKIPPED', PERSONS],
+    ['TIMED_OUT', 1],
+  ] as const) {
     const other = placed();
     other.gh.answers([
       ...passing(other.repo).filter((rule) => rule.when !== 'pr view'),
       { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion }) },
     ]);
     const refused = pr(other, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
-    assert.equal(refused.code, 1, `${conclusion}: ${refused.out}`);
+    assert.equal(
+      refused.code,
+      code,
+      `${conclusion}: ${code === PERSONS ? "judged nothing, a person's" : "a red, the work's"}: ${refused.out}`,
+    );
     assert.ok(refused.err.includes(conclusion.toLowerCase()), refused.err);
     assert.ok(refused.err.includes(RETRY), refused.err);
   }
@@ -766,7 +784,7 @@ test("a red ci whose base is red too at the commit the head holds says so, namin
   assert.ok(!r.err.includes('lint: '), `a job that passed on the base is not named:\n${r.err}`);
   assert.ok(r.err.includes('git merge main-worktree/HEAD'), `the merge of a moved base is named:\n${r.err}`);
   assert.ok(r.err.includes(RETRY), r.err);
-  assert.doesNotMatch(r.err, PERSONS, "the base's red is a hint: the refusal stays the try's");
+  assert.notEqual(r.code, PERSONS, "the base's red is a hint: the refusal stays the try's");
 
   const byStatus = redOnBase({ statuses: [{ context: 'ci', state: 'failure', target_url: BASE_JOB_URL }] });
   assert.ok(byStatus.err.includes(BASE_AT.slice(0, 12)), `a status context of the base's is read too:\n${byStatus.err}`);
@@ -777,7 +795,7 @@ test('a red ci on a base that is green, pending, unread or not answered adds no 
     assert.equal(r.code, 1, r.out);
     assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
     assert.ok(r.err.includes(RETRY), r.err);
-    assert.doesNotMatch(r.err, PERSONS, 'still the work');
+    assert.notEqual(r.code, PERSONS, 'still the work');
     assert.ok(!r.err.includes(BASE_AT.slice(0, 12)), `no line about the base:\n${r.err}`);
     assert.ok(!r.err.includes('`main`'), `no line about the base:\n${r.err}`);
     return r;
@@ -847,7 +865,7 @@ test('wait reads the CI context --check names and no other: a green `ci` is no v
   const quick = { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' };
   const ciAlone = placed();
   const refused = pr(ciAlone, 'wait', ['--check', 'gate'], quick);
-  assert.equal(refused.code, 1, refused.out);
+  assert.equal(refused.code, PERSONS, refused.out);
   assert.match(refused.err, /no `gate` context was reported for #7/);
 
   const gated = placed();
@@ -867,10 +885,10 @@ test('REFUSED: a wait with no --check, a --check with no name, or more after it,
   const at = placed();
   for (const given of [[], ['--check'], ['--check', '--x'], ['--check', 'ci', 'more']]) {
     const r = pr(at, 'wait', given, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
-    assert.equal(r.code, 1, `${given.join(' ')}: ${r.out}`);
+    assert.equal(r.code, PERSONS, `${given.join(' ')}: ${r.out}`);
     assert.ok(r.err.startsWith('nemia ci: '), `a refusal of the script's, not a crash:\n${r.err}`);
     assert.match(r.err, /--check/, 'naming the flag');
-    assert.match(r.err, PERSONS, `${given.join(' ')}: the check line is the factory's`);
+    assert.doesNotMatch(r.err, TAGGED, `${given.join(' ')}: the check line is the factory's`);
     assert.deepEqual(r.calls, [], 'gh is not called at all');
   }
 });
@@ -903,13 +921,13 @@ test("a ci that failed is the work's to answer; one only cancelled, skipped or n
       { when: 'actions/jobs', out: 'boom' },
     ]);
     const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
-    assert.equal(r.code, 1, r.out);
-    return r.err;
+    assert.doesNotMatch(r.err, TAGGED, 'the exit says whose it is, no line does');
+    return r.code;
   };
-  assert.doesNotMatch(judged('FAILURE'), PERSONS, 'a red ci is the work');
-  assert.doesNotMatch(judged('CANCELLED', 'FAILURE'), PERSONS, 'a failure beside a cancelled job is the work still');
-  assert.match(judged('CANCELLED'), PERSONS, 'a cancelled ci judged nothing');
-  assert.match(judged('SKIPPED', 'NEUTRAL'), PERSONS, 'nor did a skipped or neutral one');
+  assert.equal(judged('FAILURE'), 1, 'a red ci is the work');
+  assert.equal(judged('CANCELLED', 'FAILURE'), 1, 'a failure beside a cancelled job is the work still');
+  assert.equal(judged('CANCELLED'), PERSONS, 'a cancelled ci judged nothing');
+  assert.equal(judged('SKIPPED', 'NEUTRAL'), PERSONS, 'nor did a skipped or neutral one');
 });
 
 test('REFUSED: no ci context within the bound, and a ci still pending at its end, each by the name of the context', () => {
@@ -919,11 +937,11 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
     { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [{ name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) },
   ]);
   const absent = pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
-  assert.equal(absent.code, 1, absent.out);
+  assert.equal(absent.code, PERSONS, absent.out);
   assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/);
   assert.ok(absent.err.includes('https://github.com/o/r/pull/7/checks'), absent.err);
   assert.ok(absent.err.includes(RETRY), absent.err);
-  assert.match(absent.err, PERSONS, 'CI that never came judged nothing');
+  assert.doesNotMatch(absent.err, TAGGED, 'CI that never came judged nothing');
 
   const slow = placed();
   slow.gh.answers([
@@ -931,11 +949,11 @@ test('REFUSED: no ci context within the bound, and a ci still pending at its end
     { when: 'pr view', out: rollup({ status: 'IN_PROGRESS' }) },
   ]);
   const unfinished = pr(slow, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
-  assert.equal(unfinished.code, 1, unfinished.out);
+  assert.equal(unfinished.code, PERSONS, unfinished.out);
   assert.match(unfinished.err, /`ci` for #7 was still in_progress after 0 s/);
   assert.ok(unfinished.err.includes(CI_URL), unfinished.err);
   assert.ok(unfinished.err.includes(RETRY), unfinished.err);
-  assert.match(unfinished.err, PERSONS, 'CI still running at the bound judged nothing');
+  assert.doesNotMatch(unfinished.err, TAGGED, 'CI still running at the bound judged nothing');
 });
 
 test("wait reads a GitHub read that fails as not yet read: once, then answering, passes; failing to the bound, it names the last error, a person's", () => {
@@ -954,10 +972,10 @@ test("wait reads a GitHub read that fails as not yet read: once, then answering,
   const down = placed();
   down.gh.answers([...passing(down.repo).filter((rule) => rule.when !== 'pr view'), { when: 'pr view', err: timedOut, status: 1 }]);
   const failing = pr(down, 'wait', CI, { WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
-  assert.equal(failing.code, 1, failing.out);
+  assert.equal(failing.code, PERSONS, failing.out);
   assert.ok(failing.err.includes(timedOut), failing.err);
   assert.ok(failing.err.includes(RETRY), failing.err);
-  assert.match(failing.err, PERSONS, 'a GitHub that cannot be read judged nothing');
+  assert.doesNotMatch(failing.err, TAGGED, 'a GitHub that cannot be read judged nothing');
 });
 
 /** A job of the workflow run 1234 as the rollup gives it: its name, its job id, when it started and how it stands. */
@@ -1020,7 +1038,7 @@ test("wait re-runs a red ci's failed jobs once, and a green second time passes t
 test("red twice is refused as today, the work's, with the re-run said and the second attempt's logs", () => {
   const r = redThen([checks(...FIRST), checks(...FIRST, ...second(FAILED))]);
   assert.equal(r.code, 1, r.out);
-  assert.doesNotMatch(r.err, PERSONS, 'a job red again is the change');
+  assert.notEqual(r.code, PERSONS, 'a job red again is the change');
   assert.equal(reruns(r.calls).length, 1, 'never a second re-run, the re-run red too');
   assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
   assert.match(r.err, /re-ran .* run 1234/);
@@ -1036,7 +1054,7 @@ test('never twice per head: a run GitHub says is past its first attempt is not r
   assert.equal(r.code, 1, r.out);
   assert.equal(reruns(r.calls).length, 0, 'no re-run');
   assert.match(r.err, /attempt is 2/);
-  assert.doesNotMatch(r.err, PERSONS);
+  assert.notEqual(r.code, PERSONS);
 });
 
 test('after a re-run, the old red GitHub still shows is waited on, not judged', () => {
@@ -1064,7 +1082,7 @@ test("a re-run still running at the wait's bound is the work's refusal, within t
   assert.match(r.err, /re-ran .* run 1234/);
   assert.match(r.err, /re-runs nothing again/, 'saying the next check reads its verdict');
   assert.ok(r.err.includes(RETRY), r.err);
-  assert.doesNotMatch(r.err, PERSONS, 'no person is needed');
+  assert.notEqual(r.code, PERSONS, 'no person is needed');
 });
 
 test('REFUSED with no re-run, as today, where none can be asked', () => {
@@ -1072,7 +1090,7 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
     assert.equal(r.code, 1, r.out);
     assert.ok(r.err.includes('`ci` for #7 is failure'), r.err);
     assert.match(r.err, why);
-    assert.doesNotMatch(r.err, PERSONS);
+    assert.notEqual(r.code, PERSONS);
     return r;
   };
   const unread = refused(redThen([checks(...FIRST)], { when: 'actions/runs/1234', status: 1, err: 'HTTP 404' }), /its attempt is unread/);
@@ -1086,8 +1104,8 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
   assert.equal(reruns(status.calls).length, 0);
 
   const cancelled = redThen([checks(job('ci', 5678, T1, { status: 'COMPLETED', conclusion: 'CANCELLED' }))]);
-  assert.equal(cancelled.code, 1, cancelled.out);
-  assert.match(cancelled.err, PERSONS, 'a cancelled ci judged nothing, and stays the person');
+  assert.equal(cancelled.code, PERSONS, cancelled.out);
+  assert.doesNotMatch(cancelled.err, TAGGED, 'a cancelled ci judged nothing, and stays the person');
   assert.ok(!cancelled.calls.some((call) => call.argv.join(' ').includes('actions/runs/1234')), 'its attempt is not read');
   assert.equal(reruns(cancelled.calls).length, 0);
 });
@@ -1252,7 +1270,7 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
     { when: 'pr view', out: JSON.stringify({ statusCheckRollup: [{ name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }) },
   ]);
   const absent = pr(at, 'wait', CI, { WF_CI_START_SECONDS: '0', WF_CI_WAIT_SECONDS: '5', WF_CI_POLL_SECONDS: '0' });
-  assert.equal(absent.code, 1, absent.out);
+  assert.equal(absent.code, PERSONS, absent.out);
   assert.match(absent.err, /no `ci` context was reported for #7 within 0 s/, 'a `ci` never reported is refused on the start bound');
 
   const slow = placed();
@@ -1270,7 +1288,7 @@ test('the wait tells its two bounds apart: the start is its own, and what is lef
     { when: 'pr view', out: rollup({ status: 'IN_PROGRESS' }) },
   ]);
   const unfinished = pr(started, 'wait', CI, { WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '0', WF_CI_POLL_SECONDS: '0' });
-  assert.equal(unfinished.code, 1, unfinished.out);
+  assert.equal(unfinished.code, PERSONS, unfinished.out);
   assert.match(unfinished.err, /was still in_progress after 0 s/, 'a started `ci` is bounded by the whole');
 });
 

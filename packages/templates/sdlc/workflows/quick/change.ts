@@ -9,17 +9,24 @@
  * `GENERATED`, or one git says is `linguist-generated` (`git check-attr`, read from the repository's `.gitattributes`) —
  * and refuses nothing by either number: the review reads the change whatever its size.
  *
- * Prints a `nemia size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
- * another than `size`: each the environment's or the check line's, never the work's, so each refusal ends with one more line,
- * `nemia change: not the work: <why>`, which tells a try retried on its own to change nothing and stop for the person.
+ * Prints a `nemia size:` line and exits 0. Refuses, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
+ * another than `size`: each the environment's or the check line's, never the work's, so each exits 78 (`PERSONS_EXIT`), the code quick's
+ * `implement` names in its `checkFailurePolicy:`, and the run waits on the person rather than try the step again.
  */
 import { spawnSync } from 'node:child_process';
 
-/** A reason the step is refused: said on stderr, exit 1. */
+/**
+ * A reason the step is refused: said on stderr, exit 78. Every refusal is a person's: it measures the change, and refuses only where it
+ * cannot.
+ */
 class Refusal extends Error {}
 
-/** Why every refusal of this script is a person's: it measures the change, and refuses only where it cannot. */
-const NOT_THE_WORK = "a person fixes the run's environment or the check line; a change to the branch cannot";
+/**
+ * What every refusal exits with: the code quick's `implement` names in its `checkFailurePolicy:` (`onExitCodes: In [78]`), equal to
+ * `PERSONS_EXIT` in the template's `carried/exec.ts`. Kept here on its own: this script is read from the run's frozen workflow files,
+ * apart from the carried folder, and imports nothing.
+ */
+const PERSONS_EXIT = 78;
 
 /**
  * The paths a tool writes in any repository, which the count leaves out: a file, or a folder by its closing slash. A repository says its
@@ -98,7 +105,7 @@ function size(say: (line: string) => void): number {
   return 0;
 }
 
-/** The whole run: the exit of the verb asked for, 1 with the refusal on stderr. */
+/** The whole run: the exit of the verb asked for, 78 with the refusal on stderr. */
 function main(): number {
   const say = (line: string): void => void process.stdout.write(`${line}\n`);
   const [verb] = process.argv.slice(2);
@@ -108,8 +115,7 @@ function main(): number {
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     process.stderr.write(`nemia change: ${err.message}\n`);
-    process.stderr.write(`nemia change: not the work: ${NOT_THE_WORK}\n`);
-    return 1;
+    return PERSONS_EXIT;
   }
 }
 

@@ -2,9 +2,10 @@
  * The Skill door's contract (`SkillDoor`, `src/skills/skill-door.store.ts`), as walks (`door-walks.ts`): every method's rows, run on the
  * files by `src/skills/skill-door.store.test.ts` and on the memory stand-in by `src/skills/skill-memory.store.test.ts`. A skill written is
  * listed, there at a version, read back as its card entry and its text, found before a builtin place skill of its name, changed at its
- * version — whole, or its `preload:` alone — and copied whole into the library; and the write check: a stale version, a new skill at a
- * name taken, a name that is no skill's, a version of one gone, no description and one with a line break, a copy onto a name taken and
- * of a skill the source has not, are each refused with nothing written.
+ * version — whole, or its `preload:` alone — and copied whole into the library; its other text files (`others`) read back at any depth,
+ * replaced whole by a write that gives them, and left by one that gives none; and the write check: a stale version, a new skill at a
+ * name taken, a name that is no skill's, a version of one gone, no description and one with a line break, a file at a path out of the
+ * skill or given twice, a copy onto a name taken and of a skill the source has not, are each refused with nothing written.
  *
  * Each walk is on a side of its own: a fresh store, or a fresh stand-in. A skill planted outside the store's library — a repository's two
  * places, a source to copy from — is written there with `{ anywhere: true }`, as the copy of an agent writes. A link, the staged copy and
@@ -16,6 +17,7 @@ import { act, done } from './door-walks.ts';
 import type { SkillDoorShape } from '../src/skills/skill-door.store.ts';
 import { SkillName } from '../src/agents/agents.model.ts';
 import { renderSkill, type SkillDraft } from '../src/skills/skills.ts';
+import type { SkillChange } from '../src/skills/skills.store.ts';
 import { BUILTIN_SKILLS, PLACE_SKILLS } from '../src/skills/read.store.ts';
 import { WorkflowError } from '../src/step/step.ts';
 
@@ -38,15 +40,24 @@ export const libraryOn = ({ root }: Side): string => `${root}/workflows/skills`;
 /** `name`, as the door takes it. */
 const named = (name: string): SkillName => SkillName.read(name);
 
+/** A skill's other text files, as a write gives them: one two folders down, one beside its SKILL.md. */
+const OTHERS = [
+  { path: 'notes/deep/how.md', text: 'One fact a line.\n' },
+  { path: 'run.sh', text: 'echo ok\n' },
+];
+
 /** `draft` made in the library of a side (or in `at`, anywhere), at the version its write answered. */
-const made = (side: Side, draft: SkillDraft = aSkill(), at = libraryOn(side)): string =>
+const made = (side: Side, draft: SkillChange & SkillDraft = aSkill(), at = libraryOn(side)): string =>
   done(side.door.skills.write(named(draft.name), draft, undefined, at, { anywhere: at !== libraryOn(side) })).version;
 
 /** What a refused act leaves of the library: the skills it holds. */
 const left = (side: Side): readonly string[] => done(side.door.skills.list(libraryOn(side)));
 
+/** The other text files of the skill `name` of the library on a side. */
+const othersOf = (side: Side, name = 'tidy-notes') => done(side.door.skills.others(named(name), libraryOn(side)));
+
 /** What a refused write of `draft` (`version`, none for a new one) answers, and what it leaves of the library. */
-const refusedWrite = (side: Side, draft: SkillDraft, version?: string) => ({
+const refusedWrite = (side: Side, draft: SkillChange, version?: string) => ({
   write: act(side.door.skills.write(named(draft.name), draft, version, libraryOn(side))),
   left: left(side),
 });
@@ -251,6 +262,35 @@ export const SKILL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { write: { refused: 'Invalid' }, left: [] },
     },
     {
+      name: 'REFUSED: a file at a path out of the skill — climbing out, absolute, empty — its SKILL.md, or one given twice, Invalid, nothing written',
+      walk: (side) =>
+        [
+          [{ path: '../escape.md', text: 'x' }],
+          [{ path: 'notes/../../escape.md', text: 'x' }],
+          [{ path: '/etc/escape.md', text: 'x' }],
+          [{ path: '', text: 'x' }],
+          [{ path: 'notes//how.md', text: 'x' }],
+          [{ path: 'SKILL.md', text: 'x' }],
+          [
+            { path: 'run.sh', text: 'a' },
+            { path: 'run.sh', text: 'b' },
+          ],
+        ].map((files) => refusedWrite(side, { ...aSkill(), files })),
+      says: Array.from({ length: 7 }, () => ({ write: { refused: 'Invalid' }, left: [] })),
+    },
+    {
+      name: 'REFUSED: a change giving a file out of the skill, Invalid, its files as they were',
+      walk: (side) => {
+        const version = made(side, { ...aSkill(), files: OTHERS });
+        const files = [{ path: '../escape.md', text: 'x' }];
+        return {
+          write: act(side.door.skills.write(named('tidy-notes'), { ...aSkill(), files }, version, libraryOn(side))),
+          others: othersOf(side),
+        };
+      },
+      says: { write: { refused: 'Invalid' }, others: OTHERS },
+    },
+    {
       name: 'REFUSED: a change of preload: alone where no skill is, Invalid, nothing written',
       walk: (side) => ({
         write: act(side.door.skills.write(named('tidy-notes'), { name: 'tidy-notes', preload: true }, undefined, libraryOn(side))),
@@ -267,7 +307,65 @@ export const SKILL_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { write: { refused: 'Invalid' }, there: { kind: 'none' } },
     },
   ],
+  'skills.others': [
+    {
+      name: 'none for a skill written with no other file, and none where no skill is',
+      walk: (side) => {
+        const none = othersOf(side);
+        made(side);
+        return { none, made: othersOf(side) };
+      },
+      says: { none: [], made: [] },
+    },
+    {
+      name: 'a skill made with its other files: each read back by its path in the folder, at any depth, sorted',
+      walk: (side) => {
+        made(side, { ...aSkill(), files: [...OTHERS].reverse() });
+        return othersOf(side);
+      },
+      says: OTHERS,
+    },
+    {
+      name: 'changed giving its files: the set replaced whole, one left out gone, the version moved by the files alone',
+      walk: (side) => {
+        const version = made(side, { ...aSkill(), files: OTHERS });
+        const files = [
+          { path: 'run.sh', text: 'echo two\n' },
+          { path: 'ref/new.md', text: 'New.\n' },
+        ];
+        const changed = done(side.door.skills.write(named('tidy-notes'), { ...aSkill(), files }, version, libraryOn(side)));
+        return { others: othersOf(side), moved: changed.version !== version };
+      },
+      says: {
+        others: [
+          { path: 'ref/new.md', text: 'New.\n' },
+          { path: 'run.sh', text: 'echo two\n' },
+        ],
+        moved: true,
+      },
+    },
+    {
+      name: 'changed giving no files, whole or its preload: alone: its files left as they are',
+      walk: (side) => {
+        const version = made(side, { ...aSkill(), files: OTHERS });
+        const whole = done(side.door.skills.write(named('tidy-notes'), aSkill('tidy-notes', { body: 'New.' }), version, libraryOn(side)));
+        done(side.door.skills.write(named('tidy-notes'), { name: 'tidy-notes', preload: true }, whole.version, libraryOn(side)));
+        return othersOf(side);
+      },
+      says: OTHERS,
+    },
+  ],
   'skills.copy': [
+    {
+      name: 'a skill with other files copied with them',
+      walk: (side) => {
+        const from = `${side.root}/source/skills`;
+        made(side, { ...aSkill(), files: OTHERS }, from);
+        const { written } = done(side.door.skills.copy(named('tidy-notes'), from, libraryOn(side)));
+        return { written, others: othersOf(side) };
+      },
+      says: { written: ['SKILL.md', 'notes/deep/how.md', 'run.sh'], others: OTHERS },
+    },
     {
       name: 'copied whole into the library, under its name, as the source holds it',
       walk: (side) => {

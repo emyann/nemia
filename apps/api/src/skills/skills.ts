@@ -143,9 +143,17 @@ export function foundInOf(dir: string, repo: string, home: string): string | nul
 export const readsOf = (s: Served, dirs: readonly string[]): Promise<Record<string, SkillRead>> =>
   s.inRequest(SKILLS_LIST.handler({ skills: dirs }));
 
-/** The version of the skill in the folder `dir`, as the package reads it through its Skill door (`SKILLS_READ`): null where none reads. */
-export const skillVersionAt = async (s: Served, dir: string): Promise<string | null> =>
-  (await s.inRequest(SKILLS_READ.handler({ name: path.basename(dir), dir }))).version;
+/**
+ * The version of the skill in the folder `dir`, null where none reads, and the other text files of its folder, by path, as the package
+ * reads them through its Skill door (`SKILLS_READ`).
+ */
+export const skillShownAt = async (
+  s: Served,
+  dir: string,
+): Promise<{ version: string | null; files: readonly { path: string; text: string }[] }> => {
+  const { version, files } = await s.inRequest(SKILLS_READ.handler({ name: path.basename(dir), dir }));
+  return { version, files };
+};
 
 /**
  * The reading of the folder `dir` among `reads`, which the table's `skills` gives for each folder it was asked: thrown, naming the

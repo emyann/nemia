@@ -1,8 +1,9 @@
 /**
  * A proposal made (`proposeProgram`), and an undo proposed (`undoProgram`): the objects a caller proposes for a factory, judged whole
  * before a byte is written — the caller may propose there (`mayPropose`); each object of a kind a proposal carries, its spec as that kind's
- * spec says it (objects' `WorkflowSpec`, `AgentSpec`, `SkillSpec`, `HireSpec`, `McpServerSpec`, and the Factory's attached workflows,
- * rules and instruction), never the person's settings; each at the version it was read at, still the one served — then its changes,
+ * spec says it (objects' `WorkflowSpec`, `AgentSpec` with the result schema its `output` carries, `SkillSpec` with the folder's other
+ * text files its `files` carry, `HireSpec`, `McpServerSpec`, and the Factory's attached workflows, rules and instruction), never the
+ * person's settings nor an agent's custom instructions; each at the version it was read at, still the one served — then its changes,
  * what each does to access (`accessOf`, `accessChange`) and whether the whole widens it, written as a proposal that waits, named by the
  * machinery and proposed by the caller, never by the body.
  */
@@ -30,6 +31,7 @@ import { accessChange, accessOf } from './access.ts';
 import { currentOf, type ProposalNeeds, type ProposalPlace } from './current.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { proposerOf, type ProposalCaller } from '../caller/index.ts';
+import { skillFilesRefusal } from '../skills/skills.ts';
 
 /** What a proposal of the Factory may change: its attached workflows, its rules and its instruction. */
 const FactoryProposed = Schema.Struct({
@@ -67,7 +69,10 @@ export const verbOf = (object: ProposedObject): ChangeVerb =>
 /** An object's label in a refusal: `Workflow build`. */
 const labelOf = (object: ProposedObject): string => `${object.kind} ${object.metadata.name}`;
 
-/** Why a Factory or an Agent `object` carries what is the person's, or undefined where it carries none: settings, custom instructions. */
+/**
+ * Why a Factory or an Agent `object` carries what is the person's, or undefined where it carries none: settings, custom instructions. An
+ * Agent's result schema (`output`) is not one: it grants no access, and is written beside the agent with it.
+ */
 function personsRefusal(object: ProposedObject, label: string, verb: ChangeVerb): string | undefined {
   const spec = typeof object.spec === 'object' && object.spec !== null ? (object.spec as Record<string, unknown>) : undefined;
   if (object.kind === 'Factory') {
@@ -79,8 +84,6 @@ function personsRefusal(object: ProposedObject, label: string, verb: ChangeVerb)
   }
   if (object.kind === 'Agent' && spec !== undefined && 'custom' in spec)
     return `${label}: an agent's custom instructions are the person's, and no proposal carries them: the person writes them with nemia agents custom ${object.metadata.name} --file <path>.`;
-  if (object.kind === 'Agent' && spec?.output != null)
-    return `${label}: a proposal carries no result schema of an agent: leave output out, and write the schema with nemia agents write.`;
   return undefined;
 }
 
@@ -97,10 +100,17 @@ function verbRefusal(object: ProposedObject, label: string, verb: ChangeVerb, fa
   return undefined;
 }
 
-/** Why `object`'s spec is not its kind's, or undefined where it is: the kind's schema, and a Hire named after its step. */
+/**
+ * Why `object`'s spec is not its kind's, or undefined where it is: the kind's schema, a Skill's file at a path out of its folder or given
+ * twice (`skillFilesRefusal`), and a Hire named after its step.
+ */
 function specRefusal(object: ProposedObject, label: string): string | undefined {
   const broken = brokenBy(SPECS[object.kind], object.spec);
   if (broken !== null) return `${label}: its spec ${broken}: write it as nemia explain ${RESOURCE_PLURALS[object.kind]}.spec says.`;
+  if (object.kind === 'Skill') {
+    const files = skillFilesRefusal((object.spec as SkillSpec).files);
+    return files === undefined ? undefined : `${label}: ${files}`;
+  }
   if (object.kind !== 'Hire') return undefined;
   const spec = object.spec as HireSpec;
   return `${spec.workflow}.${spec.step}` === object.metadata.name

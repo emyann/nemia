@@ -1,11 +1,12 @@
 /**
  * The Skill (`src/skill.ts`): a skill and a page of them as the Api's endpoints answer them, every key kept; its origin one of the four
- * words; the write the Api takes, a whole spec or `preload` alone; and its files by path.
+ * words; the write the Api takes, a whole spec or `preload` alone; its other text files in its spec (`spec.files`), at any depth; and its
+ * files by path.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Skill, SkillWrite } from 'objects';
+import { API_VERSION, Skill, SkillFile, SkillWrite } from 'objects';
 import { answered, taken } from './served.ts';
 
 const skill = {
@@ -56,4 +57,17 @@ test('the write takes a whole spec, or preload alone; the files are paths', () =
   assert.deepEqual(answered('skills', 'files', { paths: ['SKILL.md', 'ref/a.md'] }), { paths: ['SKILL.md', 'ref/a.md'] });
   assert.equal(taken('skills', 'replace', { metadata: {} }), undefined);
   assert.equal(answered('skills', 'files', { paths: [1] }), undefined);
+});
+
+test("a spec carries the folder's other text files at any depth, served and written; one that is not a path and a text refused", () => {
+  const files = [
+    { path: 'notes/how.md', text: 'One fact a line.\n' },
+    { path: 'run.sh', text: 'echo ok\n' },
+  ];
+  const served = { ...skill, spec: { ...skill.spec, files } };
+  assert.deepEqual(answered('skills', 'get', served), served);
+  const whole = { metadata: { resourceVersion: 'sha256:s' }, spec: { description: 'd', body: 'b', files } };
+  assert.deepEqual(taken('skills', 'replace', whole), whole);
+  assert.deepEqual(Schema.decodeUnknownSync(SkillFile)(files[0]), files[0]);
+  assert.equal(answered('skills', 'get', { ...skill, spec: { ...skill.spec, files: [{ path: 'a.md' }] } }), undefined);
 });

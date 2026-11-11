@@ -1,10 +1,11 @@
 /**
  * Proposals on a scratch store, over a templated factory whose tree is rendered by hand: an agent proposes a factory's Workflow at the
  * version it read, the person approves, and it is applied into the tree with what it held before; an undo applies that back as a new
- * revision; a Workflow's proposal carries its folder's scripts, written whole and put back by its undo. Then one fixture per rule: stale, a
- * run-end proposal and its run, a delegation taken back, an agent's own proposal, a level short of auto, a widening, a confirm past the
- * delegation, a Factory read before its rules, its instruction or its status moved, and the Proposal door's own refusals. Kinds and `_tag`s
- * are asserted, never a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
+ * revision; a Workflow's proposal carries its folder's scripts, written whole and put back by its undo; an Agent's carries its result
+ * schema, written beside it; a Skill's carries its folder's other text files, written whole, a picture left. Then one fixture per rule:
+ * stale, a run-end proposal and its run, a delegation taken back, an agent's own proposal, a level short of auto, a widening, a confirm
+ * past the delegation, a Factory read before its rules, its instruction or its status moved, and the Proposal door's own refusals. Kinds
+ * and `_tag`s are asserted, never a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -256,6 +257,97 @@ test("a Workflow proposal carries its folder's scripts: applied whole, undone ba
       assert.equal((await refusalOf(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE)))._tag, 'Conflict');
     },
   );
+});
+
+/** A result schema strict enough for every harness: one field, required, nothing else. */
+const GRADES = JSON.stringify({
+  type: 'object',
+  properties: { grade: { type: 'string' } },
+  required: ['grade'],
+  additionalProperties: false,
+});
+
+test('an Agent proposal carries its result schema: accepted, applied with the schema written beside it, and read back in its spec', async () => {
+  const tree = factory('graded');
+  const output = { file: 'grader.schema.json', text: GRADES };
+  const object: ProposedObject = {
+    kind: 'Agent',
+    metadata: { name: 'grader' },
+    spec: { keys: { output: output.file }, output, instructions: 'Grade the change.\n' },
+  };
+  const proposed = await run(proposeProgram(PERSON, 'graded', { objects: [object] }, PLACE));
+  assert.equal(proposed.status.phase, 'waiting');
+  const applied = await run(approveProgram(PERSON, 'graded', proposed.metadata.name, PLACE));
+  assert.equal(applied.status.phase, 'applied', applied.status.message);
+  assert.equal(fs.readFileSync(path.join(tree, 'workflows', 'agents', output.file), 'utf8'), GRADES);
+  const now = await run(currentOf(PLACE, 'graded', 'Agent', 'grader'));
+  assert.deepEqual((now.spec as { output?: unknown }).output, output);
+  const plain = await run(currentOf(PLACE, 'graded', 'Agent', 'implementer'));
+  assert.equal('output' in (plain.spec as object), false, 'an agent with no output: line carries none');
+});
+
+/** A file of the skill `tidy` of `tree`, by its path in it, or undefined where it is not there. */
+const tidyFile = (tree: string, file: string): string | undefined => {
+  try {
+    return fs.readFileSync(path.join(tree, 'workflows', 'skills', 'tidy', file), 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+test("a Skill proposal carries its folder's other text files: read at any depth, applied whole, a picture left, and undone back", async (t) => {
+  const tree = factory('skilled');
+  const dir = path.join(tree, 'workflows', 'skills', 'tidy');
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+  fs.mkdirSync(path.join(dir, 'notes'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: tidy\ndescription: Tidy a change.\n---\nTidy it.\n');
+  fs.writeFileSync(path.join(dir, 'notes', 'old.md'), 'Old.\n');
+  fs.writeFileSync(path.join(dir, 'run.sh'), 'echo one\n');
+  fs.writeFileSync(path.join(dir, 'logo.png'), picture);
+  const now = await run(currentOf(PLACE, 'skilled', 'Skill', 'tidy'));
+  await t.test('read: its other text files by their path, sorted, the picture not among them', () => {
+    assert.deepEqual((now.spec as { files?: unknown }).files, [
+      { path: 'notes/old.md', text: 'Old.\n' },
+      { path: 'run.sh', text: 'echo one\n' },
+    ]);
+  });
+  const files = [
+    { path: 'ref/new.md', text: 'New.\n' },
+    { path: 'run.sh', text: 'echo two\n' },
+  ];
+  const object: ProposedObject = {
+    kind: 'Skill',
+    metadata: { name: 'tidy', resourceVersion: now.version ?? undefined },
+    spec: { ...(now.spec as object), files },
+  };
+  const applied = await run(
+    approveProgram(PERSON, 'skilled', (await run(proposeProgram(PERSON, 'skilled', { objects: [object] }, PLACE))).metadata.name, PLACE),
+  );
+  await t.test('applied: the given written, one left out gone, the picture as it was', () => {
+    assert.equal(applied.status.phase, 'applied', applied.status.message);
+    assert.equal(tidyFile(tree, 'ref/new.md'), 'New.\n');
+    assert.equal(tidyFile(tree, 'run.sh'), 'echo two\n');
+    assert.equal(tidyFile(tree, 'notes/old.md'), undefined);
+    assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
+  });
+  await t.test('undone: the files as they stood', async () => {
+    const undo = await run(undoProgram(PERSON, 'skilled', applied.metadata.name, PLACE));
+    const back = await run(approveProgram(PERSON, 'skilled', undo.metadata.name, PLACE));
+    assert.equal(back.status.phase, 'applied', back.status.message);
+    assert.equal(tidyFile(tree, 'notes/old.md'), 'Old.\n');
+    assert.equal(tidyFile(tree, 'run.sh'), 'echo one\n');
+    assert.equal(tidyFile(tree, 'ref/new.md'), undefined);
+  });
+  await t.test('REFUSED at propose: a file at a path that climbs out of the skill, Invalid', async () => {
+    const read = await run(currentOf(PLACE, 'skilled', 'Skill', 'tidy'));
+    const out: ProposedObject = {
+      kind: 'Skill',
+      metadata: { name: 'tidy', resourceVersion: read.version ?? undefined },
+      spec: { ...(read.spec as object), files: [{ path: '../escape.md', text: 'x' }] },
+    };
+    assert.equal((await refusalOf(proposeProgram(PERSON, 'skilled', { objects: [out] }, PLACE)))._tag, 'Invalid');
+    assert.equal(fs.existsSync(path.join(tree, 'workflows', 'skills', 'escape.md')), false);
+  });
 });
 
 /** The Factory `name` read now, proposed with its parts `spec` names over it, at the version it was read. */

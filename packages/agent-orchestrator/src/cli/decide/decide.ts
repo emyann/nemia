@@ -87,8 +87,10 @@ nemia retry of a step that signed off blocked or the nemia approve of one at its
 
 --message beside them is the note under your answers.
 
-Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
-and, at an ending's gate or after its landing check refused the merged tree, read live: whether each branch
+Last, the result: where each branch stands against the base branch as the tick's last pass read it, as the
+board reads it — on it, ahead by N commits, gone, or unread until a pass reads it (nemia up), so a branch you
+merged by hand shows as landed after the next pass — and, at an ending's gate or after its landing check
+refused the merged tree, read live: whether each branch
 ahead still merges onto the base (merges), which other runs in flight on the base it collides with and in
 which files (others, collides), and a merge clean as text whose landing check refused the base as it is
 now (semantic). Then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose

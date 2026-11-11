@@ -13,13 +13,14 @@
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Informed } from '../../contracts/informed.contract.ts';
+import type { HoldKeepsOut } from '../../contracts/rest-hold.contract.ts';
 
 /**
  * What one pass of a run read and did, as `advance` knows it once it has decided — every fact that says the next pass, with the same
  * inputs, would decide the same and do nothing.
  */
 export type RestFacts = {
-  run: Pick<Run, 'workflow' | 'pruned' | 'hold'>;
+  run: Pick<Run, 'workflow' | 'pruned' | 'hold' | 'cancelledAt'>;
   status: Assessment['status'];
   /** What the pass found due: a step to file, a check, a try, a round, or one waiting on the repository's checkout. */
   due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout'>;
@@ -53,9 +54,16 @@ export type RestFacts = {
  * Whether a run is at rest after the pass that read `f`: it is not `running` — it succeeded, failed, was cancelled, or stopped on a
  * person, at a gate or on a question — or it is pruned; its workflow is frozen on its record (a record without one reads its folder,
  * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
- * nothing it was judged by is another run's — no hold, no claim on the checkout read, no run waited on, no slot. Pure.
+ * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run waited on, no slot. Pure.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
+
+/**
+ * Whether a person's hold keeps a run out of rest (`rest-hold.contract.ts`): the pass of a held run reads the runs the hold names to lift
+ * it, which no input the memo watches says; a cancelled run's pass reads none of them (`liftHold` returns at once, `waitedOn` names no
+ * run), so its hold keeps it out of nothing. Pure.
+ */
+export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
 /**
  * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
@@ -66,7 +74,7 @@ export function restBlockers(f: RestFacts): string[] {
   const out: string[] = [];
   if (f.status === 'running' && !f.run.pruned) out.push('status');
   if (!f.run.workflow) out.push('workflow');
-  if (f.run.hold) out.push('hold');
+  if (holdKeepsOut({ held: Boolean(f.run.hold), cancelled: Boolean(f.run.cancelledAt) })) out.push('hold');
   if (!f.settled) out.push('settled');
   if (f.acted) out.push('acted');
   for (const key of ['ready', 'check', 'retry', 'round', 'waitingOnCheckout'] as const) if (f.due[key].length) out.push(`due.${key}`);

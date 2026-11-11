@@ -4,12 +4,14 @@
  * (`appliedDir`); and `status.json`, what the controller last observed (`readStatus`, `writeStatus`). The tree's wiring, `factory.json`, is
  * read and written whole here (`readTreeWiring`, `writeTreeWiring`) for the factory's verbs; a folder is staged whole beside its place
  * and renamed onto it, so no reader sees half of one (`stageFolder`), and swapped whole for an upgrade (`swapTree`, `replaceBase`); the
- * person's choices for an upgrade's conflicts are `resolutions.json` (`readResolutions`, `writeResolutions`).
+ * person's choices for an upgrade's conflicts, and the proposals that resolve a workflow's, are `resolutions.json` (`readResolutions`,
+ * `writeResolutions`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
+import { PROPOSAL_PHASES } from 'objects';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
 import { choicesApply, type MergeAt } from '../upgrade/index.ts';
@@ -114,11 +116,25 @@ const ConditionSchema = Schema.Struct({
 /** A side of a conflict as the status keeps it: its text, cut, or null where that side has none. */
 const SideSchema = Schema.NullOr(Schema.String);
 
-/** An upgrade waiting on the person: the version it is from and to, and each conflict still without a choice, its sides cut. */
+/** The proposal a conflict's resolution waits on: its name, and its phase as the pass read it, null where the store holds it no more. */
+const ConflictProposalSchema = Schema.Struct({ name: Schema.String, phase: Schema.NullOr(Schema.Literals(PROPOSAL_PHASES)) });
+
+/**
+ * An upgrade waiting on the person: the version it is from and to, and each conflict still without a choice, its sides cut, with the
+ * proposal its resolution waits on where one was made (a text file directly in a workflow's folder).
+ */
 const UpgradeSchema = Schema.Struct({
   from: Schema.String,
   to: Schema.String,
-  conflicts: Schema.Array(Schema.Struct({ at: Schema.String, base: SideSchema, ours: SideSchema, theirs: SideSchema })),
+  conflicts: Schema.Array(
+    Schema.Struct({
+      at: Schema.String,
+      base: SideSchema,
+      ours: SideSchema,
+      theirs: SideSchema,
+      proposal: Schema.optionalKey(ConflictProposalSchema),
+    }),
+  ),
 });
 
 /**
@@ -278,8 +294,9 @@ export const replaceBase = (home: string, name: string, entries: readonly Entry[
 
 /**
  * The person's choices for an upgrade's conflicts: the version they are for, the name of the template they were made for (none where
- * written before names were recorded), the digest of the base they were made against (none where written before it was recorded), and
- * a choice by address.
+ * written before names were recorded), the digest of the base they were made against (none where written before it was recorded), a
+ * choice by address, and, by workflow, the proposal that resolves its conflicts (`proposals`), made by `nemia factory resolve` once each
+ * of them has a choice: for a workflow's conflicts the choices are the draft that proposal was composed from, never the merge itself.
  */
 const ResolutionsSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -287,6 +304,7 @@ const ResolutionsSchema = Schema.StructWithRest(
     template: Schema.optionalKey(Schema.String),
     base: Schema.optionalKey(Schema.String),
     choices: Schema.Record(Schema.String, Schema.Union([Schema.Literals(['ours', 'theirs']), Schema.Struct({ text: Schema.String })])),
+    proposals: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -314,6 +332,13 @@ export function readResolutions(home: string, name: string): Resolutions | undef
  */
 export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt): Resolutions['choices'] =>
   resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {};
+
+/**
+ * The proposals of `resolutions`, by workflow, that resolve the merge `merge`: those recorded beside the choices that apply to it
+ * (`choicesApply`); none else.
+ */
+export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeAt): Readonly<Record<string, string>> =>
+  resolutions !== undefined && choicesApply(resolutions, merge) ? (resolutions.proposals ?? {}) : {};
 
 /** The person's choices for the factory `name`'s upgrade written whole. */
 export const writeResolutions = (home: string, name: string, resolutions: Resolutions): void =>

@@ -9,14 +9,15 @@
  * the door found through the Agent and Skill doors (`defs`, else those the program is given), in the places given or beside the folder
  * alone: a step naming an agent is resolved as the files resolve it, so a test gives `agentDoorMemory()`'s door beside it. Its files are
  * rendered today, so it holds no former spelling and gives no hint. The files a draft carries are held beside its steps, read where an
- * `output:` names one, and kept until carried again, as the files leave one the draft does not carry.
+ * `output:` names one, and kept until carried again, as the files leave one the draft does not carry; but a draft carrying the `whole`
+ * set drops each held one that is text (`textIn`) and not carried, listed in `removed`, as the files remove it.
  */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { renderStep } from '../workflow/index.ts';
-import { hiredLineOut, parseFolder, workflowInUse } from '../folder/folder.ts';
+import { hiredLineOut, parseFolder, textIn, workflowInUse } from '../folder/folder.ts';
 import { WorkflowDoor, workflowDoorOver, type WorkflowDefs, type WorkflowDraft, type WorkflowLayer } from './workflows.store.ts';
 import type { Fills, Found } from '../folder/folder.ts';
 
@@ -78,7 +79,14 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
       write: (dir, draft: WorkflowDraft, found, _places, fills) => {
         const files = new Map(draft.steps.map((step) => [step.name, hiredLineOut(step.name, renderStep(step), fills)] as const));
         const before = workflows.get(dir);
-        const carried = new Map([...(before?.carried ?? []), ...(draft.files ?? []).map((f) => [f.path, f.text] as const)]);
+        const given = new Map((draft.files ?? []).map((f) => [f.path, f.text] as const));
+        const dropped = draft.whole
+          ? [...(before?.carried ?? [])]
+              .filter(([file, text]) => !given.has(file) && textIn(new TextEncoder().encode(text)) !== null)
+              .map(([file]) => file)
+          : [];
+        const carried = new Map([...(before?.carried ?? [])].filter(([file]) => !dropped.includes(file)));
+        for (const [file, text] of given) carried.set(file, text);
         const steps = parseFolder([...files], (file) => carried.get(file), found.agents, found.skills, fills);
         const readme = draft.readme ?? before?.readme;
         const held: Held = { files, carried, ...(readme !== undefined && { readme }) };
@@ -97,9 +105,7 @@ export function workflowDoorMemory(defs?: WorkflowDefs): Layer.Layer<never> {
             ...(draft.readme !== undefined ? ['README.md'] : []),
           ].sort(),
           kept: [...kept, ...carriedKept].sort(),
-          removed: names(before?.files)
-            .filter((file) => !now.has(file))
-            .sort(),
+          removed: [...names(before?.files).filter((file) => !now.has(file)), ...dropped].sort(),
         };
       },
       remove: (dir, users) => {

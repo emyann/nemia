@@ -223,6 +223,12 @@ export const cgroupParent = (env: Env): string | undefined =>
 export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /**
+ * `WF_SESSION_TOKEN`, the token of the session a command runs in, which says who calls a verb that proposes in its place
+ * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
+ */
+export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOKEN || undefined;
+
+/**
  * The daemon's per-session variables: what it sets on each session it starts, and so what no process but a session's starts with — the
  * session's token, and the memory limit and slice a limited session runs under. A test seat drops them, so a test reads what CI reads.
  */
@@ -239,6 +245,7 @@ export type Settings = {
   readonly memoryLimit: string | undefined;
   readonly cgroupParent: string | undefined;
   readonly defaultFactoryStarts: boolean;
+  readonly sessionToken: string | undefined;
 };
 
 /**
@@ -272,6 +279,9 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get defaultFactoryStarts() {
     return defaultFactoryStarts(env);
+  },
+  get sessionToken() {
+    return sessionToken(env);
   },
 });
 

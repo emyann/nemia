@@ -14,6 +14,7 @@ import {
   type McpServerSpec,
   type ProposedObject,
   type SkillSpec,
+  type WorkflowSpec,
   type WorkflowStep,
 } from 'objects';
 import { tried } from '../runtime-client.ts';
@@ -69,7 +70,10 @@ const counted = (kind: RevisionKind, object: ProposedObject, version: string) =>
 /** The revision of a kind the ledger does not count. */
 const uncounted = (object: ProposedObject): string => `${RESOURCE_PLURALS[object.kind]}/${object.metadata.name}`;
 
-/** A Workflow of the factory's tree written or removed. */
+/**
+ * A Workflow of the factory's tree written or removed. A spec that gives `files` gives the whole set of the folder's other text files,
+ * so one it leaves out is removed (`whole`); one that gives none leaves them as they are.
+ */
 const workflowWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
     const name = object.metadata.name;
@@ -80,10 +84,14 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
       yield* door.remove(dir, object.metadata.resourceVersion, [], places);
       return uncounted(object);
     }
-    const spec = object.spec as { steps: readonly WorkflowStep[]; readme?: string | null };
+    const spec = object.spec as WorkflowSpec;
     const saved = yield* door.write(
       dir,
-      { steps: spec.steps.map(stepDraftOf), ...(typeof spec.readme === 'string' && { readme: spec.readme }) },
+      {
+        steps: spec.steps.map(stepDraftOf),
+        ...(typeof spec.readme === 'string' && { readme: spec.readme }),
+        ...(spec.files !== undefined && { files: spec.files, whole: true }),
+      },
       object.metadata.resourceVersion,
       places,
       fills,

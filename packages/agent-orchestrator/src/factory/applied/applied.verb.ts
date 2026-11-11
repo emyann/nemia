@@ -3,7 +3,8 @@
  * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`).
  * The factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template,
  * its base (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version
- * its file wants merged three ways once the person has chosen for each conflict (`upgradePass`), and its status written — the version and
+ * its file wants merged three ways once the person has chosen for each conflict, and a workflow's resolution, proposed by
+ * `nemia factory resolve`, has applied (`upgradePass`), and its status written — the version and
  * digest of its base and its conditions, `Applied` and `ConflictsPending` (`reconcileFactory`). Nothing is carried between passes: what a
  * pass does, it reads off the disk. A tree once seeded is the person's, written here again only by an upgrade's merge, and never over a
  * write of theirs made since the merge read it.
@@ -34,6 +35,7 @@ import {
   treeDir,
   writeStatus,
   choicesFor,
+  proposalsFor,
   type Condition,
   type Entry,
   type Status,
@@ -44,17 +46,27 @@ import { generationOf } from '../door/generation.ts';
 import { trustedLines, type PlaceTrust } from '../../trust/trust.ts';
 import { NO_TRUST, trustPlaces } from '../../trust/trust.verb.ts';
 import {
+  approveLine,
   baseTemplateOf,
   compose,
   conflictCut,
+  conflictOwners,
   mergeBaseOf,
   mergeTrees,
   resolveLine,
   sameVersionChange,
   switchTrees,
+  takenFromTree,
+  workflowResolution,
+  type Choice,
   type Conflict,
   type Switched,
+  type TreeFile,
+  type TreeMerge,
+  type WorkflowResolution,
 } from '../upgrade/index.ts';
+import type { ProposalPhase } from 'objects';
+import { ProposalDoor } from '../../proposal/proposal.store.ts';
 
 /**
  * A template rendered with a factory's parameters: its name (its tree's, which the lint holds equal to its manifest's), its version, the
@@ -205,15 +217,96 @@ const upgraded = (factory: Factory & { template: FactoryTemplate }, version: str
   condition('ConflictsPending', false, 'Merged', `The upgrade to ${version} is merged, so no change waits to be merged.`),
 ];
 
+/** The phase of each proposal `resolutions.json` names, by its name, as read now: `gone` where the store holds it no more. */
+export type ProposalPhases = Readonly<Record<string, ProposalPhase | 'gone'>>;
+
+/** A workflow's resolution as a pass reads it: the proposal named for it, by name and phase now, where one is, and what it is to it. */
+export type WorkflowResolved = {
+  readonly proposal?: { readonly name: string; readonly phase: ProposalPhase | 'gone' };
+  readonly resolution: WorkflowResolution;
+};
+
 /**
- * The conditions of an upgrade from `from` waiting on the person's choice for each conflict of `pending`; where it is a switch onto
- * another template (`switched`), saying so, and that it has no common base.
+ * An upgrade's merge as the pass and `nemia factory resolve` read it: the merge, the workflow whose proposal resolves each of its
+ * conflicts by address (`conflictOwners`), and each such workflow's resolution, by the proposal `proposals` names for it and its phase in
+ * `phases` (`workflowResolution`).
+ */
+export type UpgradeMerge = {
+  readonly merge: TreeMerge;
+  readonly owners: ReadonlyMap<string, string>;
+  readonly resolved: ReadonlyMap<string, WorkflowResolved>;
+};
+
+/**
+ * The tree `ours` merged with `base` and the render `theirs` three ways, or, for a switch, with `theirs` alone: where a workflow with
+ * conflicts has a resolution that applied (`taken`), merged again with that workflow's text files taken from the tree for the render's
+ * (`takenFromTree`), so its conflicts are settled by what the proposal wrote. Pure.
+ */
+export function upgradeMerge(
+  base: readonly TreeFile[],
+  ours: readonly TreeFile[],
+  theirs: readonly TreeFile[],
+  switched: boolean,
+  proposals: Readonly<Record<string, string>>,
+  phases: ProposalPhases,
+): UpgradeMerge {
+  const mergeOf = (render: readonly TreeFile[]) => (switched ? switchTrees(ours, render) : mergeTrees(base, ours, render));
+  const sides = [switched ? [] : base, ours, theirs];
+  const first = mergeOf(theirs);
+  const firstOwners = conflictOwners(first.conflicts, ...sides);
+  const resolved = new Map<string, WorkflowResolved>();
+  for (const workflow of new Set(firstOwners.values())) {
+    const name = proposals[workflow];
+    const proposal = name === undefined ? undefined : { name, phase: phases[name] ?? ('gone' as const) };
+    const resolution = workflowResolution(proposal === undefined ? undefined : { phase: proposal.phase });
+    resolved.set(workflow, proposal === undefined ? { resolution } : { proposal, resolution });
+  }
+  const taken = [...resolved].filter(([, r]) => r.resolution === 'taken').map(([workflow]) => workflow);
+  if (!taken.length) return { merge: first, owners: firstOwners, resolved };
+  const merge = mergeOf(takenFromTree(theirs, ours, taken));
+  return { merge, owners: conflictOwners(merge.conflicts, ...sides), resolved };
+}
+
+/** `choices` without those for a conflict a workflow's proposal resolves (`owners`): the draft it was composed from, never the merge. */
+export const choicesUnowned = (
+  choices: Readonly<Record<string, Choice>>,
+  owners: ReadonlyMap<string, string>,
+): Readonly<Record<string, Choice>> => Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at)));
+
+/**
+ * The line that settles the conflict `conflict` of the factory `name`: where a workflow's proposal resolves it, the approve line while
+ * the proposal waits, or the resolve line again, saying why, once it ended unapplied; else the resolve line.
+ */
+function settleLine(name: string, conflict: Conflict, read: UpgradeMerge): string {
+  const workflow = read.owners.get(conflict.at);
+  const resolved = workflow === undefined ? undefined : read.resolved.get(workflow);
+  const proposal = resolved?.proposal;
+  if (proposal !== undefined && resolved?.resolution === 'proposed')
+    return `the workflow ${workflow ?? ''} waits on its resolution's proposal ${proposal.name}: ${approveLine(name, proposal.name)}`;
+  if (proposal !== undefined && resolved?.resolution === 'refused')
+    return `${resolveLine(name, conflict.at)} again, since its proposal ${proposal.name} ${proposal.phase === 'gone' ? 'is gone' : `was ${proposal.phase}`}`;
+  return resolveLine(name, conflict.at);
+}
+
+/** A pending conflict as the status keeps it: its sides cut (`conflictCut`), and the proposal its resolution waits on, where one is. */
+function conflictKept(conflict: Conflict, read: UpgradeMerge) {
+  const workflow = read.owners.get(conflict.at);
+  const proposal = workflow === undefined ? undefined : read.resolved.get(workflow)?.proposal;
+  return proposal === undefined
+    ? conflictCut(conflict)
+    : { ...conflictCut(conflict), proposal: { name: proposal.name, phase: proposal.phase === 'gone' ? null : proposal.phase } };
+}
+
+/**
+ * The conditions of an upgrade from `from` waiting on the person's choice for each conflict of `pending`, each with the line that settles
+ * it (`settleLine`) once; where it is a switch onto another template (`switched`), saying so, and that it has no common base.
  */
 function waiting(
   factory: Factory & { template: FactoryTemplate },
   from: string,
   pending: readonly Conflict[],
   switched: Switched | undefined,
+  read: UpgradeMerge,
 ): Condition[] {
   const { name, template } = factory;
   const count = `${pending.length} conflict${pending.length === 1 ? '' : 's'}`;
@@ -235,7 +328,7 @@ function waiting(
       'ConflictsPending',
       true,
       'Conflicts',
-      `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${pending.map((c) => resolveLine(name, c.at)).join('; ')}.`,
+      `${count} of the ${switched === undefined ? 'upgrade' : 'switch'} to ${template.version} wait for a choice: ${[...new Set(pending.map((c) => settleLine(name, c, read)))].join('; ')}.`,
     ),
   ];
 }
@@ -261,10 +354,12 @@ const upgradeDue = (
 
 /**
  * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
- * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), and the
- * person's choices for the version and the template composed into it. While a conflict has none, only the
- * status is written, naming each; once every one has, the tree is swapped for the merge where no one wrote it since it was read, then the
- * base for the render, then the status. A pass that stops between them composes the same tree on the next.
+ * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), a workflow
+ * whose resolution's proposal applied taken from the tree (`upgradeMerge`, read with the proposals' `phases`), and the person's choices
+ * for the version and the template composed into it, but those for a workflow's conflicts, which its proposal resolves. While a conflict
+ * has none, only the status is written, naming each and the proposal it waits on; once every one has, the tree is swapped for the merge
+ * where no one wrote it since it was read, then the base for the render, then the status. A pass that stops between them composes the
+ * same tree on the next.
  */
 function upgradePass(
   home: string,
@@ -273,22 +368,24 @@ function upgradePass(
   base: Entry[],
   last: Status & { version: string },
   at: string,
+  phases: ProposalPhases,
 ) {
   const { name, template } = factory;
   const ours = entriesIn(treeDir(home, name));
   const switched =
     last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
-  const merge = switched === undefined ? mergeTrees(base, ours, now.entries) : switchTrees(ours, now.entries);
   const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
-  const composed = compose(merge, choicesFor(readResolutions(home, name), merging));
+  const resolutions = readResolutions(home, name);
+  const read = upgradeMerge(base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
+  const composed = compose(read.merge, choicesUnowned(choicesFor(resolutions, merging), read.owners));
   if ('pending' in composed) {
     const status: Status = {
       version: last.version,
       ...(last.template === undefined ? {} : { template: last.template }),
       digest: digestOf(base),
       params: last.params,
-      conditions: waiting(factory, last.version, composed.pending, switched),
-      upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictCut(c)) },
+      conditions: waiting(factory, last.version, composed.pending, switched, read),
+      upgrade: { from: last.version, to: template.version, conflicts: composed.pending.map((c) => conflictKept(c, read)) },
     };
     return statusWritten(home, factory, stamped(status, last, at, factory));
   }
@@ -344,14 +441,31 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
 /**
  * One templated factory brought to its template: its base rendered where absent, then its tree seeded from its base where absent, an
  * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
- * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
+ * wherever the base is its render, else the one last written, else unknown, said by its own condition. The proposals the upgrade's
+ * resolutions name are read as they are now (`phasesNamed`), so a workflow's conflicts are taken once its proposal applied. The status it
+ * observed.
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
   const home = yield* StoreRoot;
   const { now, named } = yield* templateNow(factory);
   const recorded = yield* recordedOf(factory, now, readStatus(home, factory.name));
+  const phases = yield* phasesNamed(factory.name, readResolutions(home, factory.name)?.proposals ?? {});
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
-  return reconciledWith(home, factory, now, named, at, recorded);
+  return reconciledWith(home, factory, now, named, at, recorded, phases);
+});
+
+/**
+ * The phase now of each proposal of the factory `factory` that `proposals` names, read through the Proposal door: `gone` where the store
+ * holds none of that name, or the name is no proposal's.
+ */
+export const phasesNamed = Effect.fn('phasesNamed')(function* (factory: string, proposals: Readonly<Record<string, string>>) {
+  const door = (yield* ProposalDoor).proposals;
+  const phases: Record<string, ProposalPhase | 'gone'> = {};
+  for (const name of new Set(Object.values(proposals))) {
+    const read = yield* door.read(factory, name).pipe(Effect.catchTag('Invalid', () => Effect.succeed(undefined)));
+    phases[name] = read?.status.phase ?? 'gone';
+  }
+  return phases;
 });
 
 /**
@@ -398,6 +512,7 @@ function reconciledWith(
   named: string | undefined,
   at: string,
   recorded: string | undefined,
+  phases: ProposalPhases,
 ): Status {
   const last = readStatus(home, factory.name);
   if (!('type' in now)) stageFolder(appliedDir(home, factory.name), now.entries, true);
@@ -405,7 +520,7 @@ function reconciledWith(
   if (base.length && !fs.existsSync(treeDir(home, factory.name))) stageFolder(treeDir(home, factory.name), base, false);
   const digest = base.length ? digestOf(base) : null;
   if (!('type' in now) && digest !== null && upgradeDue(factory, now, digest, last, recorded))
-    return upgradePass(home, factory, now, base, last as Status & { version: string }, at);
+    return upgradePass(home, factory, now, base, last as Status & { version: string }, at, phases);
   return observed(home, factory, now, base, digest, last, named, at);
 }
 

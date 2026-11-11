@@ -80,3 +80,13 @@ test('the write bodies: a whole spec with the version it was read at, and a crea
   assert.throws(() => Schema.decodeUnknownSync(WorkflowCreate)({ spec: create.spec }), 'a create names its workflow');
   assert.equal(taken('workflows', 'create', write), undefined, 'a whole write is no create');
 });
+
+test("a spec carries the folder's other text files, each a path and its text; a file without its text refused", () => {
+  const spec = { ...workflow.spec, files: [{ path: 'check.ts', text: 'export {};\n' }] };
+  const write = { metadata: { resourceVersion: 'sha256:1' }, spec };
+  assert.deepEqual(taken('workflows', 'replace', write), write);
+  assert.deepEqual(answered('workflows', 'get', { ...workflow, spec }), { ...workflow, spec });
+  const decode = Schema.decodeUnknownSync(Workflow);
+  assert.throws(() => decode({ ...workflow, spec: { ...workflow.spec, files: [{ path: 'check.ts' }] } }), 'a file carries its text');
+  assert.equal(taken('workflows', 'replace', { ...write, spec: { ...spec, files: [{ path: 1, text: '' }] } }), undefined);
+});

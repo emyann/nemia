@@ -20,6 +20,7 @@ const LsInput = Schema.Struct({
 
 export const LS: Command<RunsListed, typeof LsInput.Type> = {
   name: 'ls',
+  served: [{ endpoint: 'runs.listing' }, { endpoint: 'runs.listingOne', as: 'ls_run' }],
   usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
     'runs and their steps — a run waiting on another says waiting on <run>,',

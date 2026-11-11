@@ -170,6 +170,7 @@ const ruleSpec = (name: string): Spec => ({
 /** `nemia policy <agent>`: an agent's rules for `auto`, the list in force beside its proposal and its custom instruction. */
 export const POLICY: Command<PolicyList, PolicyInput> = {
   name: 'policy',
+  served: [{ endpoint: 'nemia.policy' }],
   usage: '<agent>',
   help: [
     "the agent's rules at auto: the answers it may give unasked, in force once",
@@ -303,6 +304,7 @@ const confirmWordless = (agent: string): string =>
  */
 export const POLICY_CONFIRM: Command<PolicyList, ConfirmInput> = {
   name: 'policy confirm',
+  served: [{ endpoint: 'nemia.confirmRule' }],
   usage: "<agent> <id> --words '<words>'",
   help: [
     'put in force a rule the agent proposed, or the default again, as its',
@@ -348,6 +350,7 @@ export const POLICY_CONFIRM: Command<PolicyList, ConfirmInput> = {
 /** `nemia policy rm <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
 export const POLICY_DROP: Command<PolicyList, RuleInput> = {
   name: 'policy rm',
+  served: [{ endpoint: 'nemia.dropRule' }],
   usage: '<agent> <id>',
   help: ['take a rule out of force, the default among them: what it allowed is', 'asked of you again. Asked of you every time'],
   spec: ruleSpec('policy rm'),

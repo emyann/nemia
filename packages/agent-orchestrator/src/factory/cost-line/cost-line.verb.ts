@@ -93,6 +93,7 @@ export type CostLineRemoved = { file: string; factory: string; workflow: string 
  */
 export const FACTORY_COST_LINE_SET: Command<CostLineSet, CostLineSetInput> = {
   name: 'factory cost-line set',
+  served: [{ endpoint: 'factories.putCostLine' }],
   usage: SET_USAGE,
   help: [
     'set what a run of a workflow may cost before its gate says so, in dollars:',
@@ -127,6 +128,7 @@ export const FACTORY_COST_LINE_SET: Command<CostLineSet, CostLineSetInput> = {
  */
 export const FACTORY_COST_LINE_RM: Command<CostLineRemoved, CostLineRmInput> = {
   name: 'factory cost-line rm',
+  served: [{ endpoint: 'factories.deleteCostLine' }],
   usage: RM_USAGE,
   help: ["take a workflow's cost line off a factory"],
   spec: specOf('rm', RM_USAGE, false),

@@ -40,6 +40,7 @@ export type StepTranscriptInput = typeof StepTranscriptInput.Type;
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
 export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
   name: 'step artifact',
+  served: [{ endpoint: 'steps.artifact' }],
   usage: '<runId> <step> <name>',
   help: ["one file of a step's files directory"],
   spec: stepSpec(NAME, []),
@@ -61,6 +62,7 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }, StepFileInput> = {
  */
 export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }, StepFileInput> = {
   name: 'step file',
+  served: [{ endpoint: 'steps.file' }],
   usage: '<runId> <step> <name>',
   help: ["one file of a folder step's own folder"],
   spec: stepSpec(NAME, []),
@@ -82,6 +84,7 @@ export type LifecycleTransition = Effect.Success<ReturnType<Engine['path']>>[num
 /** The path through the runtime's lifecycle of the task `task` — a try of the step `step` of the run `id`, as the api resolved it. */
 export const STEP_PATH: Command<{ path: LifecycleTransition[] }, StepTaskInput> = {
   name: 'step path',
+  served: [{ endpoint: 'steps.path' }],
   usage: '<runId> <step>',
   help: ["the path of a step's task through the runtime's lifecycle"],
   spec: stepSpec([], ['task']),
@@ -105,6 +108,7 @@ export type ConversationEvent = Effect.Success<ReturnType<Engine['transcript']>>
  */
 export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string }, StepTranscriptInput> = {
   name: 'step transcript',
+  served: [{ endpoint: 'steps.transcript' }],
   usage: '<runId> <step>',
   help: ["a read of a step's conversation"],
   spec: stepSpec([], ['task', 'after']),

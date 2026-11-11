@@ -572,7 +572,7 @@ export const TABLE_COLUMN_TYPES = ['string', 'integer', 'number', 'boolean', 'da
 export type TableColumnType = (typeof TABLE_COLUMN_TYPES)[number];
 
 /** Why a presented session token is refused (a 401): the store never minted it, or its session's try is no longer live. */
-export const TOKEN_REFUSALS = ['unknown-token', 'session-ended'] as const;
+export const TOKEN_REFUSALS = ['unknown-token', 'session-ended', 'token-required', 'person-token-required'] as const;
 
 /** One of `TOKEN_REFUSALS`. */
 export type TokenRefusal = (typeof TOKEN_REFUSALS)[number];

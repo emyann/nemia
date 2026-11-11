@@ -75,6 +75,7 @@ export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
  */
 export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }, RmInput> = {
   name: 'rm',
+  served: [{ endpoint: 'runs.delete' }],
   usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
   help: [
     "forget runs that are over, a line each: a run's worktrees removed",
@@ -152,6 +153,7 @@ export const PRUNE: Command<
   PruneInput
 > = {
   name: 'prune',
+  served: [{ endpoint: 'runs.prune' }],
   usage: '[<runId> ...] [--unmerged] [--artifacts] [--yes]',
   help: [
     'free the space runs that are over hold: their worktrees, removed',

@@ -164,6 +164,11 @@ const placed = (args: InstructionInput): Effect.Effect<FactoryInstruction, Refus
  */
 export const FACTORY_INSTRUCTION: Command<FactoryInstruction, InstructionInput> = {
   name: 'factory instruction',
+  served: [
+    { endpoint: 'factories.instruction' },
+    { endpoint: 'factories.putInstruction', as: 'factory_instruction_put' },
+    { endpoint: 'factories.deleteInstruction', as: 'factory_instruction_delete' },
+  ],
   usage: '<name> [--path <path> | --store | --clear]',
   help: [
     "where a factory's instruction is kept, what Nemia is to know of the",
@@ -220,6 +225,7 @@ type Instructed = FactoryInstruction & { removed?: boolean };
  */
 export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
   name: 'factory instruct',
+  served: [{ endpoint: 'factories.putInstructionWords' }, { endpoint: 'factories.deleteInstructionWords', as: 'factory_instruct_delete' }],
   usage: '<name> --file <path>|- | --clear',
   help: [
     'write the instruction the store keeps for a factory (- for stdin), what',

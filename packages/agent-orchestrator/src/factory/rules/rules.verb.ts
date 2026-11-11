@@ -87,6 +87,11 @@ const KEPT = 'a run already started keeps the rules it was started with';
  */
 export const FACTORY_RULES: Command<FactoryRules, RulesInput> = {
   name: 'factory rules',
+  served: [
+    { endpoint: 'factories.rules' },
+    { endpoint: 'factories.putRules', as: 'factory_rules_put' },
+    { endpoint: 'factories.deleteRules', as: 'factory_rules_delete' },
+  ],
   usage: '<name> [--file <path>|- | --clear]',
   help: [
     "a factory's rules and policies: words told to every agent hired into",

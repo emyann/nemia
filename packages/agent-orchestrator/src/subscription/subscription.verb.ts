@@ -121,6 +121,7 @@ const subscribe = Effect.fn('subscribe')(function* (input: SubscribeInput) {
 /** `nemia subscribe`: a long-lived task given a subscription to the feed (`subscribe`). */
 export const SUBSCRIBE: Command<Subscribed, SubscribeInput> = {
   name: 'subscribe',
+  served: [{ endpoint: 'subscriptions.subscribe' }],
   usage: '<name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]',
   help: [
     "give the engine's long-lived task <task> a subscription to the feed,",
@@ -178,6 +179,7 @@ export const SUBSCRIBE: Command<Subscribed, SubscribeInput> = {
  */
 export const UNSUBSCRIBE: Command<{ name: string }, UnsubscribeInput> = {
   name: 'unsubscribe',
+  served: [{ endpoint: 'subscriptions.unsubscribe' }],
   usage: '<name>',
   help: ['take the subscription <name> away: its task is told nothing more of the feed'],
   spec: {

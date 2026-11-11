@@ -37,7 +37,7 @@
  * the repository's skills is counted as `nemia stats` counts it (`rulesOfTry`), and no tsconfig of the checkout makes `tsc --noEmit`
  * write (`buildInfoConfigs`).
  *
- * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs long-lived, outside any checkout this
+ * Nemia, the store's own agent, ships outside any workflow folder (`nemia/agents/nemia.md`) and runs long-lived, outside any checkout this
  * suite reads: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
  * `auto` is refused her (`readNemia`). Her rules are those her keeper files (`herRules`): the fence derived from the table's classes
  * (`nemiaFence`) asks every write that prompts and every write form of a command that reads bare, denies her what is out of her reach,
@@ -1345,7 +1345,7 @@ test('REFUSED: Nemia without her deny of git push is open on each push, and a mo
     'nemia: Bash(git push --force origin wf/r-1/implement)',
   ]);
   const dir = scratch('wf-nemia-mode-');
-  const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'nemia', 'nemia.md'), 'utf8');
+  const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'nemia', 'agents', 'nemia.md'), 'utf8');
   for (const mode of ['default', 'dontAsk', 'bypassPermissions', 'acceptEdits']) {
     const file = path.join(dir, `${mode}.md`);
     fs.writeFileSync(file, text.replace('permissionMode: auto', `permissionMode: ${mode}`));

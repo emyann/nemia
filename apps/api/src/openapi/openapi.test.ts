@@ -168,6 +168,7 @@ const RUN_ACTIONS = [
   ['post', '/api/namespaces/{namespace}/runs/{name}/labels', '200', 'LabelEdit'],
   ['post', '/api/namespaces/{namespace}/runs/{name}/hold', '200', 'RunHold'],
   ['delete', '/api/namespaces/{namespace}/runs/{name}/hold', '200', null],
+  ['post', '/api/namespaces/{namespace}/runs/{name}/cancel', '200', null],
   ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/retry', '202', 'RunRetry'],
   ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/approve', '202', 'RunApprove'],
   ['post', '/api/namespaces/{namespace}/runs/{name}/steps/{step}/say', '202', 'RunSay'],

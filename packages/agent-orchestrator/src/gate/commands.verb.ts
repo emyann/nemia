@@ -101,6 +101,7 @@ export const APPROVE: Command<
   ApproveInput
 > = {
   name: 'approve',
+  served: [{ endpoint: 'runs.approve' }],
   usage: '<runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]',
   help: [
     'let a step waiting at its gate hand on: what waits on it is filed on',

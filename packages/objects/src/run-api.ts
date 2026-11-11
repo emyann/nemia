@@ -16,6 +16,7 @@ import {
   RunApprove,
   RunApproved,
   RunAsked,
+  RunCancelled,
   RunHeld,
   RunHold,
   RunPrune,
@@ -125,6 +126,11 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   HttpApiEndpoint.delete('unhold', '/api/namespaces/:namespace/runs/:name/hold', {
     params: runParams,
     success: RunHeld,
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('cancel', '/api/namespaces/:namespace/runs/:name/cancel', {
+    params: runParams,
+    success: RunCancelled,
     error: runActionErrors,
   }),
   HttpApiEndpoint.post('retry', '/api/namespaces/:namespace/runs/:name/steps/:step/retry', {

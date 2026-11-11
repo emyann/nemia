@@ -16,6 +16,11 @@
  * - Not sent as `application/json`: the one body a page on another site cannot send without the browser asking the api first, and the api
  *   answers no such question. That holds in a browser too old to send `Sec-Fetch-Site`. Refused 415 (`UnsupportedMediaType`).
  *
+ * A write that presents a bearer token (`Authorization: Bearer <token>`) passes the host and the site: a page on another site cannot send
+ * that header without the browser asking the api first, which it never answers, and cannot know a token; behind a proxy or a tunnel the
+ * `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
+ * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body.
+ *
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read as another
  * site's.
  */
@@ -23,13 +28,24 @@ import type { MiddlewareHandler } from 'hono';
 import { Forbidden, UnsupportedMediaType } from 'objects';
 import type { WriteRefused } from '../contracts/write-guard.contract.ts';
 
-/** A request as the guard reads it: its method, and its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent. */
+/**
+ * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent, and
+ * whether it presents a bearer token (`bearer`).
+ */
 export type WriteRequest = {
   readonly method: string;
   readonly host: string | undefined;
   readonly site: string | undefined;
   readonly contentType: string | undefined;
+  readonly bearer: boolean;
 };
+
+/** What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`). */
+export function bearerOf(header: string | undefined): string | undefined | null {
+  if (header === undefined) return undefined;
+  const match = /^Bearer +(\S+)\s*$/i.exec(header.trim());
+  return match?.[1] ?? null;
+}
 
 /** Which refusal a write meets: another host, another site, or a body that is not JSON. */
 export type WriteRefusal = 'host' | 'site' | 'media';
@@ -46,11 +62,14 @@ const mediaOf = (type: string): string => type.split(';')[0]?.trim().toLowerCase
 /** Whether `type` says a JSON body: `application/json`, whatever its parameters, case and white space. */
 export const saysJson = (type: string): boolean => mediaOf(type) === 'application/json';
 
-/** Why a write is refused before its body is read, or null: its host first, then its site, then its body's type; a read never. */
+/**
+ * Why a write is refused before its body is read, or null: its host first, then its site, neither where it presents a bearer token, then
+ * its body's type; a read never.
+ */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
-  if (request.host !== undefined && !loopback(request.host)) return 'host';
-  if (request.site !== undefined && request.site !== 'same-origin') return 'site';
+  if (!request.bearer && request.host !== undefined && !loopback(request.host)) return 'host';
+  if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
   if (request.contentType === undefined || !saysJson(request.contentType)) return 'media';
   return null;
 };
@@ -88,6 +107,7 @@ export const writeGuard: MiddlewareHandler = async (c, next) => {
     host: c.req.header('host'),
     site: c.req.header('sec-fetch-site'),
     contentType: c.req.header('content-type'),
+    bearer: typeof bearerOf(c.req.header('authorization')) === 'string',
   };
   const refusal = writeRefused(request);
   if (refusal === null) return next();

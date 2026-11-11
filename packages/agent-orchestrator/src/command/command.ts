@@ -9,6 +9,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
 import { FORMER_MODES } from '../retry/index.ts';
 import { oneLine } from '../record/record.ts';
+import type { ApiEndpointName } from 'objects';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -191,13 +192,21 @@ export type Spec = {
 };
 
 /**
+ * An endpoint of `objects`' `Api` that serves a verb (`<group>.<endpoint>`, typed so a name no endpoint has does not compile), and the
+ * tool it is on the MCP port: the verb's name, its spaces as `_`, for the first link of an entry; `as` for every other.
+ */
+export type EndpointLink = { readonly endpoint: ApiEndpointName; readonly as?: string };
+
+/**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `class`, who
  * answers for it when an agent calls it (`CommandClass`); `only`, the side it is served on alone and why — an entry with none is served
- * on both, the api calling it by its exported name with its typed `input`; `manual`, the long help `nemia <name> --help` prints in place
- * of running it, where it has one; `ticks`, that what it files waits on the daemon's next pass, so the command line starts the daemon
- * where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's call of it is asked of the person every time, whatever its
- * session was allowed at a prompt or by a rule (`admissionOf`), on a command classed `ask` alone (`classBreaks`).
+ * on both, the api calling it by its exported name with its typed `input`; `served`, the endpoints of the api that serve it, each a tool
+ * of the MCP port (`EndpointLink`) — an entry with none is the command line's alone, its `only.why` saying why; `manual`, the long help
+ * `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on the daemon's next pass, so
+ * the command line starts the daemon where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's call of it is asked of
+ * the person every time, whatever its session was allowed at a prompt or by a rule (`admissionOf`), on a command classed `ask` alone
+ * (`classBreaks`).
  */
 export type CommandSpec = {
   readonly name: string;
@@ -208,6 +217,7 @@ export type CommandSpec = {
   readonly writes: boolean;
   readonly class: CommandClass;
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
+  readonly served?: readonly [EndpointLink, ...EndpointLink[]];
   readonly manual?: string;
   readonly ticks?: true;
   readonly asksAlways?: true;
@@ -502,15 +512,16 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
 
 /**
  * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
- * help prints them, and its class: `nemia decide`, a read, whose screen is printed off the run's decision (`decisionRead`), which the api
- * serves as data.
+ * help prints them, its class, and the endpoint that serves it: `nemia decide`, a read, whose screen is printed off the run's decision
+ * (`decisionRead`), which the api serves as data (`runs.decision`).
  */
-export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class'>[] = [
+export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>[] = [
   {
     name: 'decide',
     usage: '<runId> [--sensitive <globs>]',
     help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
     class: 'read',
+    served: [{ endpoint: 'runs.decision' }],
   },
 ];
 
@@ -524,8 +535,8 @@ export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'hel
     .flatMap((c) => [`  ${CLI} ${[c.name, c.usage].filter(Boolean).join(' ')}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)])
     .join('\n');
 
-/** An entry of a table as `commandBreaks` reads it: whether it has a handler and an `input`, and its spec. */
-type Entry = Pick<CommandSpec, 'name' | 'only' | 'ticks'> & {
+/** An entry of a table as `commandBreaks` reads it: whether it has a handler and an `input`, its spec, and its links. */
+type Entry = Pick<CommandSpec, 'name' | 'only' | 'ticks' | 'served'> & {
   readonly spec?: Spec;
   readonly handler?: unknown;
   readonly writes?: boolean;
@@ -564,15 +575,64 @@ function sideBreaks(c: Entry): string[] {
   return breaks;
 }
 
+/** A tool of the MCP port: the endpoint it calls, its name, and the entry whose link it is. */
+export type LinkedTool = { readonly endpoint: EndpointLink['endpoint']; readonly tool: string; readonly entry: string };
+
+/**
+ * The tools of `entry`'s links (`served`), in order: the first named by the verb, each space `_` (`factory ls` is the tool
+ * factory_ls), every other by its `as`; a later link with no `as` gives no tool, which `commandBreaks` refuses.
+ */
+export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool[] =>
+  (entry.served ?? []).flatMap((link, i) => {
+    const tool = i === 0 ? entry.name.replaceAll(' ', '_') : link.as;
+    return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name }];
+  });
+
+/**
+ * Where an entry's links break the rules: an entry the command line does not serve alone that links no endpoint, which the api would
+ * serve with no tool on the port; and a link after the first that names no tool (`as`), which only the first takes from the verb.
+ */
+function linkBreaks(c: Entry): string[] {
+  const breaks: string[] = [];
+  if (c.served === undefined && c.only?.side !== 'cli')
+    breaks.push(
+      `${c.name} links no endpoint and is not the command line's alone: give it served, the endpoint of objects' Api whose handler calls it, or only: { side: 'cli', why } where no endpoint serves it`,
+    );
+  for (const link of (c.served ?? []).slice(1))
+    if (link.as === undefined)
+      breaks.push(
+        `${c.name}'s link to ${link.endpoint} names no tool: give it as, the tool's name on the port, as only the first link takes the verb's`,
+      );
+  return breaks;
+}
+
+/** Each tool name that two links give (`toolsOf`), of `entries`: a sentence naming the tool, the entries that give it, and the fix. */
+function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): string[] {
+  const first = new Map<string, string>();
+  const breaks: string[] = [];
+  for (const { tool, entry } of entries.flatMap(toolsOf)) {
+    const before = first.get(tool);
+    if (before === undefined) first.set(tool, entry);
+    else breaks.push(`${tool} is the tool of ${before} and of ${entry}: give one of the links another as, so each tool calls one endpoint`);
+  }
+  return breaks;
+}
+
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served on both sides — said to be served
  * on neither alone (`only`) — that is not typed (`input`), which the api would have no keys to call it by, so a gap between the CLI and
  * the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that is both a command the CLI
  * serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's
- * name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI (`runners`) that runs
- * no entry the CLI serves.
+ * name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); its links to the api (`linkBreaks`); a runner of
+ * the CLI (`runners`) that runs no entry the CLI serves; and a tool name two links give, of the table and of the CLI's own verbs the api
+ * serves (`linked`, `CLI_VERBS`), which the port could not tell apart (`toolBreaks`).
  */
-export function commandBreaks(table: readonly Entry[], verbs: readonly string[], runners: readonly string[] = []): string[] {
+export function commandBreaks(
+  table: readonly Entry[],
+  verbs: readonly string[],
+  runners: readonly string[] = [],
+  linked: readonly Pick<CommandSpec, 'name' | 'served'>[] = [],
+): string[] {
   const breaks: string[] = [];
   const seen = new Set<string>();
   for (const c of table) {
@@ -586,9 +646,10 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
     if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))
       breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
-    breaks.push(...runBreaks(c, runners), ...sideBreaks(c));
+    breaks.push(...runBreaks(c, runners), ...sideBreaks(c), ...linkBreaks(c));
   }
   for (const name of runners.filter((r) => !table.some((c) => c.name === r && c.only?.side !== 'api')))
     breaks.push(`${name} has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS`);
+  breaks.push(...toolBreaks([...table, ...linked]));
   return breaks;
 }

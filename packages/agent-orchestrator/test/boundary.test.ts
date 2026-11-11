@@ -496,7 +496,8 @@ function cliBreaks(sources: Sources): string[] {
  * The controllers that reach the store through doors alone and the runtime not at all, so they have no use for the client: the feed's
  * verb, whose every read and append is the Feed door's (`src/feed/feed.store.ts`), the delegations' verb, whose every read and write
  * is the Delegation door's (`src/delegation/delegation.store.ts`), the Event objects' verb, on the Feed door, and the Subscription objects'
- * verb, on the Subscription door (`src/subscription/subscription.store.ts`); and the listing of objects (`src/object/listed.verb.ts`),
+ * verb, on the Subscription door (`src/subscription/subscription.store.ts`); the wait (`src/await/await.verb.ts`), which follows the feed
+ * through the Feed door and its hub alone; and the listing of objects (`src/object/listed.verb.ts`),
  * which reads no store and no runtime, only a page of the objects its caller read and the time a file was made. Named one by one, so any
  * other controller that stops reaching the client is still refused.
  */
@@ -506,6 +507,7 @@ const DOORED_ONLY: readonly string[] = [
   'src/event-object/event.verb.ts',
   'src/subscription-object/subscription.verb.ts',
   'src/object/listed.verb.ts',
+  'src/await/await.verb.ts',
 ];
 
 /**

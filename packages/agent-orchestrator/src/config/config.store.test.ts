@@ -10,12 +10,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   cgroupParent,
+  exposedStore,
   keepsWorktrees,
   maxConcurrent,
   maxRuns,
   memoryLimit,
   metricsHourDays,
   metricsMinuteDays,
+  settingsOf,
   verifiesRest,
   wfRoot,
   type Env,
@@ -120,6 +122,12 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
     ],
     ['WF_MAX_RUNS a whole count', () => ['  ', '0', '2', ' 3 '].map((value) => maxRuns({ WF_MAX_RUNS: value })), [0, 0, 2, 3]],
     ['WF_VERIFY_REST 1 or 0', () => ['1', '0'].map((value) => verifiesRest({ WF_VERIFY_REST: value })), [true, false]],
+    [
+      'WF_EXPOSED: 1 marks the store exposed, and anything else, unset among them, leaves it not',
+      () => [{ WF_EXPOSED: '1' }, { WF_EXPOSED: '0' }, { WF_EXPOSED: '' }, { WF_EXPOSED: 'yes' }, {}].map((env) => exposedStore(env)),
+      [true, false, false, false, false],
+    ],
+    ['the settings carry it as exposed', () => [settingsOf({ WF_EXPOSED: '1' }).exposed, settingsOf({}).exposed], [true, false]],
     [
       'WF_KEEP_WORKTREES: 1 keeps the worktrees, and 0, empty or unset frees them',
       () => [{ WF_KEEP_WORKTREES: '1' }, { WF_KEEP_WORKTREES: '0' }, { WF_KEEP_WORKTREES: '' }, {}].map((env) => keepsWorktrees(env)),

@@ -7,11 +7,15 @@ description: Recap what moved in the store since the person last looked — land
 When the person opens you, tell them what moved since they last looked, in at most 10 lines. Read it fresh from the store: never from
 what you remember of it.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ## Since when
 
 Your memory keeps one fact named `feed-cursor`: where in the feed your last recap ended. `nemia watch --once <cursor>` prints what came
 after it, and the cursor to keep next. With no such fact, read `nemia watch --once` from the feed's start and say the recap covers
-everything the feed holds.
+everything the feed holds. On the port, where `watch` is not served, read the same with `wait` from the cursor, again
+from each cursor it gives, until it ends on its bound with no line.
 Write the new cursor to `feed-cursor` once the recap is given.
 
 ## What it says

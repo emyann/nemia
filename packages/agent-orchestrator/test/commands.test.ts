@@ -4,12 +4,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, commandBreaks } from '../src/runner.ts';
+import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
-test('the shipped table breaks none of its rules against the CLI’s verbs and runners', () => {
-  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
+test('the shipped table breaks none of its rules against the CLI’s verbs and runners, nor gives a tool a name its own verbs give', () => {
+  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS), []);
 });
 
 test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {
@@ -120,8 +120,9 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['skills', 'api'],
       ['skills show', 'api'],
       ['skills write', 'cli'],
-      ['cancel', 'cli'],
+      ['cancel', 'typed'],
       ['hold', 'cli'],
+      ['wait', 'typed'],
       ['rm', 'cli'],
       ['prune', 'cli'],
       ['pause', 'typed'],
@@ -145,6 +146,9 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['service uninstall', 'cli'],
       ['service status', 'cli'],
       ['service restart', 'cli'],
+      ['token add', 'cli'],
+      ['token ls', 'cli'],
+      ['token rm', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
       ['daemon', 'cli'],
@@ -192,6 +196,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'agents read',
       'skills',
       'skills show',
+      'wait',
       'paused',
       'pause now',
       'memory',
@@ -199,6 +204,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'policy reach',
       'chat speakers',
       'service status',
+      'token ls',
       'version',
       'workflows step',
       'watch',

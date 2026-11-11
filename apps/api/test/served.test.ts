@@ -4,7 +4,7 @@
  * route serves (`noRoute`) and other than a 500 with no words — a stream it opens (`text/event-stream`) is served, and let go unread — so
  * an endpoint the `Api` gains with no handler, or one a Hono route before the mount shadows, is refused here with nothing to list. The
  * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
- * `/openapi/v3` out of its own).
+ * `/openapi/v3` out of its own) and the MCP port (`/mcp`, a protocol host whose tools call the `Api`'s own endpoints).
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -12,13 +12,17 @@ import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { Api } from 'objects';
 import { app } from '../src/app.ts';
+import { MOUNT } from '../src/objects/index.ts';
 
-/** The OpenAPI document, its page and the page's script: served by Hono beside the mount, outside the `Api` they describe. */
-const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js'] as const;
+/**
+ * The OpenAPI document, its page and the page's script, and the MCP port, which takes every method and answers a POST alone (`mcpPort`,
+ * src/mcp/port.ts): served by Hono beside the mount, outside the `Api` they describe or call.
+ */
+const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js', 'ALL /mcp'] as const;
 
-/** Each route Hono serves as `METHOD path`, once, but middleware and the mount (`ALL`), which serve no route of their own. */
+/** Each route Hono serves as `METHOD path`, once, but the middleware (`ALL /*`) and the mount, which serve none of their own. */
 const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [
-  ...new Set(routes.filter((r) => r.method !== 'ALL').map((r) => `${r.method} ${r.path}`)),
+  ...new Set(routes.filter((r) => !(r.method === 'ALL' && (r.path === '/*' || r.path === MOUNT))).map((r) => `${r.method} ${r.path}`)),
 ];
 
 /** Where the routes Hono serves and those `listed` (`META`) disagree, a sentence each naming the fix. */
@@ -46,6 +50,9 @@ const ENDPOINTS = Object.values(Api.groups).flatMap((group) =>
 /** `path` with every name filled in by one no object has, so a read finds nothing and a write refuses. */
 const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
 
+/** The query an endpoint is asked with, by its path, where its default would hold the request open: a long poll's bound, cut to 1ms. */
+const ASKED: Readonly<Record<string, string>> = { '/api/feed/wait': '?for=1ms' };
+
 /** Whether `body` is the api's 404 for a path no route serves (`noRoute`), by the words it says that in. */
 const saysNoRoute = (body: unknown): boolean =>
   typeof body === 'object' && body !== null && 'error' in body && String(body.error).includes('is no route of this api');
@@ -54,7 +61,7 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
   assert.ok(ENDPOINTS.length >= 100, `${ENDPOINTS.length} endpoints read off the Api`);
   const unserved: string[] = [];
   for (const { group, name, method, path } of ENDPOINTS) {
-    const url = filled(path);
+    const url = `${filled(path)}${ASKED[path] ?? ''}`;
     const res = await app.request(
       url,
       method === 'GET' ? {} : { method, headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' },
@@ -69,7 +76,7 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
   assert.deepEqual(unserved, []);
 });
 
-test('the routes Hono serves outside the Api are the three of the OpenAPI document, and no other', () => {
+test('the routes Hono serves outside the Api are the three of the OpenAPI document and the MCP port, and no other', () => {
   assert.deepEqual(outsideBreaks(app.routes), []);
 });
 

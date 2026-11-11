@@ -29,7 +29,7 @@ export type HoldIO = { holdFile: string; drainFile: string; holdMs: number; hold
  *   that ended last, kept by its `PostToolUse` or `PostToolUseFailure` hook); the last two gone once the drain is read lifted. Once
  *   parked it says `parked`, and nothing after.
  * - The matchers leave `onFailure` (SDK 0.3.317 and after) at its default, `continue`: a hold is not a fence, so a callback that throws
- *   lets its call go on to the permission flow, where `block` would stop every call of the step on one failed read of the drain. Every
+ *   lets its call go on to the permission flow, where `block` would stop every call of the session on one failed read of the drain. Every
  *   callback here and in the attached session's (`hooksOf`) returns on every path: one that returns nothing counts as failing.
  */
 export const jobHoldOf = (io: HoldIO, ended: () => void) => {

@@ -31,6 +31,11 @@
  *
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
  *
+ * The third case measures, on the same process, which models Claude Code drops `auto` on: each model `CLAUDE_AUTO_DROPPED` lists and
+ * each alias the refusals advise as keeping it, filed in `auto`, its `init` line's mode read by the reader the engine uses (`ranIn`).
+ * The list is a measurement of one Claude Code, so it is made again at each bump by this case rather than carried; each `init` line
+ * is handed over as `sdk-<version>-auto-<model>.json`.
+ *
  * `OPUS_TODAY` in `sdk-pin.ts` is what this asserts, and the one constant of the three a bump cannot infer: an alias can move under a
  * version that did not.
  */
@@ -47,6 +52,7 @@ import { scratch } from 'test-kit/scratch';
 import { until, WAITED } from '../src/waits/index.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { CLAUDE_CODE_VERSION, OPUS_TODAY, SDK_VERSION } from './sdk-pin.ts';
+import { CLAUDE_AUTO_DROPPED, fenceReach } from '../src/vocabulary.ts';
 
 const skip = process.env.AE_LIVE === '1' ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 
@@ -126,34 +132,40 @@ const linesOf = (out: string): Line[] =>
 
 const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-claude-job.ts');
 
+/**
+ * Runs the process the worker spawns for a step, `bin/ae-claude-job.ts`, on `config` and the SDK's own Claude Code (no
+ * `AE_CLAUDE_EXECUTABLE`), and keeps its stdout, ending its stdin at the session's `result` line as the worker does (`closesOn`).
+ */
+const jobRun = async (name: string, config: object): Promise<{ stdout: string; code: number | null; err: string }> => {
+  const dir = scratch('ae-live-sdk-bin-');
+  const at = path.join(dir, 'spawn.request.json');
+  const brief = 'Answer with the single word ok. Do nothing else.';
+  fs.writeFileSync(at, JSON.stringify({ request: { name, brief, cwd: dir, config }, io: {} }));
+  const env = { ...process.env };
+  delete env.AE_CLAUDE_EXECUTABLE;
+  return new Promise((done) => {
+    const child = spawn(process.execPath, [BIN, at], { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let errs = '';
+    child.stderr.on('data', (d: Buffer) => (errs += d.toString()));
+    child.stdout.on('data', (d: Buffer) => {
+      out += d.toString();
+      if (linesOf(out).some((line) => line.type === 'result')) child.stdin.end();
+    });
+    child.stdin.write(`${JSON.stringify({ type: 'user', message: { content: brief } })}\n`);
+    child.on('close', (c) => done({ stdout: out, code: c, err: errs }));
+  });
+};
+
+const initOf = (stdout: string): Line | undefined => linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init');
+
 test(
   "a step's job process, asked for `opus`, says on its `init` line the model and the Claude Code it started on, and its reader records that model",
   { skip, timeout: 10 * 60_000 },
   async () => {
-    const dir = scratch('ae-live-sdk-bin-');
-    const at = path.join(dir, 'spawn.request.json');
-    const brief = 'Answer with the single word ok. Do nothing else.';
-    fs.writeFileSync(
-      at,
-      JSON.stringify({ request: { name: 'ae/live/init', brief, cwd: dir, config: { model: 'opus', effort: 'low', tools: [] } }, io: {} }),
-    );
-    const env = { ...process.env };
-    delete env.AE_CLAUDE_EXECUTABLE;
+    const { stdout, code, err } = await jobRun('ae/live/init', { model: 'opus', effort: 'low', tools: [] });
 
-    const { stdout, code, err } = await new Promise<{ stdout: string; code: number | null; err: string }>((done) => {
-      const child = spawn(process.execPath, [BIN, at], { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'] });
-      let out = '';
-      let errs = '';
-      child.stderr.on('data', (d: Buffer) => (errs += d.toString()));
-      child.stdout.on('data', (d: Buffer) => {
-        out += d.toString();
-        if (linesOf(out).some((line) => line.type === 'result')) child.stdin.end();
-      });
-      child.stdin.write(`${JSON.stringify({ type: 'user', message: { content: brief } })}\n`);
-      child.on('close', (c) => done({ stdout: out, code: c, err: errs }));
-    });
-
-    const init = linesOf(stdout).find((line) => line.type === 'system' && line.subtype === 'init');
+    const init = initOf(stdout);
     assert.ok(init, `the session printed its init line: ${stdout.slice(0, 300)} ${err}`);
     handOver(`sdk-${SDK_VERSION}-init.json`, `${JSON.stringify(init)}\n`);
     assert.equal(init.model, OPUS_TODAY, `\`opus\` on the Claude Code ${SDK_VERSION} bundles started on ${init.model}`);
@@ -161,5 +173,38 @@ test(
     assert.equal(claudeStreamOutput(stdout).ranOn, init.model, 'the reader the engine uses records the model the init line says');
     assert.equal(claudeStreamOutput(stdout).harnessVersion, init.claude_code_version, 'and the Claude Code it names');
     assert.equal(code, 0, `and the session ran to a result: ${err}`);
+  },
+);
+
+/**
+ * The models measured for `auto`: every one `CLAUDE_AUTO_DROPPED` lists, and every alias the refusals advise as keeping it. A model
+ * names its own `init` file, so the list and its measurement are handed over together.
+ */
+const AUTO_MEASURED: readonly string[] = [...CLAUDE_AUTO_DROPPED, 'haiku', 'sonnet', 'opus', 'fable'];
+
+test(
+  'each model, filed in `auto`, runs in `auto`, or in `default` exactly where `CLAUDE_AUTO_DROPPED` lists it',
+  { skip, timeout: 10 * 60_000 },
+  async () => {
+    const runs = await Promise.all(
+      AUTO_MEASURED.map(async (model) => ({
+        model,
+        ...(await jobRun(`ae/live/auto/${model}`, { model, permissionMode: 'auto', tools: [] })),
+      })),
+    );
+    for (const { model, stdout, code, err } of runs) {
+      const init = initOf(stdout);
+      assert.ok(init, `${model} printed its init line (exit ${code}): ${stdout.slice(0, 300)} ${err}`);
+      handOver(`sdk-${SDK_VERSION}-auto-${model}.json`, `${JSON.stringify(init)}\n`);
+      const dropped = fenceReach('claude', model)?.dropped.includes('auto') === true;
+      const ranIn = claudeStreamOutput(stdout).ranIn;
+      assert.equal(
+        ranIn,
+        dropped ? 'default' : 'auto',
+        `${model} (${init.model}) was filed in \`auto\` and its init line says ${ranIn}, on Claude Code ${init.claude_code_version}: ` +
+          `move CLAUDE_AUTO_DROPPED (src/harness/claude/vocabulary.ts) to what was measured, with the docs that repeat it`,
+      );
+      assert.equal(code, 0, `and ${model} ran to a result: ${err}`);
+    }
   },
 );

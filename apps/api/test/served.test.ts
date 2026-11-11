@@ -46,6 +46,9 @@ const ENDPOINTS = Object.values(Api.groups).flatMap((group) =>
 /** `path` with every name filled in by one no object has, so a read finds nothing and a write refuses. */
 const filled = (path: string): string => path.replace(/:[A-Za-z]+/g, 'nothing-here');
 
+/** The query an endpoint is asked with, by its path, where its default would hold the request open: a long poll's bound, cut to 1ms. */
+const ASKED: Readonly<Record<string, string>> = { '/api/feed/wait': '?for=1ms' };
+
 /** Whether `body` is the api's 404 for a path no route serves (`noRoute`), by the words it says that in. */
 const saysNoRoute = (body: unknown): boolean =>
   typeof body === 'object' && body !== null && 'error' in body && String(body.error).includes('is no route of this api');
@@ -54,7 +57,7 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
   assert.ok(ENDPOINTS.length >= 100, `${ENDPOINTS.length} endpoints read off the Api`);
   const unserved: string[] = [];
   for (const { group, name, method, path } of ENDPOINTS) {
-    const url = filled(path);
+    const url = `${filled(path)}${ASKED[path] ?? ''}`;
     const res = await app.request(
       url,
       method === 'GET' ? {} : { method, headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' },

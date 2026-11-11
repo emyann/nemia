@@ -191,6 +191,11 @@
       "type": "SubscriptionName"
     },
     {
+      "term": "Wait",
+      "meaning": "a read of the feed from a cursor (its end where none is given) that ends on the first lines a selector takes, or at its bound (four minutes, at most four and a half) with none, and answers why it ended, the lines it took and the cursor after the last line it read, from which the next wait loses no line: `nemia wait`, and `GET /api/feed/wait`, which answers it as `objects`' `FeedWait`.",
+      "type": "WaitAnswer"
+    },
+    {
       "term": "Waits",
       "meaning": "`person` on a line that waits on a person: every reason of phase waiting, and `Failed` and `CheckFailed`, from the reason table alone (`PERSON_WAITS`), never from a note.",
       "type": "PERSON_WAITS"

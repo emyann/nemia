@@ -387,6 +387,8 @@ export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
+export { WAIT, type WaitInput } from './await/commands.verb.ts';
+export type { WaitAnswer, Waited } from './await/await.verb.ts';
 export { PRUNE, RM } from './forget/commands.verb.ts';
 export { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
 export { STATS } from './stats/commands.verb.ts';

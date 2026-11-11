@@ -112,6 +112,14 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                refused. A run keeps the words it was started with; nemia, the
                                store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
+  nemia wait [-l <selector>]... [--from <cursor>] [--for <duration>]
+                               wait for the feed's next line a selector takes, and print it with the
+                               cursor after it: from --from (a cursor a wait or nemia watch printed),
+                               else from the feed's end now. It ends on the first lines a selector
+                               takes, or after --for (4m by default, at most 270s) with none, and
+                               prints the cursor either way: wait again from it and no line is lost.
+                               -l: as nemia watch -l takes it, given again for another; none takes
+                               every line.
   nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]
                                Nemia, the store's own agent: bare, where she is, each factory's level and
                                how to reach her; a level sets the store's, which every factory follows

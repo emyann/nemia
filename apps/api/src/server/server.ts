@@ -38,15 +38,33 @@
  * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`RESUME`), and the sessions' drain with it; it reads no
  *   body. None standing is a 404 (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `GET /api/feed/stream` — the workflow feed followed, as server-sent events (`feedOpened`, gauges/feed.ts).
+ * - `GET /api/feed/wait` — `nemia wait` (`WAIT`): the feed read from `?from=` (its end where none is given) until the first lines a
+ *   `?selector=` takes, given again for another, or `?for=` (4m where none is given) with none, answering `{ ended, lines, cursor }`, each
+ *   line an `Event` as the Event lists build one (`eventKept`) and the cursor the next wait starts from. A long poll: it answers once,
+ *   at its first match or its bound, never later than 270s. 422 for a selector, a cursor or a bound refused (`Invalid`), in the words
+ *   that say the fix.
  *
  * A failure that is no refusal is a 500 in its own words (`Failed`, `answeredWrite`), as on every route the api served on Hono.
  */
 import { Effect, Metric } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import type { HttpServerRequest } from 'effect/http';
-import { leaseRelease, PASSES, PAUSE, PAUSE_NOW, PAUSED, RESUME, runningRelease, SERIES, VERSION } from 'agent-orchestrator';
+import {
+  eventKept,
+  leaseRelease,
+  PASSES,
+  PAUSE,
+  PAUSE_NOW,
+  PAUSED,
+  RESUME,
+  runningRelease,
+  SERIES,
+  VERSION,
+  WAIT,
+  type WaitAnswer,
+} from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
-import { Api } from 'objects';
+import { Api, type Event, type FeedWait } from 'objects';
 import { capabilitiesWithSteps } from '../capabilities/index.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
@@ -69,6 +87,22 @@ const RELEASE = leaseRelease(runningRelease());
  */
 const selectorsOf = (request: HttpServerRequest.HttpServerRequest): string[] =>
   new URL(request.url, 'http://api').searchParams.getAll('selector');
+
+/**
+ * A wait's answer as `GET /api/feed/wait` sends it (`FeedWait`): each line an `Event` named by the byte it starts at, as a page of events
+ * builds one (`eventKept`, asked no namespace and no selector: the wait's own selectors already took the line), and the cursor as text.
+ */
+const waitSent = ({ ended, lines, cursor }: WaitAnswer): FeedWait => {
+  const kept = eventKept({});
+  return {
+    ended,
+    lines: lines.flatMap(({ line, from, to }): Event[] => {
+      const event = kept(line, from, to);
+      return event === undefined ? [] : [event];
+    }),
+    cursor: String(cursor),
+  };
+};
 
 export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
   handlers
@@ -96,6 +130,19 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
     .handle('pauseNow', () => answered((s) => s.inRequest(PAUSE_NOW.handler({}, { records: { pause: s.memo.records.pause } }))))
     .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler(payload))))
     .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}))))
+    .handle('wait', ({ query }) =>
+      answered(async (s) =>
+        waitSent(
+          await s.inRequest(
+            WAIT.handler({
+              selector: typeof query.selector === 'string' ? [query.selector] : [...(query.selector ?? [])],
+              ...(query.from === undefined ? {} : { from: query.from }),
+              ...(query.for === undefined ? {} : { for: query.for }),
+            }),
+          ),
+        ),
+      ),
+    )
     .handle('feed', ({ query, headers, request }) =>
       Effect.gen(function* () {
         const s = yield* ServedNow;

@@ -52,6 +52,7 @@ const PINNED: Record<string, string[]> = {
     'APPROVE',
     'CONCLUDED',
     'HOLD',
+    'WAIT',
     'LS',
     'REFRESH',
     'RETRY',

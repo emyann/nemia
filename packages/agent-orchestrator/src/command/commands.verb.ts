@@ -16,6 +16,7 @@ import { SERIES } from '../series/commands.verb.ts';
 import { PAGES } from '../steps/commands.verb.ts';
 import { CANCEL } from '../cancel/commands.verb.ts';
 import { HOLD } from '../wait/commands.verb.ts';
+import { WAIT } from '../await/commands.verb.ts';
 import { PRUNE, RM } from '../forget/commands.verb.ts';
 import { TICK, UP } from '../tick/commands.verb.ts';
 import { WATCH } from '../watch/commands.verb.ts';
@@ -78,6 +79,7 @@ export const COMMANDS: readonly Command[] = [
   ...SKILL_ENTRIES,
   CANCEL,
   HOLD,
+  WAIT,
   RM,
   PRUNE,
   ...PAUSE_ENTRIES,

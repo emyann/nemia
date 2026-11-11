@@ -7,18 +7,7 @@
  * there. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** The bound a wait takes when it is given none: four minutes. */
-export const WAIT_DEFAULT_MS = 240_000;
-
-/** The longest bound a wait takes: four minutes and a half, under every caller's five. */
-export const WAIT_MAX_MS = 270_000;
-
-/**
- * The bound, or why the one given is refused: `not-positive`, none to wait; `above-max`, longer than a caller's call lives. Implement
- * moves it to `src/await/await.ts`, which changes no law.
- */
-export type WaitBound = { readonly ms: number } | { readonly refused: 'not-positive' | 'above-max' };
+import { WAIT_DEFAULT_MS, WAIT_MAX_MS, type WaitBound } from '../src/await/await.ts';
 
 const waitBoundSpec = spec<(asked: number | undefined) => WaitBound>({
   requires: ({ input: [asked] }) => asked === undefined || Number.isFinite(asked),

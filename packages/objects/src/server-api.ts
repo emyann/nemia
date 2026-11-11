@@ -426,8 +426,8 @@ export const FEED_WAIT_ENDS = ['matched', 'bound'] as const;
 export type FeedWaitEnd = (typeof FEED_WAIT_ENDS)[number];
 
 /**
- * What `GET /api/feed/wait` (`nemia wait`) answers: why it ended, the lines its label queries took (none at its bound), each an `Event`, and
- * the cursor after the last line it read, from which the next wait starts and loses no line.
+ * What `GET /api/feed/wait` (`nemia wait`) answers: why it ended, the lines its label queries took (none at its bound), each an
+ * `Event`, and the cursor after the last line it read, from which the next wait starts and loses no line.
  */
 export const FeedWait = Schema.Struct({
   ended: Schema.Literals(FEED_WAIT_ENDS),
@@ -437,8 +437,8 @@ export const FeedWait = Schema.Struct({
 export type FeedWait = typeof FeedWait.Type;
 
 /**
- * `GET /api/feed/wait`'s query: `labelSelector`, a label query given once or again (`-l`), each kept as `nemia watch -l` takes it; `from`, the
- * cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
+ * `GET /api/feed/wait`'s query: `labelSelector`, a label query given once or again (`-l`), each kept as `nemia watch -l` takes it;
+ * `from`, the cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
  */
 export const FeedWaitQuery = {
   labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),

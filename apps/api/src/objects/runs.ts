@@ -260,9 +260,7 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     .handle('unhold', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }))),
     )
-    .handle('cancel', ({ params: { namespace, name } }) =>
-      acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name }))),
-    )
+    .handle('cancel', ({ params: { namespace, name } }) => acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name }))))
     .handle('retry', ({ params, payload }) => retried(params, payload))
     .handle('approve', ({ params, payload }) => approved(params, payload))
     .handle('say', ({ params, payload }) => said(params, payload))

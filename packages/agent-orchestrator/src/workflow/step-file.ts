@@ -603,12 +603,13 @@ function checkPolicyOf(step: string, text: string | undefined, check: string | u
 }
 
 /**
- * A draft's `checkFailurePolicy:`: the parsed policy, or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`),
- * read and refused as a file's line would be. Undefined for none.
+ * A draft's `checkFailurePolicy:`, read and refused as a file's line would be: the parsed policy, the map a step's frontmatter reads as
+ * (a Workflow proposal's keys, each exit code a string), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
+ * Undefined for none.
  */
-function policyDrafted(step: string, drafted: CheckFailurePolicy | string | null | undefined): CheckFailurePolicy | undefined {
+function policyDrafted(step: string, drafted: unknown): CheckFailurePolicy | undefined {
   if (drafted == null) return undefined;
-  if (typeof drafted !== 'string') return drafted;
+  if (typeof drafted !== 'string') return checkFailurePolicyOf(step, JSON.stringify(drafted));
   let read: unknown;
   try {
     read = readFrontmatter(step, `checkFailurePolicy: ${drafted}`).entries[0]?.value;

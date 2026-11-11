@@ -136,6 +136,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * declaration, so `harness/declaration.ts`, `harness/claude/rules.ts`, `harness/command/vocabulary.ts`, `a2a/vocabulary.ts` and
  * `core/own.ts`, which `harness/reach.ts` reads a fence word's reach by, load with it: all five pure, importing nothing but each other's
  * declarations and their contracts' types, and none touching a disk.
+ *
+ * Each is more by a step's check failure policy: `check/check-policy.ts`, the judgement of a refused check's exit code against the
+ * step's `checkFailurePolicy:` and its line's reader and writers, which `retry/retry.ts` and the step's parser read, and `check/index.ts`,
+ * the check feature's face that the folder rule asks for once the folder holds two pure files. `agent-orchestrator/run` is those two
+ * more; `agent-orchestrator/workflow`, which exports the policy's line (`checkFailurePolicyLine`) through that face, four more: those two,
+ * `check/check.ts` behind the face and `out-of-memory/out-of-memory.ts`, which it reads the words of a check killed at its limit by. All
+ * four pure, importing nothing but pure files and their contracts' types, and none touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 202, effect: 15 },

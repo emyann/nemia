@@ -27,11 +27,11 @@ export type {
  */
 export const checkFailureAction: CheckFailureActionOf = (policy, verdict) => {
   if (policy === undefined || verdict === 'unfinished') return 'Count';
-  for (const rule of policy.rules) {
+  const first = policy.rules.find((rule) => {
     const listed = rule.onExitCodes.values.some((code) => code === verdict);
-    if (rule.onExitCodes.operator === 'In' ? listed : !listed) return rule.action;
-  }
-  return 'Count';
+    return rule.onExitCodes.operator === 'In' ? listed : !listed;
+  });
+  return first === undefined ? 'Count' : first.action;
 };
 
 const ACTIONS = ['FailStep', 'Count'] as const;

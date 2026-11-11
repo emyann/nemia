@@ -660,15 +660,17 @@ export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 
 /**
  * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
- * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Held, neither is yet
- * (`heldRefusal`).
+ * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Cancelled, neither is either
+ * (`approvalRefusal`): a cancelled run files nothing more, held or not. Held, neither is yet (`heldRefusal`).
  */
-const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
+const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold' | 'cancelledAt'>, step: string, back: readonly string[]): string =>
   run.pruned
     ? neverApproved(run.pruned)
-    : run.hold
-      ? heldLater(run.hold, 'its approval')
-      : `approve it: nemia approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
+    : run.cancelledAt
+      ? `not approved, and never can be: the run was cancelled at ${run.cancelledAt}`
+      : run.hold
+        ? heldLater(run.hold, 'its approval')
+        : `approve it: nemia approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
 
 /**
  * What `nemia ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a

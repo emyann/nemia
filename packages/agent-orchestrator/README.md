@@ -4153,7 +4153,14 @@ restart included. No pass waits on it: the place is asked off the daemon's loop.
   sweeps as that takes, never in one.
 - **A run that is not finished is none of its business**: in flight, failed, stopped, over its budget or
   waiting at a gate, it can still be tried again from its worktree, and nothing is asked of its place. A
-  run that succeeded and waits on a person's merge is judged and left, without a word.
+  run that succeeded and waits on a person's merge is judged and left, without a word. A held run is not
+  finished: a hold is no decision about the work, and the run reads running until the hold lifts.
+- **A cancelled run is freed whatever else stands**: held (`nemia hold`, put before the cancel), at a gate
+  awaiting approval, or waiting on another run. It can never go on, so a hold keeps it out of nothing
+  (`holdKeepsOut`, `src/rest/rest.ts`), and `nemia ls` says its gate can never be approved.
+- **A finished run it can never find at rest is said once**: an old record that froze no workflow reads
+  its folder on every pass, so the sweep never takes it, and `nemia up` warns `<id>  not freed: …` once,
+  naming `nemia prune <id>` (`untaken`, `src/forget/prune/prune.ts`).
 - **A worktree it will not remove is said once.** A finished run whose worktree is dirty, locked or
   detached stays, and `nemia up` warns `<id>  not freed: …` once while those words stand (once more after
   a restart), with the fix. A run it frees is one line: `<id>  freed: removed 1 worktree, 13.2 MB; …`.

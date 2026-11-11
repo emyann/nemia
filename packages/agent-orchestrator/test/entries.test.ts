@@ -497,6 +497,7 @@ const PINNED: Record<string, string[]> = {
     'timelineLines',
     'timelineTotalLines',
     'toDecideWords',
+    'toolsOf',
     'touchedLines',
     'trialRefusal',
     'triesDir',

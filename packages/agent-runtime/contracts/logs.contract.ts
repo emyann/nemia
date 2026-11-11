@@ -12,7 +12,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 const isCut = (text: string, max: number, cut: boolean): boolean => cut || text.length > max;
 
 const endOfSpec = spec<(text: string, max: number, said: string, cut: boolean) => string>({
-  requires: ({ input: [, max, said] }) => Number.isInteger(max) && said.length + 1 < max,
+  requires: ({ input: [, max, said] }) => Number.isSafeInteger(max) && said.length + 1 < max,
   ensures: {
     withinMax: {
       description: 'What a log returns is never longer than its bound, whatever the other party sent',
@@ -33,7 +33,7 @@ const endOfSpec = spec<(text: string, max: number, said: string, cut: boolean) =
     keepsAsMuchAsFits: {
       description: 'Words cut keep as much of their end as fits under that line, all of them where they are shorter',
       condition: ({ input: [text, max, said, cut], output }) =>
-        isCut(text, max, cut) ? output.length === Math.min(max, said.length + 1 + text.length) : true,
+        isCut(text, max, cut) ? output.length === max || output === said + '\n' + text : true,
     },
   },
 });

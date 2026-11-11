@@ -6,6 +6,9 @@ import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
+import type { SaidBy, SaidFrom } from '../../contracts/step-speaker.contract.ts';
+
+export type { SaidFrom } from '../../contracts/step-speaker.contract.ts';
 
 /**
  * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
@@ -66,4 +69,43 @@ export function saidLines(said: readonly SaidTo[]): string[] {
     `said to try ${s.try}${s.attempt > 1 ? `, attempt ${s.attempt}` : ''}, at ${s.at}:`,
     ...fenced(s.text, 'text'),
   ]);
+}
+
+/** The words an agent's frame opens with, before its name: `framedFor`'s (chat.ts), read back by `saidBy`. */
+export const AGENT_OPENS = 'The agent ';
+
+/** The words between an agent's name and its own in its frame: `framedFor`'s (chat.ts), read back by `saidBy`. */
+export const AGENT_WRITES = ' writes, not the person: ';
+
+/**
+ * Who the words `text` a step's journal holds are from, and the words without their frame: an agent's where they stand in the frame
+ * `framedFor` writes (`AGENT_OPENS`, a name up to the first `AGENT_WRITES`, which may hold a space as an agent's name may, then that
+ * phrase), the person's as journalled otherwise — every say from before words were framed among them. Pure: read back each time,
+ * nothing kept beside the journal.
+ *
+ * Two of its tests hold of every text the others pass, and are made so the verifier need not prove them of `indexOf` and `slice`: that
+ * the name, cut at the first `AGENT_WRITES`, holds none; and that the frame written again around the name and the words is the text.
+ */
+export const saidBy: SaidBy = (text) => {
+  const asJournalled = { from: { kind: 'person' }, words: text } as const;
+  if (!text.startsWith(AGENT_OPENS)) return asJournalled;
+  const rest = text.slice(AGENT_OPENS.length);
+  const end = rest.indexOf(AGENT_WRITES);
+  if (end <= 0) return asJournalled;
+  const name = rest.slice(0, end);
+  if (name.includes(AGENT_WRITES)) return asJournalled;
+  const after = rest.slice(end);
+  if (!after.startsWith(AGENT_WRITES)) return asJournalled;
+  const words = after.slice(AGENT_WRITES.length);
+  if (AGENT_OPENS + name + AGENT_WRITES + words !== text) return asJournalled;
+  return { from: { kind: 'agent', name }, words };
+};
+
+/**
+ * A said as the run's step status shows it (`objects`' `Said`): the engine's entry as journalled, with who wrote it (`from`) and its
+ * words without the frame (`words`) where an agent did; the person's unchanged, no key added. Pure.
+ */
+export function saidOf<S extends { text: string }>(said: S): S | (S & SaidFrom) {
+  const by = saidBy(said.text);
+  return by.from.kind === 'agent' ? { ...said, from: by.from, words: by.words } : said;
 }

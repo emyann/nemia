@@ -232,11 +232,18 @@ const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
     return { step: done.step, try: done.try, at: done.at, message: done.message, file: done.file };
   });
 
-/** Words said to the step `at.step`'s session (`nemia say`): when, to which attempt, and what follows them. */
+/**
+ * Words said to the step `at.step`'s session (`nemia say`), from the caller the request is (`Served.caller`, by its session token) and
+ * who the body says they are from, which the package's program judges: when, to which attempt, what follows them, and, where an agent
+ * wrote them, which and its words without the frame they were said in.
+ */
 const said = (at: At & { readonly step: string }, payload: RunSay) =>
   acted(at, async (s) => {
-    const { at: when, attempt, text, after } = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, ...payload }));
-    return { at: when, attempt, text, after };
+    const done = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, caller: s.caller, ...payload }));
+    const { at: when, attempt, text, after } = done;
+    return done.from === undefined
+      ? { at: when, attempt, text, after }
+      : { at: when, attempt, text, after, from: done.from, words: done.words };
   });
 
 export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>

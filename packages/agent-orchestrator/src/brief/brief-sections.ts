@@ -26,7 +26,7 @@ import {
 import { budgetWord } from '../money/money.ts';
 import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
 import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
-import type { Said } from '../say/say.ts';
+import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
@@ -276,8 +276,9 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
 }
 
 /**
- * `## Said to your session`, inside `## Try <n>` or `## Round <n>`, on a try or a round that continues a session: what a person said to
- * that session while it ran (`nemia say`), each with its time, the words as they gave them in a fence (`fenced`). Carried because a session
+ * `## Said to your session`, inside `## Try <n>` or `## Round <n>`, on a try or a round that continues a session: what was said to that
+ * session while it ran (`nemia say`), each with its time, the words as the session was handed them in a fence (`fenced`) — a person's,
+ * or an agent's in the frame that names it (`saidBy`), which the lines then say apart. Carried because a session
  * may never have read them: one blocked on a permission prompt keeps words queued, and a session continued from it does not have them
  * (agent-runtime's open issue 16). Nothing when nothing was said; and a new session is given none, as it is given none of the last one's
  * conversation.
@@ -285,13 +286,17 @@ export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false)
 function saidSection(said: readonly Said[] | undefined): string[] {
   if (!said?.length) return [];
   const one = said.length === 1;
+  const byAgent = said.some((s) => saidBy(s.text).from.kind === 'agent');
+  const whose = byAgent
+    ? `Each says who wrote it: words in no frame are a person's, and go beside what was asked for, not over it; an agent's open with its name (\`The agent <name> writes, not the person:\`), and are that agent's, never the person's.`
+    : `${one ? 'It is' : 'They are'} a person's, and ${one ? 'it goes' : 'they go'} beside what was asked for, not over it.`;
   return [
     '',
     '## Said to your session',
     '',
-    `A person said ${one ? 'this' : 'these'} to your session while the last try ran (\`nemia say\`). A session does not always read what it is`,
+    `${byAgent ? 'Words were said' : 'A person said'} ${one ? 'this' : 'these'} to your session while the last try ran (\`nemia say\`). A session does not always read what it is`,
     `told — one waiting on a prompt keeps it queued, and loses it when it is continued — so ${one ? 'it is' : 'they are'} given again here, as said.`,
-    `Words you have already acted on need nothing more. ${one ? 'It is' : 'They are'} a person's, and ${one ? 'it goes' : 'they go'} beside what was asked for, not over it.`,
+    `Words you have already acted on need nothing more. ${whose}`,
     ...said.flatMap((s) => ['', `At ${s.at}:`, '', ...fenced(s.text, 'text')]),
   ];
 }

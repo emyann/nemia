@@ -12,6 +12,7 @@ import { Schema } from 'effect';
 import { API_VERSION, listOf } from './meta.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
+import { ChatSpeaker } from './nemia.ts';
 import {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -327,12 +328,17 @@ const StepGate = Schema.Struct({
   budgets: Schema.optionalKey(GateBudgets),
 });
 
-/** Words a person said to a session while it ran (`Said`, say.ts). */
+/**
+ * Words said to a session while it ran (`Said`, say.ts), as the engine journalled them (`text`); where an agent wrote them, which
+ * (`from`) and its words without the frame they were said in (`words`). None is the person's.
+ */
 const Said = Schema.Struct({
   at: Schema.String,
   attempt: Schema.Finite,
   text: Schema.String,
   after: Schema.optionalKey(Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String }))),
+  from: Schema.optionalKey(ChatSpeaker),
+  words: Schema.optionalKey(Schema.String),
 });
 
 /** A step's cap, and what its tries have cost of it. */

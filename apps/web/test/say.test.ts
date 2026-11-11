@@ -115,7 +115,15 @@ test("mergeSaid, withSaid and heardIn: what was said, shown once, laid among the
         laid.map((t) => (t.kind === 'told' ? `told: ${t.text}` : t.kind)),
         ['said', 'told: Early.', 'said', 'tools', 'told: Mid-fold.', 'said', 'told: Late.'],
       );
-      assert.deepEqual(laid.at(-1), { kind: 'told', key: `told:2:${at(50)}`, at: at(50), attempt: 2, text: 'Late.', arrived: null });
+      assert.deepEqual(laid.at(-1), {
+        kind: 'told',
+        key: `told:2:${at(50)}`,
+        at: at(50),
+        attempt: 2,
+        text: 'Late.',
+        arrived: null,
+        by: null,
+      });
       assert.deepEqual(
         laid.filter((t) => t.kind !== 'told'),
         turns,
@@ -163,7 +171,15 @@ test("mergeSaid, withSaid and heardIn: what was said, shown once, laid among the
       assert.deepEqual([heardIdle.said, heardIdle.events], [[{ ...late, arrived: at(45) }], EVENTS]);
       const turns = withSaid(foldTranscript(heardIdle.events), heardIdle.said);
       assert.equal(drawnWith(turns), 1);
-      assert.deepEqual(turns.at(-1), { kind: 'told', key: `told:1:${at(44)}`, at: at(44), attempt: 1, text: words, arrived: at(45) });
+      assert.deepEqual(turns.at(-1), {
+        kind: 'told',
+        key: `told:1:${at(44)}`,
+        at: at(44),
+        attempt: 1,
+        text: words,
+        arrived: at(45),
+        by: null,
+      });
     },
   );
   await t.test(

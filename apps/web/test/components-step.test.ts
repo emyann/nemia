@@ -815,16 +815,24 @@ test('a StructuredOutput call is drawn as the closeout, named, with its outcome,
 });
 
 test('what a person told the session is their own words, once, with when they reached its conversation', () => {
-  const html = own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: '2026-09-13T00:01:00.000Z' });
+  const html = own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: '2026-09-13T00:01:00.000Z', by: null });
   assert.match(html, /data-session-message="told"/);
   assert.equal([...html.matchAll(/Widen the api too\./g)].length, 1, 'drawn once: the session\u2019s own line for them is taken out');
   assert.match(html, /data-session-arrived="2026-09-13T00:01:00\.000Z"/);
   assert.match(html, />You said, while it ran ·/, 'marked as yours, said while the session ran');
   assert.doesNotMatch(
-    own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: null }),
+    own({ what: 'told', at, attempt: 1, text: 'Widen the api too.', arrived: null, by: null }),
     /data-session-arrived/,
     'and says nothing of its arrival until the transcript shows it',
   );
+});
+
+test("what an agent told the session is drawn as that agent's, under its name, never as the person's", () => {
+  const html = own({ what: 'told', at, attempt: 1, text: 'Cut it.', arrived: null, by: 'operator' });
+  assert.match(html, /data-session-message="told-peer"/);
+  assert.match(html, /data-session-bubble="told-peer"/);
+  assert.match(html, />operator · agent, while it ran ·/);
+  assert.doesNotMatch(html, /You said|data-session-message="told"/, 'never as yours');
 });
 
 test('a line the harness wrote on its own is a quiet note; one between two calls is a line of the turn', () => {

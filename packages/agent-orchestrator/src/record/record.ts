@@ -5,7 +5,7 @@
  * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
  * Pure: `record.store.ts` reads and writes the record.
  */
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';

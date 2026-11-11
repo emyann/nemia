@@ -151,6 +151,18 @@ test('keysOf, polled and filterOf: what each event reads again, and what is poll
       assert.deepEqual(keysOf('daemon'), [['daemon']]);
     },
   );
+  await t.test(
+    "a factory's line, its conflicts pending or settled, reads the factories and the daemon's standing, and no key of a run",
+    () => {
+      assert.deepEqual(keysOf('factory'), [['factories'], ['daemon']]);
+      const f = followed();
+      f.stream().opens();
+      f.stream().send('factory', { at: '2026-11-11T06:00:00.000Z', factory: 'acme', word: 'conflicts pending' }, '10');
+      f.frame();
+      assert.deepEqual(f.invalidated, [[['factories'], ['daemon']]], 'read on the line, the board following its event');
+      f.stop();
+    },
+  );
   await t.test("the store's line, its pause put or lifted, reads the pause again on the line itself, and no key of a run", () => {
     assert.deepEqual(keysOf('store'), [['pause'], ['pause', 'now'], ['daemon']]);
     const f = followed();

@@ -259,6 +259,7 @@ const WIRING = [
   'denials',
   'check',
   'retries',
+  'checkFailurePolicy',
   'gate',
   'loop',
   'rounds',

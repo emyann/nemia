@@ -1,6 +1,6 @@
 /** A step's session output and its check's, as a run's page is given them: the end of each, and what a refused check said. */
 import { Effect } from 'effect';
-import { attemptVerdict, checkVerdictOf, verdictWord, type CheckVerdict } from '../check/check.ts';
+import { attemptVerdict, checkVerdictOf, verdictWord, type CheckVerdict } from '../check/index.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { Views } from '../summary/reads.verb.ts';
 import type { Run } from '../record/record.ts';

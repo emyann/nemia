@@ -438,13 +438,15 @@ export const EVENT_REASONS = [
   'StorePaused',
   'StoreResumed',
   'LevelChanged',
+  'ConflictsPending',
+  'ConflictsSettled',
 ] as const;
 
 /** One of `EVENT_REASONS`. */
 export type EventReason = (typeof EVENT_REASONS)[number];
 
-/** What an Event is about: a run, one of its steps, a daemon that took the store, or the store itself. */
-export const INVOLVED_KINDS = ['Run', 'Step', 'Daemon', 'Store'] as const;
+/** What an Event is about: a run, one of its steps, a daemon that took the store, the store itself, or a factory. */
+export const INVOLVED_KINDS = ['Run', 'Step', 'Daemon', 'Store', 'Factory'] as const;
 
 /** One of `INVOLVED_KINDS`. */
 export type InvolvedKind = (typeof INVOLVED_KINDS)[number];
@@ -687,13 +689,14 @@ export type StatsBy = (typeof STATS_BY)[number];
 
 /**
  * The events of the feed's stream: `opened`, the first, sent the moment it opens so a proxy hands its head on, which every reader skips; a
- * line's, by what it is about (`store`, `daemon`, `step`, `removed`, `run`); where it has read to (`bookmark`); a label query's hint
- * (`hint`); and a read that failed and the read after it (`unreadable`, `readable`).
+ * line's, by what it is about (`store`, `daemon`, `factory`, `step`, `removed`, `run`); where it has read to (`bookmark`); a label query's
+ * hint (`hint`); and a read that failed and the read after it (`unreadable`, `readable`).
  */
 export const FEED_STREAM_EVENTS = [
   'opened',
   'store',
   'daemon',
+  'factory',
   'step',
   'removed',
   'run',

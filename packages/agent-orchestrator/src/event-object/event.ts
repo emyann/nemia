@@ -17,7 +17,7 @@ import {
   WAIT_ON,
 } from 'objects';
 import type { EventInvolvedKind, EventNamespace, EventReason } from '../../contracts/event.contract.ts';
-import { isRunLine, isStoreLine, messageOf, REASON_CODES, sourceOf, typeOf, type FeedLine } from '../feed/index.ts';
+import { isFactoryLine, isRunLine, isStoreLine, messageOf, REASON_CODES, sourceOf, typeOf, type FeedLine } from '../feed/index.ts';
 
 /** The namespace an event is in: the factory its line names, `default` for a run's or a step's that names none, else none. */
 export const eventNamespace: EventNamespace = (kind, factory) => {
@@ -37,7 +37,7 @@ const kindOf = (line: FeedLine): EventInvolvedKind => {
   const said = line.involved?.kind;
   if (oneOf(INVOLVED_KINDS, said)) return said;
   if (isRunLine(line)) return line.step === undefined ? 'Run' : 'Step';
-  return isStoreLine(line) ? 'Store' : 'Daemon';
+  return isStoreLine(line) ? 'Store' : isFactoryLine(line) ? 'Factory' : 'Daemon';
 };
 
 /** The name of what a line is about, as `involvedOf` reads it. */
@@ -49,7 +49,9 @@ const nameOf = (line: FeedLine): string =>
       : `${line.run}/${line.step}`
     : isStoreLine(line)
       ? line.store
-      : String(line.daemon));
+      : isFactoryLine(line)
+        ? line.factory
+        : String(line.daemon));
 
 /** The labels a line carries, only those with a string value, or none where it carries none. */
 const labelsOf = (line: FeedLine): Record<string, string> | undefined => {

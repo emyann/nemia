@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import type { LandingWords } from '../check/check.ts';
+import type { LandingWords } from '../check/index.ts';
 import { resultBranches } from '../branches/branches.store.ts';
 import { resultTips } from '../branches/index.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';

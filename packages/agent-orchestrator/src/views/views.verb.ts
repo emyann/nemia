@@ -20,7 +20,7 @@ import {
   type CheckRefusal,
   type LandingSaid,
   type Verdict,
-} from '../check/check.ts';
+} from '../check/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { attemptIn, scriptCloseouts } from '../script/script.store.ts';
 import { resultSteps } from '../branches/index.ts';

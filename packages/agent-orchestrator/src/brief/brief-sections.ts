@@ -25,7 +25,7 @@ import {
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
 import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
-import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/check.ts';
+import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
 import { heldLater, roundsDue } from '../round/round.ts';

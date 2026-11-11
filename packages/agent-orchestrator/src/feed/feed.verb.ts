@@ -18,6 +18,7 @@ import {
   freshMemo,
   isRunLine,
   isStoreLine,
+  isFactoryLine,
   publishedOf,
   type DaemonLine,
   type FeedCloseout,
@@ -25,6 +26,7 @@ import {
   type FeedMemo,
   type FeedPause,
   type FeedLevels,
+  type FeedConflicts,
   type FeedPublished,
   type FeedWords,
 } from './feed.ts';
@@ -88,8 +90,8 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
 const logged = (line: FeedLine): Effect.Effect<void> => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
 
 /**
- * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon or its store, its reason, type, try and
- * word.
+ * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon, its store or its factory, its reason,
+ * type, try and word.
  */
 const lineFields = (line: FeedLine): Record<string, unknown> => ({
   ...line.labels,
@@ -97,7 +99,9 @@ const lineFields = (line: FeedLine): Record<string, unknown> => ({
     ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) }
     : isStoreLine(line)
       ? { store: line.store }
-      : { daemon: line.daemon }),
+      : isFactoryLine(line)
+        ? { factory: line.factory }
+        : { daemon: line.daemon }),
   ...(line.reason !== undefined ? { reason: line.reason } : {}),
   ...(line.type !== undefined ? { type: line.type } : {}),
   ...(line.try !== undefined ? { try: line.try } : {}),
@@ -134,7 +138,8 @@ const loggedOf =
 
 /**
  * A pass's words written to the feed where they changed (`feedPass`, over this process's fold, `feedMemo`), with the store's pause put
- * or lifted where the pass hands the pause it read (`pause`) and each factory's level changed where it hands the levels (`levels`), each
+ * or lifted where the pass hands the pause it read (`pause`) and each factory's level changed where it hands the levels (`levels`) and
+ * its conflicts turned where it hands them (`conflicts`), each
  * line written logged (`loggedOf`: a `closed out` line as its closeout, every other as its words) and, where the process has a hub
  * (`FeedHub`), published to it with the bytes it was written at
  * (`publishedOf`): none when another writer's bytes landed among them. Answers with the lines written. `memo` is for a test, which
@@ -146,7 +151,14 @@ export const emitFeed = Effect.fn('emitFeed')(function* (
   {
     memo = feedMemo,
     ...pass
-  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
+  }: {
+    at?: string;
+    memo?: FeedMemo;
+    unjudged?: ReadonlySet<string>;
+    pause?: FeedPause;
+    levels?: FeedLevels;
+    conflicts?: FeedConflicts;
+  } = {},
 ) {
   const appended = yield* withinEffect('act', feedPass(yield* FeedDoor, memo, now, pass));
   yield* Effect.forEach(appended.lines, loggedOf(now), { discard: true });

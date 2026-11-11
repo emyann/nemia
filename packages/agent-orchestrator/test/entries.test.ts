@@ -820,6 +820,7 @@ const PINNED: Record<string, string[]> = {
     'setSchedule',
   ],
   'agent-orchestrator/workflow': [
+    'checkFailurePolicyLine',
     'definitionServed',
     'definitionsServed',
     'definitionWriteRefusal',

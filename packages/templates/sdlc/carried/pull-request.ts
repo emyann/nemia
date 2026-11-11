@@ -22,10 +22,10 @@
  *   The labels the rules give the run are added, and any other label a rule could give is removed, so a run relabelled is followed and a
  *   label no rule gives — a person's — is left as it is; each through REST (`issues/<n>/labels`), never `gh pr edit`, and the labels set
  *   are printed. A malformed rule, a `WF_LABELS` that is no JSON object of strings, and a label a rule gives that the repository lacks are
- *   refused before anything is pushed, and so is a run whose labels match none of the rules, exit 2, naming each key the rules read, the
- *   values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: such a pull request would carry no label
- *   a rule gives, and a check that reads its labels would fail where only the merge finds out. An empty or absent `--labels` labels
- *   nothing, and so does a check with no `WF_LABELS` at all, a run of an older Nemia, saying so.
+ *   refused before anything is pushed, and so is a run whose labels match none of the rules, a person's, naming each key the rules
+ *   read, the values they take and the `nemia label run <run> <key>=<value> --overwrite` that sets one: such a pull request would carry
+ *   no label a rule gives, and a check that reads its labels would fail where only the merge finds out. An empty or absent `--labels`
+ *   labels nothing, and so does a check with no `WF_LABELS` at all, a run of an older Nemia, saying so.
  * - `wait --check <name>`, which the round's check runs last, `<name>` the CI context branch protection requires of the base branch (the
  *   repository's, so the check gives it): it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which no CI
  *   would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says `UNKNOWN`,
@@ -52,11 +52,12 @@
  * on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull request,
  * or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request that conflicts
  * with its base; an `open` with no `--labels`; an `open --labels` or a `push --labels` whose rules, `WF_LABELS` or the repository's
- * labels are not as above (a run whose labels match no rule, exit 2); a `wait` with no `--check`; and a CI context that is red,
- * cancelled, skipped or never reported. A refusal a change to the branch cannot answer — no `gh` or none authenticated, no `origin`, two
- * open pull requests, a draft or another base, the label rules, `WF_LABELS` or the repository's labels, a `push` or `wait` given other
- * arguments than its check line's, and a CI context never reported, still pending at the bound, or only cancelled, skipped or neutral —
- * ends with one more line, `<tag>: not the work: …`: a try retried on its own reads it as the person's, and stops.
+ * labels are not as above; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported. A refusal a
+ * change to the branch cannot answer — no `gh` or none authenticated, no `origin`, two open pull requests, a draft or another base, the
+ * label rules, `WF_LABELS`, a run whose labels match no rule, or the repository's labels, a `push` or `wait` given other arguments than
+ * its check line's, and a CI context never reported, still pending at the bound, or only cancelled, skipped or neutral — exits 78
+ * instead (`PERSONS_EXIT`, `exec.ts`), the code the `checkFailurePolicy:` of the step whose check runs this names: the run tries the
+ * step no more on it and waits on the person, who answers it, then has the check run again.
  *
  * A red the work answers says one thing more where the base is red too: the wait asks GitHub for the commit of the base the head holds
  * (`gh api repos/{owner}/{repo}/compare/<base>...<head>`), reads the CI context there over REST, and where it failed, the refusal says so
@@ -65,20 +66,28 @@
  * the work's, never the person's because of it. A green head's wait asks nothing of the base.
  */
 import { PASSED, type Seen, JOBS, checkKey, failures, latest, linkOf, listing, nameOf, pending, seenOf, verdict } from './ci-log.ts';
-import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, type Ran, seconds, sleep } from './exec.ts';
+import {
+  PERSONS_EXIT,
+  POLL_SECONDS,
+  Refusal,
+  START_SECONDS,
+  WHOLE_SECONDS,
+  authed,
+  base,
+  git,
+  noGh,
+  run,
+  type Ran,
+  seconds,
+  sleep,
+} from './exec.ts';
 
 /**
  * A refusal only a person can answer — the machine, the repository on GitHub, the factory's rules, or CI that never judged — which no
- * change to the branch answers: said as any other, then one more line, `<tag>: not the work: …` (`NOT_THE_WORK`), which tells a try of
- * the step that runs this check, retried on its own, to change nothing and stop for the person.
+ * change to the branch answers: said as any other, and exit 78 (`PERSONS_EXIT`), which the step's `checkFailurePolicy:` names, so the
+ * run waits on the person rather than try the step again.
  */
 class PersonsRefusal extends Refusal {}
-
-/** The line a person's refusal ends with, after its tag. */
-const NOT_THE_WORK = 'not the work: a person answers this refusal, as it says; a change to the branch cannot';
-
-/** A run whose labels match none of the factory's label rules: refused as any other, exit 2, so a caller tells it apart. */
-class Unlabelled extends PersonsRefusal {}
 
 /**
  * How long, in seconds, the wait reads the pull request's `mergeable` again while GitHub answers `UNKNOWN`, which it does while it
@@ -129,7 +138,7 @@ const OPENING = 'opening the pull request';
 
 /**
  * What `gh` printed for `args`, trimmed; refuses, naming what it was asked, when `gh` fails or is not there. Apart from
- * `landing.ts`'s on purpose: a missing `gh` here is a person's refusal, which tells a retried try to change nothing.
+ * `landing.ts`'s on purpose: a missing `gh` here is a person's refusal, exit 78.
  */
 function gh(...args: string[]): string {
   const ran = run('gh', args);
@@ -306,7 +315,7 @@ function labelPlan(rules: readonly LabelRule[], run: string): { want: Set<string
   const ofRun = runLabels();
   if (ofRun === undefined) return { note: "no label is set: this was given no WF_LABELS, the run's labels, which a later Nemia gives it" };
   if (!rules.some((rule) => Object.hasOwn(ofRun, rule.key) && ofRun[rule.key] === rule.value))
-    throw new Unlabelled(unmatched(rules, ofRun, run));
+    throw new PersonsRefusal(unmatched(rules, ofRun, run));
   const givable = new Set(rules.map((rule) => rule.label));
   const has = repoLabels();
   const lacking = [...givable].filter((label) => !has.has(label));
@@ -712,8 +721,8 @@ const VERBS: Record<string, { tag: string; act: (args: string[]) => string[] }> 
 };
 
 /**
- * The whole run: exit 0 with what was done on stdout, or the refusal on stderr with 1, 2 for a run no label rule matches; each line
- * under the verb's tag, and a person's refusal followed by its `not the work` line.
+ * The whole run: exit 0 with what was done on stdout, or the refusal on stderr, each line under the verb's tag, with 78 for a person's
+ * (`PERSONS_EXIT`) and 1 for any other.
  */
 function main(): number {
   const [verb = '', ...args] = process.argv.slice(2);
@@ -726,8 +735,7 @@ function main(): number {
   } catch (err) {
     if (!(err instanceof Refusal)) throw err;
     process.stderr.write(`${tag}: ${err.message}\n`);
-    if (err instanceof PersonsRefusal) process.stderr.write(`${tag}: ${NOT_THE_WORK}\n`);
-    return err instanceof Unlabelled ? 2 : 1;
+    return err instanceof PersonsRefusal ? PERSONS_EXIT : 1;
   }
 }
 

@@ -16,7 +16,7 @@
 import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
-import { attemptVerdict } from '../check/check.ts';
+import { attemptVerdict } from '../check/index.ts';
 import { stepTaskId, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepStatus } from '../record/record.ts';

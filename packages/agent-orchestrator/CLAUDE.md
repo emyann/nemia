@@ -184,6 +184,10 @@ too, which holds parity with this one until the in-process reads retire.
   never remembered and never a thing's last word: counting by place cannot tell two offers of one fact from two facts. A run's new
   one-shot is offered from `word-feed.verb.ts`, off what the pass already read, the store's from `storeOnce` (`feed.ts`), off the pause
   the pass read (`readPause`, handed to `emitFeed` as `pause`), and the note is what tells one occurrence from another.
+- **A standing word of no run is kept in the fold under a key of its own** (`levelKey`, `conflictsKey` in `feed.ts`), never `Run/` or
+  `Step/`, so no `removed` forgets it: a factory's level, read off `levelsNow`, and its conflicts, read off `conflictsNow`
+  (`src/factory/applied/applied.verb.ts`) and decided by `conflictsDue` (`contracts/conflicts-said.contract.ts`), each handed to
+  `emitFeed` by the pass.
 
 ## The tick
 

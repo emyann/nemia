@@ -16,7 +16,7 @@ import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { StepSpec } from '../step/step.ts';
 import { mergeAsk, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';

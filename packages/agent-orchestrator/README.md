@@ -73,7 +73,7 @@ nemia watch               # the same from the start, then each line as the tick 
 
 It is `$WF_ROOT/feed.jsonl`, a line of JSON per change. Every line a `nemia` of this version writes is a
 typed, labelled signal, as a Kubernetes `Event` is: `apiVersion: "nemia/v1"`, `involved` what it is about
-(`{kind, name}`, kind `Run`, `Step`, `Daemon` or `Store`, a step named `<run>/<step>`, the store `store`), `labels` the run, its factory,
+(`{kind, name}`, kind `Run`, `Step`, `Daemon`, `Store` or `Factory`, a step named `<run>/<step>`, the store `store`, a factory by its name), `labels` the run, its factory,
 its workflow and, on a step's line, the step and its agent — the same `stepLabels` a filing gives its
 session — `reason` a stable code a machine selects on, from the closed table in `src/feed/reason.ts`,
 `type` `Normal` or `Warning`, `waits: "person"` where the line waits on somebody, `source` the `tick`,
@@ -112,7 +112,13 @@ stands per factory, not a one-shot: the same pass reads each factory's level in 
 what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
 writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
 (`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. `nemia watch -l
-kind=Store` follows them, and the api sends them as a `store` event. **Nothing reads it to decide**: every pass still
+kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
+(`involved {kind: 'Factory'}`, labelled with it): `conflicts pending`, `reason: "ConflictsPending"`, when the `ConflictsPending` condition
+its controller writes to its status turns True, its note the condition's message, and `conflicts settled`, `reason: "ConflictsSettled"`,
+when it turns back, both `Normal` and the tick's. A word that stands per factory, compared by its reason alone (`conflictsDue`): the pass
+reads each templated factory's condition (`conflictsNow`), so a reworded message is no line, and a factory never said pending is never
+said settled. The first is one of Nemia's selectors (`reason=ConflictsPending`); `nemia watch -l kind=Factory` follows both, and the api
+sends them as a `factory` event. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
 
 What a pass compares against is the feed itself, folded, not something it remembers: a daemon keeps
@@ -456,7 +462,7 @@ reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `deadlineSeconds`, `memory`, `budget`, `check`,
-`retries`, `gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
+`retries`, `checkFailurePolicy`, `gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow/step-file.ts`). The fence keys among them (`permissionMode`, `sandbox`, `tools`, `disallowedTools`,
 `allowedTools`) are written under the block of the harness the step runs on, below. `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
@@ -1699,6 +1705,20 @@ retries: 1
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
+- **`checkFailurePolicy:` — which refusals are a person's.** A step's check can say which of its exit codes mean a refusal only a
+  person can answer — no tool signed in, a remote not there — read against Kubernetes' Job `podFailurePolicy`:
+
+  ```yaml
+  checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }
+  ```
+
+  The rules are read in order, and the first whose `onExitCodes` holds of the exit code decides (`checkFailureAction`,
+  `src/check/check-policy.ts`, proved by `contracts/check-failure-policy.contract.ts`); where none holds, or the check did not finish,
+  the refusal is counted as before. On `FailStep` the run files no `retries:` try and spends none: the step reads `failed (check)` and
+  waits on you, and `wf decide` offers `wf retry <run> <step> --recheck` first, saying the exit code, since the answer is outside the
+  branch, and continuing its session beside it. The step is the Job, `retries:` its `backoffLimit`, so `FailJob` is `FailStep`; there is
+  no `Ignore` (a try counted against nothing has no bound but the budget), no `FailIndex`, no `containerName` (a check is one command)
+  and no `onPodConditions`. The key needs a `check:`, is frozen with the run, and a run frozen without it counts every refusal.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `closedOut: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:

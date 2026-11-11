@@ -5,7 +5,7 @@
  * money's `money/money.ts`'s, and a person's route for a try `route/person-route.ts`'s. Pure, and read by nearly every other part of the
  * run's judgement; it reads the record alone.
  */
-import { onItsCheck, type Verdict } from '../check/check.ts';
+import { onItsCheck, type Verdict } from '../check/index.ts';
 import { DEFAULT_ROUNDS, endsOnBase, JUDGE_ROUTE, LOOP_REPLIES, type StepSpec } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { isJudge } from '../route/index.ts';

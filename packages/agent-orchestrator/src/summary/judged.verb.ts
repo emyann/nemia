@@ -24,7 +24,7 @@ import { inFlight } from '../cap/cap.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { StepSpec } from '../step/step.ts';
-import type { CheckVerdict } from '../check/check.ts';
+import type { CheckVerdict } from '../check/index.ts';
 import {
   runCodes,
   type AnswerVia,

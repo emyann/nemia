@@ -9,7 +9,7 @@ import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import type { StepSpec } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';

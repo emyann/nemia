@@ -33,7 +33,7 @@ import {
   type SpendOf,
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } from './retry-ask.ts';
 import { carries, heard, pauseAskVoid, retriesDue, retryable } from './retry.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';

@@ -10,6 +10,14 @@ import { spawnSync } from 'node:child_process';
 /** A reason the verb is refused: said on stderr, exit 1, under the script's own tag. */
 export class Refusal extends Error {}
 
+/**
+ * What a script exits with for a refusal only a person answers — no change to the branch does: the code sdlc's `checkFailurePolicy:`
+ * names on `implement` (`FailStep`, `onExitCodes: In [78]`), so the run files no try of the step on it and waits on the person. 78,
+ * sysexits' EX_CONFIG, lies outside what a test runner, a compiler or a linter usually exits with, so a check command of the
+ * repository's chained beside the scripts rarely says it; one that did would be read as a person's refusal.
+ */
+export const PERSONS_EXIT = 78;
+
 /** How long a call of `git` or `gh` may take, in milliseconds. */
 export const BOUND = 120_000;
 
@@ -70,7 +78,8 @@ export const noGh = (act: string): string =>
 
 /**
  * `gh auth status` passing; refuses with the one command a person types when it does not, as `refused`: `pull-request.ts` passes its
- * person's refusal, which tells a retried try to change nothing, and `landing.ts`, which has no tries of its own, the plain one.
+ * person's refusal, which exits `PERSONS_EXIT` so the run tries the step no more on it, and `landing.ts`, which has no tries of its
+ * own, the plain one.
  */
 export function authed(act: string, refused: typeof Refusal = Refusal): void {
   const status = run('gh', ['auth', 'status']);

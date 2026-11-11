@@ -166,6 +166,12 @@ const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'level changed', note: 'acme is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
 ];
 
+/** The two words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
+const FACTORY_LINES: readonly Case[] = [
+  { kind: 'Factory', word: 'conflicts pending', note: 'agents/coder.md: choose one', reason: 'ConflictsPending' },
+  { kind: 'Factory', word: 'conflicts settled', note: 'merged', reason: 'ConflictsSettled' },
+];
+
 /** A parked step's words (`pausedWord`): paused between two calls, after the call it stopped after, or with the call it cut. */
 const PAUSED_WORDS: readonly Case[] = [
   { kind: 'Step', word: pausedWord({}), reason: 'Paused' },
@@ -186,6 +192,7 @@ const CASES: readonly Case[] = [
   ...ONE_SHOTS,
   ...ACT_WORDS,
   ...STORE_LINES,
+  ...FACTORY_LINES,
 ];
 
 /**
@@ -230,6 +237,10 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
       assert.equal(reasonOf(said, c.kind), c.reason);
     }
   });
+  await t.test("a factory's word no rule names is Unknown, never another kind's code", () => {
+    assert.equal(reasonOf({ word: 'level changed' }, 'Factory'), 'Unknown');
+    assert.equal(reasonOf({ word: 'conflicts reworded' }, 'Factory'), 'Unknown');
+  });
   await t.test('a reason is only named of a kind the table gives it', () => {
     for (const c of CASES) assert.ok(kindsOf(c.reason).includes(c.kind), `${c.reason} is not a reason of a ${c.kind}`);
   });
@@ -242,8 +253,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 47, 'the table the owner named has 47 entries');
-    assert.equal(REASON_CODES.length, 36, 'of 36 distinct codes');
+    assert.equal(entries.length, 49, 'the table the owner named has 49 entries');
+    assert.equal(REASON_CODES.length, 38, 'of 38 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

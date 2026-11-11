@@ -3,7 +3,7 @@
  * the nodes after it (`routedWords`, `runWords`) — `skipped` off the route taken, `sent` for a workflow node that filed its card, and a
  * table condition's own word. Pure, worked out on every pass from facts, carrying nothing between passes.
  */
-import type { Verdict } from '../../check/check.ts';
+import type { Verdict } from '../../check/index.ts';
 import type { Closeout } from '../../closeout/index.ts';
 import { satisfiesAfter, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../../record/record.ts';
 import type { RouteEval, StepSpec } from '../../step/step.ts';

@@ -14,7 +14,9 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { loadWorkflows } from 'agent-orchestrator';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
+import { PERSONS_EXIT } from '../sdlc/carried/exec.ts';
 import { scratch } from 'test-kit/scratch';
 import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
@@ -130,6 +132,39 @@ test("build's and quick's implement try again on their own twice when their chec
     for (const workflow of ['build', 'quick']) {
       assert.equal(stepIn(treeOf(name), workflow, 'implement').front.retries, 2, `${name}: ${workflow}/implement`);
       assert.equal(stepIn(treeOf(name), workflow, 'land').front.retries, undefined, `${name}: ${workflow}/land waits on a person`);
+    }
+});
+
+/** The steps of `workflow` in the factory `name`'s tree, loaded as a start of it in the factory loads them: with the factory's hires. */
+function loaded(name: string, workflow: string) {
+  const tree = treeOf(name);
+  const { hires } = JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')) as { hires: Record<string, string> };
+  const agents = Object.fromEntries(
+    Object.entries(hires).flatMap(([step, agent]) => (step.startsWith(`${workflow}/`) ? [[step.slice(workflow.length + 1), agent]] : [])),
+  );
+  const store = TREES[name]?.store ?? '';
+  return loadWorkflows(path.join(tree, 'workflows', workflow), { home: store }, { factory: 'sdlc', workflow, agents });
+}
+
+/** The code `change.ts` exits with, read from its shipped text: it imports nothing, so it keeps its own copy of `PERSONS_EXIT`. */
+const changeExit = (): number => {
+  const found = /^const PERSONS_EXIT = (\d+);$/m.exec(fs.readFileSync(path.join(SDLC, 'workflows', 'quick', 'change.ts'), 'utf8'));
+  assert.ok(found, 'change.ts declares its PERSONS_EXIT');
+  return Number(found[1]);
+};
+
+test("build's and quick's implement load with a policy that fails the step on 78, the code sdlc's scripts exit with for a person's refusal", () => {
+  assert.equal(PERSONS_EXIT, 78, "carried/exec.ts's code");
+  assert.equal(changeExit(), PERSONS_EXIT, "change.ts's own copy of it");
+  for (const name of ['set', 'plain'])
+    for (const workflow of ['build', 'quick']) {
+      const steps = loaded(name, workflow);
+      assert.deepEqual(
+        steps.find((step) => step.name === 'implement')?.checkFailurePolicy,
+        { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [PERSONS_EXIT] } }] },
+        `${name}: ${workflow}/implement waits on the person for a refusal only a person answers`,
+      );
+      assert.equal(steps.find((step) => step.name === 'land')?.checkFailurePolicy, undefined, `${name}: ${workflow}/land has none`);
     }
 });
 

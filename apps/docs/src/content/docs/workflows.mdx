@@ -93,6 +93,11 @@ When a check refuses a step, `retries` says how many times the run sends the wor
 tells it why. A person can try a step again too, with `nemia retry`: continuing the session with a message, starting fresh, on another
 model, or just running its check again.
 
+A check can also say which of its exit codes mean a refusal only you can answer, such as a tool that is not signed in: its check
+failure policy, read the way a Kubernetes Job reads its pod failure policy, its rules in order and the first that holds deciding. On
+such a code the run tries nothing on its own and spends no try: the step waits on you, and `nemia decide` offers to run its check again
+once you have answered it.
+
 ## A loop and its rounds
 
 A reviewing step can send the work back. Its `loop` names an earlier step to run again, and `rounds` caps how many times, 3 when it

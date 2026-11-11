@@ -341,6 +341,34 @@ test(
       },
     );
     await s.test(
+      "a factory's conflicts pending and settled, as the tick writes them, are each sent as a factory event, its data the line whole",
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const memo = freshFeedMemo();
+        for (const pending of [true, false])
+          await runtime.runPromise(
+            emitFeed(new Map([['r-1', planAt('running')]]), { memo, conflicts: [{ factory: 'acme', pending }] }).pipe(
+              Effect.provide(Logger.layer([])),
+            ),
+          );
+        const lines = readFeed(root, 0).lines;
+        const opened = await open();
+        const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 4);
+        await opened.reader.cancel();
+        assert.deepEqual(
+          all.map((b) => b.event),
+          ['run', 'step', 'factory', 'factory'],
+          "a factory's line is never a daemon's or the store's",
+        );
+        assert.deepEqual(
+          all.slice(2).map((b) => JSON.parse(b.data!).reason),
+          ['ConflictsPending', 'ConflictsSettled'],
+        );
+        assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
+      },
+    );
+    await s.test(
       'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
       async (t) => {
         const pass = emptyFeed();

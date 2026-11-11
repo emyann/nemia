@@ -17,8 +17,9 @@ import {
   WorkflowError,
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
-import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
+import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeWritten, routingOf } from '../route/index.ts';
+import { checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,
@@ -126,7 +127,7 @@ export function parseWorkflow(
     block: fenced,
   } = block === null
     ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
-    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), ['route']);
+    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)), MAP_KEYS);
   meta = baseSpelled(placeSpelled(name, meta));
   placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
@@ -381,6 +382,7 @@ export function stepFrom(
     budget: budgetOf(name, meta.budget),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
+    checkFailurePolicy: checkPolicyOf(name, meta.checkFailurePolicy, meta.check),
     gate: gateOf(name, meta.gate),
     input: meta.input
       ?.split(',')
@@ -495,6 +497,10 @@ export function renderStep(step: StepDraft): string {
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
     if (key === 'route') return step.route == null ? [] : [['route', routeWritten(step.route)]];
+    if (key === 'checkFailurePolicy') {
+      const policy = policyDrafted(step.name, step.checkFailurePolicy);
+      return policy === undefined ? [] : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]];
+    }
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [[key, value]];
@@ -586,3 +592,29 @@ const unknownKey = (step: string, key: string): string =>
   Object.hasOwn(REFUSED, key)
     ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
     : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
+
+/** A step's `checkFailurePolicy:`, read only beside a `check:`: with none, no exit code is there for it to read. */
+function checkPolicyOf(step: string, text: string | undefined, check: string | undefined): CheckFailurePolicy | undefined {
+  if (text !== undefined && check === undefined)
+    refuse(
+      `${step}: \`checkFailurePolicy:\` reads the exit code of the step's \`check:\`, and this step has none. Add \`check: <command>\`, or delete the line.`,
+    );
+  return checkFailurePolicyOf(step, text);
+}
+
+/**
+ * A draft's `checkFailurePolicy:`, read and refused as a file's line would be: the parsed policy, the map a step's frontmatter reads as
+ * (a Workflow proposal's keys, each exit code a number), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
+ * Undefined for none.
+ */
+function policyDrafted(step: string, drafted: unknown): CheckFailurePolicy | undefined {
+  if (drafted == null) return undefined;
+  if (typeof drafted !== 'string') return checkFailurePolicyOf(step, JSON.stringify(drafted));
+  let read: unknown;
+  try {
+    read = readFrontmatter(step, `checkFailurePolicy: ${drafted}`).entries[0]?.value;
+  } catch {
+    read = drafted;
+  }
+  return checkFailurePolicyOf(step, typeof read === 'string' ? read : JSON.stringify(read));
+}

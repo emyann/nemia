@@ -18,6 +18,16 @@
       }
     },
     {
+      "term": "Conflicts pending",
+      "meaning": "a Normal line about a factory, `ConflictsPending`, labelled with it (`labels.factory`): written by the tick once when the factory's `ConflictsPending` condition turns True — its upgrade waiting on a person's choice for each conflict — its note the condition's message, and not again while it stays True, a reworded message included. A wait on a person, not a fault, and one of Nemia's selectors.",
+      "type": "Reason"
+    },
+    {
+      "term": "Conflicts settled",
+      "meaning": "a Normal line about a factory, `ConflictsSettled`: written by the tick once when the factory's `ConflictsPending` condition, said pending on the feed, turns back to False — merged, or the version put back. A factory never said pending is never said settled.",
+      "type": "Reason"
+    },
+    {
       "term": "Daemon's line",
       "meaning": "a line a daemon writes once it has taken the store, naming its pid and how the one before it ended.",
       "type": "DaemonLine"
@@ -26,6 +36,11 @@
       "term": "Delivery",
       "meaning": "where the deliverer is with a subscription: the byte of the feed it has delivered or folded every line before, the routine lines folded and not yet said, and the subscription it was written for; kept beside the subscription's file and checked by the model's `Delivery` on every write.",
       "type": "Delivery"
+    },
+    {
+      "term": "Factory's line",
+      "meaning": "a line about a factory itself (`involved.kind` `Factory`, its name): its upgrade's conflicts pending or settled, read off the status its controller wrote, and sent on the feed's stream as a `factory` event.",
+      "type": "FactoryLine"
     },
     {
       "term": "Feed",
@@ -53,7 +68,7 @@
     },
     {
       "term": "Line",
-      "meaning": "one judged change of a run, a step, a daemon or the store, written on the feed: a report, never an input.",
+      "meaning": "one judged change of a run, a step, a daemon, the store or a factory, written on the feed: a report, never an input.",
       "type": "FeedLine",
       "retired": [
         {

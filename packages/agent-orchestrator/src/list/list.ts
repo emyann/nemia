@@ -10,7 +10,7 @@ import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
+import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/index.ts';
 import { routedRows, routedWords } from '../route/routed/index.ts';
 import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, tryNote, type RetryAsk } from '../retry/index.ts';

@@ -19,6 +19,7 @@ import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../temp
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
+import { checkFailurePolicyOf, type CheckFailurePolicy } from '../../check/index.ts';
 
 /**
  * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of
@@ -158,6 +159,10 @@ function routeEvalOf(route: unknown): RouteEval | undefined {
   return undefined;
 }
 
+/** A template's `checkFailurePolicy:` as the parser reads it, refused as a step's line would be; nothing for none. */
+const policyOf = (step: string, policy: unknown): { checkFailurePolicy?: CheckFailurePolicy } =>
+  policy === undefined ? {} : { checkFailurePolicy: checkFailurePolicyOf(step, JSON.stringify(policy)) };
+
 /**
  * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
  * the harness it runs on (`harness`), and its instruction.
@@ -191,7 +196,7 @@ function stepFile(
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   const route = routeEvalOf(step.route);
   try {
-    return renderStep({ name, body, ...keys, ...(route ? { route } : {}) } as never);
+    return renderStep({ name, body, ...keys, ...(route ? { route } : {}), ...policyOf(name, step.checkFailurePolicy) } as never);
   } catch (err) {
     refusals.push(`${where}: ${(err as Error).message}`);
     return undefined;

@@ -16,7 +16,7 @@ import { settingsObject } from './vocabulary.ts';
 const AUTO_MEMORY_OFF: Readonly<Record<string, boolean>> = { autoMemoryEnabled: false };
 
 /**
- * The `CLAUDE.md` files no session loads, as Claude Code's `claudeMdExcludes` takes them (`sdk.d.ts:9603`): picomatch globs matched
+ * The `CLAUDE.md` files no session loads, as Claude Code's `claudeMdExcludes` takes them (`sdk.d.ts:9745`): picomatch globs matched
  * against a file's absolute path, here every `CLAUDE.md` under a `node_modules`, at any depth. Measured on Claude Code 2.1.308
  * (`test/live.test.ts`): a session that reads under `node_modules/<dep>/` gets no `nested_memory` attachment for its `CLAUDE.md`, while
  * one beside it outside `node_modules` is attached.

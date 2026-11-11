@@ -29,13 +29,13 @@ export type Told = { run: Run; taskId: string; try: number; said: Said; from: Sp
  * Who says words to a step: the `caller` the request is (a session by its token, or the person with none), and who the words say they
  * are from (`from`, `--as <name>`), none being the caller itself.
  */
-export type SaidBy = { readonly caller: Caller; readonly from?: Speaker };
+export type SaidWho = { readonly caller: Caller; readonly from?: Speaker };
 
 /**
  * Who the words are from, judged before anything else is read (`stepSpeaker`): the names the person allowed in her chat (`nemia chat
  * allow`, `<store>/nemia/speakers.json`) read only for an agent that presents no token; refused `Invalid` or `Conflict` as it refuses.
  */
-const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidBy) {
+const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidWho) {
   const home = yield* StoreRoot;
   const allowed = caller.kind === 'person' && from?.kind === 'agent' ? yield* tried(() => readSpeakers(path.join(home, 'nemia'))) : [];
   const speaker = stepSpeaker(caller, from, allowed);
@@ -60,7 +60,7 @@ const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidBy) {
  * as the engine throws it, which journals nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's
  * (`toldBy`) or one a read threw; dies of anything else, a failure to deliver included (`tried`, `asked`).
  */
-export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string, by: SaidBy) {
+export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string, by: SaidWho) {
   const from = yield* speakerOf(by);
   const e = yield* EngineService;
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));

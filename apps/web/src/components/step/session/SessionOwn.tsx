@@ -51,14 +51,20 @@ function Brief({ text, marks }: { text: string; marks: string }) {
 }
 
 /**
- * What a person said to the session, off the engine's journal: their own words, at the right as the family draws a person's, with when
- * they were said and — once the session's transcript shows them reaching it — that they are in its conversation. Drawn once: the
- * session's own line for them is taken out (`heardIn`). The words as given, not as markdown: they are on the record as typed.
+ * What was said to the session, off the engine's journal, with when it was said and — once the session's transcript shows it reaching it
+ * — that it is in its conversation. A person's words at the right, as the family draws a person's (`You said, while it ran`); an
+ * agent's (`by`) at the left in a ring, under its name, as the family draws another agent's (`Peer`), never as the person's. Drawn once:
+ * the session's own line for them is taken out (`heardIn`). The words as given, not as markdown: they are on the record as typed.
  */
 function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: string }) {
+  const peer = told.by !== null;
+  const which = peer ? 'told-peer' : 'told';
   return (
-    <div {...mark(marks, 'message', 'told')} className="flex max-w-[94%] flex-col items-end gap-1.5 self-end">
-      <Who who="You said, while it ran" at={told.at}>
+    <div
+      {...mark(marks, 'message', which)}
+      className={cn('flex max-w-[94%] flex-col gap-1.5', peer ? 'items-start self-start' : 'items-end self-end')}
+    >
+      <Who who={peer ? `${told.by} · agent, while it ran` : 'You said, while it ran'} at={told.at}>
         {told.arrived !== null && (
           <span
             {...mark(marks, 'arrived', told.arrived)}
@@ -71,8 +77,11 @@ function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: st
         <SendIcon aria-hidden="true" className="size-3 text-on-surface-variant" />
       </Who>
       <div
-        {...mark(marks, 'bubble', 'told')}
-        className="max-h-72 overflow-y-auto px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface ring-1 ring-outline-variant ring-inset"
+        {...mark(marks, 'bubble', which)}
+        className={cn(
+          'max-h-72 overflow-y-auto px-3.5 py-2.5 whitespace-pre-wrap text-body-medium text-on-surface ring-1 ring-inset',
+          peer ? 'ring-outline' : 'ring-outline-variant',
+        )}
       >
         {told.text}
       </div>

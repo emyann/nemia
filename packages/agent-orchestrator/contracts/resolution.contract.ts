@@ -4,9 +4,9 @@
  * resolved by a proposal of that Workflow: the folder's merged files, proposed at the revision the conflict read, which the person
  * approves, or an agent a delegation lets approve. Any other conflict — the tree's wiring, its instruction and rules, an agent's, a
  * skill's, a carried file, a file nested deeper in a workflow's folder or one that is not text, neither of which a Workflow's spec
- * carries — is resolved by the person's choice, as before (`resolvedBy`). The pass reads, for each workflow with conflicts, the proposal `resolutions.json` names for
- * it, as it is now, and takes the workflow's files from the tree only once that proposal applied (`workflowResolution`); until then its
- * conflicts wait, and the status says on what. Pure.
+ * carries — is resolved by the person's choice, as before (`resolvedBy`). The pass reads, for each workflow with conflicts, the proposal
+ * `resolutions.json` names for it, as it is now, and takes the workflow's files from the tree only once that proposal applied
+ * (`workflowResolution`); until then its conflicts wait, and the status says on what. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { ProposalPhase } from 'objects';
@@ -77,13 +77,8 @@ const workflowResolutionSpec = spec<(proposal: ResolutionProposal) => WorkflowRe
     endedUnappliedIsResolvedAgain: {
       description: 'A proposal declined, stale, dropped, failed or gone resolves nothing: the conflicts are resolved again',
       condition: ({ input: [p], output }) =>
-        !(
-          p?.phase === 'declined' ||
-          p?.phase === 'stale' ||
-          p?.phase === 'dropped' ||
-          p?.phase === 'failed' ||
-          p?.phase === 'gone'
-        ) || output === 'refused',
+        !(p?.phase === 'declined' || p?.phase === 'stale' || p?.phase === 'dropped' || p?.phase === 'failed' || p?.phase === 'gone') ||
+        output === 'refused',
     },
   },
 });

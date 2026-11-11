@@ -1,8 +1,8 @@
 /**
  * A workflow folder's files read as the spec a Workflow object carries (`WorkflowSpec` of objects): each step, a `.md` file that is not
- * its README, by its name, its frontmatter's keys in the form the spec carries them (`servedKeys`) and its body, in the order of their names; its README; and the folder's other text
- * files (`files`), sorted by name. One reading for the folder on disk (`workflowSpecAt`, `current.verb.ts`) and for a folder composed
- * from an upgrade's merge (`nemia factory resolve`). Pure.
+ * its README, by its name, its frontmatter's keys in the form the spec carries them (`servedKeys`) and its body, in the order of their
+ * names; its README; and the folder's other text files (`files`), sorted by name. One reading for the folder on disk (`workflowSpecAt`,
+ * `current.verb.ts`) and for a folder composed from an upgrade's merge (`nemia factory resolve`). Pure.
  */
 import { isReadme, splitFrontmatter } from '../step/step.ts';
 import { frontmatterValues } from '../frontmatter/frontmatter.ts';

@@ -7,6 +7,9 @@ description: Make a whole factory, short of a run — create it, write its workf
 A factory is a set of repositories, the workflows attached to it, and the agents hired into their steps (`nemia factory --help`). You
 make one whole, short of a run, and stop before any work starts: starting is the person's next step, not part of making it.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 Each write to a factory's definition prompts the person (the `verbs` skill): say what it does before you run it, one at a time.
 
 ## 1. Ask what it is for

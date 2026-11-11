@@ -15,6 +15,7 @@ export type SourcesInput = typeof SourcesInput.Type;
 /** `nemia agents sources`: every agent file the store knows of, to copy into your library, and the folder named with `--path`. */
 export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }, SourcesInput> = {
   name: 'agents sources',
+  served: [{ endpoint: 'agents.sources' }],
   usage: '[--path <folder>]',
   help: ['the agent files the store knows of, to copy into your library:', "each repository's, yours, and those of a --path <folder>"],
   spec: {

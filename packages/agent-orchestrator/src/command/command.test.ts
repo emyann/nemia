@@ -614,6 +614,14 @@ test("the table's help is today's, word for word", () => {
       '                               said; --by: who puts the hold (default: your OS user).',
       '                               nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
       '                               if it had never been put',
+      '  nemia wait [-l <selector>]... [--from <cursor>] [--for <duration>]',
+      "                               wait for the feed's next line a selector takes, and print it with the",
+      '                               cursor after it: from --from (a cursor a wait or nemia watch printed),',
+      "                               else from the feed's end now. It ends on the first lines a selector",
+      '                               takes, or after --for (4m by default, at most 270s) with none, and',
+      '                               prints the cursor either way: wait again from it and no line is lost.',
+      '                               -l: as nemia watch -l takes it, given again for another; none takes',
+      '                               every line.',
       '  nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
       "                               forget runs that are over, a line each: a run's worktrees removed",
       '                               through git, what one held uncommitted committed first, then its',
@@ -755,6 +763,17 @@ test("the table's help is today's, word for word", () => {
       '                               own ends with the command: killed, the next pass of the daemon lifts it.',
       '                               Starts the service where nothing ticks; a daemon started by hand is',
       "                               named with --take-over's line",
+      '  nemia token add <name>',
+      '                               mint a token of yours under a name, printed this once: the store keeps',
+      '                               only its digest. A request presenting it, as Authorization: Bearer',
+      '                               <token>, is you, on the api and on the MCP port (<api>/mcp, the',
+      '                               header an MCP client sends). Refused of a name already used: nemia',
+      '                               token rm frees it',
+      '  nemia token ls',
+      '                               your tokens, by name, with when each was minted: never a token itself',
+      '  nemia token rm <name>',
+      '                               remove your token named <name>: a request presenting it is refused',
+      '                               from then on',
       '  nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]',
       "                               build the tag from a clean export into the store's releases/<tag>:",
       '                               npm ci, npm run build and npm run release:check there, on a trial',
@@ -863,6 +882,8 @@ type Table = Parameters<typeof commandBreaks>[0];
 const input = Schema.Struct({ name: Schema.String });
 const API = { side: 'api', why: 'w' } as const;
 const CLI_ALONE = { side: 'cli', why: 'w' } as const;
+/** The one endpoint of `objects`' Api that serves an entry, its tool the entry's name. */
+const LINK = [{ endpoint: 'runs.show' }] as const;
 const SAID_NOTHING: Spec = { ...CARD, flags: [{ flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: '' } }] };
 
 /**
@@ -870,21 +891,21 @@ const SAID_NOTHING: Spec = { ...CARD, flags: [{ flag: '--file', kind: 'text', ke
  * order, each naming the entry and the fix; none for a table that keeps its rules.
  */
 const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly string[], ReadonlyArray<readonly string[]>]> = [
-  ['an entry that ticks and writes', [{ name: 'x', input, handler, writes: true, ticks: true }], [], [], []],
+  ['an entry that ticks and writes', [{ name: 'x', input, handler, writes: true, ticks: true, served: LINK }], [], [], []],
   [
     'REFUSED: an entry that ticks and writes nothing, since nothing it does waits on a pass',
-    [{ name: 'x', input, handler, writes: false, ticks: true }],
+    [{ name: 'x', input, handler, writes: false, ticks: true, served: LINK }],
     [],
     [],
     [['x ticks and writes nothing', 'writes: true']],
   ],
-  ['an entry served on both sides, typed, beside a verb of another name', [{ name: 'a', input, handler }], ['b'], [], []],
+  ['an entry served on both sides, typed, beside a verb of another name', [{ name: 'a', input, handler, served: LINK }], ['b'], [], []],
   ['an entry the CLI alone serves', [{ name: 'a', only: CLI_ALONE, handler }], [], [], []],
-  ['an entry the api alone serves', [{ name: 'a', only: API, handler }], [], [], []],
+  ['an entry the api alone serves', [{ name: 'a', only: API, handler, served: LINK }], [], [], []],
   [
     'a name twice',
     [
-      { name: 'a', input, handler },
+      { name: 'a', input, handler, served: LINK },
       { name: 'a', only: CLI_ALONE, handler },
     ],
     [],
@@ -893,20 +914,26 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ],
   [
     'REFUSED: an entry served on both sides with no input, which the api has no keys to call it by',
-    [{ name: 'a', handler }],
+    [{ name: 'a', handler, served: LINK }],
     [],
     [],
     [['a has no input and no only', 'give it its input', 'which side alone serves it']],
   ],
-  ['a command that is also a verb of the CLI', [{ name: 'a', input, handler }], ['a'], [], [['a is a command', 'out of VERBS']]],
+  [
+    'a command that is also a verb of the CLI',
+    [{ name: 'a', input, handler, served: LINK }],
+    ['a'],
+    [],
+    [['a is a command', 'out of VERBS']],
+  ],
   [
     'an entry named by a former spelling, which the line it names would never reach',
-    [{ name: 'agents remove', input, handler }],
+    [{ name: 'agents remove', input, handler, served: LINK }],
     [],
     [],
     [['agents remove', 'RENAMED']],
   ],
-  ['a verb of the CLI beside an entry the api alone serves', [{ name: 'decide', only: API, handler }], ['decide'], [], []],
+  ['a verb of the CLI beside an entry the api alone serves', [{ name: 'decide', only: API, handler, served: LINK }], ['decide'], [], []],
   [
     'a verb of the CLI beside an entry the CLI serves',
     [{ name: 'decide', only: CLI_ALONE, handler }],
@@ -917,7 +944,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ['an entry the CLI alone serves with a runner and no handler', [{ name: 'a', only: CLI_ALONE }], [], ['a'], []],
   [
     'an entry the api serves with no handler',
-    [{ name: 'a', input }],
+    [{ name: 'a', input, served: LINK }],
     [],
     ['a'],
     [['a has no handler and is served on the api', 'give it a handler']],
@@ -931,7 +958,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ],
   [
     'a runner of the CLI that runs no entry the CLI serves',
-    [{ name: 'a', only: API, handler }],
+    [{ name: 'a', only: API, handler, served: LINK }],
     [],
     ['a', 'b'],
     [
@@ -939,7 +966,7 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
       ['b has a runner', 'its entry in the table', 'take it out of RUNS'],
     ],
   ],
-  ['a flag the CLI alone takes, saying why', [{ name: 'a', input, spec: CARD, handler }], [], [], []],
+  ['a flag the CLI alone takes, saying why', [{ name: 'a', input, spec: CARD, handler, served: LINK }], [], [], []],
   [
     'a why left empty, of a side alone',
     [{ name: 'a', only: { side: 'cli', why: '' }, handler }],
@@ -949,10 +976,55 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ],
   [
     'a why left empty, of a flag the CLI alone takes',
-    [{ name: 'a', input, spec: SAID_NOTHING, handler }],
+    [{ name: 'a', input, spec: SAID_NOTHING, handler, served: LINK }],
     [],
     [],
     [["a's --file is taken on the cli alone", 'says no why']],
+  ],
+  [
+    'REFUSED: an entry served on both sides that links no endpoint, which no tool of the port would call',
+    [{ name: 'a', input, handler }],
+    [],
+    [],
+    [['a links no endpoint', 'served', "only: { side: 'cli'"]],
+  ],
+  [
+    'REFUSED: an entry the api alone serves that links no endpoint',
+    [{ name: 'a', only: API, handler }],
+    [],
+    [],
+    [['a links no endpoint', 'served']],
+  ],
+  [
+    'an entry the CLI alone serves that links the endpoint the api serves it on',
+    [{ name: 'a', only: CLI_ALONE, handler, served: LINK }],
+    [],
+    [],
+    [],
+  ],
+  [
+    'an entry with a second link that names its tool',
+    [{ name: 'a b', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'un_a_b' }] }],
+    [],
+    [],
+    [],
+  ],
+  [
+    'REFUSED: a second link that names no tool, which would take the name of the first',
+    [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold' }] }],
+    [],
+    [],
+    [["a's link to runs.unhold names no tool", 'as']],
+  ],
+  [
+    'REFUSED: one tool name on two links, the first of one entry and the second of another',
+    [
+      { name: 'a b', input, handler, served: LINK },
+      { name: 'c', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'a_b' }] },
+    ],
+    [],
+    [],
+    [['a_b is the tool of a b and of c', 'another as']],
   ],
 ];
 
@@ -963,6 +1035,21 @@ test('a table breaks its rules, each break named with its fix, and a table that 
       assert.equal(breaks.length, broken.length, breaks.join('\n'));
       broken.forEach((fixes, i) => names(breaks[i], ...fixes));
     });
+});
+
+test("a tool of a CLI verb the api serves counts against the table's tools, and one of its own name breaks none", () => {
+  const decide = { name: 'decide', served: [{ endpoint: 'runs.decision' }] } as const;
+  names(
+    commandBreaks(
+      [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'decide' }] }],
+      [],
+      [],
+      [decide],
+    ).join('\n'),
+    'decide is the tool of a and of decide',
+    'another as',
+  );
+  assert.deepEqual(commandBreaks([{ name: 'a', input, handler, served: LINK }], [], [], [decide]), []);
 });
 
 /** What each flag `nemia stats` takes, as its refusal of one it does not take lists them. */

@@ -61,6 +61,7 @@ export type LabelRunInput = typeof LabelRunInput.Type;
  */
 export const LABEL_RUN: Command<Labelled, LabelRunInput> = {
   name: 'label run',
+  served: [{ endpoint: 'runs.labels' }],
   usage: '<runId> <key=value|key->... [--overwrite]',
   help: [
     "edit a run's labels: key=value sets a key, key- removes it; changing a",
@@ -87,6 +88,7 @@ export type LabelCardInput = typeof LabelCardInput.Type;
 /** `nemia label inbox`: an inbox card's `labels:` edited, every other key and its body kept; the run it starts is created with them. */
 export const LABEL_CARD: Command<Labelled, LabelCardInput> = {
   name: 'label inbox',
+  served: [{ endpoint: 'cards.labels' }],
   usage: '<name> <key=value|key->... [--overwrite]',
   help: [
     "edit an inbox card's labels: key=value sets a key, key- removes it;",

@@ -2,7 +2,7 @@
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
  * the custom words she was last filed or told with (`told.json`, the keeper's record), and what is built in with her in the package's
- * `nemia/` folder: her definition (`nemia.md`) and her skills.
+ * `nemia/` folder, a plugin: her definition (`agents/nemia.md`), her skills and the MCP port's server entry.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
  */
@@ -34,11 +34,14 @@ export const promptFile = (home: string): string => path.join(nemiaDir(home), 'p
 /** The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`). */
 export const toldFile = (home: string): string => path.join(nemiaDir(home), 'told.json');
 
-/** What is built in with her: her definition, `nemia.md`, and her skills, `skills/`, a plugin folder. */
+/**
+ * What is built in with her, a plugin folder: her definition, `agents/nemia.md`, which a coding agent that installs the plugin is given
+ * too, her skills, `skills/`, and the store's MCP port as its server, `.mcp.json`.
+ */
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
 
-/** The file that defines her, frontmatter and instruction. */
-export const nemiaDefinition = (): string => path.join(SHIPPED_NEMIA, 'nemia.md');
+/** The file that defines her, frontmatter and instruction: the plugin's agent, read by the keeper and by a coding agent alike. */
+export const nemiaDefinition = (): string => path.join(SHIPPED_NEMIA, 'agents', 'nemia.md');
 
 /** The level file as `nemia level` writes it. */
 const LevelSchema = Schema.Struct({
@@ -89,7 +92,7 @@ export function readNemia(file: string = nemiaDefinition()): StepSpec {
   if (/^askTools:/m.test(text))
     throw new Invalid({ message: `${file}: her askTools: is derived from the command table: take it out of nemia.md.` });
   const agent = parseAgent('nemia', text);
-  const step = stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
+  const step = stepFrom('nemia/agents/nemia.md', agent.keys, agent.body, undefined);
   const handed = (step.allowedTools ?? []).filter((rule) => /^Bash\(\s*nemia\b/.test(rule));
   if (handed.length)
     throw new Invalid({

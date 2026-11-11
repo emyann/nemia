@@ -1,5 +1,5 @@
 {
   "name": "nemia",
-  "description": "Nemia's own skills: bring what waits on the person, recap what moved, write a card, create a factory, commission a workflow, grant access, and the verbs she runs, by class.",
-  "version": "0.1.0"
+  "description": "Nemia, the operator of a Nemia store, as an agent of your own coding agent: her agent (nemia), her skills — bring what waits on the person, recap what moved, write a card, create a factory, commission a workflow, grant access, and every verb by class — and the store's MCP port as a server, at ${NEMIA_URL} (http://127.0.0.1:8787 by default) with a person's token in ${NEMIA_TOKEN}. Codex reads no plugin: give it the same server as an [mcp_servers.nemia] entry of its config.toml, its url the port's and its bearer token the person's.",
+  "version": "0.2.0"
 }

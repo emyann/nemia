@@ -48,6 +48,7 @@ function agentsRefusal(args: Args): string | null {
 /** `nemia agents`: every agent of both places, the repository's then yours, each read now through the Agent door. */
 export const AGENTS: Command<AgentsRead, AgentsInput> = {
   name: 'agents',
+  served: [{ endpoint: 'agents.list' }],
   usage: '[--repo .]',
   help: [
     "the agents a step may name, the repository's then yours: what each is",
@@ -70,6 +71,7 @@ export const AGENTS: Command<AgentsRead, AgentsInput> = {
 /** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
 export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
   name: 'agents card',
+  served: [{ endpoint: 'agents.card' }],
   usage: '<name> [--repo .] [--from repo|yours]',
   help: [
     'that agent in the shape of an A2A Agent Card, JSON on stdout and',

@@ -94,6 +94,7 @@ export type StatsInput = typeof StatsInput.Type;
  */
 export const STATS: Command<Stats, StatsInput> = {
   name: 'stats',
+  served: [{ endpoint: 'server.stats' }],
   usage:
     '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]',
   help: [

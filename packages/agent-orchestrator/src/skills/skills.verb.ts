@@ -37,6 +37,7 @@ export type SkillsInput = typeof SkillsInput.Type;
 /** Each skill folder `skills` names read now through the door (the skill named by its folder), by folder. */
 export const SKILLS_LIST: Command<Record<string, SkillRead>, SkillsInput> = {
   name: 'skills',
+  served: [{ endpoint: 'skills.list' }],
   usage: '[<skills> ...]',
   help: ['the skill folders named, each read'],
   spec: apiSpec([{ key: 'skills', takes: 'many', kind: 'name' }], []),
@@ -68,6 +69,7 @@ export type SkillShowInput = typeof SkillShowInput.Type;
  */
 export const SKILLS_READ: Command<SkillPage, SkillShowInput> = {
   name: 'skills show',
+  served: [{ endpoint: 'skills.get' }],
   usage: '<from> <name>',
   help: ['one skill, read for its page'],
   spec: apiSpec(
@@ -126,6 +128,11 @@ export type SkillWriteInput = typeof SkillWriteInput.Type;
 
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> = {
   name: 'skills write',
+  served: [
+    { endpoint: 'skills.create' },
+    { endpoint: 'skills.replace', as: 'skills_replace' },
+    { endpoint: 'skills.copy', as: 'skills_copy' },
+  ],
   usage: '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
   help: [
     'a skill of yours, or of a templated --factory, written from its',

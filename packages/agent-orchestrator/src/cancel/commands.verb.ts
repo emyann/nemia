@@ -1,19 +1,21 @@
 /** `nemia cancel`, an entry of the command table: what a run has in flight asked to stop, and nothing more filed (`cancelRun`). */
 import { cancelRun } from './cancel.verb.ts';
 import type { CancelPlan } from './cancel.ts';
-import { Effect } from 'effect';
-import type { Args } from '../command/command.ts';
+import { Effect, Schema } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
+/** What `nemia cancel` takes: the run's id, which the api reads off its path. */
+export const CancelInput = Schema.Struct({ runId: Schema.String });
+export type CancelInput = typeof CancelInput.Type;
 
-/** `nemia cancel`: what a run has in flight asked to stop, and nothing more filed; the plan it followed, a run already over included. */
-export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
+/**
+ * `nemia cancel`: what a run has in flight asked to stop, and nothing more filed; the plan it followed, a run already over included. The
+ * api serves it as the Run's `cancel` (`POST /api/namespaces/:namespace/runs/:name/cancel`), so a seat that started a run from outside
+ * can stop it.
+ */
+export const CANCEL: Command<{ id: string; plan: CancelPlan }, CancelInput> = {
   name: 'cancel',
+  served: [{ endpoint: 'runs.cancel' }],
   usage: '<runId>',
   help: ['stop what it has in flight; file nothing more'],
   spec: {
@@ -24,9 +26,9 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
   writes: true,
   ticks: true,
   class: 'ask',
-  only: { side: 'cli', why: 'the board offers no cancel: a person stops a run at the command line' },
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const { run, plan } = yield* cancelRun(textOf(args, 'runId') ?? '');
+  input: CancelInput,
+  handler: Effect.fnUntraced(function* ({ runId }: CancelInput) {
+    const { run, plan } = yield* cancelRun(runId);
     return { id: run.id, plan };
   }),
   print: ({ id, plan }) => {

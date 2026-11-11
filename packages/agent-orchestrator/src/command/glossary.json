@@ -7,6 +7,11 @@
   ],
   "terms": [
     {
+      "term": "Endpoint link",
+      "meaning": "an entry's `served`: the endpoint of `objects`' Api whose handler calls the entry (`<group>.<endpoint>`, typed by `ApiEndpointName`), and the tool it is on the MCP port, the verb's name with `_` for each space on the first link and its `as` on every other (`packages/agent-orchestrator/src/command/command.ts`). An entry the command line does not serve alone links one, and no tool name is given twice (`commandBreaks`).",
+      "type": "EndpointLink"
+    },
+    {
       "term": "Request",
       "meaning": "a person's answer beside a run, written for the next pass to file: a try or a round (`retry`), a yes at a gate or to a loop (`approve`), the base brought in (`refresh --base`).",
       "type": "PersonRequest",

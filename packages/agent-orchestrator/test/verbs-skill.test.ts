@@ -1,6 +1,7 @@
 /**
  * Nemia's `verbs` skill is the command table's, generated (`verbsSkill`): the shipped file is what the table renders today, a command added
- * without regenerating it is refused, and every verb the CLI serves her is listed under its class, none out of her reach.
+ * without regenerating it is refused, and every verb the CLI serves her is listed under its class, none out of her reach, each with the
+ * tools that serve it on the MCP port or why the command line alone runs it, so either seat reads it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { REGENERATE, verbsSkill, verbsSkillOf } from '../src/nemia/verbs.verb.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
-import { CLI_VERBS } from '../src/command/command.ts';
+import { CLI_VERBS, toolsOf } from '../src/command/command.ts';
 import { VERBS } from '../src/cli/main.ts';
 import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from './command-words.ts';
 
@@ -108,4 +109,55 @@ test('the skill lists no verb named by a refused word but those pending, and no 
     usages.some((u) => u.startsWith('refresh ') && u.includes('--base')),
     'the base is taken by refresh --base',
   );
+});
+
+/** The lines `text` lists under the command `name`'s usage line, to the next usage line or the block's end. */
+const blockOf = (text: string, name: string): string => {
+  const lines = text.split('\n');
+  const at = lines.findIndex((line) => line === `  nemia ${name}` || line.startsWith(`  nemia ${name} `));
+  assert.notEqual(at, -1, `${name} is listed`);
+  const end = lines.findIndex((line, i) => i > at && !line.startsWith('    '));
+  return lines.slice(at + 1, end).join('\n');
+};
+
+/** What a listed verb's block says of the port: its tools, or that the command line alone runs it, and why. */
+const portSaid = (c: { name: string; served?: Parameters<typeof toolsOf>[0]['served']; only?: { side: string; why: string } }) => {
+  const tools = toolsOf(c).map((t) => t.tool);
+  return tools.length > 0 ? `on the port: ${tools.join(', ')}` : `CLI only: ${c.only?.why}`;
+};
+
+test('each listed verb names its tools on the port, or why the command line alone runs it', () => {
+  const text = verbsSkill();
+  const listed = [...TABLE.filter((c) => c.only?.side !== 'api' && c.class !== 'none'), ...CLI_VERBS];
+  assert.ok(listed.some((c) => toolsOf(c).length > 1) && listed.some((c) => toolsOf(c).length === 0), 'both kinds are listed');
+  const says = (c: (typeof listed)[number]) =>
+    blockOf(text, c.name)
+      .split('\n')
+      .map((line) => line.trim())
+      .includes(portSaid(c));
+  assert.deepEqual(
+    listed.filter((c) => !says(c)).map((c) => c.name),
+    [],
+  );
+  assert.match(blockOf(text, 'hold'), /on the port: hold, unhold$/, 'every link of an entry is a tool');
+});
+
+test('REFUSED: a planted verb linked to an endpoint is listed with its tools, and one the command line alone runs with its why', () => {
+  const linked = {
+    name: 'planted',
+    usage: '',
+    help: ['a planted verb'],
+    class: 'act' as const,
+    served: [{ endpoint: 'runs.hold' as const }, { endpoint: 'runs.unhold' as const, as: 'unplanted' }] as const,
+  };
+  const alone = {
+    name: 'alone',
+    usage: '',
+    help: ['a verb of the shell'],
+    class: 'act' as const,
+    only: { side: 'cli' as const, why: 'it reads the machine it runs on' },
+  };
+  const rendered = verbsSkillOf([...TABLE, linked, alone], CLI_VERBS);
+  assert.match(blockOf(rendered, 'planted'), /on the port: planted, unplanted$/);
+  assert.match(blockOf(rendered, 'alone'), /CLI only: it reads the machine it runs on$/);
 });

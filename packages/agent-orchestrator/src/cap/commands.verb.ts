@@ -7,6 +7,7 @@ import type { Command } from '../command/entry.verb.ts';
  */
 export const CEILINGS: Command<Slots> = {
   name: 'ceilings',
+  served: [{ endpoint: 'server.ceilings' }],
   usage: '',
   help: ['the cap on runs in flight, the runs it counts and the runs it holds'],
   spec: { positionals: [], flags: [], unknown: (arg) => `the ceilings take no ${arg}.` },

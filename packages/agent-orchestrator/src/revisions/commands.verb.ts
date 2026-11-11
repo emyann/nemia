@@ -58,6 +58,7 @@ export const REFRESH: Command<
   RefreshInput
 > = {
   name: 'refresh',
+  served: [{ endpoint: 'runs.refresh' }],
   usage: '<runId> [<step>] [--base]',
   help: [
     'take the new revisions: a run keeps the workflow, agents, skills and',

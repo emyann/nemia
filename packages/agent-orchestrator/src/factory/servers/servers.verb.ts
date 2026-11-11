@@ -99,6 +99,7 @@ const LIST_USAGE = '<factory>';
 /** `nemia factory servers`: a factory's recorded MCP servers, each with its state as its harness reports it now. */
 export const FACTORY_SERVERS: Command<ServersListing> = {
   name: 'factory servers',
+  served: [{ endpoint: 'mcpservers.list' }],
   usage: LIST_USAGE,
   help: ["a factory's own MCP servers, each with the state its harness reports"],
   spec: {
@@ -307,6 +308,7 @@ type Added = { file: string; name: string; server: FactoryServers[string]; repla
  */
 export const FACTORY_SERVER_ADD: Command<Added, ServerAddInput> = {
   name: 'factory server add',
+  served: [{ endpoint: 'mcpservers.put' }],
   usage: ADD_USAGE,
   help: ["record a remote MCP server for a factory: its steps' sessions are", 'handed it, and an agent `mcp:` line names it'],
   spec: ADD_SPEC,
@@ -349,6 +351,7 @@ const RM_USAGE = '<factory> <server>';
  */
 export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }, ServerRmInput> = {
   name: 'factory server rm',
+  served: [{ endpoint: 'mcpservers.delete' }],
   usage: RM_USAGE,
   help: ["take a server off a factory's record"],
   spec: {

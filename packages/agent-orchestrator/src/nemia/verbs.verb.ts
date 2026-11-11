@@ -1,10 +1,11 @@
 /**
  * Nemia's `verbs` skill, generated from the command table (`TABLE`) and each command's class (`CommandClass`): every verb the CLI serves
- * her, by who answers for it, with its usage and help as `nemia`'s help prints them (`helpOf`). Built in as `nemia/skills/verbs/SKILL.md`,
- * and held to the table by `test/verbs-skill.test.ts`, which names `REGENERATE` when the file drifts.
+ * her, by who answers for it, with its usage and help as `nemia`'s help prints them (`helpOf`), and the tools that serve it on the MCP port
+ * (`toolsOf`) or why the command line alone runs it. Built in as `nemia/skills/verbs/SKILL.md`, and held to the table by
+ * `test/verbs-skill.test.ts`, which names `REGENERATE` when the file drifts.
  */
 import type { CommandClass } from '../admission/index.ts';
-import { CLI_VERBS, helpOf, type CommandSpec } from '../command/command.ts';
+import { CLI_VERBS, helpOf, toolsOf, type CommandSpec } from '../command/command.ts';
 import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
 import { TABLE } from '../command/commands.verb.ts';
 
@@ -13,11 +14,11 @@ export const REGENERATE =
   'node -e "import(\'./packages/agent-orchestrator/src/nemia/verbs.verb.ts\').then((m) => process.stdout.write(m.verbsSkill()))" > ' +
   'packages/agent-orchestrator/nemia/skills/verbs/SKILL.md';
 
-/** An entry as the skill reads it: its name, usage, help, class and the side it is served on alone. */
-type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'class'>;
+/** An entry as the skill reads it: its name, usage, help, class, the side it is served on alone and its endpoints. */
+type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'class' | 'served'>;
 
-/** A verb the CLI runs by a hand of its own: its name, usage, help and class. */
-type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class'>;
+/** A verb the CLI runs by a hand of its own: its name, usage, help, class and its endpoints. */
+type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>;
 
 /** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `none`. */
 const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; readonly heading: string; readonly says: string }[] = [
@@ -36,19 +37,26 @@ const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; re
     class: 'answer',
     heading: 'Answers what waits',
     says:
-      'Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then, in a terminal, run the verb they choose ' +
-      'with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.',
+      'Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose, at a shell ' +
+      'with their words as `--message`, or its tool on the port with them as its message: its prompt is their decision, asked once. `retry` asks ' +
+      'only of a step that waits on the person, or with `--budget`.',
   },
 ];
 
 /** The section a class is listed under: a command that reads bare and sets with some words is a read. */
 const sectionOf = (c: CommandClass): CommandClass => (typeof c === 'object' ? 'read' : c);
 
-/** An entry's help, and for a command that reads bare, the words that make it prompt the person. */
+/** Where an entry is served besides the shell: its tools on the MCP port (`toolsOf`), or why the command line alone runs it. */
+function servedLine(entry: Entry): readonly string[] {
+  const tools = toolsOf(entry).map((t) => t.tool);
+  if (tools.length > 0) return [`on the port: ${tools.join(', ')}`];
+  return entry.only?.side === 'cli' ? [`CLI only: ${entry.only.why}`] : [];
+}
+
+/** An entry's help, for a command that reads bare the words that make it prompt the person, and where it is served (`servedLine`). */
 function helpLines(entry: Entry): readonly string[] {
-  if (typeof entry.class !== 'object') return entry.help;
-  const words = entry.class.setsBy.join(', ');
-  return [...entry.help, `reads bare; prompts the person given ${words}`];
+  const bare = typeof entry.class === 'object' ? [`reads bare; prompts the person given ${entry.class.setsBy.join(', ')}`] : [];
+  return [...entry.help, ...bare, ...servedLine(entry)];
 }
 
 /**
@@ -76,7 +84,8 @@ export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb
     '# The verbs',
     '',
     'Every verb `nemia` serves you, by who answers for it, with its usage and help as `nemia --help` prints them. `nemia <verb> --help`',
-    'says more of one that has a manual.',
+    'says more of one that has a manual. With a shell, run `nemia <verb>`; on the MCP port, call the tool its `on the port` line names,',
+    'whose schema says its arguments. A verb said `CLI only` runs at a shell alone, for the reason given.',
     '',
     `Generated from the command table, never edited by hand: from the repository's root, \`${REGENERATE}\`.`,
     '',

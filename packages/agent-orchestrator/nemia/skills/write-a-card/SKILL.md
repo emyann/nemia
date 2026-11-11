@@ -7,6 +7,9 @@ description: Write a card a workflow can build from — the person's words, what
 A card is what a workflow's first step reads: the brief its agents work from. A card that says only the idea leaves each step to guess
 when it is done and how to show it. Write every part below; a part you cannot fill is a question for the person, not a part to drop.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ## What it holds
 
 1. **The person's words**, quoted, as they said them, with the date.

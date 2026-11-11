@@ -241,6 +241,22 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.deepEqual(selected(['reason=StorePaused']), ['store: store paused']);
     assert.deepEqual(selected(['source=person,kind=Store']), ['store: store paused', 'store: store resumed']);
   });
+  await t.test("kind=Factory and reason=ConflictsPending take a factory's conflicts line, and kind=Store does not", () => {
+    const pending = upgraded({
+      at: AT,
+      factory: 'acme',
+      word: 'conflicts pending',
+      note: 'agents/coder.md: choose one',
+      involved: { kind: 'Factory', name: 'acme' },
+      labels: { factory: 'acme' },
+      reason: 'ConflictsPending',
+    });
+    assert.deepEqual(selectableOf(pending), { factory: 'acme', kind: 'Factory', reason: 'ConflictsPending', type: 'Normal', source: 'tick' });
+    for (const typed of ['kind=Factory', 'reason=ConflictsPending', 'factory=acme', 'kind=Factory,reason=ConflictsPending'])
+      assert.equal(selects(parseSelectors([typed]), pending), true, typed);
+    for (const typed of ['kind=Store', 'reason=LevelChanged', 'waits', 'type=Warning'])
+      assert.equal(selects(parseSelectors([typed]), pending), false, typed);
+  });
   await t.test('AND within one selector, OR across two', () => {
     assert.deepEqual(selected(['factory=nemia,workflow=build,agent=ada,step=implement']), ['r-1/implement']);
     assert.deepEqual(selected(['factory=nemia,agent=iris']), [], 'a clause that holds of no line selects none');

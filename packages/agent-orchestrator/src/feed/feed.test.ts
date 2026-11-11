@@ -22,11 +22,14 @@ import {
   FEED_VERSION,
   foldFeed,
   freshFold,
+  isFactoryLine,
   isRunLine,
   isStoreLine,
   publishedOf,
   REMOVED,
   upgraded,
+  type FactoryLine,
+  type FeedConflicts,
   type FeedLine,
   type FeedPause,
   type FeedWords,
@@ -62,6 +65,7 @@ const emptyStore = () => fs.rmSync(FEED, { force: true });
 const lines = (): RunLine[] => readFeed(ROOT, 0).lines.filter(isRunLine);
 /** The store's lines in the feed: its pause put and lifted. */
 const storeLines = (): StoreLine[] => readFeed(ROOT, 0).lines.filter(isStoreLine);
+const factoryLines = (): FactoryLine[] => readFeed(ROOT, 0).lines.filter(isFactoryLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 
 /** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
@@ -420,6 +424,55 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
           upgraded({ at: AT, store: 'store', word: 'level changed', note: 'is at auto', involved: { kind: 'Store', name: 'store' } }),
         ]);
         assert.deepEqual([...fold.said.keys()], []);
+      });
+    },
+  );
+  await t.test(
+    "a factory's conflicts are one line when its ConflictsPending condition turns True and one when it turns back, read off the feed",
+    async (t) => {
+      emptyStore();
+      const memo = freshFeedMemo();
+      const pass = (conflicts: FeedConflicts, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, conflicts });
+      const said = () => factoryLines().map((l) => [l.factory, l.reason]);
+      const PENDING = { factory: 'acme', pending: true, message: 'agents/coder.md: choose one' };
+      const SETTLED = { factory: 'acme', pending: false, message: 'merged' };
+      await t.test('a factory whose conflicts are pending is said once over many passes; one with none pending is never said', () => {
+        for (let i = 0; i < 5; i++) pass([PENDING, { factory: 'quiet', pending: false }]);
+        assert.deepEqual(said(), [['acme', 'ConflictsPending']]);
+        assert.deepEqual(
+          factoryLines().map((l) => [l.involved, l.type, l.source, l.waits, l.labels, l.note]),
+          [[{ kind: 'Factory', name: 'acme' }, 'Normal', 'tick', undefined, { factory: 'acme' }, PENDING.message]],
+          "about the factory, the tick's, waiting on nobody by the table, labelled with its factory, its note the condition's message",
+        );
+        assert.equal(storeLines().length, 0, "no line of the store's");
+      });
+      await t.test('its message reworded, as a choice made for one conflict of several rewords it, owes no line', () => {
+        pass([{ ...PENDING, message: 'agents/coder.md: chosen · skills/look/SKILL.md: choose one' }]);
+        assert.equal(factoryLines().length, 1);
+      });
+      await t.test('a daemon with no fold says it no second time', () => {
+        for (let i = 0; i < 3; i++) pass([PENDING], freshFeedMemo());
+        assert.equal(factoryLines().length, 1);
+      });
+      await t.test('turned back to False it is said settled once, and a restarted daemon says it no second time', () => {
+        for (let i = 0; i < 3; i++) pass([SETTLED]);
+        pass([SETTLED], freshFeedMemo());
+        assert.deepEqual(said().slice(1), [['acme', 'ConflictsSettled']]);
+      });
+      await t.test('pending again after settled is said again: a standing word, never a one-shot', () => {
+        pass([PENDING]);
+        pass([PENDING]);
+        assert.deepEqual(said().slice(2), [['acme', 'ConflictsPending']]);
+      });
+      await t.test('a caller that read no conflicts says nothing of them, however the feed stands', () => {
+        recordFeed(ROOT, new Map(), { at: AT, memo });
+        recordFeed(ROOT, new Map(), { at: AT, memo: freshFeedMemo() });
+        assert.equal(factoryLines().length, 3);
+      });
+      await t.test("a factory's line is no run's, and a run's removed forgets none of it", () => {
+        const fold = foldFeed(freshFold(), readFeed(ROOT, 0).lines);
+        assert.deepEqual([...fold.said.keys()], ['Conflicts/acme']);
+        assert.ok(factoryLines().every((l) => !isRunLine(l) && !isStoreLine(l)));
       });
     },
   );

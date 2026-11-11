@@ -6,7 +6,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { DaemonLine, Delivery, FeedCursor, FeedLine, feedModel, RunLine, StoreLine, Subscription, SubscriptionName } from './feed.model.ts';
+import {
+  DaemonLine,
+  Delivery,
+  FactoryLine,
+  FeedCursor,
+  FeedLine,
+  feedModel,
+  RunLine,
+  StoreLine,
+  Subscription,
+  SubscriptionName,
+} from './feed.model.ts';
 import { DAEMON_STARTED, lineAsRead, startedLine, STORE, upgraded } from './feed.ts';
 import { DEFAULT_DIGEST_EVERY, DEFAULT_SELECTORS } from '../subscription/subscription.ts';
 
@@ -87,6 +98,7 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
     "a step's, with its try": [RunLine, { ...upgraded({ at: AT, run: 'r-1', step: 'review', word: 'blocked', note: 'x' }), try: 1 }],
     "a daemon's": [DaemonLine, startedLine(5151, { kind: 'none' }, AT, 0)],
     "the store's": [StoreLine, upgraded({ at: AT, store: STORE, word: 'store paused', note: `since ${AT}` })],
+    "a factory's": [FactoryLine, upgraded({ at: AT, factory: 'acme', word: 'conflicts pending', labels: { factory: 'acme' } })],
   };
   for (const [row, [schema, line]] of Object.entries(rows))
     await t.test(row, () => {
@@ -104,7 +116,7 @@ test('each kind of line decodes as the feed’s writers write it, and as a line 
   );
   await t.test('the model', () => {
     assert.deepEqual(feedModel.ids, { SubscriptionName: 'Subscription' });
-    assert.deepEqual(feedModel.entities, [Subscription, Delivery, RunLine, DaemonLine, StoreLine]);
+    assert.deepEqual(feedModel.entities, [Subscription, Delivery, RunLine, DaemonLine, StoreLine, FactoryLine]);
   });
 });
 

@@ -604,7 +604,7 @@ function checkPolicyOf(step: string, text: string | undefined, check: string | u
 
 /**
  * A draft's `checkFailurePolicy:`, read and refused as a file's line would be: the parsed policy, the map a step's frontmatter reads as
- * (a Workflow proposal's keys, each exit code a string), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
+ * (a Workflow proposal's keys, each exit code a number), or its line as the api's builder sends it (YAML flow, `checkFailurePolicyLine`).
  * Undefined for none.
  */
 function policyDrafted(step: string, drafted: unknown): CheckFailurePolicy | undefined {

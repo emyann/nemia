@@ -8,8 +8,8 @@ import type { Paused } from 'objects';
 
 /**
  * What the watch prints of a line of the feed, which the stream sends as its JSON (`FeedStreamEvent`'s `data`): a run's (`run`, its
- * `step`), the store's (`store`, `by`, `why`) or a daemon's (`daemon`, its pid), each with its time and its word. Read by this Schema
- * where it is printed in words; printed whole, every key it carries, under `--json`.
+ * `step`), the store's (`store`, `by`, `why`), a factory's (`factory`) or a daemon's (`daemon`, its pid), each with its time and its word.
+ * Read by this Schema where it is printed in words; printed whole, every key it carries, under `--json`.
  */
 export const FeedLineSaid = Schema.Struct({
   at: Schema.String,
@@ -21,18 +21,26 @@ export const FeedLineSaid = Schema.Struct({
   by: Schema.optionalKey(Schema.String),
   why: Schema.optionalKey(Schema.String),
   daemon: Schema.optionalKey(Schema.Number),
+  factory: Schema.optionalKey(Schema.String),
 });
 type FeedLine = typeof FeedLineSaid.Type;
 
 /** How the watch prints: as JSON (`--json`), else in words. */
 export type Watched = { json?: boolean };
 
-/** What one line of the feed says, without its time: a run's, the store's, or a daemon's. */
+/** What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's. */
 export const feedSaidWords = (l: FeedLine): string => {
   const store = l.store !== undefined ? l : undefined;
   const who = store?.by ? ` by ${store.by}` : '';
   const notes = [store?.why, l.note].filter((n) => n);
-  const head = l.run !== undefined ? `${l.run}  ${l.step ?? '—'}` : l.store !== undefined ? `${l.store}  —` : `pid ${l.daemon}`;
+  const head =
+    l.run !== undefined
+      ? `${l.run}  ${l.step ?? '—'}`
+      : l.store !== undefined
+        ? `${l.store}  —`
+        : l.factory !== undefined
+          ? `${l.factory}  —`
+          : `pid ${l.daemon}`;
   return `${head}  ${l.word}${who}${notes.map((n) => `  · ${n}`).join('')}`;
 };
 

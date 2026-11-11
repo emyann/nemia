@@ -17,6 +17,8 @@ export {
   involvedOf,
   isRunLine,
   isStoreLine,
+  isFactoryLine,
+  conflictsDue,
   lineAsRead,
   publishedOf,
   REMOVED,
@@ -27,8 +29,10 @@ export {
 } from './feed.ts';
 export type {
   DaemonLine,
+  FactoryLine,
   FeedAppended,
   FeedCloseout,
+  FeedConflicts,
   FeedDenial,
   FeedFold,
   ClosedFeedLabels,

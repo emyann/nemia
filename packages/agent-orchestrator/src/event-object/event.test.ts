@@ -15,7 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { meteredPass } from '../meter/tally.store.ts';
 import { FeedDoor, feedDoorFiles } from '../feed/feed.store.ts';
 import { feedDoorMemory } from '../feed/memory.store.ts';
-import type { FeedLine } from '../feed/feed.ts';
+import { upgraded, type FeedLine } from '../feed/feed.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { eventOf } from './event.ts';
 import { eventList, eventObject } from './event.verb.ts';
@@ -102,6 +102,30 @@ test('a reason this nemia does not know is served Unknown, its type and source t
   assert.equal(event.source, 'tick');
   assert.equal(event.metadata.namespace, 'mill');
   assert.equal(event.metadata.resourceVersion, '10');
+});
+
+test("a factory's conflicts line is served as an Event about the factory, in its namespace, its reason and type the table's", () => {
+  const signed: FeedLine = {
+    at: AT,
+    factory: 'mill',
+    word: 'conflicts pending',
+    note: 'agents/coder.md: choose one',
+    apiVersion: 'nemia/v1',
+    involved: { kind: 'Factory', name: 'mill' },
+    labels: { factory: 'mill' },
+    reason: 'ConflictsPending',
+    type: 'Normal',
+    source: 'tick',
+    message: 'conflicts pending · agents/coder.md: choose one',
+  };
+  const read = upgraded({ at: AT, factory: 'mill', word: 'conflicts pending', labels: { factory: 'mill' } });
+  for (const line of [signed, read]) {
+    const event = decode(eventOf(line, 0, 10));
+    assert.deepEqual(event.involved, { kind: 'Factory', name: 'mill' });
+    assert.equal(event.metadata.namespace, 'mill');
+    assert.equal(event.reason, 'ConflictsPending');
+    assert.equal(event.type, 'Normal');
+  }
 });
 
 test('a page of 2 reads on by continue in feed order, counting what follows', () => {

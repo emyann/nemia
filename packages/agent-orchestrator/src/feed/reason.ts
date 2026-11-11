@@ -10,9 +10,9 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 47 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 36 distinct codes,
- * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
- * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
+ * **The codes are the owner's.** The 49 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 2 of a factory, 38
+ * distinct codes, eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read
+ * under its former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
  * **Recognition is ordered** (`reasonOf`): the prefix `denied: ` of a one-shot before the bare `denied` of a check a person refused; the
  * suffix `· BLOCKED` before the word it is suffixed to, since a step that signed off blocked waits on a person whatever its session came
@@ -30,9 +30,9 @@ import { firstPiece } from '../piece/piece.ts';
 import type { EventSource, EventType, InvolvedKind } from 'objects';
 
 /**
- * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
+ * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, the store itself — its
  * pause, put by `nemia pause` and lifted by `nemia resume`, and a factory's level in force, set by `nemia level`, which are no run's and
- * no daemon's.
+ * no daemon's — or a factory, whose upgrade waits on a person's choice for its conflicts.
  */
 export type { InvolvedKind };
 
@@ -69,10 +69,10 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * The word each of a person's acts, each of the two runtime faults, a step's closeout read, the store's pause and a factory's level and
- * a pinned run behind its files say, the one place it is spelled: the owner named the first six at their slice's design gate, `closed
- * out` on its card, `revisions behind` at its design's and `level changed` on its card, and `reason.test.ts` holds each literally beside
- * the rule below that reads it back.
+ * The word each of a person's acts, each of the two runtime faults, a step's closeout read, the store's pause, a factory's level and
+ * its conflicts, and a pinned run behind its files say, the one place it is spelled: the owner named the first six at their slice's
+ * design gate, `closed out` on its card, `revisions behind` at its design's, `level changed` on its card and the conflicts' two at theirs,
+ * and `reason.test.ts` holds each literally beside the rule below that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by**: the retired prose match found its words anywhere inside a line's word, so
  * `failed`, `blocked` or `needs:` in one of these would have woken a subscriber for a fact the owner said waits on nobody — which is why a
@@ -89,6 +89,8 @@ export const LINE_WORDS = {
   StorePaused: 'store paused',
   StoreResumed: 'store resumed',
   LevelChanged: 'level changed',
+  ConflictsPending: 'conflicts pending',
+  ConflictsSettled: 'conflicts settled',
   RevisionsBehind: 'revisions behind',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
@@ -135,6 +137,8 @@ export const REASONS = {
   StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
   StoreResumed: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
   LevelChanged: { kinds: ['Store'], type: 'Normal', source: 'person' },
+  ConflictsPending: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
+  ConflictsSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
 } as const satisfies Record<string, Entry>;
 
 /** One of the feed's reasons, the code a machine selects on. */
@@ -255,6 +259,15 @@ const STORE_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.LevelChanged, reason: 'LevelChanged' },
 ];
 
+/**
+ * A factory's words: its upgrade waiting on a person's choice for each conflict, and that wait over — a word that stands per factory
+ * until its `ConflictsPending` condition turns (`conflictLines`). Both `Normal`: a wait on a person, not a fault.
+ */
+const FACTORY_WORDS: readonly Rule[] = [
+  { is: LINE_WORDS.ConflictsPending, reason: 'ConflictsPending' },
+  { is: LINE_WORDS.ConflictsSettled, reason: 'ConflictsSettled' },
+];
+
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */
 const matches = (rule: Rule, word: string): boolean => (rule.is !== undefined ? word === rule.is : word.startsWith(rule.starts));
 
@@ -279,6 +292,7 @@ export function codesOf(said: Said, kind: InvolvedKind): Codes {
   if (kind === 'Daemon') return { reason: 'DaemonStarted' };
   const { word } = said;
   if (kind === 'Store') return { reason: STORE_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown' };
+  if (kind === 'Factory') return { reason: FACTORY_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown' };
   if (word.startsWith(DENIED)) return { reason: 'ToolDenied' };
   if (word.endsWith(BLOCKED_END)) return { reason: 'AwaitingAnswer', via: 'closeout' };
   const said0 = firstPiece(word, PART);

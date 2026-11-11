@@ -37,6 +37,7 @@ import {
   type FeedMemo,
   type FeedPause,
   type FeedLevels,
+  type FeedConflicts,
   type FeedWords,
   lineAsRead,
 } from './feed.ts';
@@ -258,7 +259,8 @@ export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed
  * for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `pause` is the store's pause as the pass read it
  * (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is said of the store.
  * `levels` is each factory's level in force as the pass read it (`levelsNow`), whose changes the feed says (`levelLines`); none given,
- * none said.
+ * none said. `conflicts` is each factory's `ConflictsPending` condition as the pass read it (`conflictsNow`), whose turns the feed says
+ * (`conflictLines`); none given, none said.
  *
  * `memo` is the fold its caller has read so far, which this moves: it is read on to the end of the feed first — the lines the caller wrote
  * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put
@@ -274,7 +276,14 @@ export const feedPass = (
     unjudged = new Set<string>(),
     pause,
     levels,
-  }: { at?: string; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
+    conflicts,
+  }: {
+    at?: string;
+    unjudged?: ReadonlySet<string>;
+    pause?: FeedPause;
+    levels?: FeedLevels;
+    conflicts?: FeedConflicts;
+  } = {},
 ): Effect.Effect<FeedAppended, Refusal> =>
   Effect.gen(function* () {
     const end = yield* door.lines.end();
@@ -287,7 +296,7 @@ export const feedPass = (
     foldFeed(memo.fold, read.lines);
     memo.cursor = read.cursor;
     memo.generation = end?.generation;
-    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels);
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts);
     const size = end?.cursor ?? 0;
     if (!lines.length) return { lines, before: size, after: size, leading: '' };
     const appended = yield* door.lines.append(lines);
@@ -316,7 +325,14 @@ export const recordFeed = (
   {
     memo = freshMemo(),
     ...pass
-  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause; levels?: FeedLevels } = {},
+  }: {
+    at?: string;
+    memo?: FeedMemo;
+    unjudged?: ReadonlySet<string>;
+    pause?: FeedPause;
+    levels?: FeedLevels;
+    conflicts?: FeedConflicts;
+  } = {},
 ): FeedAppended => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
 
 /**
@@ -426,6 +442,16 @@ export const FeedLineSchema = Schema.Union([
       note: Schema.optionalKey(Schema.String),
       by: Schema.optionalKey(Schema.String),
       why: Schema.optionalKey(Schema.String),
+      ...LINE_KEYS,
+    }),
+    Rest,
+  ),
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      factory: Schema.String,
+      word: Schema.String,
+      note: Schema.optionalKey(Schema.String),
       ...LINE_KEYS,
     }),
     Rest,

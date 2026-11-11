@@ -73,7 +73,7 @@ nemia watch               # the same from the start, then each line as the tick 
 
 It is `$WF_ROOT/feed.jsonl`, a line of JSON per change. Every line a `nemia` of this version writes is a
 typed, labelled signal, as a Kubernetes `Event` is: `apiVersion: "nemia/v1"`, `involved` what it is about
-(`{kind, name}`, kind `Run`, `Step`, `Daemon` or `Store`, a step named `<run>/<step>`, the store `store`), `labels` the run, its factory,
+(`{kind, name}`, kind `Run`, `Step`, `Daemon`, `Store` or `Factory`, a step named `<run>/<step>`, the store `store`, a factory by its name), `labels` the run, its factory,
 its workflow and, on a step's line, the step and its agent — the same `stepLabels` a filing gives its
 session — `reason` a stable code a machine selects on, from the closed table in `src/feed/reason.ts`,
 `type` `Normal` or `Warning`, `waits: "person"` where the line waits on somebody, `source` the `tick`,
@@ -112,7 +112,13 @@ stands per factory, not a one-shot: the same pass reads each factory's level in 
 what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
 writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
 (`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. `nemia watch -l
-kind=Store` follows them, and the api sends them as a `store` event. **Nothing reads it to decide**: every pass still
+kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
+(`involved {kind: 'Factory'}`, labelled with it): `conflicts pending`, `reason: "ConflictsPending"`, when the `ConflictsPending` condition
+its controller writes to its status turns True, its note the condition's message, and `conflicts settled`, `reason: "ConflictsSettled"`,
+when it turns back, both `Normal` and the tick's. A word that stands per factory, compared by its reason alone (`conflictsDue`): the pass
+reads each templated factory's condition (`conflictsNow`), so a reworded message is no line, and a factory never said pending is never
+said settled. The first is one of Nemia's selectors (`reason=ConflictsPending`); `nemia watch -l kind=Factory` follows both, and the api
+sends them as a `factory` event. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
 
 What a pass compares against is the feed itself, folded, not something it remembers: a daemon keeps

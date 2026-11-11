@@ -1113,7 +1113,7 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
 });
 
 /**
- * A job's annotations as `gh api repos/{owner}/{repo}/check-runs/<id>/annotations` answered them, measured 2026-11-11 on public runs:
+ * A job's annotations as `gh api repos/{owner}/{repo}/check-runs/<id>/annotations` answered them, as read off public runs:
  * a job GitHub cut off at its `timeout-minutes` (thomhurst/TUnit, job 127347565906, conclusion `cancelled`, no other field marking it),
  * and a job cancelled by its workflow's concurrency (nodejs/node, job 130581766469), each as GitHub gave it, its blob address shortened.
  */
@@ -1183,7 +1183,7 @@ test("a ci job GitHub cut off at its timeout-minutes is red, re-run once, and th
   assert.equal(cancelled.code, PERSONS, cancelled.out);
   assert.equal(reruns(cancelled.calls).length, 0, 'a job cancelled by concurrency or a person is not re-run');
 
-  for (const unread of [{ 5678: 'not json' }, {}]) {
+  for (const unread of [{ 5678: 'not json' }, {}] as Record<number, string>[]) {
     const r = cutOffThen([checks(cancelledCi(5678))], unread);
     assert.equal(r.code, PERSONS, `annotations that cannot be read mark nothing: ${r.out}`);
   }

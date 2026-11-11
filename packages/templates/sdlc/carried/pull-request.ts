@@ -448,7 +448,7 @@ function why(entries: readonly Entry[], check: string): string[] {
 /**
  * The mark GitHub leaves on a job it cut off because it ran past its own `timeout-minutes`: the job's conclusion is `cancelled`, as a
  * job cancelled by concurrency or by a person is, and no field of the job or of its check run says otherwise; only an annotation of its
- * check run does, `The job has exceeded the maximum execution time of 45m0s` (measured 2026-11-11 on public runs; a concurrency's
+ * check run does, `The job has exceeded the maximum execution time of 45m0s` (as read off public runs; a concurrency's
  * cancel says `Canceling since a higher priority waiting request … exists` there instead).
  */
 const TIME_LIMIT = /has exceeded the maximum execution time/;

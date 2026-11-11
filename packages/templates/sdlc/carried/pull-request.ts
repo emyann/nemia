@@ -44,7 +44,11 @@
  *   Until GitHub has replaced every job it re-ran, the red it still shows is no verdict. The pass, or the refusal, then names the jobs
  *   re-run and how each ended the second time; a re-run still running at the bound is the work's refusal, not the person's, since the
  *   next check reads its verdict. An attempt that cannot be read, a re-run `gh` refuses, or a red entry that is no Actions job means no
- *   re-run, said in one line, and the refusal is as it would have been.
+ *   re-run, said in one line, and the refusal is as it would have been. A context still absent at half the start bound
+ *   (`WF_CI_STUCK_SECONDS` for a test) on a head with a workflow run GitHub queued and never started has that run's workflow dispatched
+ *   once on the branch (`dispatchStuck`), waited on within the same start bound; a dispatch GitHub refuses is a person's refusal at once,
+ *   naming the command to type. A dispatched run's entry links its run, not a job: its failing jobs are read from the run, re-run and read
+ *   as any other.
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
@@ -366,8 +370,39 @@ function rollup(number: number): Entry[] {
 /** The job GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where its URL names no job. */
 const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf(entry))?.[1];
 
-/** The workflow run GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where it is no job of an Actions run. */
-const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)\/job\/\d+/.exec(linkOf(entry))?.[1];
+/**
+ * The workflow run GitHub's own URL names for `entry`: a job's (`…/actions/runs/<run>/job/<id>`), or the run's own
+ * (`…/actions/runs/<run>`), which is what the rollup entry of a run started by `workflow_dispatch` links; none where it is no Actions run.
+ */
+const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)(?:[/?#]|$)/.exec(linkOf(entry))?.[1];
+
+/** A job of a workflow run, as `gh api repos/{owner}/{repo}/actions/runs/<id>/jobs` gives one. */
+type Job = { id?: number; name?: string; status?: string; conclusion?: string | null; html_url?: string };
+
+/** The jobs of the workflow run `id`, its latest attempt's, as GitHub says; `undefined` where they cannot be read. */
+const jobsOf = (id: string): Job[] | undefined =>
+  hinted<{ jobs?: Job[] }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}/jobs`))?.jobs;
+
+/**
+ * `entry` as the jobs that failed it: itself where it names a job or no Actions run, and where it names only a run — the rollup entry of
+ * a run started by `workflow_dispatch` links the run, not a job — that run's jobs that did not pass, read from GitHub, each as an entry
+ * linking its job, so their logs are read as a `pull_request` run's are; itself still where none can be read.
+ */
+function jobsFailing(entry: Entry): Entry[] {
+  const id = runIdOf(entry);
+  if (jobIdOf(entry) || !id) return [entry];
+  const runUrl = linkOf(entry).replace(/(\/actions\/runs\/\d+).*$/, '$1');
+  const failed = (jobsOf(id) ?? [])
+    .map((job): Entry => ({
+      name: job.name ?? '',
+      workflowName: entry.workflowName,
+      status: job.status?.toUpperCase(),
+      conclusion: job.conclusion?.toUpperCase(),
+      detailsUrl: job.html_url ?? `${runUrl}/job/${job.id ?? ''}`,
+    }))
+    .filter((job) => !pending(job) && verdict(job) !== PASSED && !['SKIPPED', 'NEUTRAL'].includes(verdict(job)));
+  return failed.length ? failed : [entry];
+}
 
 /**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
@@ -377,7 +412,7 @@ const runIdOf = (entry: Entry): string | undefined => /\/actions\/runs\/(\d+)\/j
  * team may call `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[], check: string): string[] {
-  const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED);
+  const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED).flatMap(jobsFailing);
   const jobs = new Map<string, string>();
   const ordered = [...failed.filter((entry) => nameOf(entry) !== check), ...failed.filter((entry) => nameOf(entry) === check)];
   for (const entry of ordered.slice(0, JOBS)) {
@@ -651,10 +686,16 @@ function rerunOnce(ours: readonly Entry[], entries: readonly Entry[]): Rerun | u
   return { runs, was: entries.filter((entry) => judgedRed(entry) && runs.includes(runIdOf(entry) ?? '')), lines };
 }
 
+/**
+ * Which run of a check `entry` is: its job's id, or, for an entry that links only its workflow run (a dispatched run's), that link and
+ * when it started, since a re-run keeps the run's link and starts the job again.
+ */
+const attemptOf = (entry: Entry): string => jobIdOf(entry) ?? `${linkOf(entry)}@${entry.startedAt ?? ''}`;
+
 /** How a job the wait re-ran ended the second time, by `entries`: empty while GitHub still shows its first time, which is no verdict. */
 function second(entries: readonly Entry[], was: Entry): string {
   const now = entries.find((entry) => checkKey(entry) === checkKey(was));
-  return !now || jobIdOf(now) === jobIdOf(was) ? '' : (verdict(now) || now.status || 'no verdict').toLowerCase();
+  return !now || attemptOf(now) === attemptOf(was) ? '' : (verdict(now) || now.status || 'no verdict').toLowerCase();
 }
 
 /** What the wait re-ran and how each job ended the second time, then why any run was not re-run; nothing where it asked nothing. */
@@ -672,6 +713,104 @@ const seenAfter = (rerun: Rerun | undefined, entries: readonly Entry[], ours: re
 const RERUNNING =
   "  the next check reads the re-run's own verdict and re-runs nothing again: change nothing for it, and sign off as before";
 
+/** A workflow run of a commit, as `gh run list --commit <sha> --json databaseId,workflowName,status,event` gives one. */
+type Listed = { databaseId?: number; workflowName?: string; status?: string; event?: string };
+
+/** What the wait dispatched of a head whose runs never started: the workflows dispatched, and the lines that say what it did and why. */
+type Dispatch = { dispatched: string[]; refused: string[]; lines: string[] };
+
+/**
+ * The workflow file of the run `id`, by the name `gh workflow run` takes (the last part of the path GitHub gives the run), as GitHub says;
+ * `undefined` where it cannot be read.
+ */
+function fileOf(id: string): string | undefined {
+  const at = hinted<{ path?: string }>(read('api', `repos/{owner}/{repo}/actions/runs/${id}`))?.path;
+  return at ? (at.split('@')[0] ?? at).split('/').pop() : undefined;
+}
+
+/**
+ * The inputs `yaml`, a workflow file, requires of a `workflow_dispatch`: each input under its `workflow_dispatch:`'s `inputs:` that says
+ * `required: true`. Read by indentation, as no YAML parser is beside this script; a file it cannot read so gives none, and the command
+ * it is told then is one GitHub refuses naming the input it lacks.
+ */
+function requiredInputs(yaml: string): string[] {
+  const lines = yaml.split('\n').filter((line) => line.trim() && !line.trim().startsWith('#'));
+  const indent = (line: string): number => line.search(/\S/);
+  const under = (at: number): number[] => {
+    const out: number[] = [];
+    for (let i = at + 1; i < lines.length && indent(lines[i] ?? '') > indent(lines[at] ?? ''); i++) out.push(i);
+    return out;
+  };
+  const key = (at: number, word: string): boolean => new RegExp(`^\\s*${word}:\\s*(?:#.*)?$`).test(lines[at] ?? '');
+  const dispatch = lines.findIndex((_, at) => key(at, 'workflow_dispatch'));
+  const inputs = dispatch === -1 ? undefined : under(dispatch).find((at) => key(at, 'inputs'));
+  const listed = inputs === undefined ? [] : under(inputs);
+  const child = Math.min(...listed.map((at) => indent(lines[at] ?? '')));
+  const names: string[] = [];
+  let current: string | undefined;
+  for (const at of listed) {
+    const line = lines[at] ?? '';
+    if (indent(line) === child) current = /^\s*["']?([\w-]+)["']?:/.exec(line)?.[1];
+    else if (current && /^\s*required:\s*true\b/.test(line) && !names.includes(current)) names.push(current);
+  }
+  return names;
+}
+
+/**
+ * The workflows of the head `sha` whose run GitHub queued and never started, dispatched once each on `branch`. A run GitHub creates during
+ * an incident of its Actions can stay `queued` with no job for good, which `gh run cancel`, its force-cancel and `gh run rerun` all refuse,
+ * so no re-run frees it: a `workflow_dispatch` at the branch does, its check runs attaching to the head commit, where the pull request's
+ * rollup reads them. A dispatched run checks the branch head, not the merge ref a `pull_request` run checks: the landing's wait on the
+ * base branch's own context at the merge commit stays the last word on the merged tree. The workflow is the stuck run's own, read from
+ * GitHub (`gh run list --commit`), never a name the template knows. Once is read from GitHub, never carried: a workflow that already has
+ * a `workflow_dispatch` run on the head is not dispatched again, so a `--recheck` or a later try never dispatches it twice. A run whose
+ * jobs cannot be read is not dispatched, and a dispatch GitHub refuses (no `workflow_dispatch` trigger, a required input, a token that
+ * may not) names the stuck run and the command a person types, with `-f` for each input the file requires; each said in a line.
+ */
+function dispatchStuck(sha: string, branch: string): Dispatch {
+  const runs = hinted<Listed[]>(read('run', 'list', '--commit', sha, '--json', 'databaseId,workflowName,status,event'));
+  if (!Array.isArray(runs))
+    return { dispatched: [], refused: [], lines: [`  not dispatched: the workflow runs of ${sha.slice(0, 12)} could not be read`] };
+  const already = new Set(runs.filter((r) => r.event === 'workflow_dispatch').map((r) => r.workflowName ?? ''));
+  const done: Dispatch = { dispatched: [], refused: [], lines: [] };
+  const handled = new Set<string>();
+  for (const r of runs) {
+    const name = r.workflowName ?? '';
+    if ((r.status ?? '').toLowerCase() !== 'queued' || r.event === 'workflow_dispatch' || r.databaseId === undefined || handled.has(name))
+      continue;
+    const id = String(r.databaseId);
+    const jobs = jobsOf(id);
+    if (!jobs) {
+      done.lines.push(`  not dispatched: run ${id} of ${name} is queued, and its jobs could not be read`);
+      continue;
+    }
+    if (jobs.some((job) => (job.status ?? '').toLowerCase() !== 'queued')) continue;
+    handled.add(name);
+    if (already.has(name)) {
+      done.lines.push(`  run ${id} of ${name} is queued with no job started, and ${name} was dispatched on this head already: not again`);
+      continue;
+    }
+    const file = fileOf(id) ?? name;
+    const command = `gh workflow run ${file} --ref ${branch}`;
+    const asked = read('workflow', 'run', file, '--ref', branch);
+    if (asked.status === 0) {
+      done.dispatched.push(name);
+      done.lines.push(`  dispatched ${name} once (\`${command}\`): its run ${id} on this head was queued with no job started`);
+      continue;
+    }
+    const yaml = read('workflow', 'view', file, '--yaml', '--ref', branch);
+    const inputs = yaml.status === 0 ? requiredInputs(yaml.out) : [];
+    done.refused.push(name);
+    done.lines.push(
+      `  not dispatched: run ${id} of ${name} is queued with no job started, which no re-run or cancel frees, and \`${command}\` ` +
+        `failed: ${asked.err.split('\n')[0]}`,
+      '  dispatch it on the branch yourself, giving the workflow a `workflow_dispatch` trigger first where it has none, then retry:',
+      `  ${[command, ...inputs.map((input) => `-f ${input}=<value>`)].join(' ')}`,
+    );
+  }
+  return done;
+}
+
 /** The CI context `wait` reads, from `--check <name>`; refuses a wait given none, or given anything else. */
 function checkOf(args: readonly string[]): string {
   const [flag, name, ...rest] = args;
@@ -683,9 +822,43 @@ function checkOf(args: readonly string[]): string {
   return name;
 }
 
+/** Whether the wait looks for the head's runs GitHub never started: its context still absent once `stuck` seconds since `began` are out. */
+const dispatchDue = (seen: Seen, began: number, stuck: number): boolean => seen === 'absent' && Date.now() - began >= stuck * 1000;
+
+/**
+ * The refusal of a context with no verdict where the wait stops, `say` given its tail: the work's while a re-run it asked still runs, since
+ * the next check reads that verdict, else the person's; each with `said` and the retry line after it.
+ */
+const stalled = (rerun: Rerun | undefined, said: string[], retry: string, say: (tail: string[]) => string): Refusal =>
+  rerun?.runs.length ? new Refusal(say([...said, RERUNNING, retry])) : new PersonsRefusal(say([...said, retry]));
+
+/** What the wait dispatched, then what it re-ran and how each job ended the second time; nothing where it asked neither. */
+const waitSaid = (dispatch: Dispatch | undefined, rerun: Rerun | undefined, entries: readonly Entry[]): string[] => [
+  ...(dispatch?.lines ?? []),
+  ...rerunSaid(rerun, entries),
+];
+
+/**
+ * The seconds a context still absent is waited on before the head's runs GitHub never started are looked for (`dispatchStuck`): half the
+ * start bound `start`, within it; `WF_CI_STUCK_SECONDS` sets it for a test.
+ */
+const stuckSeconds = (start: number): number => Math.min(seconds('WF_CI_STUCK_SECONDS', start / 2), start);
+
+/**
+ * The seconds the wait waited when it stops on a context with no verdict: `bound`, once it is out, or at once where every dispatch it asked
+ * GitHub refused, since nothing is then to come and the person's command is said now; `undefined` while it waits on.
+ */
+function stopsAt(began: number, bound: number, dispatch: Dispatch | undefined): number | undefined {
+  const waited = Date.now() - began;
+  if (waited >= bound * 1000) return bound;
+  return dispatch?.refused.length && !dispatch.dispatched.length ? Math.floor(waited / 1000) : undefined;
+}
+
 /**
  * `wait --check <name>`: that context of the pull request's head, waited out and read, a red re-run once first (`rerunOnce`) within the
- * same bound; its refusal says why CI went red, and what the re-run did.
+ * same bound, and, where the context is still absent at half the start bound, each workflow of the head GitHub queued and never started
+ * dispatched once on the branch (`dispatchStuck`), waited on within the same start bound; its refusal says why CI went red, and what the
+ * re-run or the dispatch did.
  */
 function wait(args: string[]): string[] {
   const check = checkOf(args);
@@ -696,19 +869,21 @@ function wait(args: string[]): string[] {
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
+  const stuck = stuckSeconds(start);
   let rerun: Rerun | undefined;
+  let dispatch: Dispatch | undefined;
   for (;;) {
     const entries = latest(retried(`the checks of #${pr.number}`, () => rollup(pr.number), began, retry));
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const red = ours.filter(judgedRed);
     rerun ??= rerunOnce(ours, entries);
     const seen = seenAfter(rerun, entries, ours);
-    const said = rerunSaid(rerun, entries);
+    dispatch ??= dispatchDue(seen, began, stuck) ? dispatchStuck(pr.headRefOid, branch) : undefined;
+    const said = waitSaid(dispatch, rerun, entries);
     if (seen === 'passed') return [...said.map((line) => line.trim()), `\`${check}\` passed on ${pr.headRefOid.slice(0, 12)}: ${pr.url}`];
     if (seen === 'failed') throw new (red.length ? Refusal : PersonsRefusal)(redly(pr, check, ours, entries, retry, onto, said));
-    const bound = seen === 'absent' ? start : whole;
-    const [Kind, tail] = rerun?.runs.length ? [Refusal, [...said, RERUNNING, retry]] : [PersonsRefusal, [retry]];
-    if (Date.now() - began >= bound * 1000) throw new Kind(unanswered(seen, pr, check, ours, entries, bound, tail));
+    const stopped = stopsAt(began, seen === 'absent' ? start : whole, dispatch);
+    if (stopped !== undefined) throw stalled(rerun, said, retry, (tail) => unanswered(seen, pr, check, ours, entries, stopped, tail));
     sleep(poll);
   }
 }

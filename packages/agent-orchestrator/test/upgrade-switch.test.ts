@@ -18,6 +18,8 @@ import path from 'node:path';
 import { parse, stringify } from 'yaml';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { approveProgram } from '../src/approval/approve.verb.ts';
+import { PERSON } from '../src/caller/caller.ts';
 import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
 import { readFactoryAt } from '../src/factory/factory.store.ts';
@@ -206,20 +208,29 @@ test('a switch onto another template: previewed with no common base, held to its
     );
   });
 
-  await s.test('each conflict resolved: the agent kept, the hire taken, the rules written by hand, the rest the template', async (t) => {
-    const mine = path.join(scratch('wf-upgrade-switch-choice-'), 'rules.md');
-    for (const at of conflicts) {
-      const choice =
-        at === ALMA
-          ? ['--ours']
-          : at.startsWith(`${RULES}:`)
-            ? (fs.writeFileSync(mine, 'Never touch the database.\n'), ['--file', mine])
-            : ['--theirs'];
-      await printedBy(t, 'factory', 'resolve', 'crew', at, ...choice);
-    }
-    const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8'));
-    assert.deepEqual([resolutions.to, resolutions.template], ['1.0.0', 'other'], 'the choices are for other at 1.0.0');
-  });
+  await s.test(
+    'each conflict resolved: the agent kept, the hire taken, the rules written by hand, the rest the template, each workflow by its proposal, approved',
+    async (t) => {
+      const mine = path.join(scratch('wf-upgrade-switch-choice-'), 'rules.md');
+      for (const at of conflicts) {
+        const choice =
+          at === ALMA
+            ? ['--ours']
+            : at.startsWith(`${RULES}:`)
+              ? (fs.writeFileSync(mine, 'Never touch the database.\n'), ['--file', mine])
+              : ['--theirs'];
+        await printedBy(t, 'factory', 'resolve', 'crew', at, ...choice);
+      }
+      const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8'));
+      assert.deepEqual([resolutions.to, resolutions.template], ['1.0.0', 'other'], 'the choices are for other at 1.0.0');
+      const proposals = Object.values(resolutions.proposals ?? {}) as string[];
+      assert.ok(proposals.length > 0, "a workflow's conflicts are resolved by its proposal");
+      for (const name of proposals) {
+        const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'crew', name, { home: ROOT, repo: ROOT }));
+        assert.equal(applied.status.phase, 'applied');
+      }
+    },
+  );
 
   await s.test('the controller merges: each choice in the tree, the base the new render, the status naming other', () => {
     const merged = reconciled(factory('crew'));

@@ -440,6 +440,12 @@ export function compareVersions(a: string, b: string): number {
 /** The line that resolves the conflict `at` of the factory `name`, as a person types it. */
 export const resolveLine = (name: string, at: string): string => `nemia factory resolve ${name} '${at}' --ours|--theirs|--file <path>`;
 
+/** The line that approves the proposal `proposal` resolving conflicts of the factory `name`, as a person types it. */
+export const approveLine = (name: string, proposal: string): string => `nemia proposals approve ${proposal} -n ${name}`;
+
+/** The line that declines the proposal `proposal` of the factory `name`, so its workflow's conflicts are resolved again. */
+export const declineLine = (name: string, proposal: string): string => `nemia proposals decline ${proposal} -n ${name}`;
+
 /** The most lines of a side a status keeps of a conflict. */
 export const KEPT_LINES = 200;
 

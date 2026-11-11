@@ -522,6 +522,7 @@ const PINNED: Record<string, string[]> = {
     'watchedLine',
     'wfRoot',
     'withProposalsPass',
+    'withResolutionProposer',
     'wordOf',
     'workflowAt',
     'workflowDescription',

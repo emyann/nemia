@@ -197,7 +197,7 @@
     },
     {
       "term": "Involved",
-      "meaning": "what an Event is about: a run, one of its steps, a daemon or the store, by its kind (`INVOLVED_KINDS`) and its name (`EventInvolved`, `packages/objects/src/event.ts`).",
+      "meaning": "what an Event is about: a run, one of its steps, a daemon, the store or a factory, by its kind (`INVOLVED_KINDS`) and its name (`EventInvolved`, `packages/objects/src/event.ts`).",
       "type": "EventInvolved"
     },
     {

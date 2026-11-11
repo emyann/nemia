@@ -63,8 +63,19 @@ const store = {
   source: 'person',
 } as const;
 
-test("the Api's get answers a run's, a step's, a daemon's and the store's event, its list a page of them; another kind refused", () => {
-  for (const event of [run, step, daemon, store]) assert.deepEqual(answered('events', 'getAll', event), event);
+const factory = {
+  apiVersion: API_VERSION,
+  kind: 'Event',
+  metadata: meta('400', 'acme'),
+  involved: { kind: 'Factory', name: 'acme' },
+  reason: 'ConflictsPending',
+  type: 'Normal',
+  message: 'conflicts pending',
+  source: 'tick',
+} as const;
+
+test("the Api's get answers a run's, a step's, a daemon's, the store's and a factory's event, its list a page of them; another kind refused", () => {
+  for (const event of [run, step, daemon, store, factory]) assert.deepEqual(answered('events', 'getAll', event), event);
   const page = { apiVersion: API_VERSION, kind: 'EventList', metadata: { continue: 'x', remainingItemCount: 2 }, items: [run, daemon] };
   assert.deepEqual(answered('events', 'listAll', page), page);
   assert.equal(answered('events', 'getAll', { ...run, kind: 'Run' }), undefined);

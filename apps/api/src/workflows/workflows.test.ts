@@ -107,6 +107,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   budget: null,
   check: null,
   retries: null,
+  checkFailurePolicy: null,
   gate: null,
   output: null,
   tally: [],
@@ -171,6 +172,18 @@ test("a condition's keys and a workflow node's are listed on the spec, the route
     { routes: node.routes, route: node.route, when: node.when, workflow: node.workflow },
     { routes: null, route: null, when: ['web'], workflow: 'build' },
   );
+});
+
+test("a step's check failure policy is listed on its spec as its line writes it, and null where it says none", () => {
+  const policed = specOf({
+    name: 'implement',
+    after: [],
+    body: '',
+    check: 'npm test',
+    checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }] },
+  });
+  assert.equal(policed.checkFailurePolicy, '{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }');
+  assert.equal(specOf({ name: 'implement', after: [], body: '', check: 'npm test' }).checkFailurePolicy, null);
 });
 
 test("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", async (t) => {

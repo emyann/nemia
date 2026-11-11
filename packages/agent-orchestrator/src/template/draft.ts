@@ -15,6 +15,7 @@ import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
+import { checkFailurePolicyOf } from '../check/check-policy.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -95,6 +96,7 @@ const PLACED = new Set<string>([
   'output',
   'tally',
   'route',
+  'checkFailurePolicy',
   'workflow',
   ...ROUTE_LISTS,
   ...WORDS,
@@ -161,6 +163,8 @@ function routingOf(keys: Readonly<Partial<Record<string, unknown>>>): Partial<St
     else if (typeof written === 'string') wired[key] = listOf(written);
   }
   if (keys.route !== undefined) wired.route = templateRoute(keys.route) ?? keys.route;
+  if (typeof keys.checkFailurePolicy === 'string')
+    wired.checkFailurePolicy = checkFailurePolicyOf('checkFailurePolicy', JSON.stringify(flowOf(keys.checkFailurePolicy)));
   if (typeof keys.workflow === 'string') wired.workflow = keys.workflow;
   return wired;
 }

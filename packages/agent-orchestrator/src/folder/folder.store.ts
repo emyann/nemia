@@ -366,6 +366,25 @@ const frozenStepFields = {
   budget: Schema.optionalKey(Schema.Finite),
   check: Schema.optionalKey(Schema.String),
   retries: Schema.optionalKey(Schema.Finite),
+  checkFailurePolicy: Schema.optionalKey(
+    Schema.StructWithRest(
+      Schema.Struct({
+        rules: Schema.Array(
+          Schema.StructWithRest(
+            Schema.Struct({
+              action: Schema.Literals(['FailStep', 'Count']),
+              onExitCodes: Schema.StructWithRest(
+                Schema.Struct({ operator: Schema.Literals(['In', 'NotIn']), values: Schema.Array(Schema.Finite) }),
+                Rest,
+              ),
+            }),
+            Rest,
+          ),
+        ),
+      }),
+      Rest,
+    ),
+  ),
   gate: Schema.optionalKey(Schema.Literal(true)),
   output: Schema.optionalKey(
     Schema.StructWithRest(

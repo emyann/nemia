@@ -40,9 +40,12 @@ const FORMER_LINE = /^[A-Za-z_][\w.-]*[ \t]*:/;
 
 /**
  * A step's keys that hold one value: a flow collection YAML reads on one of them, `check: [ -f x ]` or `check: { a; b; }`, is the shell
- * the former form wrote, never a list or a map the key could take. Not `route:`, a condition's eval, which holds a map.
+ * the former form wrote, never a list or a map the key could take. Not the keys that hold a map (`MAP_KEYS`).
  */
-const ONE_VALUE: readonly string[] = STEP_KEYS.filter((key) => !LIST_KEYS.includes(key) && key !== 'route');
+/** The step keys whose value is a map: `route:`, a condition's eval, and `checkFailurePolicy:`, a check's failure policy. */
+export const MAP_KEYS: readonly string[] = ['route', 'checkFailurePolicy'];
+
+const ONE_VALUE: readonly string[] = STEP_KEYS.filter((key) => !LIST_KEYS.includes(key) && !MAP_KEYS.includes(key));
 
 /** The options every parse here is read with. */
 const parsed = (block: string, lineCounter?: LineCounter) =>

@@ -51,6 +51,7 @@ import { closeoutAsked, closeoutOf, deniedOf, harnessBlocked } from '../src/view
 import { endWords, phaseOfView } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { StepSpec } from '../src/workflow.ts';
+import { retryOffers } from '../src/retry/retry.ts';
 import { aRead, listing, names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -547,6 +548,38 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       cancelPlan(aRead(CHECKED, withCheck('c1'), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => 1 })),
       { kind: 'cancel', stop: [] },
       'a refused check with no try due waits on a person, so the run is not finished',
+    );
+  });
+  await t.test("a refusal its `checkFailurePolicy:` names a person's spends no try: the step waits on you, offered `--recheck`", () => {
+    const policed: StepSpec[] = [
+      {
+        ...RETRIED[0]!,
+        checkFailurePolicy: {
+          rules: [
+            { action: 'Count', onExitCodes: { operator: 'In', values: [2] } },
+            { action: 'FailStep', onExitCodes: { operator: 'NotIn', values: [1, 2] } },
+          ],
+        },
+      },
+      RETRIED[1]!,
+    ];
+    const read = (code: Verdict) => aRead(policed, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => code });
+    const a = assess(read(78));
+    assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed'], 'no try is filed, though retries: 2 has both left');
+    const d = decision(read(78), nothingShipped);
+    assert.deepEqual(d.kind === 'awaiting' && d.failedCheck, ['implement'], 'it waits on you');
+    const offers = retryOffers(policed, onTry(), d, checkFailed, signedDone, asked, undefined, () => 78);
+    assert.equal(offers[0]?.command, 'nemia retry r-1 implement --recheck', 'the recheck first: a person answers outside the branch');
+    for (const code of [1, 2])
+      assert.deepEqual(
+        assess(read(code)).retry,
+        [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }],
+        `exit ${code}: the first rule that holds counts it, or none does`,
+      );
+    assert.deepEqual(
+      assess(aRead(RETRIED, onTry(), { phaseOf: checkFailed, signedOff: signedDone, asked, verdictOf: () => 78 })).retry.length,
+      1,
+      'with no policy, exit 78 is counted as any other',
     );
   });
   await t.test("a person's tries do not spend what the run may spend on its own", () => {

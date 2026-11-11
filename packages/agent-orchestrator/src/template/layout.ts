@@ -10,6 +10,7 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import type { TemplateParameterType } from 'objects';
 import type { InLayout } from '../../contracts/template-layout.contract.ts';
+import { checkFailurePolicyOf, type CheckFailurePolicy } from '../check/check-policy.ts';
 
 /** The version of the template layout, the schema every document of a template is written in: no `apiVersion` objects serve. */
 export const TEMPLATE_LAYOUT_VERSION = 'nemia.dev/v1alpha1';
@@ -112,6 +113,8 @@ export type Step = {
   when?: readonly string[];
   workflow?: string;
   retries?: number;
+  /** Which exit codes of its check a person answers, as the step's line reads it (`CheckFailurePolicy`, src/check/check-policy.ts). */
+  checkFailurePolicy?: CheckFailurePolicy;
   deadlineSeconds?: number;
   /** The most memory each session of the step may use, a Kubernetes quantity (`4Gi`), as its line writes it. */
   memory?: string;
@@ -247,6 +250,7 @@ type Leaf =
   | 'option'
   | 'revisions'
   | 'route'
+  | 'policy'
   | 'any'
   | 'not-yet';
 
@@ -306,6 +310,7 @@ const STEP: Shape = {
     when: 'strings',
     workflow: 'string',
     retries: 'number',
+    checkFailurePolicy: 'policy',
     deadlineSeconds: 'number',
     memory: 'string',
     reads: 'strings',
@@ -422,6 +427,17 @@ const isRoute = (value: unknown): boolean => {
   );
 };
 
+/** Whether `value` is a `checkFailurePolicy:` the step's parser reads (`checkFailurePolicyOf`). */
+const isPolicy = (value: unknown): boolean => {
+  if (!isMap(value)) return false;
+  try {
+    checkFailurePolicyOf('checkFailurePolicy', JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** What each plain leaf must be, and how it is said. */
 const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknown) => boolean, string]>> = {
   string: [(v) => typeof v === 'string', 'a string'],
@@ -434,6 +450,7 @@ const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknow
   option: [(v) => ['string', 'number'].includes(typeof v) || v === true || isStrings(v), 'a string, a number, true or a list of strings'],
   revisions: [(v) => REVISIONS_POLICIES.some((p) => p === v), REVISIONS_POLICIES.join(' or ')],
   route: [isRoute, '`judge`, {script: <file>} or {from: <step>.<field>, table: {<value>: <route>}}'],
+  policy: [isPolicy, '{rules: [{action: FailStep|Count, onExitCodes: {operator: In|NotIn, values: [<exit code 1-255>, …]}}, …]}'],
   any: [() => true, 'anything'],
 };
 

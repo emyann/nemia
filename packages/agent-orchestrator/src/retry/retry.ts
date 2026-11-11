@@ -44,6 +44,7 @@ import {
 } from '../status/status.ts';
 import { budgetWord, dollars } from '../money/money.ts';
 import type { Verdict } from '../check/check.ts';
+import { checkFailureAction } from '../check/check-policy.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
@@ -382,6 +383,8 @@ export const pauseAsksVoid = (
  * the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written; `runsOn`
  * marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
  * the step re-filed, its session continued. Past them, or for a check that did not finish, nothing is due — the step waits on the person.
+ * Nor for a refusal whose exit code the step's `checkFailurePolicy:` says is a person's (`FailStep`, `personsRefusal`): no try is spent
+ * on it, and the step waits on the person, offered `--recheck` (`retryOffers`).
  *
  * And a session that ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
  * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`),
@@ -472,6 +475,7 @@ export function retriesDue(
       status === 'failed (check)' &&
       record.check &&
       refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)) &&
+      personsRefusal(step, verdictOf(step.name)) === undefined &&
       retriesSpent(record) < (step.retries ?? 0)
     ) {
       due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
@@ -600,7 +604,8 @@ const abortedWords = (
  * on the base branch waits on is offered the send-back, which no gate line offers, and the ending a try to land again for what was not
  * the work.
  * An ending that lands on its check, whose merge the run aborted, is offered with why, and one whose check did not finish a merge again,
- * with nothing staged for `--recheck` to judge. Otherwise a check that did not finish is offered `--recheck` first, past a budget or not;
+ * with nothing staged for `--recheck` to judge. Otherwise a check that did not finish is offered `--recheck` first, past a budget or not,
+ * and so is a check whose refusal its step's `checkFailurePolicy:` names a person's (`personsRefusal`), its session continued beside it;
  * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
  * agent's try, a new Task, never its session continued, with no `--model` (`remoteRetryRefusal`).
  *
@@ -653,11 +658,18 @@ export function retryOffers(
       );
       continue;
     }
+    const persons = status === 'failed (check)' ? personsRefusal(step, verdictOf(step.name)) : undefined;
     if (d.unfinishedCheck.includes(step.name)) {
       offer(
         `${command} --recheck`,
         'its check did not finish, so no retry was spent on it. Run the check again, and nothing else',
         sessionNeeds(raise),
+      );
+    } else if (persons !== undefined && !raise && modes.includes('recheck')) {
+      offer(
+        `${command} --recheck`,
+        `its check exited ${persons}, which its \`checkFailurePolicy:\` names a person's to answer, so no retry was spent on it. Answer what its check said, then run the check again, and nothing else`,
+        `  (or continue its session, told what happened: ${command}${spent ? `${spent}` : ''})`,
       );
     } else if (raise) {
       const recheck = recheckWords(status, modes);
@@ -681,6 +693,15 @@ export function retryOffers(
     }
   }
   return lines;
+}
+
+/**
+ * The exit code of a step's refused check where its `checkFailurePolicy:` says the refusal is a person's to answer (`FailStep`,
+ * `checkFailureAction`), or undefined: no policy, a code the policy counts, a check that did not finish or has no verdict. Pure.
+ */
+function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Verdict | undefined): number | undefined {
+  if (verdict === undefined || verdict === 'unfinished') return undefined;
+  return checkFailureAction(step.checkFailurePolicy, verdict) === 'FailStep' ? verdict : undefined;
 }
 
 /** What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */

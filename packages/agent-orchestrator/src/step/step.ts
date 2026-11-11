@@ -7,6 +7,7 @@
  */
 import { Invalid } from '../refusal/refusal.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
+import type { CheckFailurePolicy } from '../../contracts/check-failure-policy.contract.ts';
 import type { PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
 
 export type StepSpec = {
@@ -191,6 +192,14 @@ export type StepSpec = {
   check?: string;
   /** How many times the run re-files the step after its check refuses it. Absent means none. */
   retries?: number;
+  /**
+   * Which exit codes of its `check:` mean a refusal only a person answers (`checkFailureAction`, src/check/check-policy.ts): Kubernetes'
+   * Job `podFailurePolicy`, narrowed — `{ rules: [ { action: FailStep | Count, onExitCodes: { operator: In | NotIn, values: [...] } } ] }`,
+   * read in order, the first rule that holds of the exit code deciding, `Count` where none holds. `FailStep` files no `retries:` try:
+   * the step waits on a person, `failed (check)`, offered `nemia retry --recheck`. `FailJob` is `FailStep` here, the step being the Job;
+   * no `Ignore`, `FailIndex`, `containerName` or `onPodConditions`. Absent: every refusal is counted. Only on a step with a `check:`.
+   */
+  checkFailurePolicy?: CheckFailurePolicy;
   /**
    * `gate: true`: the step's closeout waits for a person before anything after it is filed. Verified first, where it has a `check:`, then
    * held — `awaiting approval` — until `nemia approve` is on disk for the try it is on. Not control flow: the run files nothing on a
@@ -385,6 +394,7 @@ export const STEP_KEYS: typeof SERVED_STEP_KEYS = [
   'budget',
   'check',
   'retries',
+  'checkFailurePolicy',
   'gate',
   'output',
   'tally',
@@ -484,6 +494,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,
+  checkFailurePolicy:
+    'which exit codes of its check a person answers: `{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }`, read in order, the first that holds deciding — on `FailStep` the run tries nothing on its own and waits on you',
   gate: "`true`: the step's closeout waits for a person — `nemia approve` — before anything after it is filed, verified first where it has a check",
   output: 'a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`',
   tally:

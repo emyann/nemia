@@ -19,6 +19,7 @@ import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../temp
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
+import { checkFailurePolicyOf } from '../../check/check-policy.ts';
 
 /**
  * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of
@@ -191,7 +192,9 @@ function stepFile(
   const body = textOr(step.instruction, `${WORKFLOWS}/${workflow}/${name}.md`, read, params) ?? '';
   const route = routeEvalOf(step.route);
   try {
-    return renderStep({ name, body, ...keys, ...(route ? { route } : {}) } as never);
+    const checkFailurePolicy =
+      step.checkFailurePolicy === undefined ? undefined : checkFailurePolicyOf(name, JSON.stringify(step.checkFailurePolicy));
+    return renderStep({ name, body, ...keys, ...(route ? { route } : {}), ...(checkFailurePolicy ? { checkFailurePolicy } : {}) } as never);
   } catch (err) {
     refusals.push(`${where}: ${(err as Error).message}`);
     return undefined;

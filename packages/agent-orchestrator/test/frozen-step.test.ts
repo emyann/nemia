@@ -79,6 +79,7 @@ test('a step with every key the parser types, its agent and its output reads as 
     budget: 2.5,
     check: 'npm test',
     retries: 1,
+    checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [78] } }] },
     gate: true,
     output: {
       file: 'review.json',
@@ -120,6 +121,8 @@ test('a step with every key the parser types, its agent and its output reads as 
     ['place', 'cloud'],
     ['workspace', 'worktree'],
     ['background', 'true'],
+    ['checkFailurePolicy', { rules: [{ action: 'Ignore', onExitCodes: { operator: 'In', values: [78] } }] }],
+    ['checkFailurePolicy', { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: ['78'] } }] }],
   ] as const) {
     assert.ok(Result.isFailure(decode({ ...(frozen(step) as object), [key]: value })), `${key}: ${value} is refused`);
   }

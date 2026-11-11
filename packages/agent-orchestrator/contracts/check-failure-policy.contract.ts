@@ -31,7 +31,9 @@ export type CheckFailurePolicy = { readonly rules: readonly CheckFailureRule[] }
 /** Whether `rule` holds of a check's verdict: an exit code, `In` or `NotIn` its values. A check that did not finish matches no rule. */
 const holds = (rule: CheckFailureRule, verdict: Verdict): boolean =>
   verdict !== 'unfinished' &&
-  (rule.onExitCodes.operator === 'In' ? rule.onExitCodes.values.includes(verdict) : !rule.onExitCodes.values.includes(verdict));
+  (rule.onExitCodes.operator === 'In'
+    ? rule.onExitCodes.values.some((code) => code === verdict)
+    : !rule.onExitCodes.values.some((code) => code === verdict));
 
 /** Whether a rule before the `i`th of `rules` holds of the verdict. */
 const heldBefore = (rules: readonly CheckFailureRule[], i: number, verdict: Verdict): boolean =>

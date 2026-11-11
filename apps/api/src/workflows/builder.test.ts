@@ -206,6 +206,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   budget: null,
   check: null,
   retries: null,
+  checkFailurePolicy: null,
   gate: null,
   output: null,
   tally: [],
@@ -1487,6 +1488,16 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
     },
   );
 
+  await t.test("a step saved with its check's failure policy, as its line, is read back as written", async () => {
+    const dir = planned('policed');
+    const [plan, build] = (await listedSteps('policed')) as [ListedStep, ListedStep];
+    const line = '{ rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }';
+    const res = await put('policed', { steps: [plan, { ...build, spec: { ...build.spec, retries: 2, checkFailurePolicy: line } }] });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^checkFailurePolicy:$/m, 'written as a map');
+    const [, read] = (await listedSteps('policed')) as [ListedStep, ListedStep];
+    assert.equal(read.spec.checkFailurePolicy, line);
+  });
   await t.test(
     'a save of a folder that changed since it was read — a step edited, added or removed by hand, a schema or the README edited — is a 409 that says to read it again, and nothing is written over the change',
     async () => {

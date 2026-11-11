@@ -4,11 +4,11 @@
  * contracts/check-failure-policy.contract.ts), and written back as its map (`checkFailurePolicyWritten`) or its line in YAML flow
  * (`checkFailurePolicyLine`).
  *
- * The shape is Kubernetes' Job `spec.podFailurePolicy`, narrowed: `{ rules: [ { action, onExitCodes: { operator, values } } ] }`, the
+ * The shape is Kubernetes' Job spec.podFailurePolicy, narrowed: `{ rules: [ { action, onExitCodes: { operator, values } } ] }`, the
  * rules read in order and the first whose `onExitCodes` holds of the exit code deciding, `Count` where none holds. The step is the Job
- * and `retries:` its `backoffLimit`, so the departures are these: `FailJob` is `FailStep` (no `retries:` try is filed and the step waits
- * on a person, `failed (check)`); no `Ignore` (a try counted against nothing has no bound but the budget); no `FailIndex` (a step has no
- * index); no `containerName` (a check is one command); no `onPodConditions` (a check has an exit code and nothing else).
+ * and `retries:` its `backoffLimit`, so the departures are these: FailJob is `FailStep` (no `retries:` try is filed and the step waits
+ * on a person, `failed (check)`); no `Ignore` (a try counted against nothing has no bound but the budget); no FailIndex (a step has no
+ * index); no containerName (a check is one command); no onPodConditions (a check has an exit code and nothing else).
  */
 import type { CheckFailureActionOf, CheckFailurePolicy, CheckFailureRule } from '../../contracts/check-failure-policy.contract.ts';
 import type { FrontmatterValue } from '../frontmatter/frontmatter.ts';

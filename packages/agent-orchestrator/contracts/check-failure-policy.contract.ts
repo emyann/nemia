@@ -3,11 +3,11 @@
  * `checkFailureAction`): `FailStep`, the refusal is one only a person answers, so `retries:` files no try of it and the step waits on the
  * person; or `Count`, the default, a refusal `retries:` tries again while it has tries left (`retriesDue`, src/retry/retry.ts).
  *
- * Read against Kubernetes' Job `spec.podFailurePolicy`: its rules are read in order, the first whose `onExitCodes` requirement holds of
+ * Read against Kubernetes' Job spec.podFailurePolicy: its rules are read in order, the first whose `onExitCodes` requirement holds of
  * the exit code decides, and where none holds the default handling applies, which is `Count`. The step is the Job — `retries:` its
- * `backoffLimit` — so `FailJob` is `FailStep` here, and it fails nothing else: the run waits on a person, as it does past `retries:`.
- * Neither `Ignore` nor `FailIndex` is taken (a try counted against nothing has no bound but the budget, and a step has no index), and
- * no `containerName`: a check is one command.
+ * `backoffLimit` — so FailJob is `FailStep` here, and it fails nothing else: the run waits on a person, as it does past `retries:`.
+ * Neither `Ignore` nor FailIndex is taken (a try counted against nothing has no bound but the budget, and a step has no index), and
+ * no containerName: a check is one command.
  *
  * The policy is the orchestrator's, a key on the step frozen with the run and read by its pure judgement on every pass; the runtime runs
  * the check and records its exit code, and judges nothing of it (`attemptVerdict`, src/check/check.ts). A check that did not finish has no

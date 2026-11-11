@@ -194,10 +194,10 @@ export type StepSpec = {
   retries?: number;
   /**
    * Which exit codes of its `check:` mean a refusal only a person answers (`checkFailureAction`, src/check/check-policy.ts): Kubernetes'
-   * Job `podFailurePolicy`, narrowed — `{ rules: [ { action: FailStep | Count, onExitCodes: { operator: In | NotIn, values: [...] } } ] }`,
+   * Job podFailurePolicy, narrowed — `{ rules: [ { action: FailStep | Count, onExitCodes: { operator: In | NotIn, values: [...] } } ] }`,
    * read in order, the first rule that holds of the exit code deciding, `Count` where none holds. `FailStep` files no `retries:` try:
-   * the step waits on a person, `failed (check)`, offered `nemia retry --recheck`. `FailJob` is `FailStep` here, the step being the Job;
-   * no `Ignore`, `FailIndex`, `containerName` or `onPodConditions`. Absent: every refusal is counted. Only on a step with a `check:`.
+   * the step waits on a person, `failed (check)`, offered `nemia retry --recheck`. FailJob is `FailStep` here, the step being the Job;
+   * no `Ignore`, FailIndex, containerName or onPodConditions. Absent: every refusal is counted. Only on a step with a `check:`.
    */
   checkFailurePolicy?: CheckFailurePolicy;
   /**

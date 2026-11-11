@@ -45,7 +45,8 @@ const instruct = (method: string, name: string, args: { words?: string; clear?: 
 
 /**
  * The cost line of `workflow` in the factory `name`, set (`usd`) or taken back, as `nemia factory cost-line` does it, answering
- * the factory after. */
+ * the factory after.
+ */
 const costLine = (method: string, name: string, workflow: string, usd?: number) =>
   answeredWrite(async (s: Served) => {
     factoryNamed(`${method} /api/factories/${name}/costlines/${workflow}`, name);

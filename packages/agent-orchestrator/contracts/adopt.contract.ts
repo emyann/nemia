@@ -163,8 +163,7 @@ const adoptedSpec = spec<(factory: Factory, wiring: Wiring, template: FactoryTem
     keepsItsCostLines: {
       description: "It keeps its cost lines, for the same workflows, none where it had none: they are the person's, never the template's",
       condition: ({ input: [factory], output }) =>
-        (output.costLines === undefined) === (factory.costLines === undefined) &&
-        sameKeys(output.costLines ?? {}, factory.costLines ?? {}),
+        (output.costLines === undefined) === (factory.costLines === undefined) && sameKeys(output.costLines ?? {}, factory.costLines ?? {}),
     },
     offersTheTemplates: {
       description: "Its workflows are the template's wiring's",

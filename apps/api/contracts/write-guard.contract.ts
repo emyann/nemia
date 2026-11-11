@@ -28,12 +28,6 @@ import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src
 export const loopbackName = assume(loopback, { pure: true });
 export const jsonType = assume(saysJson, { pure: true });
 
-/**
- * A write as the guard reads it: `WriteRequest`, and `bearer`, whether it presents a bearer token. Implement adds `bearer` to
- * `WriteRequest` in `src/guard.ts` and drops this type, which changes no law.
- */
-export type GuardedRequest = WriteRequest & { readonly bearer: boolean };
-
 /** The methods that write nothing, which the guard never stands in front of. */
 const reads = (method: string): boolean => method === 'GET' || method === 'HEAD';
 
@@ -47,9 +41,9 @@ const ours = (site: string | undefined): boolean => site === undefined || site =
 const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
 
 /** Whether a write may come from where it says it does: this machine, from no other site, or with a token, from anywhere. */
-const fromWhereItMay = (r: GuardedRequest): boolean => r.bearer || (here(r.host) && ours(r.site));
+const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || (here(r.host) && ours(r.site));
 
-const writeRefusedSpec = spec<(request: GuardedRequest) => WriteRefusal | null>({
+const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
   ensures: {
     aReadIsNeverRefused: {
       description: 'A GET or a HEAD writes nothing, and the guard never refuses one',

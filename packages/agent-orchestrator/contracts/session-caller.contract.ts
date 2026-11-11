@@ -9,6 +9,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { CallerKind, TokenRefusal } from 'objects';
+import type { TokenNeed } from '../src/token/token.ts';
 
 /**
  * What the store keeps of a session token it minted, found by the token's digest: the session's agent, its factory (null for a session
@@ -23,19 +24,6 @@ export type TokenRecord = {
   readonly attempt: number;
 };
 
-/**
- * What a request's route needs of a token: `none`, a request with none being the person; `token`, any live one; `person`, one of the
- * person's. Implement moves it to `src/token/token.ts`, which changes no law.
- */
-export type TokenNeed = 'none' | 'token' | 'person';
-
-/**
- * The two refusals this change adds to `objects`' `TOKEN_REFUSALS`: no token where the route needs one, and a session's token where it
- * needs the person's. Implement adds both words to `objects` (`packages/objects/src/words.ts`) and reads them from there, dropping this
- * type, which changes no law.
- */
-export type NeedRefusal = 'token-required' | 'person-token-required';
-
 /** The caller a request is: the person, an agent's live session, or refused with its reason. */
 export type CallerOf =
   | { readonly kind: Extract<CallerKind, 'person'> }
@@ -46,18 +34,15 @@ export type CallerOf =
       readonly run: string | null;
       readonly step: string | null;
     }
-  | { readonly kind: 'refused'; readonly reason: TokenRefusal | NeedRefusal };
+  | { readonly kind: 'refused'; readonly reason: TokenRefusal };
 
 /** Whether `output` is a refusal for `reason`. */
-const refusedFor = (output: CallerOf, reason: TokenRefusal | NeedRefusal): boolean =>
-  output.kind === 'refused' && output.reason === reason;
+const refusedFor = (output: CallerOf, reason: TokenRefusal): boolean => output.kind === 'refused' && output.reason === reason;
 
 /** A token presented that is no person's: a session's, or one the store never minted. */
 const sessionSide = (presented: boolean, person: boolean): boolean => presented && !person;
 
-const callerOfSpec = spec<
-  (presented: boolean, need: TokenNeed, person: boolean, record: TokenRecord | null, live: boolean) => CallerOf
->({
+const callerOfSpec = spec<(presented: boolean, need: TokenNeed, person: boolean, record: TokenRecord | null, live: boolean) => CallerOf>({
   requires: ({ input: [presented, , person] }) => presented || !person,
   ensures: {
     noTokenIsThePersonWhereNoneIsNeeded: {

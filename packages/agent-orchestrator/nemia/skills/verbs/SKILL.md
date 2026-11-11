@@ -151,6 +151,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
+  nemia token ls
+                               your tokens, by name, with when each was minted: never a token itself
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the

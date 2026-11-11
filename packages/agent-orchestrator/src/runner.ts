@@ -518,7 +518,7 @@ import * as RunObject from './object/run.model.ts';
 export { RunModel, RunObject };
 
 export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
-export type { CallerOf } from './token/caller.verb.ts';
+export type { CallerOf, PersonTokenFiled, TokenNeed } from './token/caller.verb.ts';
 export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export type { ProposalPlace } from './propose/current.verb.ts';

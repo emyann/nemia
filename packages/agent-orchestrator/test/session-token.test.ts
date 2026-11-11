@@ -2,11 +2,13 @@
  * The session token, as a run meets it: a step's session is filed a token of its try's own in its environment (`SESSION_TOKEN`), the
  * store keeps only its digest's record, and the api's question — who a request is from (`sessionCaller`) — answers the step's agent while
  * the try is the live one, `session-ended` once it settled or a later try replaced it, `unknown-token` for one the store never minted,
- * and the person for none. Nemia's session is filed one too, in no factory. Kinds are asserted, never sentences.
+ * and the person for none. Nemia's session is filed one too, in no factory. A person's token is the person whatever the route needs, until
+ * it is removed by name; none, where the route needs one, is refused. `nemia token add`, `ls` and `rm` as a person types them. Kinds are
+ * asserted, never sentences.
  *
  * Its store is its own at `ROOT`, given as `ENV`.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +20,8 @@ import { runRecord } from '../src/record/record.store.ts';
 import { SESSION_TOKEN } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { sessionCaller } from '../src/token/caller.verb.ts';
-import { tokenDigest, tokensDir, mintToken } from '../src/token/token.store.ts';
+import type { TokenNeed } from '../src/token/token.ts';
+import { tokenDigest, tokensDir, mintToken, mintPersonToken, revokePersonToken } from '../src/token/token.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -49,8 +52,8 @@ const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord
 /** The token the engine's task `id` was filed in its environment. */
 const tokenOf = (id: string): string | undefined => stage.board().tasks.get(id)?.spec.config?.env?.[SESSION_TOKEN];
 
-/** Who a request presenting `token` is from, over the stage's engine and the store's root. */
-const callerBy = (token: string | undefined) => stage.runWith(stage.board().e, sessionCaller(token));
+/** Who a request presenting `token` is from, to a route that needs `need` of it, over the stage's engine and the store's root. */
+const callerBy = (token: string | undefined, need?: TokenNeed) => stage.runWith(stage.board().e, sessionCaller(token, need));
 
 /** Every file under the store's tokens folder, with its text. */
 const tokenFiles = (): Array<{ name: string; text: string }> => {
@@ -128,4 +131,62 @@ test("a session that is no run's is live while its task has not settled, in no f
     stage.board().settle(task, 'succeeded', undefined);
     assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'session-ended' });
   });
+});
+
+test("a person's token is the person whatever the route needs, until removed by name; none is refused where a route needs one", async (t) => {
+  await t.test('no token: the person where the route needs none, refused token-required where it needs any', async () => {
+    assert.deepEqual(await callerBy(undefined, 'none'), { kind: 'person' });
+    for (const need of ['token', 'person'] as const)
+      assert.deepEqual(await callerBy(undefined, need), { kind: 'refused', reason: 'token-required' }, need);
+  });
+
+  await t.test("a person's token is the person, on a route that needs none, any token, or the person's", async () => {
+    const token = mintPersonToken(ROOT, 'laptop');
+    for (const need of ['none', 'token', 'person'] as const) assert.deepEqual(await callerBy(token, need), { kind: 'person' }, need);
+    revokePersonToken(ROOT, 'laptop');
+    for (const need of ['none', 'token', 'person'] as const)
+      assert.deepEqual(await callerBy(token, need), { kind: 'refused', reason: 'unknown-token' }, `${need}, once removed`);
+  });
+
+  await t.test("a live session's token is refused person-token-required where the route needs the person's", async () => {
+    const task = 'nemia-person-need';
+    const token = mintToken(ROOT, { agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
+    await Effect.runPromise(stage.board().e.file({ id: task, brief: 'be on', cwd: ROOT, restartPolicy: 'Always' }));
+    assert.equal((await callerBy(token, 'token')).kind, 'agent');
+    assert.deepEqual(await callerBy(token, 'person'), { kind: 'refused', reason: 'person-token-required' });
+  });
+});
+
+/** What `argv` printed on stdout through the stage's CLI, line by line. */
+const printedBy = async (t: TestContext, argv: string[]): Promise<string[]> => {
+  const lines: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
+    lines.push(args.join(' '));
+  });
+  try {
+    await stage.main(argv);
+  } finally {
+    log.mock.restore();
+  }
+  return lines.join('\n').split('\n');
+};
+
+test('nemia token add prints the token once with its header, ls lists it by name alone, and rm revokes it', async (t) => {
+  const added = await printedBy(t, ['token', 'add', 'cli-laptop']);
+  const token = added.find((line) => /^[A-Za-z0-9_-]{43}$/.test(line)) ?? '';
+  assert.ok(token, 'the token is printed on a line of its own');
+  assert.ok(
+    added.some((line) => line === `Authorization: Bearer ${token}`),
+    'the header a client sends it in',
+  );
+  assert.deepEqual(await callerBy(token, 'person'), { kind: 'person' });
+
+  const listed = (await printedBy(t, ['token', 'ls'])).join('\n');
+  assert.match(listed, /cli-laptop/);
+  assert.ok(!listed.includes(token) && !listed.includes(tokenDigest(token)), 'neither the token nor its digest is listed');
+
+  await assert.rejects(stage.main(['token', 'add', 'cli-laptop']), (err: unknown) => (err as { _tag?: string })._tag === 'Conflict');
+  await printedBy(t, ['token', 'rm', 'cli-laptop']);
+  assert.deepEqual(await callerBy(token), { kind: 'refused', reason: 'unknown-token' });
+  await assert.rejects(stage.main(['token', 'rm', 'cli-laptop']), (err: unknown) => (err as { _tag?: string })._tag === 'Missing');
 });

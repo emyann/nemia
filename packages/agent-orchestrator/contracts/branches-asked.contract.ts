@@ -1,7 +1,7 @@
 /**
  * Which of a run's result branches its one judgement asks where they stand (agent-orchestrator, src/branches/branches.ts,
  * `branchesAsked`): what the run object, the runs list, the tick's informer and `nemia decide` all read a run's standings, its
- * `toDecide` and its decision off, so none of them reads a branch another does not. It replaces `toDecideBranches`, which asked only a
+ * `toDecide` and its decision off, so none of them reads a branch another does not. It replaces the judgement's rule that asked only a
  * succeeded run with no merging step, while `nemia decide` asked every result branch of a run neither running nor called off: an ending
  * approved first that never ran, whose work a person merged by hand, was `approve` on the board and nothing to approve on `nemia decide`.
  *

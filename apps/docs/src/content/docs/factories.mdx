@@ -89,6 +89,24 @@ nemia factory setting rm pipao claude.attribution
   `nemia factory adopt` and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory; the board shows none yet.
 - The default factory holds none, as it holds no volume: a run that names no factory is given no factory setting.
 
+## Its cost lines
+
+A factory can set, per workflow it offers, the dollars a run of that workflow should stay under, all tries and rounds included:
+
+```sh
+nemia factory cost-line set pipao build 80
+nemia factory cost-line rm pipao build
+```
+
+- A gate whose caps would let the run pass its line says so, and Nemia at `auto` never approves that gate unasked
+  ([What a step may spend](/workflows/#what-a-step-may-spend)). The line cuts nothing.
+- A run keeps the line it was started with: a later change reaches only the runs started after it.
+- Lines are yours: they live in the factory's own file (`"costLines": { "build": 80 }`), never in a template, and `nemia factory adopt`
+  and `nemia factory upgrade` keep them. `nemia factory` lists them under the factory, and the board's factory settings page sets and
+  clears them.
+- Refused: a workflow the factory does not offer, an amount that is not dollars above zero, and the default factory. A workflow with a
+  line is not detached until its line is taken back.
+
 ## Attached workflows
 
 A factory offers only the workflows attached to it, and none until one is. Attaching records the workflow's folder name in the

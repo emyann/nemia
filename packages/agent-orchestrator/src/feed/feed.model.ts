@@ -97,8 +97,18 @@ export const StoreLine = Schema.Struct({
 }).annotate({ identifier: 'StoreLine' });
 export type StoreLine = typeof StoreLine.Type;
 
-/** One line of the feed (`FeedLine`): a run's, a daemon's or the store's. No identifier of its own, so the printer draws its members. */
-export const FeedLine = Schema.Union([RunLine, DaemonLine, StoreLine]);
+/** A factory's line (`FactoryLine`): its upgrade's conflicts pending or settled, the condition's message as its note. */
+export const FactoryLine = Schema.Struct({
+  at: Schema.String,
+  factory: Schema.String,
+  word: Schema.String,
+  note: Schema.optional(Schema.String),
+  ...signed,
+}).annotate({ identifier: 'FactoryLine' });
+export type FactoryLine = typeof FactoryLine.Type;
+
+/** One line of the feed (`FeedLine`): a run's, a daemon's, the store's or a factory's. No identifier of its own, so the printer draws its members. */
+export const FeedLine = Schema.Union([RunLine, DaemonLine, StoreLine, FactoryLine]);
 export type FeedLine = typeof FeedLine.Type;
 
 /** A moment as the deliverer stamps a digest's first line: the wall clock, and the boot's monotonic reading where it has one. */
@@ -124,6 +134,6 @@ export type Delivery = typeof Delivery.Type;
 
 /** The feed context's part of the orchestrator's diagram. */
 export const feedModel = {
-  entities: [Subscription, Delivery, RunLine, DaemonLine, StoreLine],
+  entities: [Subscription, Delivery, RunLine, DaemonLine, StoreLine, FactoryLine],
   ids: { SubscriptionName: 'Subscription' },
 } satisfies ErModel;

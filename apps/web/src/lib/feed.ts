@@ -9,12 +9,15 @@ export type FeedStatus = 'connecting' | 'open' | 'down';
 
 /**
  * What the feed's stream names each event, as the api's `feedEventOf` does: the store's pause put or lifted, a daemon that took the
- * store, a step's word, a run gone from the store, or a run's own word.
+ * store, a factory's upgrade conflicts pending or settled, a step's word, a run gone from the store, or a run's own word.
  */
-type FeedEvent = 'run' | 'step' | 'removed' | 'daemon' | 'store';
+type FeedEvent = 'run' | 'step' | 'removed' | 'daemon' | 'store' | 'factory';
 
-/** The events of the feed that are a run's, each line naming the run it is about; a daemon's and the store's name none. */
-type RunEvent = Exclude<FeedEvent, 'daemon' | 'store'>;
+/** The events of the feed that are no run's: a daemon's, the store's and a factory's name none. */
+type StandingEvent = 'daemon' | 'store' | 'factory';
+
+/** The events of the feed that are a run's, each line naming the run it is about. */
+type RunEvent = Exclude<FeedEvent, StandingEvent>;
 
 /** How often what the feed answers for is read all the same while its stream is open: a slow fallback, in case an event is ever missed. */
 export const FALLBACK_MS = 60_000;
@@ -51,8 +54,11 @@ export const FLUSH_MS = 1_000;
  * The store's line — its pause put or lifted, said by the tick that read it — reads the pause again, and what a pause at once
  * would stop, and the daemon's standing as every tick's line does: it names no run either. The pause's own poll (`pauseQuery`) stays as
  * the fallback.
+ *
+ * A factory's line — its upgrade's conflicts pending or settled — reads the factories again, whose conditions say it, and the daemon's
+ * standing: it names no run.
  */
-export function keysOf(event: 'daemon' | 'store'): QueryKey[];
+export function keysOf(event: StandingEvent): QueryKey[];
 export function keysOf(event: RunEvent, run: string): QueryKey[];
 export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
   switch (event) {
@@ -60,6 +66,8 @@ export function keysOf(event: FeedEvent, run?: string): QueryKey[] {
       return [['daemon']];
     case 'store':
       return [['pause'], ['pause', 'now'], ['daemon']];
+    case 'factory':
+      return [['factories'], ['daemon']];
     case 'step':
       return [['runs'], ['runs-open'], ['runs-finished'], ['runs', run], [INBOX], ['daemon']];
     case 'run':
@@ -145,7 +153,7 @@ const browserTimers: Timers = { set: (f, ms) => setTimeout(f, ms), clear: (t) =>
  */
 const keysFor = (event: FeedEvent, data: string): QueryKey[] => {
   const { run } = JSON.parse(data) as { run?: unknown };
-  if (event === 'daemon' || event === 'store') return keysOf(event);
+  if (event === 'daemon' || event === 'store' || event === 'factory') return keysOf(event);
   return typeof run === 'string' ? keysOf(event, run) : [];
 };
 
@@ -243,7 +251,7 @@ export function followFeed(
       const keys = keysFor(event, message.data);
       if (keys.length) reads.arrive(keys);
     };
-    for (const event of ['run', 'step', 'removed', 'daemon', 'store'] as const) s.addEventListener(event, read(event));
+    for (const event of ['run', 'step', 'removed', 'daemon', 'store', 'factory'] as const) s.addEventListener(event, read(event));
     s.addEventListener('open', () => {
       if (!current()) return;
       opened = true;

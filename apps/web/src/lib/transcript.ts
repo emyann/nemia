@@ -236,10 +236,10 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
 
 /**
  * The turns, with what a person said to the session laid in among them (off the engine's journal of the step's task, through `heardIn`):
- * each a turn of its own, "you said" (or an agent's, under its name, `by`), placed where its words reached the session when its transcript shows that, and otherwise when they
- * were said — before the first turn that came after, and after a fold that began before, since a fold is one line. Words after everything
- * the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn holds no mark to stand after: an
- * arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
+ * each a turn of its own, "you said" (or an agent's, under its name, `by`), placed where its words reached the session when its transcript
+ * shows that, and otherwise when they were said — before the first turn that came after, and after a fold that began before, since a fold
+ * is one line. Words after everything the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn
+ * holds no mark to stand after: an arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
  */
 export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);

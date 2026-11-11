@@ -230,7 +230,6 @@ test('who says words to a step: a session by its token as its agent, framed; an 
   );
   const asSession = { ...BOARD, authorization: `Bearer ${token}` };
   const operator = { kind: 'agent', name: 'operator' } as const;
-  /** The list `nemia chat allow` writes, planted as it writes it (`<store>/nemia/chat/speakers.json`). */
   const allow = (allowed: string[]) => write(path.join(root, 'nemia', 'chat', 'speakers.json'), `${JSON.stringify({ allowed })}\n`);
 
   await s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {

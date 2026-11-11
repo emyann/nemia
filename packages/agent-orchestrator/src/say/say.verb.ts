@@ -47,18 +47,18 @@ const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidWho) {
 
 /**
  * Tell a step's running session something — `nemia say` — through the engine's `say`, on the step's current try's task: the one `retry`
- * would replace, as `run.steps[step].taskId` names it. Who the words are from is judged first, off `by` (`speakerOf`, `stepSpeaker`):
- * the person's words are said as they are, an agent's in the frame that names it (`framedForStep`), never as the person's. The engine hands the words to the session through its harness, then journals them as
- * a `said` entry on the task, which is the record: this verb writes nothing of its own, and `nemia ls` and `nemia decide` read the words
- * back off the engine's view of the task. Only the step's own task is read: the engine's `say` observes its harness again, and a run's
- * other tasks have no part in it.
+ * would replace, as `run.steps[step].taskId` names it. Who the words are from is judged first, off `by` (`speakerOf`, `stepSpeaker`): the
+ * person's words are said as they are, an agent's in the frame that names it (`framedForStep`), never as the person's. The engine hands the
+ * words to the session through its harness, then journals them as a `said` entry on the task, which is the record: this verb writes nothing
+ * of its own, and `nemia ls` and `nemia decide` read the words back off the engine's view of the task. Only the step's own task is read:
+ * the engine's `say` observes its harness again, and a run's other tasks have no part in it.
  *
  * Refused before the engine is asked, with what to do instead: words from a speaker the step's rule refuses, `Invalid` or `Conflict`
- * (`stepSpeaker`); then (`sayRefusal`) a step the run does not have, a cancelled run, a step with no
- * task filed, and one whose task has settled — each a `Conflict`. Then the engine's refusals, each a `Conflict` in the engine's words —
- * empty words, an attempt not started, a harness with no way in, a session its harness does not list running — and a failure to deliver,
- * as the engine throws it, which journals nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's
- * (`toldBy`) or one a read threw; dies of anything else, a failure to deliver included (`tried`, `asked`).
+ * (`stepSpeaker`); then (`sayRefusal`) a step the run does not have, a cancelled run, a step with no task filed, and one whose task has
+ * settled — each a `Conflict`. Then the engine's refusals, each a `Conflict` in the engine's words — empty words, an attempt not started, a
+ * harness with no way in, a session its harness does not list running — and a failure to deliver, as the engine throws it, which journals
+ * nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's (`toldBy`) or one a read threw; dies of anything
+ * else, a failure to deliver included (`tried`, `asked`).
  */
 export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string, by: SaidWho) {
   const from = yield* speakerOf(by);

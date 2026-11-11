@@ -103,6 +103,9 @@ export const framedForStep: FramedForStep = (speaker, text) => (speaker.kind ===
  * Who the words `text` a step's journal holds are from, and the words without their frame: an agent's where they stand in the frame
  * `framedFor` writes (`AGENT_OPENS`, a name of no space, `AGENT_WRITES`), the person's as journalled otherwise — every say from before
  * words were framed among them. Pure: read back each time, nothing kept beside the journal.
+ *
+ * Two of its tests hold of every text the others pass, and are made so the verifier need not prove them of `indexOf` and `slice`: that
+ * the name, cut at the first space, holds none; and that the frame written again around the name and the words is the text.
  */
 export const saidBy: SaidBy = (text) => {
   const asJournalled = { from: { kind: 'person' }, words: text } as const;
@@ -111,12 +114,10 @@ export const saidBy: SaidBy = (text) => {
   const end = rest.indexOf(' ');
   if (end <= 0) return asJournalled;
   const name = rest.slice(0, end);
-  // `name` holds no space, being cut at the first: said again so the solver need not prove it of `indexOf`.
   if (name.includes(' ')) return asJournalled;
   const after = rest.slice(end);
   if (!after.startsWith(AGENT_WRITES)) return asJournalled;
   const words = after.slice(AGENT_WRITES.length);
-  // The frame written again around what was read must be the text: said, so the solver need not prove the slices add up.
   if (AGENT_OPENS + name + AGENT_WRITES + words !== text) return asJournalled;
   return { from: { kind: 'agent', name }, words };
 };

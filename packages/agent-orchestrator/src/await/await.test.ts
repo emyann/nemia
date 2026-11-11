@@ -14,13 +14,13 @@ import { until, WAITED } from 'agent-runtime/testing';
 import { StoreRoot } from '../config/root.store.ts';
 import { emitFeed, FEED_FOLLOWERS, feedHubLayer } from '../feed/feed.verb.ts';
 import { feedSize } from '../feed/feed.store.ts';
-import type { FeedWords } from '../feed/feed.ts';
+import type { FeedLine, FeedWords } from '../feed/feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors } from '../watch/selector.ts';
 import { watchedLine } from '../subscription/subscription.ts';
 import { steeredClock } from '../../test/steered.ts';
 import { waitForBound } from './await.ts';
-import { waitFeed } from './await.verb.ts';
+import { answerOf, readChunk, waitFeed } from './await.verb.ts';
 import { WAIT } from './commands.verb.ts';
 
 const ROOT = scratch('wf-await-');
@@ -123,6 +123,27 @@ test(
     assert.equal(second.cursor, feedSize(ROOT));
   },
 );
+
+test('what a wait read holds the lines it took beside its cursor, so a bound that falls once they are taken still answers them', (t) => {
+  const line = (run: string) => ({
+    kind: 'line' as const,
+    line: { at: '2026-11-11T00:00:00.000Z', run, word: 'started' } as FeedLine,
+    cursor: 0,
+  });
+  const at = (run: string, cursor: number) => ({ ...line(run), cursor });
+  const selectors = parseSelectors(['run=chunk-1']);
+  const none = readChunk({ cursor: 10, lines: [] }, [at('chunk-0', 20)], selectors);
+  t.test('a chunk with no line taken moves the cursor past it, and answers bound there', () => {
+    assert.deepEqual(answerOf(none), { ended: 'bound', lines: [], cursor: 20 });
+  });
+  const took = readChunk(none, [at('chunk-0', 30), at('chunk-1', 40), at('chunk-0', 50)], selectors);
+  t.test('a chunk with a line taken answers matched with it, the cursor after the chunk', () => {
+    assert.deepEqual(answerOf(took), { ended: 'matched', lines: [{ line: at('chunk-1', 40).line, from: 30, to: 40 }], cursor: 50 });
+  });
+  t.test('once lines are taken, a later chunk is not read: the cursor stays after the chunk they came in', () => {
+    assert.equal(readChunk(took, [at('chunk-1', 60)], selectors), took);
+  });
+});
 
 test('REFUSED: a cursor inside a line is refused as followFeed refuses it', async (t) => {
   const rt = hubbed(t);

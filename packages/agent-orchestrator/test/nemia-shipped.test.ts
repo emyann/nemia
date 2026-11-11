@@ -285,7 +285,7 @@ test("her plugin's agent is the file the keeper reads, and the only agent it shi
  * Where a plugin's `.mcp.json` text breaks what her port's entry is: one server, `nemia`, of `type: "http"`, its url `${NEMIA_URL}` (a
  * default allowed) then `/mcp`, and its `Authorization` header `Bearer ${NEMIA_TOKEN}`, nothing of the store's written in: a line each.
  *
- * Why the two variables reach the entry: https://code.claude.com/docs/en/mcp (read 2026-11-11), "Environment variable expansion in
+ * Why the two variables reach the entry: https://code.claude.com/docs/en/mcp , "Environment variable expansion in
  * `.mcp.json`" — `${VAR}` and `${VAR:-default}` expand in an http server's `url` and `headers`, and a plugin's servers read the same
  * environment as one configured by hand. The same page reads a set of credential names (the host's own, a cloud provider's, a proxy's
  * or npm's, not listed in full) as empty in a remote server's `url` and `headers`; a name outside it "expands as written", which

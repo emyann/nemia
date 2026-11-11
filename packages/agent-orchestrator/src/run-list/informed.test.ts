@@ -21,7 +21,8 @@ import { advanceRun, approveRun, cancelRun, startRun, runWith as runEngine } fro
 import { runList } from './run-list.verb.ts';
 import { informerMemo, keepObject, keptObject, passStarted, type InformerMemo } from '../rest/informer.verb.ts';
 import type { RunList } from 'objects';
-import { runRecord, pruneFile, artifactsDir } from '../record/record.store.ts';
+import { listRuns, runRecord, pruneFile, artifactsDir } from '../record/record.store.ts';
+import { passStanding } from '../standing/standing.verb.ts';
 import { writeLabels } from '../record/files.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { engineOf } from '../runtime-client.ts';
@@ -83,11 +84,15 @@ const started = async (front = 'place: git', gates: string[] = []): Promise<{ id
   return { id: run.id, dir };
 };
 
-/** A run whose step signed off, advanced: at its gate where it has one, else finished. At rest either way. */
+/**
+ * A run whose step signed off, advanced, and where its branch stands read by a pass as the daemon's writes it (`passStanding`): at its
+ * gate where it has one, else finished. At rest either way, its branch read.
+ */
 const signed = async (front?: string, gates: string[] = []) => {
   const run = await started(front, gates);
   engine().settle(`${run.id}-work`, 'succeeded', { closeout: SIGNED, startedAt: AT, spawnedAt: AT });
   await runWith(e(), advanceRun(runRecord(ROOT, run.id)));
+  await runPlaced(passStanding(listRuns(ROOT)));
   return run;
 };
 

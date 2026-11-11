@@ -497,7 +497,7 @@ const DENIED_BRIEF = (outside: string) =>
 /**
  * The mode a job is denied in by asking: `default`, where each of DENIED_BRIEF's calls would prompt, and a job, which nobody
  * answers, is denied it at once. On 2.1.280 a job at shipped defaults (`auto`) on haiku ran as `default` and was denied all three
- * (docs/open-issues.md, M1). On 2.1.316 haiku runs `auto` as `auto` (its transcript says `permissionMode: auto`),
+ * (docs/open-issues.md, M1). On 2.1.316 and 2.1.322 haiku runs `auto` as `auto` (on 2.1.316 its transcript, on 2.1.322 its `init` line),
  * and auto mode's classifier allowed the write outside the folder, the `curl` and the fetch: no denial, and the file written.
  * So the denied job names the mode M1 measured rather than leaning on what `auto` becomes for a model.
  */

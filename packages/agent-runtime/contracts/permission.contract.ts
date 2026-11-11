@@ -4,9 +4,10 @@
  * answer to it turned into what the Agent SDK's `canUseTool` returns (`permissionAnswered`).
  *
  * What the person is shown is what the SDK handed over (`CanUseTool`'s `title`, `displayName`, `description`, `decisionReason`,
- * `blockedPath`, `sdk.d.ts` of `@anthropic-ai/claude-agent-sdk` 0.3.316), with a shell call's command as typed; never words rebuilt
- * from the call's input. Three answers: allow once, always allow (the SDK's `suggestions` returned as `updatedPermissions`, as its
- * comment on `suggestions` says), and deny, with the person's own words as the message the session reads where they wrote some.
+ * `blockedPath`, `sdk.d.ts` of `@anthropic-ai/claude-agent-sdk` 0.3.322, unchanged from 0.3.316), with a shell call's command as typed;
+ * never words rebuilt from the call's input. Three answers: allow once, always allow (the SDK's `suggestions` returned as
+ * `updatedPermissions`, as its comment on `suggestions` says), and deny, with the person's own words as the message the session reads
+ * where they wrote some.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';

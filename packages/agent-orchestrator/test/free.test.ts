@@ -4,7 +4,8 @@
  * story on `story(t)` and the stage (`staged`): one test place and one engine's stand-in for its checkpoints, since its runs share one
  * store and every pass reads them all, each sweep handed the runs of its own checkpoint alone; the daemon that frees and measures with no
  * person ends it. A sweep that fails, on a steered clock, stays a test of its own; which answers a sweep takes is a table. A worktree a
- * person locked, and a checkout on no branch, are walked on git in free-held.boundary.test.ts.
+ * person locked, and a checkout on no branch, are walked on git in free-held.boundary.test.ts. A person's hold (`nemia hold`) keeps a
+ * run that is not cancelled, and is said once of one that succeeded; a cancelled run is freed whatever it holds.
  *
  * The stand-in moves no task by itself: a checkpoint settles each session as its harness would end it, and a pass is given an engine
  * pass that reports nothing (`QUIET`), so each task is read off the stand-in. `WF_KEEP_WORKTREES` is unset in the test's `ENV`, its own
@@ -36,6 +37,7 @@ import { up } from '../src/daemon/up.verb.ts';
 import { recentPasses } from '../src/daemon/daemon.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 import { main } from '../src/cli/main.ts';
+import { hold, unhold } from '../src/wait/wait.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 
 const ROOT = scratch('wf-free-');
@@ -96,6 +98,10 @@ fs.writeFileSync(
   path.join(ENDING, 'ship.md'),
   '---\nafter: work\nplace: git\nworkspace: base\ngate: true\nharness: codex\n---\nShip it.\n',
 );
+
+/** `work`, gated once it has run: its session signs off, and the step waits at its gate on a person, as a design's does. */
+const GATED = fs.mkdtempSync(path.join(ROOT, 'wf-gated-'));
+fs.writeFileSync(path.join(GATED, 'work.md'), '---\nplace: git\ngate: true\nharness: codex\n---\nwork it\n');
 
 /** The tasks of the run `id` the stand-in holds, by id. */
 const tasksOf = (id: string) => [...stage.board().tasks].filter(([taskId]) => taskId.startsWith(`${id}-`));
@@ -329,6 +335,91 @@ test(
           assert.deepEqual([done.verbs, done.freed, done.logged], [[], [], []]);
         }
         assert.deepEqual(ids.map(whole), [true, true, true]);
+      },
+    );
+
+    await s.test(
+      'a run held, then cancelled at its gate — as ebky was — is freed at shipped defaults, and nemia ls says its gate can never be approved',
+      async (t) => {
+        const { id } = await started(GATED);
+        await worked(id);
+        await stage.runWith(engine(), hold(id, []));
+        await stage.runWith(engine(), cancelRun(id));
+        assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.hold`)), 'the hold stands, cancelled');
+        const ls = await printedBy(t, ['ls']);
+        const at = ls.findIndex((l) => l.startsWith(`${id}  `));
+        const end = ls.findIndex((l, k) => k > at && !/^\s/.test(l));
+        const gate = ls.slice(at + 1, end < 0 ? undefined : end).find((l) => /^\s+work\b/.test(l));
+        assert.ok(gate, ls.join('\n'));
+        assert.ok(!gate.includes('nemia approve'), `no verb a cancelled run refuses is offered: ${gate}`);
+        assert.match(gate, /never can be/);
+
+        const pass = await ticked((p) => rests(p, id, 'cancelled'), 'held, cancelled at its gate, and at rest');
+        const done = await sweep(pass, [id], freshFreeMemory());
+        assert.deepEqual([done.freed.map((p) => p.id), gone(id)], [[id], true]);
+        assert.equal(runRecord(ROOT, id).pruned?.worktrees.length, 1);
+      },
+    );
+
+    await s.test(
+      'REFUSED at shipped defaults: the same run held at its gate and not cancelled is left whole by three sweeps, and nothing is asked of its place or said',
+      async () => {
+        const { id } = await started(GATED);
+        await worked(id);
+        await stage.runWith(engine(), hold(id, []));
+        const memory = freshFreeMemory();
+        for (let k = 0; k < 3; k++) {
+          const pass = await tick();
+          assert.notEqual(answerOf(pass, id)?.status, 'cancelled');
+          assert.notEqual(answerOf(pass, id)?.feed.atRest, true, 'held and not cancelled, its pass reads the hold: not at rest');
+          const done = await sweep(pass, [id], memory);
+          assert.deepEqual([done.verbs, done.freed, done.logged], [[], [], []]);
+        }
+        assert.ok(whole(id));
+      },
+    );
+
+    await s.test(
+      'REFUSED at shipped defaults: a held run whose work is done is no finished run, and nothing is said of it; a finished run whose record froze no workflow is left, said once across three sweeps, and freed by hand',
+      async (t) => {
+        const { id, repo } = await started(WORK);
+        await ticked(() => atWork(id), `${id}'s work at work`);
+        await stage.runWith(engine(), hold(id, []));
+        const at = lane(id);
+        fs.writeFileSync(path.join(at, `${id}.txt`), 'work\n');
+        world().commit(at, `work of ${id}`);
+        sign(id);
+        await ticked(() => !atWork(id), `${id}'s work signed off, held`);
+        const memory = freshFreeMemory();
+        for (let k = 0; k < 2; k++) {
+          const pass = await tick();
+          assert.equal(answerOf(pass, id)?.status, 'running', 'a hold is no decision about the work: the run reads running');
+          const done = await sweep(pass, [id], memory);
+          assert.deepEqual([done.freed, done.verbs, done.logged], [[], [], []]);
+        }
+
+        await stage.runWith(engine(), unhold(id));
+        await ticked((p) => rests(p, id, 'succeeded'), 'the hold lifted, succeeded and at rest');
+        mergedIn(repo, runRecord(ROOT, id).steps.work.branch!, 'by hand');
+        const record = runRecord(ROOT, id);
+        delete record.workflow;
+        fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify(record, null, 2));
+        const logged: string[] = [];
+        for (let k = 0; k < 3; k++) {
+          const pass = await tick();
+          assert.equal(answerOf(pass, id)?.status, 'succeeded');
+          assert.notEqual(answerOf(pass, id)?.feed.atRest, true, 'a record that froze no workflow reads its folder: never at rest');
+          const done = await sweep(pass, [id], memory);
+          assert.deepEqual([done.freed, done.verbs], [[], []], 'nothing is asked of its place');
+          logged.push(...done.logged);
+        }
+        assert.equal(logged.length, 1, logged.join('\n'));
+        assert.ok(logged[0].startsWith(`${id}  not freed: `), logged[0]);
+        assert.ok(logged[0].includes(`nemia prune ${id}`), logged[0]);
+        assert.ok(whole(id));
+
+        await printedBy(t, ['prune', id, '--yes']);
+        assert.ok(gone(id), 'the prune the line names frees it');
       },
     );
 

@@ -1,14 +1,15 @@
 /**
  * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
  * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`); and
- * the daemon's rule for a finished run: which runs it may free (`freeable`), which of them a sweep takes (`freeTurn`), and what it says
- * of one it left (`freeSaid`) or freed (`freedLine`). Pure.
+ * the daemon's rule for a finished run: which runs it may free (`freeable`), which of them a sweep takes (`freeTurn`), why it leaves
+ * one out until a person acts (`untaken`, `untakenWords`), and what it says of one it left (`freeSaid`) or freed (`freedLine`). Pure.
  */
 import { andList, isRepositoryRun, prunedWords, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
 import { holdWord } from '../../wait/wait.ts';
 import { sizeOf } from '../../artifacts/artifacts.ts';
 import type { Decision } from '../../decide/decide.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
+import type { Untaken, UntakenWhy } from '../../../contracts/sweep-untaken.contract.ts';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>
@@ -225,8 +226,9 @@ export type Answered = { readonly run: Run; readonly status: string; readonly fe
 /**
  * The runs the daemon may free of their worktrees, by id, among what a pass answered: at rest, succeeded or cancelled, and a
  * repository's. Pure. Every other run is none of the rule's, and nothing is asked of its place: one in flight, failed, stopped, over
- * its budget or waiting on a person may still be tried again from its worktree, and a folder run's folders are its work. Whether a
- * succeeded run is merged is not read here: the prune's own judgement refuses one that is not (`pruneRefusal`).
+ * its budget or waiting on a person may still be tried again from its worktree, and a folder run's folders are its work. A cancelled
+ * run is at rest whatever it holds or waits on (`holdKeepsOut`, rest.ts); a finished run left out for good is said (`untaken`). Whether
+ * a succeeded run is merged is not read here: the prune's own judgement refuses one that is not (`pruneRefusal`).
  */
 export const freeable = (answers: readonly Answered[]): string[] =>
   answers
@@ -260,3 +262,34 @@ export function freeSaid(facts: PruneFacts | undefined, refusal: string): string
 /** What the daemon says of a run it freed: how many worktrees, and the bytes that freed. Pure. */
 export const freedLine = (p: Pick<Pruning, 'id' | 'worktrees'>): string =>
   `${p.id}  freed: removed ${p.worktrees.length} worktree${p.worktrees.length === 1 ? '' : 's'}, ${sizeOf(prunedBytes(p.worktrees))}; its record, branches and files are kept`;
+
+/** Why the sweep leaves a finished run out of its candidates until a person acts (`sweep-untaken.contract.ts`), or null. Pure. */
+export const untaken: Untaken = (r) => {
+  if (r.atRest || !r.repository || (r.status !== 'succeeded' && r.status !== 'cancelled')) return null;
+  if (r.status === 'succeeded' && r.held) return 'held';
+  return r.frozen ? null : 'unfrozen';
+};
+
+/** What `untaken` reads of a run a pass answered. Pure. */
+export const untakenOf = (a: Answered): UntakenWhy | null =>
+  untaken({
+    status: a.status,
+    atRest: a.feed.atRest === true,
+    repository: isRepositoryRun(a.run),
+    held: Boolean(a.run.hold),
+    frozen: Boolean(a.run.workflow),
+  });
+
+/**
+ * What the daemon says of a finished run it leaves out of its candidates until a person acts (`untaken`): its hold, as `nemia ls` says
+ * it, and how to lift it; or that its record froze no workflow, and the prune a person runs for it. Pure.
+ */
+export function untakenWords(run: Run, why: UntakenWhy): string {
+  if (why === 'held' && run.hold) {
+    return `it is ${holdWord(
+      run.hold.until.map((id) => ({ run: id })),
+      run.hold,
+    )}, and a held run is not at rest, so no sweep frees it: lift the hold (nemia hold ${run.id} --off), and a later sweep frees it`;
+  }
+  return `its record froze no workflow, so no pass finds it at rest and no sweep frees it: free it by hand, nemia prune ${run.id}`;
+}

@@ -4,8 +4,8 @@
  *
  * Its namespace (`eventNamespace`): the factory its line names (`labels.factory`, `default` on a run's line in the default
  * factory); a run's or a step's line that names none, written before lines carried labels, is in `default`, since every run is in a
- * namespace; a daemon's line and the store's that name no factory are in none, cluster-scoped (decision 17). An empty label names no
- * factory.
+ * namespace; a daemon's line and the store's that name no factory are in none, cluster-scoped (decision 17), and a factory's line,
+ * which always names its factory, is in that factory's. An empty label names no factory.
  *
  * Its reason (`eventReason`): the line's own, where it is a code of this `nemia`'s feed (`known`, `REASON_CODES`), else `Unknown`, so the
  * `Event`'s `reason` stays one of the closed words its Schema reads (`EVENT_REASONS`) whatever a newer writer stamped.
@@ -33,7 +33,7 @@ const eventNamespaceSpec = spec<(kind: EventInvolvedKind, factory: string | unde
       condition: ({ input: [kind, factory], output }) => !ofARun(kind) || namesAFactory(factory) || output === 'default',
     },
     daemonAndStoreAreClusterScopedWhenTheyNameNone: {
-      description: "A daemon's or the store's event whose line names no factory is in no namespace",
+      description: "An event of no run — a daemon's, the store's or a factory's — whose line names no factory is in no namespace",
       condition: ({ input: [kind, factory], output }) => ofARun(kind) || namesAFactory(factory) || output === undefined,
     },
   },

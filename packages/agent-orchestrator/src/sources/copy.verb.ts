@@ -148,6 +148,7 @@ const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => [
  */
 export const AGENTS_COPY: Command<AgentCopied, AgentCopy> = {
   name: 'agents copy',
+  served: [{ endpoint: 'agents.copy' }],
   usage: '<file> [--as <name>] [--keep <part>]...',
   help: [
     'an agent file copied into your library, with its schema and skills;',

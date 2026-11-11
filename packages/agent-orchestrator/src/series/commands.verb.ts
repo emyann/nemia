@@ -13,6 +13,7 @@ export type SeriesInput = typeof SeriesInput.Type;
 /** `nemia series`: the system's series over a range, a point a minute, an hour or a day. */
 export const SERIES: Command<SeriesRead, SeriesInput> = {
   name: 'series',
+  served: [{ endpoint: 'server.series' }],
   usage: '[--range 24h|7d|30d|all] [--json]',
   help: [
     "the system's series over a range: a pass's time and its phases, its",

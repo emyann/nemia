@@ -429,6 +429,7 @@ export type StartInput = typeof StartInput.Type;
  */
 export const START: Command<Started, StartInput> = {
   name: 'start',
+  served: [{ endpoint: 'runs.create' }, { endpoint: 'cards.start', as: 'inbox_start' }],
   usage: START_USAGE,
   help: START_LINES,
   manual: START_HELP,
@@ -476,6 +477,7 @@ const ConcludedInput = Schema.Struct({ runId: Schema.String });
 
 export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   name: 'concluded',
+  served: [{ endpoint: 'runs.concluded' }],
   usage: '<runId>',
   help: ['what a run started with --from <runId> would be handed of it, now'],
   spec: {

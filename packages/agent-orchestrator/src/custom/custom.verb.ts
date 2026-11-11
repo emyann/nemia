@@ -75,6 +75,14 @@ export type CustomInput = typeof CustomInput.Type;
  */
 export const AGENTS_CUSTOM: Command<Read | Cleared, CustomInput> = {
   name: 'agents custom',
+  served: [
+    { endpoint: 'agents.instructions' },
+    { endpoint: 'agents.putInstructions', as: 'agents_custom_put' },
+    { endpoint: 'agents.deleteInstructions', as: 'agents_custom_delete' },
+    { endpoint: 'nemia.instructions', as: 'nemia_instructions' },
+    { endpoint: 'nemia.writeInstructions', as: 'nemia_instructions_put' },
+    { endpoint: 'nemia.clearInstructions', as: 'nemia_instructions_delete' },
+  ],
   usage: '<name> [--file <path>|-] [--clear] [--repo .]',
   help: [
     'your custom instructions for that agent: words you add to it without',

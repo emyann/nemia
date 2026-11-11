@@ -224,6 +224,7 @@ export type InboxAddInput = typeof InboxAddInput.Type;
  */
 export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   name: 'inbox add',
+  served: [{ endpoint: 'cards.create' }],
   usage: '"<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
   help: ['park an idea as a card in the inbox, named from its first line'],
   spec: ADD_SPEC,
@@ -300,6 +301,7 @@ export type InboxQueueInput = typeof InboxQueueInput.Type;
  */
 export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
   name: 'inbox queue',
+  served: [{ endpoint: 'cards.queue' }, { endpoint: 'cards.unqueue', as: 'inbox_unqueue' }],
   usage: '<name> [--workflow <w>] [--off]',
   help: ['mark a card to start on its own: the tick starts the oldest queued', 'card once a run slot is free; --off takes the mark back'],
   spec: QUEUE_SPEC,
@@ -397,6 +399,7 @@ export type InboxRmInput = typeof InboxRmInput.Type;
  */
 export const INBOX_RM: Command<InboxDropped, InboxRmInput> = {
   name: 'inbox rm',
+  served: [{ endpoint: 'cards.delete' }],
   usage: '<name>',
   help: ['drop a card without starting it'],
   spec: {

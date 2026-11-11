@@ -46,6 +46,7 @@ export type PassesInput = typeof PassesInput.Type;
 /** `nemia passes`: the recent passes of the tick, a histogram of their times and where it went, phase by phase. */
 export const PASSES: Command<PassesRead, PassesInput> = {
   name: 'passes',
+  served: [{ endpoint: 'server.passes' }],
   usage: '[--last <n>] [--json]',
   help: [
     'what the recent passes of the tick cost: their median and slowest',

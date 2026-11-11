@@ -42,6 +42,7 @@ const ShowInput = Schema.Struct({ runId: Schema.String, raw: Schema.optionalKey(
 
 export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.Type> = {
   name: 'show',
+  served: [{ endpoint: 'runs.record' }],
   usage: '<runId> [--raw]',
   help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
   spec: {
@@ -93,6 +94,7 @@ const API_ONLY = 'a sub-resource of the run object, for a client; at the command
 /** A step's tries, earliest first, the current one last (`StepTry`): the api's `steps` group serves it (`tries`). */
 export const TRIES: Command<{ tries: StepTry[] }, StepInput> = {
   name: 'tries',
+  served: [{ endpoint: 'steps.tries' }],
   usage: '<runId> <step>',
   help: ["a step's tries"],
   spec: { positionals: [...RUN_STEP], flags: [], unknown: takesNo('tries', "one run's id and one step's name") },
@@ -107,6 +109,7 @@ export const TRIES: Command<{ tries: StepTry[] }, StepInput> = {
 /** One try of a step (`StepTry`): the api's `steps` group serves it (`try`). */
 export const TRY: Command<StepTry, TryInput> = {
   name: 'try',
+  served: [{ endpoint: 'steps.try' }],
   usage: '<runId> <step> <try>',
   help: ['one try of a step'],
   spec: {
@@ -150,6 +153,7 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
  */
 export const CLOSEOUT: Command<TryCloseout, CloseoutInput> = {
   name: 'closeout',
+  served: [{ endpoint: 'steps.closeout' }],
   usage: '<runId> <step> [--try <n>]',
   help: ["what a step's try signed off with: its latest, or --try <n>"],
   spec: {
@@ -171,6 +175,7 @@ export const CLOSEOUT: Command<TryCloseout, CloseoutInput> = {
 /** What a step was told, its brief by layer and its task by part (`toldOf`): the api's `steps` group serves it (`told`). */
 export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>, StepInput> = {
   name: 'told',
+  served: [{ endpoint: 'steps.told' }],
   usage: '<runId> <step>',
   help: ['what a step was told'],
   spec: { positionals: [...RUN_STEP], flags: [], unknown: takesNo('told', "one run's id and one step's name") },
@@ -188,6 +193,7 @@ export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>, StepInpu
  */
 export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
   name: 'logs',
+  served: [{ endpoint: 'steps.log' }],
   usage: '<runId> <step>',
   help: ["that step's session output"],
   spec: {

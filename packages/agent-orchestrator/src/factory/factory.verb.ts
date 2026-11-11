@@ -211,6 +211,7 @@ const listed = ({ factories, schedules, untrusted, dir }: Listed): string[] => [
 /** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its nine forms. */
 export const FACTORY: Command<Listed> = {
   name: 'factory',
+  served: [{ endpoint: 'factories.listAll' }],
   usage: '',
   help: [
     "the store's factories: the default first — every run and card that",
@@ -397,6 +398,7 @@ export type FireInput = typeof FireInput.Type;
 /** `nemia factory hire`: one agent hired into one step, and the agent it replaced, if any. */
 export const FACTORY_HIRE: Command<{ file: string; replaced: string | null }, HireInput> = {
   name: 'factory hire',
+  served: [{ endpoint: 'hires.put' }],
   usage: '<factory> <agent> --step <workflow>/<step>',
   help: ["hire an agent into a workflow's step: one a step, a second replaces it"],
   spec: HIRE_SPEC,
@@ -427,6 +429,7 @@ const FIRE_SPEC = stepSpec(
 /** `nemia factory fire`: one step's hire taken back. */
 export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> = {
   name: 'factory fire',
+  served: [{ endpoint: 'hires.delete' }],
   usage: '<factory> --step <workflow>/<step>',
   help: ["take a step's hire back"],
   spec: FIRE_SPEC,

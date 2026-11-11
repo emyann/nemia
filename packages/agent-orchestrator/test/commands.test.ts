@@ -4,12 +4,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, commandBreaks } from '../src/runner.ts';
+import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
-test('the shipped table breaks none of its rules against the CLI’s verbs and runners', () => {
-  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
+test('the shipped table breaks none of its rules against the CLI’s verbs and runners, nor gives a tool a name its own verbs give', () => {
+  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS), []);
 });
 
 test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {

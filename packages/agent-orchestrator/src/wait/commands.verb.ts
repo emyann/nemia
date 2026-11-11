@@ -59,6 +59,7 @@ export type HoldInput = typeof HoldInput.Type;
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }, HoldInput> = {
   name: 'hold',
+  served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'unhold' }],
   usage: '<runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
     'file nothing more of a run until other runs land, as --after would',

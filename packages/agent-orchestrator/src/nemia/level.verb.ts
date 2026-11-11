@@ -238,6 +238,7 @@ function factoryArgsRefusal(args: Args): string | null {
  */
 export const LEVEL: Command<NemiaLevel, LevelInput> = {
   name: 'level',
+  served: [{ endpoint: 'nemia.level' }, { endpoint: 'nemia.setLevel', as: 'level_set' }],
   usage: '[manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]',
   help: [
     "Nemia, the store's own agent: bare, where she is, each factory's level and",

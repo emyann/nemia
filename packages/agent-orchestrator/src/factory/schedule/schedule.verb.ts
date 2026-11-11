@@ -135,6 +135,7 @@ export type UnscheduleInput = typeof UnscheduleInput.Type;
 /** `nemia factory schedule`: a workflow the factory has attached, started by the daemon at each fire of its cron. */
 export const FACTORY_SCHEDULE: Command<Scheduled, ScheduleInput> = {
   name: 'factory schedule',
+  served: [{ endpoint: 'schedules.put' }],
   usage: USAGE,
   help: ['start a run of an attached workflow at each fire of a cron, by the', 'daemon, at every level; a second replaces the first'],
   spec: SCHEDULE_SPEC,
@@ -165,6 +166,7 @@ const UNSCHEDULE_USAGE = '<factory> <workflow>';
 /** `nemia factory unschedule`: a workflow's schedule taken back. */
 export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }, UnscheduleInput> = {
   name: 'factory unschedule',
+  served: [{ endpoint: 'schedules.delete' }],
   usage: UNSCHEDULE_USAGE,
   help: ["take a workflow's schedule back: the daemon starts it no more"],
   spec: {

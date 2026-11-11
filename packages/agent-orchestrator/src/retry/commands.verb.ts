@@ -107,6 +107,7 @@ export const RETRY: Command<
   RetryInput
 > = {
   name: 'retry',
+  served: [{ endpoint: 'runs.retry' }],
   usage:
     '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
   help: [

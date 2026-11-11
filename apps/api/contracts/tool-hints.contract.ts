@@ -7,22 +7,25 @@
  * setting form of a verb that reads bare, is destructive. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { CommandSpec } from 'agent-orchestrator';
 
-/** The class of a verb of the command table. */
-export type ToolClass = CommandSpec['class'];
+/**
+ * The class of a verb of the command table (`CommandClass`) as the hints read it: each of its words, and `setting` for its setting form
+ * (`{ bare: 'read', sets }`), which `src/mcp/hints.ts` names so (`classWordOf`). A word, since tsverify models no union of a string and
+ * a record, and the laws read no more of the setting form than that it is one.
+ */
+export type ToolClass = 'read' | 'act' | 'ask' | 'answer' | 'none' | 'setting';
 
 /** The method of the endpoint a tool calls. Implement may read it off the endpoint's own type, which changes no law. */
 export type ToolMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-/** The annotations a tool carries, as MCP's `ToolAnnotations` names them. */
+/** The annotations a tool carries, as MCP's tool annotations name them. */
 export type ToolHints = { readonly readOnlyHint: boolean; readonly destructiveHint: boolean };
 
 /** Whether an endpoint of `method` writes nothing: the api's guard stands in front of every other. */
 const reads = (method: ToolMethod): boolean => method === 'GET';
 
 /** Whether the inside seat would not run a write of `cls` unasked: asked each time, out of reach, or a read's setting form. */
-const asksInside = (cls: ToolClass): boolean => cls === 'ask' || cls === 'none' || typeof cls === 'object';
+const asksInside = (cls: ToolClass): boolean => cls === 'ask' || cls === 'none' || cls === 'setting';
 
 const toolHintsSpec = spec<(cls: ToolClass, method: ToolMethod) => ToolHints>({
   ensures: {

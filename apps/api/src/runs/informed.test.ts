@@ -163,7 +163,7 @@ test("the run's status phase and reason are its row's in the list: one judgement
   }
 });
 
-test('F6: the decision and the run object read one judgement: a failed run at rest is served from the informer, and both move once a pass reads a hand merge', async () => {
+test('F6: the decision and the run object read one judgement: a run awaiting its ending is served from the informer, and both move once a pass reads a hand merge', async () => {
   const id = 'r-informed-merged';
   const repo = fs.mkdtempSync(path.join(root, 'repo-'));
   const world = stand().world;
@@ -171,28 +171,49 @@ test('F6: the decision and the run object read one judgement: a failed run at re
   const base = world.head(repo);
   const branch = `wf/${id}/implement`;
   world.branch(repo, branch, { 'a.txt': 'the work\n' });
-  const run = { ...record(id), repo, workspace: repo, baseRef: base, steps: { implement: { taskId: `t-${id}`, branch } } };
+  /** Its work done on a branch, and an ending gated on a person that would merge it: what the object's `toDecide` names. */
+  const ending = { name: 'land', after: ['implement'], body: 'Land it.', harness: 'claude', workspace: 'base' };
+  const run = {
+    ...record(id, ['land']),
+    repo,
+    workspace: repo,
+    baseRef: base,
+    workflow: [...record(id).workflow, ending],
+    steps: { implement: { taskId: `t-${id}`, branch } },
+  };
   fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify(run));
   Effect.runSync(engine().file({ id: `t-${id}`, brief: 'Do it.', cwd: repo, harness: 'claude' }));
-  standIn().settle(`t-${id}`, 'failed', { exitCode: 1 });
+  standIn().settle(`t-${id}`, 'succeeded', {
+    exitCode: 0,
+    closeout: { outcome: 'done', summary: 'Built it.', needs: null, artifacts: [] },
+  });
   const aPass = () => runOver(() => stand().layer)(engine(), passStanding(runsAtOnce(root).runs.list()));
   const decision = async (): Promise<RunDecision> => {
     const res = await app().request(`/api/runs/${id}/decision`);
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as RunDecision;
   };
+  /** Whether the decision and the run object each say something is left to decide: the object by its `toDecide`, read now. */
+  const saidBoth = async (): Promise<{ decision: boolean; object: boolean }> => {
+    const answer = await decision();
+    const { status } = await object(id);
+    return { decision: 'standings' in answer, object: status.toDecide !== null };
+  };
   try {
     await aPass();
-    assert.ok('standings' in (await decision()), 'a failed run whose branch is ahead is one to decide');
+    assert.deepEqual(
+      await saidBoth(),
+      { decision: true, object: true },
+      'a run whose branch is ahead, its ending gated, is one to decide, for both',
+    );
     assert.ok(informer().runs.has(id), 'the decision is judged through the informer, which keeps the run at rest');
-    const object = await app().request(`/api/runs/${id}`);
-    assert.equal(object.status, 200);
     world.stage(repo, branch);
     world.commit(repo, `Merge branch '${branch}'`);
-    assert.ok('standings' in (await decision()), 'no pass has read the hand merge: the decision says what the object says');
+    assert.deepEqual(await saidBoth(), { decision: true, object: true }, 'no pass has read the hand merge: neither has moved');
     await aPass();
     const landed = await decision();
     assert.ok('nothing' in landed && landed.nothing.startsWith('landed'), JSON.stringify(landed));
+    assert.equal((await object(id)).status.toDecide, null, 'once a pass reads the hand merge, the object has nothing to decide either');
   } finally {
     fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true });
   }

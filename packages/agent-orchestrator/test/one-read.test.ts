@@ -134,6 +134,8 @@ type Said = {
   checkout?: string | null;
   /** Each step's tries on the clock, as `<step>:<try>` in the order the reader names them. */
   tries?: string[];
+  /** Where each try's check stands on the clock, as `<step>:<try>:<at>` (`TaskSpan`'s `at`), for a try whose check was filed. */
+  checks?: string[];
 };
 
 /** A `ToDecide`, or the board's, as one comparable word: its kind and what it names. */
@@ -159,6 +161,12 @@ const triesOn = (steps: Record<string, readonly { try: number }[]>): string[] =>
   Object.keys(steps)
     .sort()
     .flatMap((name) => (steps[name] ?? []).map((t) => `${name}:${t.try}`));
+
+/** Where each try's check stands on a clock, as `<step>:<try>:<at>`, the steps sorted: a check the reader did not view reads `unknown`. */
+const checksOn = (steps: Record<string, readonly { try: number; check: { at: string } | null }[]>): string[] =>
+  Object.keys(steps)
+    .sort()
+    .flatMap((name) => (steps[name] ?? []).flatMap((t) => (t.check ? [`${name}:${t.try}:${t.check.at}`] : [])));
 
 /**
  * What each reader says of the run `id`, the tick's pass first, after a pass wrote where the branches stand; with `pass: false`, off
@@ -214,6 +222,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
       waitingOn: sorted(decided.waiting.map((w) => w.run)),
       checkout: decided.checkout?.run ?? null,
       tries: triesOn(decided.timeline.steps),
+      checks: checksOn(decided.timeline.steps),
     },
     decision: {
       landed: 'nothing' in read && Boolean(read.nothing?.startsWith('landed')),
@@ -231,6 +240,7 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
             waitingOnYou: sorted(object.status.waitingOnYou),
             waitingOn: sorted((object.status.waiting?.runs ?? []).map((w) => w.run)),
             tries: triesOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
+            checks: checksOn(Object.fromEntries(object.status.steps.map((s) => [s.name, s.timeline]))),
           },
         }),
     ...(pruned.facts?.decided ? { prune: { running: pruned.facts.decided === 'running' } } : {}),
@@ -470,6 +480,20 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     const said = await readers(id);
     agree(said);
     assert.deepEqual(said.decide?.tries, ['implement:1', 'implement:2'], 'both tries of implement, and review not yet on the clock');
+  });
+
+  await t.test("a step tried again by its refused check: nemia decide and the run object both time the first try's check", async () => {
+    const id = await started(folder({ implement: ['check: npm test', 'retries: 1'], review: ['after: implement'] }));
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    stage.board().settle(`${id}-implement-check`, 'failed', undefined, 1);
+    await tick(id);
+    stage.board().settle(`${id}-implement`, 'succeeded', SIGNED);
+    await tick(id);
+    const said = await readers(id);
+    agree(said);
+    assert.deepEqual(said.decide?.tries, ['implement:1', 'implement:2'], 'both tries of implement, and review not yet on the clock');
+    assert.equal(said.decide?.checks?.[0], 'implement:1:ended', "the first try's refused check is on decide's clock, not unknown");
   });
 });
 

@@ -186,7 +186,7 @@ too, which holds parity with this one until the in-process reads retire.
   the pass read (`readPause`, handed to `emitFeed` as `pause`), and the note is what tells one occurrence from another.
 - **A standing word of no run is kept in the fold under a key of its own** (`levelKey`, `conflictsKey` in `feed.ts`), never `Run/` or
   `Step/`, so no `removed` forgets it: a factory's level, read off `levelsNow`, and its conflicts, read off `conflictsNow`
-  (`src/factory/applied/conflicts.verb.ts`) and decided by `conflictsDue` (`contracts/conflicts-said.contract.ts`), each handed to
+  (`src/factory/applied/applied.verb.ts`) and decided by `conflictsDue` (`contracts/conflicts-said.contract.ts`), each handed to
   `emitFeed` by the pass.
 
 ## The tick

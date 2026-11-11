@@ -14,7 +14,8 @@ import { Cause, Clock, Duration, Effect } from 'effect';
 import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
-import { Invalid } from '../../refusal/refusal.ts';
+import { Invalid, type Refusal } from '../../refusal/refusal.ts';
+import type { FeedConflicts } from '../../feed/index.ts';
 import { FactoryDoor, factoryRepos, refuseName } from '../door/factories.store.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
@@ -453,6 +454,21 @@ export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
   return reconciledWith(home, factory, now, named, at, recorded, phases);
 });
+
+/**
+ * Each templated factory's `ConflictsPending` condition as `reconcileFactory` last wrote it, read through the Factory door for the tick's
+ * pass, which hands it to the feed (`emitFeed`, `conflictLines`): whether it is `True`, and its message. A factory whose file does not
+ * read, that has no status yet, or whose status says no such condition is left out: nothing read, nothing said.
+ */
+export const conflictsNow = (): Effect.Effect<FeedConflicts, Refusal> =>
+  Effect.gen(function* () {
+    const listed = yield* (yield* FactoryDoor).factories.listed();
+    return listed.flatMap((l) => {
+      if ('error' in l) return [];
+      const c = l.status?.conditions.find((condition) => condition.type === 'ConflictsPending');
+      return c === undefined ? [] : [{ factory: l.name, pending: c.status === 'True', message: c.message }];
+    });
+  });
 
 /**
  * The phase now of each proposal of the factory `factory` that `proposals` names, read through the Proposal door: `gone` where the store

@@ -6122,7 +6122,7 @@ learnt of a conflict only when she ran the upgrade herself or read the list. The
   at design: `ConflictsPending` (`conflicts pending`) and `ConflictsSettled` (`conflicts settled`), both Normal — a wait on a person,
   not a fault — `source: tick`, words that stand (`src/feed/reason.ts`, 49 entries, 38 codes), and in `objects`' `EVENT_REASONS`.
 - **The controller and the verbs write nothing.** The pass reads each templated factory's condition through the Factory door
-  (`conflictsNow`, `src/factory/applied/conflicts.verb.ts`) beside the levels, and hands it to `emitFeed`; `conflictsDue`
+  (`conflictsNow`, `src/factory/applied/applied.verb.ts`) beside the levels, and hands it to `emitFeed`; `conflictsDue`
   (`contracts/conflicts-said.contract.ts`) compares it to the reason the fold keeps under `Conflicts/<factory>`, so the condition turning
   True is one line, turning back one, a reworded message none, and a restarted daemon says neither again. A factory never said pending
   is never said settled.

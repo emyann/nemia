@@ -23,7 +23,7 @@ import { templated as programsAt } from './templated.ts';
 import { tickRun, readFeed } from '../src/runner.ts';
 import { readFactoryAt } from '../src/factory/factory.store.ts';
 import { treeDir } from '../src/factory/applied/applied.store.ts';
-import { conflictsNow } from '../src/factory/applied/conflicts.verb.ts';
+import { conflictsNow } from '../src/factory/applied/applied.verb.ts';
 import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { parseSelectors, selects } from '../src/watch/selector.ts';
 import { NEMIA_SELECTORS } from '../src/nemia/nemia.ts';

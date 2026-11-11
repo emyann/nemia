@@ -33,10 +33,10 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedConflicts } from '../feed/feed.ts';
+import type { FeedConflicts } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
-import { conflictsNow } from '../factory/applied/conflicts.verb.ts';
+import { conflictsNow } from '../factory/applied/applied.verb.ts';
 import type { FactoryLevel } from '../level/level.ts';
 import {
   freshStandingMemo,

@@ -34,7 +34,8 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
 } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -150,6 +151,13 @@ const board = () => {
                 ),
         },
       };
+    },
+    /**
+     * Each of `ids` the board has filed, viewed as `view` views it, as the engine's `list` answers: the judgement reads the run through
+     * it. `promised` calls each method on the fake, so `this` is the fake.
+     */
+    async list(this: { view: (id: string) => Promise<unknown> }, ids: string[]) {
+      return { views: await Promise.all(ids.filter((id) => tasks.has(id)).map((id) => this.view(id))), unreadable: [] };
     },
     file: async (spec: Filed) => {
       filings.push(spec.id);
@@ -300,6 +308,13 @@ const timed = () => {
                 ],
         },
       };
+    },
+    /**
+     * Each of `ids` the board has filed, viewed as `view` views it, as the engine's `list` answers: the judgement reads the run through
+     * it. `promised` calls each method on the fake, so `this` is the fake.
+     */
+    async list(this: { view: (id: string) => Promise<unknown> }, ids: string[]) {
+      return { views: await Promise.all(ids.filter((id) => tasks.has(id)).map((id) => this.view(id))), unreadable: [] };
     },
     file: async (spec: Filed) => {
       tasks.set(spec.id, { phase: 'pending', filedAt: T0 + tasks.size * 600_000 });
@@ -644,7 +659,7 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
   let a = { run: undefined as unknown as RepositoryRun, repo: '', branch: '', b: timed() };
 
   await s.test(
-    'the whole screen of a run waiting on you: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and ship and drop — each task viewed once and the feed never read',
+    'the whole screen of a run waiting on you, once a pass has read where its branch stands: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and ship and drop — each task viewed once and the feed never read',
     async (c) => {
       const repo = aPackage();
       const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: checked(), isolate: false })));
@@ -664,9 +679,14 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
       const read = runRecord(ROOT, run.id);
-      const record = { ...read, steps: Object.fromEntries(Object.entries(read.steps).map(([name, step]) => [name, { ...step, branch }])) };
+      const record = {
+        ...read,
+        isolate: true,
+        steps: Object.fromEntries(Object.entries(read.steps).map(([name, step]) => [name, { ...step, branch }])),
+      };
       fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
       a = { run, repo, branch, b };
+      await runWith(b.e, passStanding(listRuns(ROOT)));
 
       b.viewed.clear();
       b.fed.reads = 0;
@@ -969,70 +989,74 @@ test('the whole screens of a run through its tries and on two branches, and of `
     },
   );
 
-  await s.test('the whole screen of a run on two branches, one with a note longer than the screen shows', async (c) => {
-    const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-    fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
-    const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: dir })));
-    const { e, settle } = timed();
-    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-    const committed = (step: string, file: string, text: string) => {
-      const wt = runRecord(ROOT, run.id).steps[step].workspace!;
-      write(wt, file, text);
-      git(wt, 'add', '-A');
-      git(wt, 'commit', '-q', '-m', `add ${file}`);
-    };
-    committed('implement', 'sub.ts', 'export const sub = (a, b) => a - b;\n');
-    committed('docs', 'NOTES.md', Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join(''));
-    settle(`${run.id}-implement`, 'succeeded', SIGNED);
-    settle(`${run.id}-docs`, 'succeeded', SIGNED);
-    await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(await whole(c, e, run), [
-      '<id>  add sub',
-      '',
-      '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked',
-      '',
-      '  touched  wf/<id>/run',
-      '    (root)  1 file   +123 −0',
-      '  touched  wf/<id>/implement',
-      '    (root)  1 file   +1 −0',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/run ───',
-      '  none',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/implement ───',
-      '  none',
-      '',
-      '  docs',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-      '    did it',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
-      '    did it',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
-      '',
-      '  wf/<id>/run  — 1 file: +123 −0',
-      '',
-      '  ── NOTES.md ────────────────────────────────────────────────────────',
-      ...Array.from({ length: 120 }, (_, i) => `  note ${i + 1}`),
-      '  … 3 more lines — git show wf/<id>/run:NOTES.md',
-      '  wf/<id>/implement  — 1 file: +1 −0',
-      '',
-      '  branch    wf/<id>/run is ahead of main by 1 commit',
-      '  branch    wf/<id>/implement is ahead of main by 1 commit',
-      '',
-      '  land it   git -C <repo> merge --no-ff wf/<id>/run',
-      '  drop it   git -C <repo> branch -D wf/<id>/run wf/<id>/implement',
-    ]);
-  });
+  await s.test(
+    'the whole screen of a run on two branches, once a pass has read where they stand, one with a note longer than the screen shows',
+    async (c) => {
+      const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+      fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+      fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
+      const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: dir })));
+      const { e, settle } = timed();
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+      const committed = (step: string, file: string, text: string) => {
+        const wt = runRecord(ROOT, run.id).steps[step].workspace!;
+        write(wt, file, text);
+        git(wt, 'add', '-A');
+        git(wt, 'commit', '-q', '-m', `add ${file}`);
+      };
+      committed('implement', 'sub.ts', 'export const sub = (a, b) => a - b;\n');
+      committed('docs', 'NOTES.md', Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join(''));
+      settle(`${run.id}-implement`, 'succeeded', SIGNED);
+      settle(`${run.id}-docs`, 'succeeded', SIGNED);
+      await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+      await runWith(e, passStanding(listRuns(ROOT)));
+      assert.deepEqual(await whole(c, e, run), [
+        '<id>  add sub',
+        '',
+        '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked',
+        '',
+        '  touched  wf/<id>/run',
+        '    (root)  1 file   +123 −0',
+        '  touched  wf/<id>/implement',
+        '    (root)  1 file   +1 −0',
+        '  lesson  nothing written where the next agent reads',
+        '',
+        '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/run ───',
+        '  none',
+        '',
+        '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/implement ───',
+        '  none',
+        '',
+        '  docs',
+        '    used  not measured',
+        '    cost  not measured',
+        '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
+        '    did it',
+        '',
+        '  implement',
+        '    used  not measured',
+        '    cost  not measured',
+        '    timeline  try 1  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
+        '    did it',
+        '',
+        '  cost  run not measured',
+        '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
+        '',
+        '  wf/<id>/run  — 1 file: +123 −0',
+        '',
+        '  ── NOTES.md ────────────────────────────────────────────────────────',
+        ...Array.from({ length: 120 }, (_, i) => `  note ${i + 1}`),
+        '  … 3 more lines — git show wf/<id>/run:NOTES.md',
+        '  wf/<id>/implement  — 1 file: +1 −0',
+        '',
+        '  branch    wf/<id>/run is ahead of main by 1 commit',
+        '  branch    wf/<id>/implement is ahead of main by 1 commit',
+        '',
+        '  land it   git -C <repo> merge --no-ff wf/<id>/run',
+        '  drop it   git -C <repo> branch -D wf/<id>/run wf/<id>/implement',
+      ]);
+    },
+  );
 
   await s.test('the whole screen of `nemia decide --help`, and of `nemia decide` with no run', async (c) => {
     const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');

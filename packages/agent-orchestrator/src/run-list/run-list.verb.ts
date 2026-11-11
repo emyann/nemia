@@ -12,6 +12,7 @@
  * `metadata.asOf` (`framePartsOf`). A plain list carries none of it.
  */
 import { isDeepStrictEqual } from 'node:util';
+import type { BranchReader } from '../branches/branches.store.ts';
 import { Effect } from 'effect';
 import { type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
 import type { Run } from '../run.ts';
@@ -122,7 +123,7 @@ export const runList = Effect.fn('runList')(function* (e: Engine, how: SummaryHo
   const { git, read, all } = yield* storeRunsListed(e, how);
   const judging = (some: readonly Run[]) => informedJudgements(e, home, some, read, git, () => all);
   const { home } = how;
-  const objectOf = objectsOf(e, how, reads, read.verify);
+  const objectOf = objectsOf(e, how, reads, read.verify, git);
   if (field !== undefined) return yield* byState(all, query, field, { home, judging, objectOf });
   return yield* runListOf(all, query, (page) =>
     Effect.gen(function* () {
@@ -146,11 +147,11 @@ const notJudged = (run: Pick<Run, 'id'>) => Effect.die(new Error(`Run ${run.id} 
  * (`withDiskParts`), or one built and its core kept (`keepObject`) where none is and its read did not fail (`readFailed`). Under `verify`,
  * one served from memory is built afresh too, and one that differs dies. Each workflow folder is loaded once a request (`folderReader`).
  */
-const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean) => {
+const objectsOf = (e: Engine, { home, memo }: SummaryHow, reads: RunReads, verify: boolean, git: BranchReader) => {
   const folders = folderReader(home);
   const built = (run: Run, one: JudgedOrWhy) =>
     Effect.gen(function* () {
-      const steps = yield* stepsReadingOf(e, home, run, one, folders(run));
+      const steps = yield* stepsReadingOf(e, home, run, one, folders(run), git);
       if ('unjudged' in steps) return { core: undefined, answer: steps, failed: false };
       const core = yield* runObjectCore(run, runReadingOf(steps), { said: reads.memo.said, listed: true });
       return { core, answer: withDiskParts(core, diskPartsOf(run, home, folders(run))), failed: readFailed(steps) };

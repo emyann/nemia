@@ -41,6 +41,7 @@ import {
   runWith as runEngine,
 } from '../src/runner.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } from '../src/forget/prune/prune.verb.ts';
 import { PlaceService } from '../src/place/place.store.ts';
@@ -58,6 +59,8 @@ const files = filesStoreAt(ROOT);
 const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
   decideScreen(t, e, argv, as, place, ENV);
 const { runWith, runPlaced } = stage;
+/** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `decide` reads them off. */
+const aPass = (e: Engine) => runWith(e, passStanding(listRuns(ROOT)));
 const world = () => stage.place().world;
 /** The test place's own place, as a verb is answered over it. */
 const placeNow = () => stage.place().place;
@@ -227,7 +230,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
   );
 
   await s.test(
-    'with --yes its worktree is removed, its record, closeout, branch, files and asks kept; `nemia ls` and `nemia decide` say it is pruned; a tick files nothing; a second prune has nothing to do; `nemia rm` still forgets it',
+    'with --yes its worktree is removed, its record, closeout, branch, files and asks kept; `nemia ls` and `nemia decide`, once a pass has read where it stands, say it is pruned; a tick files nothing; a second prune has nothing to do; `nemia rm` still forgets it',
     async () => {
       const { run, repo, wt, branch } = await aFinished(b, { merged: true });
       fs.mkdirSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'), { recursive: true });
@@ -259,6 +262,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
 
       const ls = await typed(t, b.e, 'ls', run.id);
       assert.match(ls.printed[0], new RegExp(`^${run.id}  add a flag  \\(pruned\\)`), 'still on the board, with the word beside it');
+      await aPass(b.e);
       const d = await runWith(b.e, decideRun(run.id));
       assert.equal(d.decision.kind, 'landed');
       assert.equal((d.closeouts.implement as { summary?: string }).summary, 'did it', "its closeout is the engine's, and still read");
@@ -278,7 +282,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
   );
 
   await s.test(
-    '`--artifacts`: its worktree and its files listed with their sizes until --yes, then removed — a link among them as a link — what freed said; its record, asks, inputs and prompts kept; `nemia decide` says the files went',
+    '`--artifacts`: its worktree and its files listed with their sizes until --yes, then removed — a link among them as a link — what freed said; its record, asks, inputs and prompts kept; `nemia decide`, once a pass has read where it stands, says the files went',
     async () => {
       const shotOf = (id: string) => path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
       const run0 = await aFinished(b, { merged: true, closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
@@ -321,6 +325,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.equal(pruned.artifacts?.bytes, measured, 'the marker says what the files freed');
       assert.ok(pruned.artifacts?.at);
 
+      await aPass(b.e);
       assert.equal((await runWith(b.e, decideRun(id))).decision.kind, 'landed');
       const screen = await typed(t, b.e, 'decide', id);
       assert.equal(screen.error, undefined, 'nemia decide reads it');
@@ -553,7 +558,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
   });
 
   await s.test(
-    'REFUSED: whatever holds `nemia rm` — a step at its gate, named with its approval, and an ask no pass has spent, with the file that takes it back — until each is answered',
+    'REFUSED: whatever holds `nemia rm` — a step at its gate, named with its approval, and an ask no pass has spent on a run landed as a pass read it, with the file that takes it back — until each is answered',
     async (tt) => {
       const { run, wt } = await atItsGate(b);
       assert.equal((await runWith(b.e, decideRun(run.id))).decision.kind, 'awaiting', 'over, as `decide` reads it: not refused as running');
@@ -575,6 +580,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
       const asks = path.join(ROOT, 'runs', `${landed.run.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
+      await aPass(b.e);
       assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'landed');
       const asked = await runWith(b.e, prune(landed.run.id, { yes: true }));
       assert.equal(asked.kind, 'refused', 'a retry asked of a step that landed, which no pass files: the ask alone holds it');
@@ -693,7 +699,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
   );
 
   await s.test(
-    'REFUSED: a step over its budget is offered no raise once pruned — `decide` and `nemia decide` say the run was pruned where they said it waits on you, as `nemia ls` does — and the whole screen says so',
+    'REFUSED: a step over its budget is offered no raise once pruned — `decide` and `nemia decide` say the run was pruned where they said it waits on you, as `nemia ls` does — and the whole screen says so, once a pass has read where its branch stands',
     async (tt) => {
       const { run, repo } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
       const before = await runWith(b.e, decideRun(run.id));
@@ -728,6 +734,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       assert.doesNotMatch(screen, /nemia (retry|round|accept|approve) /, 'no verb a pruned run refuses');
       assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 
+      await aPass(b.e);
       const whole = await screenOn(tt, b.e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': repo, '<at>': at }, placeNow());
       const timesCut = whole.map((l) => l.replace(/^( *timeline {2}(?:try 1 {2}filed|run {2}queued) ).*$/, '$1<times>'));
       assert.deepEqual(

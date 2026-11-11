@@ -18,7 +18,7 @@ import { engine, runWith as runEngine } from '../runtime-client.ts';
 import { builtinGitPlace, gitPlaceLayer } from '../place/builtin.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { storeConfigLayer } from '../config/root.store.ts';
-import { standingWhen } from '../standing/standing.verb.ts';
+import { passStanding } from '../standing/standing.verb.ts';
 import { Missing, isRefusal } from '../refusal/refusal.ts';
 import { runDecision, diffFiles, DIFF_LINES } from './decision.verb.ts';
 import type { Env } from '../config/config.store.ts';
@@ -183,6 +183,13 @@ writeRun({
   steps: { implement: { taskId: 't-d1-implement', branch }, review: { taskId: 't-d1-review', branch } },
 });
 
+/**
+ * A pass of the tick's over the store, asking the git place where every run's branches stand and writing it to `standing.json`
+ * (`passStanding`): what a decision reads, as the board does, and never asks git itself.
+ */
+const aPass = () =>
+  runEngine(e, passStanding(stored.runs.list()).pipe(Effect.provide(gitPlaceLayer), Effect.provide(storeConfigLayer(ENV))));
+
 /** The package's git place, its `standing` counted each time it is asked (`asks`), as a layer an app or a program is given. */
 function countedStanding() {
   let asks = 0;
@@ -200,11 +207,12 @@ function countedStanding() {
   return { layer: PlaceService.layer(place), asks: () => asks };
 }
 
-test("a finished run's decision: what its branch touched, the lesson, the diffs cut per file, what each step consumed and the commands, off one ask of where the branches stand, and its total's peak against its own step's cap", async (t) => {
+test("a finished run's decision: what its branch touched, the lesson, the diffs cut per file, what each step consumed and the commands, off the tick's last pass of where the branches stand, and its total's peak against its own step's cap", async (t) => {
   const s = story(t);
   await s.test(
-    'a finished run: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands',
+    'a finished run, after a pass: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands',
     async () => {
+      await aPass();
       const body = await decidable('r-d1');
       assert.deepEqual(Object.keys(body), [
         'standings',
@@ -342,17 +350,11 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
     },
   );
   await s.test(
-    "a decidable run's decision asks where the branches stand once: the package's decision reads the api's own ask",
+    "a decidable run's decision asks the place nothing of where the branches stand: it reads the tick's last pass, as the board does",
     async () => {
-      const one = countedStanding();
-      await runEngine(
-        e,
-        Effect.flatMap(standingWhen(stored.runs.list(), 'r-d1'), (asker) => asker.standing).pipe(Effect.provide(one.layer)),
-      );
-      assert.ok(one.asks() > 0, 'one ask asks the place its standing, which the count sees');
       const served = countedStanding();
       assert.ok('commands' in (await decisionOf('r-d1', ENV, served.layer)));
-      assert.equal(served.asks(), one.asks(), 'the decision asks as one ask does, never twice');
+      assert.equal(served.asks(), 0, 'standing.json is read, and the place is not asked');
     },
   );
   await s.test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {

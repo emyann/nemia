@@ -9,15 +9,17 @@ import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
-import { type BranchReader, branchStandings } from '../branches/branches.store.ts';
-import { resultSteps } from '../branches/index.ts';
+import { type BranchReader, branchStandings, landedOf } from '../branches/branches.store.ts';
+import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
 import { wordOfView, type EnginePhase } from '../views/views-words.ts';
 import { holdAdvice, holdNeedsYou, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
-import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
+import { type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
+import type { RunRead } from '../tick/told.verb.ts';
+import type { Decision, Landed } from '../decide/decide.ts';
 import { inFlight } from '../cap/cap.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
@@ -333,24 +335,22 @@ type Judged = {
   spendOf: SpendOf;
   /** What the run has cost, every step's tries (`runSpend`); null until a cost was measured. */
   cost: Spent | null;
+  /**
+   * What is left for a person to do about the run (`decision`), on the same read as everything above, each branch on the base or not as
+   * the judgement's `git` read it: what `nemia decide` and the api's decision answer from.
+   */
+  decision: Decision;
+  /** What `assess` says of the run on that read (`Assessment`): each step's word, and the tries, rounds and checks due. */
+  assessed: Assessment;
+  /** The runs its roots wait on and the runs a person holds it until, as `waitsOf` and `holdsOf` read them, unworded. */
+  waits: readonly Wait[];
+  holds: readonly Wait[];
+  /**
+   * The run's one read the judgement was made on (`RunRead`), its checkout and standings with it: the readers of its tasks, so a reader of
+   * the judgement reads no task again. Left out of what two judgements are compared by, as its readers are functions.
+   */
+  read: RunRead;
 };
-
-/**
- * The result branches whose standing against the base branch decides anything, for this run: none unless it finished with every step
- * satisfied, it was not called off, it cut worktrees of its own, and no step of its workflow merges (`merges`) — a folder whose ending
- * merges answers for its own branch; a pruned run's branches are kept, and still decide. Pure, and off the record alone: what
- * `standingsOf` asks git about, and nothing more.
- */
-const toDecideBranches = (run: Run, steps: readonly StepSpec[], status: RunStatus): string[] =>
-  run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
-    ? []
-    : [
-        ...new Set(
-          resultSteps(steps)
-            .map((s) => run.steps[s.name]?.branch)
-            .filter((b): b is string => Boolean(b)),
-        ),
-      ];
 
 /**
  * Result branches this process has seen on their base branch, as `<run>/<branch>` — a run id has no slash, so the pair is unambiguous —
@@ -364,10 +364,9 @@ const toDecideBranches = (run: Run, steps: readonly StepSpec[], status: RunStatu
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
  * a run whose branch had nothing on it past its base reads `on` too (`landedOver`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and the branch read afresh. What is left is a person committing
- * to a finished run's branch by hand, which nothing on the board is told of either: `nemia decide` asks where it stands every time, and a
- * fresh process reads it afresh.
+ * to a finished run's branch by hand, which nothing on the board or on `nemia decide` is told of: a fresh process reads it afresh.
  */
-const onTheBase = new Map<string, string>();
+const onTheBase = new Map<string, { filed: string; landed: Landed }>();
 
 /**
  * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
@@ -382,14 +381,13 @@ const workFiled = (run: Run, steps: readonly StepSpec[]): string =>
  * Where each of a run's result branches stands against the base branch, as `git` read it (`branchStandings`): what says a finished run
  * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
  *
- * Asked of the runs where the answer can decide anything and of no other (`toDecideBranches`): a gate says a run is one to decide without
- * a branch being read at all. Level-triggered, as the package is: read on the request that asks, off the tick's last reading, stored
+ * Asked of the branches `branchesAsked` names and of no other: those the tick's pass reads, of a run no longer running, nobody called off,
+ * that cut worktrees of its own. Level-triggered, as the package is: read on the request that asks, off the tick's last reading, stored
  * nowhere but the memo of branches already on the base (`onTheBase`), so a branch a person merged by hand stops being one to decide with
  * nobody telling the run. A record whose branches cannot be read is no branch: git said nothing, and only a gate says there is something
  * to decide. A branch no reading has is unread, and decides nothing either.
  *
- * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it. A
- * folder run has no branch, and stands nowhere.
+ * A branch known to be on the base is answered `on` without being read again. A folder run has no branch, and stands nowhere.
  *
  * `git` is the request's reader (`standingReader`, off `standing.json`). `asked`, where given, is told what was read of — the branches not
  * on the base, which only their tips can move, a branch on the base staying there as `onTheBase` has it; and whether a branch was unread or
@@ -404,19 +402,37 @@ export function standingsOf(
 ): BranchStanding[] {
   if (!isRepositoryRun(run)) return [];
   const filed = workFiled(run, steps);
-  const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
+  const branches = branchesAsked(askedOf(run, steps, status));
   if (!branches.length) return [];
+  const known = (branch: string) => onTheBase.get(`${run.id}/${branch}`)?.filed === filed;
   try {
-    const read = branchStandings(run, branches, git);
-    for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
+    const read = branchStandings(
+      run,
+      branches.filter((branch) => !known(branch)),
+      git,
+    );
+    for (const stood of read)
+      if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, { filed, landed: landedOf(run, git)(stood.branch) });
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     if (asked && read.some((stood) => stood.where === 'unread')) asked.failed = true;
-    return read;
+    return branches.map((branch) => read.find((stood) => stood.branch === branch) ?? { branch, where: 'on' as const });
   } catch {
     if (asked) asked.failed = true;
     return [];
   }
 }
+
+/**
+ * Whether a branch of `run` is on its base (`Landed`), as `standingsOf` says it: off the memo of branches already on the base where it
+ * holds the branch against the work filed (`onTheBase`), else as `git` reads it (`landedOf`). What the judgement's decision reads, so it
+ * never says a branch landed or not where its standings say otherwise.
+ */
+export const landedThrough =
+  (run: Run, steps: readonly StepSpec[], git: BranchReader) =>
+  (branch: string): Landed => {
+    const kept = onTheBase.get(`${run.id}/${branch}`);
+    return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
+  };
 
 /**
  * What `standingsOf` read for one run: the result branches not found on the base, and whether one was unread or the read failed
@@ -478,6 +494,7 @@ export const judge = Effect.fn('judge')(function* (
     shown,
     standings,
     git,
+    landed: landedThrough(run, steps, git),
     ...(config ? { config } : {}),
     ...(parent ? { parent } : {}),
   });
@@ -510,6 +527,11 @@ export const judge = Effect.fn('judge')(function* (
     answers: read.answers,
     spendOf: read.spendOf,
     cost: spentOf(read.spend),
+    decision: read.decision,
+    assessed: read.assessed,
+    waits: read.waiting,
+    holds: read.holding ?? [],
+    read: read.read,
   } satisfies Judged;
 });
 

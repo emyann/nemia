@@ -47,10 +47,10 @@ export type Judgement = {
 export type UnjudgedStep = { readonly name: string; readonly message: string; readonly branch: string | null };
 
 /**
- * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`), with each step's word off its record
- * (`steps`).
+ * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`) and in a reader's own (`saidBy`), with
+ * each step's word off its record (`steps`).
  */
-export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; steps: readonly UnjudgedStep[] };
+export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; saidBy: (by: string) => string; steps: readonly UnjudgedStep[] };
 
 /** What `judgementsOf` read: each run's judgement or why it has none, and the views and unreadable journals of the one listing. */
 export type Judgements = { readonly runs: ReadonlyMap<string, JudgedOrWhy>; readonly views: Views; readonly unreadable: Unreadable };
@@ -90,7 +90,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
       run.id,
       'judged' in one
         ? { judgement: { run, names, steps: judgedSteps(run, folder), views, judged: one.judged, asked } }
-        : { unjudged: one.unreadable, steps: unjudgedSteps(run, names, views, unreadable) },
+        : { unjudged: one.unreadable, saidBy: one.saidBy, steps: unjudgedSteps(run, names, views, unreadable) },
     );
   }
   return { runs: out, views, unreadable } satisfies Judgements;
@@ -108,9 +108,12 @@ export const restingOf = Effect.fnUntraced(function* (e: Engine, { run, judged, 
   return [...(yield* viewsOf(run, seenBy(e, views))).values()].every((view) => view.state.settled);
 });
 
-/** What two judgements of a run are compared by under `WF_VERIFY_REST`: everything but the functions the judgement carries. */
+/**
+ * What two judgements of a run are compared by under `WF_VERIFY_REST`: everything but the functions the judgement carries — its spend
+ * reader, and the read it was made on, whose views and standings are compared already, through `views` and what was decided on them.
+ */
 const comparable = ({ run, names, steps, views, judged, asked }: Judgement) => {
-  const { spendOf: _, ...said } = judged;
+  const { spendOf: _, read: __, ...said } = judged;
   return { run: JSON.stringify(run), names, steps, views: runTasks(run).map((id) => views.get(id)), said, asked };
 };
 

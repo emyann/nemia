@@ -470,7 +470,6 @@ const PINNED: Record<string, string[]> = {
     'standingLiveOf',
     'standingReader',
     'standingSnapshot',
-    'standingWhen',
     'startFromInbox',
     'startPlan',
     'startQueued',

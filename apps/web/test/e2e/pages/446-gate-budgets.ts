@@ -83,8 +83,9 @@ export default {
         `the most the run may cost under the proposal passes the cost line of $${line.past} it was started under, said under the run's line`,
       );
       const said = (await past.textContent()) ?? '';
-      if (!said.includes(dollars(line.past)))
-        throw new Refused(`the gate's sentence names the line it passes, ${dollars(line.past)} — it says ${JSON.stringify(said)}`);
+      for (const named of [dollars(line.past), BUDGETING.factory, BUDGETING.workflow])
+        if (!said.includes(named))
+          throw new Refused(`the gate's sentence names the line, its factory and its workflow: ${named} — it says ${JSON.stringify(said)}`);
       const field = (step: string) => proposed.getByRole('spinbutton', { name: `The budget of ${step}, in dollars` });
       for (const one of [above, under])
         if ((await field(one.step).inputValue()) !== String(one.usd))

@@ -3203,7 +3203,7 @@ export const BUDGETED = {
  * A run whose gated step proposes the budgets of the steps after it, written by its page for its visit and taken back before it ends
  * (`writeBudgeting`): `design → implement → review`, gated at design, which signed off proposing implement $60 — above implement's own
  * `budget: 40` — and review $8, under its `budget: 16`. Neither later step is filed. The page changes review's to $6 and approves.
- * Started under a cost line its caps' bound passes (`line.past`, frozen on the record as `costLine`), so its gate says so; a second run
+ * Started in the factory `nemia`, of its workflow `build`, under a cost line its caps' bound passes (`line.past`, frozen on the record as `costLine`), so its gate says so; a second run
  * of the same shape (`under.id`), under a line the bound does not reach (`line.under`), says nothing of it.
  */
 export const BUDGETING = {
@@ -3221,6 +3221,12 @@ export const BUDGETING = {
   line: { past: 20, under: 500 },
   /** The run whose caps stay under its line, visited only to see that its gate says nothing of it. */
   underId: 'gate-budgets-under-e2e',
+  /**
+   * The factory both runs were started in, FOLDER's (`nemia`), and the workflow folder's name, which the line is set for: a line is
+   * frozen only on a run of a factory that sets one, never of the default factory, so the gate's sentence names both as a person reads it.
+   */
+  factory: 'nemia',
+  workflow: 'build',
 } as const;
 
 /**
@@ -3235,7 +3241,8 @@ export function writeBudgeting(
 ): string[] {
   const { gated, above, under } = BUDGETING;
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
-  const dir = path.join(root, `workflow-${id}`);
+  const home = path.join(root, `workflow-${id}`);
+  const dir = path.join(home, BUDGETING.workflow);
   const schema = { type: 'object', properties: { budgets: BUDGETED }, required: ['budgets'], additionalProperties: false };
   const task = path.join(root, 'engine', 'tasks', `${id}-${gated}.jsonl`);
   write(
@@ -3314,11 +3321,12 @@ export function writeBudgeting(
         gates: [gated],
         createdAt: ago(10),
         steps: { [gated]: { taskId: `${id}-${gated}` }, [above.step]: { taskId: null }, [under.step]: { taskId: null } },
+        factory: BUDGETING.factory,
         ...(costLine === undefined ? {} : { costLine }),
       },
       null,
       2,
     ),
   );
-  return [record, dir, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task];
+  return [record, home, path.join(root, 'runs', id), path.join(root, 'runs', `${id}.asks`), task];
 }

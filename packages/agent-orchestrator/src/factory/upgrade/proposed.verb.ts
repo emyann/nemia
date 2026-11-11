@@ -1,7 +1,7 @@
 /**
- * The proposer of a workflow's resolution as the command line gives it (`ResolutionProposer`, `proposer.verb.ts`): the Workflow proposed
- * with `proposeProgram` at the version its tree's folder is at now (`currentOf`) — an update, a creation where the tree has no such folder,
- * a removal where it is given no spec — by the caller the session's token in `WF_SESSION_TOKEN` names (`sessionCaller`): the person from
+ * The proposer of an owner's resolution as the command line gives it (`ResolutionProposer`, `proposer.verb.ts`): the object proposed
+ * with `proposeProgram` at the version it is at now (`currentOf`) — an update, a creation where nothing is at its name, a removal where it
+ * is given no spec; the Factory and a Hire always an update, a Hire whose spec hires no one its step fired — by the caller the session's token in `WF_SESSION_TOKEN` names (`sessionCaller`): the person from
  * a shell, the session's agent from a session, held to its own factory. A token refused is refused `Conflict`; the rest as
  * `proposeProgram` refuses it, another factory's session among them (`Forbidden`).
  */
@@ -16,15 +16,15 @@ import { proposeProgram } from '../../propose/propose.verb.ts';
 import { currentOf, type ProposalPlace } from '../../propose/current.verb.ts';
 import { ResolutionProposer, type ResolutionProposed } from './proposer.verb.ts';
 
-/** The Workflow `workflow` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name. */
-export const resolutionProposed: ResolutionProposed = (factory, workflow, spec, why) =>
+/** The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name. */
+export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
   Effect.gen(function* () {
     const place: ProposalPlace = { home: yield* StoreRoot, repo: path.resolve('.') };
-    const now = yield* currentOf(place, factory, 'Workflow', workflow);
-    const verb = spec === undefined ? 'delete' : now.version === null ? 'create' : 'update';
+    const now = yield* currentOf(place, factory, kind, name);
+    const verb = spec === undefined ? 'delete' : now.version === null && kind !== 'Factory' ? 'create' : 'update';
     const object: ProposedObject = {
-      kind: 'Workflow',
-      metadata: { name: workflow, ...(now.version !== null && { resourceVersion: now.version }) },
+      kind,
+      metadata: { name, ...(now.version !== null && { resourceVersion: now.version }) },
       verb,
       ...(spec === undefined ? {} : { spec }),
     };
@@ -39,6 +39,6 @@ export const resolutionProposed: ResolutionProposed = (factory, workflow, spec, 
     return proposal.metadata.name;
   });
 
-/** `program` given the command line's proposer of a workflow's resolution. */
+/** `program` given the command line's proposer of an owner's resolution. */
 export const withResolutionProposer = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, ResolutionProposer, resolutionProposed);

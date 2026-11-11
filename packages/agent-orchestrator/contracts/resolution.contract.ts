@@ -51,7 +51,7 @@ const hireOfKey = (key: string | null): string | null => {
   if (key === null || !key.startsWith('hires.')) return null;
   const step = key.slice('hires.'.length);
   const cut = step.indexOf('/');
-  return cut > 0 && cut < step.length - 1 ? `${step.slice(0, cut)}.${step.slice(cut + 1)}` : null;
+  return cut > 0 && cut < step.length - 1 ? step.slice(0, cut) + '.' + step.slice(cut).slice(1) : null;
 };
 
 /** Whether a conflict is a step's hire in the wiring. */

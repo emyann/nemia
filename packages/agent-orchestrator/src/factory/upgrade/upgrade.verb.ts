@@ -3,11 +3,12 @@
  * another version, rendered with the factory's parameters overlaid by each `--set`, and writes nothing (`FACTORY_PLAN`); `nemia factory
  * upgrade` writes the version wanted, the template's source where `--template` names one, and the parameters it rendered with, into the
  * factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve`
- * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict in a text file directly in
- * a workflow's folder, once each conflict of that workflow has one, proposes the workflow's folder as the choices compose it, a Proposal
- * of that Workflow at its version now, by the caller its session's token names (`sessionCaller`), and records it beside the choices; the
- * controller merges once each other conflict has a choice and each such proposal applied. A run in flight keeps the folders frozen on its
- * record.
+ * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict an object of the tree
+ * owns (`resolvedBy`: a Workflow, an Agent, a Skill, a Hire or the Factory), once each conflict of that owner has one, proposes the owner as
+ * the choices compose it (`ownerSpec`), a Proposal of it at its version now, by the caller its session's token names (`sessionCaller`),
+ * and records it beside the choices by the owner's key (`ownerKey`); the controller merges once each other conflict — a carried file's,
+ * the wiring's other keys', a file's that is not text — has a choice and each such proposal applied. A run in flight keeps the folders
+ * frozen on its record.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,7 @@ import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
-import { workflowSpecOf } from '../../propose/index.ts';
+import { ownerSpec } from './owner-spec.ts';
 import { ResolutionProposer } from './proposer.verb.ts';
 import { textIn } from '../../folder/folder.ts';
 import { StoreRoot } from '../../config/root.store.ts';
@@ -30,6 +31,7 @@ import {
   renderedOrNot,
   sameParams,
   setsOf,
+  ownerSaid,
   upgradeMerge,
   type RenderedAt,
   type UpgradeMerge,
@@ -55,6 +57,7 @@ import {
   declineLine,
   mergeBaseOf,
   mergeTrees,
+  ownerOfKey,
   planLines,
   resolveLine,
   sameVersionChange,
@@ -585,13 +588,14 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
   const proposals = proposalsFor(readResolutions(home, factory.name), merging);
   const phases = yield* phasesNamed(factory.name, proposals);
   const ours = yield* tried(() => entriesIn(treeDir(home, factory.name)));
-  const merged = upgradeMerge(base, ours, render.entries, switched !== undefined, proposals, phases);
-  return yield* resolvedWith(home, args, factory, merging, merged);
+  const merged = upgradeMerge(factory.name, base, ours, render.entries, switched !== undefined, proposals, phases);
+  return yield* resolvedWith(home, args, factory, merging, merged, ours);
 });
 
 /**
  * What `nemia factory resolve` wrote: the factory, the conflict, the version, its file, the conflicts still waiting for a choice, the
- * proposal it made of the conflict's workflow where it made one (`proposed`), and the proposals the merge waits on to apply (`waits`).
+ * proposal it made of the conflict's owner where it made one (`proposed`, the owner's kind and name), and the proposals the merge waits on
+ * to apply (`waits`).
  */
 type Resolved = {
   name: string;
@@ -599,70 +603,37 @@ type Resolved = {
   to: string;
   file: string;
   left: string[];
-  proposed?: { workflow: string; proposal: string };
+  proposed?: { kind: string; name: string; proposal: string };
   waits: string[];
 };
 
-/** `choices` with each conflict of `merge` left without one given `'ours'`: what a part of the merge is composed with. */
-const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Record<string, Choice> =>
-  Object.fromEntries(merge.conflicts.map((c) => [c.at, choices[c.at] ?? 'ours']));
-
 /**
- * The text files directly in the folder of `workflow` as `merge` composes them with `choices`, by name; a file that is not text, which a
- * Workflow's spec does not carry, left out.
- */
-function workflowTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>, workflow: string): { name: string; text: string }[] {
-  const composed = compose(merge, filledFor(merge, choices));
-  const prefix = `workflows/${workflow}/`;
-  const entries = 'entries' in composed ? composed.entries : [];
-  return entries.flatMap((entry) => {
-    const name = entry.path.slice(prefix.length);
-    if (!entry.path.startsWith(prefix) || name.includes('/')) return [];
-    const text = textIn(entry.bytes);
-    return text === null ? [] : [{ name, text }];
-  });
-}
-
-/**
- * The Workflow `workflow` of `factory` as `merge` composes its folder with `choices`, handed to the proposer the program was given
- * (`ResolutionProposer`): proposed at the version its tree's folder is at now, by the caller the session's token names, or its removal
- * where the merge leaves no text file in it. Refused: a composed step that does not read, and a folder left with files but no step
- * (`Invalid`); and as the proposer refuses. The proposal's name.
+ * The owner `key` of `factory` (`ownerOfKey`) as `merge` composes its files with `choices` (`ownerSpec`), handed to the proposer the
+ * program was given (`ResolutionProposer`): proposed at the version it is at now, by the caller the session's token names, or its removal.
+ * Refused as `ownerSpec` refuses (`Invalid`), and as the proposer refuses. The proposal's name.
  */
 const proposedResolution = Effect.fn('proposedResolution')(function* (
   factory: Templated,
   to: string,
-  workflow: string,
+  key: string,
   merge: TreeMerge,
   choices: Readonly<Record<string, Choice>>,
+  ours: readonly Entry[],
 ) {
-  const verb = 'nemia factory resolve';
-  const kept = `Your choice is kept; choose again for a conflict of ${workflow} to propose it again (${verb} ${factory.name} <conflict> --ours|--theirs|--file <path>).`;
-  const texts = workflowTexts(merge, choices, workflow);
-  const read = yield* Effect.try({
-    try: () => workflowSpecOf(texts),
-    catch: (err) =>
-      new Invalid({
-        message: `${verb}: the workflow ${workflow} as your choices compose it does not read: ${err instanceof Error ? err.message : String(err)} Nothing was proposed. ${kept}`,
-      }),
-  });
-  const spec = read;
-  if (texts.length > 0 && spec.steps.length === 0)
-    return yield* Effect.fail(
-      new Invalid({
-        message: `${verb}: your choices leave the workflow ${workflow} with no step, and a workflow has one at least: keep a step's file, --ours or --theirs on its conflict. Nothing was proposed. ${kept}`,
-      }),
-    );
-  const why = `the resolution of ${factory.name}'s upgrade to ${to}: the workflow ${workflow} as the choices for its conflicts compose it`;
-  return yield* (yield* ResolutionProposer)(factory.name, workflow, texts.length === 0 ? undefined : spec, why);
+  const owner = ownerOfKey(key);
+  const tree = new Map(ours.flatMap((e) => (textIn(e.bytes) === null ? [] : [[e.path, textIn(e.bytes) ?? ''] as const])));
+  const spec = yield* tried(() => ownerSpec(factory.name, owner, merge, choices, tree));
+  const why = `the resolution of ${factory.name}'s upgrade to ${to}: ${ownerSaid(key)} as the choices for its conflicts compose it`;
+  return yield* (yield* ResolutionProposer)(factory.name, owner.kind, owner.name, spec, why);
 });
 
 /**
  * The choice `args` give for one conflict of `read`'s merge, the upgrade of `factory` named by `merging` — its versions, its template and
- * the digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`); where a workflow's
- * proposal resolves the conflict (`read.owners`) and each conflict of that workflow then has a choice, the workflow proposed as the
- * choices compose it (`proposedResolution`) and recorded by workflow beside them. Refused before anything is written: an address that is
- * no conflict of the merge (`Missing`); a `--file` not there (`Invalid`); and a conflict of a workflow whose proposal still waits
+ * the digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`); where an owner's
+ * proposal resolves the conflict (`read.owners`) and each conflict of that owner then has a choice, the owner proposed as the choices
+ * compose it (`proposedResolution`) against the tree's files `ours`, and recorded by its key beside them. Refused before anything is
+ * written: an address that is no conflict of the merge (`Missing`); a `--file` not there (`Invalid`); and a conflict of an owner whose
+ * proposal still waits
  * (`Conflict`, naming the lines that approve and decline it). Refused after the choice is written, which stays a draft: as
  * `proposedResolution` refuses.
  */
@@ -672,6 +643,7 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
   factory: Templated,
   merging: MergeAt,
   read: UpgradeMerge,
+  ours: readonly Entry[],
 ) {
   const { to } = merging;
   const { merge } = read;
@@ -685,17 +657,17 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
       }),
     );
   const choice = yield* tried(() => choiceOf(args));
-  const workflow = read.owners.get(at);
-  const waiting = workflow === undefined ? undefined : read.resolved.get(workflow);
+  const owner = read.owners.get(at);
+  const waiting = owner === undefined ? undefined : read.resolved.get(owner);
   if (waiting?.resolution === 'proposed' && waiting.proposal !== undefined)
     return yield* Effect.fail(
       new Conflict({
-        message: `${verb}: the conflicts of the workflow ${workflow ?? ''} are resolved by the proposal ${waiting.proposal.name}, which is ${waiting.proposal.phase}: approve it, ${approveLine(factory.name, waiting.proposal.name)}; or decline it, ${declineLine(factory.name, waiting.proposal.name)}, then resolve again. ${notDone}`,
+        message: `${verb}: the conflicts of ${owner === undefined ? '' : ownerSaid(owner)} are resolved by the proposal ${waiting.proposal.name}, which is ${waiting.proposal.phase}: approve it, ${approveLine(factory.name, waiting.proposal.name)}; or decline it, ${declineLine(factory.name, waiting.proposal.name)}, then resolve again. ${notDone}`,
       }),
     );
   const kept = readResolutions(home, factory.name);
   const choices = { ...choicesFor(kept, merging), [at]: choice };
-  const proposals: Record<string, string> = Object.fromEntries(Object.entries(proposalsFor(kept, merging)).filter(([w]) => w !== workflow));
+  const proposals: Record<string, string> = Object.fromEntries(Object.entries(proposalsFor(kept, merging)).filter(([o]) => o !== owner));
   const written = () => {
     const { proposals: _was, ...others } = kept ?? {};
     writeResolutions(home, factory.name, {
@@ -709,15 +681,15 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
   };
   yield* tried(written);
   let proposed: Resolved['proposed'];
-  if (workflow !== undefined && merge.conflicts.every((c) => read.owners.get(c.at) !== workflow || Object.hasOwn(choices, c.at))) {
-    const proposal = yield* proposedResolution(factory, to, workflow, merge, choices);
-    proposals[workflow] = proposal;
+  if (owner !== undefined && merge.conflicts.every((c) => read.owners.get(c.at) !== owner || Object.hasOwn(choices, c.at))) {
+    const proposal = yield* proposedResolution(factory, to, owner, merge, choices, ours);
+    proposals[owner] = proposal;
     yield* tried(written);
-    proposed = { workflow, proposal };
+    proposed = { ...ownerOfKey(owner), proposal };
   }
   const left = compose(merge, choices);
   const waits = [...new Set(read.owners.values())].flatMap((w) => {
-    if (w === workflow) return proposed === undefined ? [] : [proposed.proposal];
+    if (w === owner) return proposed === undefined ? [] : [proposed.proposal];
     const r = read.resolved.get(w);
     return r?.resolution === 'proposed' && r.proposal !== undefined ? [r.proposal.name] : [];
   });
@@ -733,8 +705,8 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
 });
 
 /**
- * `nemia factory resolve`: the person's choice for one conflict of an upgrade; for a workflow's conflicts, once each has one, the
- * proposal of that workflow, to approve; the daemon merges once each conflict has a choice and each such proposal applied.
+ * `nemia factory resolve`: the person's choice for one conflict of an upgrade; for the conflicts of an owner — a Workflow, an Agent, a
+ * Skill, a Hire or the Factory — once each has one, the proposal of that owner, to approve; the daemon merges once each conflict has a choice and each such proposal applied.
  */
 export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',
@@ -742,8 +714,9 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
   help: [
     "choose for one conflict of a templated factory's upgrade or switch: your",
     'tree, the template (none: drop the file), or the text of a file; once',
-    "each conflict of a workflow's folder has one, the workflow is proposed",
-    'as they compose it, to approve (nemia proposals approve <p> -n <name>);',
+    'each conflict of a workflow, an agent, a skill, a hire or the rules and',
+    'instruction has one, that object is proposed as they compose it, to',
+    'approve (nemia proposals approve <p> -n <name>); a carried file stays a choice;',
     'the daemon merges once each has one and each proposal applied',
   ],
   spec: RESOLVE_SPEC,
@@ -761,7 +734,7 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
     ...(proposed === undefined
       ? []
       : [
-          `the workflow ${proposed.workflow} is proposed as your choices compose it, ${proposed.proposal}: ${approveLine(name, proposed.proposal)}`,
+          `the ${proposed.kind} ${proposed.name} is proposed as your choices compose it, ${proposed.proposal}: ${approveLine(name, proposed.proposal)}`,
         ]),
     left.length
       ? `${left.length} conflict${left.length === 1 ? '' : 's'} still wait for a choice: ${left.map((c) => resolveLine(name, c)).join('; ')}`

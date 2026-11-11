@@ -53,6 +53,7 @@ const PERSONS_SETTINGS: Readonly<Record<string, string>> = {
   repos: 'nemia apply -f <factory.yaml>, the Factory with its repos',
   volumes: 'nemia factory volume add and nemia factory volume rm',
   harnessSettings: 'nemia factory setting set and nemia factory setting rm',
+  costLines: 'nemia factory cost-line set and nemia factory cost-line rm',
   revisions: 'nemia factory revisions <factory> <policy>',
   template: 'nemia factory upgrade <factory>',
   level: 'nemia level <level> --factory <factory>',

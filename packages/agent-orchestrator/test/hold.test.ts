@@ -43,6 +43,7 @@ import {
   retryRun,
   roundRun,
   sayRun,
+  PERSON,
   startRun,
   unhold,
   WHY_CAP,
@@ -415,21 +416,24 @@ test('a run held until another lands: said by every screen with why and who, not
       b.settle(`${blocked.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
       await tick(b, blocked.id);
       await assert.rejects(
-        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello')),
+        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
         (err: Error) => /: nemia retry /.test(err.message),
         'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
       );
       await stage.runWith(b.e, hold(blocked.id, [target.id]));
-      await assert.rejects(stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello')), (err: Error & { exitCode?: number }) => {
-        assert.equal(err.exitCode, 2);
-        names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
-        assert.doesNotMatch(err.message, VERBS);
-        return true;
-      });
+      await assert.rejects(
+        stage.runWith(b.e, sayRun(blocked.id, 'implement', 'hello', { caller: PERSON })),
+        (err: Error & { exitCode?: number }) => {
+          assert.equal(err.exitCode, 2);
+          names(err.message, `no try is filed while ${blocked.id} is held until ${target.id} lands`, `nemia hold ${blocked.id} --off`);
+          assert.doesNotMatch(err.message, VERBS);
+          return true;
+        },
+      );
       await stage.runWith(b.e, unhold(blocked.id));
       assert.equal((await stage.runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
       await assert.rejects(
-        stage.runWith(b.e, sayRun(done.id, 'implement', 'hello')),
+        stage.runWith(b.e, sayRun(done.id, 'implement', 'hello', { caller: PERSON })),
         (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
       );
     },

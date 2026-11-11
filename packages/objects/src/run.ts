@@ -12,6 +12,7 @@ import { Schema } from 'effect';
 import { API_VERSION, listOf } from './meta.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
+import { ChatSpeaker } from './nemia.ts';
 import {
   ANSWER_VIA,
   ARTIFACT_KINDS,
@@ -299,7 +300,7 @@ const StepArtifact = Schema.Union([
  * The budgets a gated step proposes for the steps after it, or the caps its approval set (`GateBudgets`, tries.verb.ts): per step, the
  * amount and its words, why the step proposed it (null where it did not say, or the person gave it), the step's own `budget:` (null
  * where it has none) and whether the amount is above it; then the run's line in a person's words, what it has spent and the most it may
- * cost under these caps.
+ * cost under these caps; and, where that most passes the cost line the run froze from its factory, the line and its sentence.
  */
 const GateBudgets = Schema.Struct({
   from: Schema.Literals(GATE_BUDGETS_FROM),
@@ -314,6 +315,7 @@ const GateBudgets = Schema.Struct({
     }),
   ),
   said: Schema.String,
+  line: Schema.optionalKey(Schema.Struct({ usd: Schema.Finite, said: Schema.String })),
 });
 
 /**
@@ -326,12 +328,17 @@ const StepGate = Schema.Struct({
   budgets: Schema.optionalKey(GateBudgets),
 });
 
-/** Words a person said to a session while it ran (`Said`, say.ts). */
+/**
+ * Words said to a session while it ran (`Said`, say.ts), as the engine journalled them (`text`); where an agent wrote them, which
+ * (`from`) and its words without the frame they were said in (`words`). None is the person's.
+ */
 const Said = Schema.Struct({
   at: Schema.String,
   attempt: Schema.Finite,
   text: Schema.String,
   after: Schema.optionalKey(Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String }))),
+  from: Schema.optionalKey(ChatSpeaker),
+  words: Schema.optionalKey(Schema.String),
 });
 
 /** A step's cap, and what its tries have cost of it. */

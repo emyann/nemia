@@ -543,7 +543,8 @@ function printChoice({ run, toDecide, commands, closeouts, budgets }: Decided, s
 /**
  * The budgets at a step's gate (`GateBudgets`), as `nemia decide` prints them before its approve line: whose they are, then a line for
  * each step — its amount, `above the workflow's $40.00` where it is above the step's own `budget:`, and why it was proposed — then the
- * run's line. None where the gate has none.
+ * run's line, and the cost line it passes where its caps pass one (`GateBudgets.line`, said as the gate says it). None where the gate has
+ * none.
  */
 function budgetLines(gated: string, budgets: GateBudgets | undefined, indent: string): string[] {
   if (!budgets) return [];
@@ -559,6 +560,7 @@ function budgetLines(gated: string, budgets: GateBudgets | undefined, indent: st
       return `${indent}  ${b.step.padEnd(width)}  ${b.said}${above}${b.why ? ` — ${b.why}` : ''}`;
     }),
     `${indent}  ${budgets.said}`,
+    ...(budgets.line === undefined ? [] : [`${indent}  ${budgets.line.said}`]),
   ];
 }
 

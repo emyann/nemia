@@ -719,6 +719,7 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
   },
   untrusted: [],
   volumes: [],
+  costLines: {},
   template: null,
 });
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];

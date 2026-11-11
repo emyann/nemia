@@ -8,12 +8,12 @@ import type { Outcome } from 'objects';
 /**
  * What admission read of a run at a call, for the step it answers: the step's closeout, outcome and what it needs of the person, or
  * undefined where it signed none (`closeout`); the questions it asks, each with what it recommended (`recommended`, as `Question` holds
- * it); its check's
- * verdict, a number, `unfinished`, or undefined where it has no check (`verdict`); each looping step of the run that signed, whether it
- * asks for another round and whether a person accepted its work as it stands (`loops`); whether any step of the run is at or past the
- * cap in force on it (`overBudget`); whether the budgets the step proposes for the steps after it hold a cap above a step's own
- * `budget:` (`aboveCeiling`, `aboveTheWorkflow`); what the run has cost, in dollars (`spend`); and whether a step other than this one waits
- * on the person (`othersWaiting`).
+ * it); its check's verdict, a number, `unfinished`, or undefined where it has no check (`verdict`); each looping step of the run that
+ * signed, whether it asks for another round and whether a person accepted its work as it stands (`loops`); whether any step of the run is
+ * at or past the cap in force on it (`overBudget`); whether the budgets the step proposes for the steps after it hold a cap above a step's
+ * own `budget:` (`aboveCeiling`, `aboveTheWorkflow`); whether the most the run may cost under the step's gate passes the cost line its
+ * factory set for its workflow (`pastLine`, `pastTheLine`); what the run has cost, in dollars (`spend`); and whether a step other than this
+ * one waits on the person (`othersWaiting`).
  */
 export type Seen = {
   closeout: { outcome: Outcome; needs?: string } | undefined;
@@ -22,23 +22,24 @@ export type Seen = {
   loops: readonly { again: boolean; personAccepted: boolean }[];
   overBudget: boolean;
   aboveCeiling: boolean;
+  pastLine: boolean;
   spend: number;
   othersWaiting: boolean;
 };
 
 /**
- * The facts of `seen`: its agent recommends it where its step signed `done` and gave each question it asks a recommended answer, a list
- * of none being none; its check passed where its verdict is exit 0, so a step with no check never meets it; its review passed where no
- * looping step asks for another round and none was accepted by a person over what it found; it stayed within budget where no step is
- * past its budget and the step proposes no cap above a step's own budget, which a person sees at the gate and never has applied
- * unasked; and nothing waits on you where the step asks no question and needs nothing of the person, and no other step waits on them.
- * Pure.
+ * The facts of `seen`: its agent recommends it where its step signed `done` and gave each question it asks a recommended answer, a list of
+ * none being none; its check passed where its verdict is exit 0, so a step with no check never meets it; its review passed where no looping
+ * step asks for another round and none was accepted by a person over what it found; it stayed within budget where no step is past its
+ * budget, the step proposes no cap above a step's own budget, and its caps do not pass the run's cost line, each of which a person sees at
+ * the gate and never has applied unasked — a rule's `under` keeps its own amount, of what the run has spent; and nothing waits on you where
+ * the step asks no question and needs nothing of the person, and no other step waits on them. Pure.
  */
 export const factsOf = (seen: Seen): Facts => ({
   recommends: seen.closeout?.outcome === 'done' && seen.questions.every((q) => q.recommended !== null && q.recommended.length > 0),
   checked: seen.verdict === 0,
   accepted: seen.loops.every((l) => !l.again && !l.personAccepted),
-  withinBudget: !seen.overBudget && !seen.aboveCeiling,
+  withinBudget: !seen.overBudget && !seen.aboveCeiling && !seen.pastLine,
   nothingOpen: seen.questions.length === 0 && !seen.closeout?.needs?.trim() && !seen.othersWaiting,
   spend: seen.spend,
 });

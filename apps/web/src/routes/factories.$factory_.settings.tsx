@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { FactoryCostLines } from '@/components/factory/FactoryCostLines';
 import { FactoryDelegations } from '@/components/factory/FactoryDelegations';
 import { FactoryInstruction } from '@/components/factory/FactoryInstruction';
 import { FactoryRules } from '@/components/factory/FactoryRules';
@@ -53,7 +54,8 @@ const RouterLinkButton = routeLink(LinkButton);
 
 /**
  * What a person sets of one factory: first, a place of it that is not trusted, with the line that trusts it (`FactoryTrust`); the folders
- * its runs reach beside its repositories, each with the line that takes it back (`FactoryVolumes`); its rules, what every agent hired into
+ * its runs reach beside its repositories, each with the line that takes it back (`FactoryVolumes`); the cost line it sets per workflow it
+ * offers, which a gate whose caps pass it says (`FactoryCostLines`); its rules, what every agent hired into
  * it is told (`FactoryRules`); the agents it lets approve its proposals (`FactoryDelegations`); its instruction, what Nemia is to know
  * about it (`FactoryInstruction`); then its schedules, shown as the factories' read answers them (`FactorySchedules`). The default factory,
  * and a name no factory has, have no settings to keep, and say so: neither the rules nor the instruction is read for them.
@@ -87,6 +89,7 @@ function SettingsPage() {
         <>
           <FactoryTrust factory={factory} />
           <FactoryVolumes factory={factory} />
+          <FactoryCostLines factory={factory} />
           <FactoryRules name={name} />
           <FactoryDelegations name={name} />
           <FactoryInstruction name={name} />

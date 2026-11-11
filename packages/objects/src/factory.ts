@@ -12,7 +12,14 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
-import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, LEVELS, REVISIONS_POLICIES } from './words.ts';
+import {
+  FACTORY_CONDITION_REASONS,
+  FACTORY_CONDITION_STATUSES,
+  FACTORY_CONDITION_TYPES,
+  LEVELS,
+  PROPOSAL_PHASES,
+  REVISIONS_POLICIES,
+} from './words.ts';
 
 /** A folder of the person's machine the factory mounts for every local step: its stored name, its path, and whether steps only read it. */
 export const FactoryVolume = Schema.Struct({
@@ -67,11 +74,22 @@ export type FactoryCondition = typeof FactoryCondition.Type;
 /** A side of an upgrade's conflict: its text, cut, or null where that side has none. */
 const Side = Schema.NullOr(Schema.String);
 
-/** An upgrade waiting on the person: the version it is from and to, and each conflict still without a choice, its sides cut. */
+/**
+ * The proposal a conflict's resolution waits on, where a proposal resolves it (a text file directly in a workflow's folder): its name and
+ * its phase now, null where the store holds it no more.
+ */
+const ConflictProposal = Schema.Struct({ name: Schema.String, phase: Schema.NullOr(Schema.Literals(PROPOSAL_PHASES)) });
+
+/**
+ * An upgrade waiting on the person: the version it is from and to, and each conflict still without a choice, its sides cut, with the
+ * proposal its resolution waits on where one was made.
+ */
 export const FactoryUpgrade = Schema.Struct({
   from: Schema.String,
   to: Schema.String,
-  conflicts: Schema.Array(Schema.Struct({ at: Schema.String, base: Side, ours: Side, theirs: Side })),
+  conflicts: Schema.Array(
+    Schema.Struct({ at: Schema.String, base: Side, ours: Side, theirs: Side, proposal: Schema.optionalKey(ConflictProposal) }),
+  ),
 });
 export type FactoryUpgrade = typeof FactoryUpgrade.Type;
 

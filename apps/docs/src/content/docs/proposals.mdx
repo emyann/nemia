@@ -25,6 +25,11 @@ and the Factory itself, for the workflows it offers, its rules and its instructi
 Kubernetes says it: an object with a `resourceVersion` is an update at that version, one with none is created, and one marked
 `verb: delete` is removed.
 
+A Workflow's spec carries its steps, its README and the folder's other text files (`spec.files`): a proposal can change a script beside
+the steps. Given, `spec.files` is the whole set, so a text file it leaves out is removed; a file that is not text is never touched.
+Its `resourceVersion` covers every file in the folder, so a script edited after the proposal read it makes the proposal stale. The
+resolution of a factory upgrade's conflict in a workflow is such a proposal (see [Factories](/factories/)).
+
 For each object, Nemia works out whether the change widens access: whether the agent it changes would let through a rule it did not
 before, stop refusing one it refused, or run in a permission mode that reaches further. A proposal that widens access says so when
 it is listed, and a rule for auto has to accept that outright (see [below](#delegations-and-rules-at-auto)).

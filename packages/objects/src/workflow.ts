@@ -187,11 +187,20 @@ export type StepKeys = typeof StepKeys.Type;
 export const WorkflowStep = Schema.Struct({ name: Schema.String, keys: StepKeys, body: Schema.String });
 export type WorkflowStep = typeof WorkflowStep.Type;
 
-/** A workflow as its files say it: its description, its README (null for none) and its steps, in its order. */
+/** A text file directly in a workflow's folder that is no markdown — a script, a schema, a table: its name in the folder and its text. */
+export const WorkflowFile = Schema.Struct({ path: Schema.String, text: Schema.String });
+export type WorkflowFile = typeof WorkflowFile.Type;
+
+/**
+ * A workflow as its files say it: its description, its README (null for none), its steps, in its order, and the folder's other text
+ * files (`files`, sorted by name). Given on a write, `files` is their whole set, as a Kubernetes replace is: a text file of the folder
+ * that is no markdown and is not named is removed, a file that is not text is never touched; left out, the folder's other files stay.
+ */
 export const WorkflowSpec = Schema.Struct({
   description: Schema.optionalKey(Text),
   readme: Schema.optionalKey(Text),
   steps: Schema.Array(WorkflowStep),
+  files: Schema.optionalKey(Schema.Array(WorkflowFile)),
 });
 export type WorkflowSpec = typeof WorkflowSpec.Type;
 

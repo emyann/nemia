@@ -11,12 +11,12 @@ import type { LocalMcpServer, RemoteMcpServer, TranscriptOriginKind } from '../s
 
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-/** The seam's origin words (`ORIGIN_KINDS`, `src/harness/seam.ts`) are the SDK's (`SDKMessageOrigin`, `sdk.d.ts:5609`) and `unknown`. */
+/** The seam's origin words (`ORIGIN_KINDS`, `src/harness/seam.ts`) are the SDK's (`SDKMessageOrigin`, `sdk.d.ts:5677`) and `unknown`. */
 const originKindsHeld: Same<TranscriptOriginKind, SDKMessageOrigin['kind'] | 'unknown'> = true;
 
 /**
  * The transports of `MCP_TRANSPORTS` (`src/harness/mcp.ts`) are the SDK's for a server a file declares
- * (`McpServerConfigForProcessTransport`, `sdk.d.ts:1264`, its in-process `sdk` aside), and the ones the seam's servers carry.
+ * (`McpServerConfigForProcessTransport`, `sdk.d.ts:1284`, its in-process `sdk` aside), and the ones the seam's servers carry.
  */
 const mcpTransportsHeld: Same<McpTransport, Exclude<NonNullable<McpServerConfigForProcessTransport['type']>, 'sdk'>> = true;
 const seamTransportsHeld: Same<McpTransport, NonNullable<LocalMcpServer['type']> | RemoteMcpServer['type']> = true;

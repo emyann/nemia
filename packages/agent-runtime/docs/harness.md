@@ -90,7 +90,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` composes onto `Options.env` inside the job's bin, since the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1721`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
+  entirely (`sdk.d.ts:1743`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
   tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06, then `claude -p`; `claudeTelemetryEnv`).
 - **`OTEL_LOG_TOOL_DETAILS=1` puts a tool's inputs on its `claude_code.tool` span (`full_command`, `file_path`) and on the
   `tool_decision` and `tool_result` events (`tool_parameters`, `tool_input`, `error`)** (2.1.293, 2026-10-07, `claude -p`): without it no
@@ -115,7 +115,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   at each bump and never carried. Measured again on **SDK 0.3.316, Claude Code 2.1.316, 2026-11-01**: still `claude-opus-5-5`, alike
   on the `init` line of `bin/ae-claude-job.ts` run on the bundled Claude Code (`live-sdk.boundary.test.ts`, which keeps that line as
   `sdk-0.3.316-init.json`), on the attempt the engine recorded (`ranOn`), and on the owner's own `claude -p --model opus` at 2.1.316.
-- **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6259`), and the runtime reads it as the attempt's
+- **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6369`), and the runtime reads it as the attempt's
   `ranIn` (`harness/detached/output.ts`): what was asked is the task's `permissionMode`, what ran is what Claude Code printed. The SDK
   prints one `init` per turn, so the last one is read, as `claude_code_version` is, and the capture keeps a later `init` that names
   another mode (`initKept`): on a model that drops `auto` the mode can change from one turn to the next (`auto` on haiku ran as
@@ -195,7 +195,7 @@ with `updatedPermissions` set to the `suggestions` it was handed, as an always a
   ["Bash(echo nemia-probe*)"]` in the folder's `.claude/settings.json`, each of two `echo nemia-probe` calls was handed `displayName:
   "Bash"`, a `description` that is the call's own `description` input (the words the model wrote, not a subtitle of Claude Code's),
   `decisionReasonType: "rule"` and `serverPolicyAskOnly: false`, and nothing else: no `suggestions`, `title`, `decisionReason`,
-  `blockedPath`, `defaultToNo`, `suppressAlwaysAllowRule` or `matchedAskRule` (`sdk.d.ts:312`). So a permission an ask rule forced
+  `blockedPath`, `defaultToNo`, `suppressAlwaysAllowRule` or `matchedAskRule` (`sdk.d.ts:315`). So a permission an ask rule forced
   offers no always allow (`permissionAskOf`: always needs a suggestion), and its question is the `displayName`. No rule can be saved
   from it, and none equal to the ask rule: an always never widens a fence an ask rule holds, such as
   `Bash(nemia agents custom *--file*)`.
@@ -233,11 +233,11 @@ own (public) client id. It stopped at the authorize URL: no browser, no token ex
 
 | affordance | declared in `sdk.d.ts`? | there? | what it answered |
 | --- | --- | --- | --- |
-| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3117` | yes | one row for the inline server, `status: 'pending'` at the first call |
+| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3145` | yes | one row for the inline server, `status: 'pending'` at the first call |
 | `Query.mcpAuthenticate(name, redirectUri)` | no | yes | `{ authUrl, requiresUserAction: true, callbackExpected: true, redirectScheme: 'localhost', state, callbackPort: 8791 }` |
 | `Query.mcpSubmitOAuthCallbackUrl(name, url)` | no | yes | refuses a URL with no code or a mismatched state, in a sentence that says to submit the redirect URL from the sign-in's own page |
 | `Query.mcpClearAuth(name)` | no | yes | resolves with `{}`, and the sign-in in flight stays in flight |
-| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1219-1234` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
+| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1237-1253` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
 
 What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
 
@@ -297,7 +297,7 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
 What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
 2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's
 cost*, `AE_LIVE=1`). `total_cost_usd` is the running total of one `query()` call, and a resumed one "continues from the total its
-transcript saved, when it has one" (`sdk.d.ts:6100-6103`); this is what that saving takes:
+transcript saved, when it has one" (`sdk.d.ts:6182-6185`); this is what that saving takes:
 
 - **A process that ends cleanly saves its total, and a resumed query carries it on.** A session that ran to its result and whose
   input was closed exited 0 and appended a `cost-state` line (`totalCostUSD` equal to its result's `total_cost_usd`) to its

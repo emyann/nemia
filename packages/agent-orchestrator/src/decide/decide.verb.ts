@@ -1,55 +1,49 @@
 /**
- * `nemia decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the
- * repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the
- * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with
- * `runWith`.
+ * `nemia decide` (`decideRun`): what a person needs to decide the run, built off its one reading (`stepsReading`, `decidedOf`) — the
+ * judgement the run object, the runs list and the tick's informer read too — so none of them says a run differently. A controller,
+ * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
+ * (`EngineService`), run with `runWith`.
  */
 import { StoreConfig } from '../config/config.store.ts';
 import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
-import { EngineService, asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
+import { asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
 import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
-import { hasStarted, holdsOf, waitedOn, waitsOf, type Wait } from '../wait/wait.ts';
+import { hasStarted, type Wait } from '../wait/wait.ts';
 import { roundOffers } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
-import { choicesOf, costLine, decision, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
-import { assess } from '../tick/assess.ts';
+import { choicesOf, costLine, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { answerLines, answerOf, overBudgetLine, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
-import { landedOf, standingsOf } from '../branches/branches.store.ts';
-import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
+import { askedStandings } from '../branches/branches.store.ts';
 import {
   checkReportsRead,
   closeoutOf,
   consumption,
   deniedOf,
-  everyTryOf,
-  parentsRead,
   passParents,
   saidIn,
   viewedOnce,
   waitingOf,
   type CheckReport,
 } from '../views/views.verb.ts';
-import { checkoutHold } from '../ending/ending.verb.ts';
 import { mergeOffers } from '../merge/merge.verb.ts';
 import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
-import { landingDenies, statusMemo } from '../place/landing.store.ts';
+import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { readRun } from '../tick/told.verb.ts';
+import { stepsReading, type StepsReading } from '../object/read.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import { StoreRoot } from '../config/root.store.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -153,7 +147,10 @@ export type Decided = {
    * none. Asked only of a run not cancelled with nothing filed, which is all the cap holds, as the answer reads every run in the store.
    */
   held?: RunSlot;
-  /** Where each result branch stands against the base branch, as git says it now (`branchStandings`): the fact under the run's result. */
+  /**
+   * Where each result branch the reading asks of stands against the base branch (`askedStandings`), as the tick's last pass read it: the
+   * fact under the run's result.
+   */
   standings: BranchStanding[];
   /**
    * The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds
@@ -167,7 +164,8 @@ export type Decided = {
   toDecide?: ToDecide;
   /**
    * At an ending's decision (`collisionsDue`) — its gate, or its landing a check refused — whether the run's branches merge onto the base,
-   * which runs in flight they collide with, and the semantic conflict (`collisionsAt`), read live; absent at any other decision.
+   * which runs in flight they collide with, and the semantic conflict (`collisionsAt`), off the reading's branches; absent at any other
+   * decision.
    */
   collisions?: Collisions;
 };
@@ -176,7 +174,7 @@ export type Decided = {
  * For each step whose current try a person answered, the answer beside the `needs` of the try before it, off `views` or, for a try
  * not among them, the engine's view of it (`e`, the call's `viewedOnce`).
  */
-const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>, given: RetryAsk[]) {
+const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>, given: readonly RetryAsk[]) {
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
@@ -246,60 +244,41 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 }
 
 /**
- * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
- * current tries and every try before them, and where the branches stand asked of their places at most once, now (`standingNow`: this
- * run's, and those of every run the tick's pass would ask of), only where something read depends on it (`standingWhen`): the decision of
- * a run neither running nor called off, its standings and collisions, the checkout's claims of an ending asked for, the runs it waits on,
- * and the cap's parents where a run waits on another. A run still running or called off has no standings: nothing of it is decided on them.
+ * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
+ * due, what is left to decide and the decision itself, the runs it waits on and is held until, the checkout's holder, every try's view —
+ * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
+ * tick's last reading): the standings, the collisions at an ending and the cap's parents are read through it, and git is asked nothing.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
- * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for both facts it bears on: whether
- * a run nothing of which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`). Where the
- * branches stand is asked through `standing` where it is given, so a caller that asked already asks no second time. Fails with a refusal a
- * read threw (`Missing`, for a run that is not there); dies of anything else (`tried`).
+ * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for whether a run nothing of which
+ * is filed is held (`slotsOf`). Fails with a refusal a read threw.
  */
-export const decideRun = Effect.fn('decide')(function* (id: string, standing?: StandingAsker) {
-  const home = yield* StoreRoot;
+export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
+  const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
-  const e = viewedOnce(yield* EngineService);
-  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  const runs = yield* (yield* RunDoor).runs.list();
-  const live = standing ?? (yield* standingWhen(runs, id));
-  const { read: base } = yield* readRun(e, run);
-  const { steps, views, phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, spendOf } = base;
+  const e = viewedOnce(at.e);
+  const { phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, checkout } = judged.read;
+  const steps = [...at.steps];
+  const { decision: d, assessed, spendOf } = judged;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(
     yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
   const place = yield* PlaceService;
-  const memo = statusMemo((r) => headsOver(live.read())(r), place);
-  const checkout = yield* checkoutHold(home, e, run, steps, { standing: live.standing }, config, memo);
-  const withCheckout = { ...base, checkout };
-  const unasked = decision(withCheckout, landedOf(run, standingReader(NOTHING_READ)));
-  const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
-  const d = yield* tried(() => decision(withCheckout, landedOf(run, git)));
-  const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, steps, git));
-  const read = { ...withCheckout, standings };
-  const assessed = assess(read);
+  const standings = yield* tried(() => askedStandings(run, steps, assessed.status, git));
   const decide = assessed.toDecide;
   const ending = collisionsDue(steps, run, decide);
-  const collisions = ending ? yield* collisionsAt(home, run, ending, standings, git, place) : undefined;
-  const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
-  const everyTry = yield* everyTryOf(e, run, views);
-  const said = saidOf(run, everyTry);
+  const collisions = ending ? yield* collisionsAt(at.home, run, ending, standings, git, place) : undefined;
+  const answers = yield* answersOf(e, run, views, judged.answers);
   const used = consumption(views, run);
-  const costs = costsOf(steps, run, used, spendOf);
-  const waitingOn = waitingOnOf(id, run, views);
-  const denied = deniedLinesOf(run, views);
-  const parents = passParents(yield* live.when(runs.some((r) => waitedOn(r).length > 0)));
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, runs, config, parents)).held.get(id) : undefined;
+  const runs = !hasStarted(run) && !run.cancelledAt ? yield* (yield* RunDoor).runs.list() : [];
+  const held = runs.length ? (yield* slotsOf(e, runs, config, passParents(git))).held.get(run.id) : undefined;
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
     ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place)),
   ];
-  const parent = yield* parentsRead(run, yield* live.when(waitedOn(run).length > 0)).pipe(over(e));
   const answer: Decided = {
     run,
     steps,
@@ -312,7 +291,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
     commands: choicesOf(steps, run, d, offers),
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),
     used,
-    costs,
+    costs: costsOf(steps, run, used, spendOf),
     runCost: runCostLines(run, spendOf),
     runCostSaid: runCostWords(run, spendOf),
     answers,
@@ -320,12 +299,12 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
     gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     budgets: gatesBudgets(run, steps, reader, spendOf),
     accepted: acceptedLines(steps, run),
-    waitingOn,
-    denied,
-    waiting: waitsOf(run, parent),
-    holding: run.cancelledAt ? [] : holdsOf(run, parent),
-    said,
-    timeline: timeline(run, everyTry, steps),
+    waitingOn: waitingOnOf(run.id, run, views),
+    denied: deniedLinesOf(run, views),
+    waiting: [...judged.waits],
+    holding: run.cancelledAt ? [] : [...judged.holds],
+    said: saidOf(run, views),
+    timeline: timeline(run, views, steps),
     ...(held ? { held } : {}),
     standings,
     ...(checkout ? { checkout } : {}),
@@ -333,4 +312,17 @@ export const decideRun = Effect.fn('decide')(function* (id: string, standing?: S
     ...(collisions ? { collisions } : {}),
   };
   return answer;
+});
+
+/**
+ * What is left for a person to do about the run `id` (`decidedOf`), off its one reading (`stepsReading`): the informer's judgement where
+ * this process keeps one, else judged on demand, where the branches stand read off the tick's last reading (`standing.json`), never git
+ * asked now. A run whose folder or a task journal of which does not read dies in `nemia decide`'s words (`saidBy`); fails with a refusal a
+ * read threw (`Missing`, for a run that is not there).
+ */
+export const decideRun = Effect.fn('decide')(function* (id: string) {
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
+  const at = yield* stepsReading(run);
+  if ('unjudged' in at) return yield* Effect.die(new Error(at.saidBy('nemia decide')));
+  return yield* decidedOf(at);
 });

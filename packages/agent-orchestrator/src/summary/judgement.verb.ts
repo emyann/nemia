@@ -47,10 +47,12 @@ export type Judgement = {
 export type UnjudgedStep = { readonly name: string; readonly message: string; readonly branch: string | null };
 
 /**
- * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`), with each step's word off its record
- * (`steps`).
+ * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`) and in a reader's own (`saidBy`), with
+ * each step's word off its record (`steps`).
  */
-export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; steps: readonly UnjudgedStep[] };
+export type JudgedOrWhy =
+  | { judgement: Judgement }
+  | { unjudged: string; saidBy: (by: string) => string; steps: readonly UnjudgedStep[] };
 
 /** What `judgementsOf` read: each run's judgement or why it has none, and the views and unreadable journals of the one listing. */
 export type Judgements = { readonly runs: ReadonlyMap<string, JudgedOrWhy>; readonly views: Views; readonly unreadable: Unreadable };
@@ -90,7 +92,7 @@ export const judgementsOf = Effect.fn('judgementsOf')(function* (
       run.id,
       'judged' in one
         ? { judgement: { run, names, steps: judgedSteps(run, folder), views, judged: one.judged, asked } }
-        : { unjudged: one.unreadable, steps: unjudgedSteps(run, names, views, unreadable) },
+        : { unjudged: one.unreadable, saidBy: one.saidBy, steps: unjudgedSteps(run, names, views, unreadable) },
     );
   }
   return { runs: out, views, unreadable } satisfies Judgements;

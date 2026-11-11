@@ -53,8 +53,11 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
   return undefined;
 }
 
-/** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
-export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
+/**
+ * What `judgedUnlessUnreadable` answers: the judgement, or why there is none, in the board's words (`unreadable`) and in a reader's own
+ * (`saidBy`, the reader named: `nemia decide`).
+ */
+export type JudgedOrNot<T> = { judged: T } | { unreadable: string; saidBy: (by: string) => string };
 
 /**
  * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): its unfrozen
@@ -68,15 +71,16 @@ export const judgedUnlessUnreadable = Effect.fnUntraced(function* <T, E, R>(
   unreadable: Unreadable,
   judge: () => Effect.Effect<T, E, R>,
 ): Effect.fn.Return<JudgedOrNot<T>, E, R> {
+  const said = (saidBy: (by: string) => string) => ({ unreadable: saidBy('the board'), saidBy });
   const folder = yield* Effect.orDie(unloadedOf(run));
-  if (folder !== undefined) return { unreadable: unloadedWords(run.id, folder, 'the board') };
+  if (folder !== undefined) return said((by) => unloadedWords(run.id, folder, by));
   const own = unreadableOf(run, unreadable);
-  if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };
+  if (own) return said((by) => unjudgedWords(run.id, own.taskId, own.why, by));
   const exit = yield* Effect.exit(judge());
   if (Exit.isSuccess(exit)) return { judged: exit.value };
   const why = unreadableJournal(Cause.squash(exit.cause));
   if (why === undefined) return yield* Effect.failCause(exit.cause);
-  return { unreadable: unjudgedWords(run.id, undefined, why, 'the board') };
+  return said((by) => unjudgedWords(run.id, undefined, why, by));
 });
 
 /**

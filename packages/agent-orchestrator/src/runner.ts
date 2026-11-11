@@ -293,7 +293,7 @@ export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export { lackLines } from './artifacts/artifacts.ts';
 export { type BranchReader } from './branches/branches.store.ts';
-export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot, standingWhen } from './standing/standing.verb.ts';
+export { passStanding, standingLive, standingLiveOf, standingReader, standingSnapshot } from './standing/standing.verb.ts';
 export { changesOf, type BranchChanges, type Note } from './branches/changes.store.ts';
 export { evictedBy, recordMemo, type RecordMemo } from './rest/index.ts';
 export { removeAgent, writeAgent, type AgentSchema } from './agents/agents.store.ts';

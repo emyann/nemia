@@ -218,19 +218,15 @@ type StepAt = RunReading & {
   readonly listed: boolean;
 };
 
-/** The step `name`'s word, as `nemia decide` says it (`stepStatus`), off the views already read. */
+/**
+ * The step `name`'s word, as `nemia decide` says it: `assess`'s on the judgement's read (`stepWords`), so the object and the decision say a
+ * step alike; a step the run is not judged by (a `bare` one its record names) is worded off the views already read (`stepStatus`).
+ */
 const stepWord = ({ run, steps, views, judged }: StepAt, name: string): RunStepStatus['status'] => {
+  const judgedWord = judged.assessed.stepWords.get(name)?.status;
+  if (judgedWord !== undefined) return judgedWord;
   const reads = raiseReads(run, views, steps);
-  return stepStatus(
-    steps.find((s) => s.name === name) ?? bare(name),
-    run,
-    reads.phaseOf,
-    reads.closeoutOf,
-    reads.askedCloseout,
-    steps,
-    judged.spendOf,
-    reads.verdictOf,
-  );
+  return stepStatus(bare(name), run, reads.phaseOf, reads.closeoutOf, reads.askedCloseout, steps, judged.spendOf, reads.verdictOf);
 };
 
 /** How many questions the step's closeout asks of a person it waits on (`Judged`'s `beside`), where it asks any. */

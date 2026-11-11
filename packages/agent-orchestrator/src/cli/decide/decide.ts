@@ -16,7 +16,6 @@ import {
   branchWord,
   countsLine,
   checkoutLine,
-  decideRun,
   decisionRead,
   dollars,
   runWith,
@@ -39,7 +38,6 @@ import {
   questionLines,
   closeoutRefusals,
   prunedWords,
-  runsAtOnce,
   roundDueNote,
   saidLines,
   signoffsSpent,
@@ -48,7 +46,6 @@ import {
   timelineTotalLines,
   touchedLines,
   tryNote,
-  unjudgedOf,
   usedLines,
   verdictWord,
   type Env,
@@ -153,11 +150,9 @@ export async function decideVerb(env: Env, rest: string[], e: Engine, place: Pla
   if (runId.startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${runId} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const read = await runWith(e, placedIn(env, place, decisionRead(runId, sensitive ? { sensitive } : {}))).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, placedIn(env, place, unjudgedOf(e, runsAtOnce(home).runs.read(runId), err, 'nemia decide')));
-    throw unjudged ? new Error(unjudged.said) : err;
-  });
-  const deciding = await standstill(env, home, read, e, place);
+  const read = await runWith(e, placedIn(env, place, decisionRead(runId, sensitive ? { sensitive } : {})));
+  if ('unjudged' in read) throw new Error(read.saidBy('nemia decide'));
+  const deciding = standstill(home, read);
   if (!deciding) return;
   const { run, decided, decision, out } = deciding;
   const { steps } = decided;
@@ -184,22 +179,16 @@ const shown = (print: () => void): undefined => {
   return undefined;
 };
 
-async function standstill(
-  env: Env,
+function standstill(
   home: string,
   { run, decision: said, decided }: DecisionRead,
-  e: Engine,
-  place: Place,
-): Promise<{ run: Decided['run']; decided: Decided; decision: Awaiting; out: HeldOut } | undefined> {
+): { run: Decided['run']; decided: Decided; decision: Awaiting; out: HeldOut } | undefined {
   const head = headOf(home, run);
   if ('nothing' in said) return shown(() => console.log(`${head}\n\n  ${said.nothing}`));
   if ('waiting' in said) return shown(() => printWaiting(run, said.waiting, said.holding, head));
-  if ('holding' in said && said.holding) {
-    const inFlight = await runWith(e, placedIn(env, place, decideRun(run.id)));
-    return shown(() => printHold(inFlight, said.holding, head));
-  }
   if (decided === undefined)
     throw new Error(`the decision of ${run.id} was read without the run's reading: report it as a defect of nemia decide`);
+  if ('holding' in said && said.holding) return shown(() => printHold(decided, said.holding, head));
   const out = heldOutOf(decided.steps, decided.checkout);
   const held = 'running' in said ? said.held : undefined;
   if (held)

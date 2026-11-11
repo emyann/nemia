@@ -450,6 +450,7 @@ export { AGENTS_COPY } from './sources/copy.verb.ts';
 export { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from './skills/skills.verb.ts';
 export { WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows/workflows.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, helpOf, leftOut, parseArgv } from './command/command.ts';
+export type { EndpointLink } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Spec } from './command/command.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';

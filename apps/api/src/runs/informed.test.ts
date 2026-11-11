@@ -16,10 +16,10 @@ import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { Informer, informerMemo, type InformerMemo } from 'agent-orchestrator';
-import type { Labelled, RunList } from 'objects';
+import { Informer, informerMemo, passStanding, runsAtOnce, type InformerMemo } from 'agent-orchestrator';
+import type { Labelled, RunDecision, RunList } from 'objects';
 import type { Run as RunAnswer } from 'objects';
-import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { framedOf, listedRuns } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
@@ -160,5 +160,40 @@ test("the run's status phase and reason are its row's in the list: one judgement
     assert.deepEqual([status.phase, status.reason], [row.status.phase, row.status.reason], id);
     const framed = (await framedOf(app(), id)).status;
     assert.deepEqual([status.phase, status.reason], [framed.phase, framed.reason], `${id}, on the list asked by state`);
+  }
+});
+
+test('F6: the decision and the run object read one judgement: a failed run at rest is served from the informer, and both move once a pass reads a hand merge', async () => {
+  const id = 'r-informed-merged';
+  const repo = fs.mkdtempSync(path.join(root, 'repo-'));
+  const world = stand().world;
+  world.repository(repo, { 'README.md': 'a repo\n' });
+  const base = world.head(repo);
+  const branch = `wf/${id}/implement`;
+  world.branch(repo, branch, { 'a.txt': 'the work\n' });
+  const run = { ...record(id), repo, workspace: repo, baseRef: base, steps: { implement: { taskId: `t-${id}`, branch } } };
+  fs.writeFileSync(path.join(root, 'runs', `${id}.json`), JSON.stringify(run));
+  Effect.runSync(engine().file({ id: `t-${id}`, brief: 'Do it.', cwd: repo, harness: 'claude' }));
+  standIn().settle(`t-${id}`, 'failed', { exitCode: 1 });
+  const aPass = () => runOver(() => stand().layer)(engine(), passStanding(runsAtOnce(root).runs.list()));
+  const decision = async (): Promise<RunDecision> => {
+    const res = await app().request(`/api/runs/${id}/decision`);
+    assert.equal(res.status, 200, await res.clone().text());
+    return (await res.json()) as RunDecision;
+  };
+  try {
+    await aPass();
+    assert.ok('standings' in (await decision()), 'a failed run whose branch is ahead is one to decide');
+    assert.ok(informer().runs.has(id), 'the decision is judged through the informer, which keeps the run at rest');
+    const object = await app().request(`/api/runs/${id}`);
+    assert.equal(object.status, 200);
+    world.stage(repo, branch);
+    world.commit(repo, `Merge branch '${branch}'`);
+    assert.ok('standings' in (await decision()), 'no pass has read the hand merge: the decision says what the object says');
+    await aPass();
+    const landed = await decision();
+    assert.ok('nothing' in landed && landed.nothing.startsWith('landed'), JSON.stringify(landed));
+  } finally {
+    fs.rmSync(path.join(root, 'runs', `${id}.json`), { force: true });
   }
 });

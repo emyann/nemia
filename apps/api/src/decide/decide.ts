@@ -5,7 +5,7 @@
  */
 import { Effect } from 'effect';
 import { Unjudged } from 'objects';
-import { runDecision } from 'agent-orchestrator';
+import { Informer, runDecision } from 'agent-orchestrator';
 import { answered } from '../objects/refused.ts';
 
 /** The globs `?sensitive=` names, comma-separated, each trimmed and none empty; none asked where it is not given. */
@@ -18,11 +18,12 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
 };
 
 /**
- * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services; `sensitive`, the
- * query's comma-separated globs, names the files shown in full in place of the defaults.
+ * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services, its judgement through
+ * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's comma-separated globs,
+ * names the files shown in full in place of the defaults.
  */
 export const decisionHandler = (runId: string, sensitive?: string) =>
   Effect.flatMap(
-    answered((s) => s.inRequest(runDecision(runId, globsOf(sensitive)))),
+    answered((s) => s.inRequest(Effect.provideService(runDecision(runId, globsOf(sensitive)), Informer, s.informer))),
     (read) => ('unjudged' in read ? Effect.fail(new Unjudged({ error: read.unjudged })) : Effect.succeed(read.decision)),
   );

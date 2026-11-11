@@ -98,22 +98,22 @@ export type FramedForStep = Implementation<typeof framedForStepSpec>;
 export type SaidFrom = { readonly from: Speaker; readonly words: string };
 
 /**
- * Whether `text` is in an agent's frame, as `framedFor` writes one for a name of no space: it opens with `AGENT_OPENS`, a name follows
- * that holds no space, then `AGENT_WRITES`.
+ * Whether `text` is in an agent's frame, as `framedFor` writes one: it opens with `AGENT_OPENS`, a name follows, never empty and up to
+ * the first `AGENT_WRITES`, then that phrase. A name may hold a space, as an agent's may (`code reviewer`); none holds the phrase.
  *
  * Two of its conditions hold of every text the others hold of, and are said so the solver need not prove them of `indexOf` and
- * `slice`: that the name, cut at the first space, holds none; and that the frame written again around the name and the words after it
- * is the text. The set of texts is the same.
+ * `slice`: that the name, cut at the first `AGENT_WRITES`, holds none; and that the frame written again around the name and the words
+ * after it is the text. The set of texts is the same.
  */
 const inAnAgentsFrame = (text: string): boolean => {
   if (!text.startsWith(AGENT_OPENS)) return false;
   const rest = text.slice(AGENT_OPENS.length);
-  const end = rest.indexOf(' ');
+  const end = rest.indexOf(AGENT_WRITES);
   const name = rest.slice(0, end);
   const after = rest.slice(end);
   return (
     end > 0 &&
-    !name.includes(' ') &&
+    !name.includes(AGENT_WRITES) &&
     after.startsWith(AGENT_WRITES) &&
     AGENT_OPENS + name + AGENT_WRITES + after.slice(AGENT_WRITES.length) === text
   );
@@ -135,9 +135,10 @@ const saidBySpec = spec<(text: string) => SaidFrom>({
       condition: ({ input: [text], output }) =>
         output.from.kind !== 'agent' || text === AGENT_OPENS + output.from.name + AGENT_WRITES + output.words,
     },
-    aNameHasNoSpace: {
-      description: 'The name read back is a name, never empty and holding no space, so a frame reads back under one name alone',
-      condition: ({ output }) => output.from.kind !== 'agent' || (output.from.name.length > 0 && !output.from.name.includes(' ')),
+    aNameIsOneName: {
+      description:
+        'The name read back is a name, never empty and never holding the frame’s own phrase, so a frame reads back under one name alone',
+      condition: ({ output }) => output.from.kind !== 'agent' || (output.from.name.length > 0 && !output.from.name.includes(AGENT_WRITES)),
     },
   },
 });

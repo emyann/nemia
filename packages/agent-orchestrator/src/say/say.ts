@@ -79,20 +79,21 @@ export const AGENT_WRITES = ' writes, not the person: ';
 
 /**
  * Who the words `text` a step's journal holds are from, and the words without their frame: an agent's where they stand in the frame
- * `framedFor` writes (`AGENT_OPENS`, a name of no space, `AGENT_WRITES`), the person's as journalled otherwise — every say from before
- * words were framed among them. Pure: read back each time, nothing kept beside the journal.
+ * `framedFor` writes (`AGENT_OPENS`, a name up to the first `AGENT_WRITES`, which may hold a space as an agent's name may, then that
+ * phrase), the person's as journalled otherwise — every say from before words were framed among them. Pure: read back each time,
+ * nothing kept beside the journal.
  *
  * Two of its tests hold of every text the others pass, and are made so the verifier need not prove them of `indexOf` and `slice`: that
- * the name, cut at the first space, holds none; and that the frame written again around the name and the words is the text.
+ * the name, cut at the first `AGENT_WRITES`, holds none; and that the frame written again around the name and the words is the text.
  */
 export const saidBy: SaidBy = (text) => {
   const asJournalled = { from: { kind: 'person' }, words: text } as const;
   if (!text.startsWith(AGENT_OPENS)) return asJournalled;
   const rest = text.slice(AGENT_OPENS.length);
-  const end = rest.indexOf(' ');
+  const end = rest.indexOf(AGENT_WRITES);
   if (end <= 0) return asJournalled;
   const name = rest.slice(0, end);
-  if (name.includes(' ')) return asJournalled;
+  if (name.includes(AGENT_WRITES)) return asJournalled;
   const after = rest.slice(end);
   if (!after.startsWith(AGENT_WRITES)) return asJournalled;
   const words = after.slice(AGENT_WRITES.length);

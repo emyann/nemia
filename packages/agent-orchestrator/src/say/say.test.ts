@@ -12,6 +12,10 @@ test('words handed to a step read back as who said them', async (t) => {
   await t.test("an agent's words, framed, read back as that agent's and its own words", () => {
     assert.deepEqual(saidBy(framedForStep(operator, 'Cut the scope.')), { from: operator, words: 'Cut the scope.' });
   });
+  await t.test("an agent whose name holds a space, as an agent's name may, reads back as that agent, never the person", () => {
+    const reviewer = { kind: 'agent', name: 'code reviewer' } as const;
+    assert.deepEqual(saidBy(framedForStep(reviewer, 'Cut it.')), { from: reviewer, words: 'Cut it.' });
+  });
   await t.test("the person's words, as they are, read back as the person's", () => {
     assert.deepEqual(saidBy(framedForStep({ kind: 'person' }, 'Cut the scope.')), { from: { kind: 'person' }, words: 'Cut the scope.' });
   });

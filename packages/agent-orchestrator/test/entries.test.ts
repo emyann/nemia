@@ -328,6 +328,7 @@ const PINNED: Record<string, string[]> = {
     'isRepositoryRun',
     'isRefusal',
     'isBuiltinPlace',
+    'isMarkdown',
     'BUILTIN_SKILLS',
     'keptRuns',
     'lastCeilings',

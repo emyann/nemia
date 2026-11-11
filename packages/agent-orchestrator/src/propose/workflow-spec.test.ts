@@ -30,3 +30,13 @@ test("a step's keys in the form the spec carries them: a list a file writes `a, 
   const [step] = workflowSpecOf([{ name: 'b.md', text: '---\nafter: a, c\nagent: x\n---\nDo b.\n' }]).steps;
   assert.deepEqual(step?.keys, { after: ['a', 'c'], agent: 'x' });
 });
+
+test('markdown in capitals is markdown: a README.MD is the README, and no .MD is among the other files', () => {
+  const spec = workflowSpecOf([
+    { name: 'README.MD', text: '# Flow\n' },
+    { name: 'NOTES.MD', text: 'notes\n' },
+    { name: 'a.md', text: 'Do a.\n' },
+  ]);
+  assert.equal(spec.readme, '# Flow\n');
+  assert.deepEqual(spec.files, []);
+});

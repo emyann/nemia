@@ -263,6 +263,13 @@ export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there,
 };
 
 /**
+ * Whether a file's name is markdown, in any case, as the README (`isReadme`) and a draft's carried names (`carriedNameRefusal`) are
+ * judged: a Workflow's spec carries markdown as its steps and its README, never among the folder's other files, and a whole write never
+ * removes it.
+ */
+export const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith('.md');
+
+/**
  * A file's bytes as text a person can read, or null where they are not text (a NUL, or not UTF-8). A Workflow's spec carries the text
  * files of its folder (`spec.files`), and a write given them leaves every other file alone.
  */

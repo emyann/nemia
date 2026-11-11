@@ -318,7 +318,7 @@ export type {
   Unread,
 } from './place/place.ts';
 export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.store.ts';
-export { textIn, workflowStale, workflowTaken } from './folder/folder.ts';
+export { isMarkdown, textIn, workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
 export { agentRead, agentSkillsFound, listAgents, type Readings } from './roster/roster.store.ts';

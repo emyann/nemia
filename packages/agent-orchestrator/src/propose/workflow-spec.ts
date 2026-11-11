@@ -5,6 +5,7 @@
  * `current.verb.ts`) and for a folder composed from an upgrade's merge (`nemia factory resolve`). Pure.
  */
 import { isReadme, splitFrontmatter } from '../step/step.ts';
+import { isMarkdown } from '../folder/folder.ts';
 import { frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { STEP_KEY_FORM } from 'objects';
 import { tokensOf } from '../keys/index.ts';
@@ -59,6 +60,6 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
       const { keys, body } = fileParts(name, f.text);
       return { name, keys: servedKeys(keys), body };
     });
-  const others = byName.filter((f) => !f.name.endsWith('.md')).map((f) => ({ path: f.name, text: f.text }));
+  const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
   return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };
 }

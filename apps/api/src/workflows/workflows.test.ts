@@ -932,6 +932,7 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
   write(path.join(dir, 'route.schema.json'), '{"type":"object"}\n');
   write(path.join(dir, 'check.ts'), 'process.exit(0);\n');
   write(path.join(dir, 'old.sh'), 'exit 0\n');
+  write(path.join(dir, 'README.MD'), '# Scripted\n');
   const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
   fs.writeFileSync(path.join(dir, 'logo.png'), picture);
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -958,7 +959,7 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
     });
     assert.equal(res.status, 400);
     assert.equal(fs.readFileSync(path.join(dir, 'route.schema.json'), 'utf8'), '{"type":"object"}\n');
-    assert.deepEqual(files(), ['check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
+    assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
   });
 
   await t.test('REFUSED: a spec.files entry whose path is a number is a 400 at that field', async () => {
@@ -968,7 +969,7 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
     });
     assert.equal(res.status, 400);
     assert.match(String(((await res.json()) as { field?: unknown }).field), /spec\.files.*0.*path/);
-    assert.deepEqual(files(), ['check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
+    assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
   });
 
   await t.test('PUT with spec.files writes them, removes a text file it leaves out, and leaves the picture', async () => {
@@ -983,7 +984,11 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
       },
     });
     assert.equal(res.status, 200, await res.clone().text());
-    assert.deepEqual(files(), ['check.ts', 'logo.png', 'plan.md', 'route.schema.json']);
+    assert.deepEqual(
+      files(),
+      ['README.MD', 'check.ts', 'logo.png', 'plan.md', 'route.schema.json'],
+      'a README in capitals is markdown, never removed',
+    );
     assert.equal(fs.readFileSync(path.join(dir, 'check.ts'), 'utf8'), 'process.exit(1);\n');
     assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
     assert.deepEqual(

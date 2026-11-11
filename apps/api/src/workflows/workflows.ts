@@ -23,6 +23,7 @@ import {
   fillsOf,
   foldersIn,
   foldersLoaded,
+  isMarkdown,
   textIn,
   unfilledRefusal,
   workflowDescription,
@@ -338,7 +339,7 @@ function filesIn(dir: string): WorkflowFile[] {
     return [];
   }
   return entries
-    .filter((e) => e.isFile() && !e.name.endsWith('.md'))
+    .filter((e) => e.isFile() && !isMarkdown(e.name))
     .map((e) => e.name)
     .sort()
     .flatMap((name) => {

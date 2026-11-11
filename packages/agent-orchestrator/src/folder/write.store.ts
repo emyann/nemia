@@ -22,6 +22,7 @@ import {
   parseFolder,
   stepNameRefusal,
   textIn,
+  isMarkdown,
   twiceRefusal,
   workflowInUse,
 } from './folder.ts';
@@ -173,7 +174,7 @@ function droppedOf(at: string, entries: readonly fs.Dirent[], carried: ReadonlyM
       return false;
     }
   };
-  return entries.filter((e) => e.isFile() && !e.name.endsWith('.md') && !carried.has(e.name) && isText(e.name)).map((e) => e.name);
+  return entries.filter((e) => e.isFile() && !isMarkdown(e.name) && !carried.has(e.name) && isText(e.name)).map((e) => e.name);
 }
 
 /**

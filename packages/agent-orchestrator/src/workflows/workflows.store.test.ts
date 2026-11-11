@@ -260,12 +260,17 @@ test("a whole write removes the folder's text files it does not carry, and leave
   fs.writeFileSync(path.join(dir, 'logo.png'), picture);
   fs.mkdirSync(path.join(dir, 'assets'));
   fs.writeFileSync(path.join(dir, 'assets', 'note.txt'), 'kept\n');
+  fs.writeFileSync(path.join(dir, 'NOTES.MD'), 'markdown in capitals\n');
   const { version: now } = done(side.door.workflows.there(yoursOn(side, 'dev'))) as { version: string };
   assert.notEqual(now, version, 'the picture is in the version');
   const draft = { steps: [aStep('build')], files: [{ path: 'check.ts', text: 'process.exit(1);\n' }], whole: true };
   const saved = done(side.door.workflows.write(yoursOn(side, 'dev'), draft, now));
   assert.deepEqual(saved.removed, ['build.schema.json']);
-  assert.deepEqual(fs.readdirSync(dir).sort(), ['assets', 'build.md', 'check.ts', 'logo.png']);
+  assert.deepEqual(
+    fs.readdirSync(dir).sort(),
+    ['NOTES.MD', 'assets', 'build.md', 'check.ts', 'logo.png'],
+    'markdown in capitals is no other file',
+  );
   assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
   assert.equal(fs.readFileSync(path.join(dir, 'assets', 'note.txt'), 'utf8'), 'kept\n');
 });

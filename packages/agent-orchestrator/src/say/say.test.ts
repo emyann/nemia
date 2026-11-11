@@ -4,7 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { framedForStep, saidBy, saidOf } from './say.ts';
+import { saidBy, saidOf } from './say.ts';
+import { framedForStep } from '../chat/chat.ts';
 
 test('words handed to a step read back as who said them', async (t) => {
   const operator = { kind: 'agent', name: 'operator' } as const;

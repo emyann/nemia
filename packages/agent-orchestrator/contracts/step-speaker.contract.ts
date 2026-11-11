@@ -1,5 +1,5 @@
 /**
- * Who speaks to a step's session (agent-orchestrator, src/say/say.ts): `nemia say` and the api's
+ * Who speaks to a step's session (agent-orchestrator, src/chat/chat.ts and src/say/say.ts): `nemia say` and the api's
  * `POST /api/namespaces/:namespace/runs/:name/steps/:step/say`. Who the words are from (`stepSpeaker`), off the caller the request is
  * (a session's token, or none: `Caller`), who the words say they are from (`from`) and the names the person allowed in her chat
  * (`nemia chat allow`, the same list); the words the session is handed (`framedForStep`); and who the words a step's journal holds
@@ -70,7 +70,10 @@ const stepSpeakerSpec = spec<(caller: Caller, from: Speaker | undefined, allowed
     },
   },
 });
-/** `stepSpeaker`'s type, which `src/say/say.ts` takes: who words to a step's session are from, or why they are refused. */
+/**
+ * `stepSpeaker`'s type, which `src/chat/chat.ts` takes, beside her chat's rule it reuses: who words to a step's session are from, or why
+ * they are refused.
+ */
 export type StepSpeaker = Implementation<typeof stepSpeakerSpec>;
 
 const framedForStepSpec = spec<(speaker: Speaker, text: string) => string>({
@@ -85,7 +88,10 @@ const framedForStepSpec = spec<(speaker: Speaker, text: string) => string>({
     },
   },
 });
-/** `framedForStep`'s type, which `src/say/say.ts` takes: the words `text` from `speaker` are said to a step's session in. */
+/**
+ * `framedForStep`'s type, which `src/chat/chat.ts` takes, beside `framedFor`: the words `text` from `speaker` are said to a step's session
+ * in.
+ */
 export type FramedForStep = Implementation<typeof framedForStepSpec>;
 
 /** Who words a step's journal holds are from, and the words themselves without the frame they were said in. */

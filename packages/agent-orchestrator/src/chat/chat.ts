@@ -9,7 +9,11 @@
  * (`say.verb.ts`).
  */
 import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
+import type { FramedForStep, StepSpeaker } from '../../contracts/step-speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { AGENT_OPENS, AGENT_WRITES } from '../say/say.ts';
+
+export { AGENT_OPENS, AGENT_WRITES } from '../say/say.ts';
 import { blockedWord, type EnginePhase } from '../views/views-words.ts';
 import type { CallState, ChatFrom, SaidAfter } from 'objects';
 
@@ -172,12 +176,6 @@ export type SpeakerRefused = { kind: 'Invalid' | 'Conflict'; message: string };
 /** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
 export const PERSON_FRAME = 'The person writes from the board: ';
 
-/** The words an agent's frame opens with, before its name (`framedFor`; read back by `saidBy`, say.ts). */
-export const AGENT_OPENS = 'The agent ';
-
-/** The words between an agent's name and its own in its frame (`framedFor`; read back by `saidBy`, say.ts). */
-export const AGENT_WRITES = ' writes, not the person: ';
-
 /** The longest name an agent speaks under. */
 export const SPEAKER_NAME_MAX = 64;
 
@@ -241,6 +239,33 @@ export const speakerRefusal: SpeakerRefusal = (speaker, via, allowed) => {
  */
 export const framedFor: FramedFor = (speaker, text) =>
   speaker.kind === 'person' ? PERSON_FRAME + text : AGENT_OPENS + speaker.name + AGENT_WRITES + text;
+
+/**
+ * Who words to a step's session are from (`nemia say`, the api's `say`, `src/say/say.verb.ts`), or why they are refused, off the
+ * `caller` the request is, who the words say they are from (`from`) and the names the person `allowed` in her chat (`nemia chat allow`, the
+ * same list). A session that presents its token speaks as its own agent, whatever the person allowed, and is refused `Invalid` where it
+ * names anyone else. With no token, words that name no one, or the person, are the person's, from the board or a shell as every say was
+ * before; an agent is judged by her chat's own rule (`speakerRefusal`, as if from anywhere but the board): `Invalid` under a name no agent
+ * speaks under, `Conflict` under one the person has not allowed. Pure.
+ */
+export const stepSpeaker: StepSpeaker = (caller, from, allowed) => {
+  if (caller.kind === 'agent') {
+    if (from === undefined || (from.kind === 'agent' && from.name === caller.agent)) return { kind: 'agent', name: caller.agent };
+    return {
+      kind: 'Invalid',
+      message: `This session's token says it is \`${caller.agent}\`, and its words say they are from ${from.kind === 'person' ? 'the person' : `\`${from.name}\``}: a session speaks as itself alone, so send no \`from\` (no \`--as\`).`,
+    };
+  }
+  if (from === undefined || from.kind === 'person') return { kind: 'person' };
+  const refused = speakerRefusal(from, 'elsewhere', allowed);
+  return refused ?? { kind: 'agent', name: from.name };
+};
+
+/**
+ * The words `text` from `speaker` are handed to a step's session in: the person's as they always were, in no frame; an agent's in the
+ * frame her chat says them in (`framedFor`), never as the person's. Pure.
+ */
+export const framedForStep: FramedForStep = (speaker, text) => (speaker.kind === 'person' ? text : framedFor(speaker, text));
 
 /** The person's `allowed` names with `name` allowed, listed once. Pure. */
 export const withSpeaker: WithSpeaker = (allowed, name) => (allowed.includes(name) ? [...allowed] : [...allowed, name]);

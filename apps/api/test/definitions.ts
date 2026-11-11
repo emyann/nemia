@@ -34,7 +34,7 @@ export const asWorkflowListing = (o: Obj) => {
     steps: s.steps,
     graph: { roots: s.graph.roots, edges: s.graph.edges.filter((e) => e.kind !== 'input') },
     schemas: s.schemas,
-    files: o.spec.files,
+    files: o.spec.files ?? [],
     folderTeam: s.folderTeam,
     version: o.metadata.resourceVersion,
     error: s.error,

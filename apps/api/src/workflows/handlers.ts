@@ -8,8 +8,9 @@
  * the ledger's number for what the folder holds now (`definitionRevision`), which a run started on it pins.
  *
  * Writes are yours, in `default` alone (`writeGoes`): made with its steps (the builder's `write`, builder.ts), written whole at the
- * `metadata.resourceVersion` it was read at, its `spec.files` — served as the folder's other text files — the whole set of them where
- * given, so one it leaves out is removed; — a stale one is a 409 — and removed at the `?resourceVersion=` it was read at
+ * `metadata.resourceVersion` it was read at, its `spec.files` — served as the folder's other text files, left out where it has none —
+ * the whole set of them where given, so one it leaves out is removed; — a stale one is a 409 — and removed at the `?resourceVersion=` it
+ * was read at
  * (`workflows rm`). The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
  *
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
@@ -154,7 +155,12 @@ const workflowObject = (
     creationTimestamp: writtenAt(listing.dir),
     resourceVersion: listing.version,
   },
-  spec: { description: listing.description, readme: listing.readme, steps: listing.steps.map(writtenStep), files: listing.files },
+  spec: {
+    description: listing.description,
+    readme: listing.readme,
+    steps: listing.steps.map(writtenStep),
+    ...(listing.files.length > 0 && { files: listing.files }),
+  },
   status: {
     origin,
     ...(shadowedBy !== null && { shadowedBy }),

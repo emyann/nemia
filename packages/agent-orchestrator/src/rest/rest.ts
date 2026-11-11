@@ -54,7 +54,8 @@ export type RestFacts = {
  * Whether a run is at rest after the pass that read `f`: it is not `running` — it succeeded, failed, was cancelled, or stopped on a
  * person, at a gate or on a question — or it is pruned; its workflow is frozen on its record (a record without one reads its folder,
  * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
- * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run waited on, no slot. Pure.
+ * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run
+ * waited on, no slot. Pure.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
 

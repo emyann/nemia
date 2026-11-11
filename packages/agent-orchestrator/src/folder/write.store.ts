@@ -21,6 +21,7 @@ import {
   noStepsRefusal,
   parseFolder,
   stepNameRefusal,
+  textIn,
   twiceRefusal,
   workflowInUse,
 } from './folder.ts';
@@ -56,8 +57,11 @@ export type WorkflowWritten = { dir: string; steps: StepSpec[]; written: string[
  * The other files a draft folder carries (`files`, each by its name in the folder: a script its check runs, a schema an `output:` names)
  * are read before the folder's own copies when the folder is judged, so an `output:` is judged against the schema the draft carries, and
  * each is written after the steps, or kept where its bytes are there already. A file of the folder the draft does not carry is left as it
- * is: no removal is asked for. Which names a draft may carry is the door's to judge (`carriedNameRefusal`, `workflows.store.ts`); a
- * carried name that is a link in the folder is refused here, before any of it, as a linked step is.
+ * is, but where the draft is the folder's `whole` set of them: then each regular file directly in it that is no markdown, is text
+ * (`textIn`) and is not carried is removed after the steps, and listed in `removed`, and the folder is judged without it, so an `output:`
+ * naming a schema the draft drops is refused. A non-text file — a picture — and a folder inside are left, whole or not. Which names a draft
+ * may carry is the door's to judge (`carriedNameRefusal`, `workflows.store.ts`); a carried name that is a link in the folder is refused
+ * here, before any of it, as a linked step is.
  *
  * A `.md` in the folder that is a link is refused by name, before any of it: a write follows a link, so a step would be rendered into
  * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
@@ -83,8 +87,16 @@ export function writeWorkflowAt(
     places,
     found,
     files = [],
+    whole = false,
     fills,
-  }: { anywhere?: boolean; places?: Places; found: Found; files?: readonly { path: string; text: string }[]; fills?: Fills },
+  }: {
+    anywhere?: boolean;
+    places?: Places;
+    found: Found;
+    files?: readonly { path: string; text: string }[];
+    whole?: boolean;
+    fills?: Fills;
+  },
 ): WorkflowWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined) => {
@@ -114,7 +126,8 @@ export function writeWorkflowAt(
     }
   };
   const carried = new Map(files.map((file) => [file.path, file.text] as const));
-  const read = (file: string): string | undefined => carried.get(file) ?? there(file);
+  const dropped = droppedOf(at, entries, carried, whole);
+  const read = (file: string): string | undefined => carried.get(file) ?? (dropped.includes(file) ? undefined : there(file));
   const parsed = parseFolder(texts, read, agents, skills, fills);
 
   fs.mkdirSync(at, { recursive: true });
@@ -142,7 +155,25 @@ export function writeWorkflowAt(
   for (const [file, text] of carried) put(file, text, (now) => now === text);
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
-  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+  for (const file of dropped) fs.rmSync(path.join(at, file));
+  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: [...removed, ...dropped].sort() };
+}
+
+/**
+ * The files a write of the folder `at` removes beside its steps: none but where it is `whole`, then each regular file among its `entries`
+ * that is no markdown, is text (`textIn`) and is not `carried`. A non-text file — a picture — and a folder inside are never among them, nor
+ * a file that does not read.
+ */
+function droppedOf(at: string, entries: readonly fs.Dirent[], carried: ReadonlyMap<string, string>, whole: boolean): string[] {
+  if (!whole) return [];
+  const isText = (name: string): boolean => {
+    try {
+      return textIn(fs.readFileSync(path.join(at, name))) !== null;
+    } catch {
+      return false;
+    }
+  };
+  return entries.filter((e) => e.isFile() && !e.name.endsWith('.md') && !carried.has(e.name) && isText(e.name)).map((e) => e.name);
 }
 
 /**

@@ -236,17 +236,46 @@ test("a draft's carried schema replaces the folder's own before the folder is ju
   assert.equal(fs.readFileSync(path.join(dir, 'landing.ts'), 'utf8'), 'process.exit(1);\n');
 });
 
-test('REFUSED: a carried file whose name in the folder is a link is Invalid, and the folder is byte for byte as it was', () => {
+test('REFUSED: a carried file whose name in the folder is a link, read at its version as a link, is Invalid, and the folder is byte for byte as it was', () => {
   const { root, side } = store();
-  const { version } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
+  done(side.door.workflows.write(yoursOn(side, 'dev'), carried('size')));
   const dir = path.join(root, 'workflows', 'dev');
   const outside = path.join(root, 'outside.ts');
   fs.writeFileSync(outside, 'outside\n');
   fs.rmSync(path.join(dir, 'check.ts'));
   fs.symlinkSync(outside, path.join(dir, 'check.ts'));
+  const { version } = done(side.door.workflows.there(yoursOn(side, 'dev'))) as { version: string };
   const before = bytes(dir);
   const draft = { ...carried('pages'), steps: [{ ...aStep('build'), body: 'Do it now.', output: { file: 'build.schema.json' } }] };
   assert.deepEqual(act(side.door.workflows.write(yoursOn(side, 'dev'), draft, version)), { refused: 'Invalid' });
   assert.deepEqual(bytes(dir), before);
   assert.equal(fs.readFileSync(outside, 'utf8'), 'outside\n');
+});
+
+test("a whole write removes the folder's text files it does not carry, and leaves a picture's bytes and a folder inside", () => {
+  const { root, side } = store();
+  const { version } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried()));
+  const dir = path.join(root, 'workflows', 'dev');
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 0xff]);
+  fs.writeFileSync(path.join(dir, 'logo.png'), picture);
+  fs.mkdirSync(path.join(dir, 'assets'));
+  fs.writeFileSync(path.join(dir, 'assets', 'note.txt'), 'kept\n');
+  const { version: now } = done(side.door.workflows.there(yoursOn(side, 'dev'))) as { version: string };
+  assert.notEqual(now, version, 'the picture is in the version');
+  const draft = { steps: [aStep('build')], files: [{ path: 'check.ts', text: 'process.exit(1);\n' }], whole: true };
+  const saved = done(side.door.workflows.write(yoursOn(side, 'dev'), draft, now));
+  assert.deepEqual(saved.removed, ['build.schema.json']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['assets', 'build.md', 'check.ts', 'logo.png']);
+  assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
+  assert.equal(fs.readFileSync(path.join(dir, 'assets', 'note.txt'), 'utf8'), 'kept\n');
+});
+
+test('REFUSED: a whole write dropping the schema a step’s output names is Invalid, and the folder is byte for byte as it was', () => {
+  const { root, side } = store();
+  const { version } = done(side.door.workflows.write(yoursOn(side, 'dev'), carried()));
+  const dir = path.join(root, 'workflows', 'dev');
+  const before = bytes(dir);
+  const draft = { ...carried(), files: [{ path: 'check.ts', text: 'process.exit(0);\n' }], whole: true };
+  assert.deepEqual(act(side.door.workflows.write(yoursOn(side, 'dev'), draft, version)), { refused: 'Invalid' });
+  assert.deepEqual(bytes(dir), before);
 });

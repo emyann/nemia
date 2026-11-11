@@ -41,9 +41,16 @@ export type CarriedFile = { readonly path: string; readonly text: string };
 
 /**
  * What a workflow is written from: its steps as the builder sends them, its README where one is given, and the other files its draft
- * folder carries where given (`files`), which the command line reads off `--folder` and the builder never sends.
+ * folder carries where given (`files`), which the command line reads off `--folder` and a Workflow's `spec.files` gives. Where `whole`,
+ * the files are the whole set of the folder's other text files: one it does not carry is removed (`writeWorkflowAt`), as a spec's
+ * `files` says; the command line's `--folder` never sets it.
  */
-export type WorkflowDraft = { readonly steps: readonly StepDraft[]; readonly readme?: string; readonly files?: readonly CarriedFile[] };
+export type WorkflowDraft = {
+  readonly steps: readonly StepDraft[];
+  readonly readme?: string;
+  readonly files?: readonly CarriedFile[];
+  readonly whole?: boolean;
+};
 
 /** What a write answers: what was written, and the version the folder is at after it, which the door reads once the layer wrote. */
 export type WorkflowSaved = WorkflowWritten & { readonly version: string };
@@ -264,6 +271,7 @@ export function workflowFiles(home: string): WorkflowLayer {
           ...(fills !== undefined && { fills }),
           ...(places !== undefined && { places }),
           ...(draft.files !== undefined && { files: draft.files }),
+          ...(draft.whole !== undefined && { whole: draft.whole }),
         }),
       remove: (dir, users) => removeWorkflowAt(home, dir, users),
       hints: (dir) => formerKeyLines(dir),

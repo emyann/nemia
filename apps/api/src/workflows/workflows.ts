@@ -23,6 +23,7 @@ import {
   fillsOf,
   foldersIn,
   foldersLoaded,
+  textIn,
   unfilledRefusal,
   workflowDescription,
   workflowReadme,
@@ -46,7 +47,7 @@ import type { Refusal } from '../guard.ts';
 import { StoreRoot, type Engine, type RunsOn } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
 import { runPlaced } from '../store.ts';
-import type { DefinitionOrigin, StepKeys } from 'objects';
+import type { DefinitionOrigin, StepKeys, WorkflowFile } from 'objects';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = Extract<DefinitionOrigin, 'repo' | 'yours'>;
@@ -64,8 +65,9 @@ export type WorkflowStepSpec = { -readonly [K in StepKey]-?: Writable<Exclude<St
 /**
  * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is
  * told: the shape the builder puts a folder back in (builder.ts). `graph` is `graphOf` its steps, as a run of it would be drawn. `schemas`
- * are the `.json` files beside the steps, which an `output:` may name. `error` is the loader's refusal of a folder that does not read as a
- * workflow, whose `steps` are then none. Listed in a factory, each step its hires fill is read with the agent hired.
+ * are the `.json` files beside the steps, which an `output:` may name, and `files` the folder's other text files, those among them. `error`
+ * is the loader's refusal of a folder that does not read as a workflow, whose `steps` are then none. Listed in a factory, each step its
+ * hires fill is read with the agent hired.
  */
 export type WorkflowListing = {
   name: string;
@@ -77,6 +79,11 @@ export type WorkflowListing = {
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
+  /**
+   * The folder's other text files, sorted by name (`filesIn`): every file directly in it that is no markdown and reads as text — a script
+   * its check runs, a schema — with what it holds. A Workflow's `spec.files`; a picture is not among them.
+   */
+  files: WorkflowFile[];
   /**
    * Whether every step says `place: folder` (`isFolderTeam`): a team that works in folders the run makes and never looks at a
    * repository. What the board reads to file a card for it without a `repo:`, and to say where a run of it does its work. False for a
@@ -252,6 +259,7 @@ export function listed(
   const description = workflowDescription(dir);
   const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
+  const files = filesIn(dir);
   if ('error' in loaded) {
     return {
       name,
@@ -262,6 +270,7 @@ export function listed(
       steps: [],
       graph: graphOf([]),
       schemas,
+      files,
       folderTeam: false,
       version,
       error: loaded.error,
@@ -278,6 +287,7 @@ export function listed(
     steps: steps.map(listedStep(new Map(factory ? Object.entries(fillsOf(factory.hires, name)) : []))),
     graph: graphOf(steps),
     schemas,
+    files,
     folderTeam: isFolderTeam(steps),
     version,
     error: null,
@@ -314,6 +324,31 @@ function schemasIn(dir: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The other text files of a workflow's folder, sorted by name: each regular file directly in it that is no markdown and is text by the
+ * package's one test (`textIn`), with its text, as a proposal reads the folder. None for a folder that cannot be listed.
+ */
+function filesIn(dir: string): WorkflowFile[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => e.isFile() && !e.name.endsWith('.md'))
+    .map((e) => e.name)
+    .sort()
+    .flatMap((name) => {
+      try {
+        const text = textIn(fs.readFileSync(path.join(dir, name)));
+        return text === null ? [] : [{ path: name, text }];
+      } catch {
+        return [];
+      }
+    });
 }
 
 /** The keys of a step that are lists, each empty where the step leaves it unset. */

@@ -8,7 +8,8 @@
  * the ledger's number for what the folder holds now (`definitionRevision`), which a run started on it pins.
  *
  * Writes are yours, in `default` alone (`writeGoes`): made with its steps (the builder's `write`, builder.ts), written whole at the
- * `metadata.resourceVersion` it was read at — a stale one is a 409 — and removed at the `?resourceVersion=` it was read at
+ * `metadata.resourceVersion` it was read at, its `spec.files` — served as the folder's other text files — the whole set of them where
+ * given, so one it leaves out is removed; — a stale one is a 409 — and removed at the `?resourceVersion=` it was read at
  * (`workflows rm`). The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
  *
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
@@ -27,7 +28,7 @@ import {
   workflowVersion,
   type FolderLoaded,
 } from 'agent-orchestrator';
-import { Api, API_VERSION, Conflict, Invalid, Missing, type Workflow, type WorkflowStep } from 'objects';
+import { Api, API_VERSION, Conflict, Invalid, Missing, type Workflow, type WorkflowFile, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
@@ -60,7 +61,21 @@ type Folder = { from: WorkflowSource; dir: string };
 
 /** What a write sends, said by its refusals. */
 const SHAPE =
-  '`{ "metadata": { "resourceVersion": "<as the Workflow was read>" }, "spec": { "steps": [{ "name", "keys", "body" }], "readme"? }, "schemas"?: [{ "file", "text" }] }`';
+  '`{ "metadata": { "resourceVersion": "<as the Workflow was read>" }, "spec": { "steps": [{ "name", "keys", "body" }], "readme"?, "files"?: [{ "path", "text" }] }, "schemas"?: [{ "file", "text" }] }`';
+
+/**
+ * A write's `spec.files`, refused 400 where one names a file `schemas` pastes too: a file holds one text, and either says it. Given, they
+ * are the whole set of the folder's other text files (`write`, builder.ts).
+ */
+const filesOf = (files: readonly WorkflowFile[] | undefined, schemas: readonly { file: string }[], route: string) => {
+  const twice = files?.find((f) => schemas.some((s) => s.file === f.path));
+  if (twice !== undefined)
+    throw readerRefused({
+      status: 400,
+      error: `${route}: ${twice.path} is in both \`schemas\` and \`spec.files\`, and a file holds one text. Give it in \`spec.files\` alone. Send ${SHAPE}.`,
+    });
+  return files;
+};
 
 /** The folders of `dir`, each held at `origin`, read as `from`: in a factory only those attached to it. Nothing is loaded. */
 const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: string): Held<Folder>[] =>
@@ -139,7 +154,7 @@ const workflowObject = (
     creationTimestamp: writtenAt(listing.dir),
     resourceVersion: listing.version,
   },
-  spec: { description: listing.description, readme: listing.readme, steps: listing.steps.map(writtenStep) },
+  spec: { description: listing.description, readme: listing.readme, steps: listing.steps.map(writtenStep), files: listing.files },
   status: {
     origin,
     ...(shadowedBy !== null && { shadowedBy }),
@@ -239,7 +254,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
         if (payload.spec.steps.length === 0)
           throw new Invalid({ error: `${route}: a workflow is made with its first step. Send ${SHAPE}, with one step at least.` });
         const steps = draftsOf(payload.spec.steps, route);
-        builderRefused(await write(writing(s, name, false), steps, payload.spec.readme ?? undefined));
+        builderRefused(await write(writing(s, name, false), steps, payload.spec.readme ?? undefined, [], payload.spec.files));
         return workflowAt(s, namespace, name, 'yours');
       }),
     )
@@ -250,6 +265,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
         const steps = draftsOf(payload.spec.steps, route);
         const schemas = schemasOf(payload.schemas, route, SHAPE);
         if ('status' in schemas) throw readerRefused(schemas);
+        const files = filesOf(payload.spec.files, schemas, route);
         const given = payload.metadata?.resourceVersion;
         if (given === undefined)
           throw new Invalid({
@@ -258,7 +274,7 @@ export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handler
         const at = writing(s, name, true);
         const now = await s.inRequest(workflowVersion(at.dir, placesOf(s.repo, s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
-        builderRefused(await write(at, steps, payload.spec.readme ?? undefined, schemas));
+        builderRefused(await write(at, steps, payload.spec.readme ?? undefined, schemas, files));
         return workflowAt(s, namespace, name, 'yours');
       }),
     )

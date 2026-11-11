@@ -36,8 +36,9 @@ export const TOKEN_ADD: Command<TokenAdded> = {
   help: [
     'mint a token of yours under a name, printed this once: the store keeps',
     'only its digest. A request presenting it, as Authorization: Bearer',
-    "<token>, is you, on the api and on the MCP port (claude mcp add's",
-    '--header). Refused of a name already used: nemia token rm frees it',
+    '<token>, is you, on the api and on the MCP port (<api>/mcp, the',
+    "header an MCP client sends). Refused of a name already used: nemia",
+    'token rm frees it',
   ],
   spec: namedSpec('nemia token add'),
   writes: true,
@@ -50,7 +51,7 @@ export const TOKEN_ADD: Command<TokenAdded> = {
     token,
     'send it as the header:',
     `Authorization: Bearer ${token}`,
-    `as claude mcp add --transport http nemia <api>/mcp --header "Authorization: Bearer ${token}"; nemia token rm ${name} revokes it`,
+    `to <api>/mcp, the MCP port, or to the api; nemia token rm ${name} revokes it`,
   ],
 };
 

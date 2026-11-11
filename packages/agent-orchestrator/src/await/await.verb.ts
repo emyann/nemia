@@ -5,7 +5,7 @@
 import { Duration, Effect, Option, Ref, Stream } from 'effect';
 import type { FeedWaitEnd } from 'objects';
 import { FeedDoor } from '../feed/feed.store.ts';
-import type { FeedLine } from '../feed/feed.ts';
+import type { FeedLine } from '../feed/index.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import { selects, type Selectors } from '../watch/selector.ts';
 

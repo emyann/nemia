@@ -1,5 +1,5 @@
 /**
- * The MCP port, `/mcp`: how a coding agent on a laptop (Claude Code, Codex) operates this store. A stateless MCP server over Streamable
+ * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable
  * HTTP, built afresh for each request (the SDK's low-level `Server` and its web-standard transport, no session), serving the tools
  * generated from the command table (`portTools`, tools.ts). A call of a tool is a request to the endpoint its verb links, presenting the
  * caller's own `Authorization`, handed to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and

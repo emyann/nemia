@@ -3,7 +3,7 @@ import { Effect, Schema } from 'effect';
 import { checked, type Command } from '../command/entry.verb.ts';
 import type { Args } from '../command/command.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { watchedLine } from '../subscription/subscription.ts';
+import { watchedLine } from '../subscription/index.ts';
 import { parseSelectors, SELECTOR_FORM, selectorsRefusal } from '../watch/selector.ts';
 import { waitForBound } from './await.ts';
 import { waitFeed, type WaitAnswer } from './await.verb.ts';

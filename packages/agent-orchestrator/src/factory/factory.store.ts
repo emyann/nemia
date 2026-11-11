@@ -75,10 +75,11 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path or the
  * store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it in its
  * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
- * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness
- * its runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; and the
- * template it was made from, when it was (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the
- * count of changes to its spec, absent on a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
+ * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness its
+ * runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; the cost
+ * line it sets for each workflow it offers (`costLines`), kept here for the same reason; and the template it was made from, when it was
+ * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
+ * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -90,6 +91,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
     volumes: Schema.optionalKey(Schema.Array(VolumeEntrySchema)),
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+    costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -169,6 +171,7 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     ...(template === undefined ? {} : { template, tree: treeDir(home, name) }),
     ...(content.volumes?.length ? { volumes: content.volumes.map(volumeEntry) } : {}),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
+    ...(content.costLines === undefined ? {} : { costLines: content.costLines }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
   };
 }
@@ -301,6 +304,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
       : undefined,
   );
   kept('harnessSettings', factory.harnessSettings);
+  kept('costLines', factory.costLines);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
   if (factory.generation !== undefined) next.generation = factory.generation;
   return next as FactoryFile;

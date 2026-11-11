@@ -7,6 +7,7 @@ import {
   closeoutOf,
   detailOf,
   foldTranscript,
+  heardIn,
   mergeEvents,
   sessionToRead,
   summaryLine,
@@ -371,6 +372,27 @@ test("sessionItems: a step's session on the family's shape", async (t) => {
       assert.deepEqual([told.own.text, told.own.attempt, told.own.arrived], ['Try the other file.', 1, null]);
     },
   );
+  await t.test("an agent's words said to the step are its own told turn, under its name and unframed; the person's under none", () => {
+    const framed = 'The agent operator writes, not the person: Cut it.';
+    const at = new Date(clock + 1000).toISOString();
+    const heard = heardIn(
+      [{ kind: 'system', id: 's1', at: new Date(clock + 2000).toISOString(), text: framed } as TranscriptEvent],
+      [{ at, attempt: 1, text: framed, after: null, from: { kind: 'agent', name: 'operator' }, words: 'Cut it.' }],
+    );
+    assert.deepEqual(heard.events, [], 'its arrival is found on the words as the session was handed them');
+    const told = sessionItems(
+      withSaid([], [...heard.said, { at: new Date(clock + 5000).toISOString(), attempt: 1, text: 'Widen it.', after: null }]),
+      'implement',
+      false,
+    );
+    assert.deepEqual(
+      told.map((item) => (item.kind === 'own' && item.own.what === 'told' ? [item.own.by, item.own.text] : null)),
+      [
+        ['operator', 'Cut it.'],
+        [null, 'Widen it.'],
+      ],
+    );
+  });
   await t.test(
     'a turn’s lines: a call with what it asked and what came back, a thought behind its line, and the harness’s own line',
     () => {

@@ -83,7 +83,7 @@
     },
     {
       "term": "Speaker",
-      "meaning": "who wrote words to a session's chat: the person, from the board alone, or an agent by a name the person allowed it with `nemia chat allow <name>`.",
+      "meaning": "who wrote words to a session: in her chat the person, from the board alone; to a step's session (`nemia say`) the person, from anywhere, or a session by its own token as its agent; and in either an agent by a name the person allowed it with `nemia chat allow <name>`.",
       "type": "Speaker"
     }
   ]

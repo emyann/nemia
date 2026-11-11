@@ -1,7 +1,7 @@
 /**
  * What `nemia admit` reads of a run for an answer a rule may give unasked (`seenOf`), the facts it is judged on at `auto` (`factsOf`): the
- * step's closeout and questions, its check's verdict, the looping steps' word, each step's cap, the run's cost, and what else waits on the
- * person, read as `nemia retry` reads them at the moment of the call. A controller over `EngineService`.
+ * step's closeout and questions, its check's verdict, the looping steps' word, each step's cap, the run's cost line, the run's cost, and
+ * what else waits on the person, read as `nemia retry` reads them at the moment of the call. A controller over `EngineService`.
  */
 import { Effect } from 'effect';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -13,13 +13,14 @@ import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReade
 import type { Seen } from '../auto/index.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { gateBudgets } from '../gate-budgets/gate-budgets.ts';
 
 /**
  * What admission reads of the run `runId` for its step `stepName` (`Seen`): the step's closeout and the questions it asks, its check's
  * verdict, each looping step that signed with whether it asks again and whether a person accepted it, whether any step is at its cap,
- * whether the step proposes a cap above a step's own `budget:`, what
- * the run cost, and whether another step waits on the person. A step the run does not have reads as one that signed nothing. Refused: no
- * such run (`Missing`), and a record that does not read.
+ * whether the step proposes a cap above a step's own `budget:`, whether its gate says the run's caps pass its cost line
+ * (`GateBudgets.line`, the gate's one answer), what the run cost, and whether another step waits on the person. A step the run does not
+ * have reads as one that signed nothing. Refused: no such run (`Missing`), and a record that does not read.
  */
 export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
@@ -52,6 +53,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
       .map((s) => ({ again: closeoutOf(s.name)?.output?.again === true, personAccepted: acceptanceOf(run, s.name) !== undefined })),
     overBudget: steps.some((s) => overBudget(s, run, spendOf) !== undefined),
     aboveCeiling: aboveTheWorkflow(proposedBudgets(step, closeout), ceilingsOf(steps)).length > 0,
+    pastLine: step !== undefined && gateBudgets(run, step, steps, closeout, spendOf)?.line !== undefined,
     spend: runSpend(run, spendOf).usd,
     othersWaiting: steps.some((s) => s.name !== stepName && waits(s)),
   } satisfies Seen;

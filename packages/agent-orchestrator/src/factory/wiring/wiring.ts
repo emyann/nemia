@@ -2,12 +2,14 @@
  * A factory's wiring, judged: the change a person's verb asks of what a factory offers, hires and schedules (`WiringChange`), why it is
  * refused (`wiringRefusal`), and the factory after it where it is not (`rewired`). Pure: what is on disk — that a step's own file names
  * its agent, that a cron fires — is its caller's to ask, and the words are `factory.ts`'s. `contracts/wiring.contract.ts` proves
- * that a change which would break the door's invariant — a factory hires and schedules only into a workflow it offers — is refused,
+ * that a change which would break the door's invariant — a factory hires, schedules and sets a cost line only for a workflow it offers —
+ * is refused,
  * and what each accepted change does; that the factory written after it keeps the invariant is the door's model decode
  * (`factoryChecked`, `factories.store.ts`), on every create and rewrite.
  */
 import type { Rewired, WiringRefusal } from '../../../contracts/wiring.contract.ts';
 import {
+  costLinedDetachRefusal,
   hiredDetachRefusal,
   hireRefusal,
   scheduledDetachRefusal,
@@ -98,11 +100,15 @@ function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent:
   return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
 }
 
-/** Why `factory` cannot be relieved of `workflow`: it does not offer it (`Missing`), or still hires into or schedules it (`Invalid`). */
+/**
+ * Why `factory` cannot be relieved of `workflow`: it does not offer it (`Missing`), or still hires into, schedules or sets a cost line for
+ * it (`Invalid`).
+ */
 function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string): WiringRefused | null {
   if (!factory.workflows.includes(workflow)) return missing(unattachedDetachRefusal(factory, workflow));
   if (hiresInto(factory.hires, workflow)) return invalid(hiredDetachRefusal(factory.name, workflow, hiredInto(factory.hires, workflow)));
   if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow));
+  if (factory.costLines !== undefined && holds(factory.costLines, workflow)) return invalid(costLinedDetachRefusal(factory.name, workflow));
   return null;
 }
 

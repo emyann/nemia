@@ -344,6 +344,7 @@ type Told = Pick<
   | 'mounts'
   | 'volumes'
   | 'harnessSettings'
+  | 'costLine'
   | 'gatesTimed'
   | 'deniedCounted'
   | 'settlesCounted'
@@ -450,7 +451,8 @@ function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] 
 
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, `mounts`
- * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings; an option not given is
+ * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings, and the cost line
+ * the factory sets for the workflow, by its folder's name (`costLine`); an option not given is
  * left out, and so are the default
  * factory, no mounts and no volumes. No gate of it is
  * timed yet (`gatesTimed`), no denied call counted (`deniedCounted`), no settle counted (`settlesCounted`), and its timeline not handed
@@ -468,6 +470,7 @@ function toldOf(
   const after = opts.after ?? [];
   const context = opts.context ?? [];
   const gates = opts.gates ?? [];
+  const costLine = factory?.costLines?.[path.basename(opts.workflowDir)];
   return {
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
@@ -485,6 +488,7 @@ function toldOf(
     ...(mounts.length ? { mounts } : {}),
     ...(volumes.length ? { volumes } : {}),
     ...(harnessSettings ? { harnessSettings } : {}),
+    ...(costLine === undefined ? {} : { costLine }),
     gatesTimed: [],
     deniedCounted: [],
     settlesCounted: [],
@@ -665,7 +669,9 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  * frozen beside them as `volumes` (`volumesAt`), filed with every local step as marked, a writable one only where the step's fence
  * writes (`volumeMounts`); a step whose harness cannot hold one is refused before anything is written (`volumeMountRefusal`). Its harness
  * settings are frozen beside them as `harnessSettings`, given to every step on their harness (`filedConfig`); a key a factory may not
- * set, written into its file by hand, refuses the start `Invalid` before anything is written (`settingsAt`).
+ * set, written into its file by hand, refuses the start `Invalid` before anything is written (`settingsAt`). The cost line it sets for the
+ * workflow, by its folder's name (`costLines`), is frozen beside them as `costLine`: a gate whose caps pass it says so, and holds auto
+ * back (`gateBudgets`, `withinBudget`).
  *
  * The revision of every kind the run resolved — its workflow, each agent, each of their skills and the factory's rules — is appended to
  * the ledger and pinned on the record as `pinned` (`pinsOf`); a run that has filed nothing resolves them again on every pass, so an

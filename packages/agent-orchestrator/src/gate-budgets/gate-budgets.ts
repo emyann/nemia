@@ -1,14 +1,17 @@
 /**
  * The budgets a gate shows (`GateBudgets`): before its approval, those its step's closeout proposes for the steps after it; after it, the
  * caps the approval set — each with the step's own `budget:` and whether the amount is above it — and the run's line: what it has spent,
- * and the most it may cost under these caps. Read by the Run object's gate (`gateOf`, tries.verb.ts) and by `nemia decide`. Pure.
+ * and the most it may cost under these caps — and, where that most passes the cost line its factory set for its workflow (`Run.costLine`,
+ * `pastTheLine`), the line in a sentence a person reads as it is. Read by the Run object's gate (`gateOf`, tries.verb.ts) and by `nemia
+ * decide`. Pure.
  */
 import type { Closeout } from '../closeout/index.ts';
 import type { Run } from '../record/record.ts';
 import { approvalOf, budgetOf, hasGate, runSpend, spentWord, stepSpend, type SpendOf } from '../status/status.ts';
 import { dollars } from '../money/money.ts';
 import type { StepSpec } from '../step/step.ts';
-import { aboveTheWorkflow, budgetRefusals, ceilingsOf, proposedBudgets } from '../budget/budget.ts';
+import { aboveTheWorkflow, budgetRefusals, ceilingsOf, pastTheLine, proposedBudgets } from '../budget/budget.ts';
+import { basename } from 'node:path';
 import type { GateBudgetsFrom } from 'objects';
 
 /** Where a gate's budgets come from: its step's closeout, before the approval, or the approval itself. */
@@ -20,8 +23,17 @@ export type { GateBudgetsFrom };
  */
 export type GateBudget = { step: string; usd: number; said: string; why: string | null; workflow: number | null; above: boolean };
 
-/** The budgets at a gate (`GateBudget`), where they come from, and the run's line in a person's words. */
-export type GateBudgets = { from: GateBudgetsFrom; steps: GateBudget[]; said: string };
+/**
+ * The run's cost line where the most it may cost under a gate's caps passes it: the line in dollars, and a sentence naming the most, the
+ * line, the factory and the workflow, which the board and `nemia decide` show as it is.
+ */
+export type GateLine = { usd: number; said: string };
+
+/**
+ * The budgets at a gate (`GateBudget`), where they come from, the run's line in a person's words, and its cost line where the caps pass it
+ * (`GateLine`), absent otherwise.
+ */
+export type GateBudgets = { from: GateBudgetsFrom; steps: GateBudget[]; said: string; line?: GateLine };
 
 /**
  * The budgets at `step`'s gate, or undefined for a step with no gate, an approval that set no cap, or a closeout that proposes none or
@@ -58,12 +70,19 @@ export function gateBudgets(
     workflow: steps.find((s) => s.name === r.step)?.budget ?? null,
     above: above.includes(r.step),
   }));
-  return { from, steps: budgets, said: runLine(run, steps, budgets, spendOf) };
+  const bound = runBound(run, steps, budgets, spendOf);
+  const runSaid = `the run has spent ${spentWord(runSpend(run, spendOf))}; ${boundWords(bound)}`;
+  const line = run.costLine;
+  return line !== undefined && pastTheLine(bound.most, line)
+    ? { from, steps: budgets, said: runSaid, line: { usd: line, said: lineWords(run, bound.most, line) } }
+    : { from, steps: budgets, said: runSaid };
 }
 
-/** What the run has spent, and the most it may cost under `budgets` and the caps in force on every other step, in words. */
-function runLine(run: Run, steps: readonly StepSpec[], budgets: readonly GateBudget[], spendOf: SpendOf): string {
-  const spent = runSpend(run, spendOf);
+/** The most the run may cost under `budgets` and the caps in force on every other step, and the steps with no cap, which bound nothing. */
+type RunBound = { most: number; uncapped: string[] };
+
+/** The run's bound: each step counted at the larger of its cap (here, else in force) and what its tries have cost. */
+function runBound(run: Run, steps: readonly StepSpec[], budgets: readonly GateBudget[], spendOf: SpendOf): RunBound {
   const uncapped: string[] = [];
   let most = 0;
   for (const s of steps) {
@@ -72,11 +91,18 @@ function runLine(run: Run, steps: readonly StepSpec[], budgets: readonly GateBud
     if (cap === undefined) uncapped.push(s.name);
     most += Math.max(cap ?? 0, cost);
   }
-  const bound = uncapped.length
+  return { most, uncapped };
+}
+
+/** The bound in words, naming the steps with no cap. */
+const boundWords = ({ most, uncapped }: RunBound): string =>
+  uncapped.length
     ? `at most ${dollars(most)} under these caps, but for ${uncapped.join(', ')}, which ${uncapped.length > 1 ? 'have' : 'has'} no cap`
     : `at most ${dollars(most)} under these caps`;
-  return `the run has spent ${spentWord(spent)}; ${bound}`;
-}
+
+/** The sentence of a line passed: the most, the line, the factory that set it and the workflow it is set for. */
+const lineWords = (run: Run, most: number, line: number): string =>
+  `at most ${dollars(most)} under these caps passes the cost line of ${dollars(line)} factory ${run.factory ?? 'default'} sets for ${basename(run.workflowDir)}`;
 
 /** The budgets at every gate of `run` that has some (`gateBudgets`), by its step: what `nemia decide` carries beside its gate lines. */
 export const gatesBudgets = (

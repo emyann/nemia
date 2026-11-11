@@ -104,6 +104,12 @@ const framedForSpec = spec<(speaker: Speaker, text: string) => string>({
       description: 'The words themselves are said whole, last',
       condition: ({ input: [, text], output }) => output.endsWith(text),
     },
+    anAgentInItsFrame: {
+      description:
+        'An agent’s words are said in one frame, its name between the same two phrases, so a step’s journal reads them back as its own (`saidBy`, step-speaker.contract.ts)',
+      condition: ({ input: [speaker, text], output }) =>
+        speaker.kind !== 'agent' || output === 'The agent ' + speaker.name + ' writes, not the person: ' + text,
+    },
   },
 });
 /** `framedFor`'s type, which `src/chat/chat.ts` takes: the words `text` from `speaker` are said to the session in. */

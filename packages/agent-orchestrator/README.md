@@ -876,7 +876,7 @@ session cannot load is a name in its prompt (F11); skills or a harness prompt on
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`:
-`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316 and 2.1.322), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -1125,6 +1125,15 @@ loop asks for a round that would file it again.
 
 Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
 the same on every Claude Code step — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
+
+**A factory sets a cost line per workflow.** `nemia factory cost-line set <factory> <workflow> <usd>` writes what a run of a workflow
+the factory offers may cost before its gate says so (`costLines` in the factory's own file, never a template's; `cost-line rm` takes it
+back, and a workflow with a line is not detached until it is). It is frozen on a run at its start (`Run.costLine`), so a line set later
+reaches the runs started after it. At each gate that sets budgets, the most the run may cost under its caps — what it has spent, each
+step at the larger of its cap and its cost — is read against the line (`pastTheLine`); past it, the gate says so beside the caps, in
+one sentence the board and `nemia decide` show as it is (`GateBudgets.line`), and no rule of auto approves that gate unasked
+(`withinBudget`). The line cuts nothing: a step's cap still ends its session, and a rule's `under` keeps its own amount of what the run
+has spent.
 
 **A resumed session is charged its own spend.** A try, a round or a gate's answer that continues a session is a new task filed with
 `resumeFrom` — a resumed job on the Agent SDK — and handed what is left of the cap. A resume's cap bounds its own spend, not its
@@ -1824,6 +1833,14 @@ its own, and everything below reads the words back off the engine's view of the 
 
 - **Which session.** The step's current try's task, as `wf retry` finds it (`run.steps[step].taskId`). The words are
   everything after the step, so an unquoted sentence is one message.
+- **Who said them.** A session its run filed (a step's, or Nemia's) is known by its session token (`WF_SESSION_TOKEN`, or
+  the api's `Authorization: Bearer`), and its words are its agent's whatever the person allowed; it names no one else
+  (`Invalid`). With no token, the words are the person's, from the board or a shell, as they always were; an agent with
+  none says `--as <name>` before its words (the api's `from`), a name the person allowed with `nemia chat allow <name>`,
+  the same list as her chat (`Conflict` for one not allowed, `Invalid` for no agent's name). The person's words reach
+  the session as typed; an agent's in her chat's frame, `The agent <name> writes, not the person: …` (`framedForStep`), and
+  who said each is read back off the journalled words (`saidBy`): the step's detail carries `from` and the words without
+  the frame (`words`) where an agent spoke, and the board draws them under `<name> · agent`, apart from the person's.
 - **Refused**, exit code 2 and nothing said, in the package's words first: a step the run does not have, a cancelled run,
   a step not filed yet, and one whose task has settled — words for it go into its next try's brief, with
   `wf retry --message`. Then the engine's own, verbatim (`say: …`): empty words, an attempt not started, a harness with no
@@ -4332,7 +4349,7 @@ holding a concurrency slot forever.
 | `src/ending/ending.ts` | a run's ending — pure: when its merge lands on its check (`landingDue`, `landingOpen`), what landed (`landedWords`), the checkout it holds (`checkoutLine`), the denies it is filed with (`filedDenies`), and what is left for a person to decide (`toDecide`, `gateRefusal`) |
 | `src/gate/gate.ts` | a gate from a person's side — pure: **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, the words refused with an approval (`approvalWordsRefusal`), and whether a task held open waits for a person's word (`holdsOpen`) |
 | `src/branches/branches.ts` | a run's result branches — pure: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the tips a pass records (`tipBranches`, `tipsSeen`), and what `wf decide` shows of a branch: the numstat grouped by blast radius (`radius`), the agent-facing, check-affecting and lesson lists, and the lesson line; `branches/branches.store.ts` reads git |
-| `src/say/say.ts` | words a person says to a running step (`wf say`) — pure: what the engine journalled (`Said`), what is refused before the engine is asked (`sayRefusal`), and how `wf ls` and `wf decide` show them (`saidLines`) |
+| `src/say/say.ts` | words said to a running step (`wf say`) — pure: what the engine journalled (`Said`), who said them read back off the words (`saidBy`, `saidOf`, the frame's phrases `AGENT_OPENS` and `AGENT_WRITES`), what is refused before the engine is asked (`sayRefusal`), and how `wf ls` and `wf decide` show them (`saidLines`) |
 | `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against both clocks and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), the silence measured with `elapsedMs` (the runtime's, copied for the daemon's lease), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it, and whether the store is up or down as `nemia watch` says it (`livenessLine`) |
 | `src/timeline/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
 | `src/closeout/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |

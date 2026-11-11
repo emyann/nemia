@@ -51,6 +51,7 @@ import {
 import { main as cli } from '../src/cli/main.ts';
 import { inputsDir, listRuns, markCancelled, readAnswers, readAsks, runRecord, runsDir } from '../src/record/record.store.ts';
 import { sayRun } from '../src/say/say.verb.ts';
+import { PERSON } from '../src/caller/caller.ts';
 import { Invalid, isRefusal, type Refusal } from '../src/refusal/refusal.ts';
 import * as views from '../src/views/views.verb.ts';
 import { NOTHING_READ, standingLiveOf as liveOf, standingReader } from '../src/standing/standing.verb.ts';
@@ -1078,7 +1079,7 @@ async function _verbProgramTypes() {
     v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService | StoreRoot>,
     v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService | StoreRoot>,
     v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService | PlaceService | StoreRoot>,
-    v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, Refusal, EngineService>,
+    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told, Refusal, EngineService | StoreRoot>,
     v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
   ] satisfies Array<EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>>);
   void [
@@ -1091,7 +1092,7 @@ async function _verbProgramTypes() {
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.approveRun('x', 'y') satisfies EffectOf<Approved, never, EngineService>,
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-    v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, never, EngineService>,
+    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told, never, EngineService>,
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.cancelRun('x') satisfies EffectOf<Cancelled, never, EngineService>,
   ];
@@ -1105,7 +1106,7 @@ async function _verbProgramTypes() {
     // @ts-expect-error -- approveRun requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.approveRun('x', 'y')),
     // @ts-expect-error -- sayRun requires EngineService, and runPromise takes no requirement
-    v.Effect.runPromise(v.sayRun('x', 'y', 'z')),
+    v.Effect.runPromise(v.sayRun('x', 'y', 'z', { caller: PERSON })),
     // @ts-expect-error -- cancelRun requires EngineService, and runPromise takes no requirement
     v.Effect.runPromise(v.cancelRun('x')),
   ];

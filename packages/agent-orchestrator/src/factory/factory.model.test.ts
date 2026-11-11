@@ -101,3 +101,17 @@ test('a factory names the harness settings a factory may set, and one naming ano
   for (const [row, factory] of Object.entries(rows))
     await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
 });
+
+test('a factory sets a cost line for a workflow it offers, and one for a workflow it does not offer, or of no dollars, is refused', async (t) => {
+  const mill = { name: 'mill', repos: ['/r'], workflows: ['build'], hires: {}, schedules: {} };
+  await t.test('a line of $80 for build, which it offers', () =>
+    assert.equal(Schema.is(Factory)({ ...mill, costLines: { build: 80 } }), true),
+  );
+  const rows: Record<string, object> = {
+    'a line for a workflow it does not offer': { ...mill, costLines: { intake: 80 } },
+    'a line of no dollars': { ...mill, costLines: { build: 0 } },
+    'a line below zero': { ...mill, costLines: { build: -1 } },
+  };
+  for (const [row, factory] of Object.entries(rows))
+    await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
+});

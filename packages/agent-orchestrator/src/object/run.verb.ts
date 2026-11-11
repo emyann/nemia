@@ -54,6 +54,7 @@ import { runNamespace } from '../run-list/index.ts';
 import { prunedWords } from '../record/record.ts';
 import { prunedKept } from '../forget/prune/prune.ts';
 import { currentOf, raiseReads, runReading, type RunReading, stepsReading, triesIn } from './read.verb.ts';
+import { saidOf } from '../say/say.ts';
 
 /**
  * What `runObject` is handed beside its services: what a caller's reads keep between requests (`said`, where each blocked session's
@@ -272,7 +273,7 @@ const stepStatusOf = Effect.fnUntraced(function* (name: string, at: StepAt) {
       raiseReads(run, views, steps).closeoutOf,
       judged.spendOf,
     ),
-    said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
+    said: taskId ? (views.get(taskId)?.state.said ?? []).map(saidOf) : [],
     asked: askedOf(judged.asked.get(name)),
     check: current.check,
     attempts: current.attempts,

@@ -256,6 +256,12 @@ test('`## Said to your session` goes inside `## Try <n>` on a try that continues
     told,
   );
   assert.match(briefOf({ ...nudge, said: [said[0]] }), /A person said this to your session/);
+  const byAgent = briefOf({
+    ...nudge,
+    said: [said[0], { at: '2026-09-14T16:10:00.000Z', attempt: 1, text: 'The agent operator writes, not the person: Cut it.' }],
+  });
+  assert.doesNotMatch(byAgent, /A person said these|They are a person's/, "where an agent spoke, the words are not all the person's");
+  assert.match(byAgent, /The agent operator writes, not the person: Cut it\./, 'its words as the session was handed them');
   assert.ok(
     briefOf({ try: 2, by: 'retries', mode: 'continue', resumed: true, status: 'failed (check)', said }).includes('## Said to your session'),
     "the run's own nudge carries them too",

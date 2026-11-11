@@ -405,8 +405,9 @@ const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined): boolean 
     (!word.arg && (spec.missing === undefined || p.kind !== 'text')));
 
 /**
- * A command whose last positional is a rest: its required positionals the first words, and every word after them its text, flags
- * included; a flag it has none of where a required argument stands is refused in its words.
+ * A command whose last positional is a rest: its required positionals the first words, then the command's own flags given right after
+ * them (`nemia say <runId> <step> --as <name> <words>`), each with its value, and every word after those its text, flags included; a flag
+ * it has none of where a required argument stands is refused in its words.
  */
 function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args | undefined {
   const required = spec.positionals.filter((p) => p.takes === 'required');
@@ -417,7 +418,15 @@ function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args 
     (a, i) => a.startsWith(spec.missing === undefined ? '--' : '-') || (!a && (spec.missing === undefined || required[i]?.kind !== 'text')),
   );
   if (head.length < required.length || short) return spec.missing === undefined ? undefined : usage(spec.missing);
-  return { ...Object.fromEntries(required.map((p, i) => [p.key, head[i]])), [rest.key]: argv.slice(required.length).join(' ') };
+  const args: Filling = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));
+  let at = required.length;
+  for (let arg = argv[at]; arg !== undefined; arg = argv[at]) {
+    const { word, last } = wordAt(spec, argv, at, arg);
+    if (word.is !== 'flag') break;
+    readFlag(spec, word, args);
+    at = last + 1;
+  }
+  return { ...args, [rest.key]: argv.slice(at).join(' ') };
 }
 
 /** A word that is a flag no command takes: neither one of `spec`'s, nor `--help`. */

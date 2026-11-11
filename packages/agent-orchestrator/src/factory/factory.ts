@@ -13,6 +13,7 @@ import { fireWord, type ScheduleListed } from './schedule/schedule.ts';
 import { untrustedLines, type Untrusted } from '../trust/trust.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
+import { dollars } from '../money/money.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
 import type {
   ConditionStatus,
@@ -77,9 +78,11 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * workflows, agents, skills, wiring and instruction, when it was made from one. `volumes`: the folders of the person's machine its runs
  * mount for every local step beside its repositories, each read-only or writable as it was named (`Volume`), when it names any.
  * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
- * the file holds them: judged at a start and at the door's write, not on read. `generation`: the count of changes to its spec, Kubernetes'
- * `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when its file holds one; a file
- * written before the counter reads as 1 (`generationOf`).
+ * the file holds them: judged at a start and at the door's write, not on read. `costLines`: the cost line it sets for each workflow it
+ * offers, in dollars, by the workflow's folder name (`nemia factory cost-line set`), when it sets any: frozen on a run of that workflow at
+ * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `generation`: the count of
+ * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
+ * its file holds one; a file written before the counter reads as 1 (`generationOf`).
  */
 export type Factory = {
   name: string;
@@ -93,6 +96,7 @@ export type Factory = {
   tree?: string;
   volumes?: readonly Volume[];
   harnessSettings?: SettingsAsRead;
+  costLines?: Readonly<Record<string, number>>;
   generation?: number;
 };
 
@@ -247,7 +251,8 @@ export type FactoryWrite =
   | 'upgrade'
   | 'adopt'
   | 'volume'
-  | 'setting';
+  | 'setting'
+  | 'cost-line';
 
 /** What to do in place of `nemia factory <verb>` on the default factory. */
 const INSTEAD: Record<FactoryWrite, string> = {
@@ -267,6 +272,7 @@ const INSTEAD: Record<FactoryWrite, string> = {
   upgrade: 'It is made from no template: upgrade a factory nemia factory apply made.',
   volume: 'It mounts no volume, and no run is started in it: add one to a factory nemia factory ls lists.',
   setting: 'It holds no harness settings, and no run is started in it: set one on a factory nemia factory ls lists.',
+  'cost-line': 'It sets no cost line, and no run is started in it: set one on a factory nemia factory ls lists.',
   adopt:
     'It holds every run and card that names no factory: take over a factory nemia factory ls lists, or make one with nemia factory apply.',
 };
@@ -648,6 +654,15 @@ const scheduleLines = (factory: Factory, listed: readonly ScheduleListed[], widt
       ];
     });
 
+/** A factory's cost lines as `nemia factory ls` lists them under its line, sorted by workflow: `cost line build $80.00`. */
+const costLineLines = (lines: Factory['costLines'], width: number): string[] =>
+  Object.keys(lines ?? {})
+    .sort()
+    .flatMap((workflow) => {
+      const usd = lines?.[workflow];
+      return usd === undefined ? [] : [`${' '.repeat(width)}  cost line ${workflow} ${dollars(usd)}`];
+    });
+
 /**
  * What `nemia factory ls` prints: the default factory first, then each factory by name with its repositories, or why it does not read;
  * each schedule with its next fire and last run as `listed` reads them at `now`, and each place in `untrusted` under its factory.
@@ -672,6 +687,7 @@ export function factoryLines(
             ...workflowLine(l.workflows, width),
             ...volumeLines(l.volumes, width),
             ...settingLines(l.harnessSettings, width),
+            ...costLineLines(l.costLines, width),
             ...hireLines(l.hires, width),
             ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),
@@ -699,6 +715,10 @@ export const hiredDetachRefusal = (factory: string, workflow: string, hired: rea
 /** Why `factory` cannot be relieved of `workflow` while it schedules it: the unschedule, then the detach. */
 export const scheduledDetachRefusal = (factory: string, workflow: string): string =>
   `${factory} schedules ${workflow}: unschedule it first — nemia factory unschedule ${factory} ${workflow} — then detach it. Nothing was detached.`;
+
+/** Why `factory` cannot be relieved of `workflow` while it sets a cost line for it: the line taken back, then the detach. */
+export const costLinedDetachRefusal = (factory: string, workflow: string): string =>
+  `${factory} sets a cost line for ${workflow}: take it back first — nemia factory cost-line rm ${factory} ${workflow} — then detach it. Nothing was detached.`;
 
 /** Why `factory` fires no one from `step`: it hires no one there, naming the steps it hires into. */
 export const unhiredFireRefusal = (factory: string, step: string, hires: Hires): string => {

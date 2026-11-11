@@ -52,7 +52,11 @@ type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
  * Words a person said to the session (the CLI's `say`, or the session page's composer), off the engine's journal of the step's task: "you
  * said" — and when the session's transcript shows them reaching it (`heardIn`).
  */
-type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null };
+/**
+ * Words said to the session while it ran, as a turn: when, on which attempt, the words, when it shows them reaching it, and the agent that
+ * wrote them (`by`) where one did — its words then without the frame they were handed in — null for the person's.
+ */
+type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string; arrived: string | null; by: string | null };
 /** What a fold holds, in order: its calls, and the thoughts and system lines between them. */
 export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
 /** Two or more calls with nothing said between them. `failed` counts results that are errors; `waiting`, calls with no result yet. */
@@ -232,10 +236,10 @@ export function heardIn(events: readonly TranscriptEvent[], said: readonly Said[
 
 /**
  * The turns, with what a person said to the session laid in among them (off the engine's journal of the step's task, through `heardIn`):
- * each a turn of its own, "you said", placed where its words reached the session when its transcript shows that, and otherwise when they
- * were said — before the first turn that came after, and after a fold that began before, since a fold is one line. Words after everything
- * the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn holds no mark to stand after: an
- * arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
+ * each a turn of its own, "you said" (or an agent's, under its name, `by`), placed where its words reached the session when its transcript
+ * shows that, and otherwise when they were said — before the first turn that came after, and after a fold that began before, since a fold
+ * is one line. Words after everything the transcript has are last. Nothing said leaves the turns as they were. Placed by time, since a turn
+ * holds no mark to stand after: an arrival by the session's own clock, as its turns are, and only words not seen yet by the api's.
  */
 export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { arrived?: string | null }>): Turn[] {
   const placed = (s: { at: string; arrived?: string | null }) => Date.parse(s.arrived ?? s.at);
@@ -246,8 +250,9 @@ export function withSaid(turns: readonly Turn[], said: ReadonlyArray<Said & { ar
       key: `told:${s.attempt}:${s.at}`,
       at: s.at,
       attempt: s.attempt,
-      text: s.text,
+      text: s.from?.kind === 'agent' ? (s.words ?? s.text) : s.text,
       arrived: s.arrived ?? null,
+      by: s.from?.kind === 'agent' ? s.from.name : null,
     }));
   const out: Turn[] = [];
   let next = 0;

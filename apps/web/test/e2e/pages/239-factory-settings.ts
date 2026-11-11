@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { budgetWord } from '../../../src/lib/money.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -16,13 +17,21 @@ const RULES = 'Never push on a Friday. A change comes with the test that proves 
 /** A file of the checkout the page points the instruction at: the README of the workflow `dev`. */
 const README = path.join('workflows', WORKFLOWS.good.name, 'README.md');
 
+/** The workflow the factory offers, whose cost line the page sets and clears, and the line it sets. */
+const LINED = { workflow: WORKFLOWS.good.name, usd: 80 } as const;
+
 const route = `/api/factories/${FACTORY}/instruction`;
 const rulesRoute = `/api/factories/${FACTORY}/rules`;
 
-/** Which route a press writes: the instruction's, its words', or the rules'. */
-type Written = 'instruction' | 'words' | 'rules';
+/** Which route a press writes: the instruction's, its words', the rules', or the cost line's of LINED's workflow. */
+type Written = 'instruction' | 'words' | 'rules' | 'costLine';
 
-const ROUTES: Record<Written, string> = { instruction: route, words: `${route}/words`, rules: rulesRoute };
+const ROUTES: Record<Written, string> = {
+  instruction: route,
+  words: `${route}/words`,
+  rules: rulesRoute,
+  costLine: `/api/factories/${FACTORY}/costlines/${LINED.workflow}`,
+};
 
 /** The answer to the next `method` on the route of `what`. */
 const answered = (page: Page, method: 'PUT' | 'DELETE', what: Written) =>
@@ -83,6 +92,43 @@ async function keepRules(page: Page, kept: string): Promise<void> {
   if (fs.existsSync(kept)) throw new Refused(`cleared, ${kept} is gone`);
   if ((await words.inputValue()) !== '') throw new Refused(`cleared, the rules are empty — ${await words.inputValue()}`);
   await expectVisible(section.locator('[data-rules-done]', { hasText: 'Cleared' }), 'the page says they are cleared');
+}
+
+/** The cost lines the factory's file keeps, as it reads now. */
+const costLinesIn = (factoryFile: string): unknown =>
+  (JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as { costLines?: unknown }).costLines;
+
+/**
+ * The factory's cost lines: a row per workflow it offers, none set yet and nothing to clear; a line typed and saved is the factory's
+ * file's `costLines`, shown on the row and read again on a reload; cleared, the file keeps none and the row says so.
+ */
+async function setCostLine(page: Page, factoryFile: string): Promise<void> {
+  const { workflow, usd } = LINED;
+  const section = page.locator('[data-cost-lines]');
+  const row = section.locator(`[data-cost-line="${workflow}"]`);
+  await expectCount(section.locator('[data-cost-line]'), 1, 'a row for each workflow the factory offers');
+  await expectVisible(row.locator('[data-cost-line-said="none"]'), `${workflow} has no cost line yet, and its row says so`);
+  await expectCount(row.getByRole('button', { name: 'Clear', exact: true }), 0, 'with no line set, there is nothing to clear');
+  await row.getByRole('spinbutton', { name: `The cost line of ${workflow}, in dollars` }).fill(String(usd));
+  await wrote(page, row, 'Save', 'PUT', 'costLine');
+  const kept = costLinesIn(factoryFile);
+  if (JSON.stringify(kept) !== JSON.stringify({ [workflow]: usd }))
+    throw new Refused(
+      `saved, the factory's file keeps the line, ${JSON.stringify({ [workflow]: usd })} — it keeps ${JSON.stringify(kept)}`,
+    );
+  const said = row.locator(`[data-cost-line-said="${usd}"]`, { hasText: budgetWord(usd) });
+  await expectVisible(said, `the row shows ${workflow}'s line, ${budgetWord(usd)}`);
+  await expectVisible(row.locator('[data-cost-line-done]'), 'and says it is saved');
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  await expectVisible(said, 'the line, read again on a reload');
+  await settled(page);
+  await photograph(section, path.join(OUT, `factory-settings-cost-lines-${await themeOf(page)}.png`));
+  await wrote(page, row, 'Clear', 'DELETE', 'costLine');
+  const left = costLinesIn(factoryFile);
+  if (left !== undefined && JSON.stringify(left) !== '{}')
+    throw new Refused(`cleared, the factory's file keeps no line — it keeps ${JSON.stringify(left)}`);
+  await expectVisible(row.locator('[data-cost-line-said="none"]'), 'cleared, the row says there is no line');
 }
 
 /** Where the section says the instruction is kept, and the file it names. */
@@ -182,7 +228,8 @@ export default {
    * default from `NEMIA.md` in the factory's first folder, no file there yet. Pointed at a file of that folder, it reads that file and
    * the factory's file names its path; Back to NEMIA.md undoes it. Kept in the store, its words are saved to the store's file and read
    * again on a reload, then cleared, asked twice; Back to NEMIA.md leaves the factory's file as it was. The factory's file and the
-   * store's folder for it are taken back whatever happens.
+   * store's folder for it are taken back whatever happens. Its cost lines, a row per workflow it offers: a line set is the factory's
+   * file's `costLines`, shown and read again on a reload, then cleared.
    */
   name: 'factory-settings',
   route: `/factories/${FACTORY}`,
@@ -204,6 +251,7 @@ export default {
       await expectKept(section, 'folder', path.join(checkout, 'NEMIA.md'), 'Back to NEMIA.md reads NEMIA.md again');
       if (JSON.stringify(asRead(fs.readFileSync(factoryFile, 'utf8'))) !== JSON.stringify(asRead(factoryText)))
         throw new Refused(`back to NEMIA.md, the factory's file is as it was — it holds ${fs.readFileSync(factoryFile, 'utf8')}`);
+      await setCostLine(page, factoryFile);
     } finally {
       fs.writeFileSync(factoryFile, factoryText);
       fs.rmSync(folder, { recursive: true, force: true });

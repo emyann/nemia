@@ -1,6 +1,7 @@
 /** `nemia say`, an entry of the command table: words to a step's session, journalled on its task (`sayRun`). */
 import { Effect, Schema } from 'effect';
 import { RunSay, type SaidAfter } from 'objects';
+import type { Speaker } from '../chat/chat.ts';
 import { saidLines } from './say.ts';
 import { sayRun } from './say.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -11,8 +12,18 @@ const RUN_STEP = [
   { key: 'step', takes: 'required', kind: 'name' },
 ] as const;
 
-/** What `nemia say` takes: the run, the step, and the words as the api is sent them (`objects`' `RunSay`). */
-export const SayInput = Schema.Struct({ runId: Schema.String, step: Schema.String, ...RunSay.fields });
+/** Who calls: the person, with no session's token, or a session's agent by its token (`Caller`, `sessionCaller`). */
+const SayCaller = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('person') }),
+  Schema.Struct({ kind: Schema.Literal('agent'), agent: Schema.String, factory: Schema.NullOr(Schema.String) }),
+]);
+
+/**
+ * What `nemia say` takes: the run, the step, the words and who they say they are from as the api is sent them (`objects`' `RunSay`),
+ * and the caller the request is, which the api reads off the request's token and the CLI off `WF_SESSION_TOKEN` — required, so no path
+ * takes the person by default.
+ */
+export const SayInput = Schema.Struct({ runId: Schema.String, step: Schema.String, caller: SayCaller, ...RunSay.fields });
 export type SayInput = typeof SayInput.Type;
 
 /**
@@ -27,30 +38,45 @@ export const SAY: Command<
     after: { kind: SaidAfter; id: string } | null;
     try: number;
     taskId: string;
+    from?: Speaker;
+    words?: string;
   },
   SayInput
 > = {
   name: 'say',
-  usage: '<runId> <step> "<words>"',
+  usage: '<runId> <step> [--as <name>] "<words>"',
   help: [
     "tell a step's running session something, through its harness: the",
     "engine journals the words on the step's task, nemia ls notes the step",
     'said to, and nemia decide prints them under it. A try that continues',
-    'the session is handed them again, as ## Said to your session',
+    'the session is handed them again, as ## Said to your session.',
+    "Words from a session its run filed are its agent's, by its token",
+    '(WF_SESSION_TOKEN); an agent with none says --as <name> before its',
+    "words, a name the person allowed with nemia chat allow. An agent's",
+    'words reach the step under its name, never as yours',
   ],
   spec: {
     positionals: [...RUN_STEP, { key: 'text', takes: 'rest', kind: 'text' }],
-    flags: [],
+    flags: [
+      {
+        flag: '--as',
+        kind: 'name',
+        key: 'as',
+        takes:
+          '--as takes the name an agent with no session token speaks under, one the person allowed: nemia say <runId> <step> --as <name> "<words>".',
+      },
+    ],
     unknown: (arg) => `nemia say does not take ${arg}.`,
   },
   writes: true,
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `say` of `objects`' Api, calling this handler" },
   input: SayInput,
-  handler: Effect.fnUntraced(function* ({ runId, step, text: words }: SayInput) {
-    const told = yield* sayRun(runId, step, words);
+  handler: Effect.fnUntraced(function* ({ runId, step, text: given, caller, from }: SayInput) {
+    const told = yield* sayRun(runId, step, given, from === undefined ? { caller } : { caller, from });
     const { at, attempt, text, after } = told.said;
-    return { at, attempt, text, after: after ?? null, try: told.try, taskId: told.taskId };
+    const answer = { at, attempt, text, after: after ?? null, try: told.try, taskId: told.taskId };
+    return told.from.kind === 'agent' ? { ...answer, from: told.from, words: given } : answer;
   }),
   print({ at, attempt, text, try: tryNo, taskId }, { runId, step }) {
     return [

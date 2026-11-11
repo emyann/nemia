@@ -1,13 +1,14 @@
 /**
  * A factory's wiring, judged (agent-orchestrator, src/factory/wiring/wiring.ts): why a person's change of what a factory offers, hires and
  * schedules is refused (`wiringRefusal`), and the factory after one it accepts (`rewired`). The refusal's laws are the Factory door's
- * invariant — a factory hires and schedules only into a workflow it offers — so a change that would break it is refused; the
- * rewire's say what each change does, and the door's model decode refuses a factory written that breaks the invariant. The names a
- * change carries are judged by `hireRefusal` and `workflowNameRefusal`, declared pure and nothing more: whether a name is well formed
- * is theirs, and their tests'.
+ * invariant — a factory hires, schedules and sets a cost line only for a workflow it offers — so a change that would break it is refused;
+ * the rewire's say what each change does, and the door's model decode refuses a factory written that breaks the invariant. The names a
+ * change carries are judged by `hireRefusal` and `workflowNameRefusal`, declared pure and nothing more: whether a name is well formed is
+ * theirs, and their tests'.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import {
+  costLinedDetachRefusal,
   hiredDetachRefusal,
   hireRefusal,
   scheduledDetachRefusal,
@@ -39,6 +40,7 @@ export const words = [
   assume(unattachedDetachRefusal, { pure: true }),
   assume(hiredDetachRefusal, { pure: true }),
   assume(scheduledDetachRefusal, { pure: true }),
+  assume(costLinedDetachRefusal, { pure: true }),
   assume(unofferedScheduleRefusal, { pure: true }),
   assume(unscheduledRefusal, { pure: true }),
 ];
@@ -117,6 +119,15 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
       condition: ({ input: [factory, change], output }) =>
         change.verb !== 'detach' || !Object.hasOwn(factory.schedules, change.workflow) || output !== null,
     },
+    detachLeavesNoCostLine: {
+      description: 'A detach of a workflow it sets a cost line for is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'detach' ||
+        !factory.workflows.includes(change.workflow) ||
+        factory.costLines === undefined ||
+        !Object.hasOwn(factory.costLines, change.workflow) ||
+        output?.kind === 'Invalid',
+    },
     scheduleOnlyOffered: {
       description: 'A schedule of a workflow it does not offer is refused',
       condition: ({ input: [factory, change], output }) =>
@@ -171,12 +182,11 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
    */
   requires: ({ input: [factory, change] }) => accepted(factory, change),
   /**
-   * A wiring change copies the factory's instruction, revisions, template, tree, volumes and harness settings as they were, by a spread,
-   * and the
-   * verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread, where the spread value
-   * may lack it"), so no law can say they are kept: left to the code, which names none of them, until the verifier reads one. That a
-   * factory's volumes and harness settings survive a wiring change is held by the tests of its verbs (`test/factory-start.test.ts`, its
-   * volume and setting checkpoints). Its generation is carried the same way: the door counts it on the write that follows
+   * A wiring change copies the factory's instruction, revisions, template, tree, volumes, harness settings and cost lines as they were, by
+   * a spread, and the verifier reads no optional field through one (tsverify's `docs/reads.md`: "a field read through a spread, where the
+   * spread value may lack it"), so no law can say they are kept: left to the code, which names none of them, until the verifier reads one.
+   * That a factory's volumes and harness settings survive a wiring change is held by the tests of its verbs (`test/factory-start.test.ts`,
+   * its volume and setting checkpoints). Its generation is carried the same way: the door counts it on the write that follows
    * (`generationAfter`, `contracts/generation.contract.ts`), never the wiring.
    */
   open: [
@@ -187,6 +197,7 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.tree',
     'output.volumes',
     'output.harnessSettings',
+    'output.costLines',
   ],
   ensures: {
     detachWithdraws: {

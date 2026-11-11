@@ -44,7 +44,8 @@ export type HarnessSettings = typeof HarnessSettings.Type;
 /**
  * What a factory's file says: its repositories; the workflows it offers, absent on the default factory, which offers every workflow
  * found; its hires, `<workflow>/<step>` to an agent's name; its volumes; and, where its file names them, its harness settings, its
- * revisions policy, the template it was applied from, and its own level (absent where it follows the store's).
+ * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
+ * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none).
  */
 export const FactorySpec = Schema.Struct({
   repos: Schema.Array(Schema.String),
@@ -55,6 +56,7 @@ export const FactorySpec = Schema.Struct({
   revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
   template: Schema.optionalKey(FactoryTemplate),
   level: Schema.optionalKey(Schema.Literals(LEVELS)),
+  costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
 });
 export type FactorySpec = typeof FactorySpec.Type;
 
@@ -151,6 +153,10 @@ export type FactoryRules = typeof FactoryRules.Type;
 /** A factory's rules written (`PUT …/rules`): what every agent hired into it is told. */
 export const FactoryRulesWrite = Schema.Struct({ words: Schema.String });
 export type FactoryRulesWrite = typeof FactoryRulesWrite.Type;
+
+/** What a person writes of a factory's cost line for one workflow: its dollars. */
+export const FactoryCostLineWrite = Schema.Struct({ usd: Schema.Finite });
+export type FactoryCostLineWrite = typeof FactoryCostLineWrite.Type;
 
 /**
  * A factory's instruction: the factory, the path its file names (null for none), whether the store keeps it, the file it is read from,

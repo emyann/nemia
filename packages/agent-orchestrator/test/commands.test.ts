@@ -76,6 +76,8 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['factory volume rm', 'cli'],
       ['factory setting set', 'cli'],
       ['factory setting rm', 'cli'],
+      ['factory cost-line set', 'typed'],
+      ['factory cost-line rm', 'typed'],
       ['factory rules', 'cli'],
       ['factory instruction', 'cli'],
       ['factory instruct', 'cli'],

@@ -527,6 +527,7 @@ export const filed = (
   },
   untrusted: [],
   volumes: [],
+  costLines: {},
   template: null,
   ...extra,
 });

@@ -2,7 +2,8 @@
  * Who may speak in her chat as an agent, the person's to allow: `nemia chat speakers` lists the names they allowed, `nemia chat allow
  * <name>` allows one and `nemia chat disallow <name>` takes one back. Each write is the person's own setting, asked of them every time an
  * agent calls it (`class: 'ask'`, `asksAlways`), and the CLI's alone while the board shows no list of speakers. The list is the chat's
- * own file (`speakers.json`, `chat.store.ts`), which `chatSay` reads to take an agent's words or refuse them.
+ * own file (`speakers.json`, `chat.store.ts`), which `chatSay` reads to take an agent's words or refuse them, and `nemia say` reads for
+ * an agent that speaks to a step's session with no token (`stepSpeaker`, say.ts).
  */
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
@@ -73,8 +74,9 @@ export const CHAT_ALLOW: Command<Speakers> = {
   name: 'chat allow',
   usage: '<name>',
   help: [
-    'let an agent speak in her chat under a name: its words reach her and the',
-    'board as its own, never as yours. Asked of you every time',
+    "let an agent speak in her chat under a name, and to a step's session",
+    '(nemia say --as <name>): its words reach her, the step and the board as',
+    'its own, never as yours. Asked of you every time',
   ],
   spec: nameSpec('allow'),
   check: (args) => speakerNameRefusal(nameIn(args)) ?? null,
@@ -83,7 +85,7 @@ export const CHAT_ALLOW: Command<Speakers> = {
   asksAlways: true,
   only: ONLY,
   handler: (args) => Effect.flatMap(StoreRoot, (home) => changed(home, 'allow', nameIn(args), withSpeaker)),
-  print: (list, args) => [`${nameIn(args)} may speak in her chat, as itself.`, ...listLines(list)],
+  print: (list, args) => [`${nameIn(args)} may speak in her chat and to a step's session, as itself.`, ...listLines(list)],
 };
 
 /** `nemia chat disallow <name>`: no agent speaks in her chat under `name` any more. Asked of the person every time. */
@@ -98,7 +100,7 @@ export const CHAT_DISALLOW: Command<Speakers> = {
   asksAlways: true,
   only: ONLY,
   handler: (args) => Effect.flatMap(StoreRoot, (home) => changed(home, 'disallow', nameIn(args), withoutSpeaker)),
-  print: (list, args) => [`${nameIn(args)} may no longer speak in her chat.`, ...listLines(list)],
+  print: (list, args) => [`${nameIn(args)} may no longer speak in her chat nor to a step's session.`, ...listLines(list)],
 };
 
 /** The entries of `nemia chat`, in the order `nemia`'s help lists them. */

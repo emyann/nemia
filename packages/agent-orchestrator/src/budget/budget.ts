@@ -3,11 +3,19 @@
  * (`"x-shape": "budgets"`, expanded by `expandShapes` in question.ts as `questions` is), decoded strictly (`budgetsOf`), refused back to
  * its agent where it cannot be taken (`budgetRefusals`), and, once a person approves the gate, the caps those steps are filed and judged
  * under (`approvedCaps`, written into the approval; `capInForce`, read from it on every pass). A cap above a step's own `budget:` is named
- * (`aboveTheWorkflow`), so the gate says it and no rule of auto approves it unasked.
+ * (`aboveTheWorkflow`), so the gate says it and no rule of auto approves it unasked; so is a run whose caps pass its factory's cost line
+ * (`pastTheLine`).
  *
- * Pure. The four functions a contract proves are typed by `contracts/budget.contract.ts`.
+ * Pure. The six functions a contract proves are typed by `contracts/budget.contract.ts`.
  */
-import type { AboveTheWorkflow, ApprovedCaps, CapInForce, ProposalRefusal, Unchanged } from '../../contracts/budget.contract.ts';
+import type {
+  AboveTheWorkflow,
+  ApprovedCaps,
+  CapInForce,
+  PastTheLine,
+  ProposalRefusal,
+  Unchanged,
+} from '../../contracts/budget.contract.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 import type { StepSpec } from '../step/step.ts';
@@ -176,6 +184,12 @@ export const aboveTheWorkflow: AboveTheWorkflow = (caps, ceilings) => {
   for (const c of caps) if (ceilings.some((w) => w.step === c.step && c.usd > w.usd)) named.push(c.step);
   return named;
 };
+
+/**
+ * Whether the most a run may cost under a gate's caps (`most`) passes the cost line its factory set for its workflow, frozen on the run
+ * at its start (`line`, undefined where none is set): the gate says it, and no rule of auto approves it unasked (`withinBudget`).
+ */
+export const pastTheLine: PastTheLine = (most, line) => line !== undefined && most > line;
 
 /** The steps' own budgets, as the ceilings `aboveTheWorkflow` reads: none of a step with no `budget:`. */
 export const ceilingsOf = (steps: readonly StepSpec[]): StepBudget[] =>

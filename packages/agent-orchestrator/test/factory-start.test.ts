@@ -462,6 +462,31 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test(
+    "a run started then freezes its workflow's cost line, and no other's; a run in the default factory has none; a line changed after changes no run started",
+    async () => {
+      const f = path.basename(file, '.json');
+      const start = async (cwd: string, ...factory: string[]) =>
+        runRecord(ROOT, startedId(await typedFrom(cwd, ['start', 'x', '--workflows', build, ...factory, '--no-worktree'])));
+      await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'notes', '30']);
+      assert.equal((await start(b, '--factory', f)).costLine, undefined, "notes' line is not build's");
+      assert.deepEqual(await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '80']), [
+        `${f}  cost line build $80.00`,
+        `changed: ${file} — runs started from now on are held to it; a run in flight keeps the line it was started with`,
+      ]);
+      const frozen = await start(b, '--factory', f);
+      assert.equal(frozen.costLine, 80);
+      assert.equal((await start(aRepo())).costLine, undefined, 'a run in the default factory');
+      const record = fs.readFileSync(path.join(ROOT, 'runs', `${frozen.id}.json`), 'utf8');
+      await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '95']);
+      await typedFrom(ROOT, ['factory', 'cost-line', 'rm', f, 'notes']);
+      assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${frozen.id}.json`), 'utf8'), record, 'the run keeps the line it began with');
+      await refusedBy(() => typedFrom(ROOT, ['factory', 'detach', f, 'build']), 'Invalid');
+      await typedFrom(ROOT, ['factory', 'cost-line', 'rm', f, 'build']);
+      assert.equal('costLines' in fileOf(f), false, 'the key is gone once none is left');
+    },
+  );
+
+  await s.test(
     'REFUSED: a start in a factory whose file a person gave a widening setting by hand, naming it, and no run written',
     async () => {
       const f = path.basename(file, '.json');

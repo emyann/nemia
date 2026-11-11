@@ -29,7 +29,9 @@ and, if you like, on each factory:
 - **`auto`**: as `semi-auto`, with one difference: an answer your confirmed list allows, in the run's current state, she gives without
   asking. The builtin rule, "decide when all agree", approves only when five conditions all hold: the step signed `done` with a
   recommendation for each question (`recommends`), its check exited 0 (`checked`), no loop asks for another round (`accepted`), no
-  step is past its budget (`withinBudget`), and nothing else waits on you (`nothingOpen`). Anything else still asks you.
+  step is past its budget, no proposed cap is above a step's own budget and the caps do not pass the run's cost line (`withinBudget`),
+  and nothing else waits on you (`nothingOpen`). Anything else still asks you. A rule's `under` keeps its own amount, of what the run
+  has spent: the factory's cost line does not change it.
 
 ```bash
 nemia level                        # where she is: her level, her session, how to reach her

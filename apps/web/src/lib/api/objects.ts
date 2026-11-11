@@ -1,10 +1,10 @@
 /**
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
  * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
- * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction and command lines (`factories`), its MCP
- * servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes; and the definitions a
- * namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`); and the proposals that change them and the
- * delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack Query's functions
+ * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction, command lines and cost lines
+ * (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes;
+ * and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`); and the proposals that
+ * change them and the delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack Query's functions
  * take one.
  *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
@@ -329,7 +329,7 @@ export const cards = {
     ),
 };
 
-/** What a write of a factory's rules or instruction may have done, and what to look at before writing again. */
+/** What a write of a factory's rules, instruction or cost line may have done, and what to look at before writing again. */
 const SETTINGS_WRITTEN = "The factory's settings may be changed: read its settings again before changing them again.";
 
 /** A factory, its rules, its instruction and the lines a person types for it (`/api/factories`). */
@@ -363,6 +363,12 @@ export const factories = {
   /** The instruction the store keeps for the factory `name` removed. */
   deleteInstructionWords: (name: string): Promise<FactoryInstruction> =>
     call((c) => c.factories.deleteInstructionWords({ params: { name } }), write(FactoryInstruction, SETTINGS_WRITTEN)),
+  /** The cost line of `workflow` in the factory `name` set to `usd`: the factory as it then reads. */
+  putCostLine: (name: string, workflow: string, usd: number): Promise<Factory> =>
+    call((c) => c.factories.putCostLine({ params: { name, workflow }, payload: { usd } }), write(Factory, SETTINGS_WRITTEN)),
+  /** The cost line of `workflow` in the factory `name` taken off: the factory as it then reads. */
+  deleteCostLine: (name: string, workflow: string): Promise<Factory> =>
+    call((c) => c.factories.deleteCostLine({ params: { name, workflow } }), write(Factory, SETTINGS_WRITTEN)),
 };
 
 /** What a write of a server may have done, and what to look at before writing again. */

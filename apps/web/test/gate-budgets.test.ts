@@ -65,3 +65,15 @@ test("the gate's budgets are drawn per step: its amount, its own budget, the 'ab
   assert.doesNotMatch(approved, /<input/, 'read only once approved');
   assert.match(approved, /\$60\.00/);
 });
+
+test("the run's cost line, past it, is said under the run's line in the api's words; under it, or with none, nothing is", () => {
+  const past = 'at most $71.10 under these caps passes the cost line of $50.00 factory mill sets for build';
+  const html = renderToStaticMarkup(
+    createElement(GateBudgetRows, { step: 'design', budgets: { ...proposal(), line: { usd: 50, said: past } } }),
+  );
+  const drawn = /<p data-past-line[^>]*>([^<]*)<\/p>/.exec(html);
+  assert.equal(drawn?.[1], past, "the api's sentence, drawn as it is");
+  assert.match(drawn?.[0] ?? '', /text-yours/, 'drawn as what a person weighs');
+  assert.ok(html.indexOf('data-said') < html.indexOf('data-past-line'), "under the run's line");
+  assert.doesNotMatch(renderToStaticMarkup(createElement(GateBudgetRows, { step: 'design', budgets: proposal() })), /data-past-line/);
+});

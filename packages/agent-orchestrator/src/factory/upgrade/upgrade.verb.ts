@@ -3,8 +3,11 @@
  * another version, rendered with the factory's parameters overlaid by each `--set`, and writes nothing (`FACTORY_PLAN`); `nemia factory
  * upgrade` writes the version wanted, the template's source where `--template` names one, and the parameters it rendered with, into the
  * factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve`
- * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and the controller merges once each conflict has
- * one. A run in flight keeps the folders frozen on its record.
+ * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict in a text file directly in
+ * a workflow's folder, once each conflict of that workflow has one, proposes the workflow's folder as the choices compose it, a Proposal
+ * of that Workflow at its version now, by the caller its session's token names (`sessionCaller`), and records it beside the choices; the
+ * controller merges once each other conflict has a choice and each such proposal applied. A run in flight keeps the folders frozen on its
+ * record.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,13 +15,26 @@ import { tried } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
+import { workflowSpecOf } from '../../propose/index.ts';
+import { ResolutionProposer } from './proposer.verb.ts';
+import { textIn } from '../../folder/folder.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { FactoryDoor, filedFactory } from '../door/factories.store.ts';
 import { templatePlace } from '../../template/door/templates.store.ts';
 import { nameOfSource, sourceGiven } from '../../template/door/templates.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory.ts';
-import { renderedAt, renderedOrNot, sameParams, setsOf, type RenderedAt, type Unrendered } from '../applied/applied.verb.ts';
+import {
+  phasesNamed,
+  renderedAt,
+  renderedOrNot,
+  sameParams,
+  setsOf,
+  upgradeMerge,
+  type RenderedAt,
+  type UpgradeMerge,
+  type Unrendered,
+} from '../applied/applied.verb.ts';
 import {
   appliedDir,
   digestOf,
@@ -26,14 +42,17 @@ import {
   readResolutions,
   readStatus,
   choicesFor,
+  proposalsFor,
   resolutionsFile,
   treeDir,
   writeResolutions,
   type Entry,
 } from '../applied/applied.store.ts';
 import {
+  approveLine,
   compareVersions,
   compose,
+  declineLine,
   mergeBaseOf,
   mergeTrees,
   planLines,
@@ -523,9 +542,6 @@ function choiceOf(args: Args): Choice {
   return { text: fs.readFileSync(file, 'utf8') };
 }
 
-/** What `nemia factory resolve` wrote: the factory, the conflict, the version, its file, and the conflicts still waiting. */
-type Resolved = { name: string; at: string; to: string; file: string; left: string[] };
-
 /**
  * The choice `args` give, written for one conflict of the upgrade under way — another version wanted, or a template of another name
  * than the base's (a switch) — for that version and that template. Refused, nothing written: the factory as an upgrade is (`rendered`);
@@ -566,44 +582,169 @@ const resolved = Effect.fn('resolved')(function* (args: Args) {
       }),
     );
   const merging = { from, to, template: render.name, base: digestOf(base) };
-  return yield* tried(() => resolvedWith(home, args, factory, merging, mergeOf(home, factory.name, base, render, switched)));
+  const proposals = proposalsFor(readResolutions(home, factory.name), merging);
+  const phases = yield* phasesNamed(factory.name, proposals);
+  const ours = yield* tried(() => entriesIn(treeDir(home, factory.name)));
+  const merged = upgradeMerge(base, ours, render.entries, switched !== undefined, proposals, phases);
+  return yield* resolvedWith(home, args, factory, merging, merged);
 });
 
 /**
- * The choice `args` give for one conflict of `merge`, the upgrade of `factory` named by `merging` — its versions, its template and the
- * digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`).
+ * What `nemia factory resolve` wrote: the factory, the conflict, the version, its file, the conflicts still waiting for a choice, the
+ * proposal it made of the conflict's workflow where it made one (`proposed`), and the proposals the merge waits on to apply (`waits`).
  */
-function resolvedWith(home: string, args: Args, factory: Templated, merging: MergeAt, merge: TreeMerge): Resolved {
+type Resolved = {
+  name: string;
+  at: string;
+  to: string;
+  file: string;
+  left: string[];
+  proposed?: { workflow: string; proposal: string };
+  waits: string[];
+};
+
+/** `choices` with each conflict of `merge` left without one given `'ours'`: what a part of the merge is composed with. */
+const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Record<string, Choice> =>
+  Object.fromEntries(merge.conflicts.map((c) => [c.at, choices[c.at] ?? 'ours']));
+
+/**
+ * The text files directly in the folder of `workflow` as `merge` composes them with `choices`, by name; a file that is not text, which a
+ * Workflow's spec does not carry, left out.
+ */
+function workflowTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>, workflow: string): { name: string; text: string }[] {
+  const composed = compose(merge, filledFor(merge, choices));
+  const prefix = `workflows/${workflow}/`;
+  const entries = 'entries' in composed ? composed.entries : [];
+  return entries.flatMap((entry) => {
+    const name = entry.path.slice(prefix.length);
+    if (!entry.path.startsWith(prefix) || name.includes('/')) return [];
+    const text = textIn(entry.bytes);
+    return text === null ? [] : [{ name, text }];
+  });
+}
+
+/**
+ * The Workflow `workflow` of `factory` as `merge` composes its folder with `choices`, handed to the proposer the program was given
+ * (`ResolutionProposer`): proposed at the version its tree's folder is at now, by the caller the session's token names, or its removal
+ * where the merge leaves no text file in it. Refused: a composed step that does not read, and a folder left with files but no step
+ * (`Invalid`); and as the proposer refuses. The proposal's name.
+ */
+const proposedResolution = Effect.fn('proposedResolution')(function* (
+  factory: Templated,
+  to: string,
+  workflow: string,
+  merge: TreeMerge,
+  choices: Readonly<Record<string, Choice>>,
+) {
+  const verb = 'nemia factory resolve';
+  const kept = `Your choice is kept; choose again for a conflict of ${workflow} to propose it again (${verb} ${factory.name} <conflict> --ours|--theirs|--file <path>).`;
+  const texts = workflowTexts(merge, choices, workflow);
+  const read = yield* Effect.try({
+    try: () => workflowSpecOf(texts),
+    catch: (err) =>
+      new Invalid({
+        message: `${verb}: the workflow ${workflow} as your choices compose it does not read: ${err instanceof Error ? err.message : String(err)} Nothing was proposed. ${kept}`,
+      }),
+  });
+  const spec = read;
+  if (texts.length > 0 && spec.steps.length === 0)
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb}: your choices leave the workflow ${workflow} with no step, and a workflow has one at least: keep a step's file, --ours or --theirs on its conflict. Nothing was proposed. ${kept}`,
+      }),
+    );
+  const why = `the resolution of ${factory.name}'s upgrade to ${to}: the workflow ${workflow} as the choices for its conflicts compose it`;
+  return yield* (yield* ResolutionProposer)(factory.name, workflow, texts.length === 0 ? undefined : spec, why);
+});
+
+/**
+ * The choice `args` give for one conflict of `read`'s merge, the upgrade of `factory` named by `merging` — its versions, its template and
+ * the digest of its base — written (`resolved`), beside the choices already made for that merge (`choicesFor`); where a workflow's
+ * proposal resolves the conflict (`read.owners`) and each conflict of that workflow then has a choice, the workflow proposed as the
+ * choices compose it (`proposedResolution`) and recorded by workflow beside them. Refused before anything is written: an address that is
+ * no conflict of the merge (`Missing`); a `--file` not there (`Invalid`); and a conflict of a workflow whose proposal still waits
+ * (`Conflict`, naming the lines that approve and decline it). Refused after the choice is written, which stays a draft: as
+ * `proposedResolution` refuses.
+ */
+const resolvedWith = Effect.fn('resolvedWith')(function* (
+  home: string,
+  args: Args,
+  factory: Templated,
+  merging: MergeAt,
+  read: UpgradeMerge,
+) {
   const { to } = merging;
+  const { merge } = read;
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
   const at = textOf(args, 'conflict') ?? '';
   if (!merge.conflicts.some((c) => c.at === at))
-    throw new Missing({
-      message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory diff ${factory.name} --to ${to}). ${notDone}`,
-    });
-  const choice = choiceOf(args);
+    return yield* Effect.fail(
+      new Missing({
+        message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory diff ${factory.name} --to ${to}). ${notDone}`,
+      }),
+    );
+  const choice = yield* tried(() => choiceOf(args));
+  const workflow = read.owners.get(at);
+  const waiting = workflow === undefined ? undefined : read.resolved.get(workflow);
+  if (waiting?.resolution === 'proposed' && waiting.proposal !== undefined)
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: the conflicts of the workflow ${workflow ?? ''} are resolved by the proposal ${waiting.proposal.name}, which is ${waiting.proposal.phase}: approve it, ${approveLine(factory.name, waiting.proposal.name)}; or decline it, ${declineLine(factory.name, waiting.proposal.name)}, then resolve again. ${notDone}`,
+      }),
+    );
   const kept = readResolutions(home, factory.name);
   const choices = { ...choicesFor(kept, merging), [at]: choice };
-  writeResolutions(home, factory.name, { ...kept, to, template: merging.template, base: merging.base, choices });
+  const proposals: Record<string, string> = Object.fromEntries(Object.entries(proposalsFor(kept, merging)).filter(([w]) => w !== workflow));
+  const written = () => {
+    const { proposals: _was, ...others } = kept ?? {};
+    writeResolutions(home, factory.name, {
+      ...others,
+      to,
+      template: merging.template,
+      base: merging.base,
+      choices,
+      ...(Object.keys(proposals).length ? { proposals } : {}),
+    });
+  };
+  yield* tried(written);
+  let proposed: Resolved['proposed'];
+  if (workflow !== undefined && merge.conflicts.every((c) => read.owners.get(c.at) !== workflow || Object.hasOwn(choices, c.at))) {
+    const proposal = yield* proposedResolution(factory, to, workflow, merge, choices);
+    proposals[workflow] = proposal;
+    yield* tried(written);
+    proposed = { workflow, proposal };
+  }
   const left = compose(merge, choices);
+  const waits = [...new Set(read.owners.values())].flatMap((w) => {
+    if (w === workflow) return proposed === undefined ? [] : [proposed.proposal];
+    const r = read.resolved.get(w);
+    return r?.resolution === 'proposed' && r.proposal !== undefined ? [r.proposal.name] : [];
+  });
   return {
     name: factory.name,
     at,
     to,
     file: resolutionsFile(home, factory.name),
     left: 'pending' in left ? left.pending.map((c) => c.at) : [],
-  };
-}
+    ...(proposed === undefined ? {} : { proposed }),
+    waits,
+  } satisfies Resolved;
+});
 
-/** `nemia factory resolve`: the person's choice for one conflict of an upgrade; the daemon merges once each has one. */
+/**
+ * `nemia factory resolve`: the person's choice for one conflict of an upgrade; for a workflow's conflicts, once each has one, the
+ * proposal of that workflow, to approve; the daemon merges once each conflict has a choice and each such proposal applied.
+ */
 export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',
   usage: '<name> <conflict> --ours|--theirs|--file <path>',
   help: [
     "choose for one conflict of a templated factory's upgrade or switch: your",
-    'tree, the template (none: drop the file), or the text of a file; the',
-    'daemon merges once each has one',
+    'tree, the template (none: drop the file), or the text of a file; once',
+    "each conflict of a workflow's folder has one, the workflow is proposed",
+    'as they compose it, to approve (nemia proposals approve <p> -n <name>);',
+    'the daemon merges once each has one and each proposal applied',
   ],
   spec: RESOLVE_SPEC,
   check: (args) =>
@@ -615,10 +756,17 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
   asksAlways: true,
   only: HERE,
   handler: (args) => resolved(args),
-  print: ({ name, at, to, file, left }) => [
+  print: ({ name, at, to, file, left, proposed, waits }) => [
     `${name}: ${at} resolved for the upgrade to ${to} — ${file}`,
+    ...(proposed === undefined
+      ? []
+      : [
+          `the workflow ${proposed.workflow} is proposed as your choices compose it, ${proposed.proposal}: ${approveLine(name, proposed.proposal)}`,
+        ]),
     left.length
       ? `${left.length} conflict${left.length === 1 ? '' : 's'} still wait for a choice: ${left.map((c) => resolveLine(name, c)).join('; ')}`
-      : 'every conflict has a choice: the daemon merges on its next pass (nemia up)',
+      : waits.length
+        ? `every conflict has a choice: the daemon merges once ${waits.join(', ')} applied (${waits.map((p) => approveLine(name, p)).join('; ')})`
+        : 'every conflict has a choice: the daemon merges on its next pass (nemia up)',
   ],
 };

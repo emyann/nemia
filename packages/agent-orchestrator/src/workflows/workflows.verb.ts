@@ -99,7 +99,8 @@ const StepDrafts = Schema.declare((u: unknown): u is StepDraft[] => Array.isArra
 /**
  * What `nemia workflows write`'s handler takes: the place it writes (`from`, `yours` or `factory`, and the `factory` whose tree), the
  * folder's `name`, the repository it is judged on, the `version` it was read at, its steps (`draft`), its README, and the other files the
- * draft folder carries (`files`, a script, a schema), each by its path and with its text.
+ * draft folder carries (`files`, a script, a schema), each by its path and with its text; `whole` where they are the whole set of the
+ * folder's other text files, as a Workflow's `spec.files` is, which the api sets and the command line's `--folder` never does.
  */
 export const WorkflowWriteInput = Schema.Struct({
   from: Schema.String,
@@ -110,6 +111,7 @@ export const WorkflowWriteInput = Schema.Struct({
   draft: StepDrafts,
   readme: Schema.optionalKey(Schema.String),
   files: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String, text: Schema.String }))),
+  whole: Schema.optionalKey(Schema.Boolean),
 });
 export type WorkflowWriteInput = typeof WorkflowWriteInput.Type;
 
@@ -138,11 +140,12 @@ export type WorkflowStepInput = typeof WorkflowStepInput.Type;
 
 /**
  * A folder of yours, `<home>/workflows/<name>`, or of the tree of the factory `--factory` names (the place `factory`), written from its
- * steps through the Workflow door, which judges the whole folder before a byte is written and checks it against the version it was read
- * at (`workflowVersionRefusal`): `draft`, the steps as JSON text, which the command line reads off `--folder`; `readme`, the folder's
- * README where one is given; `files`, the other files the draft folder carries — a script, a schema — which the command line reads off
- * `--folder` too, and a file the folder holds that the draft does not carry is left. Answers what was written, and the version the folder
- * is at now.
+ * steps through the Workflow door, which judges the whole folder before a byte is written and checks it against the version it was read at
+ * (`workflowVersionRefusal`): `draft`, the steps as JSON text, which the command line reads off `--folder`; `readme`, the folder's README
+ * where one is given; `files`, the other files the draft folder carries — a script, a schema — which the command line reads off `--folder`
+ * too, and a file the folder holds that the draft does not carry is left, but where `whole` says the files are the whole set of its other
+ * text files, as the api's write of a Workflow's `spec.files` does: then a text file not carried is removed. Answers what was written, and
+ * the version the folder is at now.
  */
 export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, WorkflowWriteInput> = {
   name: 'workflows write',
@@ -174,7 +177,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
     why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
   },
   input: WorkflowWriteInput,
-  handler: ({ draft: steps, readme, files, version, ...where }) =>
+  handler: ({ draft: steps, readme, files, whole, version, ...where }) =>
     Effect.flatMap(StoreRoot, (home) =>
       Effect.gen(function* () {
         const dir = yield* tried(() => yoursWorkflowDir('nemia workflows write', where, home));
@@ -183,7 +186,12 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
         const door = yield* WorkflowDoor;
         return yield* door.workflows.write(
           dir,
-          { steps, ...(readme !== undefined && { readme }), ...(carried !== undefined && { files: carried }) },
+          {
+            steps,
+            ...(readme !== undefined && { readme }),
+            ...(carried !== undefined && { files: carried }),
+            ...(whole !== undefined && { whole }),
+          },
           version,
           places,
           fills,

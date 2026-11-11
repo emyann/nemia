@@ -176,7 +176,7 @@ test("a condition's keys and a workflow node's are listed on the spec, the route
 test("a person reads the workflows on the board, opens a step's page, and is refused a page that is not there", async (t) => {
   const s = story(t);
   await s.test(
-    "GET /api/namespaces/default/workflows lists each folder, the repository's then yours (each by its ?origin=): its description, its steps' specs and bodies, its graph and the schemas beside its steps — and a folder the loader refuses, with the refusal and no steps",
+    "GET /api/namespaces/default/workflows lists each folder, the repository's then yours (each by its ?origin=): its description, its steps' specs and bodies, its graph, the schemas beside its steps and its other text files — and a folder the loader refuses, with the refusal and no steps",
     async () => {
       const refused = loaderRefusal(broken);
       assert.match(refused, /review: `afer` is not a key a step has/);
@@ -195,6 +195,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
           steps: [],
           graph: { roots: [], edges: [] },
           schemas: [],
+          files: [],
           folderTeam: false,
           version: versionOf(broken),
           error: refused,
@@ -246,6 +247,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
             ],
           },
           schemas: ['review.json'],
+          files: [{ path: 'review.json', text: again }],
           /** Neither works in folders: a folder team is every step saying `workspace: folder` (folder-run.test.ts lists one). */
           folderTeam: false,
           version: versionOf(good),
@@ -272,6 +274,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
           ],
           graph: { roots: ['plan'], edges: [] },
           schemas: [],
+          files: [],
           folderTeam: false,
           version: versionOf(mine),
           error: null,
@@ -922,3 +925,75 @@ function parents(): void {
   parentRun('p-running');
   parentRun('p-cancelled', '2026-09-14T00:30:00.000Z');
 }
+
+test("a Workflow's spec carries its folder's other text files: served sorted, written whole by a PUT, and refused where named twice or misshapen", async (t) => {
+  const dir = path.join(root, 'workflows', 'scripted');
+  write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
+  write(path.join(dir, 'route.schema.json'), '{"type":"object"}\n');
+  write(path.join(dir, 'check.ts'), 'process.exit(0);\n');
+  write(path.join(dir, 'old.sh'), 'exit 0\n');
+  write(path.join(dir, 'README.MD'), '# Scripted\n');
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+  fs.writeFileSync(path.join(dir, 'logo.png'), picture);
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const url = '/api/namespaces/default/workflows/scripted';
+  const got = async () => (await (await app.request(`${url}?origin=yours`)).json()) as import('objects').Workflow;
+  const put = (body: unknown) =>
+    app.request(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const files = () => fs.readdirSync(dir).sort();
+
+  const read = await got();
+  await t.test("GET serves the folder's other text files in spec.files, sorted, with no markdown and no picture", () => {
+    assert.deepEqual(read.spec.files, [
+      { path: 'check.ts', text: 'process.exit(0);\n' },
+      { path: 'old.sh', text: 'exit 0\n' },
+      { path: 'route.schema.json', text: '{"type":"object"}\n' },
+    ]);
+  });
+
+  await t.test('REFUSED: a file named both in schemas and in spec.files is a 400, and nothing is written', async () => {
+    const res = await put({
+      metadata: { resourceVersion: read.metadata.resourceVersion },
+      spec: { steps: read.spec.steps, files: [{ path: 'route.schema.json', text: '{}\n' }] },
+      schemas: [{ file: 'route.schema.json', text: '{}\n' }],
+    });
+    assert.equal(res.status, 400);
+    assert.equal(fs.readFileSync(path.join(dir, 'route.schema.json'), 'utf8'), '{"type":"object"}\n');
+    assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
+  });
+
+  await t.test('REFUSED: a spec.files entry whose path is a number is a 400 at that field', async () => {
+    const res = await put({
+      metadata: { resourceVersion: read.metadata.resourceVersion },
+      spec: { steps: read.spec.steps, files: [{ path: 7, text: 'x\n' }] },
+    });
+    assert.equal(res.status, 400);
+    assert.match(String(((await res.json()) as { field?: unknown }).field), /spec\.files.*0.*path/);
+    assert.deepEqual(files(), ['README.MD', 'check.ts', 'logo.png', 'old.sh', 'plan.md', 'route.schema.json']);
+  });
+
+  await t.test('PUT with spec.files writes them, removes a text file it leaves out, and leaves the picture', async () => {
+    const res = await put({
+      metadata: { resourceVersion: read.metadata.resourceVersion },
+      spec: {
+        steps: read.spec.steps,
+        files: [
+          { path: 'check.ts', text: 'process.exit(1);\n' },
+          { path: 'route.schema.json', text: '{"type":"object"}\n' },
+        ],
+      },
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(
+      files(),
+      ['README.MD', 'check.ts', 'logo.png', 'plan.md', 'route.schema.json'],
+      'a README in capitals is markdown, never removed',
+    );
+    assert.equal(fs.readFileSync(path.join(dir, 'check.ts'), 'utf8'), 'process.exit(1);\n');
+    assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(dir, 'logo.png'))), picture);
+    assert.deepEqual(
+      ((await res.json()) as import('objects').Workflow).spec.files?.map((f) => f.path),
+      ['check.ts', 'route.schema.json'],
+    );
+  });
+});

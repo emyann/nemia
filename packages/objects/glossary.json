@@ -140,7 +140,7 @@
     },
     {
       "term": "Workflow",
-      "meaning": "a folder of steps a factory resolves, served in the factory's namespace: its `spec` its steps as their files write them, its `status` its origin, its typed graph, each step resolved and its revision (`Workflow`, `packages/objects/src/workflow.ts`).",
+      "meaning": "a folder of steps a factory resolves, served in the factory's namespace: its `spec` its steps as their files write them and the folder's other text files (`spec.files`), its `status` its origin, its typed graph, each step resolved and its revision (`Workflow`, `packages/objects/src/workflow.ts`).",
       "type": "Workflow"
     },
     {

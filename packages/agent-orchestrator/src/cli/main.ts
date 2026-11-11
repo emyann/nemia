@@ -70,6 +70,7 @@ import {
   pauseNowPreview,
   pauseNowPreviewLines,
   withProposalsPass,
+  withResolutionProposer,
   type Env,
 } from '../runner.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
@@ -445,7 +446,7 @@ async function commanded(
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const given = inputOf(command, args);
-  const data = await runWith(e, placedIn(env, place, command.handler(given)));
+  const data = await runWith(e, placedIn(env, place, withResolutionProposer(command.handler(given))));
   for (const line of command.print(data, given)) console.log(line);
   for (const line of command.note?.(data, given) ?? []) console.error(line);
 }

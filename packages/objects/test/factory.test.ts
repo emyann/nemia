@@ -114,3 +114,19 @@ test('REFUSED: a condition, a status, a reason, a level or a revisions policy of
   assert.throws(() => decode({ ...templated, kind: 'Card' }));
   assert.throws(() => Schema.decodeUnknownSync(FactoryCommands)({ attach: 'x' }));
 });
+
+test("an upgrade's conflict names the proposal its resolution waits on: its phase one of the proposal's words, or null where it is gone", () => {
+  const conflict = { at: 'workflows/flow/check.ts:3-4', base: 'a', ours: 'b', theirs: 'c' };
+  const upgradeWith = (proposal: unknown) => ({
+    ...templated,
+    status: { ...templated.status, upgrade: { from: '1.2.0', to: '1.3.0', conflicts: [{ ...conflict, proposal }] } },
+  });
+  for (const phase of ['waiting', null]) {
+    const factory = upgradeWith({ name: 'p-1', phase });
+    assert.deepEqual(answered('factories', 'get', factory), factory);
+  }
+  assert.throws(
+    () => Schema.decodeUnknownSync(Factory)(upgradeWith({ name: 'p-1', phase: 'pending' })),
+    'a phase is one of PROPOSAL_PHASES',
+  );
+});

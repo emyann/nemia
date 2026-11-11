@@ -23,12 +23,8 @@ export const standingsOf = (run: Run, steps: readonly StepSpec[], git: BranchRea
  * pass, the judgement and `nemia decide` read a run's standings off. None for a folder run, nor for one running, called off, or that worked
  * on its base branch itself.
  */
-export const askedStandings = (
-  run: Run,
-  steps: readonly StepSpec[],
-  status: Assessment['status'],
-  git: BranchReader,
-): BranchStanding[] => (isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : []);
+export const askedStandings = (run: Run, steps: readonly StepSpec[], status: Assessment['status'], git: BranchReader): BranchStanding[] =>
+  isRepositoryRun(run) ? branchStandings(run, branchesAsked(askedOf(run, steps, status)), git) : [];
 
 /** Whether a branch of the run is on its base, as `git` says: never, for a folder run, which has no branch to ask about. */
 export const landedOf =

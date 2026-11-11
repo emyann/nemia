@@ -50,9 +50,7 @@ export type UnjudgedStep = { readonly name: string; readonly message: string; re
  * A run judged (`judgement`), or why it is not, in the words the list says it with (`unjudged`) and in a reader's own (`saidBy`), with
  * each step's word off its record (`steps`).
  */
-export type JudgedOrWhy =
-  | { judgement: Judgement }
-  | { unjudged: string; saidBy: (by: string) => string; steps: readonly UnjudgedStep[] };
+export type JudgedOrWhy = { judgement: Judgement } | { unjudged: string; saidBy: (by: string) => string; steps: readonly UnjudgedStep[] };
 
 /** What `judgementsOf` read: each run's judgement or why it has none, and the views and unreadable journals of the one listing. */
 export type Judgements = { readonly runs: ReadonlyMap<string, JudgedOrWhy>; readonly views: Views; readonly unreadable: Unreadable };

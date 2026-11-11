@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
-import { type BranchReader, branchStandings } from '../branches/branches.store.ts';
+import { type BranchReader, branchStandings, landedOf } from '../branches/branches.store.ts';
 import { askedOf, branchesAsked, resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
@@ -19,7 +19,7 @@ import { type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { RunRead } from '../tick/told.verb.ts';
-import type { Decision } from '../decide/decide.ts';
+import type { Decision, Landed } from '../decide/decide.ts';
 import { inFlight } from '../cap/cap.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
@@ -366,7 +366,7 @@ type Judged = {
  * round files a task, which the record carries, so the memo is dropped and the branch read afresh. What is left is a person committing
  * to a finished run's branch by hand, which nothing on the board or on `nemia decide` is told of: a fresh process reads it afresh.
  */
-const onTheBase = new Map<string, string>();
+const onTheBase = new Map<string, { filed: string; landed: Landed }>();
 
 /**
  * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
@@ -404,14 +404,15 @@ export function standingsOf(
   const filed = workFiled(run, steps);
   const branches = branchesAsked(askedOf(run, steps, status));
   if (!branches.length) return [];
-  const known = (branch: string) => onTheBase.get(`${run.id}/${branch}`) === filed;
+  const known = (branch: string) => onTheBase.get(`${run.id}/${branch}`)?.filed === filed;
   try {
     const read = branchStandings(
       run,
       branches.filter((branch) => !known(branch)),
       git,
     );
-    for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
+    for (const stood of read)
+      if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, { filed, landed: landedOf(run, git)(stood.branch) });
     asked?.branches.push(...read.filter((stood) => stood.where !== 'on').map((stood) => stood.branch));
     if (asked && read.some((stood) => stood.where === 'unread')) asked.failed = true;
     return branches.map((branch) => read.find((stood) => stood.branch === branch) ?? { branch, where: 'on' as const });
@@ -420,6 +421,18 @@ export function standingsOf(
     return [];
   }
 }
+
+/**
+ * Whether a branch of `run` is on its base (`Landed`), as `standingsOf` says it: off the memo of branches already on the base where it
+ * holds the branch against the work filed (`onTheBase`), else as `git` reads it (`landedOf`). What the judgement's decision reads, so it
+ * never says a branch landed or not where its standings say otherwise.
+ */
+export const landedThrough =
+  (run: Run, steps: readonly StepSpec[], git: BranchReader) =>
+  (branch: string): Landed => {
+    const kept = onTheBase.get(`${run.id}/${branch}`);
+    return kept && kept.filed === workFiled(run, steps) ? kept.landed : landedOf(run, git)(branch);
+  };
 
 /**
  * What `standingsOf` read for one run: the result branches not found on the base, and whether one was unread or the read failed
@@ -481,6 +494,7 @@ export const judge = Effect.fn('judge')(function* (
     shown,
     standings,
     git,
+    landed: landedThrough(run, steps, git),
     ...(config ? { config } : {}),
     ...(parent ? { parent } : {}),
   });

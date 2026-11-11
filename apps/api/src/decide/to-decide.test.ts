@@ -216,8 +216,9 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
     },
   );
   await s.test(
-    "the decision of a run at its ending's gate offers the approval and the send-back, and never `git merge` by hand: its ending is what merges",
+    "the decision of a run at its ending's gate, once a pass has read where its branch stands, offers the approval and the send-back, and never `git merge` by hand: its ending is what merges",
     async () => {
+      await aPass();
       const { commands, standings } = await decidableOf('r-ending');
       assert.deepEqual(
         commands.map((c) => c.label),
@@ -627,7 +628,7 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   assert.ok(gitCount() > before, "a pass reads a finished run's branch out of git, through the same PATH: the count counts");
 });
 
-test("at an ending's gate, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
+test("at an ending's gate, once a pass has read where the branches stand, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
   const own = aRepo();
   const runOn = (id: string, file: string, text: string, done: boolean, workflow = ENDING) => {
     const branch = `wf/${id}/implement`;
@@ -639,6 +640,7 @@ test("at an ending's gate, the decision says each run in flight on the base its 
   runOn('r-gate', 'src/c.ts', 'export const c = 1;\n', true);
   runOn('r-flight', 'src/c.ts', 'export const c = 2;\n', false);
   runOn('r-apart', 'src/f.ts', 'export const f = 6;\n', false);
+  await aPass();
 
   const read = gitCount();
   const { collisions, standings } = await decidableOf('r-gate');

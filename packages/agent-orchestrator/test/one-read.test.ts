@@ -386,20 +386,23 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     agree(await readers(id));
   });
 
-  await t.test('F1: a finished run merged by hand since the last pass: the result is to decide for every reader until a pass reads it', async () => {
-    const { id, repo, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
-    stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
-    await tick(id);
-    await aPass();
-    mergedByHand(repo, branch);
-    const before = await readers(id, { pass: false });
-    agree(before);
-    assert.equal(before.decide?.toDecide, `result:${branch}`, 'every reader reads the last pass, which read the branch ahead');
-    const after = await readers(id);
-    agree(after);
-    assert.equal(after.decide?.landed, true, 'a pass reads the hand merge');
-    assert.equal(after.decide?.toDecide, null);
-  });
+  await t.test(
+    'F1: a finished run merged by hand since the last pass: the result is to decide for every reader until a pass reads it',
+    async () => {
+      const { id, repo, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
+      stage.board().settle(`${id}-review`, 'succeeded', SIGNED);
+      await tick(id);
+      await aPass();
+      mergedByHand(repo, branch);
+      const before = await readers(id, { pass: false });
+      agree(before);
+      assert.equal(before.decide?.toDecide, `result:${branch}`, 'every reader reads the last pass, which read the branch ahead');
+      const after = await readers(id);
+      agree(after);
+      assert.equal(after.decide?.landed, true, 'a pass reads the hand merge');
+      assert.equal(after.decide?.toDecide, null);
+    },
+  );
 
   await t.test('F2: a finished run in a store no pass has read: nothing to decide and no branch read, for every reader', async () => {
     const { id, branch } = await worked(folder({ implement: [], review: ['after: implement'] }));
@@ -431,19 +434,22 @@ test('one read of a run: the tick, nemia ls, nemia decide, nemia prune and the r
     assert.deepEqual(said.decide?.waitingOn, [parent.id], 'no reader reads the merge before a pass does');
   });
 
-  await t.test('F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder', async () => {
-    const repo = aRepo();
-    const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
-    const first = await started(workflow, repo);
-    stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
-    await tick(first);
-    stage.board().settle(`${first}-land`, 'working');
-    const second = await started(workflow, repo);
-    stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
-    await aPass();
-    stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
-    agree(await readers(second, { pass: false }));
-  });
+  await t.test(
+    'F4: an ending waits for the checkout a run held at the last pass and has let go since: every reader names one holder',
+    async () => {
+      const repo = aRepo();
+      const workflow = folder({ implement: [], land: ['after: implement', 'workspace: base'] });
+      const first = await started(workflow, repo);
+      stage.board().settle(`${first}-implement`, 'succeeded', SIGNED);
+      await tick(first);
+      stage.board().settle(`${first}-land`, 'working');
+      const second = await started(workflow, repo);
+      stage.board().settle(`${second}-implement`, 'succeeded', SIGNED);
+      await aPass();
+      stage.board().settle(`${first}-land`, 'succeeded', SIGNED);
+      agree(await readers(second, { pass: false }));
+    },
+  );
 
   await t.test('F5: a gated ending never filed whose result a person merged by hand: nothing to approve, for every reader', async () => {
     const { id, repo, branch } = await worked(folder({ implement: [], land: ['after: implement', 'workspace: base', 'gate: true'] }));

@@ -90,8 +90,9 @@ const answered = (read: DecisionRead | DecisionUnjudged): DecisionRead | Decisio
 
 /**
  * A run's decision, in one order, off its one reading (`stepsReading`): the judgement the run object, the runs list and the tick's informer
- * read, where its branches stand as the tick's last pass read them (`standing.json`), never git asked now. Called off is `nothing`, and
- * nothing is read. Then the runs it waits on and is held until, as the judgement read them: a run whose roots wait on runs that have not
+ * read, where its branches stand as the tick's last pass read them (`standing.json`), never git asked now. A run whose unfrozen folder or a
+ * task journal of which does not read is answered unjudged (`DecisionUnjudged`), as its object is, called off or not. Called off is
+ * `nothing`. Then the runs it waits on and is held until, as the judgement read them: a run whose roots wait on runs that have not
  * landed is `waiting` — with its hold beside it — and one a person holds is `holding`, with what is in flight (`decided`). Else the run is
  * decided (`decidedOf`). A run the cap on runs in flight holds is `running` with its slot (its `WF_MAX_RUNS` before any pass is `env`'s),
  * as is a run still running with nobody waited on. A run whose branches are already on its base is `nothing`, with an approved ending that
@@ -99,16 +100,16 @@ const answered = (read: DecisionRead | DecisionUnjudged): DecisionRead | Decisio
  * a run still running has a step waiting on you, and every branch a step worked on when no terminal step has one (`branchesToRead`), never
  * the base branch of a run that cut worktrees, each read from the run's place on this read (`changesOf`). What the place could not say is
  * an `error` on its entry, never a failed read. A folder run has no repository to ask, and a run that worked on its base branch itself no
- * standings. A run whose unfrozen folder or a task journal of which does not read is answered unjudged (`DecisionUnjudged`).
+ * standings.
  *
  * Fails with `Missing` for a run the store does not have.
  */
 export const decisionRead = Effect.fn('decisionRead')(function* (id: string, how: DecisionHow = {}) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
-  if (run.cancelledAt)
-    return answered({ run, decision: { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` }, touched: [], results: [] });
   const at = yield* stepsReading(run);
   if ('unjudged' in at) return answered({ run, unjudged: at.unjudged, saidBy: at.saidBy });
+  if (run.cancelledAt)
+    return answered({ run, decision: { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` }, touched: [], results: [] });
   return answered(yield* decisionOf(at, how));
 });
 

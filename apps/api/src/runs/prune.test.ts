@@ -22,7 +22,7 @@ import type { Pruning } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, runsAtOnce } from 'agent-orchestrator';
+import { engine, passStanding, prune, prunedKept, prunedWords, runsAtOnce } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -203,8 +203,9 @@ const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: bo
 test('a finished run pruned on the board as `nemia prune` prunes it: what it refuses without `--unmerged`, a merged run pruned with its files, refused a second time, an unmerged one refused and then pruned keeping its branch', async (t) => {
   const s = story(t);
   await s.test(
-    "the decision's `awaiting` is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand",
+    "the decision's `awaiting`, once a pass has read where the branches stand, is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand",
     async () => {
+      await runWith(engine(process.env), passStanding(runsAtOnce(root).runs.list()));
       const awaiting = new Map<string, unknown>();
       for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
         const res = await app.request(`/api/runs/${id}/decision`);

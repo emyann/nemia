@@ -25,7 +25,7 @@ import type { Selectors } from '../watch/selector.ts';
 import { unloadedFolder } from '../steps/steps.ts';
 import { stepsAmong, stepsOf } from '../steps/steps.verb.ts';
 import { askedStandings, landedOf, resultBranches, type BranchReader } from '../branches/branches.store.ts';
-import { decision, type Decision } from '../decide/decide.ts';
+import { decision, type Decision, type Landed } from '../decide/decide.ts';
 import { headsOver, standingReader, standingSnapshot, type PassStanding } from '../standing/standing.verb.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
@@ -66,6 +66,7 @@ import { currentTasks, finishingAmong, parkedAmong, type Pause, type Paused, typ
  *   the program's (`StoreConfig`).
  * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
+ * @param landed Whether a result branch is on its base, as the decision reads it; left out, as `git` reads it (`landedOf`).
  */
 export type ListReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
@@ -77,6 +78,7 @@ export type ListReadingHow = {
   config?: Settings;
   git: BranchReader;
   parent?: (id: string) => ParentRun;
+  landed?: (branch: string) => Landed;
   /**
    * The store's real releases folder (`realReleasesDir`), which a step at work is said to run on under (`ranOnOf`); left out, none
    * is said.
@@ -126,7 +128,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
   const standings = how.standings ? how.standings(status, steps) : askedStandings(run, steps, status, git);
   const read = { ...held, standings };
   const assessed = assess(read);
-  const decided = decision(read, landedOf(run, git), assessed);
+  const decided = decision(read, how.landed ?? landedOf(run, git), assessed);
   const assessOf = (on: Run): Assessment => assess({ ...read, run: on });
   const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
   const scripted = base.signedOff;

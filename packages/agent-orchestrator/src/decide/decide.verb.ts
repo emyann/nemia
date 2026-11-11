@@ -7,7 +7,7 @@
 import { StoreConfig } from '../config/config.store.ts';
 import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
-import { asked as engineAsked, nameFor, over, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
+import { asked as engineAsked, nameFor, over, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
@@ -22,7 +22,6 @@ import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { answerLines, answerOf, overBudgetLine, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
-import { askedStandings } from '../branches/branches.store.ts';
 import {
   checkReportsRead,
   closeoutOf,
@@ -149,8 +148,8 @@ export type Decided = {
    */
   held?: RunSlot;
   /**
-   * Where each result branch the reading asks of stands against the base branch (`askedStandings`), as the tick's last pass read it: the
-   * fact under the run's result.
+   * Where each result branch the reading asks of stands against the base branch (`branchesAsked`), as the judgement read it off the tick's
+   * last pass: the fact under the run's result.
    */
   standings: BranchStanding[];
   /**
@@ -267,7 +266,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
   const place = yield* PlaceService;
-  const standings = yield* tried(() => askedStandings(run, steps, assessed.status, git));
+  const standings = [...judged.read.standings];
   const decide = assessed.toDecide;
   const ending = collisionsDue(steps, run, decide);
   const collisions = ending ? yield* collisionsAt(at.home, run, ending, standings, git, place) : undefined;

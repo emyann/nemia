@@ -83,13 +83,13 @@ export const takenAt = (version: string | null): string =>
 
 /**
  * Why a write or a removal (`does`) of the workflow folder `dir` given the version `version` it was read at does nothing: the folder is at
- * `now` since (`workflowVersion`), so a step, the README or a schema there changed, and what it holds would go unseen.
+ * `now` since (`workflowVersion`), so a step, the README or another of its files there changed, and what it holds would go unseen.
  */
 export const workflowStale = {
   write: (dir: string, version: string, now: string): string =>
-    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
+    `${dir} has changed since it was read at version ${version}: a step, the README or another of its files there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
   remove: (dir: string, version: string, now: string): string =>
-    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`,
+    `${dir} has changed since it was read at version ${version}: a step, the README or another of its files there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`,
 };
 
 /**

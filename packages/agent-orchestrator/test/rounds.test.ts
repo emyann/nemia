@@ -18,7 +18,7 @@ import type { StepRecord } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { names, namesFor } from './assessed.ts';
-import { acceptRun, advanceRun, decideRun, list, retryRun, roundRun, sayRun, startRun, runWith } from '../src/runner.ts';
+import { acceptRun, advanceRun, decideRun, list, retryRun, roundRun, sayRun, PERSON, startRun, runWith } from '../src/runner.ts';
 import { asksDir, markCancelled, runRecord } from '../src/record/record.store.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -170,7 +170,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     async () => {
       id = await startedLoop(looped('', '', { ship: ['gate: true'] }));
       stage.board().settle(`${id}-implement`, 'working');
-      await over(sayRun(id, 'implement', 'Leave the parser alone.'));
+      await over(sayRun(id, 'implement', 'Leave the parser alone.', { caller: PERSON }));
       await assert.rejects(
         over(roundRun(id)),
         refusedAs('Conflict', "round 1 of review's loop is still running", `nemia ls ${id}`, `nemia cancel ${id}`),

@@ -15,15 +15,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Caller } from './proposal-approval.contract.ts';
-import { framedFor, type Speaker, type SpeakerRefused, speakerNameRefusal } from '../src/chat/chat.ts';
-
-/**
- * What the words an agent's frame opens with, and the words between its name and its own: `framedFor`'s agent arm
- * (`speaker.contract.ts`, `anAgentInItsFrame`). Declared here until implement names them in `src/chat/chat.ts`, which `framedFor`
- * then writes its frame from; moving them changes no law.
- */
-const AGENT_OPENS = 'The agent ';
-const AGENT_WRITES = ' writes, not the person: ';
+import { AGENT_OPENS, AGENT_WRITES, framedFor, type Speaker, type SpeakerRefused, speakerNameRefusal } from '../src/chat/chat.ts';
 
 /** Whether the caller is a session that presents its token and names no one but itself, the agent the store filed it under. */
 const isItself = (caller: Caller, from: Speaker | undefined): boolean =>
@@ -65,11 +57,7 @@ const stepSpeakerSpec = spec<(caller: Caller, from: Speaker | undefined, allowed
     unallowedIsConflict: {
       description: 'An agent with no token, under a name the person has not allowed with `nemia chat allow`, is refused as Conflict',
       condition: ({ input: [caller, from, allowed], output }) =>
-        caller.kind !== 'person' ||
-        from?.kind !== 'agent' ||
-        !wellNamed(from) ||
-        allowed.includes(from.name) ||
-        output.kind === 'Conflict',
+        caller.kind !== 'person' || from?.kind !== 'agent' || !wellNamed(from) || allowed.includes(from.name) || output.kind === 'Conflict',
     },
     allowedIsItsName: {
       description: 'An agent with no token, under a name the person allowed, speaks under that name',
@@ -106,12 +94,23 @@ export type SaidFrom = { readonly from: Speaker; readonly words: string };
 /**
  * Whether `text` is in an agent's frame, as `framedFor` writes one for a name of no space: it opens with `AGENT_OPENS`, a name follows
  * that holds no space, then `AGENT_WRITES`.
+ *
+ * Two of its conditions hold of every text the others hold of, and are said so the solver need not prove them of `indexOf` and
+ * `slice`: that the name, cut at the first space, holds none; and that the frame written again around the name and the words after it
+ * is the text. The set of texts is the same.
  */
 const inAnAgentsFrame = (text: string): boolean => {
   if (!text.startsWith(AGENT_OPENS)) return false;
   const rest = text.slice(AGENT_OPENS.length);
   const end = rest.indexOf(' ');
-  return end > 0 && rest.slice(end).startsWith(AGENT_WRITES);
+  const name = rest.slice(0, end);
+  const after = rest.slice(end);
+  return (
+    end > 0 &&
+    !name.includes(' ') &&
+    after.startsWith(AGENT_WRITES) &&
+    AGENT_OPENS + name + AGENT_WRITES + after.slice(AGENT_WRITES.length) === text
+  );
 };
 
 const saidBySpec = spec<(text: string) => SaidFrom>({

@@ -6,6 +6,10 @@ import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
+import type { FramedForStep, SaidBy, SaidFrom, StepSpeaker } from '../../contracts/step-speaker.contract.ts';
+import { AGENT_OPENS, AGENT_WRITES, framedFor, speakerRefusal } from '../chat/chat.ts';
+
+export type { SaidFrom } from '../../contracts/step-speaker.contract.ts';
 
 /**
  * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
@@ -66,4 +70,62 @@ export function saidLines(said: readonly SaidTo[]): string[] {
     `said to try ${s.try}${s.attempt > 1 ? `, attempt ${s.attempt}` : ''}, at ${s.at}:`,
     ...fenced(s.text, 'text'),
   ]);
+}
+
+/**
+ * Who words to a step's session are from (`nemia say`, the api's `say`), or why they are refused, off the `caller` the request is, who
+ * the words say they are from (`from`) and the names the person `allowed` in her chat (`nemia chat allow`, the same list). A session
+ * that presents its token speaks as its own agent, whatever the person allowed, and is refused `Invalid` where it names anyone else.
+ * With no token, words that name no one, or the person, are the person's, from the board or a shell as every say was before; an agent
+ * is judged by her chat's own rule (`speakerRefusal`, as if from anywhere but the board): `Invalid` under a name no agent speaks
+ * under, `Conflict` under one the person has not allowed. Pure.
+ */
+export const stepSpeaker: StepSpeaker = (caller, from, allowed) => {
+  if (caller.kind === 'agent') {
+    if (from === undefined || (from.kind === 'agent' && from.name === caller.agent)) return { kind: 'agent', name: caller.agent };
+    return {
+      kind: 'Invalid',
+      message: `This session's token says it is \`${caller.agent}\`, and its words say they are from ${from.kind === 'person' ? 'the person' : `\`${from.name}\``}: a session speaks as itself alone, so send no \`from\` (no \`--as\`).`,
+    };
+  }
+  if (from === undefined || from.kind === 'person') return { kind: 'person' };
+  const refused = speakerRefusal(from, 'elsewhere', allowed);
+  return refused ?? { kind: 'agent', name: from.name };
+};
+
+/**
+ * The words `text` from `speaker` are handed to a step's session in: the person's as they always were, in no frame; an agent's in the
+ * frame her chat says them in (`framedFor`), never as the person's. Pure.
+ */
+export const framedForStep: FramedForStep = (speaker, text) => (speaker.kind === 'person' ? text : framedFor(speaker, text));
+
+/**
+ * Who the words `text` a step's journal holds are from, and the words without their frame: an agent's where they stand in the frame
+ * `framedFor` writes (`AGENT_OPENS`, a name of no space, `AGENT_WRITES`), the person's as journalled otherwise — every say from before
+ * words were framed among them. Pure: read back each time, nothing kept beside the journal.
+ */
+export const saidBy: SaidBy = (text) => {
+  const asJournalled = { from: { kind: 'person' }, words: text } as const;
+  if (!text.startsWith(AGENT_OPENS)) return asJournalled;
+  const rest = text.slice(AGENT_OPENS.length);
+  const end = rest.indexOf(' ');
+  if (end <= 0) return asJournalled;
+  const name = rest.slice(0, end);
+  // `name` holds no space, being cut at the first: said again so the solver need not prove it of `indexOf`.
+  if (name.includes(' ')) return asJournalled;
+  const after = rest.slice(end);
+  if (!after.startsWith(AGENT_WRITES)) return asJournalled;
+  const words = after.slice(AGENT_WRITES.length);
+  // The frame written again around what was read must be the text: said, so the solver need not prove the slices add up.
+  if (AGENT_OPENS + name + AGENT_WRITES + words !== text) return asJournalled;
+  return { from: { kind: 'agent', name }, words };
+};
+
+/**
+ * A said as the run's step status shows it (`objects`' `Said`): the engine's entry as journalled, with who wrote it (`from`) and its
+ * words without the frame (`words`) where an agent did; the person's unchanged, no key added. Pure.
+ */
+export function saidOf<S extends { text: string }>(said: S): S | (S & SaidFrom) {
+  const by = saidBy(said.text);
+  return by.from.kind === 'agent' ? { ...said, from: by.from, words: by.words } : said;
 }

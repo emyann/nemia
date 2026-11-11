@@ -83,6 +83,7 @@ import {
   factoryServerAddRun,
   pruneVerb,
   rmVerb,
+  sayRun,
 } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
@@ -396,7 +397,8 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
  * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia factory server
- * add`, whose runner maps its flags to the write its handler takes; and `nemia admit`, whose runner reads the call on stdin: handed its
+ * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
+ * and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
  */
 export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
@@ -418,6 +420,7 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['workflows write', workflowsWriteRun],
   ['admit', admitRun],
   ['pause', pauseRun],
+  ['say', sayRun],
 ]);
 
 /**

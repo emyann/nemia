@@ -34,6 +34,7 @@ import {
   phaseOfView,
   retryRun,
   sayRun,
+  PERSON,
   startRun,
   runWith,
 } from '../src/runner.ts';
@@ -1375,7 +1376,7 @@ test('telling a running step something with `nemia say`, and the try that contin
       branch: run.branch,
       note: 'said to 1×',
     });
-    const told = await stage.runWith(b.e, sayRun(run.id, 'implement', 'Keep:\n```\n--flag\n```'));
+    const told = await stage.runWith(b.e, sayRun(run.id, 'implement', 'Keep:\n```\n--flag\n```', { caller: PERSON }));
     assert.deepEqual([told.taskId, told.try, told.said], [taskId(), 1, saidTo()[1]]);
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'said to 2×');
   });
@@ -1426,7 +1427,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     const other = await startedRun(implementThenReview());
     await tick(other.id);
     ended(`${other.id}-implement`, 'working');
-    await stage.runWith(b.e, sayRun(other.id, 'implement', 'Widen the scope to apps/api too.'));
+    await stage.runWith(b.e, sayRun(other.id, 'implement', 'Widen the scope to apps/api too.', { caller: PERSON }));
     ended(`${other.id}-implement`, 'succeeded', { closeout: { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which?' } });
     await tick(other.id);
     await stage.runWith(b.e, retryRun(other.id, 'implement', { mode: 'fresh' }));
@@ -1437,7 +1438,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     const checked = await startedRun(implementThenReview(['check: npm test', 'retries: 1']));
     await tick(checked.id);
     ended(`${checked.id}-implement`, 'working');
-    await stage.runWith(b.e, sayRun(checked.id, 'implement', 'Run the parser tests too.'));
+    await stage.runWith(b.e, sayRun(checked.id, 'implement', 'Run the parser tests too.', { caller: PERSON }));
     ended(`${checked.id}-implement`, 'succeeded', { closeout: SIGNED });
     await tick(checked.id);
     ended(`${checked.id}-implement-check`, 'failed', { exitCode: 1 });
@@ -1453,7 +1454,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     const id = `${blocked.id}-implement`;
     await tick(blocked.id);
     ended(id, 'needs-human');
-    await stage.runWith(b.e, sayRun(blocked.id, 'implement', 'Approve nothing; widen the scope instead.'));
+    await stage.runWith(b.e, sayRun(blocked.id, 'implement', 'Approve nothing; widen the scope instead.', { caller: PERSON }));
     await stage.runWith(b.e, retryRun(blocked.id, 'implement', { mode: 'continue' }, { stopBlocked: true }));
     await tick(blocked.id);
     assert.ok(b.stopped.includes(id));
@@ -1482,7 +1483,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
       return b.e.say(id, text);
     },
   };
-  const saying = (step: string, words = 'Widen the scope.') => stage.runWith(e, sayRun(run.id, step, words));
+  const saying = (step: string, words = 'Widen the scope.') => stage.runWith(e, sayRun(run.id, step, words, { caller: PERSON }));
   await t.test('by the engine, in its words: a task filed with no attempt started', () =>
     assert.rejects(saying('implement'), refusedAs('Conflict', taskId, 'has not started an attempt')),
   );

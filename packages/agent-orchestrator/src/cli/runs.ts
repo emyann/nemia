@@ -2,7 +2,8 @@
  * The runners of `nemia agents custom`, `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
  * runner of `nemia rm` (`RM`), which walks the many runs a command line names through the entry's handler, and of `nemia prune`, which
  * hands them to the package's many-run verbs (`judgingMany`, `freeingMany`) and prints what they answer; each asks a person's yes and
- * tallies what was not done into the exit code; and the runner of `nemia admit`, which reads the call on stdin.
+ * tallies what was not done into the exit code; the runner of `nemia admit`, which reads the call on stdin; and of `nemia say`, which
+ * reads who calls off the session's token.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,10 @@ import {
   runWith,
   type Place,
   sizeOf,
+  SAY,
+  sessionCaller,
+  SESSION_TOKEN,
+  Conflict,
   TABLE,
   type Args,
   type Listed,
@@ -309,4 +314,27 @@ export async function admitRun(env: Env, args: Args, e: Engine, place: Place): P
   const auto = typeof args.auto === 'string' ? args.auto : undefined;
   const answer = await runWith(e, placedIn(env, place, admitted(home, fs.readFileSync(0, 'utf8'), TABLE, floor, auto)));
   if (answer !== undefined) console.log(JSON.stringify(answer));
+}
+
+/**
+ * `nemia say`'s runner: who calls read off the session's token (`WF_SESSION_TOKEN`, `sessionCaller`), the person where none is set, and
+ * refused (`Conflict`) where the store never minted it or its try is no longer the step's live one, rather than taken as the person's;
+ * `--as <name>` is who the words say they are from. Handed to its entry's handler, and what it says printed.
+ */
+export async function sayRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const token = env[SESSION_TOKEN];
+  const caller = await runWith(e, placedIn(env, place, sessionCaller(token === undefined || token === '' ? undefined : token)));
+  if (caller.kind === 'refused')
+    throw new Conflict({
+      message: `nemia say refuses this session's token (${caller.reason}, ${SESSION_TOKEN}): ${caller.reason === 'unknown-token' ? 'no session the store filed was given it' : "the try it was minted for is no longer its step's live one"}. Run it from the session its run filed, or unset ${SESSION_TOKEN} to say it as yourself.`,
+    });
+  const asked = inputFor(SAY, {
+    runId: args.runId,
+    step: args.step,
+    text: args.text,
+    caller: caller.kind === 'agent' ? { kind: 'agent', agent: caller.agent, factory: caller.factory } : { kind: 'person' },
+    ...(typeof args.as === 'string' ? { from: { kind: 'agent', name: args.as } } : {}),
+  });
+  const data = await runWith(e, placedIn(env, place, SAY.handler(asked)));
+  for (const line of SAY.print(data, asked)) console.log(line);
 }

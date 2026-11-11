@@ -172,6 +172,12 @@ export type SpeakerRefused = { kind: 'Invalid' | 'Conflict'; message: string };
 /** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
 export const PERSON_FRAME = 'The person writes from the board: ';
 
+/** The words an agent's frame opens with, before its name (`framedFor`; read back by `saidBy`, say.ts). */
+export const AGENT_OPENS = 'The agent ';
+
+/** The words between an agent's name and its own in its frame (`framedFor`; read back by `saidBy`, say.ts). */
+export const AGENT_WRITES = ' writes, not the person: ';
+
 /** The longest name an agent speaks under. */
 export const SPEAKER_NAME_MAX = 64;
 
@@ -234,7 +240,7 @@ export const speakerRefusal: SpeakerRefusal = (speaker, via, allowed) => {
  * (`PERSON_FRAME`), an agent's under its name and never as the person's. Pure.
  */
 export const framedFor: FramedFor = (speaker, text) =>
-  speaker.kind === 'person' ? PERSON_FRAME + text : 'The agent ' + speaker.name + ' writes, not the person: ' + text;
+  speaker.kind === 'person' ? PERSON_FRAME + text : AGENT_OPENS + speaker.name + AGENT_WRITES + text;
 
 /** The person's `allowed` names with `name` allowed, listed once. Pure. */
 export const withSpeaker: WithSpeaker = (allowed, name) => (allowed.includes(name) ? [...allowed] : [...allowed, name]);

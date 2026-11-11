@@ -143,6 +143,15 @@
       }
     },
     {
+      "term": "Check failure policy",
+      "meaning": "a step's `checkFailurePolicy:`, read against Kubernetes' Job `podFailurePolicy`: rules read in order, each an action (`FailStep` or `Count`) and the exit codes of its check it holds of (`In` or `NotIn`). The first that holds decides; on `FailStep` the run files no `retries:` try and the step waits on a person.",
+      "type": "CheckFailurePolicy",
+      "see": {
+        "label": "Trying again",
+        "href": "/workflows/#trying-again"
+      }
+    },
+    {
       "term": "Closeout",
       "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it. `nemia closeout <run> <step> [--try n]` prints a try's, its latest by default, and the api serves the same on `GET /api/runs/:runId/steps/:step/tries/:try/closeout`.",
       "type": "Closeout",

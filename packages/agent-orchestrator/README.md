@@ -1126,6 +1126,15 @@ loop asks for a round that would file it again.
 Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
 the same on every Claude Code step — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
 
+**A factory sets a cost line per workflow.** `nemia factory cost-line set <factory> <workflow> <usd>` writes what a run of a workflow
+the factory offers may cost before its gate says so (`costLines` in the factory's own file, never a template's; `cost-line rm` takes it
+back, and a workflow with a line is not detached until it is). It is frozen on a run at its start (`Run.costLine`), so a line set later
+reaches the runs started after it. At each gate that sets budgets, the most the run may cost under its caps — what it has spent, each
+step at the larger of its cap and its cost — is read against the line (`pastTheLine`); past it, the gate says so beside the caps, in
+one sentence the board and `nemia decide` show as it is (`GateBudgets.line`), and no rule of auto approves that gate unasked
+(`withinBudget`). The line cuts nothing: a step's cap still ends its session, and a rule's `under` keeps its own amount of what the run
+has spent.
+
 **A resumed session is charged its own spend.** A try, a round or a gate's answer that continues a session is a new task filed with
 `resumeFrom` — a resumed job on the Agent SDK — and handed what is left of the cap. A resume's cap bounds its own spend, not its
 session's (M5), and it prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that

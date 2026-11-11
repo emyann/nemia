@@ -377,6 +377,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                claude.attribution among them; its value is JSON
   nemia factory setting rm <factory> <harness>.<key>
                                take a harness setting off a factory, by its key
+  nemia factory cost-line set <factory> <workflow> <usd>
+                               set what a run of a workflow may cost before its gate says so, in dollars:
+                               a gate whose caps pass it is said, and never approved unasked at auto
+  nemia factory cost-line rm <factory> <workflow>
+                               take a workflow's cost line off a factory
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear

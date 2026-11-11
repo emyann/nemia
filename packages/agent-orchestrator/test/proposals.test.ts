@@ -465,6 +465,10 @@ test("REFUSED at propose: another factory's session (Forbidden), the person's se
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [settings] }, PLACE)))._tag, 'Invalid');
   const level: ProposedObject = { ...settings, spec: { level: 'auto' } };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [level] }, PLACE)))._tag, 'Invalid');
+  const lined: ProposedObject = { ...settings, spec: { costLines: { build: 80 } } };
+  const costLines = await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [lined] }, PLACE));
+  assert.equal(costLines._tag, 'Invalid');
+  assert.ok(costLines.message?.includes('nemia factory cost-line'), costLines.message);
   const shapeless: ProposedObject = { ...object, spec: { steps: 'none' } };
   assert.equal((await refusalOf(proposeProgram(PERSON, 'refuse', { objects: [shapeless] }, PLACE)))._tag, 'Invalid');
   const moved: ProposedObject = { ...object, metadata: { ...object.metadata, resourceVersion: 'not-it' } };

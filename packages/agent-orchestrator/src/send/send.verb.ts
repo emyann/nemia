@@ -17,7 +17,7 @@ import { conditionOf } from '../route/index.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { found } from '../tick/told.verb.ts';
 import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 
 /** What a pass files of its due work: the steps ready (`Assessment.ready`) and the workflow nodes due their card (`Assessment.send`). */
 export type Due = { ready: readonly string[]; send: readonly string[] };

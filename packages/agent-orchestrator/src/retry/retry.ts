@@ -43,8 +43,8 @@ import {
   type SpendOf,
 } from '../status/status.ts';
 import { budgetWord, dollars } from '../money/money.ts';
-import type { Verdict } from '../check/check.ts';
-import { checkFailureAction } from '../check/check-policy.ts';
+import type { Verdict } from '../check/index.ts';
+import { checkFailureAction } from '../check/index.ts';
 import { retriesSpent, signoffDue, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';

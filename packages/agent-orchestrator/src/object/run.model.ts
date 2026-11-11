@@ -30,7 +30,7 @@ import {
   WAIT_ON,
 } from 'objects';
 import type * as Phase from '../phase/phase.ts';
-import type * as Check from '../check/check.ts';
+import type * as Check from '../check/index.ts';
 import type * as Records from '../record/record.ts';
 import type * as Retry from '../retry/index.ts';
 import type * as Revisions from '../revisions/revisions.ts';

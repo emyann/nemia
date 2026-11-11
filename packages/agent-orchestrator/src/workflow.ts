@@ -162,8 +162,8 @@ export type {
 export { renderSkill, skillDraftOf, skillEntryOf, withPreload } from './skills/skills.ts';
 export type { AgentSkill, SkillDraft } from './skills/skills.ts';
 /** A step's `checkFailurePolicy:` as its line writes it, and its types (`check/check-policy.ts`). */
-export { checkFailurePolicyLine } from './check/check-policy.ts';
-export type { CheckFailurePolicy } from './check/check-policy.ts';
+export { checkFailurePolicyLine } from './check/index.ts';
+export type { CheckFailurePolicy } from './check/index.ts';
 /** Which definition a namespace serves of a name, and where a write of one goes (`definition/served.ts`). */
 export {
   definitionServed,

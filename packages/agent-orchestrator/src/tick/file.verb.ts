@@ -18,7 +18,7 @@ import {
   REFUSAL_LINES,
   type CheckHanded,
   type LandingSaid,
-} from '../check/check.ts';
+} from '../check/index.ts';
 import { isRemoteHarness, type StepSpec } from '../workflow.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';

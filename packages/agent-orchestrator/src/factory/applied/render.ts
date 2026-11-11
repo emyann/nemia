@@ -19,7 +19,7 @@ import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../temp
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
 import { interpolated, substitute, type Params } from './params.ts';
-import { checkFailurePolicyOf } from '../../check/check-policy.ts';
+import { checkFailurePolicyOf } from '../../check/index.ts';
 
 /**
  * A checked template as the store hands it in: its folder as read, the text of one of its files by its path, and the lines of a file of

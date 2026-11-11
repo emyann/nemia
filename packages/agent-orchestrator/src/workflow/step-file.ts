@@ -19,7 +19,7 @@ import {
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { routeWritten, routingOf } from '../route/index.ts';
-import { checkFailurePolicyLine, checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/check-policy.ts';
+import { checkFailurePolicyLine, checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   budgetOf,

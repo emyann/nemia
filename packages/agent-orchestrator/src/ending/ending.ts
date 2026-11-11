@@ -2,7 +2,7 @@
  * A run's ending step: when its merge lands on its check (`landingDue`, `landingOpen`), what landed (`landedWords`), the one checkout
  * it holds (`checkoutLine`), and what is left for a person to decide (`toDecide`, `gateRefusal`). Pure: the tick merges and commits.
  */
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import type { MergeState } from '../place/place.ts';
 import type { StepSpec } from '../step/step.ts';
 import { sandboxed, terminalSteps } from '../workflow/index.ts';

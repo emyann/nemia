@@ -4,7 +4,7 @@
  */
 import type { StepSpec } from '../step/step.ts';
 import { isRepositoryRun, refusedCheck, tryOf, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import type { Verdict } from '../check/check.ts';
+import type { Verdict } from '../check/index.ts';
 import {
   budgetOf,
   waitsOnCheckout,

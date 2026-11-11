@@ -11,7 +11,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { lastLines } from '../check/check.ts';
+import { lastLines } from '../check/index.ts';
 import {
   cutName,
   depsPlan,

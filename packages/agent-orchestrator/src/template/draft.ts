@@ -15,7 +15,7 @@ import { FACTORY_RULES_FILE } from '../factory/rules/rules.ts';
 import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { TEMPLATE_LAYOUT_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step, type TemplateRoute } from './layout.ts';
-import { checkFailurePolicyOf } from '../check/check-policy.ts';
+import { checkFailurePolicyOf } from '../check/index.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };

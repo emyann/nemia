@@ -10,7 +10,7 @@ import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import type { TemplateParameterType } from 'objects';
 import type { InLayout } from '../../contracts/template-layout.contract.ts';
-import { checkFailurePolicyOf, type CheckFailurePolicy } from '../check/check-policy.ts';
+import { checkFailurePolicyOf, type CheckFailurePolicy } from '../check/index.ts';
 
 /** The version of the template layout, the schema every document of a template is written in: no `apiVersion` objects serve. */
 export const TEMPLATE_LAYOUT_VERSION = 'nemia.dev/v1alpha1';

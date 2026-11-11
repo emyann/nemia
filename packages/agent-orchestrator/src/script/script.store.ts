@@ -4,7 +4,7 @@
  * `{ unsure, evidence? }`, before `scriptRoute` reads it. Fields it does not name are ignored.
  */
 import { Result, Schema } from 'effect';
-import { attemptVerdict } from '../check/check.ts';
+import { attemptVerdict } from '../check/index.ts';
 import { summaryLine, type Closeout } from '../closeout/index.ts';
 import { stepTaskId, tryOf, type Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';

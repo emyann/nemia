@@ -299,7 +299,7 @@ const StepArtifact = Schema.Union([
  * The budgets a gated step proposes for the steps after it, or the caps its approval set (`GateBudgets`, tries.verb.ts): per step, the
  * amount and its words, why the step proposed it (null where it did not say, or the person gave it), the step's own `budget:` (null
  * where it has none) and whether the amount is above it; then the run's line in a person's words, what it has spent and the most it may
- * cost under these caps.
+ * cost under these caps; and, where that most passes the cost line the run froze from its factory, the line and its sentence.
  */
 const GateBudgets = Schema.Struct({
   from: Schema.Literals(GATE_BUDGETS_FROM),
@@ -314,6 +314,7 @@ const GateBudgets = Schema.Struct({
     }),
   ),
   said: Schema.String,
+  line: Schema.optionalKey(Schema.Struct({ usd: Schema.Finite, said: Schema.String })),
 });
 
 /**

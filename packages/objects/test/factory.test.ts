@@ -22,6 +22,7 @@ const templated = {
     revisions: 'follow',
     template: { source: 'sdlc', version: '1.2.0', params: { repo: '/repo', strict: true, cap: 3 } },
     level: 'semi-auto',
+    costLines: { build: 80 },
   },
   status: {
     observedGeneration: 3,
@@ -81,6 +82,14 @@ test("the factory's sub-resources as the Api's endpoints answer them and take th
   assert.notDeepEqual(answered('factories', 'rules', instruction), instruction, "the rules keep none of the instruction's own keys");
   assert.equal(answered('factories', 'instruction', rules), undefined);
   assert.equal(taken('factories', 'putRules', {}), undefined);
+});
+
+test("a cost line's write takes its dollars and answers the factory; REFUSED: a write without them, or with them as words", () => {
+  assert.deepEqual(taken('factories', 'putCostLine', { usd: 80 }), { usd: 80 });
+  assert.equal(taken('factories', 'putCostLine', {}), undefined);
+  assert.equal(taken('factories', 'putCostLine', { usd: '80' }), undefined);
+  assert.deepEqual(answered('factories', 'putCostLine', templated), templated);
+  assert.deepEqual(answered('factories', 'deleteCostLine', bare), bare);
 });
 
 test("the Api's commands answer the old route's lines, with unschedule by workflow and volume rm by volume name", () => {

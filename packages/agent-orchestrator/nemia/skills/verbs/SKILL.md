@@ -23,7 +23,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
                                run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
                                their labels on each line
-                               CLI only: the command line's listing: the api's list of the Card (`GET /api/cards`, `objects`' Api) is the package's `cardList`, never this handler, and prints its rows as a Table (`cardTable`)
+                               on the port: inbox
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its

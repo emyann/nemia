@@ -8,7 +8,6 @@ import { TABLE } from './commands.verb.ts';
 
 /** Each entry of the command line's alone that no endpoint serves, in the table's order. */
 const LEFT_OUT = [
-  'inbox',
   'inbox from',
   'factory ls',
   'factory add',

@@ -21,7 +21,7 @@ import { AgentCard, Role } from '@a2a-js/sdk';
 import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
 import { REQUEST_MS, SEND_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
-import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
+import { LOG_MESSAGES, LOGS_CHARS, LOGS_CUT, RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import {
   apiKey,
   bearer,
@@ -599,8 +599,16 @@ const BINDINGS: Binding[][] = [['JSONRPC'], ['HTTP+JSON'], ['JSONRPC', 'HTTP+JSO
 const pathOf = (b: Binding) => (b === 'JSONRPC' ? 'jsonrpc' : 'rest');
 
 /** The brief of each task the story files, and what the agent does with its first message; a held-open conversation's answers too. */
-const BRIEF = { works: 'paint the fence', asks: 'paint it a colour', fails: 'paint with no paint', words: 'say it in words' } as const;
-const HOLD = { reply: 'answer in a message', open: 'hold the conversation open', answer: 'once more' } as const;
+const BRIEF = {
+  works: 'paint the fence',
+  asks: 'paint it a colour',
+  fails: 'paint with no paint',
+  words: 'say it in words',
+  floods: 'say it all at once',
+} as const;
+const HOLD = { reply: 'answer in a message', floods: 'answer in a long message', open: 'hold the conversation open', answer: 'once more' } as const;
+/** What an agent that floods its logs says: 100,000 characters, in one artifact or one reply. */
+const FLOOD = 'x'.repeat(100_000);
 const scriptOf = (t: Turn): Step[] => {
   if (t.turn === 2) return [{ data: { colour: t.text }, state: 'completed' }];
   switch (t.text) {
@@ -610,6 +618,10 @@ const scriptOf = (t: Turn): Step[] => {
       return [{ state: 'failed', words: 'the paint ran out' }];
     case BRIEF.words:
       return [{ text: 'done, in words', state: 'completed' }];
+    case BRIEF.floods:
+      return [{ text: FLOOD, state: 'completed' }];
+    case HOLD.floods:
+      return [{ reply: FLOOD, data: { answer: 42 } }];
     case HOLD.reply:
       return [{ reply: 'here you are', data: { answer: 42 } }];
     case HOLD.open:
@@ -718,6 +730,27 @@ for (const bindings of BINDINGS) {
       assert.match(await Effect.runPromise(e.logs(id)), /agent: here you are/);
       assert.equal(calls(s, 'getTask') - gets, 0, 'no Task to ask about');
       everyCallOnFirstBinding();
+    });
+
+    await c.test("an agent that floods its logs: they are bounded, say they were cut, and end on the Task's state", async () => {
+      const id = await Effect.runPromise(e.file(task({ brief: BRIEF.floods })));
+      const done = await settled(e, id);
+      const gets = s.gets.length;
+      const logs = await Effect.runPromise(e.logs(id));
+      assert.ok(logs.length <= LOGS_CHARS, `${logs.length} characters`);
+      assert.ok(logs.startsWith(`${LOGS_CUT}\n`));
+      assert.match(logs, /\nCOMPLETED$/);
+      assert.deepEqual(
+        s.gets.slice(gets).map((g) => g.historyLength),
+        [LOG_MESSAGES],
+        'the logs asked for the latest messages alone',
+      );
+      const reply = await Effect.runPromise(e.file(task({ brief: HOLD.floods })));
+      await settled(e, reply);
+      const said = await Effect.runPromise(e.logs(reply));
+      assert.ok(said.length <= LOGS_CHARS, `${said.length} characters`);
+      assert.ok(said.startsWith(`${LOGS_CUT}\n`));
+      assert.equal(done.state.settled, 'succeeded');
     });
 
     await c.test('a task held open: its answer is a new Task in the same context, as A2A continues a conversation', async () => {

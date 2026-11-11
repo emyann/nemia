@@ -375,6 +375,31 @@ test("a cap proposed above a step's own budget is said at the gate and when appr
   });
 });
 
+test("a gate whose caps pass the run's cost line says so in `nemia decide`; one whose caps stay under it says nothing of it", async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  const atTheGate = async (costLine: number) => {
+    const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: budgeted(), isolate: false }));
+    const file = path.join(ROOT, 'runs', `${run.id}.json`);
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), costLine }));
+    await tick(b.e, run.id);
+    b.settle(`${run.id}-plan`, 'succeeded', proposing(['implement', 60]));
+    await tick(b.e, run.id);
+    return printedBy(['decide', run.id], b.e);
+  };
+  await s.test('implement $60 proposed, at most $82.00 in all, and a line of $80: the gate says the most passes it', async () => {
+    const printed = await atTheGate(80);
+    assert.ok(
+      printed.some((l) => l.includes('$82.00') && l.includes('cost line of $80.00')),
+      printed.join('\n'),
+    );
+  });
+  await s.test('a line of $90: nothing said of it', async () => {
+    const printed = await atTheGate(90);
+    assert.ok(!printed.some((l) => l.includes('cost line')), printed.join('\n'));
+  });
+});
+
 test('a send-back from a gate spends the approval given before it', async (t) => {
   const s = story(t);
   let gate: Awaited<ReturnType<typeof atItsGate>>;

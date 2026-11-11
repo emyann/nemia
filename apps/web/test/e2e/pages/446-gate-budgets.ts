@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator } from 'playwright';
+import type { Locator, Page } from 'playwright';
 import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { budgetWord } from '../../../src/lib/money.ts';
+import { budgetWord, dollars } from '../../../src/lib/money.ts';
 import { BUDGETING, writeBudgeting } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -15,6 +15,19 @@ const approving = (r: { request: () => { method: () => string }; url: () => stri
 /** The JSON of the approval file `file`, or nothing where it is not there. */
 const approvalIn = (file: string): { budgets?: Record<string, number> } =>
   fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+
+/**
+ * The run whose caps' bound stays under the cost line it was started under: its gate draws its budgets and the run's line, and says
+ * nothing of the cost line.
+ */
+async function expectUnderTheLine(page: Page): Promise<void> {
+  const { underId, gated } = BUDGETING;
+  await page.goto(new URL(`/runs/${underId}`, page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+  const proposed = page.locator(`section[aria-label="The gate of ${gated}"] section[data-gate-budgets="proposed"]`);
+  await expectVisible(proposed.locator('[data-said]'), `under its line of $${BUDGETING.line.under}, ${gated}'s gate draws the run's line`);
+  await expectCount(proposed.locator('[data-past-line]'), 0, 'and says nothing of a cost line its caps do not pass');
+}
 
 /** The rows of `budgets`, the one above its step's own budget saying so and the other not. */
 async function expectRows(budgets: Locator, usd: { above: string; under: string }, when: string): Promise<void> {
@@ -41,17 +54,22 @@ export default {
    * A gate whose step proposes the budgets of the steps after it as data: drawn beside Approve, a row a step — its amount in a field, its
    * own budget, `above the workflow's $40` where it is above it, why — and the run's line. Review's amount changed from $8 to $6,
    * Approve sends that change alone (`budgets: [{ step: 'review', usd: 6 }]`); the api writes the caps into the approval, and the step,
-   * read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. Taken back, and
-   * the run with it.
+   * read again, shows the caps its approval set (`gate.budgets.from === 'approved'`), implement's $60 still said above. The run was
+   * started under a cost line of $20, which the most it may cost under the proposal passes: under the run's line, the gate says so in
+   * the api's words; a second run, under a line of $500, says nothing of it. Taken back, and the runs with it.
    */
   name: 'gate-budgets',
   route: '/runs',
   expect: async (page) => {
     await sidebar(page);
-    const written = writeBudgeting(store!);
-    const { id, gated, above, under } = BUDGETING;
+    const written = [
+      ...writeBudgeting(store!, { costLine: BUDGETING.line.past }),
+      ...writeBudgeting(store!, { id: BUDGETING.underId, costLine: BUDGETING.line.under }),
+    ];
+    const { id, gated, above, under, underId, line } = BUDGETING;
     const asks = path.join(store!, 'runs', `${id}.asks`);
     try {
+      await expectUnderTheLine(page);
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const theme = await themeOf(page);
@@ -59,6 +77,15 @@ export default {
       const proposed = gate.locator('section[data-gate-budgets="proposed"]');
       await expectVisible(proposed, `${gated}'s gate draws the budgets it proposes`);
       await expectRows(proposed, { above: `$${above.usd}`, under: `$${under.usd}` }, 'proposed');
+      const past = proposed.locator('[data-said] + [data-past-line]');
+      await expectVisible(
+        past,
+        `the most the run may cost under the proposal passes the cost line of $${line.past} it was started under, said under the run's line`,
+      );
+      const said = (await past.textContent()) ?? '';
+      for (const named of [dollars(line.past), BUDGETING.factory, BUDGETING.workflow])
+        if (!said.includes(named))
+          throw new Refused(`the gate's sentence names the line, its factory and its workflow: ${named} — it says ${JSON.stringify(said)}`);
       const field = (step: string) => proposed.getByRole('spinbutton', { name: `The budget of ${step}, in dollars` });
       for (const one of [above, under])
         if ((await field(one.step).inputValue()) !== String(one.usd))
@@ -97,7 +124,9 @@ export default {
       await idle(page);
       for (const file of written) fs.rmSync(file, { recursive: true, force: true });
       fed(id, 'removed');
+      fed(underId, 'removed');
     }
     await expectCount(page.locator(`a[href="/runs/${id}"]`), 0, 'taken back and said on the feed: the run is gone from the list');
+    await expectCount(page.locator(`a[href="/runs/${underId}"]`), 0, 'and the run under its line with it');
   },
 } satisfies PageSpec;

@@ -12,6 +12,7 @@ import { capabilitiesQuery, type Capabilities } from '../src/lib/api/capabilitie
 import { ceilingsQuery, type Ceilings } from '../src/lib/api/ceilings.ts';
 import { HEADER_MASK } from 'objects';
 import {
+  clearCostLine,
   clearRules,
   factoriesQuery,
   factoryRulesQuery,
@@ -20,6 +21,7 @@ import {
   fireAgent,
   hireAgent,
   recordServer,
+  setCostLine,
   writeRules,
   type Factory,
   type FactoryRules,
@@ -178,11 +180,17 @@ const millView: Factory = {
   template: null,
   untrusted: [],
   volumes: [{ path: '/home/me/notes', readOnly: true, commands: { rm: 'nemia factory volume rm mill notes' } }],
+  costLines: {},
 };
 
 test("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", async (t) => {
   await t.test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
     assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands(), [scheduleObject()]), millView);
+    assert.deepEqual(
+      factoryViewOf(factoryObject({ spec: { costLines: { build: 80 } } }), factoryCommands()).costLines,
+      { build: 80 },
+      'the cost line it sets per workflow is carried on the view',
+    );
     const templated = factoryObject({
       spec: { template: { source: 'sdlc', version: '1.0.0', params: {} }, workflows: undefined },
       status: {
@@ -278,6 +286,15 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
       { method: 'GET', url: '/api/factories/the%20mill/rules', body: undefined },
       { method: 'PUT', url: '/api/factories/the%20mill/rules', body: { words: 'Never push.' } },
       { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: undefined },
+    ]);
+  });
+  await t.test("a cost line is set and cleared at its workflow's route under the factory, and read back as the Factory", async (t) => {
+    const sent = serving(t, () => factoryObject({ spec: { costLines: { build: 80 } } }));
+    assert.deepEqual((await setCostLine('the mill', 'build', 80)).spec.costLines, { build: 80 });
+    await clearCostLine('the mill', 'build');
+    assert.deepEqual(sent, [
+      { method: 'PUT', url: '/api/factories/the%20mill/costlines/build', body: { usd: 80 } },
+      { method: 'DELETE', url: '/api/factories/the%20mill/costlines/build', body: undefined },
     ]);
   });
   await t.test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {

@@ -58,8 +58,9 @@ export function GateBudgetFields({
 /**
  * The budgets of a gate: per later step, its amount (a field holding it while it is the step's proposal and `onAmounts` is given), the
  * step's own `budget:`, the words `above the workflow's $X` where the amount is above it, and why the step proposed it; then the run's
- * line, what it has spent and the most it may cost under these caps, as the api says it. Approved, the caps the approval set, each read
- * only (`Approved`).
+ * line, what it has spent and the most it may cost under these caps, as the api says it, and, where that most passes the cost line its
+ * factory set for the run, the api's sentence saying so, drawn as what a person weighs (`data-past-line`). Approved, the caps the
+ * approval set, each read only (`Approved`).
  */
 export function GateBudgetRows({
   step,
@@ -100,6 +101,11 @@ export function GateBudgetRows({
       <p data-said className="break-words border-t border-outline-variant pt-2 text-body-small">
         {budgets.said}
       </p>
+      {budgets.line && (
+        <p data-past-line className="break-words text-body-small font-medium text-yours">
+          {budgets.line.said}
+        </p>
+      )}
     </section>
   );
 }

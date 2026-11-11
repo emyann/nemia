@@ -171,7 +171,6 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
   const base = world.head(repo);
   const branch = `wf/${id}/implement`;
   world.branch(repo, branch, { 'a.txt': 'the work\n' });
-  /** Its work done on a branch, and an ending gated on a person that would merge it: what the object's `toDecide` names. */
   const ending = { name: 'land', after: ['implement'], body: 'Land it.', harness: 'claude', workspace: 'base' };
   const run = {
     ...record(id, ['land']),
@@ -193,7 +192,6 @@ test('F6: the decision and the run object read one judgement: a run awaiting its
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as RunDecision;
   };
-  /** Whether the decision and the run object each say something is left to decide: the object by its `toDecide`, read now. */
   const saidBoth = async (): Promise<{ decision: boolean; object: boolean }> => {
     const answer = await decision();
     const { status } = await object(id);

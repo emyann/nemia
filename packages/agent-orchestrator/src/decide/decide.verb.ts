@@ -42,6 +42,7 @@ import { collisionsAt } from '../collide/collisions.verb.ts';
 import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { stepsReading, type StepsReading } from '../object/read.verb.ts';
+import { seenBy } from '../summary/reads.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
@@ -257,7 +258,7 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
-  const e = viewedOnce(at.e);
+  const e = viewedOnce(seenBy(at.e, views));
   const { phaseOf, signedOff: reader, asked, verdictOf, asks, roundAsks: rounds, checkout } = judged.read;
   const steps = [...at.steps];
   const { decision: d, assessed, spendOf } = judged;

@@ -322,7 +322,7 @@ const board = () => {
       };
     },
     /** Each of `ids` the board has filed, viewed as `view` views it, as the engine's `list` answers: the judgement reads the run through it. */
-    async list(ids: string[]) {
+    async list(this: { view: (id: string) => Promise<unknown> }, ids: string[]) {
       return { views: await Promise.all(ids.filter((id) => tasks.has(id)).map((id) => this.view(id))), unreadable: [] };
     },
     file: async (spec: Filed) => {

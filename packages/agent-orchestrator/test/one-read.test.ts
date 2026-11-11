@@ -173,7 +173,9 @@ const readers = async (id: string, { pass: passFirst = true } = {}): Promise<Rec
     Effect.flatMap(standingSnapshot(), (standing) => list(e, theRun(id), undefined, standing)),
   );
   const decided = await stage.runWith(e, decideRun(id));
-  const { decision: read } = await stage.runWith(e, decisionRead(id));
+  const decisionOf = await stage.runWith(e, decisionRead(id));
+  assert.ok('decision' in decisionOf, `${id} is judged`);
+  const read = decisionOf.decision;
   const object = await stage.runWith(e, Effect.provideService(runObject(theRun(id), { memo: { said: new Map() } }), StoreRoot, ROOT));
   const pruned = await stage.runWith(e, judging(id));
   const said: Record<string, Said> = {
@@ -479,7 +481,9 @@ test('F7: a cold decision of a finished run judges it once', async () => {
       return span;
     },
   });
-  const { decision: read } = await stage.runWith(e, Effect.withTracer(decisionRead(id), tracer));
+  const answer = await stage.runWith(e, Effect.withTracer(decisionRead(id), tracer));
+  assert.ok('decision' in answer, 'the run is judged');
+  const read = answer.decision;
   assert.ok('standings' in read, 'the run awaits a decision on its branch');
   assert.equal(spans.filter((span) => span.name === 'judge').length, 1, 'one judgement makes the whole decision');
 });

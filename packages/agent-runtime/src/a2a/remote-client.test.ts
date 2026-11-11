@@ -21,14 +21,20 @@ const cardAsking = (name: string): AgentCard =>
 /** Each row: what was shown, and the most characters it may be. */
 const ROWS: Array<{ name: string; got: () => string; most: number }> = [
   {
-    name: "an address whose path a card served at 10,000 characters is shown with that path quoted, and never its query",
+    name: 'an address whose path a card served at 10,000 characters is shown with that path quoted, and never its query',
     got: () => shownUrl(`https://a.example/${flood}?key=secret`),
     most: 'https://a.example'.length + WORDS_QUOTE + 1,
   },
   {
     name: "a missing secret for a scheme a card named at 10,000 characters is refused in the caller's fix, quoted",
     got: () => {
-      const auth = authOf(cardAsking(flood), 'https://a.example', 'remote', () => undefined, (scheme) => `set ${scheme} and retry`);
+      const auth = authOf(
+        cardAsking(flood),
+        'https://a.example',
+        'remote',
+        () => undefined,
+        (scheme) => `set ${scheme} and retry`,
+      );
       return 'refusal' in auth ? auth.refusal : '';
     },
     most: 2 * MISSING_QUOTE,

@@ -28,7 +28,8 @@ const endOfSpec = spec<(text: string, max: number, said: string, cut: boolean) =
     },
     addsNothing: {
       description: 'What follows the line that says a cut is an end of the words, as they were said',
-      condition: ({ input: [text, max, said, cut], output }) => (isCut(text, max, cut) ? text.endsWith(output.slice(said.length + 1)) : true),
+      condition: ({ input: [text, max, said, cut], output }) =>
+        isCut(text, max, cut) ? text.endsWith(output.slice(said.length + 1)) : true,
     },
     keepsAsMuchAsFits: {
       description: 'Words cut keep as much of their end as fits under that line, all of them where they are shorter',

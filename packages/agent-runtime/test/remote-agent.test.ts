@@ -606,7 +606,12 @@ const BRIEF = {
   words: 'say it in words',
   floods: 'say it all at once',
 } as const;
-const HOLD = { reply: 'answer in a message', floods: 'answer in a long message', open: 'hold the conversation open', answer: 'once more' } as const;
+const HOLD = {
+  reply: 'answer in a message',
+  floods: 'answer in a long message',
+  open: 'hold the conversation open',
+  answer: 'once more',
+} as const;
 /** What an agent that floods its logs says: 100,000 characters, in one artifact or one reply. */
 const FLOOD = 'x'.repeat(100_000);
 const scriptOf = (t: Turn): Step[] => {

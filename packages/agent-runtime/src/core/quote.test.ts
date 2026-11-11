@@ -1,7 +1,7 @@
 /**
  * The bounded quote (`core/quote.ts`): a text over its bound is cut there and marked, one within it comes back whole, and a list
- * past its count names how many more it held; a log's end is kept within its bound under a line that says it was cut. What each caller quotes through it, bounded end to end, is
- * `test/remote-quotes.test.ts`'s.
+ * past its count names how many more it held; a log's end is kept within its bound under a line that says it was cut. What each
+ * caller quotes through it, bounded end to end, is `test/remote-quotes.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

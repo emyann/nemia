@@ -110,11 +110,13 @@ const HOLDER = 'an A2A 1.0 card holds';
 
 const hasKey = (value: unknown, key: string): boolean => typeof value === 'object' && value !== null && Object.hasOwn(value, key);
 
-/** The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write. */
+/**
+ * The first thing wrong with `json` as a card, in words: its dotted path, and what is there; a key in snake_case by the one to write.
+ * Each key of the path is quoted, since a served card is another party's, which may name a key of any length.
+ */
 const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
   const { path, words } = firstRefusal(json, error, HOLDER);
   const keys = path.map(String);
-  /** The path as a refusal says it: each key quoted, since a served card is another party's, which may name a key of any length. */
   const shown = keys.map((k) => quote(k));
   const last = keys.at(-1);
   if (last === undefined) return `it ${words}`;

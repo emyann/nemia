@@ -182,18 +182,23 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
     });
     const flood = 'x'.repeat(100_000);
     const done = TaskState.TASK_STATE_COMPLETED;
-    /** Each row: the Task, the messages asked for, whether its logs are cut, and the line they end on. */
     const ROWS: Array<{ name: string; task: Task; asked?: number; cut: boolean; last: string }> = [
       { name: 'a 100,000-character artifact', task: taskIn(done, [artifact(text(flood))]), cut: true, last: 'COMPLETED' },
       {
         name: 'a 100,000-character status',
-        task: { ...taskIn(TaskState.TASK_STATE_FAILED), status: { state: TaskState.TASK_STATE_FAILED, timestamp: undefined, message: message(Role.ROLE_AGENT, flood) } },
+        task: {
+          ...taskIn(TaskState.TASK_STATE_FAILED),
+          status: { state: TaskState.TASK_STATE_FAILED, timestamp: undefined, message: message(Role.ROLE_AGENT, flood) },
+        },
         cut: true,
         last: `FAILED — ${'x'.repeat(LOG_PART_CHARS)}…`,
       },
       {
         name: 'five artifacts of a part each',
-        task: taskIn(done, Array.from({ length: 5 }, () => artifact(text('y'.repeat(LOG_PART_CHARS))))),
+        task: taskIn(
+          done,
+          Array.from({ length: 5 }, () => artifact(text('y'.repeat(LOG_PART_CHARS)))),
+        ),
         cut: true,
         last: 'COMPLETED',
       },

@@ -299,11 +299,12 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
     },
   );
   await s.test(
-    'a signs off: it has landed, and b and c file their roots from the base as it stands now, with what a committed',
+    'a signs off: it has landed, once a pass has read where it stands, and b and c file their roots from the base as it stands now, with what a committed',
     async () => {
       const startedOn = record('b').baseRef;
       const tip = world().head(repo);
       board().settle(`${ids.a}-review`, 'succeeded', { ...SIGNED, summary: 'A-SUMMARY: the flag is parsed first', findings: FOUND });
+      await aPass();
       assert.deepEqual(await decided(ids.a), { kind: 'landed', branches: [lines.a.branch] });
       for (const card of ['b', 'c']) {
         const r = await tick(ids[card]);
@@ -341,7 +342,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
     },
   );
   await s.test(
-    'b finishes, is merged and its branch deleted while c still runs: b lands by the tip its own pass recorded, and d waits on c alone',
+    'b finishes, is merged and its branch deleted while c still runs: b lands by the tip its own pass recorded, as its `nemia decide` says once a pass reads the hand merge, and d waits on c alone',
     async () => {
       committed('b', 'b.txt');
       board().settle(`${ids.b}-implement`, 'succeeded', SIGNED);
@@ -352,6 +353,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
       mergedByHand(repo, lines.b.branch, 'Merge b');
       droppedByHand(repo, lines.b.wt, lines.b.branch);
       assert.deepEqual(await parentNow(ids.b), { record: record('b'), landed: true }, 'the merge stays, the branch goes');
+      await aPass();
       assert.deepEqual(await decided(ids.b), { kind: 'landed', branches: [lines.b.branch] }, 'and its own `nemia decide` says so');
       assert.equal((await tick(ids.b)).run.tips?.[lines.b.branch], tip, 'a branch git no longer has keeps the tip last seen');
       const filings = [...board().filings];
@@ -463,7 +465,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
     },
   );
   await s.test(
-    'a parent whose step signs off with nothing to commit has landed, as its own `nemia decide` says, and its child files',
+    'a parent whose step signs off with nothing to commit has landed, as its own `nemia decide` says once a pass has read where it stands, and its child files',
     async () => {
       const p = await aParent(repo);
       const child = await started({ brief: 'the child of a change already made', repo, workflowDir: twoSteps(), after: [p.run.id] });
@@ -471,6 +473,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       assert.equal((await decided(p.run.id)).kind, 'running');
       board().settle(`${p.run.id}-implement`, 'succeeded', SIGNED);
       assert.equal(ahead(repo, p.run.baseRef, p.branch), 0);
+      await aPass();
       assert.deepEqual(await decided(p.run.id), { kind: 'landed', branches: [p.branch] });
       assert.equal((await parentNow(p.run.id)).landed, true, 'the gate says what its `nemia decide` says');
       const r = await tick(child.id);
@@ -478,7 +481,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
     },
   );
   await s.test(
-    'failed parents whose work a person merged have landed, whatever the step said, and their child files — handed why their closeouts cannot be',
+    'failed parents whose work a person merged have landed, once a pass reads the hand merge, whatever the step said, and their child files — handed why their closeouts cannot be',
     async () => {
       const lost = await aParent(repo, { work: 'lost.txt', signed: false });
       board().settle(`${lost.run.id}-implement`, 'failed');
@@ -488,6 +491,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       assert.equal(before.kind === 'awaiting' && before.outcome, 'failed', 'not merged yet: decided');
       for (const parent of [lost, garbled]) {
         mergedByHand(repo, parent.branch);
+        await aPass();
         assert.deepEqual(await decided(parent.run.id), { kind: 'landed', branches: [parent.branch] });
       }
       const child = await started({

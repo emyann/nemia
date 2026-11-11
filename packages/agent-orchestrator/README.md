@@ -2499,7 +2499,10 @@ dropped. **Nothing in the packages knows what shipping means.**
   (approving that one accepts what it did) — or, where no step of the workflow merges, when every step
   finished and a result branch is ahead of the base branch and not gone. Level-triggered: the branches are
   read off git on the pass that asks and nothing is stored, so a run whose branch a person merged by hand
-  stops being one to decide without anybody telling the run. That holds at an ending's gate too: an ending
+  stops being one to decide without anybody telling the run. Every reader of a run — `wf decide`, the api's
+  decision, the run object, `wf ls` and the board — reads where its branches stand off the tick's last pass
+  (`standing.json`), one judgement for all: a hand merge shows on each after the next pass, and before any
+  pass a branch reads unread. That holds at an ending's gate too: an ending
   that has not run, whose result git already has on the base branch, has nothing left to merge — nothing is to
   decide, the run reads as landed (below), its line on `wf ls` and `wf decide`'s screen say where the branch
   stands and name `wf cancel <run>` to close the record, `wf rm` forgets it, and `wf approve <run> ship` is

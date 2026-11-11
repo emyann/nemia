@@ -21,7 +21,8 @@ import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { advanceRun, approveRun, decideRun, startRun, runWith as runEngine } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { runRecord } from '../src/record/record.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-stand-in-run-');
@@ -53,7 +54,7 @@ const folder = (): string => {
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\n';
 
-test('a run from start to landed on the test place: the merge committed after the base and the result, and no git process started', async () => {
+test('a run from start to landed on the test place: the merge committed after the base and the result, read landed once a pass has read where it stands, and no git process started', async () => {
   const { world } = stand();
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const base = world.repository(repo, { 'add.ts': 'export const add = (a, b) => a + b;\n' });
@@ -89,6 +90,7 @@ test('a run from start to landed on the test place: the merge committed after th
   );
   assert.deepEqual(runRecord(ROOT, run.id).steps.ship.landed, { commit: head });
   assert.equal(landed.status, 'succeeded');
+  await runPlaced(passStanding(listRuns(ROOT)));
   assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'landed');
   assert.deepEqual(PLANTED.said(), [], 'no git was asked anything');
 });

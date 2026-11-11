@@ -17,7 +17,8 @@ import { scratch } from 'test-kit/scratch';
 import { main } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { advanceRun, runWith as runEngine } from '../src/runner.ts';
-import { runRecord } from '../src/record/record.store.ts';
+import { listRuns, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
 import { LINE_NAME } from '../src/run.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -41,6 +42,9 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 /** One pass over the run `id`, on this test's engine and place. */
 const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(runRecord(ROOT, id)));
 
+/** A pass of the tick's over every run of the store, on this test's engine and place: where their branches stand, written down. */
+const aPass = () => runWith(engineOf(engine().layer), passStanding(listRuns(ROOT)));
+
 /** `nemia`, typed with `argv` and handed this test's engine and place: the lines it printed. */
 async function typed(t: TestContext, ...argv: string[]): Promise<string[]> {
   const printed: string[] = [];
@@ -62,7 +66,7 @@ function oneStep(): string {
   return dir;
 }
 
-test('a run started, read and removed through `main` is answered by the place `main` was handed, on a repository git never made', async (t) => {
+test('a run started, read once a pass has read where its branch stands, and removed through `main` is answered by the place `main` was handed, on a repository git never made', async (t) => {
   const { world } = stand();
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const base = world.repository(repo, { 'a.txt': 'one\n' });
@@ -79,6 +83,7 @@ test('a run started, read and removed through `main` is answered by the place `m
   fs.writeFileSync(path.join(workspace, 'flag.ts'), 'export const flag = true;\n');
   engine().settle(`${id}-implement`, 'failed', {});
   await advanced(id);
+  await aPass();
   const decided = (await typed(t, 'decide', id)).join('\n').split('\n');
   assert.match(decided[0], new RegExp(`^${id}`), 'nemia decide read the run');
   assert.ok(

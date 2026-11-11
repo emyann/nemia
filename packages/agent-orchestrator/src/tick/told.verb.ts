@@ -11,7 +11,7 @@ import { Effect, Result } from 'effect';
 import { ownArgsOf } from 'agent-runtime/vocabulary';
 import { assess, refusedTold, type AssessRead } from './assess.ts';
 import { standingReader, type PassStanding } from '../standing/standing.verb.ts';
-import { standingsOf } from '../branches/branches.store.ts';
+import { askedStandings } from '../branches/branches.store.ts';
 import { declarationOf, DEFAULT_HARNESS } from '../harness/harness.ts';
 import { mcpServerOf, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
@@ -449,15 +449,15 @@ export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: Ru
 });
 
 /**
- * `read` with where its result branches stand, as `standing` read them (`standingsOf` over `standingReader`: no process, a branch no pass
- * read is unread): what says a finished run with no gated ending is one nobody has decided. Read only for a run neither running nor
- * cancelled, since nothing of a run still going is decided on them; none where no standing is given.
+ * `read` with where its result branches stand, as `standing` read them (`askedStandings` over `standingReader`: no process, a branch no
+ * pass read is unread): what says a finished run with no gated ending is one nobody has decided. Read only of the branches the judgement
+ * and `nemia decide` read too (`branchesAsked`), none of a run still going or called off; none where no standing is given.
  */
 export const withStandings = <R extends AssessRead>(read: R, standing: PassStanding | undefined): R => {
   if (!standing) return read;
   const { status } = assess(read);
   if (status === 'running' || status === 'cancelled') return read;
-  return { ...read, standings: standingsOf(read.run, read.steps, standingReader(standing)) };
+  return { ...read, standings: askedStandings(read.run, read.steps, status, standingReader(standing)) };
 };
 
 /**

@@ -261,3 +261,16 @@ export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there,
   if (given !== there.version) return { kind: 'Conflict', message: workflowStale[does](dir, given, there.version) };
   return null;
 };
+
+/**
+ * A file's bytes as text a person can read, or null where they are not text (a NUL, or not UTF-8). A Workflow's spec carries the text
+ * files of its folder (`spec.files`), and a write given them leaves every other file alone.
+ */
+export function textIn(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}

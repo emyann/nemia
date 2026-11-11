@@ -12,8 +12,8 @@ import { turnOf, type Attempt, type Parked, type Sighting, type State } from './
 /**
  * What a session whose cap is `cap` may still spend once it has spent `spent`: the one arithmetic of a cap the runtime hands on, to a
  * holder's take-up of an attached session (`resumedRequest`, `harness/claude/attached.ts`) and to a parked job's continuation
- * (`parkedCapLeft`). The Agent SDK counts `maxBudgetUsd` from its own `query()` alone (`sdk.d.ts:1989-1993`), while a resume's running
- * total carries on its parent's (`sdk.d.ts:6100-6103`), so the cap less the spend so far is the right cap for the next process either
+ * (`parkedCapLeft`). The Agent SDK counts `maxBudgetUsd` from its own `query()` alone (`sdk.d.ts:2011-2015`), while a resume's running
+ * total carries on its parent's (`sdk.d.ts:6182-6185`), so the cap less the spend so far is the right cap for the next process either
  * way. No cap: none. Spend unknown — no result yet, or one whose totals were zeroed or reset and taken off as nothing — counts nothing,
  * an undercount like a killed process's lost spend, never a double count. At or below nothing where the cap is spent (`capSpent`).
  */

@@ -641,6 +641,15 @@ and one of them on a pass:
 The size itself is the lever not taken: a feed rotated on a size or an age, its sealed half kept for a cursor from before, would
 keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
 
+### 41. A remote agent's ids are kept whole (2026-11-11)
+
+A remote Task's `id` and `contextId`, and an artifact's `artifactId`, are another party's words that the runtime keeps whole: in the
+registry entry, as the attempt's `nativeId` on the journal, and in the words that name the Task (`entry.ts`'s `forget`, the logs of a
+Task the agent no longer has). Everything else a remote agent sends is bounded where a sentence or a log says it (`quote` and
+`endOf`, `core/quote.ts`): its words on `logs`, a served card's keys and a late request's path. An id is not cut, since a later
+GetTask needs it whole, so its only bound would be a refusal, a Task whose id is over some length read as a failed send. Left as it
+is on the owner's decision: an id is the agent's own key, and an agent that floods it gains nothing.
+
 ## Verified live, once
 
 An entry below on `--bg`, `claude -p` or `claude-detached` is the record of a road removed on 2026-10-24, kept for what it

@@ -581,7 +581,10 @@ Nothing of the task but its brief, the session it continues (`resumeFrom`, as th
 schema (in the message's metadata, under the runtime's extension) is sent; `cwd` stays here.
 
 **What the verbs are.** A spawn is one SendMessage, asked to return at once; `observe` is one GetTask per open session;
-`stop` is a CancelTask; `logs` is a GetTask with its history. The session is the agent's Task, named by its id, and its
+`stop` is a CancelTask; `logs` is a GetTask of the Task's last `LOG_MESSAGES` (20) messages, read as its messages, its
+artifacts and its state last, each part quoted to `LOG_PART_CHARS` (2,000) characters and the whole kept to its last
+`LOGS_CHARS` (8,000) under a first line that says it was cut, whenever anything was (`logsOfTask`, `src/a2a/map.ts`): an agent
+that answers with 100,000 characters puts their end on `logs`, and the session's transcript holds the whole. The session is the agent's Task, named by its id, and its
 context is the attempt's `nativeId`, so `answer` on a task held open is a new Task in the same context, as A2A continues
 a conversation. A Task's state is the session's, under its own name (`submitted`, `input-required`, …): `INPUT_REQUIRED`
 and `AUTH_REQUIRED` are the view's `needs-human`, `waitingFor` `input` or `authentication`, and a state no version of A2A

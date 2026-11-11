@@ -26,6 +26,8 @@ import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
 import { withBuiltins } from '../../../test/templated.ts';
 import type { Env } from '../../config/config.store.ts';
+import { approveProgram } from '../../approval/approve.verb.ts';
+import { PERSON } from '../../caller/caller.ts';
 
 const ROOT = scratch('wf-upgrade-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -437,9 +439,27 @@ test('choices made for another version are not merged, and the next resolve drop
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(
-    reconciled(templated('stale')).upgrade?.conflicts.map((c) => c.at),
-    [`${REVIEW}#rounds`],
+    reconciled(templated('stale')).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
+    [
+      [`${README}:1-1`, undefined],
+      [`${REVIEW}#rounds`, undefined],
+    ],
+    "the proposal made for 0.2.0 answers no conflict of 0.3.0, and a choice for a workflow's conflict is a draft until its proposal",
   );
+});
+
+test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with text its step does not read; the choice stays a draft", async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { dir } = await applied('unread');
+  rewrite(treeDir(ROOT, 'unread'), REVIEW, 'rounds: 3', 'rounds: 4');
+  released(dir, '0.2.0', 5);
+  await main(['factory', 'upgrade', 'unread', '--to', '0.2.0'], noEngine());
+  const broken = path.join(scratch('wf-upgrade-unread-'), 'rounds.md');
+  fs.writeFileSync(broken, 'rounds: [5\n');
+  await assert.rejects(main(['factory', 'resolve', 'unread', `${REVIEW}#rounds`, '--file', broken], noEngine()), refusedWith('Invalid'));
+  assert.equal(fs.existsSync(path.join(FACTORIES, 'unread', 'proposals')), false, 'nothing is proposed');
+  const kept = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'unread'), 'utf8'));
+  assert.deepEqual([kept.choices, kept.proposals], [{ [`${REVIEW}#rounds`]: { text: 'rounds: [5\n' } }, undefined]);
 });
 
 /** The plan `nemia factory diff` printed in `printed`, and the line that files it. */
@@ -525,12 +545,17 @@ test('a parameter set again at the version applied: previewed, filed with its pl
       );
       assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 8$/m, 'left as it is while the conflict waits');
       await main(['factory', 'resolve', 'clash', `${REVIEW}#budget`, '--theirs'], noEngine());
-      assert.deepEqual(JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'clash'), 'utf8')), {
+      const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'clash'), 'utf8'));
+      const proposal: string = resolutions.proposals?.dev ?? '';
+      assert.deepEqual(resolutions, {
         to: '0.1.0',
         template: 'team',
         base: digestOf(entriesIn(appliedDir(ROOT, 'clash'))),
         choices: { [`${REVIEW}#budget`]: 'theirs' },
+        proposals: { dev: proposal },
       });
+      assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
+      await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT, repo: ROOT }));
       assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
       assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 9$/m);
       rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 9', 'budget: 6');

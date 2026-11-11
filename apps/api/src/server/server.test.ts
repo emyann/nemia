@@ -36,7 +36,7 @@ test(
     await written({ 'wait-before': 'started' });
     const from = feedSize(root);
     const was = followers();
-    const asked = app.request('/api/feed/wait?selector=run%3Dwait-1&selector=run%3Dwait-2&for=60s');
+    const asked = app.request('/api/feed/wait?labelSelector=run%3Dwait-1&labelSelector=run%3Dwait-2&for=60s');
     await until(t, () => followers() === was + 1, 'the wait holds its cursor', { everyMs: 5 });
     await written({ 'wait-before': 'started', 'wait-2': 'running' });
     const res = await asked;
@@ -50,7 +50,7 @@ test(
 );
 
 test('REFUSED: GET /api/feed/wait refuses a bound out of its form, none to wait or longer than a call lives, and a bad selector, 422', async () => {
-  for (const query of ['for=soon', 'for=0s', 'for=5m', 'selector=run%3D%3D', 'from=start']) {
+  for (const query of ['for=soon', 'for=0s', 'for=5m', 'labelSelector=run%3D%3D', 'from=start']) {
     const res = await app.request(`/api/feed/wait?${query}`);
     assert.equal(res.status, 422, `${query}: ${await res.text()}`);
   }

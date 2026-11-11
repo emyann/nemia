@@ -39,7 +39,7 @@
  *   body. None standing is a 404 (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `GET /api/feed/stream` — the workflow feed followed, as server-sent events (`feedOpened`, gauges/feed.ts).
  * - `GET /api/feed/wait` — `nemia wait` (`WAIT`): the feed read from `?from=` (its end where none is given) until the first lines a
- *   `?selector=` takes, given again for another, or `?for=` (4m where none is given) with none, answering `{ ended, lines, cursor }`, each
+ *   `?labelSelector=` takes, given again for another, or `?for=` (4m where none is given) with none, answering `{ ended, lines, cursor }`, each
  *   line an `Event` as the Event lists build one (`eventKept`) and the cursor the next wait starts from. A long poll: it answers once,
  *   at its first match or its bound, never later than 270s. 422 for a selector, a cursor or a bound refused (`Invalid`), in the words
  *   that say the fix.
@@ -135,7 +135,7 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
         waitSent(
           await s.inRequest(
             WAIT.handler({
-              selector: typeof query.selector === 'string' ? [query.selector] : [...(query.selector ?? [])],
+              selector: typeof query.labelSelector === 'string' ? [query.labelSelector] : [...(query.labelSelector ?? [])],
               ...(query.from === undefined ? {} : { from: query.from }),
               ...(query.for === undefined ? {} : { for: query.for }),
             }),

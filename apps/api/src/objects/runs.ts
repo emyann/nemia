@@ -4,8 +4,8 @@
  * app's informer (`runObject`); what is read beside it — its lines (`runLines`), what it concludes (`CONCLUDED`), its record (`SHOW`,
  * raw), `nemia ls`'s listing (`LS`); its four sub-resources, the entries `tries`, `try`, `closeout` and `told`; a run started (`create`,
  * `runStart`); and the run's named actions, each its body decoded by its endpoint (`objects`' `RunRetry`, `RunApprove`, …) and handed with
- * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `SAY`, `REFRESH`, `HOLD`, `RM`, `PRUNE`,
- * `LABEL_RUN`).
+ * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `SAY`, `REFRESH`, `HOLD`, `CANCEL`, `RM`,
+ * `PRUNE`, `LABEL_RUN`).
  *
  * A run's namespace is its factory, `default` for one that names none (`runNamespace`): a run read or acted on under another is
  * `Missing`, a 404, as one the store does not list is, and so is a step the run does not have; one a task of which does not read is
@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   APPROVE,
+  CANCEL,
   CONCLUDED,
   dropInformed,
   HOLD,
@@ -258,6 +259,9 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }))),
+    )
+    .handle('cancel', ({ params: { namespace, name } }) =>
+      acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name }))),
     )
     .handle('retry', ({ params, payload }) => retried(params, payload))
     .handle('approve', ({ params, payload }) => approved(params, payload))

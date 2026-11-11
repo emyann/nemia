@@ -393,3 +393,21 @@ test('what an action ignores of its body, and the removals the board will not do
     },
   );
 });
+
+test('POST …/cancel stops a run as `nemia cancel` does, so a seat that started it from outside can stop it; a run the store has not is a 404', async (t) => {
+  await t.test('a run waiting at its gate is cancelled, its plan answered, and a second cancel reads it written', async () => {
+    gatedRun('r-cancel');
+    const res = await post('/api/namespaces/default/runs/r-cancel/cancel', {});
+    assert.equal(res.status, 200, await res.clone().text());
+    const answer = (await res.json()) as { id: string; plan: { kind: string } };
+    assert.deepEqual([answer.id, answer.plan.kind], ['r-cancel', 'cancel']);
+    const again = (await (await post('/api/namespaces/default/runs/r-cancel/cancel', {})).json()) as { plan: { kind: string } };
+    assert.equal(again.plan.kind, 'already-cancelled', 'cancelling again reads the cancellation the first one wrote');
+  });
+
+  await t.test('REFUSED: a run the store has not is a 404, nothing written', async () => {
+    const res = await post('/api/namespaces/default/runs/r-no-such/cancel', {});
+    assert.equal(res.status, 404);
+    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-no-such.json')), false);
+  });
+});

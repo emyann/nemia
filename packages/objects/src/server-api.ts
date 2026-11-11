@@ -419,14 +419,14 @@ export const FeedQuery = {
   until: Schema.optionalKey(Schema.String),
 };
 
-/** Why a wait ended: `matched`, a line a selector takes was read; `bound`, its bound came with none. */
+/** Why a wait ended: `matched`, a line a label query takes was read; `bound`, its bound came with none. */
 export const FEED_WAIT_ENDS = ['matched', 'bound'] as const;
 
 /** One of `FEED_WAIT_ENDS`. */
 export type FeedWaitEnd = (typeof FEED_WAIT_ENDS)[number];
 
 /**
- * What `GET /api/feed/wait` (`nemia wait`) answers: why it ended, the lines its selectors took (none at its bound), each an `Event`, and
+ * What `GET /api/feed/wait` (`nemia wait`) answers: why it ended, the lines its label queries took (none at its bound), each an `Event`, and
  * the cursor after the last line it read, from which the next wait starts and loses no line.
  */
 export const FeedWait = Schema.Struct({
@@ -437,11 +437,11 @@ export const FeedWait = Schema.Struct({
 export type FeedWait = typeof FeedWait.Type;
 
 /**
- * `GET /api/feed/wait`'s query: `selector`, a label selector given once or again (`-l`), each kept as `nemia watch -l` takes it; `from`, the
+ * `GET /api/feed/wait`'s query: `labelSelector`, a label query given once or again (`-l`), each kept as `nemia watch -l` takes it; `from`, the
  * cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
  */
 export const FeedWaitQuery = {
-  selector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
+  labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
   from: Schema.optionalKey(Schema.String),
   for: Schema.optionalKey(Schema.String),
 };

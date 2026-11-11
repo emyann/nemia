@@ -17,8 +17,9 @@ import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
-import { isReadme, splitFrontmatter, AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { frontmatterValues } from '../frontmatter/frontmatter.ts';
+import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
+import { fileParts, workflowSpecOf } from './workflow-spec.ts';
+import { textIn } from '../folder/folder.ts';
 import { FactoryDoor, filedAtOnce, treeChecked } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
 import { factoryObject } from '../factory/object/factory.verb.ts';
@@ -66,25 +67,19 @@ const orNone = <A, R>(read: Effect.Effect<A, Refusal, R>, current: (a: A) => Cur
     Effect.catch((err) => (err._tag === 'Missing' ? Effect.succeed(NONE) : Effect.fail(err))),
   );
 
-/** The frontmatter of a file's text as a record, and its body. */
-const fileParts = (name: string, text: string): { keys: Record<string, unknown>; body: string } => {
-  const { block, body } = splitFrontmatter(name, text);
-  const keys: unknown = block === null ? {} : frontmatterValues(block);
-  return { keys: typeof keys === 'object' && keys !== null ? (keys as Record<string, unknown>) : {}, body };
-};
-
-/** A workflow folder's spec as its files write it: each step's keys and body, by file name, and its README. */
+/**
+ * A workflow folder's spec as its files write it: each step's keys and body, by file name, its README, and its other text files. A file
+ * that is not text, or not directly in it, a Workflow's spec does not carry.
+ */
 function workflowSpecAt(dir: string): unknown {
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
-  const readme = files.find(isReadme);
-  const steps = files
-    .filter((f) => !isReadme(f))
-    .sort()
-    .map((f) => {
-      const name = f.slice(0, -'.md'.length);
-      return { name, ...fileParts(name, fs.readFileSync(path.join(dir, f), 'utf8')) };
+  const texts = fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isFile())
+    .flatMap((e) => {
+      const text = textIn(fs.readFileSync(path.join(dir, e.name)));
+      return text === null ? [] : [{ name: e.name, text }];
     });
-  return { ...(readme !== undefined && { readme: fs.readFileSync(path.join(dir, readme), 'utf8') }), steps };
+  return workflowSpecOf(texts);
 }
 
 /** The Workflow `name` of the factory's tree, now. */

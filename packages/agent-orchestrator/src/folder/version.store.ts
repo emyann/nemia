@@ -8,6 +8,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { frontmatterKey } from '../former/former.ts';
 import { AGENTS_FOLDER } from '../step/step.ts';
+import { textIn } from './folder.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { brokenBy } from '../door/door.store.ts';
 import { AgentDoor, type AgentDoorShape } from '../agents/agent-door.store.ts';
@@ -35,30 +36,36 @@ const addedSkillsIn = (text: string): string[] =>
       .filter(Boolean),
   );
 
-/** Each `.md` and `.json` directly in `dir`, sorted by name, with what it holds or why it does not read. None for a folder not there. */
-function filesOf(dir: string): Array<readonly [string, string | { unreadable: string }]> {
+/**
+ * Each file directly in `dir`, sorted by name, with what it holds or why it does not read; none for a folder not there. A `.md` or a
+ * `.json` is read as text whatever its bytes, as the version always read them, so a folder of those alone keeps its word. Any other is
+ * held by its text where it is text (`textIn`), else by the digest of its bytes.
+ */
+function filesOf(dir: string): VersionFile[] {
   let names: string[];
   try {
     names = fs
       .readdirSync(dir, { withFileTypes: true })
-      .filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name))
+      .filter((e) => !e.isDirectory())
       .map((e) => e.name)
       .sort();
   } catch {
     names = [];
   }
-  const read = (file: string): string | { unreadable: string } => {
+  const read = (name: string): VersionFile[1] => {
     try {
-      return fs.readFileSync(file, 'utf8');
+      const bytes = fs.readFileSync(path.join(dir, name));
+      if (/\.(md|json)$/.test(name)) return bytes.toString('utf8');
+      return textIn(bytes) ?? { bytes: createHash('sha256').update(bytes).digest('hex') };
     } catch (err) {
       return { unreadable: err instanceof Error ? err.message : String(err) };
     }
   };
-  return names.map((name) => [name, read(path.join(dir, name))] as const);
+  return names.map((name) => [name, read(name)] as const);
 }
 
-/** A file of a folder as its version counts it: its name, and what it holds or why it does not read. */
-export type VersionFile = readonly [string, string | { unreadable: string }];
+/** A file of a folder as its version counts it: its name, and what it holds — its text, or its bytes' digest — or why it does not read. */
+export type VersionFile = readonly [string, string | { bytes: string } | { unreadable: string }];
 
 /** What a folder's own files are and name, read with no door: the files, the agents its steps name and the skills they add, sorted. */
 export type VersionNamed = {
@@ -82,7 +89,7 @@ export type VersionDefs = { readonly agents: AgentDoorShape; readonly skills: Sk
 /** The folder's own files and what they name (`VersionNamed`): no agent or skill is read here. */
 export function versionNamed(dir: string): VersionNamed {
   const files = filesOf(dir);
-  const texts = files.flatMap(([, text]) => (typeof text === 'string' ? [text] : []));
+  const texts = files.flatMap(([name, text]) => (name.endsWith('.md') && typeof text === 'string' ? [text] : []));
   return {
     files,
     agents: [...new Set(texts.flatMap((text) => frontmatterNamed(text, 'agent')))].sort(),
@@ -149,16 +156,17 @@ export const versionGathered = (
   });
 
 /**
- * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what
- * a save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and
- * `writeWorkflow` removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or
- * removed changes it, and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as
- * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the Agent door versions it (`there`): its
- * file, where the load finds it (`lookupRoots`), each file it names beside it and each skill folder its `skills:` gives, found beside the
- * workflow. So does each skill a step's own `skills:` adds to its agent's, its folder where the load finds it, as the Skill door versions
- * it. Both are read through the doors (`versionGathered`): `defs` where given, else the program's, so a program given `agentDoorMemory()`
- * counts the memory's agents. Two cases digest otherwise than the reader before the doors did: an agent's name the Agent door refuses
- * (`AgentName`), read as missing, and an added skill whose `SKILL.md` is no regular file, read as null.
+ * What a folder's files hold, as one word: a digest of each file directly in it — its steps, its README, its schemas and its other files, a
+ * script or a picture among them, what a save writes, removes or reads — by name, with what it holds (`filesOf`). Hidden ones too: the
+ * package reads a `.draft.md` as a step and `writeWorkflow` removes it when the steps saved do not have it, and an `output:` may name a
+ * hidden schema. Any of them edited, added or removed changes it, so a proposal read before a script changed is stale; a folder inside does
+ * not, and a folder of `.md` and `.json` alone keeps the word it had before the other files were counted. A file that cannot be read counts
+ * as what it says, so it changes the word too. Only a `.md` is read for what it names. So does each agent a step names (`agent:`), as the
+ * Agent door versions it (`there`): its file, where the load finds it (`lookupRoots`), each file it names beside it and each skill folder
+ * its `skills:` gives, found beside the workflow. So does each skill a step's own `skills:` adds to its agent's, its folder where the load
+ * finds it, as the Skill door versions it. Both are read through the doors (`versionGathered`): `defs` where given, else the program's, so
+ * a program given `agentDoorMemory()` counts the memory's agents. Two cases digest otherwise than the reader before the doors did: an
+ * agent's name the Agent door refuses (`AgentName`), read as missing, and an added skill whose `SKILL.md` is no regular file, read as null.
  */
 export const workflowVersion = Effect.fn('workflowVersion')(function* (dir: string, places: Places, defs?: VersionDefs) {
   const named = versionNamed(dir);

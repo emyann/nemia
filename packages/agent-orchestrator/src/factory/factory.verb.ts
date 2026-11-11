@@ -105,7 +105,10 @@ factory, naming the repositories its work is on, the workflows it offers and the
                  template changed under it, a lower one without --downgrade, a --set without diff's --plan for it.
   nemia factory resolve writes your choice for one conflict, by the address nemia factory diff names: --ours keeps
                  your tree's side, --theirs the template's, --file <path> the text of a file; kept for the merge
-                 under way in factories/<name>/resolutions.json.
+                 under way in factories/<name>/resolutions.json. A conflict in a text file directly in a workflow's
+                 folder is resolved by a proposal of that workflow: once each of its conflicts has a choice, the
+                 folder they compose is proposed, and the daemon merges it once you approve it
+                 (nemia proposals approve <p> -n <name>); decline it to choose again.
   nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.

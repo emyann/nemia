@@ -83,13 +83,13 @@ export const takenAt = (version: string | null): string =>
 
 /**
  * Why a write or a removal (`does`) of the workflow folder `dir` given the version `version` it was read at does nothing: the folder is at
- * `now` since (`workflowVersion`), so a step, the README or a schema there changed, and what it holds would go unseen.
+ * `now` since (`workflowVersion`), so a step, the README or another of its files there changed, and what it holds would go unseen.
  */
 export const workflowStale = {
   write: (dir: string, version: string, now: string): string =>
-    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
+    `${dir} has changed since it was read at version ${version}: a step, the README or another of its files there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
   remove: (dir: string, version: string, now: string): string =>
-    `${dir} has changed since it was read at version ${version}: a step, the README or a schema there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`,
+    `${dir} has changed since it was read at version ${version}: a step, the README or another of its files there was edited, added or removed, and removing it now would remove what was not seen. Nothing was removed. Read the folder again (it is at version ${now}), and remove it as it is now.`,
 };
 
 /**
@@ -261,3 +261,23 @@ export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there,
   if (given !== there.version) return { kind: 'Conflict', message: workflowStale[does](dir, given, there.version) };
   return null;
 };
+
+/**
+ * Whether a file's name is markdown, in any case, as the README (`isReadme`) and a draft's carried names (`carriedNameRefusal`) are
+ * judged: a Workflow's spec carries markdown as its steps and its README, never among the folder's other files, and a whole write never
+ * removes it.
+ */
+export const isMarkdown = (name: string): boolean => name.toLowerCase().endsWith('.md');
+
+/**
+ * A file's bytes as text a person can read, or null where they are not text (a NUL, or not UTF-8). A Workflow's spec carries the text
+ * files of its folder (`spec.files`), and a write given them leaves every other file alone.
+ */
+export function textIn(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}

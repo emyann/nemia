@@ -279,6 +279,7 @@ export {
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export { withProposalsPass } from './apply/pass.verb.ts';
+export { withResolutionProposer } from './factory/upgrade/proposed.verb.ts';
 export { ensureDaemon, liveDemandHost, type DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/index.ts';
@@ -317,7 +318,7 @@ export type {
   Unread,
 } from './place/place.ts';
 export { draftSteps, loadWorkflows, writeWorkflow } from './workflows/workflows.store.ts';
-export { workflowStale, workflowTaken } from './folder/folder.ts';
+export { isMarkdown, textIn, workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
 export { agentRead, agentSkillsFound, listAgents, type Readings } from './roster/roster.store.ts';

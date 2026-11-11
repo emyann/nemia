@@ -171,6 +171,11 @@
           "card": "run-core, one read of a run (B): the default factory is a record the Factory door serves"
         }
       ]
+    },
+    {
+      "term": "Upgrade resolution",
+      "meaning": "how an upgrade's conflict in a text file directly in a workflow's folder is resolved: a proposal of that Workflow carrying the folder as the choices compose it, which `nemia factory resolve` makes and the factory's resolutions name by workflow; the pass takes the workflow's files from the tree once it applied, and its conflicts wait until then (`WorkflowResolution`, `packages/agent-orchestrator/contracts/resolution.contract.ts`).",
+      "type": "WorkflowResolution"
     }
   ]
 }

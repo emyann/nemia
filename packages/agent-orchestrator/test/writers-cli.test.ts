@@ -183,10 +183,11 @@ test('a person writes their library at the command line: an agent, a skill and a
         `${JSON.stringify({ type: 'object', additionalProperties: false, required: [field], properties: { [field]: { type: 'string' } } })}\n`;
       fs.writeFileSync(path.join(folder, 'only.schema.json'), schema('size'));
       fs.writeFileSync(path.join(folder, 'pictures.ts'), 'process.exit(0);\n');
+      fs.writeFileSync(path.join(folder, 'landing.ts'), 'process.exit(1);\n');
       const made = await done(sub, 'workflows', 'write', 'yours', 'carry', '--folder', folder);
       const there = path.join(YOURS, 'carry');
       assert.deepEqual(Object.keys(snapshot(there)), Object.keys(snapshot(folder)));
-      fs.writeFileSync(path.join(there, 'landing.ts'), 'process.exit(1);\n');
+      fs.rmSync(path.join(folder, 'landing.ts'));
       fs.writeFileSync(path.join(folder, 'only.schema.json'), schema('pages'));
       await done(sub, 'workflows', 'write', 'yours', 'carry', '--folder', folder, '--version', versionIn(made));
       assert.equal(fs.readFileSync(path.join(there, 'only.schema.json'), 'utf8'), schema('pages'));

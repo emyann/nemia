@@ -217,6 +217,7 @@ export {
   StepLayers,
   Workflow,
   WorkflowCreate,
+  WorkflowFile,
   WorkflowList,
   WorkflowSpec,
   WorkflowStatus,

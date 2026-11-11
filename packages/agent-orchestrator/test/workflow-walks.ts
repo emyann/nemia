@@ -62,6 +62,28 @@ const withFile = (file: { path: string; text: string }): WorkflowDraft => {
   return { ...draft, files: [...(draft.files ?? []), file] };
 };
 
+/** A picture's bytes as a carried text: a NUL among them, so it is no text (`textIn`), built from its code. */
+export const PICTURE = `${String.fromCharCode(0x89)}PNG${String.fromCharCode(0)}${String.fromCharCode(1)}`;
+
+/**
+ * `dev` written carrying two scripts, `a.ts` and `b.ts`, and a picture, `logo.png`, then written again at its version carrying `a.ts`
+ * alone, changed, `whole` as given: what the second write did.
+ */
+const wholeWrite = (side: Side, whole: boolean) => {
+  const steps = [aStep('build')];
+  const version = written(side, 'dev', {
+    steps,
+    files: [
+      { path: 'a.ts', text: 'export const a = 1;\n' },
+      { path: 'b.ts', text: 'export const b = 1;\n' },
+      { path: 'logo.png', text: PICTURE },
+    ],
+  });
+  const draft: WorkflowDraft = { steps, files: [{ path: 'a.ts', text: 'export const a = 2;\n' }], ...(whole && { whole }) };
+  const { written: files, kept, removed } = done(side.door.workflows.write(yoursOn(side, 'dev'), draft, version));
+  return { written: files, kept, removed };
+};
+
 /** Of a step read or written, what a walk compares of its agent: its name, and the model it gives the step. */
 const agentOf = (steps: readonly { name: string; agent?: { name: string }; model?: string }[]) =>
   steps.map((s) => [s.name, s.agent?.name, s.model]);
@@ -179,6 +201,16 @@ export const WORKFLOW_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         return { written: files, fields: steps.map((s) => s.output?.schema.required) };
       },
       says: { written: ['build.md', 'build.schema.json', 'check.ts'], fields: [['pages']] },
+    },
+    {
+      name: 'a whole draft: a text file of the folder it does not carry removed and listed, a non-text one and markdown left',
+      walk: (side) => wholeWrite(side, true),
+      says: { written: ['a.ts'], kept: ['build.md'], removed: ['b.ts'] },
+    },
+    {
+      name: 'the same draft not whole: no file it does not carry removed',
+      walk: (side) => wholeWrite(side, false),
+      says: { written: ['a.ts'], kept: ['build.md'], removed: [] },
     },
     {
       name: "a step naming an agent the side's Agent door holds: written, and answered resolved with its keys",

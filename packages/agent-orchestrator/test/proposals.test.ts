@@ -1,10 +1,10 @@
 /**
  * Proposals on a scratch store, over a templated factory whose tree is rendered by hand: an agent proposes a factory's Workflow at the
  * version it read, the person approves, and it is applied into the tree with what it held before; an undo applies that back as a new
- * revision. Then one fixture per rule: stale, a run-end proposal and its run, a delegation taken back, an agent's own proposal, a level
- * short of auto, a widening, a confirm past the delegation, a Factory read before its rules, its instruction or its status moved, and
- * the Proposal door's own refusals. Kinds and `_tag`s are asserted, never
- * a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
+ * revision; a Workflow's proposal carries its folder's scripts, written whole and put back by its undo. Then one fixture per rule: stale, a
+ * run-end proposal and its run, a delegation taken back, an agent's own proposal, a level short of auto, a widening, a confirm past the
+ * delegation, a Factory read before its rules, its instruction or its status moved, and the Proposal door's own refusals. Kinds and `_tag`s
+ * are asserted, never a sentence. The store is the file's own, at `ROOT`, given as `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -195,6 +195,67 @@ test('REFUSED stale: the workflow written between propose and approve leaves the
   assert.equal(after.status.phase, 'stale');
   assert.match(planIn(tree), /Someone else wrote this\./);
   assert.equal((await refusalOf(approveProgram(PERSON, 'stale', proposed.metadata.name, PLACE))).reason, 'not-waiting');
+});
+
+/** A file of the `dev` workflow of `tree`, by its name, or undefined where it is not there. */
+const devFile = (tree: string, name: string): string | undefined => {
+  try {
+    return fs.readFileSync(path.join(tree, 'workflows', 'dev', name), 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+/** The `dev` workflow of `factory` as it is, its other files replaced by `files`, at the version it was read. */
+async function devFiles(factoryName: string, files: { path: string; text: string }[]): Promise<ProposedObject> {
+  const now = await run(currentOf(PLACE, factoryName, 'Workflow', 'dev'));
+  return {
+    kind: 'Workflow',
+    metadata: { name: 'dev', resourceVersion: now.version ?? undefined },
+    spec: { ...(now.spec as object), files },
+  };
+}
+
+test("a Workflow proposal carries its folder's scripts: applied whole, undone back, and stale once a script moved after the read", async (t) => {
+  const tree = factory('scripts');
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(0);\n');
+  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'old.ts'), 'export {};\n');
+  fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'logo.png'), picture);
+  const proposed = await run(
+    proposeProgram(PERSON, 'scripts', { objects: [await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(1);\n' }])] }, PLACE),
+  );
+  const applied = await run(approveProgram(PERSON, 'scripts', proposed.metadata.name, PLACE));
+  await t.test("applied: the tree's script holds the proposal's text, one the spec leaves out is gone, a picture is left", () => {
+    assert.equal(applied.status.phase, 'applied', applied.status.message);
+    assert.equal(devFile(tree, 'check.ts'), 'process.exit(1);\n');
+    assert.equal(devFile(tree, 'old.ts'), undefined);
+    assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(tree, 'workflows', 'dev', 'logo.png'))), picture);
+  });
+  await t.test('before holds the old files, and the undo puts them back', async () => {
+    const before = applied.status.before?.[0]?.spec as { files?: { path: string; text: string }[] };
+    assert.deepEqual(before.files, [
+      { path: 'check.ts', text: 'process.exit(0);\n' },
+      { path: 'old.ts', text: 'export {};\n' },
+    ]);
+    const undo = await run(undoProgram(PERSON, 'scripts', applied.metadata.name, PLACE));
+    const back = await run(approveProgram(PERSON, 'scripts', undo.metadata.name, PLACE));
+    assert.equal(back.status.phase, 'applied', back.status.message);
+    assert.equal(devFile(tree, 'check.ts'), 'process.exit(0);\n');
+    assert.equal(devFile(tree, 'old.ts'), 'export {};\n');
+  });
+  await t.test(
+    'REFUSED stale: a script edited after the read leaves the proposal stale at approval, and is refused Conflict at propose',
+    async () => {
+      const read = await devFiles('scripts', [{ path: 'check.ts', text: 'process.exit(2);\n' }]);
+      const waiting = await run(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE));
+      fs.writeFileSync(path.join(tree, 'workflows', 'dev', 'check.ts'), 'process.exit(3);\n');
+      const after = await run(approveProgram(PERSON, 'scripts', waiting.metadata.name, PLACE));
+      assert.equal(after.status.phase, 'stale');
+      assert.equal(devFile(tree, 'check.ts'), 'process.exit(3);\n');
+      assert.equal((await refusalOf(proposeProgram(PERSON, 'scripts', { objects: [read] }, PLACE)))._tag, 'Conflict');
+    },
+  );
 });
 
 /** The Factory `name` read now, proposed with its parts `spec` names over it, at the version it was read. */

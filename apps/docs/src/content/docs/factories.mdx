@@ -193,6 +193,13 @@ factory's file, held to the plan you previewed, and the daemon merges on its nex
 tree changed the same line. A parameter changed in the file by hand is merged the same way. A template whose files changed under the
 version the factory was applied at is still refused: give it a new version, and upgrade to that.
 
+A conflict in a text file directly in a workflow's folder — a step, its README, a script beside them — is resolved by a proposal of
+that Workflow. `nemia factory resolve` records each choice, and once every conflict of that workflow has one it proposes the
+workflow's folder as the choices compose it, its other files in `spec.files`, at the version the tree's workflow is at, and prints the
+line that approves it, `nemia proposals approve <proposal> -n <factory>`. The daemon merges once that proposal has applied; declined,
+or gone stale, the factory's status says to resolve again. Any other conflict — the factory's file, its instruction and rules, an
+agent's, a skill's, a carried file — is settled by its choice alone.
+
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through

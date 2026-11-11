@@ -47,6 +47,11 @@ const CLAUSES: Array<[string, Partial<RestFacts>, string[]]> = [
   ['REFUSED: a run still running', { status: 'running' }, ['status']],
   ['REFUSED: a record whose workflow is not frozen on it reads its folder, which the memo does not watch', { run: {} }, ['workflow']],
   ['REFUSED: held: whether the runs it names landed is theirs', { run: { workflow: [], hold: HOLD } }, ['hold']],
+  [
+    "a cancelled run's hold reads no run: it rests",
+    { status: 'cancelled', run: { workflow: [], hold: HOLD, cancelledAt: '2026-09-25T11:00:00.000Z' } },
+    [],
+  ],
   ['REFUSED: a task not settled — at work, waiting for a word, unknown to the engine — moves on its own', { settled: false }, ['settled']],
   ['REFUSED: anything the pass did is a pass the next must repeat', { acted: true }, ['acted']],
   ['REFUSED: a step ready', { due: { ...RESTING.due, ready: ['work'] } }, ['due.ready']],

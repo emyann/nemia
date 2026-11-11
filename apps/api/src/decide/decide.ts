@@ -19,8 +19,8 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
 
 /**
  * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services, its judgement through
- * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's comma-separated globs,
- * names the files shown in full in place of the defaults.
+ * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's
+ * comma-separated globs, names the files shown in full in place of the defaults.
  */
 export const decisionHandler = (runId: string, sensitive?: string) =>
   Effect.flatMap(

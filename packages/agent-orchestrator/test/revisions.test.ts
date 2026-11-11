@@ -396,11 +396,12 @@ test('a folder edited around a run: what it pins, what the ledger numbers, and w
     );
   });
 
-  await s.test('a script changed in the workflow folder after the start does not reach the run in flight', async () => {
+  await s.test('a script changed in the workflow folder once the run filed its first step does not reach the run in flight', async () => {
     const t = checked(team(), 'node "$WF_WORKFLOW_FILES/helper.ts"', 'first');
     const run = await started(t.dir, aRepo());
-    fs.writeFileSync(path.join(t.dir, 'helper.ts'), helperSaying('second'));
     const b = board();
+    await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
+    fs.writeFileSync(path.join(t.dir, 'helper.ts'), helperSaying('second'));
     const env = await checkEnvAfterBuild(b, run.id);
     assert.ok(env.WF_WORKFLOW_FILES, "the check is told the run's copy of its workflow folder");
     assert.match(fs.readFileSync(path.join(env.WF_WORKFLOW_FILES, 'helper.ts'), 'utf8'), /first/, 'the script as it was at the start');

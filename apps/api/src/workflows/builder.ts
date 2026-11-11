@@ -45,7 +45,7 @@ import {
 } from 'agent-orchestrator/workflow';
 import { type Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
-import { STEP_KEY_FORM, type KeyForm } from 'objects';
+import { STEP_KEY_FORM, type KeyForm, type WorkflowFile } from 'objects';
 import { schemaNameRefusal, WORDS, type KeyKind } from './words.ts';
 import { listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
@@ -386,12 +386,16 @@ export type Writing = {
  *
  * Every schema the save has reached is put back, the one it was writing among them, should that write fail, or a later one, or the folder:
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
+ *
+ * Given `files`, a Workflow's `spec.files`, they are the whole set of the folder's other text files: carried to the package with the
+ * schemas pasted beside them, `whole`, so a text file neither names is removed, and a picture is left.
  */
 export async function write(
   { e, placeService, config, trace, name, dir, repo, home, changes, inRequest }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
+  files?: readonly WorkflowFile[],
 ): Promise<WorkflowSaved | BuildRefused> {
   const places = placesOf(repo, home);
   const refused = (message: string): BuildRefused => ({
@@ -434,6 +438,7 @@ export async function write(
       repo,
       ...(readme !== undefined && { readme }),
       ...(changes && { version: await inRequest(workflowVersion(dir, places)) }),
+      ...(files !== undefined && { files: [...files, ...writing.map(({ file, text }) => ({ path: file, text }))], whole: true }),
     };
     result = await inRequest(WORKFLOWS_WRITE.handler(input));
   } catch (err) {
@@ -442,6 +447,7 @@ export async function write(
     throw err;
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
+  const unpasted = (file: string) => !writing.some((s) => s.file === file);
   return {
     workflow: listed(
       name,
@@ -450,8 +456,8 @@ export async function write(
       loadedAt(await loadedOf(e, { placeService, config, trace }, [dir], repo, home), dir),
       await inRequest(workflowVersion(dir, places)),
     ),
-    written: [...result.written, ...schemasWritten].sort(),
-    kept: [...result.kept, ...kept].sort(),
+    written: [...result.written.filter(unpasted), ...schemasWritten].sort(),
+    kept: [...result.kept.filter(unpasted), ...kept].sort(),
     removed: result.removed,
   };
 }

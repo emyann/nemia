@@ -2,7 +2,8 @@
  * A workflow folder's version (`workflowVersion`), read through the Agent and Skill doors: the digest it answers over the files doors is
  * byte-equal to the one the synchronous reader gave before the doors (`syncVersion` below, that reader as it was, kept as the oracle,
  * since the digest names each agent's root by its absolute path and no literal holds across checkouts), and a program given the doors'
- * memory reads its agents there, never the disk.
+ * memory reads its agents there, never the disk. The oracle reads `.md` and `.json` alone, as the version did: every other file of the
+ * folder now counts too, a script by its text and a picture by its bytes, while a folder of `.md` and `.json` keeps a digest pinned.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -181,4 +182,32 @@ test('the version reads the agents of the Agent door it is given, never the disk
   );
   assert.notEqual(versions.held, versions.none, 'an agent the memory holds is counted');
   assert.notEqual(versions.edited, versions.held, 'rewriting it in the memory moves the version');
+});
+
+/** A folder of a step that names no agent, a README and a schema, with `extra` beside them: its version reads no root's path. */
+function notesFolder(extra: Record<string, string | Uint8Array> = {}): string {
+  const dir = path.join(scratch('wf-version-notes-'), 'workflows', 'notes');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'README.md'), '# Notes\n\nTake notes.\n');
+  fs.writeFileSync(path.join(dir, 'write.md'), '---\nplace: none\n---\nWrite the notes.\n');
+  fs.writeFileSync(path.join(dir, 'write.schema.json'), '{"type":"object"}\n');
+  for (const [name, content] of Object.entries(extra)) fs.writeFileSync(path.join(dir, name), content);
+  return dir;
+}
+
+test('a folder of only .md and .json keeps the digest it had before the version read its other files, recorded then', () => {
+  assert.equal(doorVersion(notesFolder(), {}), 'fd219723dd186cdd');
+});
+
+test("a script of the folder is in its version: editing it, adding one or a picture's bytes changes the word", () => {
+  const dir = notesFolder({ 'check.ts': 'export const ok = true;\n' });
+  const before = doorVersion(dir, {});
+  fs.writeFileSync(path.join(dir, 'check.ts'), 'export const ok = false;\n');
+  const edited = doorVersion(dir, {});
+  assert.notEqual(edited, before, 'a script edited changes the version');
+  fs.writeFileSync(path.join(dir, 'logo.png'), new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]));
+  const pictured = doorVersion(dir, {});
+  assert.notEqual(pictured, edited, 'a non-text file added changes it');
+  fs.writeFileSync(path.join(dir, 'logo.png'), new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 2]));
+  assert.notEqual(doorVersion(dir, {}), pictured, "a non-text file's bytes changed change it");
 });

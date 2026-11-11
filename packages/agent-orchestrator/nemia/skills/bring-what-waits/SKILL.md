@@ -138,8 +138,15 @@ Bring it:
   - then, for each conflict, a choice: `nemia factory resolve <factory> '<conflict>' --ours` to keep their tree's side, `--theirs` to take the
     template's, or `--file <path>` with the text you would write for it, shown to them first.
 
-The daemon merges once every conflict has a choice; until then the factory's tree and base stay as they are, and its runs in flight
-keep their own folders. After each resolve, say what it answered: the conflicts still waiting, or that the merge is next.
+A conflict in a text file directly in a workflow's folder is not settled by its choice alone: once every conflict of that workflow
+has one, the resolve proposes the workflow's folder as the choices compose it, a proposal of that Workflow, and prints the line that
+approves it (`nemia proposals approve <proposal> -n <factory>`). Bring that proposal to the person as any other: they approve it, or
+decline it (`nemia proposals decline <proposal> -n <factory>`) and choose again. Every other conflict — the factory's file, its
+instruction and rules, an agent's, a skill's, a carried file — is settled by its choice.
+
+The daemon merges once every conflict has a choice and each workflow's proposal has applied; until then the factory's tree and base
+stay as they are, and its runs in flight keep their own folders. After each resolve, say what it answered: the conflicts still
+waiting, the proposal to approve, or that the merge is next.
 
 An upgrade onto a template of another name than the factory's base, such as a factory applied from a hand-made template moving onto
 sdlc, is a template switch: the two share no base. The diff says so on its `switch:` line and names both templates on its first, so

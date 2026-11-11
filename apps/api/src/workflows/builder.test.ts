@@ -1542,6 +1542,11 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
           () => write(path.join(dir, '.shared.schema.json'), again),
           () => fs.rmSync(path.join(dir, '.shared.schema.json')),
         ],
+        [
+          'NOTES.txt added: the version counts every file directly in the folder, a note or a script beside the steps',
+          () => write(path.join(dir, 'NOTES.txt'), 'Ideas.\n'),
+          () => fs.rmSync(path.join(dir, 'NOTES.txt')),
+        ],
       ];
       for (const [what, edit, undo] of handEdits) {
         edit();
@@ -1557,20 +1562,13 @@ test('PUT /api/workflows/yours/:name: a save the package refuses, or of a folder
         assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);
       }
 
-      write(path.join(dir, 'NOTES.txt'), 'Ideas.\n');
-      write(path.join(dir, '.notes.txt'), 'Ideas.\n');
       write(path.join(dir, 'sub', 'x.md'), '---\nplace: git\n---\nNot a step.\n');
-      assert.equal(
-        versionOf(dir),
-        read,
-        'what is no step and no schema moves nothing: a note beside the steps, a hidden one, a folder inside it',
-      );
+      assert.equal(versionOf(dir), read, 'a folder inside it moves nothing');
 
       const taken = await put('edited', draft);
       assert.equal(taken.status, 200, `read at the version it is at, the save is taken: ${await taken.clone().text()}`);
       assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m);
-      for (const kept of ['NOTES.txt', '.notes.txt', 'sub/x.md'])
-        assert.ok(fs.existsSync(path.join(dir, kept)), `the save leaves ${kept}, which it did not count, where it was`);
+      assert.ok(fs.existsSync(path.join(dir, 'sub', 'x.md')), 'the save leaves a folder inside, which it did not count, where it was');
       const again409 = await put('edited', { ...draft, steps: [plan, build] });
       assert.equal(again409.status, 409, 'a second save from the same read is refused: the first one changed the folder');
       assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m, 'and the first save stands');

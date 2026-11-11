@@ -8,8 +8,8 @@ import type { Paused } from 'objects';
 
 /**
  * What the watch prints of a line of the feed, which the stream sends as its JSON (`FeedStreamEvent`'s `data`): a run's (`run`, its
- * `step`), the store's (`store`, `by`, `why`), a factory's (`factory`) or a daemon's (`daemon`, its pid), each with its time and its word. Read by this Schema
- * where it is printed in words; printed whole, every key it carries, under `--json`.
+ * `step`), the store's (`store`, `by`, `why`), a factory's (`factory`) or a daemon's (`daemon`, its pid), each with its time and its word.
+ * Read by this Schema where it is printed in words; printed whole, every key it carries, under `--json`.
  */
 export const FeedLineSaid = Schema.Struct({
   at: Schema.String,

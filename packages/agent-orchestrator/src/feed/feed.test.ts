@@ -434,20 +434,21 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       const memo = freshFeedMemo();
       const pass = (conflicts: FeedConflicts, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, conflicts });
       const said = () => factoryLines().map((l) => [l.factory, l.reason]);
-      const PENDING = { factory: 'acme', pending: true, message: 'agents/coder.md: choose one' };
+      const NOTE = 'one-waits';
+      const PENDING = { factory: 'acme', pending: true, message: NOTE };
       const SETTLED = { factory: 'acme', pending: false, message: 'merged' };
       await t.test('a factory whose conflicts are pending is said once over many passes; one with none pending is never said', () => {
         for (let i = 0; i < 5; i++) pass([PENDING, { factory: 'quiet', pending: false }]);
         assert.deepEqual(said(), [['acme', 'ConflictsPending']]);
         assert.deepEqual(
           factoryLines().map((l) => [l.involved, l.type, l.source, l.waits, l.labels, l.note]),
-          [[{ kind: 'Factory', name: 'acme' }, 'Normal', 'tick', undefined, { factory: 'acme' }, PENDING.message]],
-          "about the factory, the tick's, waiting on nobody by the table, labelled with its factory, its note the condition's message",
+          [[{ kind: 'Factory', name: 'acme' }, 'Normal', 'tick', undefined, { factory: 'acme' }, NOTE]],
+          "about the factory, the tick's, waiting on nobody by the table, labelled with its factory, its note the condition's own text",
         );
         assert.equal(storeLines().length, 0, "no line of the store's");
       });
       await t.test('its message reworded, as a choice made for one conflict of several rewords it, owes no line', () => {
-        pass([{ ...PENDING, message: 'agents/coder.md: chosen · skills/look/SKILL.md: choose one' }]);
+        pass([{ ...PENDING, message: 'one-of-two-waits' }]);
         assert.equal(factoryLines().length, 1);
       });
       await t.test('a daemon with no fold says it no second time', () => {

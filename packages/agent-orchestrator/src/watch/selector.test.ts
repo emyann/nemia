@@ -113,7 +113,13 @@ const selected = (values: readonly string[]): string[] => {
   assert.equal(selectorsRefusal(values), undefined, values.join(' | '));
   const sel = parseSelectors(values);
   return EVERY.filter((l) => selects(sel, l)).map((l) =>
-    'daemon' in l ? `pid ${l.daemon}` : 'store' in l ? `store: ${l.word}` : 'factory' in l ? `factory: ${l.factory}` : `${l.run}/${l.step ?? '—'}`,
+    'daemon' in l
+      ? `pid ${l.daemon}`
+      : 'store' in l
+        ? `store: ${l.word}`
+        : 'factory' in l
+          ? `factory: ${l.factory}`
+          : `${l.run}/${l.step ?? '—'}`,
   );
 };
 
@@ -251,7 +257,13 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       labels: { factory: 'acme' },
       reason: 'ConflictsPending',
     });
-    assert.deepEqual(selectableOf(pending), { factory: 'acme', kind: 'Factory', reason: 'ConflictsPending', type: 'Normal', source: 'tick' });
+    assert.deepEqual(selectableOf(pending), {
+      factory: 'acme',
+      kind: 'Factory',
+      reason: 'ConflictsPending',
+      type: 'Normal',
+      source: 'tick',
+    });
     for (const typed of ['kind=Factory', 'reason=ConflictsPending', 'factory=acme', 'kind=Factory,reason=ConflictsPending'])
       assert.equal(selects(parseSelectors([typed]), pending), true, typed);
     for (const typed of ['kind=Store', 'reason=LevelChanged', 'waits', 'type=Warning'])
@@ -287,7 +299,13 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       { typed: 'factory=pipao,agent=agora', selects: ['r-3/implement'], drop: 'factory=pipao', then: ['r-3/implement', 'r-7/review'] },
     ];
     const whole: string[] = EVERY.map((l) =>
-      'daemon' in l ? `pid ${l.daemon}` : 'store' in l ? `store: ${l.word}` : 'factory' in l ? `factory: ${l.factory}` : `${l.run}/${l.step ?? '—'}`,
+      'daemon' in l
+        ? `pid ${l.daemon}`
+        : 'store' in l
+          ? `store: ${l.word}`
+          : 'factory' in l
+            ? `factory: ${l.factory}`
+            : `${l.run}/${l.step ?? '—'}`,
     );
     for (const c of cases) {
       assert.deepEqual(selected([c.typed]), c.selects, c.typed);

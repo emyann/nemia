@@ -1,7 +1,8 @@
 /**
  * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, one from each daemon once it has
  * taken the store (`startedLine`), one for each pause of the store put and lifted (`storeOnce`), and one for each change of a factory's
- * level in force (`levelLines`) and of its conflicts pending or settled (`conflictLines`), appended to `$WF_ROOT/feed.jsonl`, and read by `nemia watch`.
+ * level in force (`levelLines`) and of its conflicts pending or settled (`conflictLines`), appended to `$WF_ROOT/feed.jsonl`, and read by
+ * `nemia watch`.
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
@@ -298,7 +299,10 @@ const foldKey = (involved: Involved): string => `${involved.kind}/${involved.nam
  */
 const levelKey = (factory: string): string => `Level/${factory}`;
 
-/** Where the fold keeps the conflicts last said of the factory `factory`: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
+/**
+ * Where the fold keeps the conflicts last said of the factory `factory`: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets
+ * it.
+ */
 const conflictsKey = (factory: string): string => `Conflicts/${factory}`;
 
 /**

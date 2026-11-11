@@ -107,7 +107,10 @@ export const FactoryLine = Schema.Struct({
 }).annotate({ identifier: 'FactoryLine' });
 export type FactoryLine = typeof FactoryLine.Type;
 
-/** One line of the feed (`FeedLine`): a run's, a daemon's, the store's or a factory's. No identifier of its own, so the printer draws its members. */
+/**
+ * One line of the feed (`FeedLine`): a run's, a daemon's, the store's or a factory's. No identifier of its own, so the printer draws its
+ * members.
+ */
 export const FeedLine = Schema.Union([RunLine, DaemonLine, StoreLine, FactoryLine]);
 export type FeedLine = typeof FeedLine.Type;
 

@@ -356,7 +356,11 @@ test(
         const opened = await open();
         const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 4);
         await opened.reader.cancel();
-        assert.deepEqual(all.map((b) => b.event), ['run', 'step', 'factory', 'factory'], "a factory's line is never a daemon's or the store's");
+        assert.deepEqual(
+          all.map((b) => b.event),
+          ['run', 'step', 'factory', 'factory'],
+          "a factory's line is never a daemon's or the store's",
+        );
         assert.deepEqual(
           all.slice(2).map((b) => JSON.parse(b.data!).reason),
           ['ConflictsPending', 'ConflictsSettled'],

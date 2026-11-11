@@ -10,9 +10,9 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 49 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 2 of a factory, 38 distinct codes,
- * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
- * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
+ * **The codes are the owner's.** The 49 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 2 of a factory, 38
+ * distinct codes, eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read
+ * under its former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
  * **Recognition is ordered** (`reasonOf`): the prefix `denied: ` of a one-shot before the bare `denied` of a check a person refused; the
  * suffix `· BLOCKED` before the word it is suffixed to, since a step that signed off blocked waits on a person whatever its session came

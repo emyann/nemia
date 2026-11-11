@@ -6112,6 +6112,33 @@ that read none; the fold), `src/watch/selector.test.ts`, `test/run-feed.test.ts`
 What it leaves: a pause put and lifted between two passes is said by no line, as a hold's is. The Factory and InboxCard kinds keep their
 own later card.
 
+## Shipped: a factory's pending upgrade conflict reaches the feed, on a Factory kind (2026-11-11)
+
+The Factory controller wrote `ConflictsPending` to `factories/<name>/status.json`, which the board and `nemia factory ls` showed; Nemia
+learnt of a conflict only when she ran the upgrade herself or read the list. The Store kind's card left the Factory kind to its own.
+
+- **A `Factory` involved kind**, beside Run, Step, Daemon and Store, in `objects`' `INVOLVED_KINDS` and its glossary row `Involved`, so the
+  line is served as a nemia/v1 Event in the factory's namespace (`FactoryLine`, `isFactoryLine` in `src/feed/feed.ts`). Its codes, named
+  at design: `ConflictsPending` (`conflicts pending`) and `ConflictsSettled` (`conflicts settled`), both Normal — a wait on a person,
+  not a fault — `source: tick`, words that stand (`src/feed/reason.ts`, 49 entries, 38 codes), and in `objects`' `EVENT_REASONS`.
+- **The controller and the verbs write nothing.** The pass reads each templated factory's condition through the Factory door
+  (`conflictsNow`, `src/factory/applied/conflicts.verb.ts`) beside the levels, and hands it to `emitFeed`; `conflictsDue`
+  (`contracts/conflicts-said.contract.ts`) compares it to the reason the fold keeps under `Conflicts/<factory>`, so the condition turning
+  True is one line, turning back one, a reworded message none, and a restarted daemon says neither again. A factory never said pending
+  is never said settled.
+- **Every reader knows the kind**: `FeedLineSchema` (a fourth member), `involvedOf`, the fold, the log's fields (`factory`), the Event's
+  `kindOf` and `nameOf`, `nemia watch` and its selectors (`kind=Factory`, `reason=ConflictsPending`) and the cli's printer, the api's
+  `factory` SSE event (`objects`' `FEED_STREAM_EVENTS`), and the board, which reads its factories again on it. Nemia's selectors gain
+  `reason=ConflictsPending`, and the keeper puts her subscription again once.
+
+Tested in `contracts/conflicts-said.contract.ts`, `src/feed/reason.test.ts`, `src/feed/feed.test.ts`, `src/feed/feed.model.test.ts`,
+`src/event-object/event.test.ts`, `src/watch/selector.test.ts`, `src/nemia/nemia.test.ts`, `test/conflicts-feed.test.ts` (the story
+through a real conflict the controller writes, resolved and merged), objects' `test/event.test.ts`, the api's
+`src/gauges/feed.test.ts`, the board's `test/feed.test.ts` and the cli's `test/watch-lines.test.ts`.
+
+What it leaves: a factory's level is still a line of the store (`LevelChanged`), to move onto the Factory kind with a fold that reads
+both. A factory removed while its conflicts are pending is said settled by no line, as a level says nothing of a factory gone.
+
 ## Shipped: a harness's fence under its block, and what a step may override — `overridable:` (decision 12, slice 1, 2026-10-31)
 
 A step's and an agent's fence keys were written at the top level. They are written now under the block of the harness the file runs on,

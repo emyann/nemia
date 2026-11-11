@@ -90,8 +90,8 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
 const logged = (line: FeedLine): Effect.Effect<void> => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
 
 /**
- * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon, its store or its factory, its reason, type, try and
- * word.
+ * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon, its store or its factory, its reason,
+ * type, try and word.
  */
 const lineFields = (line: FeedLine): Record<string, unknown> => ({
   ...line.labels,

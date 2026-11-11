@@ -205,10 +205,20 @@ test("a factory's conflicts pending wake her, and only her — her selectors nam
     involved: { kind: 'Factory', name: 'acme' },
     labels: { factory: 'acme' },
   });
-  assert.deepEqual([pending.reason, pending.type, pending.waits], ['ConflictsPending', 'Normal', undefined], 'a wait on a person by her selector, not by waits');
+  assert.deepEqual(
+    [pending.reason, pending.type, pending.waits],
+    ['ConflictsPending', 'Normal', undefined],
+    'a wait on a person by her selector, not by waits',
+  );
   assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), pending), true, 'she is told of an upgrade waiting on a choice');
   assert.equal(selects(parseSelectors([...DEFAULT_SELECTORS]), pending), false, 'and nobody else is woken');
-  const settled = upgraded({ ...pending, word: LINE_WORDS.ConflictsSettled, reason: undefined, apiVersion: undefined });
+  const settled = upgraded({
+    at: '2026-11-11T14:00:00.000Z',
+    factory: 'acme',
+    word: LINE_WORDS.ConflictsSettled,
+    involved: { kind: 'Factory', name: 'acme' },
+    labels: { factory: 'acme' },
+  });
   assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), settled), false, 'their settling is routine news, in her digest');
 });
 

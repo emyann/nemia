@@ -323,6 +323,21 @@ erDiagram
     string message "optional"
     string call "optional"
   }
+  FactoryLine {
+    string at
+    string factory
+    string word
+    string note "optional"
+    string apiVersion "optional"
+    object involved "optional"
+    object labels "optional"
+    string reason "optional"
+    string type "optional"
+    string waits "optional"
+    string source "optional"
+    string message "optional"
+    string call "optional"
+  }
   Revision {
     enum kind
     string name
@@ -378,6 +393,7 @@ erDiagram
   Delivery ||--o{ RunLine : digest
   Delivery ||--o{ DaemonLine : digest
   Delivery ||--o{ StoreLine : digest
+  Delivery ||--o{ FactoryLine : digest
   Run ||--o{ RunLine : run
   WorkflowStep ||--o{ RunLine : step
   Try ||--o{ RunLine : try

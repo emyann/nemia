@@ -334,13 +334,21 @@ a client and for the board: its floor, strips and pickers read the RunList whole
 own `continue` token. The
 board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
 reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
-read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels and hold,
-and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each handler calling the
+read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels, hold and
+cancel, and a step's retry, approval and words — are endpoints of the same `Api` on the namespaced path alone, each handler calling the
 orchestrator's entry by its exported name with its typed `input` (`apps/api/src/objects/runs.ts`). The api serves the object, its list, its
 sub-resources and its actions through the `Api` of `objects` (`apps/api/src/objects/`, off the command table's entries and the app's one
 informer), and its OpenAPI 3.1 document is `OpenApi.fromApi(Api)` (`apps/api/src/openapi/`, printed by its `print.ts`), and `GET /openapi` serves a page to browse it (Scalar's
 reference, its script served by the api from the installed package, reading the document at its route). The board reads the Run and
 the Card through a client made from the same `Api` (`apps/web/src/lib/api/objects.ts`), with no schema of its own for either.
+
+**A coding agent operates a store through the api's MCP port** (`POST /mcp`, `apps/api/src/mcp/`), the one route the api serves that is
+no endpoint of the `Api`: MCP's Streamable HTTP, hosted by Hono beside the OpenAPI routes. Its tools are generated, never listed: each
+entry of the command table names the endpoints that serve it (`served`, an `EndpointLink` typed by `objects`' `ApiEndpointName`, held by
+`commandBreaks`; an entry with none is the command line's alone, its `only.why` saying why), and each link is a tool, its input the
+endpoint's Schema and its call that endpoint, made in-process with the caller's own `Authorization`. Who a request is from is judged
+before any router (`callerGate`) by the route's need of a token (`TokenNeed`): the port needs a person's token (`nemia token add`); every
+route of a store marked exposed (`WF_EXPOSED=1`) needs one; else none is the person.
 
 **What a harness can do is the runtime's**: each harness declares it once (`HarnessDeclaration`, agent-runtime's
 `src/harness/declaration.ts`), and every check above that used to name a harness reads the declaration — the orchestrator through

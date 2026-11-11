@@ -47,12 +47,17 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A new key in `STEP_KEYS` or `AGENT_KEYS` has sites here**: see `packages/agent-orchestrator/CLAUDE.md`.
 - **`objects`' `Api` is the one route table** (`docs/architecture.md`): every route the api serves is an endpoint there, served by the
   mount (`src/objects/serve.ts`, `.all(MOUNT, mount(runtime))` in `app.ts`), and Hono is the host alone — its middleware, the three
-  OpenAPI routes and the 404. A route is added to the `Api` and handled in its group's folder (`runs/`, `steps/`, `decide/`, `server/`,
+  OpenAPI routes, the MCP port and the 404. A route is added to the `Api` and handled in its group's folder (`runs/`, `steps/`, `decide/`, `server/`,
   `nemia/`, `workflows/`, `agents/`, `skills/`, `factory/`, `proposals/`, `src/objects/` for the runs and cards), never on Hono:
   `test/served.test.ts` derives what is served from the `Api`. A handler reads the request's services (`ServedNow`, the app's informer
   among them), never a layer of its own, and calls the package's verbs by type (`ENTRY.handler(input)` through `inRequest`, which gives it `StoreRoot` and `StoreConfig`),
   each request of a namespaced kind placed in its namespace's factory (`placeFor`, `answeredIn`), a write of yours taken in `default`
   alone. A refusal's status is its class's, said once (`refusedAs`, `statusOf`, `src/objects/refused.ts`).
+- **The MCP port (`/mcp`, `src/mcp/`) is a protocol host, not a resource**: it calls the `Api`'s own endpoints through the app's `fetch`
+  with the caller's `Authorization`, so every middleware, refusal and memo applies as to any client (a call logs two request lines). A
+  tool is a link of the command table (`served` on the entry, `toolsOf`), never added here; a non-GET call always sends a JSON body, which
+  the write guard asks for. A store marked exposed (`WF_EXPOSED=1`) refuses a request with no token on every route, the board's
+  included, and `/mcp` takes a person's token alone (`needOf`, `src/caller/caller.ts`).
 - **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
   never the `Authorization` header, and hands it to the package's program, which judges it (`src/proposals/`). A token refused is a 401
   on every route, not the proposals' alone. A test that presents a live token mints it through the package's `TokenDoor`, its run

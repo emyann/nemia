@@ -615,6 +615,16 @@
       "type": "TokenRecord"
     },
     {
+      "term": "Person token",
+      "meaning": "a token the person mints at the store's machine with `nemia token add <name>`, printed once and kept only as the record its sha-256 digest names under the store's `person-tokens` folder, `{ name, createdAt }` (`packages/agent-orchestrator/src/token/token.store.ts`); listed by name with `nemia token ls` and revoked with `nemia token rm <name>`. Every one of them is the person (`callerOf`, `packages/agent-orchestrator/src/token/token.ts`); the MCP port takes no other.",
+      "type": "PersonTokenFiled"
+    },
+    {
+      "term": "Token need",
+      "meaning": "what a request's route needs of a token (`packages/agent-orchestrator/src/token/token.ts`): `none`, where a request with none is the person; `token`, any live one, on every route of a store marked exposed (`WF_EXPOSED=1`, `Settings.exposed` in `packages/agent-orchestrator/src/config/config.store.ts`); `person`, a person's token, on the MCP port always. Refused `token-required` or `person-token-required`, a 401 that names the fix.",
+      "type": "TokenNeed"
+    },
+    {
       "term": "Show",
       "meaning": "the one spelling of a read of one thing: `nemia show` of a run, which prints the run object (`--raw` its record), the api's `skills show`.",
       "retired": [

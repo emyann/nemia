@@ -142,6 +142,14 @@
           "card": "4c: the words of what waits on you are `waitingOnYouWords`, and whether a wait is yours `waitingOnYou`"
         }
       ]
+    },
+    {
+      "term": "Port",
+      "meaning": "the MCP endpoint of the api, `POST /mcp` (`apps/api/src/mcp/port.ts`): Streamable HTTP, stateless, a Hono route beside the OpenAPI routes and the one route that is no endpoint of `objects`' `Api`. It needs a person's token, and serves the port tools by calling the `Api`'s own endpoints in-process with the caller's `Authorization`, so every refusal is the api's own."
+    },
+    {
+      "term": "Port tool",
+      "meaning": "a tool of the port, one for each endpoint link of the command table (`served`, read by `toolsOf`): named by its verb (spaces as `_`) or its link's `as`, described by the verb's help and usage, its input the endpoint's path, query and payload as one JSON Schema, and its `readOnlyHint` and `destructiveHint` from the verb's class and the endpoint's method (`toolHints`, `apps/api/src/mcp/hints.ts`); generated in `apps/api/src/mcp/tools.ts`, never listed by hand."
     }
   ]
 }

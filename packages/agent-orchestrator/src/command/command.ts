@@ -9,6 +9,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
 import { FORMER_MODES } from '../retry/index.ts';
 import { oneLine } from '../record/record.ts';
+import type { ApiEndpointName } from 'objects';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -191,10 +192,17 @@ export type Spec = {
 };
 
 /**
+ * An endpoint of `objects`' `Api` that serves a verb (`<group>.<endpoint>`, typed so a name no endpoint has does not compile), and the
+ * tool it is on the MCP port: the verb's name, its spaces as `_`, for the first link of an entry; `as` for every other.
+ */
+export type EndpointLink = { readonly endpoint: ApiEndpointName; readonly as?: string };
+
+/**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `class`, who
  * answers for it when an agent calls it (`CommandClass`); `only`, the side it is served on alone and why — an entry with none is served
- * on both, the api calling it by its exported name with its typed `input`; `manual`, the long help `nemia <name> --help` prints in place
+ * on both, the api calling it by its exported name with its typed `input`; `served`, the endpoints of the api that serve it, each a tool
+ * of the MCP port (`EndpointLink`) — an entry with none is the command line's alone, its `only.why` saying why; `manual`, the long help `nemia <name> --help` prints in place
  * of running it, where it has one; `ticks`, that what it files waits on the daemon's next pass, so the command line starts the daemon
  * where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's call of it is asked of the person every time, whatever its
  * session was allowed at a prompt or by a rule (`admissionOf`), on a command classed `ask` alone (`classBreaks`).
@@ -208,6 +216,7 @@ export type CommandSpec = {
   readonly writes: boolean;
   readonly class: CommandClass;
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
+  readonly served?: readonly [EndpointLink, ...EndpointLink[]];
   readonly manual?: string;
   readonly ticks?: true;
   readonly asksAlways?: true;

@@ -31,6 +31,8 @@ export {
   RunApprove,
   RunApproved,
   RunAsked,
+  RunCancelPlan,
+  RunCancelled,
   RunHeld,
   RunHold,
   RunPrune,
@@ -189,6 +191,7 @@ export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWr
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
+  type ApiEndpointName,
   BadRequest,
   Conflict,
   Failed,
@@ -357,6 +360,9 @@ export {
   SeriesPoint,
   SeriesRead,
   ServerGroup,
+  FeedWait,
+  FEED_WAIT_ENDS,
+  type FeedWaitEnd,
   Stats,
   StatsQuery,
   Subscribed,

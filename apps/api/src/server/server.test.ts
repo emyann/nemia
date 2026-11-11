@@ -49,6 +49,29 @@ test(
   },
 );
 
+test(
+  "GET /api/feed/wait answers a factory's line as an Event about the factory, its label query taking the factory's label",
+  WAITED,
+  async (t) => {
+    const was = followers();
+    const asked = app.request('/api/feed/wait?labelSelector=factory%3Dwait-f&for=60s');
+    await until(t, () => followers() === was + 1, 'the wait holds its cursor', { everyMs: 5 });
+    await runtime.runPromise(
+      emitFeed(new Map(), { memo, conflicts: [{ factory: 'wait-f', pending: true, message: 'one conflict waits' }] }).pipe(
+        Effect.provide(Logger.layer([])),
+      ),
+    );
+    const res = await asked;
+    assert.equal(res.status, 200, await res.clone().text());
+    const got = (await res.json()) as FeedWait;
+    assert.equal(got.ended, 'matched');
+    assert.deepEqual(
+      got.lines.map((e) => [e.involved.kind, e.involved.name, e.reason]),
+      [['Factory', 'wait-f', 'ConflictsPending']],
+    );
+  },
+);
+
 test('REFUSED: GET /api/feed/wait refuses a bound out of its form, none to wait or longer than a call lives, and a bad selector, 422', async () => {
   for (const query of ['for=soon', 'for=0s', 'for=5m', 'labelSelector=run%3D%3D', 'from=start']) {
     const res = await app.request(`/api/feed/wait?${query}`);

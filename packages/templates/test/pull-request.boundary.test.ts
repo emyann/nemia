@@ -1112,6 +1112,83 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
   assert.equal(reruns(cancelled.calls).length, 0);
 });
 
+/**
+ * A job's annotations as `gh api repos/{owner}/{repo}/check-runs/<id>/annotations` answered them, measured 2026-11-11 on public runs:
+ * a job GitHub cut off at its `timeout-minutes` (thomhurst/TUnit, job 127347565906, conclusion `cancelled`, no other field marking it),
+ * and a job cancelled by its workflow's concurrency (nodejs/node, job 130581766469), each as GitHub gave it, its blob address shortened.
+ */
+const annotation = (line: number, message: string) => ({
+  path: '.github',
+  blob_href: 'https://github.com/o/r/blob/07f7cd91643ac54904ee05c3f7d798b6bd1cd6ab/.github',
+  start_line: line,
+  start_column: null,
+  end_line: line,
+  end_column: null,
+  annotation_level: 'failure',
+  title: '',
+  message,
+  raw_details: '',
+});
+const TIMED_OUT_NOTES = JSON.stringify([annotation(1, 'The job has exceeded the maximum execution time of 45m0s')]);
+const CANCELLED_NOTES = JSON.stringify([
+  annotation(1, 'Canceling since a higher priority waiting request for Test Linux-aix_shared_patch exists'),
+  annotation(90, 'The operation was canceled.'),
+]);
+
+/** The CI context `ci` as the one job of run 1234, `id`, cancelled: GitHub's conclusion for a job it cut off at its time limit too. */
+const cancelledCi = (id: number, at = T1) => job('ci', id, at, { status: 'COMPLETED', conclusion: 'CANCELLED' });
+
+/** The wait on a head whose rollup reads `outs`, run 1234 on its first attempt, each job's annotations answered by `notes`, by job id. */
+function cutOffThen(outs: string[], notes: Record<number, string>) {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs },
+    ...Object.entries(notes).map(([id, out]): Rule => ({ when: `check-runs/${id}/annotations`, out })),
+    { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: 1 }) },
+    { when: 'run rerun' },
+    { when: 'actions/jobs', out: stamped(['Error: a test hung', 'The operation was canceled.']) },
+  ]);
+  return pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+}
+
+test("a ci job GitHub cut off at its timeout-minutes is red, re-run once, and the work's; one cancelled otherwise stays a person's", () => {
+  const passed = cutOffThen([checks(cancelledCi(5678)), checks(cancelledCi(5678), job('ci', 6678, T2, PASSED_RUN))], {
+    5678: TIMED_OUT_NOTES,
+  });
+  assert.equal(passed.code, 0, passed.err);
+  assert.deepEqual(
+    reruns(passed.calls).map((call) => call.argv),
+    [['run', 'rerun', '1234', '--failed']],
+    'the timed-out job is re-run once, as any red',
+  );
+  assert.ok(
+    asked(passed.calls, 'api').some((call) => call.argv[1]?.startsWith('repos/{owner}/{repo}/check-runs/5678/annotations')),
+    "the mark is read off the job's annotations",
+  );
+
+  const twice = cutOffThen([checks(cancelledCi(5678)), checks(cancelledCi(5678), cancelledCi(6678, T2))], {
+    5678: TIMED_OUT_NOTES,
+    6678: TIMED_OUT_NOTES,
+  });
+  assert.equal(twice.code, 1, twice.out);
+  assert.equal(reruns(twice.calls).length, 1, 'never a second re-run');
+  assert.doesNotMatch(twice.err, TAGGED, 'the exit says whose it is, no line does');
+  assert.ok(
+    asked(twice.calls, 'api').some((call) => call.argv[1] === 'repos/{owner}/{repo}/actions/jobs/6678/logs'),
+    'its log is read',
+  );
+
+  const cancelled = cutOffThen([checks(cancelledCi(5678))], { 5678: CANCELLED_NOTES });
+  assert.equal(cancelled.code, PERSONS, cancelled.out);
+  assert.equal(reruns(cancelled.calls).length, 0, 'a job cancelled by concurrency or a person is not re-run');
+
+  for (const unread of [{ 5678: 'not json' }, {}]) {
+    const r = cutOffThen([checks(cancelledCi(5678))], unread);
+    assert.equal(r.code, PERSONS, `annotations that cannot be read mark nothing: ${r.out}`);
+  }
+});
+
 test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
   const at = (await renders()).round;
   const check = stepsOf(at, 'build').find((step) => step.name === 'implement')?.check;

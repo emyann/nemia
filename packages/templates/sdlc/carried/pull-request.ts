@@ -37,7 +37,10 @@
  *   absent context refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
  *   test with its diff, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why
  *   CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the check's
- *   own (`WF_STEP`). A red it judged — a failure, never one only cancelled, skipped or neutral — is not refused at once: the failed jobs
+ *   own (`WF_STEP`). A job of the context GitHub cut off at its own `timeout-minutes` reads `cancelled` like one cancelled by concurrency
+ *   or a person, and only its check run's annotations tell them apart (`gh api repos/{owner}/{repo}/check-runs/<id>/annotations`, read
+ *   once per cancelled job), so one marked as having exceeded its maximum execution time is read as `TIMED_OUT`, a red (`timedOut`).
+ *   A red it judged — a failure or a time-out, never one only cancelled, skipped or neutral — is not refused at once: the failed jobs
  *   of each workflow run the context's red entries name are re-run, once (`gh run rerun <id> --failed`, which brings back the jobs that
  *   depend on them), and waited on again within the same 2400 s. Once is read from GitHub, never carried: a run is re-run only while
  *   its `run_attempt` (`gh api repos/{owner}/{repo}/actions/runs/<id>`) is 1, so a `--recheck` or a later try never re-runs it again.
@@ -59,9 +62,9 @@
  * labels are not as above; a `wait` with no `--check`; and a CI context that is red, cancelled, skipped or never reported. A refusal a
  * change to the branch cannot answer — no `gh` or none authenticated, no `origin`, two open pull requests, a draft or another base, the
  * label rules, `WF_LABELS`, a run whose labels match no rule, or the repository's labels, a `push` or `wait` given other arguments than
- * its check line's, and a CI context never reported, still pending at the bound, or only cancelled, skipped or neutral — exits 78
- * instead (`PERSONS_EXIT`, `exec.ts`), the code the `checkFailurePolicy:` of the step whose check runs this names: the run tries the
- * step no more on it and waits on the person, who answers it, then has the check run again.
+ * its check line's, and a CI context never reported, still pending at the bound, or only cancelled (but at its time limit), skipped or
+ * neutral — exits 78 instead (`PERSONS_EXIT`, `exec.ts`), the code the `checkFailurePolicy:` of the step whose check runs this names: the
+ * run tries the step no more on it and waits on the person, who answers it, then has the check run again.
  *
  * A red the work answers says one thing more where the base is red too: the wait asks GitHub for the commit of the base the head holds
  * (`gh api repos/{owner}/{repo}/compare/<base>...<head>`), reads the CI context there over REST, and where it failed, the refusal says so
@@ -441,6 +444,41 @@ function why(entries: readonly Entry[], check: string): string[] {
   }
   return ['the jobs that did not pass:', ...listing(failed), ...logs];
 }
+
+/**
+ * The mark GitHub leaves on a job it cut off because it ran past its own `timeout-minutes`: the job's conclusion is `cancelled`, as a
+ * job cancelled by concurrency or by a person is, and no field of the job or of its check run says otherwise; only an annotation of its
+ * check run does, `The job has exceeded the maximum execution time of 45m0s` (measured 2026-11-11 on public runs; a concurrency's
+ * cancel says `Canceling since a higher priority waiting request … exists` there instead).
+ */
+const TIME_LIMIT = /has exceeded the maximum execution time/;
+
+/** Whether GitHub cut the job `id` off at its time limit, by its check run's annotations, read once per job; unread, it was not. */
+const cutOff = (() => {
+  const known = new Map<string, boolean>();
+  return (id: string): boolean => {
+    const was = known.get(id);
+    if (was !== undefined) return was;
+    const notes = hinted<unknown>(read('api', `repos/{owner}/{repo}/check-runs/${id}/annotations?per_page=100`));
+    const marked =
+      Array.isArray(notes) &&
+      notes.some((note: { message?: unknown } | null) => typeof note?.message === 'string' && TIME_LIMIT.test(note.message));
+    known.set(id, marked);
+    return marked;
+  };
+})();
+
+/**
+ * `entries` with each cancelled job of the CI context `check` that GitHub cut off at its time limit (`cutOff`) read as GitHub's own
+ * conclusion for it, `TIMED_OUT`: a red, the work's, re-run once as any red, since a test that hangs is the change's to answer. A
+ * cancelled entry without the mark, or that names no job, stays cancelled, a person's.
+ */
+const timedOut = (entries: readonly Entry[], check: string): Entry[] =>
+  entries.map((entry) => {
+    const id = jobIdOf(entry);
+    const cancelled = nameOf(entry) === check && !pending(entry) && verdict(entry) === 'CANCELLED';
+    return cancelled && id && cutOff(id) ? { ...entry, conclusion: 'TIMED_OUT' } : entry;
+  });
 
 /** The options of `open`: the title, the file its body is read from, and the rules it labels by, `--labels ""` giving none. */
 function openArgs(args: string[]): { title: string; bodyFile: string; rules: LabelRule[] } {
@@ -873,7 +911,7 @@ function wait(args: string[]): string[] {
   let rerun: Rerun | undefined;
   let dispatch: Dispatch | undefined;
   for (;;) {
-    const entries = latest(retried(`the checks of #${pr.number}`, () => rollup(pr.number), began, retry));
+    const entries = timedOut(latest(retried(`the checks of #${pr.number}`, () => rollup(pr.number), began, retry)), check);
     const ours = entries.filter((entry) => nameOf(entry) === check);
     const red = ours.filter(judgedRed);
     rerun ??= rerunOnce(ours, entries);

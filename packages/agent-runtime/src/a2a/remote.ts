@@ -51,7 +51,7 @@ import type { SessionState, Sighting } from '../core/index.ts';
 import { RunnerError, type SpawnRequest, type TranscriptCursor } from '../harness/index.ts';
 import { instantNow } from '../core/engine/now.ts';
 import { entryVerbsOf, readEntry, registryOf, type Entry } from './entry.ts';
-import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
+import { LOG_MESSAGES, logsOfReply, logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { turnOver } from './remote-events.ts';
 import type { SeamOps } from './client.ts';
 import { pacesOf, remoteFollowOf, remoteTranscriptByName, remoteTranscriptOf, type FollowDeps } from './remote-follow.ts';
@@ -131,7 +131,8 @@ export type RemoteOptions = {
  * - `stop` cancels the Task; a reply or a refusal is no Task and nothing runs; a send still under way is cut if this
  *   process makes it, and one another process makes is its to answer, a Task it brings back cancelled on the next stop.
  *   A Task that has ended, or that the agent does not have, has nothing to stop.
- * - `logs` reads the Task's history, or the entry's words when there is no Task.
+ * - `logs` reads the Task's last `LOG_MESSAGES` messages, or the entry's words when there is no Task: each part quoted, the
+ *   whole kept to its last `LOGS_CHARS` under a line that says it was cut (`logsOfTask`); the transcript reads the whole.
  * - `stop` and `logs` read an entry open or let go of (`bySession`): by the Task's id, the message's id, or
  *   its context — the id a settled task's attempt records for a remote agent, what a later turn continues — read as the
  *   latest Task sent in it. A registry folder not yet made is read as empty.
@@ -375,7 +376,7 @@ export const remoteOps = (
       catch: failure('logs'),
       try: async () => {
         const e = bySession(sessionId);
-        if (e?.reply !== undefined) return `agent: ${e.reply}`;
+        if (e?.reply !== undefined) return logsOfReply(e.reply);
         if (e?.refused !== undefined) return `REJECTED — ${e.refused}`;
         if (e && e.seen?.state === 'canceled' && e.taskId === e.messageId)
           return `CANCELED — stopped while it was being sent, before the agent answered`;
@@ -386,7 +387,7 @@ export const remoteOps = (
         }
         const taskId = e?.taskId ?? sessionId;
         try {
-          return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: undefined })));
+          return logsOfTask(await ask((c) => c.getTask({ tenant: '', id: taskId, historyLength: LOG_MESSAGES })), LOG_MESSAGES);
         } catch (err) {
           if (err instanceof TaskNotFoundError) return `(the agent no longer has the Task \`${taskId}\`)`;
           throw err;

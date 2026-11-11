@@ -5,8 +5,19 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Role, TaskState, type Artifact, type Part, type Task } from '@a2a-js/sdk';
-import { logsOfTask, messageRefusal, remoteFollowUpOf, remoteMessageOf, RUNTIME_EXTENSION, sightingOfTask } from './map.ts';
+import { Role, TaskState, type Artifact, type Message, type Part, type Task } from '@a2a-js/sdk';
+import {
+  LOG_PART_CHARS,
+  LOGS_CHARS,
+  LOGS_CUT,
+  logsOfReply,
+  logsOfTask,
+  messageRefusal,
+  remoteFollowUpOf,
+  remoteMessageOf,
+  RUNTIME_EXTENSION,
+  sightingOfTask,
+} from './map.ts';
 import type { SessionState } from '../core/session.ts';
 
 const text = (value: string): Part => ({ content: { $case: 'text', value }, metadata: undefined, filename: '', mediaType: '' });
@@ -155,6 +166,76 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
         },
       ],
     };
-    assert.equal(logsOfTask(t), 'user: do it\nCOMPLETED — finished\nartifact a1: {"ok":true}');
+    assert.equal(logsOfTask(t), 'user: do it\nartifact a1: {"ok":true}\nCOMPLETED — finished');
+  });
+
+  await t.test("a remote agent's logs are bounded, say when they were cut, and end on the Task's state", async (t) => {
+    const message = (role: Role, words: string, id = 'm'): Message => ({
+      messageId: id,
+      contextId: 'c-1',
+      taskId: 't-1',
+      role,
+      parts: [text(words)],
+      metadata: undefined,
+      extensions: [],
+      referenceTaskIds: [],
+    });
+    const flood = 'x'.repeat(100_000);
+    const done = TaskState.TASK_STATE_COMPLETED;
+    const ROWS: Array<{ name: string; task: Task; asked?: number; cut: boolean; last: string }> = [
+      { name: 'a 100,000-character artifact', task: taskIn(done, [artifact(text(flood))]), cut: true, last: 'COMPLETED' },
+      {
+        name: 'a 100,000-character status',
+        task: {
+          ...taskIn(TaskState.TASK_STATE_FAILED),
+          status: { state: TaskState.TASK_STATE_FAILED, timestamp: undefined, message: message(Role.ROLE_AGENT, flood) },
+        },
+        cut: true,
+        last: `FAILED — ${'x'.repeat(LOG_PART_CHARS)}…`,
+      },
+      {
+        name: 'five artifacts of a part each',
+        task: taskIn(
+          done,
+          Array.from({ length: 5 }, () => artifact(text('y'.repeat(LOG_PART_CHARS)))),
+        ),
+        cut: true,
+        last: 'COMPLETED',
+      },
+      {
+        name: 'a history as long as the messages asked for',
+        task: { ...taskIn(done), history: [message(Role.ROLE_USER, 'a', 'u'), message(Role.ROLE_AGENT, 'b', 'v')] },
+        asked: 2,
+        cut: true,
+        last: 'COMPLETED',
+      },
+      {
+        name: "a 100,000-character artifact's name",
+        task: taskIn(done, [{ ...artifact(text('ok')), name: flood }]),
+        cut: true,
+        last: 'COMPLETED',
+      },
+      {
+        name: 'a short Task, with fewer messages than asked for',
+        task: { ...taskIn(done), history: [message(Role.ROLE_USER, 'a', 'u')] },
+        asked: 2,
+        cut: false,
+        last: 'COMPLETED',
+      },
+    ];
+    for (const row of ROWS) {
+      await t.test(row.name, () => {
+        const logs = logsOfTask(row.task, row.asked);
+        assert.ok(logs.length <= LOGS_CHARS, `${logs.length} characters`);
+        assert.equal(logs.startsWith(`${LOGS_CUT}\n`), row.cut);
+        assert.equal(logs.split('\n').at(-1), row.last);
+      });
+    }
+    await t.test('a 100,000-character reply', () => {
+      const logs = logsOfReply(flood);
+      assert.equal(logs.length, LOGS_CHARS);
+      assert.ok(logs.startsWith(`${LOGS_CUT}\n`));
+      assert.equal(logsOfReply('done'), 'agent: done');
+    });
   });
 });

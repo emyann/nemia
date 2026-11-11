@@ -115,6 +115,8 @@ export type RemoteServer = {
   counts: Record<string, number>;
   /** Every message the agent was sent, in order. */
   sent: Message[];
+  /** The params of every GetTask the agent was asked, in order: the Task's id and how many of its messages were asked for. */
+  gets: Array<{ id?: string; historyLength?: number }>;
   /** The headers of every request that reached the A2A routes, auth refused or not. */
   headers: http.IncomingHttpHeaders[];
   /** The path of every request that reached the A2A routes, in order: which binding each call came on. */
@@ -185,6 +187,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   const bindings = o.bindings ?? ['JSONRPC', 'HTTP+JSON'];
   const script = o.script ?? (() => []);
   const counts: Record<string, number> = {};
+  const gets: RemoteServer['gets'] = [];
   const sent: Message[] = [];
   const headers: http.IncomingHttpHeaders[] = [];
   const paths: string[] = [];
@@ -386,6 +389,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
       return (...args: unknown[]) => {
         counts[key] = (counts[key] ?? 0) + 1;
         if (key === 'sendMessage') sent.push((args[0] as { message: Message }).message);
+        if (key === 'getTask') gets.push({ ...(args[0] as { id?: string; historyLength?: number }) });
         const id = (args[0] as { id?: string } | undefined)?.id;
         if (key === 'getTask' && id !== undefined && forgotten.has(id)) return Promise.reject(notFound(id));
         if (key === 'resubscribe' && id !== undefined && forgotten.has(id)) return unfound(id);
@@ -432,6 +436,7 @@ export async function remoteServer(o: ServerOptions = {}): Promise<RemoteServer>
   return {
     url: `${base}${prefix}`,
     counts,
+    gets,
     sent,
     headers,
     paths,

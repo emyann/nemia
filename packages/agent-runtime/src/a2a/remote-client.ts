@@ -46,11 +46,21 @@ const cardUrlOf = (address: string): URL => {
   return new URL('.well-known/agent-card.json', url);
 };
 
-/** An address as its words show it: origin and path, never the query, which can carry a key (as the api's `remoteOf` shows one). */
-const shownUrl = (u: string | URL | Request): string => {
+/**
+ * An address as its words show it: origin and path, never the query, which can carry a key (as the api's `remoteOf` shows one). The
+ * path is quoted: a request's address is an interface the agent's card served, whose path can be any length.
+ * Exported only for the tests that import it.
+ */
+export const shownUrl = (u: string | URL | Request): string => {
   const url = new URL(u instanceof Request ? u.url : u);
-  return `${url.origin}${url.pathname}`;
+  return `${url.origin}${quote(url.pathname, WORDS_QUOTE)}`;
 };
+
+/**
+ * How much of the words a caller's `missing` gives a refusal quotes: they name the card's scheme, which a served card can make any
+ * length, around a fix of a few sentences (the variable to set, where to set it), which this keeps whole for a scheme of a usual name.
+ */
+export const MISSING_QUOTE = 1_000;
 
 /** The bindings this runtime speaks, as a card names them: gRPC is not one. */
 const SPOKEN = ['JSONRPC', 'HTTP+JSON'];
@@ -82,7 +92,7 @@ const headerOf = (
   const needed = (header: string, value: (secret: string) => string): [string, string] | string => {
     const given = secret();
     return given === undefined || given === ''
-      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``}`
+      ? `\`${name}\` needs a secret, and \`credentials\` gave none: ${quote(missing() ?? `give \`Engine.layer\` a \`credentials\` that answers for \`${name}\``, MISSING_QUOTE)}`
       : [header, value(given)];
   };
   switch (s.$case) {

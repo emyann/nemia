@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, RunList, StepTries, WAIT_ON } from 'objects';
+import { API_VERSION, GATE_BUDGETS_FROM, RUN_PHASES, Run, RunList, RunSaid, RunSay, StepTries, WAIT_ON } from 'objects';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 const read = (name: string): string => fs.readFileSync(path.join(FIXTURES, name), 'utf8');
@@ -138,4 +138,25 @@ test('a RunList asked by state carries each run state, frame part, its counts an
   );
   const plain = { apiVersion: API_VERSION, kind: 'RunList', metadata: {}, items: [run] };
   assert.deepEqual(Schema.encodeSync(RunList)(Schema.decodeUnknownSync(RunList)(plain)), plain);
+});
+
+test("words said to a step's session say who said them where an agent did; REFUSED: an agent with no name", () => {
+  const operator = { kind: 'agent', name: 'operator' } as const;
+  assert.deepEqual(Schema.decodeUnknownSync(RunSay)({ text: 'Cut it.' }), { text: 'Cut it.' }, 'the person says no `from`');
+  assert.deepEqual(Schema.decodeUnknownSync(RunSay)({ text: 'Cut it.', from: operator }).from, operator);
+  assert.equal(Schema.decodeUnknownResult(RunSay)({ text: 'Cut it.', from: { kind: 'agent' } })._tag, 'Failure', 'an agent names itself');
+  const framed = 'The agent operator writes, not the person: Cut it.';
+  const said = { at: '2026-11-11T10:00:00.000Z', attempt: 1, text: framed, after: null, from: operator, words: 'Cut it.' };
+  assert.deepEqual(Schema.encodeSync(RunSaid)(Schema.decodeUnknownSync(RunSaid)(said)), said, 'encoded back equal');
+  const withSaid = (entry: unknown): unknown => {
+    const run = structuredClone(judged) as { status: { steps: { said: unknown[] }[] } };
+    const step = run.status.steps[0];
+    assert.ok(step);
+    step.said = [entry];
+    return run;
+  };
+  const decoded = Schema.decodeUnknownSync(Run)(withSaid(said));
+  assert.deepEqual(decoded.status.steps[0]?.said[0]?.from, operator, "the step's status carries who said it");
+  assert.equal(decoded.status.steps[0]?.said[0]?.words, 'Cut it.');
+  assert.equal(Schema.decodeUnknownResult(Run)(withSaid({ ...said, from: { kind: 'agent' } }))._tag, 'Failure');
 });

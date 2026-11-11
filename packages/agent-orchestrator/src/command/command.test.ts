@@ -243,6 +243,24 @@ test('the command line a refusal shows names what was given and the usage of wha
   assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
 });
 
+test("a rest takes the command's own flags given between its required arguments and its words, and every word after them as said", () => {
+  const spec: Spec = {
+    positionals: [
+      { key: 'runId', takes: 'required', kind: 'name' },
+      { key: 'text', takes: 'rest', kind: 'text' },
+    ],
+    flags: [{ flag: '--as', kind: 'name', key: 'as' }],
+    unknown: (arg) => `no ${arg}`,
+  };
+  assert.deepEqual(parseArgv(spec, ['r-1', '--as', 'operator', 'cut', 'it']), { runId: 'r-1', as: 'operator', text: 'cut it' });
+  assert.deepEqual(
+    parseArgv(spec, ['r-1', 'cut', '--as', 'operator']),
+    { runId: 'r-1', text: 'cut --as operator' },
+    'after the words, words',
+  );
+  assert.deepEqual(parseArgv(spec, ['r-1', '--other', 'x']), { runId: 'r-1', text: '--other x' }, 'a flag it has none of, words');
+});
+
 test('a command line says the flags it is given after its positionals, in the order its spec lists them', () => {
   const two: Spec = {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
@@ -496,11 +514,15 @@ test("the table's help is today's, word for word", () => {
       '                               cleanly goes back to merge it, once, on the next tick, on the round it',
       '                               is on, which the merge does not spend; the step is the one that closes',
       '                               the loop, left out where the run has one loop',
-      '  nemia say <runId> <step> "<words>"',
+      '  nemia say <runId> <step> [--as <name>] "<words>"',
       "                               tell a step's running session something, through its harness: the",
       "                               engine journals the words on the step's task, nemia ls notes the step",
       '                               said to, and nemia decide prints them under it. A try that continues',
-      '                               the session is handed them again, as ## Said to your session',
+      '                               the session is handed them again, as ## Said to your session.',
+      "                               Words from a session its run filed are its agent's, by its token",
+      '                               (WF_SESSION_TOKEN); an agent with none says --as <name> before its',
+      "                               words, a name the person allowed with nemia chat allow. An agent's",
+      '                               words reach the step under its name, never as yours',
       '  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]',
       '                               runs and their steps — a run waiting on another says waiting on <run>,',
       '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
@@ -698,8 +720,9 @@ test("the table's help is today's, word for word", () => {
       '  nemia chat speakers',
       '                               the names an agent may speak under in her chat, each one you allowed',
       '  nemia chat allow <name>',
-      '                               let an agent speak in her chat under a name: its words reach her and the',
-      '                               board as its own, never as yours. Asked of you every time',
+      "                               let an agent speak in her chat under a name, and to a step's session",
+      '                               (nemia say --as <name>): its words reach her, the step and the board as',
+      '                               its own, never as yours. Asked of you every time',
       '  nemia chat disallow <name>',
       '                               take a name back: words under it are refused. Asked of you every time',
       '  nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]',

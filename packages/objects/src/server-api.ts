@@ -36,7 +36,7 @@ const Json = Schema.Unknown;
 const OrNull = <S extends Schema.Top>(s: S) => Schema.NullOr(s);
 
 /** `GET /api/health`: the api answers. */
-export const Health = Schema.Struct({ ok: Schema.Literal(true) });
+export const Health = Schema.Struct({ ok: Schema.Literal(true), release: Schema.optionalKey(Schema.String) });
 export type Health = typeof Health.Type;
 
 /** Where the code runs from: the two words a session's release says (`SessionRelease`, run.ts). */

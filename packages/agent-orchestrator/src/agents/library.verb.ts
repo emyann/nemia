@@ -1,15 +1,16 @@
 /**
  * The agent library as entries of the command table: an agent of yours written (`AGENTS_WRITE`, `writeAgent`), copied in from a file
- * (`AGENTS_COPY`, `copyAgent`), removed (`AGENTS_REMOVE`,
- * `removeAgent`) and tried on a short brief (`AGENTS_TRY`, `tryAgent`), served on both sides — the command line reads the agent's file
- * (`cli/writers.ts`), the board sends its form — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api
- * guards each write and words the board's answer around what each entry answers.
+ * (`AGENTS_COPY`, `copyAgent`), removed (`AGENTS_REMOVE`, `removeAgent`) and tried on a short brief (`AGENTS_TRY`, `tryAgent`), served on
+ * both sides — the client (`apps/cli`) holds `agents write`'s words (`objects`' `COMMAND_WORDS`) and sends the form the api read off the
+ * agent's file, the board sends its own — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api guards
+ * each write and words the board's answer around what each entry answers.
  */
-import { fromPlace, givesNone, refusing, notSent } from '../command/requests.verb.ts';
+import { fromPlace, refusing } from '../command/requests.verb.ts';
+import { AGENTS_WRITE_WORDS } from 'objects';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
@@ -99,12 +100,6 @@ export const AgentTryInput = Schema.Struct({
 });
 export type AgentTryInput = typeof AgentTryInput.Type;
 
-/** The words a written agent is said in: each file written and removed, and the version it is at now, which a change of it gives. */
-const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): string[] => [
-  `${agent.name} written in ${dir}, at version ${version}: ${written.join(', ')}`,
-  ...(removed.length ? [`removed: ${removed.join(', ')}`] : []),
-];
-
 /**
  * An agent of yours written through the Agent door (`AgentDoor`, run at the store's root (`StoreRoot`) its handler is given): `draft`, the
  * agent as JSON text, which the command line reads off `--file`; `schema`, the result schema its `output:` names as JSON text, read
@@ -113,38 +108,7 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
  * `--factory` names for the place `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
  */
 export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
-  name: 'agents write',
-  served: [
-    { endpoint: 'agents.create', takes: givesNone('version'), request: notSent('agents write') },
-    { endpoint: 'agents.replace', as: 'agents_replace', request: notSent('agents write') },
-  ],
-  usage: '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
-  help: [
-    'an agent of yours, or of a templated --factory, written from its file:',
-    '<name> is the agent it changes or renames, at the --version it was',
-    'read at; none, a new one',
-  ],
-  spec: writerSpec(
-    'agents write',
-    '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
-    [FROM, { key: 'name', takes: 'optional', kind: 'name' }],
-    [
-      cliPath(
-        'agents write',
-        'file',
-        "the agent's file, <name>.md, with the result schema its output: names beside it",
-        "the api is sent the agent's form, never a path to read",
-      ),
-      versionFlag('agents write', 'the agent'),
-      factoryFlag('agents write'),
-    ],
-  ),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Agent's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
-  },
+  ...AGENTS_WRITE_WORDS,
   input: AgentWriteInput,
   handler: ({ from, name, factory, version, draft, schema, ...given }) =>
     Effect.gen(function* () {
@@ -162,7 +126,7 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
         ...(repo !== undefined && { repo }),
       });
     }),
-  print: writtenLines,
+  print: () => [],
 };
 
 /** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */

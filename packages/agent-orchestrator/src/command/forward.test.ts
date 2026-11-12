@@ -13,10 +13,13 @@ import { Schema } from 'effect';
 import { CLI_VERBS } from './command.ts';
 import { TABLE } from './commands.verb.ts';
 import { forwardedCall, forwardedOf, linkOf, partsOf, refusalOfStatus, unsentOf } from './forward.verb.ts';
-import { Api, endpointKeysOf } from 'objects';
+import { Api, COMMAND_WORDS, endpointKeysOf } from 'objects';
 
-/** The entries a command line runs, so forwards: every one but those the api alone serves, which no line reaches. */
-const RUN_HERE = [...TABLE.filter((c) => c.only?.side !== 'api'), ...CLI_VERBS];
+/**
+ * The entries a command line runs, so forwards: every one but those the api alone serves, which no line reaches, and those whose words
+ * the client holds (`COMMAND_WORDS`), which it runs through the api itself and never forwards.
+ */
+const RUN_HERE = [...TABLE.filter((c) => c.only?.side !== 'api' && !COMMAND_WORDS.some((w) => w.name === c.name)), ...CLI_VERBS];
 
 test('every key of an entry linked with no request reaches the endpoint the link calls: its path, its query or its payload', () => {
   const unsent = RUN_HERE.flatMap(unsentOf);

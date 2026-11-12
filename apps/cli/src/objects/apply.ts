@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import { parseAllDocuments } from 'yaml';
 import { API_VERSION, type APIResource, DEFAULT_NAMESPACE } from 'objects';
 import type { ApplyOf } from '../../contracts/apply.contract.ts';
-import { asked, discovered, noLocal } from '../objects.ts';
+import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
 import { type Applied, KIND_CALLS, orNone, type Prepared, type Served } from './kinds.ts';
 
@@ -239,7 +239,6 @@ export async function apply(args: readonly string[]): Promise<number> {
     process.stdout.write(APPLY_HELP);
     return 0;
   }
-  if (args.includes('--local')) throw noLocal('apply');
   const { file, namespace } = parsed(args);
   const objects = objectsOf(textOf(file), file);
   if (objects.length === 0) throw new Refused(`nemia apply: ${file} holds no object: write one, then \`nemia apply -f ${file}\``);

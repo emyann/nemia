@@ -3,17 +3,23 @@
  * started once on demand — the in-process `nemia daemon --json` (`local.ts`), which starts the store's daemon as any ticking command does
  * (`ensureDaemon`) — and waited for by its readiness, `GET /api/health` answering at the url it said or its lease names, polled until it
  * answers or `READY_WITHIN_MS` is gone. A read never asks twice: it asks once, of a daemon that answered. Refused, exit 2, where none
- * comes up or the start is off (`NEMIA_DAEMON_START=off`), naming the command that reads in process and the one that installs the service.
+ * comes up or the start is off (`NEMIA_DAEMON_START=off`), naming the command that starts one here (`nemia up`) and the one that installs
+ * the service.
+ *
+ * The readiness probe reads the daemon's release (`Health.release`) beside it: a daemon of another release than this client's
+ * (`clientRelease`, `releaseMet`) is refused, exit 2, naming `nemia version` on both machines; one that says none is let through.
  *
  * Under a remote context (`context.ts`) the daemon is the context's server: asked there, never started, and this machine's lease never
  * read; one that takes no connection is refused, exit 2, naming the context and `nemia config get-contexts`. A context the config does
  * not hold is refused too.
  */
-import { Effect, Option, Schedule } from 'effect';
+import { Effect, Option, Schedule, Schema } from 'effect';
+import { Health } from 'objects';
 import { sessionHeaders } from './client.ts';
 import { chosenOf, unheld } from './context.ts';
 import { captured } from './local.ts';
 import { Refused } from './refused.ts';
+import { clientRelease, releaseMet } from './release.ts';
 import { servedAt } from './where.ts';
 
 /** The setting that turns the start off, as the orchestrator reads it. */
@@ -34,19 +40,56 @@ const PROBE_MS = 1_000;
 /** How often a start polls its readiness. */
 const POLL_EVERY = '100 millis';
 
+/** What a probe tells of a daemon: answers (any status), silent on the connection, or none listening. */
+export type Probe = 'answers' | 'silent' | 'refused';
+
+/** The release a health answer says: `Health.release` where the body reads as `Health` and says one, else null. */
+const releaseIn = (body: string): string | null => {
+  try {
+    return Option.match(Schema.decodeUnknownOption(Health)(JSON.parse(body)), {
+      onNone: () => null,
+      onSome: (health) => health.release ?? null,
+    });
+  } catch {
+    return null;
+  }
+};
+
 /**
- * What a daemon at `base` does when asked `READY_PATH`, with the session's token as every request is (`sessionHeaders`): answers (any
- * status); takes the connection and says nothing within `PROBE_MS` (`silent`: one holds the port, and a read is to be bounded
- * rather than start another); or takes none (`refused`).
+ * What a daemon at `base` does when asked `READY_PATH`, with the session's token as every request is (`sessionHeaders`), and the
+ * release it says there: answers (any status; its release where a 2xx body reads as `Health` and says one, else null); takes the
+ * connection and says nothing within `PROBE_MS` (`silent`: one holds the port, and a read is to be bounded rather than start
+ * another); or takes none (`refused`).
  */
-export async function probe(base: string, env: NodeJS.ProcessEnv = process.env): Promise<'answers' | 'silent' | 'refused'> {
+export async function probed(
+  base: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<{ readonly probe: Probe; readonly release: string | null }> {
   try {
     const response = await fetch(new URL(READY_PATH, base), { headers: sessionHeaders(env), signal: AbortSignal.timeout(PROBE_MS) });
-    await response.body?.cancel();
-    return 'answers';
+    if (!response.ok) {
+      await response.body?.cancel();
+      return { probe: 'answers', release: null };
+    }
+    return { probe: 'answers', release: releaseIn(await response.text()) };
   } catch (err) {
-    return err instanceof Error && err.name === 'TimeoutError' ? 'silent' : 'refused';
+    return { probe: err instanceof Error && err.name === 'TimeoutError' ? 'silent' : 'refused', release: null };
   }
+}
+
+/** What a daemon at `base` does when asked `READY_PATH` (`probed`), its release left aside. */
+export const probe = async (base: string, env: NodeJS.ProcessEnv = process.env): Promise<Probe> => (await probed(base, env)).probe;
+
+/**
+ * `base`, where the daemon there says a release this client's meets or says none (`releaseMet`); refused, exit 2, where the two differ,
+ * naming `nemia version` on both machines: a client and a daemon of two releases have no layer between them.
+ */
+export function releaseHeld(verb: string, base: string, daemon: string | null, client: string | null): string {
+  if (releaseMet(client, daemon) !== 'differs') return base;
+  throw new Refused(
+    `nemia ${verb}: this nemia is ${client ?? 'a checkout'} and the daemon at ${base} runs ${daemon ?? 'a checkout'}, and a client asks only a daemon of its own release. ` +
+      "Type `nemia version` on both machines, then upgrade the older to the other's release (`nemia upgrade <tag>`), or run this command with the nemia of the daemon's release",
+  );
 }
 
 /** The url a `nemia daemon --json` answered on its last line, where it names one. */
@@ -60,12 +103,12 @@ const urlIn = (stdout: string): string | undefined => {
   }
 };
 
-/** Why none serves the store, and what to type: the read in process, the install, and the setting where it is why. */
+/** Why none serves the store, and what to type: a daemon started here, the service installed, and the setting where it is why. */
 const unserved = (verb: string, off: boolean): Refused =>
   new Refused(
     `nemia ${verb}: no daemon serves this store` +
       (off ? `, and ${START_OFF}=off here, so none is started on demand. ` : ', and none came up when one was started. ') +
-      `Read it in process, typed again with --local: \`nemia ${verb} --local …\`; or install the service that serves it: \`nemia service install\`` +
+      'Start one here, `nemia up`, or install the service that serves it, `nemia service install`, then type the command again' +
       (off ? `; or unset ${START_OFF} to have one started.` : '; what the start said is in daemon.log, in the store.'),
   );
 
@@ -111,16 +154,22 @@ const remoteDown = (verb: string, name: string, server: string): Refused =>
 /**
  * The base url of the daemon a read asks, ready: under a remote context its server, where something listens there, never a daemon
  * started here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the
- * read's own bound then says — else one started now and waited for (`daemonStarted`).
+ * read's own bound then says — else one started now and waited for (`daemonStarted`). Refused where the daemon says a release other
+ * than `client`, this client's own (`releaseHeld`).
  */
-export async function served(verb: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+export async function served(verb: string, env: NodeJS.ProcessEnv = process.env, client: string | null = clientRelease()): Promise<string> {
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   if (chosen.kind === 'remote') {
-    if ((await probe(chosen.server, env)) !== 'refused') return chosen.server;
+    const { probe, release } = await probed(chosen.server, env);
+    if (probe !== 'refused') return releaseHeld(verb, chosen.server, release, client);
     throw remoteDown(verb, chosen.name, chosen.server);
   }
   const at = servedAt(env);
-  if (at !== undefined && (await probe(at, env)) !== 'refused') return at;
-  return daemonStarted(verb, env);
+  if (at !== undefined) {
+    const { probe, release } = await probed(at, env);
+    if (probe !== 'refused') return releaseHeld(verb, at, release, client);
+  }
+  const started = await daemonStarted(verb, env);
+  return releaseHeld(verb, started, (await probed(started, env)).release, client);
 }

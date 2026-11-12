@@ -2,17 +2,17 @@
  * The skill library as entries of the command table, each through the Skill door (`SkillDoor`, run at the store's root (`StoreRoot`) the
  * handler is given): the skill folders the board lists, each read (`SKILLS_LIST`), and one skill read for its page with its other text
  * files (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's builtin skills
- * (`SKILLS_WRITE`), served on both sides. The api resolves which folders a read names, guards each write, and words the board's answer
- * around what each entry answers.
+ * (`SKILLS_WRITE`), its words the client's (`objects`' `COMMAND_WORDS`), served through the api. The api resolves which folders a read
+ * names, guards each write, and words the board's answer around what each entry answers.
  */
-import { givesNone, notSent } from '../command/requests.verb.ts';
+import { SKILLS_WRITE_WORDS } from 'objects';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedTreeOf } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
@@ -100,11 +100,6 @@ export const SKILLS_READ: Command<SkillShown, SkillShowInput> = {
   print: () => [],
 };
 
-/** The words a written skill is said in: the files written, and the version it is at now, which a change of it gives. */
-const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
-  `${data.name} written in ${data.dir}${'version' in data ? `, at version ${data.version}` : ''}: ${data.written.join(', ')}`,
-];
-
 /**
  * A skill of yours written into your library (`yourSkillsDir`) through the door: copied whole from the folder of builtin skills
  * (`builtin`) under the name `copy`, or else written from its change (`change`, as JSON text, which the command line reads off `--file`)
@@ -133,39 +128,7 @@ export const SkillWriteInput = Schema.Struct({
 export type SkillWriteInput = typeof SkillWriteInput.Type;
 
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> = {
-  name: 'skills write',
-  served: [
-    { endpoint: 'skills.create', takes: givesNone('version', 'copy', 'builtin'), request: notSent('skills write') },
-    { endpoint: 'skills.replace', as: 'skills_replace', takes: givesNone('copy', 'builtin'), request: notSent('skills write') },
-    { endpoint: 'skills.copy', as: 'skills_copy', request: notSent('skills write') },
-  ],
-  usage: '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
-  help: [
-    'a skill of yours, or of a templated --factory, written from its',
-    'SKILL.md: <name> is the skill it changes, at the --version it was',
-    'read at; none, a new one',
-  ],
-  spec: writerSpec(
-    'skills write',
-    '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
-    [FROM, { key: 'name', takes: 'optional', kind: 'name' }],
-    [
-      cliPath(
-        'skills write',
-        'file',
-        "the skill's SKILL.md, whose name: is its folder",
-        "the api is sent the skill's form, never a path to read",
-      ),
-      versionFlag('skills write', 'the skill'),
-      factoryFlag('skills write'),
-    ],
-  ),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Skill's `create`, `replace` and `copy` verb of `objects`' Api (`/api/namespaces/:namespace/skills`), which calls this entry's handler: no route of its own",
-  },
+  ...SKILLS_WRITE_WORDS,
   input: SkillWriteInput,
   handler: ({ from, name, factory, version, change, copy, builtin = '' }) =>
     Effect.gen(function* () {
@@ -186,7 +149,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> 
         );
       return yield* door.skills.write(SkillName.read(change.name), change, version, library);
     }),
-  print: writtenLines,
+  print: () => [],
 };
 
 /** The board's skill entries, in the order the table lists them. */

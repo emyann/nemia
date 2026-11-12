@@ -8,12 +8,12 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed; `process`, for every other verb, a help, a moved read typed with `--local`, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon. `refused` is a route no more: no command is refused for being remote.",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `refused`, any command typed with `--local`, exit 2, naming it typed without; `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed, and for a moved command (`MOVED_COMMANDS`), its help included; `process`, for every other verb, a help of one, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon.",
       "type": "Route"
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
     },
     {
@@ -67,11 +67,16 @@
     },
     {
       "term": "--local",
-      "meaning": "a read run in process, on the orchestrator's own CLI, rather than asked of the api: for a store no daemon serves. The client takes the word off before it spawns that CLI, which does not know it."
+      "meaning": "refused, exit 2, whatever it is typed with (`routeOf`'s `refused`, `apps/cli/src/main.ts`), naming the command typed without it: no store is read in process any more, and `local` is this machine's daemon, reached through its api, started on demand where none serves."
+    },
+    {
+      "term": "Moved command",
+      "meaning": "a command whose words the client holds (`MOVED_COMMANDS`, `apps/cli/src/route.ts`, the names of `objects`' `COMMAND_WORDS`): parsed, helped, refused and printed in `apps/cli/src/commands/`, and run through the api under every context, its old path's runner deleted with the move: `workflows write`, `agents write` and `skills write`, whose files are read here and read into their spec by the api's `read`.",
+      "type": "MovedName"
     },
     {
       "term": "Daemon on demand",
-      "meaning": "a read that finds no daemon listening at its store's lease starts one once, as a ticking command does, and waits until it answers `GET /api/health` before it asks, once (`apps/cli/src/daemon.ts`); where none comes up it is refused, naming `nemia <verb> … --local` and `nemia service install`. Which daemon serves a store is the `url` of its lease, read in `apps/cli/src/where.ts` alone."
+      "meaning": "a command that finds no daemon listening at its store's lease starts one once, as a ticking command does, and waits until it answers `GET /api/health` before it asks, once (`apps/cli/src/daemon.ts`); where none comes up, or the start is off (`NEMIA_DAEMON_START=off`), it is refused, naming `nemia up` and `nemia service install`. Which daemon serves a store is the `url` of its lease, read in `apps/cli/src/where.ts` alone. The same probe reads the daemon's release, refused where it differs from the client's (`releaseMet`, `apps/cli/src/release.ts`)."
     },
     {
       "term": "-l",

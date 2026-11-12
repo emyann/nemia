@@ -53,13 +53,11 @@ const needsHoldingSpec = spec<(filedAny: boolean, needs: readonly NeedRead[]) =>
     },
     aMissingNeedHoldsAFreshRun: {
       description: 'A run that has filed nothing waits on every need of its workflow that is missing',
-      condition: ({ input: [filedAny, needs], output }) =>
-        filedAny || needs.every((n) => n.state !== 'missing' || output.includes(n.name)),
+      condition: ({ input: [filedAny, needs], output }) => filedAny || needs.every((n) => n.state !== 'missing' || output.includes(n.name)),
     },
     onlyAMissingNeedHolds: {
       description: 'A need met or unknown holds nothing: each name held is a need read missing',
-      condition: ({ input: [, needs], output }) =>
-        output.every((name) => needs.some((n) => n.name === name && n.state === 'missing')),
+      condition: ({ input: [, needs], output }) => output.every((name) => needs.some((n) => n.name === name && n.state === 'missing')),
     },
   },
 });

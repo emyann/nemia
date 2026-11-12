@@ -33,10 +33,8 @@ const wellFormed = (a: Parsed): boolean =>
 
 const v4 = (a: Parsed, test: (o: readonly [number, number, number, number]) => boolean): boolean => a.v === 4 && test(a.octets);
 
-const v6 = (
-  a: Parsed,
-  test: (g: readonly [number, number, number, number, number, number, number, number]) => boolean,
-): boolean => a.v === 6 && test(a.groups);
+const v6 = (a: Parsed, test: (g: readonly [number, number, number, number, number, number, number, number]) => boolean): boolean =>
+  a.v === 6 && test(a.groups);
 
 const isLoopback = (a: Parsed): boolean =>
   v4(a, ([o]) => o === 127) ||
@@ -46,13 +44,11 @@ const isWildcard = (a: Parsed): boolean =>
   v4(a, (o) => o[0] === 0 && o[1] === 0 && o[2] === 0 && o[3] === 0) ||
   v6(a, (g) => g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0 && g[6] === 0 && g[7] === 0);
 
-const isPrivate = (a: Parsed): boolean =>
-  v4(a, ([x, y]) => x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168));
+const isPrivate = (a: Parsed): boolean => v4(a, ([x, y]) => x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168));
 
 const isShared = (a: Parsed): boolean => v4(a, ([x, y]) => x === 100 && y >= 64 && y <= 127);
 
-const isLinkLocal = (a: Parsed): boolean =>
-  v4(a, ([x, y]) => x === 169 && y === 254) || v6(a, ([g]) => g >= 0xfe80 && g <= 0xfebf);
+const isLinkLocal = (a: Parsed): boolean => v4(a, ([x, y]) => x === 169 && y === 254) || v6(a, ([g]) => g >= 0xfe80 && g <= 0xfebf);
 
 const isUniqueLocal = (a: Parsed): boolean => v6(a, ([g]) => g >= 0xfc00 && g <= 0xfdff);
 
@@ -87,13 +83,7 @@ const addressKindSpec = spec<(address: Parsed) => AddressKind>({
     anyOtherIsPublic: {
       description: 'An address of none of those ranges is public',
       condition: ({ input: [a], output }) =>
-        isLoopback(a) ||
-        isWildcard(a) ||
-        isPrivate(a) ||
-        isShared(a) ||
-        isLinkLocal(a) ||
-        isUniqueLocal(a) ||
-        output === 'public',
+        isLoopback(a) || isWildcard(a) || isPrivate(a) || isShared(a) || isLinkLocal(a) || isUniqueLocal(a) || output === 'public',
     },
   },
 });
@@ -117,7 +107,8 @@ const bindExposureSpec = spec<(kind: AddressKind, acknowledged: boolean) => Expo
       condition: ({ input: [kind, acknowledged], output }) => !exposed(kind) || !acknowledged || output === 'listen',
     },
     aPrivateBindIsListenedOn: {
-      description: 'A bind of any other kind — this machine, a private, shared, link or unique-local network — is listened on, acknowledged or not',
+      description:
+        'A bind of any other kind — this machine, a private, shared, link or unique-local network — is listened on, acknowledged or not',
       condition: ({ input: [kind], output }) => exposed(kind) || output === 'listen',
     },
   },

@@ -7,7 +7,7 @@
  * release before it switches.
  */
 import { Effect, Stream } from 'effect';
-import type { Fix, FixStart, Readiness } from 'objects';
+import { readinessSaid, type Fix, type FixStart, type Readiness } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { tried } from '../runtime-client.ts';
@@ -21,9 +21,12 @@ import { readinessOf } from './readiness.verb.ts';
 /** Each state's mark at the head of a piece's line. */
 const MARK = { met: '✓', missing: '✗', unknown: '?', inactive: '·' } as const;
 
-/** The lines `nemia doctor` prints: whether the server is ready, then each piece, its state, its words, and each fix's command. */
+/**
+ * The lines `nemia doctor` prints: whether a run waits on a missing piece, and what the missing pieces cost (`readinessSaid`), then each
+ * piece, its state, its words, and each fix's command.
+ */
 export const readinessLines = (r: Readiness): string[] => [
-  r.ready ? 'ready: every piece is in place' : 'not ready: a piece marked ✗ is missing, its fix below it',
+  r.ready ? 'ready: every piece is in place' : `${readinessSaid(r)}; each is marked ✗, its fix below it`,
   ...r.pieces.flatMap((p) => [
     `${MARK[p.state]} ${p.area}  ${p.name}${p.factory === undefined ? '' : `  (${p.factory}${p.workflow === undefined ? '' : `/${p.workflow}`})`}: ${p.message}`,
     ...p.fixes.map((f) => `    ${f.command}  — ${f.message}`),

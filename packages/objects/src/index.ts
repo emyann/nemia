@@ -534,6 +534,8 @@ export {
   type AddressKind,
   READINESS_AREAS,
   type ReadinessArea,
+  READINESS_COSTS,
+  type ReadinessCost,
   FIX_PHASES,
   type FixPhase,
   FIX_STREAM_EVENTS,
@@ -547,7 +549,18 @@ export {
   TICKET_STATES,
   type TicketState,
 } from './words.ts';
-export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
+export {
+  Fix,
+  FixStart,
+  FixStreamEvent,
+  Readiness,
+  ReadinessFix,
+  ReadinessGroup,
+  ReadinessPiece,
+  missingSaid,
+  readinessSaid,
+  runsWait,
+} from './readiness.ts';
 export {
   LinkClaimed,
   LinkMinted,

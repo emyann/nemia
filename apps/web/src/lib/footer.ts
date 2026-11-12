@@ -157,10 +157,12 @@ export function quotaShort(
 }
 
 /**
- * Each place in `source` that sizes a page as the screen less the old header (`100svh-3rem`), a line break inside or not: under the top
- * bar a page is the screen less its height, `100svh-var(--frame-top)`.
+ * Each place in `source` that sizes a page as the screen less a header alone, a line break inside or not: the old header
+ * (`100svh-3rem`), or the top bar without the frame's lines under it (`100svh-var(--frame-top))`). Under the top bar and the lines (a
+ * newer release, the setup banner, a refused link) a page is the screen less both, `100svh-var(--frame-top)-var(--frame-lines)`.
  */
-export const staleFrameHeights = (source: string): string[] => [...source.matchAll(/h-\[calc\(100svh-\s*3rem\)\]/g)].map((m) => m[0]);
+export const staleFrameHeights = (source: string): string[] =>
+  [...source.matchAll(/h-\[calc\(100svh-\s*(?:3rem|var\(--frame-top\))\)\]/g)].map((m) => m[0]);
 
 /**
  * The line that says a newer release is out, where the api read one newer than the release it runs (`latest.newer`): the release, and

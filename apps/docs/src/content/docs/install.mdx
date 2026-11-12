@@ -115,11 +115,16 @@ nemia doctor
 nemia doctor fix <need>
 ```
 
-One read lists every piece a server needs before a factory's first run, each in place, missing, unknown or not activated, with the
-command or fix that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and
-`systemd --user`, the git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a
-factory, and a newer release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
-same read, and a banner on every page while a piece is missing.
+One read lists every piece a server needs to run its factories, each in place, missing, unknown or not activated, with the command or
+fix that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and `systemd --user`,
+the git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a factory, and a newer
+release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the same
+read, and a banner on every page while a run waits on a missing piece.
+
+Each missing piece says what it costs. A run waits on the harness, a need, the tools folder and a factory, and on cgroup v2 and
+`systemd --user` where sessions run under a memory limit: while one of these is missing the server is not ready, and the banner says
+"before a factory's first run" only until one has started. Linger, the service, the bind and a newer release keep the server up or
+open: they are advised, listed on Setup with their fix, and `nemia doctor` still exits 0.
 
 A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
 the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need is missing,

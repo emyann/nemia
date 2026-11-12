@@ -12,7 +12,7 @@ import { forgetHarnessSkip, keepHarnessSkip, readHarnessSkipped } from '@/lib/ha
 import { harnessAsked, harnessChoices } from '@/lib/setup';
 import { useFixFollow } from '@/lib/useFixFollow';
 
-/** Settings' Setup, at /setup: what the server needs before a factory's first run. Its loader reads the readiness read. */
+/** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
 export const Route = createFileRoute('/setup')({
   loader: ({ context }) => context.queryClient.ensureQueryData(readinessQuery),
   component: SetupPage,
@@ -154,14 +154,14 @@ function Pairings() {
   );
 }
 
-/** Setup: what the server needs before a factory's first run, each piece's fix, and the clients that wait to pair. */
+/** Setup: what the server needs to run its factories, each piece's fix, and the clients that wait to pair. */
 function SetupPage() {
   return (
     <article data-setup className="mx-auto flex max-w-3xl flex-col gap-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-title-large">Setup</h1>
         <p className="text-body-medium text-muted-foreground">
-          What this server needs before a factory's first run, each piece in place or with the fix that puts it there.
+          What this server needs to run its factories, each piece in place or with the fix that puts it there.
         </p>
       </header>
       <Readiness />

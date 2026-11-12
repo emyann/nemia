@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from 'playwright';
-import { answered, photograph, themeOf, topBarOf } from '../board.ts';
+import { answered, photograph, READINESS_ROUTE, themeOf, topBarOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
 import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
@@ -170,6 +170,61 @@ async function readsPieces(page: Page): Promise<void> {
   await expectCount(page.locator('li[data-piece-state="missing"]'), missing.length, 'every missing piece is drawn missing');
   await settled(page);
   await photograph(page, path.join(OUT, `setup-pieces-${await themeOf(page)}.png`), { fullPage: true });
+}
+
+/** A piece of a planted read: `name`, of `cost`, missing. */
+const plantedPiece = (name: string, area: string, cost: 'run' | 'server') => ({
+  name,
+  area,
+  state: 'missing',
+  message: `${name}, planted by the e2e`,
+  fixes: [],
+  cost,
+});
+
+/**
+ * The reads the banner is held to, each answered in place of the api's (`page.route`, as `holdFix` holds the fixes), since the api's
+ * own answers a need `unknown` until its sweep reads it: on a server whose runs have started, a missing harness sign-in, which a run
+ * waits on, raises the banner; linger alone, which no run waits on, raises none — the card's case.
+ */
+const PLANTED_READS = {
+  waits: { ready: false, ran: true, pieces: [plantedPiece('claude-token', 'harness', 'run'), plantedPiece('linger', 'service', 'server')] },
+  advised: { ready: false, ran: true, pieces: [plantedPiece('linger', 'service', 'server')] },
+} as const;
+
+/**
+ * The banner over every other page: raised by a missing piece a run waits on, never saying "first run" on a server whose runs have
+ * started nor "not ready", and raising none where the only missing piece is advised; then back to Setup.
+ */
+async function raisesBanner(page: Page): Promise<void> {
+  const setup = page.url();
+  let planted: keyof typeof PLANTED_READS = 'waits';
+  const answer = (route: Route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
+      : route.fallback();
+  await page.route(READINESS_ROUTE, answer);
+  try {
+    await page.goto(new URL('/', setup).href);
+    await idle(page);
+    const banner = page.locator('[data-setup-banner]');
+    await expectVisible(banner, 'claude-token, which a run waits on, is missing: the banner is raised');
+    const said = (await banner.textContent()) ?? '';
+    if (/first run|not ready/.test(said))
+      throw new Refused(`on a server whose runs have started, the banner says neither "first run" nor "not ready"; it says: ${said}`);
+    if (!/a run waits on/.test(said) || !/no run waits on/.test(said))
+      throw new Refused(`the banner says the piece a run waits on apart from the one advised; it says: ${said}`);
+    await settled(page);
+    await photograph(page, path.join(OUT, `setup-banner-${await themeOf(page)}.png`));
+    planted = 'advised';
+    await page.reload();
+    await idle(page);
+    await expectCount(banner, 0, 'linger alone is missing, and no run waits on it: no banner');
+  } finally {
+    await page.unroute(READINESS_ROUTE, answer);
+  }
+  await page.goto(setup);
+  await idle(page);
 }
 
 /** NEED's fix started: its output drawn as it comes, its link a link that opens a new tab, its code large over it, and its end. */
@@ -432,12 +487,14 @@ async function signsInByLink(page: Page): Promise<void> {
 
 export default {
   /**
-   * Settings' Setup: the readiness read grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
-   * in place with each of its fixes — with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in);
-   * the first visit's question of which harness to activate, Activate drawing the install's run and then the sign-in's fixes, and Skip
-   * kept across a reload; Deactivate on a harness installed refused while a seeded run needs it, naming the run;
-   * that fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks
-   * the store); a pairing a client asks for, listed by its name and approved by the code typed; and, on a second seat marked exposed, a
+   * Settings' Setup, over the api's own read (routed on past the piece every page's context plants, `bannerShown`): the readiness read
+   * grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
+   * in place with each of its fixes — and the banner over another page, over reads it plants, raised by a missing piece a run waits on
+   * and by no piece advised alone; with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in); the
+   * first visit's question of which harness to activate, Activate drawing the install's run and then the sign-in's fixes, and Skip
+   * kept across a reload; Deactivate on a harness installed refused while a seeded run needs it, naming the run; that
+   * fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks the
+   * store); a pairing a client asks for, listed by its name and approved by the code typed; and, on a second seat marked exposed, a
    * first-visit link that signs a browser in and leaves the address, refused once used. The README, the tokens, the pairings and the
    * links are taken back.
    */
@@ -448,10 +505,13 @@ export default {
     const found = fs.readFileSync(readme, 'utf8');
     const before = heldIn();
     fs.writeFileSync(readme, plantedReadme(found));
+    const ownRead = (route: Route) => route.continue();
+    await page.route(READINESS_ROUTE, ownRead);
     try {
       await page.reload();
       await idle(page);
       await readsPieces(page);
+      await raisesBanner(page);
       await asksAndActivates(page);
       await skipsTheQuestion(page);
       await runsFix(page);
@@ -465,5 +525,6 @@ export default {
     await page.reload();
     await idle(page);
     await expectCount(page.locator(`li[data-piece="${NEED}"]`), 0, 'the planted need is taken back');
+    await page.unroute(READINESS_ROUTE, ownRead);
   },
 } satisfies PageSpec;

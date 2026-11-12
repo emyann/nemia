@@ -16,9 +16,12 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import type { Said } from './served.ts';
 import { configWritten } from '../src/context.ts';
+import { doctorLines } from '../src/doctor.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const GOOD = 'nm_good';
+/** A token the stub answers with ADVISED, the read of a server missing only a piece no run waits on. */
+const ADVISED_TOKEN = 'nm_advised';
 
 const FIX = {
   message: 'sign in',
@@ -30,6 +33,7 @@ const FIX = {
 };
 const READ = {
   ready: false,
+  ran: true,
   pieces: [
     { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [] },
     {
@@ -47,6 +51,23 @@ const READ = {
       fixes: [{ message: 'sign in at a terminal', command: 'tool auth login', startable: false, index: 0, kind: 'typed' }],
     },
     { name: 'tool-auth', area: 'workflow', state: 'missing', message: 'not signed in', factory: 'f1', workflow: 'build', fixes: [FIX] },
+  ],
+};
+
+/** A server whose runs have started, missing only linger, which keeps it up and no run waits on. */
+const ADVISED = {
+  ready: false,
+  ran: true,
+  pieces: [
+    { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [], cost: 'run' },
+    {
+      name: 'linger',
+      area: 'service',
+      state: 'missing',
+      message: 'their services stop when they log out',
+      fixes: [{ message: 'keep them running', command: 'sudo loginctl enable-linger someone', startable: false }],
+      cost: 'server',
+    },
   ],
 };
 
@@ -70,6 +91,7 @@ const stub = http.createServer((req, res) => {
       res.end(JSON.stringify(body));
     };
     if (url === '/api/health') return json(200, {});
+    if (url === '/api/readiness' && req.headers.authorization === `Bearer ${ADVISED_TOKEN}`) return json(200, ADVISED);
     if (req.headers.authorization !== `Bearer ${GOOD}`) return json(401, { error: 'no such token' });
     if (url === '/api/readiness') return json(200, READ);
     if (url === '/api/readiness/fixes' && req.method === 'POST') {
@@ -154,6 +176,7 @@ test("`nemia doctor --json`: the server's pieces, and the laptop's own under `cl
     ['claude-token', 'tool', 'tool-sign-in', 'tool-auth'],
   );
   assert.deepEqual(clientStates(said), { 'server-reached': 'met', 'token-accepted': 'met', 'local-bin-on-path': 'met' });
+  assert.equal((JSON.parse(said.out) as { ran?: boolean }).ran, true, 'whether the server ever ran a run is carried as it answered');
 });
 
 test('`nemia doctor`: a token the server refuses, and ~/.local/bin off PATH, are missing pieces of the client', async () => {
@@ -171,6 +194,17 @@ test('`nemia doctor`: a context whose server takes no connection is flagged, and
   assert.equal(text.code, 1);
   assert.match(text.out, /server-reached/);
   assert.match(text.out, /nemia config get-contexts/, 'the fix names a command');
+});
+
+test('`nemia doctor` on a server missing only linger, which no run waits on: exit 0, said ready with the piece advised and its fix', async () => {
+  const said = await nemia(['doctor'], aLaptop('nemia-ready-advised-', server, ADVISED_TOKEN));
+  assert.equal(said.code, 0, `a script waiting on the read goes on: ${said.err}`);
+  const last = said.out.trimEnd().split('\n').at(-1) ?? '';
+  assert.match(last, /^ready\b/);
+  assert.doesNotMatch(last, /not ready|first run/);
+  assert.match(said.out, /sudo loginctl enable-linger/, 'the advised piece is listed with its fix');
+  const json = await nemia(['doctor', '--json'], aLaptop('nemia-ready-advised-json-', server, ADVISED_TOKEN));
+  assert.equal(json.code, 0, json.err);
 });
 
 test('`nemia doctor` as text: each area, each piece, and the command of each fix', async () => {
@@ -224,4 +258,21 @@ test('REFUSED: an ask with no `--answer` and no terminal to ask it on is a usage
   assert.equal(said.code, 2);
   assert.match(said.err, /--answer host=/);
   assert.equal(started.length, from, 'no fix started');
+});
+
+test('`nemia doctor`\'s last line says what the missing pieces cost, never "not ready", and "first run" only where none ran', async (t) => {
+  const linger = { name: 'linger', area: 'service', state: 'missing', message: 'stops at log out', fixes: [], cost: 'server' } as const;
+  const token = { name: 'claude-token', area: 'harness', state: 'missing', message: 'no token', fixes: [], cost: 'run' } as const;
+  const last = (read: Parameters<typeof doctorLines>[0]) => doctorLines(read).at(-1) ?? '';
+  await t.test('a server whose factories have run, missing only linger: no run waits on it', () => {
+    const said = last({ ready: false, ran: true, pieces: [linger] });
+    assert.match(said, /no run waits on/);
+    assert.doesNotMatch(said, /not ready|first run/);
+  });
+  await t.test('a server that never ran, missing a piece a run waits on: before its first run', () => {
+    assert.match(last({ ready: false, ran: false, pieces: [token] }), /first run/);
+  });
+  await t.test('every piece in place: ready', () => {
+    assert.equal(last({ ready: true, ran: true, pieces: [{ ...linger, state: 'met' }] }), 'ready');
+  });
 });

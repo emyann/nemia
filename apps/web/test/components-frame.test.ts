@@ -71,3 +71,47 @@ test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_s
   for (const open of ['', 'sidebar_state=true', 'sidebar_statex=false', 'xsidebar_state=false', 'a=sidebar_state=false'])
     assert.equal(sidebarOpenOf(open), true, open);
 });
+
+/** A piece of the readiness read, of `cost`, in `state`. */
+const pieceOf = (name: string, cost: 'run' | 'server', state: 'met' | 'missing') => ({
+  name,
+  area: cost === 'run' ? ('harness' as const) : ('service' as const),
+  state,
+  message: `${name} is ${state}`,
+  fixes: [],
+  cost,
+});
+
+/** The setup banner at `/runs`, over a readiness read whose pieces are `pieces` and whose `ran` is `ran`. */
+async function bannerOver(pieces: ReturnType<typeof pieceOf>[], ran: boolean): Promise<string> {
+  const { SetupBanner } = await import('../src/components/frame/SetupBanner.tsx');
+  const read = { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran };
+  return routedWith(createElement(SetupBanner, { path: '/runs' }), [[['readiness'], read]]);
+}
+
+/** The banner's words, its markup's tags taken out. */
+const wordsOf = (html: string): string => html.replace(/<[^>]*>/g, '');
+
+test('the setup banner is raised by a missing piece a run waits on alone, says what the missing pieces cost, and "first run" only where no run was ever started', async (t) => {
+  await t.test(
+    'REFUSED: a server whose factories have run, missing only linger, which no run waits on: no banner, so no "first run" nor "not ready"',
+    async () => {
+      const html = await bannerOver([pieceOf('claude-token', 'run', 'met'), pieceOf('linger', 'server', 'missing')], true);
+      assert.equal(html, '', 'a piece advised is listed on Setup and raises no banner');
+    },
+  );
+  await t.test('a server where no run was ever started, missing a piece a run waits on: before its first run', async () => {
+    const said = wordsOf(await bannerOver([pieceOf('claude-token', 'run', 'missing'), pieceOf('linger', 'server', 'met')], false));
+    assert.match(said, /first run/);
+    assert.doesNotMatch(said, /no run waits on/);
+  });
+  await t.test('a server whose factories have run, missing a piece a run waits on and one that keeps it up: each said apart', async () => {
+    const said = wordsOf(await bannerOver([pieceOf('claude-token', 'run', 'missing'), pieceOf('linger', 'server', 'missing')], true));
+    assert.match(said, /a piece a run waits on/);
+    assert.match(said, /keeps the server up or open/);
+    assert.doesNotMatch(said, /first run|not ready/);
+  });
+  await t.test('REFUSED: a read with nothing missing draws no banner', async () => {
+    assert.equal(await bannerOver([pieceOf('linger', 'server', 'met')], true), '');
+  });
+});

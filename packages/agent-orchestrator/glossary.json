@@ -1050,7 +1050,7 @@
     },
     {
       "term": "Readiness",
-      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there, or `inactive` (`ReadinessState`), a harness nobody activated and nothing runs on, shown with what activates it and never counted against `ready`: each harness's two needs, the service and its linger, the bind, the machine, the place's and each workflow's needs, each factory's repository needs, a factory, a newer release (`readinessOf`, `nemia doctor`, `GET /api/readiness`); `nemia doctor fix` starts a fix. `nemia readiness`, its former command, is refused, naming `nemia doctor`."
+      "meaning": "the one read of what this server needs to run its factories, each piece in place, missing or unknown with the command or fix that puts it there and what it costs while missing (a run waits on it, which makes it not ready, or it keeps the server up or open, advised), or `inactive` (`ReadinessState`), a harness nobody activated and nothing runs on, shown with what activates it and never counted against `ready`; and whether a run was ever started here: each harness's two needs, the service and its linger, the bind, the machine, the place's and each workflow's needs, each factory's repository needs, a factory, a newer release (`readinessOf`, `nemia doctor`, `GET /api/readiness`); `nemia doctor fix` starts a fix. `nemia readiness`, its former command, is refused, naming `nemia doctor`."
     },
     {
       "term": "Tools folder",

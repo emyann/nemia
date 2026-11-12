@@ -42,7 +42,7 @@ function Factories() {
   const { data: factories } = useSuspenseQuery(factoriesQuery);
   const { data: runs } = useSuspenseQuery(runsQuery);
   return (
-    <div className="flex min-h-[calc(100svh-var(--frame-top))] flex-col gap-6 pt-5 lg:h-[calc(100svh-var(--frame-top))]">
+    <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines))] flex-col gap-6 pt-5 lg:h-[calc(100svh-var(--frame-top)-var(--frame-lines))]">
       <div className="px-6 max-md:px-3">
         <OverviewStrip factory={factory} />
       </div>

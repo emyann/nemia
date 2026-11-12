@@ -238,3 +238,40 @@ test('a harness nobody activated and no workflow runs on is inactive, its instal
   assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
   assert.equal(named.ready, false);
 });
+
+test('every piece declares what it costs while missing: linger and the bind keep the server up or open, a harness and a need a run waits on; and the read says whether a run was ever started', async () => {
+  const home = scratch('wf-readiness-ran-');
+  const readAt = (given: ReadinessFacts) =>
+    Effect.runPromise(
+      readinessOf(given).pipe(
+        Effect.provide(PlaceService.layer({ ...testPlace().place, declared: { ...declared, needs: [identity('exit 1')] } })),
+        Effect.provideService(StoreRoot, home),
+      ),
+    );
+  const unlingered = { 'loginctl show-user someone -p Linger': { code: 0, out: 'Linger=no\n' } };
+  const before = await readAt(facts({ PATH: '/usr/bin' }, unlingered));
+  assert.ok(
+    before.pieces.every((p) => p.cost !== undefined),
+    'each piece declares its cost',
+  );
+  const costOf = (name: string) => before.pieces.find((p) => p.name === name)?.cost;
+  assert.equal(before.pieces.find((p) => p.name === 'linger')?.state, 'missing');
+  assert.equal(costOf('linger'), 'server');
+  assert.equal(costOf('bind'), 'server');
+  assert.equal(costOf(DEFAULT_HARNESS), 'run');
+  assert.equal(costOf(SIGN_IN), 'run');
+  assert.equal(costOf('identity'), 'run');
+  assert.equal(costOf('factory'), 'run');
+  assert.equal(before.ran, false, 'no run was started in a store with no run record');
+  fs.mkdirSync(path.join(home, 'runs'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'runs', 'r-1.json'), '{}');
+  assert.equal((await readAt(facts({ PATH: '/usr/bin' }))).ran, true, "a run's record says a run was started");
+});
+
+test('cgroup v2 and the user manager cost a run only where the daemon files its sessions under a memory limit', async () => {
+  const without = await read({ ...facts({ PATH: '/usr/bin' }), exists: () => false }, identity('exit 0'));
+  assert.equal(without.pieces.find((p) => p.name === 'cgroup-v2')?.cost, 'server');
+  const limited = await read({ ...facts({ PATH: '/usr/bin', WF_MEMORY_LIMIT: '2Gi' }), exists: () => false }, identity('exit 0'));
+  assert.equal(limited.pieces.find((p) => p.name === 'cgroup-v2')?.cost, 'run');
+  assert.equal(limited.pieces.find((p) => p.name === 'systemd-user')?.cost, 'run');
+});

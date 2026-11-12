@@ -388,7 +388,6 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
 });
 
 test('REFUSED: an attach naming a repository the factory has no folder of that name for, nothing written; one named is written to its file, and a detach takes it off', async (t) => {
-  /** `fresh`, and the factory `shop` filed on its repository with `dev` attached: the repository. */
   const shop = (): string => {
     const repo = fresh();
     addFactoryAt(ROOT, { name: 'shop', repos: [repo] });

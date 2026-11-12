@@ -1,7 +1,8 @@
 /**
  * What the moved commands' runners share in making a request of what was typed: an argument read off the parsed words by its kind, the
- * namespace a run or a card is in, which the command line does not say and the api's path takes, the namespace a place names, and the
- * one label selector a query takes, and a path sent to the daemon. A request is the client's concern: the api decodes it by the endpoint's Schema.
+ * namespace a run or a card is in, which the command line does not say and the api's path takes, the namespace a place names, the one
+ * label selector a query takes, and a path sent to the daemon. A request is the client's concern: the api decodes it by the endpoint's
+ * Schema.
  */
 import path from 'node:path';
 import { type Args, DEFAULT_NAMESPACE } from 'objects';

@@ -180,16 +180,24 @@ explains contexts, and which verbs always act on the machine you type them on.
 
 ## 7. A factory and its first run
 
-Apply a factory from a template, on the repository's URL. The server clones it with the credentials of step 5. Here it is the builtin
-template, [sdlc](/sdlc/), set to judge and land its work on GitHub:
+Apply a factory from a template, on the repository's URL, from the laptop. The laptop's `nemia` sends it to the server, whose daemon
+clones the repository with the credentials of step 5. Here it is the builtin template, [sdlc](/sdlc/), set to judge and land its work
+on GitHub:
 
 ```bash
-ssh <server> '~/.local/bin/nemia factory apply mill --template sdlc --set github=true --repo https://github.com/<owner>/<repo>.git'
+nemia factory apply mill --template sdlc --set github=true --repo https://github.com/<owner>/<repo>.git
 ```
 
-With `github=true`, the factory waits on the repository's CI context, named ci unless you set another; [its parameters](/sdlc/#its-parameters)
-say what else it reads. This one command runs on the server, over SSH, because a factory named by URLs is not yet filed over the api (below). A clone that
-fails is refused with git's own words and the setup to do, and nothing is filed.
+A clone that fails is refused with git's own words and the setup to do, and nothing is filed. A `--repo` that is a folder rather than a
+URL names a folder of the server, so the server refuses it from the laptop: type that one on the server.
+
+On v1.4.0 and earlier, which file a factory by URL on the server alone, type the same command there, as
+`ssh <server> '~/.local/bin/nemia factory apply mill --template sdlc --set github=true --repo <url>'`.
+
+With `github=true`, the factory waits on the repository's CI context, named ci unless you set another
+([its parameters](/sdlc/#its-parameters)). [Before you apply it on GitHub](/sdlc/#before-you-apply-it-on-github) says what the
+repository needs first: the GitHub CLI signed in on the server, which step 5 did, and a base branch protected to require that CI check,
+so a pull request merges only once it passes.
 
 Then start its first run from the laptop:
 
@@ -203,12 +211,8 @@ GitHub sign-in, and the board shows the run step by step. [How a run lives](/how
 
 ## Still by hand
 
-Each of these has a card. Once a card lands, its line leaves this page.
+This has a card. Once it lands, its line leaves this page.
 
-- **The factory is applied over SSH.** The laptop's `nemia factory add` and `nemia factory apply` with every `--repo` a URL are not
-  served over the api yet. Until they are, type the command on the server (step 7). Card: _api-a-factory-on-repositorie-1pyt_.
 - **The quota panel has no answer.** The board's quota panel asks a Claude Code found on the api's PATH. A server with the release's
   Claude Code alone has none there, so the panel says the quota cannot be asked for. The sessions run all the same. Card:
   _runtime-the-quota-asks-the-c-m4cv_.
-- **The first line of `nemia version` says 1.0.0 on v1.3.0.** The lines under it say the release you run. Main now reads the release's
-  own version, which comes with the release after v1.3.0. Card: _release-nemia-version-get-ap-rhjd_.

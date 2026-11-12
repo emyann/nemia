@@ -346,7 +346,15 @@ test(
         assert.equal(card.capabilities.streaming, true, 'its card says it streams: a session is followed from its stdout and its rollout');
         const extension = card.capabilities.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
         assert.deepEqual(extension.params, {
-          methods: ['sessionLogs', 'sessionOutput', 'sessionTranscript', 'observeSessions', 'forgetSession', 'sessionKept'],
+          methods: [
+            'sessionLogs',
+            'sessionOutput',
+            'releaseSession',
+            'sessionTranscript',
+            'observeSessions',
+            'forgetSession',
+            'sessionKept',
+          ],
           say: false,
         });
 

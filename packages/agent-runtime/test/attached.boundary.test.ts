@@ -26,14 +26,13 @@ import test, { type TestContext } from 'node:test';
 import { Effect, Exit, Logger, Scope } from 'effect';
 import { attachedSessions, letGoOf, type Attached } from '../src/harness/claude/attached.ts';
 import { IMAGE } from '../src/harness/image.ts';
-import { alive } from '../src/process/alive.ts';
+import { alive, processStart } from '../src/process/alive.ts';
 import {
   attachedStateOf,
   crashNote,
   CARRY_ON,
   filesOf,
   putDrain,
-  processStart,
   thisHolder,
   writeRun,
   type AttachedRun,

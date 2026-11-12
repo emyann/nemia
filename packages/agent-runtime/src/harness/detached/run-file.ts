@@ -5,6 +5,7 @@
 import { Result, Schema, SchemaIssue } from 'effect';
 import type { SessionState } from '../../core/index.ts';
 import { instantNow } from '../../core/engine/now.ts';
+import type { LeaseWord } from '../../../contracts/lease.contract.ts';
 import { IMAGE } from '../image.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 
@@ -24,8 +25,9 @@ export const CarriedSchema = Schema.Struct({
 });
 
 /**
- * How long a run file may go unbeaten before `observe` calls it dead. The worker beats every 5s. Measured from its `beat` on the
- * monotonic clock when it was written in this boot, else from its `heartbeatAt` on the wall clock (`elapsedMs`).
+ * How long a run file may go unbeaten before `observe` looks for its worker's process, and calls it dead once that is gone or cannot be
+ * told (`leaseWord`): never a bound on a start, since a live worker slow to beat is working. The worker beats every 5s. Measured from
+ * its `beat` on the monotonic clock when it was written in this boot, else from its `heartbeatAt` on the wall clock (`elapsedMs`).
  */
 export const STALE_MS = 30_000;
 
@@ -36,31 +38,50 @@ type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
  * A run file's state in A2A's names — the one place this runner translates, since codex, the check and a Claude Code job all
  * run under the worker:
  *
- *   working, heartbeat fresh  → working    the worker is at work
- *   working, heartbeat stale  → failed     the worker is gone, and its process with it: the whole lease
- *   done                      → completed  the harness exited 0
- *   failed                    → failed     it exited otherwise, or the worker could not start it
- *   stopped                   → canceled   a stop ended it
+ *   working, heartbeat fresh                         → working    the worker is at work
+ *   working, heartbeat stale, worker seen running    → working    slow, not dead: its first beat not yet written, or late under load
+ *   working, heartbeat stale, worker gone or unknown → failed     nobody is left to write its end: the whole lease
+ *   done                                             → completed  the harness exited 0
+ *   failed                                           → failed     it exited otherwise, or the worker could not start it
+ *   stopped                                          → canceled   a stop ended it
+ *
+ * The worker is seen by the identity its spawn recorded (`WorkerSeen`, `launched.ts`); a run that names none, spawned before one was
+ * recorded or on a machine with no `/proc`, is judged by the clock alone, as it was before.
  *
  * No run is waiting on a person: a harness the worker runs has no registry that says so (`Sighting.waitingFor`).
  */
 const WORKER_STATES: Record<WorkerState, SessionState> = { working: 'working', done: 'completed', failed: 'failed', stopped: 'canceled' };
 
+/** What one look found of a run's worker process (`lease.contract.ts`): `running`, `gone`, or `unknown` where nothing can say. */
+export type WorkerSeen = 'running' | 'gone' | 'unknown';
+
+/**
+ * The word a run file's state is read as (`lease.contract.ts`): the worker's own word, except a `working` one whose beat is past the
+ * lease while its worker is not seen running, which is `failed`. An age that cannot be read (`NaN`) is past it.
+ */
+export const leaseWord: LeaseWord = (state, beatAgeMs, leaseMs, worker) =>
+  state !== 'working' || beatAgeMs <= leaseMs || worker === 'running' ? state : 'failed';
+
 /** What of a run file its lease reads: its state, and its last beat on both clocks. */
 type Beaten = { state: string; heartbeatAt: string; beat?: Monotonic };
 
-/** A `working` run whose heartbeat has stopped is not working: `failed`. In the worker's words. */
-export const leased = (run: Beaten, now: Instant): string =>
-  run.state === 'working' && elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now) > STALE_MS ? 'failed' : run.state;
-
-/** A run file's state as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
-export const detachedStateOf = (run: Beaten, now: Instant): SessionState => {
-  const word = leased(run, now);
-  return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
+/**
+ * The run's word as of `now` (`leaseWord`), its worker looked for (`worker`) only where its beat is stale, since that costs a read of
+ * `/proc`: given as a thunk, it is asked at most once.
+ */
+export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): string => {
+  const age = elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now);
+  const fresh = run.state !== 'working' || age <= STALE_MS;
+  return leaseWord(run.state, age, STALE_MS, fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker);
 };
 
-/** Whether a run is over as of now: anything but `working`, a lease gone included. */
-export const overNow = (run: Beaten): boolean => detachedStateOf(run, instantNow()) !== 'working';
+/** A word of a run file as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
+export const stateOfWord = (word: string): SessionState =>
+  Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
+
+/** A run file's state as a sighting says it, as of `now`, its worker as `worker` found it (`leased`). */
+export const detachedStateOf = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): SessionState =>
+  stateOfWord(leased(run, now, worker));
 
 /**
  * A run file as the worker (`bin/ae-worker.ts`) and the spawn write it: what the worker writes about one session, and the
@@ -150,6 +171,12 @@ const RunFileSchema = Schema.StructWithRest(
      * read, and what was `found` in it, as JSON cut at 200 characters, or `nothing`. The run is unread (`startRefusalOf`).
      */
     startRefused: Schema.optional(Schema.Struct({ line: Schema.Finite, field: Schema.String, found: Schema.String })),
+    /**
+     * The harness's process, as the worker wrote it the moment it spawned it: its pid, which leads the harness's process group, and when
+     * it started (`processStart`), absent where there is no `/proc`. What a run left behind is found by it once its worker has ended or
+     * is gone (`left.ts`). Absent before the harness was started, and from a run file written before it was kept.
+     */
+    harness: Schema.optional(Schema.Struct({ pid: Schema.Finite, start: Schema.optional(Schema.String) })),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

@@ -6,31 +6,26 @@
  * is refused, naming the fix (`WF_EXPOSED=1` and a token of yours, or no bind); a value that is no IP address is refused too, rather than
  * read as the default, which would listen somewhere the operator did not ask for. TLS stays outside: a private network or a reverse proxy.
  */
-import net from 'node:net';
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-
-/** The address the api listens on where no other is asked for. */
-export const LOOPBACK = '127.0.0.1';
-
-/** Why a bind is refused: not an IP address, or an address beyond this machine on a store not marked exposed. */
-export type BindRefusal = 'not-an-address' | 'unexposed';
-
-/** Where the api listens, or why it may not where it was asked. */
-export type Bind = { readonly kind: 'bound'; readonly host: string } | { readonly kind: 'refused'; readonly reason: BindRefusal };
+import { asked, type Bind, isAddress, LOOPBACK } from '../src/port.ts';
 
 /**
- * Whether a text is an IP address, v4 or v6, as Node reads one: a parse the verifier does not read, declared pure and nothing more
- * (`address`). Implement moves it into `src/port.ts`, which `bindOf` calls, and this contract then assumes the code's, as the write
- * guard's contract assumes `loopback`.
+ * Whether a text is an IP address, v4 or v6: the code's (`src/port.ts`), a parse the verifier does not read (a pattern, a URL), declared
+ * pure and nothing more, as the write guard's contract assumes `loopback`. Which texts it takes is held by its tests (`src/port.test.ts`).
  */
-export const isAddress = (text: string): boolean => net.isIP(text) !== 0;
 export const address = assume(isAddress, { pure: true });
+
+/**
+ * The text a bind asks for, its white space left out, and blank where none is set: the code's (`src/port.ts`), a trim the verifier does
+ * not read, declared pure and nothing more, so the laws read the value as the code does.
+ */
+export const askedText = assume(asked, { pure: true });
 
 /** Whether an address is this machine's loopback alone. */
 const loopbackAddress = (host: string): boolean => host === LOOPBACK || host === '::1';
 
 /** Whether `value` asks for nothing: unset, or blank. */
-const unasked = (value: string | undefined): boolean => value === undefined || value.trim() === '';
+const unasked = (value: string | undefined): boolean => asked(value) === '';
 
 const bindOfSpec = spec<(value: string | undefined, exposed: boolean) => Bind>({
   ensures: {
@@ -41,24 +36,24 @@ const bindOfSpec = spec<(value: string | undefined, exposed: boolean) => Bind>({
     notAnAddressIsRefused: {
       description: 'A bind that is no IP address is refused as such, never read as the default',
       condition: ({ input: [value], output }) =>
-        unasked(value) || isAddress(value?.trim() ?? '') || (output.kind === 'refused' && output.reason === 'not-an-address'),
+        unasked(value) || isAddress(asked(value)) || (output.kind === 'refused' && output.reason === 'not-an-address'),
     },
     beyondThisMachineNeedsExposed: {
       description: 'An address beyond this machine’s loopback on a store not marked exposed is refused, unexposed',
       condition: ({ input: [value, exposed], output }) =>
         unasked(value) ||
         exposed ||
-        !isAddress(value?.trim() ?? '') ||
-        loopbackAddress(value?.trim() ?? '') ||
+        !isAddress(asked(value)) ||
+        loopbackAddress(asked(value)) ||
         (output.kind === 'refused' && output.reason === 'unexposed'),
     },
     anAllowedAddressIsListenedOn: {
       description: 'An address that is this machine’s loopback, or any address on an exposed store, is listened on as asked',
       condition: ({ input: [value, exposed], output }) =>
         unasked(value) ||
-        !isAddress(value?.trim() ?? '') ||
-        !(exposed || loopbackAddress(value?.trim() ?? '')) ||
-        (output.kind === 'bound' && output.host === value?.trim()),
+        !isAddress(asked(value)) ||
+        !(exposed || loopbackAddress(asked(value))) ||
+        (output.kind === 'bound' && output.host === asked(value)),
     },
   },
 });

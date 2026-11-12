@@ -16,21 +16,15 @@
  * tunnel the `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
  * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body.
  *
- * A write that presents a token by the board's cookie alone (`cookie`, `objects`' `TOKEN_COOKIE`, which the board sets once a person
- * pastes a token of theirs: the one credential a browser sends on a stream it follows) passes the host, but not the site. The host:
- * a site whose name was pointed at this machine is another origin, which the browser never hands the cookie, and a board reached at a
- * private network's address names that address. Not the site: a cookie is the browser's to send, scoped by host and not by port, so a
- * page on another port of the same host carries it; only the board's own page, `same-origin`, or no browser, writes by it.
+ * A write that presents a token by the board's cookie alone (`cookie`, `objects`' `TOKEN_COOKIE`: the HttpOnly cookie the api sets
+ * (`POST /api/session`) once a person pastes a token of theirs into the board, which no script of the page reads, and the one credential
+ * a browser sends on a stream it follows) passes the host, but not the site. The host: a site whose name was pointed at this machine is
+ * another origin, which the browser never hands the cookie, and a board reached at a private network's address names that address. Not
+ * the site: a cookie is the browser's to send, scoped by host and not by port, and `SameSite=Strict` by site, so a page on another port
+ * of the same host carries it; only the board's own page, `same-origin`, or no browser, writes by it.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { loopback, saysJson, type WriteRefusal, type WriteRequest as Headers } from '../src/guard.ts';
-
-/**
- * A request as the guard reads it: its method and headers, whether it presents a bearer token, and whether it presents a token by the
- * board's cookie alone (`cookie`; absent, none). Implement folds `cookie` into `src/guard.ts`'s own `WriteRequest`, required, and this
- * type then reads it from there.
- */
-export type WriteRequest = Headers & { readonly cookie?: boolean };
+import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src/guard.ts';
 
 /**
  * Whether a header names this machine's loopback (`localhost`, `127.0.0.1` or `[::1]`, on any port, in any case), and whether one says a
@@ -54,7 +48,7 @@ const ours = (site: string | undefined): boolean => site === undefined || site =
 const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
 
 /** Whether a write presents a token by the board's cookie. */
-const byCookie = (r: WriteRequest): boolean => r.cookie === true;
+const byCookie = (r: WriteRequest): boolean => r.cookie;
 
 /**
  * Whether a write may come from where it says it does: this machine, from no other site; with the board's cookie, from no other site at

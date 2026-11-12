@@ -1,10 +1,12 @@
 /**
- * Who a request is from: the token it presents (`Authorization: Bearer <token>`) and what its route needs of one (`needOf`), asked of the
+ * Who a request is from: the token it presents (`Authorization: Bearer <token>`, else the board's cookie, `TOKEN_COOKIE`) and what its
+ * route needs of one (`needOf`, proved by `apps/api/contracts/token-need.contract.ts`), asked of the
  * package (`sessionCaller`). Resolved once per request, before any router is reached (`callerGate`, app.ts), and put on the request for
  * `served` to hand every handler as `caller` (layer.ts): a proposal's and a delegation's handlers read it there.
  *
- * What a route needs: the MCP port (`/mcp`) always one of the person's tokens; every other route, where the store is marked exposed
- * (`WF_EXPOSED=1`, `StoreConfig.exposed`), a token, any live one; and otherwise none, a request that presents none being the person.
+ * What a route needs: the MCP port (`/mcp`) always one of the person's tokens; a route the api answers (`API_PATHS`), where the store is
+ * marked exposed (`WF_EXPOSED=1`, `StoreConfig.exposed`), a token, any live one; and otherwise none, a request that presents none being
+ * the person. A page of the board (board/board.ts) needs none, exposed or not: it carries no data of the store.
  *
  * Every request that presents a token is judged, whatever its route, not only the proposals' and delegations': a session's client sends
  * its token on every request (apps/cli), so a token refused on a read is the same forged or ended token a write would carry, and a
@@ -17,7 +19,8 @@ import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
 import type { TokenRefusal } from 'objects';
-import { bearerOf } from '../guard.ts';
+import type { NeedOf } from '../../contracts/token-need.contract.ts';
+import { bearerOf, cookieTokenOf } from '../guard.ts';
 import { type ApiEnv, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
@@ -26,14 +29,30 @@ export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message
   readonly exitCode = 2;
 }
 
-/** The MCP port's path, which always needs one of the person's tokens. */
-const MCP_PATH = '/mcp';
+/** The MCP port's path: it and every path under it need one of the person's tokens. */
+export const MCP_PATH = '/mcp';
+
+/** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
+export const API_PATHS = ['/api', '/openapi'] as const;
+
+/**
+ * Whether `path` is `root` or a path under it: joined with `+`, which the verifier reads, where it reads a template string as an unknown
+ * string (`apps/api/contracts/token-need.contract.ts` joins it the same way).
+ */
+const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
 
 /** Whether `path` is the MCP port's, or under it. */
-const onPort = (path: string): boolean => path === MCP_PATH || path.startsWith(`${MCP_PATH}/`);
+export const onPort = (path: string): boolean => under(path, MCP_PATH);
 
-/** What a request to `path` needs of a token: the person's on the MCP port, any where the store is `exposed`, and otherwise none. */
-export const needOf = (path: string, exposed: boolean): TokenNeed => (onPort(path) ? 'person' : exposed ? 'token' : 'none');
+/** Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts). */
+export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
+
+/**
+ * What a request to `path` needs of a token: the person's on the MCP port; a token, any live one, on a route the api answers where the
+ * store is `exposed`; and none on a page of the board, which carries no data of the store, so that a browser reaching an exposed store
+ * loads the page that asks for a token.
+ */
+export const needOf: NeedOf = (path, exposed) => (onPort(path) ? 'person' : exposed && answered(path) ? 'token' : 'none');
 
 /** How a client sends a token, and where the person mints one. */
 const SEND = "send one as `Authorization: Bearer <token>`: `nemia token add <name>`, at the store's machine, mints one of yours";
@@ -92,12 +111,18 @@ export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
   await next();
 };
 
-/** The caller a request is, by the token it presents and what its route needs of one; refused, `Unauthorized`. */
+/**
+ * The caller a request is, by the token it presents and what its route needs of one; refused, `Unauthorized`. The token is the bearer
+ * (`Authorization: Bearer <token>`), else the board's cookie (`TOKEN_COOKIE`, which `POST /api/session` sets) on a path the api answers
+ * or the port's: a page of the board carries no data and reads no cookie, so one gone stale still loads the page that asks for a token.
+ */
 async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Promise<ProposalCaller> {
-  const token = bearerOf(c.req.header('authorization'));
-  if (token === null)
+  const path = c.req.path;
+  const bearer = bearerOf(c.req.header('authorization'));
+  if (bearer === null)
     throw new Unauthorized({
-      message: `${c.req.method} ${c.req.path} reads its Authorization header as \`Bearer <token>\`, and this one is not: send a token as \`Authorization: Bearer <token>\` — a session's is in $WF_SESSION_TOKEN, and \`nemia token add <name>\` mints one of yours.`,
+      message: `${c.req.method} ${path} reads its Authorization header as \`Bearer <token>\`, and this one is not: send a token as \`Authorization: Bearer <token>\` — a session's is in $WF_SESSION_TOKEN, and \`nemia token add <name>\` mints one of yours.`,
     });
-  return callerBy(c, token, needOf(c.req.path, await exposedOf(c)));
+  const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
+  return callerBy(c, token, needOf(path, await exposedOf(c)));
 }

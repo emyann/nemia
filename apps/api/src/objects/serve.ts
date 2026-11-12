@@ -46,7 +46,7 @@ import { type Listed, watchable } from '../watch/watch.ts';
 import { discoveryHandlers } from '../discovery/discovery.ts';
 import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-objects/index.ts';
 import { templatesHandlers } from '../template-objects/templates.ts';
-import { serverHandlers } from '../server/server.ts';
+import { serverHandlers } from '../server/index.ts';
 import { nemiaHandlers } from '../nemia/index.ts';
 
 /** Where every path the api serves is listed, with what each takes. */

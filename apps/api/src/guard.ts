@@ -21,16 +21,24 @@
  * `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
  * src/caller/caller.ts), so one refused there never reaches it. It still says a JSON body.
  *
+ * A write that presents a token by the board's cookie alone (`TOKEN_COOKIE`, the HttpOnly cookie `POST /api/session` sets,
+ * server/session.ts) passes the host, but not the site: a site whose name was pointed at this machine is another origin, which the
+ * browser never hands the cookie, and a board reached at a private network's address names that address; but a page on another port of
+ * the same host is sent the cookie too (`SameSite=Strict` is by site, and a cookie is scoped by host, not port), so only the board's
+ * own page, `same-origin`, or no browser, writes by it.
+ *
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read as another
  * site's.
  */
-import type { MiddlewareHandler } from 'hono';
-import { Forbidden, UnsupportedMediaType } from 'objects';
+import type { Context, MiddlewareHandler } from 'hono';
+import { getCookie } from 'hono/cookie';
+import { Forbidden, TOKEN_COOKIE, UnsupportedMediaType } from 'objects';
 import type { WriteRefused } from '../contracts/write-guard.contract.ts';
 
 /**
- * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent, and
- * whether it presents a bearer token (`bearer`).
+ * A request as the guard reads it: its method, its `Host`, `Sec-Fetch-Site` and `Content-Type` headers, each absent where not sent,
+ * whether it presents a bearer token (`bearer`), and whether it presents a token by the board's cookie alone (`cookie`, `TOKEN_COOKIE`,
+ * with no bearer beside it).
  */
 export type WriteRequest = {
   readonly method: string;
@@ -38,6 +46,7 @@ export type WriteRequest = {
   readonly site: string | undefined;
   readonly contentType: string | undefined;
   readonly bearer: boolean;
+  readonly cookie: boolean;
 };
 
 /** What a request's `Authorization` header presents: no header (`undefined`), a bearer token, or a header of another shape (`null`). */
@@ -47,10 +56,19 @@ export function bearerOf(header: string | undefined): string | undefined | null 
   return match?.[1] ?? null;
 }
 
+/** The token the board's cookie (`TOKEN_COOKIE`) holds, or `undefined` where the request sends none, or an empty one. */
+export const cookieTokenOf = (c: Context): string | undefined => {
+  const token = getCookie(c, TOKEN_COOKIE);
+  return token === undefined || token === '' ? undefined : token;
+};
+
 /** Which refusal a write meets: another host, another site, or a body that is not JSON. */
 export type WriteRefusal = 'host' | 'site' | 'media';
 
-/** The names a write may be addressed to: this machine's loopback, on any port. The api listens on 127.0.0.1 alone (port.ts). */
+/**
+ * The names a write with no token may be addressed to: this machine's loopback, on any port. An api bound beyond it (`NEMIA_BIND`,
+ * port.ts) serves a store marked exposed, where every write presents a token.
+ */
 const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
 
 /** Whether `host` names this machine's loopback, on any port, in any case, the white space around it left out. */
@@ -63,12 +81,12 @@ const mediaOf = (type: string): string => type.split(';')[0]?.trim().toLowerCase
 export const saysJson = (type: string): boolean => mediaOf(type) === 'application/json';
 
 /**
- * Why a write is refused before its body is read, or null: its host first, then its site, neither where it presents a bearer token, then
- * its body's type; a read never.
+ * Why a write is refused before its body is read, or null: its host first, neither where it presents a bearer token or the board's
+ * cookie; then its site, not where it presents a bearer token; then its body's type; a read never.
  */
 export const writeRefused: WriteRefused = (request) => {
   if (request.method === 'GET' || request.method === 'HEAD') return null;
-  if (!request.bearer && request.host !== undefined && !loopback(request.host)) return 'host';
+  if (!request.bearer && !request.cookie && request.host !== undefined && !loopback(request.host)) return 'host';
   if (!request.bearer && request.site !== undefined && request.site !== 'same-origin') return 'site';
   if (request.contentType === undefined || !saysJson(request.contentType)) return 'media';
   return null;
@@ -102,12 +120,14 @@ const answerOf = (refusal: WriteRefusal, route: string, request: WriteRequest): 
 export const writeGuard: MiddlewareHandler = async (c, next) => {
   const path = new URL(c.req.url).pathname;
   if (!path.startsWith('/api/')) return next();
+  const bearer = typeof bearerOf(c.req.header('authorization')) === 'string';
   const request: WriteRequest = {
     method: c.req.method,
     host: c.req.header('host'),
     site: c.req.header('sec-fetch-site'),
     contentType: c.req.header('content-type'),
-    bearer: typeof bearerOf(c.req.header('authorization')) === 'string',
+    bearer,
+    cookie: !bearer && cookieTokenOf(c) !== undefined,
   };
   const refusal = writeRefused(request);
   if (refusal === null) return next();

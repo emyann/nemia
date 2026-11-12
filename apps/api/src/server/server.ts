@@ -44,6 +44,10 @@
  *   from. A long poll: it answers once, at its first match or its bound, never later than 270s. 422 for a selector, a cursor or a
  *   bound refused (`Invalid`), in the words that say the fix.
  *
+ * - `POST /api/session` — the board's session: the bearer the caller gate judged, set as the board's HttpOnly cookie (`signIn`,
+ *   session.ts), `{ cookie: 'set' }`; 400 (`BadRequest`) for a request with no bearer.
+ * - `DELETE /api/session` — the board's cookie cleared (`signOut`), `{ cookie: 'cleared' }`.
+ *
  * A failure that is no refusal is a 500 in its own words (`Failed`, `answeredWrite`), as on every route the api served on Hono.
  */
 import { Effect, Metric } from 'effect';
@@ -69,6 +73,7 @@ import { capabilitiesWithSteps } from '../capabilities/index.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
 import { statsOf } from '../stats/stats.ts';
+import { signIn, signOut } from './session.ts';
 import { engineRead } from '../store.ts';
 import { yourStore } from '../workflows/index.ts';
 
@@ -143,6 +148,8 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
         ),
       ),
     )
+    .handle('signIn', ({ request }) => signIn(request))
+    .handle('signOut', ({ request }) => signOut(request))
     .handle('feed', ({ query, headers, request }) =>
       Effect.gen(function* () {
         const s = yield* ServedNow;

@@ -9,15 +9,10 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { TokenNeed } from 'agent-orchestrator';
-
-/** The MCP port's path: it and every path under it need one of the person's tokens. */
-export const MCP_PATH = '/mcp';
-
-/** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
-export const API_PATHS = ['/api', '/openapi'] as const;
+import { MCP_PATH } from '../src/caller/caller.ts';
 
 /** Whether `path` is `root` or a path under it. */
-const under = (path: string, root: string): boolean => path === root || path.startsWith(`${root}/`);
+const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
 
 /** Whether `path` is the MCP port's. */
 const onPort = (path: string): boolean => under(path, MCP_PATH);

@@ -4,6 +4,7 @@
  * Served on both sides, typed by its `input` (`TimeoutInput`): the api reads it as the server's `pauseTimeout` (`GET /api/pause/timeout`)
  * and writes it as `setPauseTimeout` (`PUT /api/pause/timeout`, `{ timeout }`), each calling this handler.
  */
+import { givesNone, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -42,7 +43,10 @@ const timeoutLine = ({ ms, set, at }: TimeoutAt): string =>
  */
 export const TIMEOUT: Command<TimeoutAnswer, TimeoutInput> = {
   name: 'pause-timeout',
-  served: [{ endpoint: 'server.pauseTimeout' }, { endpoint: 'server.setPauseTimeout', as: 'pause_timeout_set' }],
+  served: [
+    { endpoint: 'server.pauseTimeout', takes: givesNone('timeout'), request: renamed({}, ['timeout']) },
+    { endpoint: 'server.setPauseTimeout', as: 'pause_timeout_set' },
+  ],
   usage: '[<d>]',
   help: [
     "the store's pause timeout: how long nemia pause, nemia service restart and",

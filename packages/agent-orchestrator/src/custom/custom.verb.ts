@@ -3,6 +3,7 @@
  * calls its handler by type (`CustomInput`) for an agent's `…/agents/<name>/instructions` and Nemia's own; each through the Agent door's
  * `custom` (`AgentDoor`, run at the store's root (`StoreRoot`) its handler is given).
  */
+import { gives, givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { leftOut, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -73,15 +74,42 @@ export type CustomInput = typeof CustomInput.Type;
  * `clear` — for a run on `repo`, `.` where none is named. Refused, writing nothing, as the package refuses: a name no place has, blank
  * words, a frontmatter block, and, on a read, a file there that does not read.
  */
+/** Whether `input` names Nemia, the store's own agent, whose custom instructions the api serves at `/api/nemia/instructions`. */
+const hers = (input: Readonly<Record<string, unknown>>): boolean => input.name === 'nemia';
+
 export const AGENTS_CUSTOM: Command<Read | Cleared, CustomInput> = {
   name: 'agents custom',
   served: [
-    { endpoint: 'agents.instructions' },
-    { endpoint: 'agents.putInstructions', as: 'agents_custom_put' },
-    { endpoint: 'agents.deleteInstructions', as: 'agents_custom_delete' },
-    { endpoint: 'nemia.instructions', as: 'nemia_instructions' },
-    { endpoint: 'nemia.writeInstructions', as: 'nemia_instructions_put' },
-    { endpoint: 'nemia.clearInstructions', as: 'nemia_instructions_delete' },
+    {
+      endpoint: 'agents.instructions',
+      takes: (input) => !hers(input) && givesNone('words', 'clear')(input),
+      request: refusing('agents custom', ['repo'], renamed({}, ['repo', 'words', 'clear'])),
+    },
+    {
+      endpoint: 'agents.putInstructions',
+      as: 'agents_custom_put',
+      takes: (input) => !hers(input) && gives('words')(input),
+      request: refusing('agents custom', ['repo'], renamed({}, ['repo', 'clear'])),
+    },
+    {
+      endpoint: 'agents.deleteInstructions',
+      as: 'agents_custom_delete',
+      takes: (input) => !hers(input),
+      request: refusing('agents custom', ['repo'], renamed({}, ['repo', 'words', 'clear'])),
+    },
+    {
+      endpoint: 'nemia.instructions',
+      as: 'nemia_instructions',
+      takes: givesNone('words', 'clear'),
+      request: renamed({}, ['name', 'repo', 'words', 'clear']),
+    },
+    {
+      endpoint: 'nemia.writeInstructions',
+      as: 'nemia_instructions_put',
+      takes: gives('words'),
+      request: renamed({}, ['name', 'repo', 'clear']),
+    },
+    { endpoint: 'nemia.clearInstructions', as: 'nemia_instructions_delete', request: renamed({}, ['name', 'repo', 'words', 'clear']) },
   ],
   usage: '<name> [--file <path>|-] [--clear] [--repo .]',
   help: [

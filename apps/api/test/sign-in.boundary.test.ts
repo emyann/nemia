@@ -1,5 +1,5 @@
 /**
- * A factory's server signed in to and out of from the board (src/factory/parts/mcp-servers.ts), over the runtime's stand-in for the three
+ * A factory's server signed in to and out of from the board (src/factory/parts/mcp-servers.ts), over the runtime's stand-in for the four
  * sign-in verbs: the real ones spawn Claude Code and wait on a browser, which no api test does.
  *
  * The rule the card rests on is that no answer carries the builtin secret: every body of the three routes, and the servers' read with
@@ -28,7 +28,7 @@ const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-orig
 const URL = '/api/namespaces/signmill/mcpservers';
 
 /**
- * An app whose engine answers the three sign-in verbs from the runtime's stand-in, and everything else from the package's engine: the
+ * An app whose engine answers the four sign-in verbs from the runtime's stand-in, and everything else from the package's engine: the
  * api has no door that hands its app the stand-in whole, which is why this file is a boundary test. Every secret the package hands the
  * engine is caught in `handed`, so the search below looks for the very value the package holds, read off no file of its source.
  */
@@ -43,14 +43,21 @@ const appWith = () => {
       return signing.mcpSignIn(name, server, secret);
     },
     mcpSignInState: signing.mcpSignInState,
+    mcpSignInCallback: signing.mcpSignInCallback,
     mcpSignOut: signing.mcpSignOut,
   };
   return { app: appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(e as never))).app, stand, handed };
 };
 
 /** The answer to `method` on `url`, as the board sends it: its status, and its body as text, so a search reads every byte. */
-async function asked(app: ReturnType<typeof appWith>['app'], method: string, url: string, headers: Record<string, string> = BOARD) {
-  const res = await app.request(url, { method, headers, ...(method === 'GET' ? {} : { body: '{}' }) });
+async function asked(
+  app: ReturnType<typeof appWith>['app'],
+  method: string,
+  url: string,
+  headers: Record<string, string> = BOARD,
+  body = '{}',
+) {
+  const res = await app.request(url, { method, headers, ...(method === 'GET' ? {} : { body }) });
   return { status: res.status, text: await res.text() };
 }
 
@@ -138,4 +145,48 @@ test('REFUSED: a server the factory does not record (404), a port another sign-i
   assert.equal((await asked(app, 'POST', `${URL}/bad%20name/sign-in`)).status, 422);
   await recorded(app, 'docs', { type: 'http', url: 'https://docs.example/mcp' });
   assert.equal((await asked(app, 'POST', `${URL}/docs/sign-in`)).status, 422, 'a server with no OAuth client signs in to nothing');
+});
+
+test('a pasted callback completes a waiting sign-in: answered its state, refused by kind, the address in no answer', async (t) => {
+  const { app, stand } = appWith();
+  await recorded(app, 'github', GITHUB);
+  const CALLBACK = `${URL}/github/sign-in/callback`;
+  const PASTED = 'http://localhost:8791/callback?code=a-code-of-the-sign-in&state=a-state';
+  const paste = (url: unknown, at = CALLBACK) => asked(app, 'POST', at, BOARD, JSON.stringify({ url }));
+
+  await t.test('REFUSED: a callback where no sign-in waits is a 409, a server the factory does not record a 404', async () => {
+    const none = await paste(PASTED);
+    assert.equal(none.status, 409, none.text);
+    assert.equal(none.text.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no answer');
+    assert.equal((await paste(PASTED, `${URL}/gitlab/sign-in/callback`)).status, 404);
+  });
+
+  await t.test('REFUSED: a body with no url, or not a string, is a 400 naming the field', async () => {
+    for (const body of ['{}', JSON.stringify({ url: 3 })]) {
+      const res = await asked(app, 'POST', CALLBACK, BOARD, body);
+      assert.equal(res.status, 400, res.text);
+      assert.match((JSON.parse(res.text) as { field?: string }).field ?? '', /url/, res.text);
+    }
+  });
+
+  await t.test("REFUSED: an address that is not the sign-in's redirect is a 422, and nothing is handed on", async () => {
+    assert.equal((await asked(app, 'POST', `${URL}/github/sign-in`)).status, 200);
+    const wrong = await paste('http://localhost:9999/callback?code=a-code-of-the-sign-in&state=a-state');
+    assert.equal(wrong.status, 422, wrong.text);
+    assert.equal(wrong.text.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no answer');
+    assert.deepEqual(stand.callbacks, []);
+  });
+
+  await t.test(
+    'the redirect with a code and a state is handed on and answers the SignInState, which reads connected once it settles',
+    async () => {
+      const handed = await paste(PASTED);
+      assert.equal(handed.status, 200, handed.text);
+      assert.equal((JSON.parse(handed.text) as { state: string }).state, 'waiting');
+      assert.equal(handed.text.includes('a-code-of-the-sign-in'), false, 'the answer carries no part of the address');
+      assert.deepEqual(stand.callbacks, [{ name: 'github', url: PASTED }]);
+      stand.settleSignIn('github', { state: 'connected' });
+      assert.deepEqual(JSON.parse((await asked(app, 'GET', `${URL}/github/sign-in`)).text), { state: 'connected' });
+    },
+  );
 });

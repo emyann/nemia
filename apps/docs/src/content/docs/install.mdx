@@ -82,9 +82,17 @@ nemia config current-context
 ```
 
 Setting `NEMIA_CONTEXT=<name>` picks another context for one command. Under a remote context, the reads and the client verbs (runs,
-proposals, the inbox, decisions) reach the server. A verb only the server's own command has yet is refused there, naming the context
-to leave. The machine's own verbs (the service, upgrade, the daemon, the version, tokens and the Claude token) always act on the
-machine you type them on.
+proposals, the inbox, decisions) reach the server, and so does every other verb about the store: `nemia` parses it, checks it and
+prints its answer on your laptop as it always does, and the server does the work. The files a command names on your laptop, a card
+for `nemia inbox add -f`, a template folder or archive for `nemia factory apply --template`, a file for `nemia factory resolve
+--file`, travel with the request. A repository path (`--repo`) or a volume's path names a folder on the server's machine, not on
+yours. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
+run it on.
+
+The machine's own verbs always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`, `nemia tick`), the
+version, tokens and the Claude token, and the verbs that read and write files and no store (`nemia template`, `nemia frontmatter`,
+`nemia admit`). `nemia template export --factory` reads a factory of this machine's store, so under a remote context it is refused:
+run it on the server.
 
 ## Your Claude token
 
@@ -128,8 +136,16 @@ of an installed release reads the release list's newest entry every six hours, s
 ## Signing in from a remote browser
 
 Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as a factory's MCP server
-signing in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser cannot reach. Until Nemia carries
-those sign-ins itself, forward the port over SSH and open the page on your laptop:
+signing in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser cannot reach.
+
+A factory's MCP server signs in from your own browser wherever the daemon runs. Press _Sign in_ on the server's row of the board,
+open the page it gives and approve. Your browser is then sent back to an address like
+`http://localhost:8791/callback?code=…&state=…`, which does not load, since nothing listens for it on your laptop. Copy that address
+from the browser's address bar, paste it into the field the board shows under the waiting sign-in, _the address your browser landed
+on_, and press _Complete_. The daemon hands it to the sign-in waiting for it, and the server reads `connected`. The address carries a
+code used once: Nemia never logs or keeps it.
+
+Or, instead, forward the port over SSH and open the page on your laptop, so the call back reaches the server itself:
 
 ```bash
 ssh -L 8787:127.0.0.1:8787 you@your-server

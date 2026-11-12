@@ -8,7 +8,7 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed; `process`, for every other verb, a help, a moved read typed with `--local`, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `refused`, a verb about the store only that path has, typed under a remote context, refused exit 2 naming `nemia config use-context local`.",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed; `process`, for every other verb, a help, a moved read typed with `--local`, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon. `refused` is a route no more: no command is refused for being remote.",
       "type": "Route"
     },
     {
@@ -23,11 +23,22 @@
     },
     {
       "term": "Remote context",
-      "meaning": "a context that names a daemon on another machine (`Chosen` of kind `remote`, `apps/cli/src/context.ts`): the moved reads and the client's verbs ask its server with its token as `Authorization: Bearer` (`sessionHeaders`, `apps/cli/src/client.ts`, `WF_SESSION_TOKEN` first), this machine's lease is never read (`servedAt`, `apps/cli/src/where.ts`), no daemon is started here (`served`, `apps/cli/src/daemon.ts`), and a verb about the store only the in-process path has is refused (`notHere`)."
+      "meaning": "a context that names a daemon on another machine (`Chosen` of kind `remote`, `apps/cli/src/context.ts`): the moved reads and the client's verbs ask its server with its token as `Authorization: Bearer` (`sessionHeaders`, `apps/cli/src/client.ts`, `WF_SESSION_TOKEN` first), this machine's lease is never read (`servedAt`, `apps/cli/src/where.ts`), no daemon is started here (`served`, `apps/cli/src/daemon.ts`), and a verb about the store only the in-process path has is forwarded (`forwardedEnv`), the words a moved read hands on among them (`handedOn`, `apps/cli/src/local.ts`); `nemia template export --factory`, which reads a store in process, is refused, naming `NEMIA_CONTEXT=local` (`factoryNotHere`)."
+    },
+    {
+      "term": "Forwarded",
+      "meaning": "the route of a verb about the store only the orchestrator's own CLI has, typed under a remote context (`routeOf`, `apps/cli/src/route.ts`, proved by `apps/cli/contracts/route.contract.ts`): that CLI spawned with the same words (`spawned`, `apps/cli/src/local.ts`) and the environment `forwardedEnv` makes (`apps/cli/src/where.ts`): the context's server in `NEMIA_SERVER` and its token in `NEMIA_SERVER_TOKEN`, never on the command line, and no `WF_ROOT`. It parses, checks and prints as ever and calls each command's endpoint on that daemon in place of its handler, refusing in its own words a command no endpoint serves. A help and a machine verb are never forwarded.",
+      "type": "Route",
+      "retired": [
+        {
+          "spelling": "notHere",
+          "card": "distribution: the laptop's nemia calls a remote daemon for every store verb, forwarding what it refused"
+        }
+      ]
     },
     {
       "term": "Machine verb",
-      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included.",
+      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and the verbs that read and write this machine's files and no store, `template`, `frontmatter`, `admit`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included.",
       "type": "MachineVerb"
     },
     {

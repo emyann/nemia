@@ -2,6 +2,7 @@
  * `nemia rm` and `nemia prune`, entries of the command table: one run forgotten (`forgetRun`), or what it left on disk pruned (`prune`);
  * the CLI's runners walk the many runs each takes.
  */
+import { refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { forgetLine, type Forgot } from './forget.ts';
 import { forgetRun } from './forget.verb.ts';
@@ -69,13 +70,40 @@ export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
 };
 
 /**
+ * What the api answers of a run it removed (`runs.delete`: a try alone, its id, whether it was removed, and what the engine did with its
+ * tasks), as `nemia rm` prints it: forgotten as a folder run is, which a try is, with no worktree or branch to say anything of.
+ */
+const forgotThere = (answer: unknown): { id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot } => {
+  const { id, removed, engine } = answer as { id: string; removed: boolean; engine: EngineForgetting | null };
+  const forgot: Forgot = {
+    id,
+    kind: removed ? 'forgotten' : 'held',
+    folder: true,
+    removed: [],
+    handedOff: [],
+    gone: [],
+    left: [],
+    branches: [],
+    files: [],
+    ...(engine === null ? {} : { engine }),
+  };
+  return { id, removed, engine, forgot };
+};
+
+/**
  * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included, and with its
  * tasks on the engine (`engine`, null where nothing was removed). The api removes a try alone (`onlyTry`), and a run only once it is gone
  * (`refuses`): what `forget` refused, or held, is a `Conflict` in its words, and a run gone since a `Missing`.
  */
 export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }, RmInput> = {
   name: 'rm',
-  served: [{ endpoint: 'runs.delete' }],
+  served: [
+    {
+      endpoint: 'runs.delete',
+      request: refusing('rm', ['deleteBranches', 'forceUnmerged'], renamed({ runId: 'name' }, ['onlyTry', 'refuses'])),
+      answer: forgotThere,
+    },
+  ],
   usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
   help: [
     "forget runs that are over, a line each: a run's worktrees removed",
@@ -153,7 +181,7 @@ export const PRUNE: Command<
   PruneInput
 > = {
   name: 'prune',
-  served: [{ endpoint: 'runs.prune' }],
+  served: [{ endpoint: 'runs.prune', request: renamed({ runId: 'name' }, ['yes', 'refuses']) }],
   usage: '[<runId> ...] [--unmerged] [--artifacts] [--yes]',
   help: [
     'free the space runs that are over hold: their worktrees, removed',
@@ -194,5 +222,5 @@ export const PRUNE: Command<
     const { id, worktrees, left } = p;
     return { id, pruned: p.kind === 'pruned', lines: pruneLines(p), worktrees, artifacts: p.artifacts ?? null, left, pruning: p };
   }),
-  print: ({ pruning }) => pruneLines(pruning),
+  print: ({ lines }) => lines,
 };

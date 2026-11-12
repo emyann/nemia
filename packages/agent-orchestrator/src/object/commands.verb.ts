@@ -2,6 +2,7 @@
  * The run object's reads at the command line, entries of the command table: `nemia show` (the run as one object, or its record), a
  * step's tries, one try, its closeout and what it was told, and `nemia logs` (a step's session output).
  */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
@@ -42,7 +43,7 @@ const ShowInput = Schema.Struct({ runId: Schema.String, raw: Schema.optionalKey(
 
 export const SHOW: Command<Readonly<Record<string, unknown>>, typeof ShowInput.Type> = {
   name: 'show',
-  served: [{ endpoint: 'runs.record' }],
+  served: [{ endpoint: 'runs.record', request: renamed({ runId: 'name' }, ['raw']) }],
   usage: '<runId> [--raw]',
   help: ['the run as one object (nemia/v1 Run); --raw: its record, and', 'what each step was told'],
   spec: {

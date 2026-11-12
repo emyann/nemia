@@ -2,15 +2,18 @@
  * Which way each command goes, as a person types it: every command of the orchestrator's table goes to its own CLI but a moved read
  * (`READ_VERBS`), which asks the api; the client's own verbs (`CLIENT_VERBS`) ask the api with `--help` and `--local` too; a command
  * opens with one word (`nameOf`), and a moved read typed with words it does not read — `inbox rm <card>`, a command of its own — hands
- * them to the old path before it asks the api anything. Under a remote context a verb about the store only the old path has is refused,
- * exit 2, naming `nemia config use-context local`, the words a moved read hands on among them, while a verb about this machine
- * (`MACHINE_VERBS`) still runs here. The laws of `routeOf` are its contract's (`route.contract.ts`).
+ * them to the old path before it asks the api anything. Under a remote context a verb about the store only the old path has is
+ * forwarded, the words a moved read hands on among them: the old path spawned with the context's server and token and without
+ * `WF_ROOT`, seen by a planted entry in its place; a verb about this machine (`MACHINE_VERBS`, `template lint` among them) still runs
+ * here, and `template export --factory`, which reads this machine's store, is refused, exit 2, naming `NEMIA_CONTEXT=local`. The laws
+ * of `routeOf` are its contract's (`route.contract.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { COMMANDS } from 'agent-orchestrator';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
@@ -59,17 +62,19 @@ test('`nemia inbox rm <card>` runs on the old path, never asking the api: a stor
   assert.match(said, /no-such-card/, `the old path's own answer, naming the card (exit ${code}): ${said}`);
 });
 
-test('under a remote context a verb about the store only the old path has is refused; a machine verb and a help still run here', () => {
+test('under a remote context a verb about the store only the old path has is forwarded; a machine verb and a help still run here', () => {
   const kept: readonly string[] = [...READ_VERBS, ...CLIENT_VERBS, ...MACHINE_VERBS];
   for (const name of TABLE_NAMES) {
     assert.equal(
       routeOf({ name, local: false, help: false, remote: true }),
-      kept.includes(name) ? routeOf({ name, local: false, help: false, remote: false }) : 'refused',
+      kept.includes(name) ? routeOf({ name, local: false, help: false, remote: false }) : 'forwarded',
       name,
     );
-    assert.notEqual(routeOf({ name, local: false, help: true, remote: true }), 'refused', `${name} --help`);
+    assert.notEqual(routeOf({ name, local: false, help: true, remote: true }), 'forwarded', `${name} --help`);
   }
   for (const name of MACHINE_VERBS) assert.equal(routeOf({ name, local: false, help: false, remote: true }), 'process', name);
+  for (const name of ['template', 'frontmatter', 'admit'])
+    assert.ok((MACHINE_VERBS as readonly string[]).includes(name), `${name} reads and writes this machine's files, no store`);
 });
 
 /** A laptop whose config's context in use is a remote daemon nothing serves, and whose store root is never made. */
@@ -86,28 +91,84 @@ function remoteLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } 
   return { env, root: env.WF_ROOT };
 }
 
-/** `nemia <argv>` on `env`, waited on for its end: its code and all it said. */
-async function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<{ code: number | null; said: string }> {
-  const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-  let said = '';
-  child.stdout.on('data', (chunk) => (said += chunk));
-  child.stderr.on('data', (chunk) => (said += chunk));
-  const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
-  return { code, said };
+/**
+ * A `node` option that loads, in `nemia`'s process, a resolve hook putting a planted entry in place of the orchestrator's CLI — what
+ * `src/local.ts`, its one resolver, resolves to the package's `bin/nemia.ts` — which prints the words it was spawned with, and what it
+ * reads of the forwarded variables and of `WF_ROOT`, as one JSON line.
+ */
+function plantedEntry(prefix: string): string {
+  const entry = path.join(scratch(prefix), 'planted.mjs');
+  fs.writeFileSync(
+    entry,
+    'const { NEMIA_SERVER = null, NEMIA_SERVER_TOKEN = null, WF_ROOT = null } = process.env;\n' +
+      'process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), NEMIA_SERVER, NEMIA_SERVER_TOKEN, WF_ROOT }));\n',
+  );
+  const url = pathToFileURL(entry).href;
+  const hook = `const r=n(s,c);return c.parentURL?.endsWith('/src/local.ts')&&r.url.endsWith('/bin/nemia.ts')?{url:${JSON.stringify(url)},shortCircuit:true}:r;`;
+  return `data:text/javascript,import{registerHooks}from'node:module';registerHooks({resolve(s,c,n){${hook}}});`;
 }
 
-test('under a remote context `nemia inbox add` and `nemia start` are refused, exit 2, naming `nemia config use-context local`', async () => {
+/**
+ * `nemia <argv>` on `env`, waited on for its end: its code, all it said and its stdout, the planted entry of `hook` in the old path's
+ * place where one is given.
+ */
+async function nemia(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  hook?: string,
+): Promise<{ code: number | null; said: string; out: string }> {
+  const child = spawn(process.execPath, [...(hook === undefined ? [] : ['--import', hook]), CLI, ...argv], {
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let said = '';
+  let out = '';
+  child.stdout.on('data', (chunk) => ((said += chunk), (out += chunk)));
+  child.stderr.on('data', (chunk) => (said += chunk));
+  const code = await new Promise<number | null>((resolve) => child.on('close', resolve));
+  return { code, said, out };
+}
+
+test('under a remote context `inbox rm`, `inbox add`, `start` and `ls <run>` are forwarded: the old path, with the server and token, no WF_ROOT', async () => {
   const { env, root } = remoteLaptop('nemia-route-remote-');
+  const hook = plantedEntry('nemia-route-planted-');
   for (const argv of [
+    ['inbox', 'rm', 'x'],
     ['inbox', 'add', 'an idea'],
     ['start', 'card.md'],
     ['ls', 'some-run'],
   ]) {
-    const { code, said } = await nemia(argv, env);
-    assert.equal(code, 2, `nemia ${argv.join(' ')}: ${said}`);
-    assert.match(said, /nemia config use-context local/, argv.join(' '));
+    const { code, said, out } = await nemia(argv, env, hook);
+    assert.equal(code, 0, `nemia ${argv.join(' ')}: ${said}`);
+    assert.deepEqual(
+      JSON.parse(out),
+      { argv, NEMIA_SERVER: 'http://127.0.0.1:9', NEMIA_SERVER_TOKEN: 'tok', WF_ROOT: null },
+      argv.join(' '),
+    );
   }
   assert.equal(fs.existsSync(root), false, "nothing wrote this machine's store");
+});
+
+test('under a remote context `template lint` runs here, unforwarded; `template export --factory` is refused, exit 2, naming NEMIA_CONTEXT=local', async () => {
+  const { env, root } = remoteLaptop('nemia-route-template-');
+  const hook = plantedEntry('nemia-route-template-planted-');
+  for (const argv of [
+    ['template', 'lint', 'shop'],
+    ['template', 'export', 'shop', '--from', 'repo'],
+  ]) {
+    const { code, said, out } = await nemia(argv, env, hook);
+    assert.equal(code, 0, `nemia ${argv.join(' ')}: ${said}`);
+    assert.deepEqual(JSON.parse(out), { argv, NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: root }, argv.join(' '));
+  }
+  for (const argv of [
+    ['template', 'export', 'shop', '--from', 'repo', '--factory', 'f'],
+    ['template', 'export', 'shop', '--from', 'repo', '--factory=f'],
+  ]) {
+    const { code, said, out } = await nemia(argv, env, hook);
+    assert.equal(code, 2, `nemia ${argv.join(' ')}: ${said}`);
+    assert.match(said, /NEMIA_CONTEXT=local nemia template export/, argv.join(' '));
+    assert.equal(out, '', 'the old path never ran');
+  }
 });
 
 test('under a remote context `nemia service status` still runs here, a verb about this machine', async () => {

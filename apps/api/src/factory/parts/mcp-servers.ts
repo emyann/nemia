@@ -1,8 +1,9 @@
 /**
  * The mcpservers and builtin groups' handlers (`objects`' `Api`): a factory's MCP servers as objects, in its namespace — a page of them
  * (`mcpServerList`), one (`mcpServerObject`), each header masked — recorded (`nemia factory server add`, a header sent as the mask
- * keeping the value stored, `headerWritten`) and taken off (`server rm`); its sign-in to one started, read and signed out
- * (`serverSignIn`, `serverSignInState`, `serverSignOut`), each writing the harness's own store; and Nemia's builtin servers
+ * keeping the value stored, `headerWritten`) and taken off (`server rm`); its sign-in to one started, read, completed with the address
+ * a person's browser landed on (the body's `url`, which no answer or log carries) and signed out (`serverSignIn`, `serverSignInState`,
+ * `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and Nemia's builtin servers
  * (`builtinServerList`), a spec each and no namespace.
  */
 import { Effect } from 'effect';
@@ -16,6 +17,7 @@ import {
   mcpServerObject,
   serverNameRefusal,
   serverSignIn,
+  serverSignInCallback,
   serverSignInState,
   serverSignOut,
   Invalid as Refused,
@@ -82,6 +84,12 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
       answered(async (s) => {
         named(routeOf('GET', namespace, name, '/sign-in'), namespace, name);
         return s.inRequest(serverSignInState(namespace, name, s.home));
+      }),
+    )
+    .handle('signInCallback', ({ params: { namespace, name }, payload }) =>
+      answered(async (s) => {
+        named(routeOf('POST', namespace, name, '/sign-in/callback'), namespace, name);
+        return s.inRequest(serverSignInCallback(namespace, name, payload.url, s.home));
       }),
     )
     .handle('signOut', ({ params: { namespace, name } }) =>

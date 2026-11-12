@@ -262,6 +262,12 @@ export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOK
  */
 export const SESSION_VARIABLES = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
 
+/**
+ * What forwards the command line to another machine's daemon: its api's address, and the token it presents there, which the client
+ * sets on the CLI it spawns under a context naming a remote daemon. A test seat drops them, so a person's shell never forwards a test.
+ */
+export const FORWARD_VARIABLES = ['NEMIA_SERVER', 'NEMIA_SERVER_TOKEN'] as const;
+
 /** Every `WF_` setting a program reads besides the root, each as its reader answers it. */
 export type Settings = {
   readonly maxConcurrent: number;

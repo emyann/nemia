@@ -762,6 +762,17 @@ const MCP_SIGN_IN_STATE: readonly Walk[] = [
   },
 ];
 
+const MCP_SIGN_IN_CALLBACK: readonly Walk[] = [
+  {
+    name: 'a pasted callback is refused where no sign-in to the server waits, and nothing is handed on',
+    walk: async ({ engine }) => [
+      await asked(engine.mcpSignInCallback('github', 'http://localhost:8791/callback?code=c&state=s')),
+      await asked(engine.mcpSignInState('github')),
+    ],
+    says: [{ refused: 'McpSignInRefused' }, { state: 'none' }],
+  },
+];
+
 const MCP_SIGN_OUT: readonly Walk[] = [
   {
     name: 'a sign-out is refused a server with no OAuth client, as a sign-in is',
@@ -792,6 +803,7 @@ export const WALKS = {
   mcpState: MCP_STATE,
   mcpSignIn: MCP_SIGN_IN,
   mcpSignInState: MCP_SIGN_IN_STATE,
+  mcpSignInCallback: MCP_SIGN_IN_CALLBACK,
   mcpSignOut: MCP_SIGN_OUT,
   io: IO,
 } as const;

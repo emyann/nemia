@@ -371,3 +371,21 @@ test('nemia approve of a loop out of rounds: what it accepted, and the file it w
   assert.match(out[1], /^ {3}\/.+/);
   assert.ok(fs.existsSync(out[1].trim()), out[1]);
 });
+
+test('REFUSED forwarded to another machine (NEMIA_SERVER): a verb no endpoint serves, Invalid, exit 2, before any engine is built', async () => {
+  const there: Env = { ...ENV, NEMIA_SERVER: 'http://127.0.0.1:9', NEMIA_SERVER_TOKEN: 't' };
+  for (const argv of [['tick'], ['up', '--stats'], ['version']])
+    await assert.rejects(main(argv, undefined, undefined, undefined, there), (err: { _tag?: string; exitCode?: number }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2], argv.join(' '));
+      return true;
+    });
+});
+
+test("forwarded to a daemon no one serves, a linked verb fails naming the server, and builds no engine of this machine's", async () => {
+  const there: Env = { ...ENV, NEMIA_SERVER: 'http://127.0.0.1:9' };
+  await assert.rejects(main(['pause-timeout'], undefined, undefined, undefined, there), (err: Error & { exitCode?: number }) => {
+    assert.match(err.message, /127\.0\.0\.1:9/);
+    assert.notEqual(err.exitCode, 2);
+    return true;
+  });
+});

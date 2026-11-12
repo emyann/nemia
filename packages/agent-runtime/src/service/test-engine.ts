@@ -11,7 +11,7 @@
  * read a record's states once rather than once per task.
  *
  * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `answer`, `transcript`, `forget`, `kept`,
- * `mcpState`, the three sign-in verbs (`signIns`, `signOuts` and `settleSignIn` read and move them) and `io`, each
+ * `mcpState`, the four sign-in verbs (`signIns`, `signOuts`, `callbacks` and `settleSignIn` read and move them) and `io`, each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -336,6 +336,8 @@ export type TestEngine = {
   readonly signIns: Array<{ readonly name: string; readonly secret: boolean }>;
   /** Each `mcpSignOut` asked and not refused, by the server's name, in order. */
   readonly signOuts: string[];
+  /** Each `mcpSignInCallback` handed on, in order: the server's name and the address pasted, which a test of the stand-in reads. */
+  readonly callbacks: Array<{ readonly name: string; readonly url: string }>;
   /**
    * Settles `name`'s waiting sign-in on `state`, freeing its callback port, as the real hold does when the server connects or its
    * time is up.
@@ -484,6 +486,7 @@ type Held = Omit<
   | 'mcpReads'
   | 'signIns'
   | 'signOuts'
+  | 'callbacks'
   | 'settleSignIn'
 >;
 

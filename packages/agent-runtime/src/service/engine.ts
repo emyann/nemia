@@ -431,6 +431,14 @@ export type EngineShape = {
   /** The state of `name`'s last sign-in asked of this engine, from memory, spawning nothing: `none` where none was asked. */
   readonly mcpSignInState: (name: string) => Effect.Effect<McpSignInState>;
   /**
+   * The address a person's browser was sent back to once they approved `name`'s sign-in, pasted where the browser runs on another
+   * machine than this engine, handed to the waiting sign-in's session (`mcpSubmitOAuthCallbackUrl`); the sign-in then settles as it
+   * would have had the browser reached the callback port, and its state is answered as it stands. The address is put in no refusal and
+   * no log. Refused — `McpSignInRefused`, its `callback` saying why — where no sign-in to `name` waits (`none-waiting`), and where the
+   * address is not that sign-in's redirect with a code and a state (`callbackRefusal`), nothing handed on.
+   */
+  readonly mcpSignInCallback: (name: string, url: string) => Effect.Effect<McpSignInState, McpSignInRefused>;
+  /**
    * `name`'s sign-in cleared from Claude Code's store — its token and its stored secret, by `claude mcp remove --scope local` in the
    * folder its sign-in added it in — so a session handed the same bytes reads `needs-auth`. Refused as `mcpSignIn` is, and (`held:
    * true`) while a sign-in to it waits.
@@ -757,7 +765,7 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
 /**
  * The verbs that ask a harness something in a session of their own, opened for the ask and let go with it: what is left of a plan's
  * usage (`quota`), the state of each server a caller hands (`mcpState`), and a server's sign-in and sign-out (`mcpSignIn`,
- * `mcpSignInState`, `mcpSignOut`), whose waiting sign-ins this engine holds.
+ * `mcpSignInState`, `mcpSignInCallback`, `mcpSignOut`), whose waiting sign-ins this engine holds.
  */
 const askedVerbsOf = (
   runners: Record<string, SeamOps>,
@@ -766,7 +774,7 @@ const askedVerbsOf = (
   fallback: string,
   root: string,
   executable: string | undefined,
-): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> => ({
+): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'> => ({
   quota: quotaVerbOf(runners, declared, fallback),
   mcpState: mcpStateVerbOf(harnesses, root, executable),
   ...mcpSignInVerbsOf(harnesses, root, executable),

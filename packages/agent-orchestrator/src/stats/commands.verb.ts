@@ -1,4 +1,5 @@
 /** `nemia stats`, an entry of the command table: what the store's runs add up to (`statsRun`). */
+import { refusing, renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { setting } from '../config/config.store.ts';
@@ -94,7 +95,12 @@ export type StatsInput = typeof StatsInput.Type;
  */
 export const STATS: Command<Stats, StatsInput> = {
   name: 'stats',
-  served: [{ endpoint: 'server.stats' }],
+  served: [
+    {
+      endpoint: 'server.stats',
+      request: refusing('stats', ['selector'], renamed({ factory: 'ofFactory', repo: 'ofRepo' }, ['line', 'json'])),
+    },
+  ],
   usage:
     '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]',
   help: [

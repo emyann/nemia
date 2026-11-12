@@ -5,6 +5,7 @@
  * (`SKILLS_WRITE`), served on both sides. The api resolves which folders a read names, guards each write, and words the board's answer
  * around what each entry answers.
  */
+import { givesNone, notSent } from '../command/requests.verb.ts';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -134,9 +135,9 @@ export type SkillWriteInput = typeof SkillWriteInput.Type;
 export const SKILLS_WRITE: Command<SkillWritten | SkillCopied, SkillWriteInput> = {
   name: 'skills write',
   served: [
-    { endpoint: 'skills.create' },
-    { endpoint: 'skills.replace', as: 'skills_replace' },
-    { endpoint: 'skills.copy', as: 'skills_copy' },
+    { endpoint: 'skills.create', takes: givesNone('version', 'copy', 'builtin'), request: notSent('skills write') },
+    { endpoint: 'skills.replace', as: 'skills_replace', takes: givesNone('copy', 'builtin'), request: notSent('skills write') },
+    { endpoint: 'skills.copy', as: 'skills_copy', request: notSent('skills write') },
   ],
   usage: '(yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
   help: [

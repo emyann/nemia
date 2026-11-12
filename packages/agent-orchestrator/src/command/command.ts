@@ -196,11 +196,21 @@ export type Spec = {
  * handler, or the read the client's verb prints — and the tool it is on the MCP port: the verb's name, its spaces as `_`, for the first
  * link of an entry; `as` for every other. `query`, the values of the endpoint's query keys its tool sends where a call gives none (a call
  * that gives one, an empty one included, sends its own).
+ *
+ * What the command line forwarded to another machine's api (`NEMIA_SERVER`, `src/command/forward.verb.ts`) reads of a link: `takes`,
+ * whether this link is the one a given input calls, on an entry of more than one link (the first whose `takes` holds, the last
+ * where none says one); `request`, the call's input as the endpoint takes it — its path, query and payload keys in one object — where
+ * the entry's input is not that already, reading on this machine what the command names here (a template folder packed, a file's
+ * text), a promise rejected with the package's refusal where it cannot be sent; and `answer`, the data the entry's `print` takes,
+ * made of the endpoint's decoded answer, where that is not it already.
  */
 export type EndpointLink = {
   readonly endpoint: ApiEndpointName;
   readonly as?: string;
   readonly query?: Readonly<Record<string, string>>;
+  readonly takes?: (input: Readonly<Record<string, unknown>>) => boolean;
+  readonly request?: (input: Readonly<Record<string, unknown>>) => Promise<Readonly<Record<string, unknown>>>;
+  readonly answer?: (answer: unknown, input: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>;
 };
 
 /**
@@ -601,7 +611,9 @@ export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool
 
 /**
  * Where an entry's links break the rules: an entry the command line does not serve alone that links no endpoint, which the api would
- * serve with no tool on the port; and a link after the first that names no tool (`as`), which only the first takes from the verb.
+ * serve with no tool on the port; a link after the first that names no tool (`as`), which only the first takes from the verb; and a link
+ * before the last that says no `takes`, which the command line forwarded to another machine's api (`linkOf`) would never call, the last
+ * being the one it calls where none before it holds.
  */
 function linkBreaks(c: Entry): string[] {
   const breaks: string[] = [];
@@ -613,6 +625,11 @@ function linkBreaks(c: Entry): string[] {
     if (link.as === undefined)
       breaks.push(
         `${c.name}'s link to ${link.endpoint} names no tool: give it as, the tool's name on the port, as only the first link takes the verb's`,
+      );
+  for (const link of (c.served ?? []).slice(0, -1))
+    if (link.takes === undefined)
+      breaks.push(
+        `${c.name}'s link to ${link.endpoint} says no takes: give it takes, which inputs call it when the command line is forwarded to another machine's api, as only the last link is called where no takes holds`,
       );
   return breaks;
 }

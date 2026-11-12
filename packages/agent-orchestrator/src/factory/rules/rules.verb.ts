@@ -4,6 +4,7 @@
  * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules(home, name)` reads the files
  * at the root it is handed, for the package's callers not yet on it.
  */
+import { gives, givesNone, renamed } from '../../command/requests.verb.ts';
 import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
 import { leftOut, type Flag, type Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
@@ -88,9 +89,9 @@ const KEPT = 'a run already started keeps the rules it was started with';
 export const FACTORY_RULES: Command<FactoryRules, RulesInput> = {
   name: 'factory rules',
   served: [
-    { endpoint: 'factories.rules' },
-    { endpoint: 'factories.putRules', as: 'factory_rules_put' },
-    { endpoint: 'factories.deleteRules', as: 'factory_rules_delete' },
+    { endpoint: 'factories.rules', takes: givesNone('words', 'clear'), request: renamed({ factory: 'name' }, ['words', 'clear']) },
+    { endpoint: 'factories.putRules', as: 'factory_rules_put', takes: gives('words'), request: renamed({ factory: 'name' }, ['clear']) },
+    { endpoint: 'factories.deleteRules', as: 'factory_rules_delete', request: renamed({ factory: 'name' }, ['words', 'clear']) },
   ],
   usage: '<name> [--file <path>|- | --clear]',
   help: [

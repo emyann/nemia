@@ -1,4 +1,5 @@
 /** `nemia cancel`, an entry of the command table: what a run has in flight asked to stop, and nothing more filed (`cancelRun`). */
+import { renamed } from '../command/requests.verb.ts';
 import { cancelRun } from './cancel.verb.ts';
 import type { CancelPlan } from './cancel.ts';
 import { Effect, Schema } from 'effect';
@@ -15,7 +16,7 @@ export type CancelInput = typeof CancelInput.Type;
  */
 export const CANCEL: Command<{ id: string; plan: CancelPlan }, CancelInput> = {
   name: 'cancel',
-  served: [{ endpoint: 'runs.cancel' }],
+  served: [{ endpoint: 'runs.cancel', request: renamed({ runId: 'name' }) }],
   usage: '<runId>',
   help: ['stop what it has in flight; file nothing more'],
   spec: {

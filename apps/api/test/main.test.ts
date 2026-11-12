@@ -8,7 +8,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { MetricRead } from '../src/gauges/ceilings.ts';
-import { argsOf, DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
+import { argsOf, DEFAULT_PORT, portOf, SERVER_TIMEOUTS, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from 'test-kit/scratch';
 import { DEFAULT_EVERY_MS } from 'agent-orchestrator';
 
@@ -271,6 +271,58 @@ test('(f) --no-tick serves the board and writes no lease', async (t) => {
   const [url] = await viewer.said(/http:\/\/127\.0\.0\.1:\d+/);
   assert.deepEqual(await (await fetch(`${url}/api/health`)).json(), { ok: true });
   assert.equal(fs.existsSync(path.join(viewer.root, 'daemon.json')), false);
+});
+
+/**
+ * What a client that keeps its connection pooled meets on its second request, sent on the same connection `pauseMs` after its first was
+ * answered: `answered` with a status line, `closed` where the server had let the connection go before the call was written, and `reset`
+ * where it let it go as the call reached it — what an MCP host's pool met (`ECONNRESET`).
+ */
+async function callAfterPause(port: number, pauseMs: number): Promise<'answered' | 'reset' | 'closed'> {
+  const socket = net.connect({ port, host: '127.0.0.1' });
+  let heard = '';
+  socket.on('data', (chunk: Buffer) => (heard += chunk.toString('latin1')));
+  const ask = `GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`;
+  const answers = () => heard.split('HTTP/1.1 200').length - 1;
+  const answered = (count: number) =>
+    new Promise<'answered' | 'reset' | 'closed'>((resolve) => {
+      const done = (outcome: 'answered' | 'reset' | 'closed') => {
+        clearInterval(timer);
+        resolve(outcome);
+      };
+      const timer = setInterval(() => answers() >= count && done('answered'), 10);
+      socket.once('error', (err: NodeJS.ErrnoException) => done(err.code === 'ECONNRESET' ? 'reset' : 'closed'));
+      socket.once('close', () => done(answers() >= count ? 'answered' : 'closed'));
+      if (socket.destroyed) done('closed');
+    });
+  try {
+    socket.write(ask);
+    assert.equal(await answered(1), 'answered', 'the first call on the connection is answered');
+    await new Promise((paused) => setTimeout(paused, pauseMs));
+    if (socket.destroyed) return 'closed';
+    socket.write(ask);
+    return await answered(2);
+  } finally {
+    socket.destroy();
+  }
+}
+
+test("a client that reuses its connection after a pause past Node's keep-alive is answered by the api, where a server of Node's defaults has let it go", async (t) => {
+  const node = http.createServer((_req, res) => res.writeHead(200).end('{"ok":true}'));
+  const defaults = node as http.Server & { keepAliveTimeoutBuffer?: number };
+  const pastNodesKeepAlive = defaults.keepAliveTimeout + (defaults.keepAliveTimeoutBuffer ?? 0) + 500;
+  assert.ok(pastNodesKeepAlive < SERVER_TIMEOUTS.keepAliveTimeout, 'the api keeps an idle connection past the pause');
+  await new Promise<void>((listening) => node.listen(0, '127.0.0.1', listening));
+  t.after(() => new Promise<void>((closed) => node.close(() => closed())));
+  const api = startApi('0', ['--no-tick']);
+  t.after(() => api.child.kill());
+  const [, port] = await api.said(/http:\/\/127\.0\.0\.1:(\d+)/);
+  const [control, served] = await Promise.all([
+    callAfterPause((node.address() as net.AddressInfo).port, pastNodesKeepAlive),
+    callAfterPause(Number(port), pastNodesKeepAlive),
+  ]);
+  assert.notEqual(control, 'answered', "a server of Node's defaults has let the connection go: the planted client is not answered");
+  assert.equal(served, 'answered', 'the api answers the call on the connection the client kept');
 });
 
 /**

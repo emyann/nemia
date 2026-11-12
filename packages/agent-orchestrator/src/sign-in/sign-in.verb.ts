@@ -1,8 +1,8 @@
 /**
  * `nemia <TOKEN_NAME> set`, `status` and `rm`, entries of the command table: the person's sign-in token file (`sign-in.store.ts`).
  * `set` reads the token off stdin — at a terminal without showing it as it is typed, else whatever is piped in — and never prints it;
- * `status` says whether one is kept, its file's mode and its age, warning of one near or past its year, never the token. Served on the CLI alone, where the store's machine is, and out
- * of an agent's reach (class `none`) but for the status, which reads no token.
+ * `status` says whether one is kept, its file's mode and its age, warning of one near or past its year, never the token. Served on
+ * the CLI alone, where the store's machine is, and out of an agent's reach (class `none`) but for the status, which reads no token.
  */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';

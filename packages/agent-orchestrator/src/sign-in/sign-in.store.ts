@@ -3,8 +3,9 @@
  * prints (`TOKEN_MAKER`), kept on the person's own machine readable by them alone (mode 0600), written whole by a temporary file and a
  * rename, and never printed, logged or served. The daemon loads it at its start into the harness's variable (`TOKEN_VARIABLE`) where unset
  * (`loadClaudeToken`), so the sessions it starts sign in with it, however the daemon was started; a file whose mode lets another user
- * read it is refused, naming `chmod 600`. The token lasts a year from when it was made: its age is read off the file's write time alone, which
- * `writeClaudeToken` sets, and past about eleven months it is warned of (`tokenWarningLine`) before a session's first request fails on it.
+ * read it is refused, naming `chmod 600`. The token lasts a year from when it was made: its age is read off the file's write time
+ * alone, which `writeClaudeToken` sets, and past about eleven months it is warned of (`tokenWarningLine`) before a session's first
+ * request fails on it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +45,8 @@ export type ClaudeTokenWarning = 'near-year' | 'past-year';
 
 /**
  * What `status` says: whether a token is kept, its file, and the file's mode, as `0600`; for a kept one, when it was set (the file's
- * write time, ISO), the whole days left of its year (below zero once past it), and its warning where it is near or past it; never the token.
+ * write time, ISO), the whole days left of its year (below zero once past it), and its warning where it is near or past it; never the
+ * token.
  */
 export type ClaudeTokenStatus = {
   readonly state: ClaudeTokenState;

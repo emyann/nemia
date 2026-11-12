@@ -110,6 +110,9 @@ and no process between, and you need not ask any of them. What each takes and an
 - `root` — the repository a folder is in, asked when a folder joins a factory: `{ "dir" }` answers `{ "root" }`, the main checkout's
   root from that root, a folder inside it or a linked worktree alike, and `null` for a folder in no repository.
 - `seal` — that empty repository taken away once the checks passed: `{ "tree" }` answers `{ "removed" }`.
+- `clone` — a repository named by its URL made into a folder, with the machine's own credentials and no prompt for one:
+  `{ "url", "into" }` answers `{ "repo", "made" }`, `made` false when `into` holds a repository already, and nothing fetched then. It
+  refuses an `into` holding anything else, and a clone git will not make, naming the setup the URL needs, nothing left behind.
 
 A verb that will not act answers `{ "refused": "<why>" }`; one git did not answer within its deadline, or that failed before it
 answered, is not heard, and the run asks again on its next pass.

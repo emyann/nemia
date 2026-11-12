@@ -13,8 +13,17 @@ import { Malformed } from './asked.ts';
 import { stopChild, stopGroup, stoppedWords, threwWords, unreadNow } from '../../src/place/place.store.ts';
 import type { PlaceAnswers, PlaceOutcome, PlaceVerb } from '../../src/place/place.ts';
 
-/** One command a verb wants run: the program, where, its arguments, and what it reads on stdin. */
-export type Command = { readonly cmd: 'git' | 'tar'; readonly cwd?: string; readonly args: readonly string[]; readonly input?: string };
+/**
+ * One command a verb wants run: the program, where, its arguments, what it reads on stdin, and the variables laid over the place's own
+ * environment for it alone (`env`).
+ */
+export type Command = {
+  readonly cmd: 'git' | 'tar';
+  readonly cwd?: string;
+  readonly args: readonly string[];
+  readonly input?: string;
+  readonly env?: Readonly<Record<string, string>>;
+};
 
 /** How a command ended: its exit status or the signal that ended it, what it printed, and the error that kept it from starting. */
 export type Ran = {
@@ -168,6 +177,9 @@ export type Asked = {
   readonly started: () => void;
 };
 
+/** The environment `command` runs in: the place's own, its own variables laid over it. */
+const envOf = (command: Command, asked: Asked): NodeJS.ProcessEnv => (command.env ? { ...asked.env, ...command.env } : asked.env);
+
 /** A body moved one step: what it yields or returns next, or what it threw. */
 type Moved<V extends PlaceVerb> = { readonly step: IteratorResult<Command, Reply<V>> } | { readonly threw: unknown };
 
@@ -202,7 +214,7 @@ function ranNow(
     timeout: Math.max(1, Math.ceil(leftMs)),
     killSignal: 'SIGTERM',
     maxBuffer: MAX_PRINTED,
-    env: asked.env,
+    env: envOf(command, asked),
     detached: true,
   };
   const child = spawnSync(command.cmd, command.args, options);
@@ -235,7 +247,7 @@ type Heard = { stderr: Buffer[]; killed: boolean };
 /** `command` started in a group of its own, handed its input, what it prints kept. */
 function startedChild(command: Command, asked: Asked, out: Buffer[], heard: Heard): ChildProcessWithoutNullStreams {
   asked.started();
-  const child = spawn(command.cmd, command.args, { cwd: command.cwd, env: asked.env, detached: true, stdio: 'pipe' });
+  const child = spawn(command.cmd, command.args, { cwd: command.cwd, env: envOf(command, asked), detached: true, stdio: 'pipe' });
   heard.stderr = [];
   child.stdout.on('data', (chunk: Buffer) => out.push(chunk));
   child.stderr.on('data', (chunk: Buffer) => heard.stderr.push(chunk));

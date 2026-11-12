@@ -118,6 +118,29 @@ A token made by `claude setup-token` can only make model requests: it cannot ope
 connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
 itself still work.
 
+## A repository by its URL
+
+A factory may name a repository by its git URL rather than a folder of the machine:
+
+```bash
+nemia factory add mill --repo git@github.com:you/mill.git
+```
+
+Nemia clones it under `~/.agent-workflows/clones/<host>/<path>` before it files the factory, and the daemon clones it again if that
+folder goes. The clone uses the machine's own git credentials, and Nemia holds none: for an SSH URL, an SSH key the host accepts, with
+the host's key in `~/.ssh/known_hosts`; for an HTTPS URL, a git credential helper for the host. On GitHub, `gh auth login` sets one up.
+A URL that carries a password is refused. A clone that fails is refused with git's own words and the setup to do, and nothing is filed.
+
+## Signing Codex in
+
+A Codex step does not start while Codex is signed out on the machine; its refusal says so. On a server with no browser, sign in with a
+code you enter on any device, as the user the daemon runs as, then try the step again:
+
+```bash
+codex login --device-auth
+codex login status
+```
+
 ## Upgrade, and going back
 
 ```bash

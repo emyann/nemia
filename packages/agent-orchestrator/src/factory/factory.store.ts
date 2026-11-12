@@ -37,6 +37,7 @@ import {
   type Schedule,
   volumeEntry,
 } from './factory.ts';
+import { cloneFolder, cloneTarget } from './clones/clones.ts';
 import { firesOf } from './schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, isDirectory } from '../record/record.store.ts';
@@ -77,7 +78,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * tree's wiring, and this key is not read); the folders it mounts beside its repositories (`volumes`), each `{ path, readOnly }`, kept in
  * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness its
  * runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; the cost
- * line it sets for each workflow it offers (`costLines`), kept here for the same reason; and the template it was made from, when it was
+ * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the git URL of each repository it was given
+ * by one, by its folder (`origins`); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
  */
@@ -92,6 +94,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     volumes: Schema.optionalKey(Schema.Array(VolumeEntrySchema)),
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
     costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
+    origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -172,6 +175,7 @@ function factoryOf(home: string, name: string, content: FactoryFile): Factory | 
     ...(content.volumes?.length ? { volumes: content.volumes.map(volumeEntry) } : {}),
     ...(content.harnessSettings === undefined ? {} : { harnessSettings: content.harnessSettings }),
     ...(content.costLines === undefined ? {} : { costLines: content.costLines }),
+    ...(content.origins === undefined ? {} : { origins: content.origins }),
     ...(content.generation === undefined ? {} : { generation: content.generation }),
   };
 }
@@ -207,22 +211,40 @@ export function readFactoriesAt(home: string): FactoryListing[] {
     .map((file) => factoryAt(home, file));
 }
 
+/** A factory's `origins` key, where it has any: a factory given no URL files none. */
+export const originsOf = (origins: Readonly<Record<string, string>>): { origins?: Readonly<Record<string, string>> } =>
+  Object.keys(origins).length ? { origins } : {};
+
+/** A factory's repositories as `--repo` gave them: each a folder, and the git URL of each folder kept as a clone (`origins`). */
+export type GivenRepos = { readonly repos: string[]; readonly origins: Readonly<Record<string, string>> };
+
 /**
- * The repositories a factory is given, each resolved from where `nemia` is typed, as `nemia start --repo` records one, and named once.
- * Refused, `Invalid`: none given, and any that is not a directory, every one named. A directory is enough: git is never asked.
+ * The repositories a factory is given in the store `home`, each named once. A path is resolved from where `nemia` is typed, as `nemia
+ * start --repo` records one, and must be a directory; a git URL is the folder its clone is kept in, `<home>/clones/<host>/<path>`
+ * (`cloneTarget`, `cloneFolder`), which need not be there yet, and is recorded with its URL in `origins`. Refused, `Invalid`: none given,
+ * a URL `cloneTarget` refuses, and a path that is not a directory, every one named. Git is never asked: the clone is the caller's.
  */
-export function factoryRepos(name: string, given: readonly string[]): string[] {
+export function factoryRepos(home: string, name: string, given: readonly string[]): GivenRepos {
   if (!given.length)
     throw new Invalid({
-      message: `A factory names one repository at least, and none was given: nemia factory add ${name} --repo <path> [--repo <path> ...]. Nothing was filed.`,
+      message: `A factory names one repository at least, and none was given: nemia factory add ${name} --repo <path|url> [--repo <path|url> ...]. Nothing was filed.`,
     });
-  const repos = [...new Set(given.map((r) => path.resolve(r)))];
-  const missing = repos.filter((r) => !isDirectory(r));
+  const origins: Record<string, string> = {};
+  const read = given.map((r) => {
+    const target = cloneTarget(r);
+    if (target.kind === 'refused') throw new Invalid({ message: target.message });
+    if (target.kind === 'path') return path.resolve(r);
+    const folder = cloneFolder(home, target.folder);
+    origins[folder] ??= r;
+    return folder;
+  });
+  const repos = [...new Set(read)];
+  const missing = repos.filter((r) => origins[r] === undefined && !isDirectory(r));
   if (missing.length)
     throw new Invalid({
-      message: `--repo names a directory, and ${missing.join(', ')} ${missing.length > 1 ? 'are not directories' : 'is not a directory'}. Give the path to each repository's directory. Nothing was filed.`,
+      message: `--repo names a directory or a git URL, and ${missing.join(', ')} ${missing.length > 1 ? 'are not directories' : 'is not a directory'}. Give the path to each repository's directory, or its URL. Nothing was filed.`,
     });
-  return repos;
+  return { repos, origins };
 }
 
 /** A name a verb that writes a factory refuses: not a slug (`Invalid`), or the default factory (`Conflict`). */
@@ -242,10 +264,10 @@ export function addFactoryAt(
   opts: { name: string; repos: readonly string[]; template?: FactoryTemplate },
 ): { factory: Factory; file: string } {
   refuseName(opts.name, 'add');
-  const repos = factoryRepos(opts.name, opts.repos);
+  const { repos, origins } = factoryRepos(home, opts.name, opts.repos);
   const template = opts.template;
   const made = template === undefined ? {} : { template, tree: treeDir(home, opts.name) };
-  const factory: Factory = { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made };
+  const factory: Factory = { name: opts.name, repos, workflows: [], hires: {}, schedules: {}, ...made, ...originsOf(origins) };
   return { factory, file: createFactoryAt(home, factory) };
 }
 
@@ -305,6 +327,7 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
   );
   kept('harnessSettings', factory.harnessSettings);
   kept('costLines', factory.costLines);
+  kept('origins', factory.origins);
   kept('template', factory.template === undefined ? undefined : { ...content?.template, ...factory.template });
   if (factory.generation !== undefined) next.generation = factory.generation;
   return next as FactoryFile;

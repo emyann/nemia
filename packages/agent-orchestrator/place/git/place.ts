@@ -5,6 +5,7 @@
 import { readable } from './asked.ts';
 import { declared } from './declared.ts';
 import { answered, answeredNow, type Asking, type Reply } from './git.ts';
+import { clone } from './verbs/clone.ts';
 import { exported } from './verbs/export.ts';
 import { handoff } from './verbs/handoff.ts';
 import { inventory } from './verbs/inventory.ts';
@@ -36,6 +37,7 @@ const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<
   remove,
   export: exported,
   seal,
+  clone,
 };
 
 /** `verb`'s body for `request`, which it reads first: one it cannot read is `Malformed` before any command is run. */

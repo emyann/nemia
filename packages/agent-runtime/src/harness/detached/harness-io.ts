@@ -53,4 +53,9 @@ export type HarnessIO = {
   holdMs?: number;
   /** How often a job's own process reads the drain, in milliseconds: a test's shortening of `JOB_HOLD_POLL_MS`. Absent: that one. */
   holdPollMs?: number;
+  /**
+   * The program a spec's `prepare` found to run at this spawn, where it looks for one first in the engine's `harnessBin`
+   * (`<harnessBin>/codex`, `<harnessBin>/claude`), read by its `command` in place of the name it runs by. Absent: that name.
+   */
+  program?: string;
 };

@@ -3,6 +3,7 @@
  * engine refuses to read before it opens one.
  */
 import { Effect, Schema } from 'effect';
+import { claudeExecutableOf } from '../harness/mcp-sign-in.ts';
 import { mcpServersRead, type McpServersRead, type McpStatusAsk } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { verbHarnessOf, type HarnessDeclared } from '../harness/declaration.ts';
@@ -30,13 +31,15 @@ export const noMcpHarness = (declared: readonly HarnessDeclared[]): string =>
  *
  * `cwd` is the engine's own `root` (`engine.ts`), which is required and defaults to nothing: the probe lists the servers of the folder
  * it is opened in, so a cwd read off the process instead would list another checkout's. `ask` is the harness seam, the real one by
- * default; a test gives its own and reads the cwd the session was opened in.
+ * default; a test gives its own and reads the cwd the session was opened in. The Claude Code it opens is found at each read
+ * (`claudeExecutableOf`): `executable`, else the one in `harnessBin`, else the SDK's bundled one, else the one on PATH.
  */
 export const mcpStateVerbOf = (
   harnesses: Record<string, HarnessConfig>,
   cwd: string,
   executable: string | undefined,
   ask?: McpStatusAsk,
+  harnessBin?: string,
 ): ((servers: Record<string, RemoteMcpServer>) => Effect.Effect<McpServersRead, McpStateRefused>) =>
   Effect.fnUntraced(function* (servers: Record<string, RemoteMcpServer>) {
     const refuse = (message: string) => Effect.fail(new McpStateRefused({ message }));
@@ -44,7 +47,8 @@ export const mcpStateVerbOf = (
     if (refused) return yield* refuse(refused);
     const declared = declaredOf(harnesses);
     if (verbHarnessOf('mcp', undefined, declared).kind === 'refused') return yield* refuse(noMcpHarness(declared));
+    const found = claudeExecutableOf(executable, harnessBin);
     return yield* Effect.promise(() =>
-      mcpServersRead(servers, cwd, { ...(executable === undefined ? {} : { executable }), ...(ask === undefined ? {} : { ask }) }),
+      mcpServersRead(servers, cwd, { ...(found === undefined ? {} : { executable: found }), ...(ask === undefined ? {} : { ask }) }),
     ).pipe(Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }));
   });

@@ -310,6 +310,8 @@ type RunnersGiven = {
   attached?: Attached;
   /** The Claude Code a session runs, where it is not the Agent SDK's own. */
   claudeExecutable?: string;
+  /** The folder each harness's program is looked for in first, at every spawn (`EngineOptions.harnessBin`). */
+  harnessBin?: string;
   /** The slice each limited session's scope is made in. */
   cgroupParent?: string;
 };
@@ -326,17 +328,32 @@ export const runnersOf = (harnesses: Record<string, HarnessConfig>, given: Runne
     }),
   );
 
-/** The harness `h`, configured under `name`, as the seam's value. */
+/**
+ * The harness `h`, configured under `name`, as the seam's value: a spec that looks for its program (`inHarnessBin`) looks in the
+ * engine's `harnessBin` first.
+ */
 const runnerOf = (name: string, h: HarnessConfig, given: RunnersGiven): RunnerOps => {
-  const { root, credentials, missingCredential, attached, claudeExecutable, cgroupParent } = given;
+  const { root, credentials, missingCredential, harnessBin, cgroupParent } = given;
   return h === 'claude'
-    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}), ...(cgroupParent ? { cgroupParent } : {}) }, attached)
+    ? claudeOf(given)
     : isSpec(h)
-      ? detachedOps(h, root, cgroupParent ? { cgroupParent } : {})
+      ? detachedOps(harnessBin && h.inHarnessBin ? h.inHarnessBin(harnessBin) : h, root, cgroupParent ? { cgroupParent } : {})
       : isRemote(h)
         ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
         : h;
 };
+
+/** Claude Code's runner, built from what `runnersOf` is given. */
+const claudeOf = ({ root, attached, claudeExecutable, harnessBin, cgroupParent }: RunnersGiven): RunnerOps =>
+  claudeCodeOps(
+    {
+      root,
+      ...(claudeExecutable ? { claudeExecutable } : {}),
+      ...(harnessBin ? { harnessBin } : {}),
+      ...(cgroupParent ? { cgroupParent } : {}),
+    },
+    attached,
+  );
 
 /**
  * Which of `harnesses` a holder can hold: those whose declaration declares `hold` — Claude Code configured as the literal `'claude'`, and

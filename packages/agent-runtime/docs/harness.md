@@ -376,6 +376,31 @@ transcript saved, when it has one" (`sdk.d.ts:6182-6185`); this is what that sav
   was 0.00037, its own turn alone. So a holder that kills its sessions' Claude Code loses what they spent, which is why the let-go ends
   them through the SDK (`parked`, `harness/claude/attached.ts`) and kills only what outlives its bound.
 
+## Installing a harness
+
+What a harness's declared install puts on a machine (`HarnessNeeds.install`, `src/harness/claude/vocabulary.ts` and
+`src/harness/codex/vocabulary.ts`), and where the runtime then finds it (`EngineOptions.harnessBin`, `claudeExecutableOf`,
+`codexProgramOf`). Measured **2026-11-12 on Linux x64 (kernel 6.8), Node 24.16.0, npm 11.13.0**, by the implement step: each
+install run as declared, by `bash -c`, under an environment of `HOME`, `NEMIA_TOOLS` (a scratch folder) and a `PATH` of
+`$NEMIA_TOOLS/bin`, Node's own folder, `/usr/bin` and `/bin` alone, once with npm's cache of the machine and once with an empty one
+(`npm_config_cache`); then removed by its declared `remove`, and the scratch folder deleted. No sign-in was run.
+
+- **Claude Code 2.1.322**: the Agent SDK's platform package `@anthropic-ai/claude-agent-sdk-linux-x64@0.3.322` installed by npm into
+  `$NEMIA_TOOLS/harnesses/claude/2.1.322`, exit 0, 2 s with the machine's cache and 6 s with an empty one; it takes **327 MB** on
+  disk, nearly all of it the native `claude`. `$NEMIA_TOOLS/bin/claude` is a link to it, and `claude --version` answers
+  `2.1.322 (Claude Code)`: the pin is the SDK's `claudeCodeVersion` (`test/harness-needs.test.ts`).
+- **Codex 0.154.0**: `npm install -g --prefix "$NEMIA_TOOLS/harnesses/codex/0.154.0" @openai/codex@0.154.0`, exit 0, 6 s with the
+  machine's cache and 4 s with an empty one (npm said `added 2 packages`: the CLI and its platform binary); **324 MB** on disk.
+  `$NEMIA_TOOLS/bin/codex` links to the prefix's `bin/codex`, a Node script, and `codex --version` answers `codex-cli 0.154.0`.
+- **Both removes** (`rm -f "$NEMIA_TOOLS/bin/<program>" && rm -rf "$NEMIA_TOOLS/harnesses/<name>"`) exit 0 and leave the other
+  harness's link and folder as they were.
+- **The runtime finds what was installed**: `claudeExecutableOf(undefined, "$NEMIA_TOOLS/bin")` answered `$NEMIA_TOOLS/bin/claude`
+  and `codexProgramOf("$NEMIA_TOOLS/bin")` `$NEMIA_TOOLS/bin/codex`, on this checkout, whose SDK bundles its own Claude Code: the
+  activated one is run over the bundled one.
+
+Codex's device-code line at 0.154.0 (what `codex login --device-auth` prints, which its fix's `code` pattern reads) is unmeasured
+here: no sign-in is run by a step.
+
 ## `claude auth status`
 
 What tells, without starting a session, whether this machine's Claude Code holds a credential: what a job's spawn asks

@@ -401,11 +401,25 @@ daemon runs as, after which the step is tried again; an answer past `CODEX_SIGN_
 refuses nothing. Measured at codex-cli 0.154.0 (2026-11-11): signed in, it prints `Logged in using ChatGPT` on stderr and exits 0;
 under a `CODEX_HOME` with no sign-in, `Not logged in` on stderr, exit 1.
 
+**Where a harness's program is found.** A layer above names a folder, `EngineOptions.harnessBin` (the orchestrator's tools folder's
+`bin/`, where a person activates a harness), and the runtime looks there first, at every spawn and every ask, so a harness put there
+after the engine started is run by the next session with no restart (`programIn`, `src/harness/harness-bin.ts`). Claude Code is found
+by one resolver every road shares, a held session, a job, its sign-in check, its quota and a `claude mcp` child (`claudeExecutableOf`,
+`harness/mcp-sign-in.ts`): 1. the one named, the engine's `claudeExecutable`, or `AE_CLAUDE_EXECUTABLE` where the caller reads it;
+2. `<harnessBin>/claude`, where it exists; 3. the one the Agent SDK bundles for this platform, which a checkout has and a release does
+not; 4. the `claude` on PATH, last, so a checkout never runs a person's own Claude Code over the pinned one without a word. A job is
+handed what its spawn found as `AE_CLAUDE_EXECUTABLE`, and its own process resolves the rest (`bin/ae-claude-job.ts`); the quota
+never asks the one on PATH. Codex is `<harnessBin>/codex` where it exists, else the `codex` on PATH, spawned and asked its sign-in
+alike (`codexProgramOf`): its spec looks for it in its `prepare` and runs it as `io.program`, and the engine gives a spec that looks
+(`HarnessSpec.inHarnessBin`) its `harnessBin`. What each harness needs to be installed and signed in is its declaration's `needs`
+(`HarnessNeeds`), measured in `docs/harness.md`, *Installing a harness*.
+
 **A Claude Code job's spawn is refused while `claude auth status` says signed out** (`prepare`, `claudeSignedOutRefusal` in
 `harness/claude/sign-in.ts`, judged by `claudeSignInOf`, proved by `contracts/claude-sign-in.contract.ts`): the attempt ends
 `unstartable` before anything runs, in words naming `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN`, which the engine reads when it
 starts, or `claude auth login`, typed as the user the engine runs as, after which the task is tried again. The Claude Code asked is the
-one the session would run (the engine's `claudeExecutable`, else `AE_CLAUDE_EXECUTABLE`, else the SDK's bundled one), in the session's
+one the session would run (the engine's `claudeExecutable`, else `AE_CLAUDE_EXECUTABLE`, else `<harnessBin>/claude`, else the SDK's
+bundled one, else the `claude` on PATH: `claudeExecutableOf`, below), in the session's
 working root and environment, the task's `config.env` included. An answer past `CLAUDE_SIGN_IN_MS` (15s) refuses too, saying the check
 did not answer; a Claude Code that does not start, or answers neither way, refuses nothing. It sees a credential's presence, never its
 validity: measured at 2.1.322 (`docs/harness.md`, *`claude auth status`*), a placeholder token reads signed in, so an expired, revoked
@@ -1686,9 +1700,10 @@ if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPer
 
 Claude Code answers it, as `claude`: the ask is the Agent SDK's own usage question, put to the Claude Code the sessions run — the
 engine's `claudeExecutable` where it names one, else the `AE_CLAUDE_EXECUTABLE` of the engine's environment, which every job inherits,
-else the SDK's own bundled CLI, as a job runs it (`quotaExecutable`), never a `claude` on PATH — with no prompt (`claudeQuota`,
-`harness/claude/quota.ts`), so no model is called and no token spent. On a machine with only a release, that is the Claude Code the
-release carries. A Claude Code signed in by `CLAUDE_CODE_OAUTH_TOKEN` alone, a token of `claude setup-token`, answers no plan limits
+else `<harnessBin>/claude` where it exists, else the SDK's own bundled CLI, as a job runs it (`quotaExecutable`), never a `claude` on
+PATH — with no prompt (`claudeQuota`,
+`harness/claude/quota.ts`), so no model is called and no token spent. On a machine with only a release, that is the Claude Code a person
+activated in the tools folder (`harnessBin`): a release bundles none. A Claude Code signed in by `CLAUDE_CODE_OAUTH_TOKEN` alone, a token of `claude setup-token`, answers no plan limits
 without asking the usage service, and the quota reads it as `token`, not `no-plan` (`docs/harness.md`, *The quota of a token*). Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
 before it returns, whatever ended it — an answer, the timeout, an interruption — and no `claude` is left behind by the time it does
 (`test/quota.boundary.test.ts`). Through the engine the ask runs behind the A2A seam, which an interruption does not cross: a caller
@@ -2003,8 +2018,9 @@ stamps it anew, so a grace of 0 (`--now`) cuts at once.
 Beside the job, `query()` in the process that holds the engine's attached sessions (`harness/claude/attached.ts`). The process
 takes `hold()` in a scope; while it holds, a long-lived `claude` task (`restartPolicy: 'Always'`) spawns attached, and a job still
 runs in a process of its own (`withAttached`, `src/harness/claude/code.ts`); any other engine, or the same one before `hold`, refuses
-a long-lived one `unstartable`. The Claude Code either road drives is the Agent SDK's own bundled CLI, or the command
-`EngineOptions.claudeExecutable` names — a held session is given it here, a job's own process as `AE_CLAUDE_EXECUTABLE`.
+a long-lived one `unstartable`. The Claude Code either road drives is the command `EngineOptions.claudeExecutable` names, else the one
+in `EngineOptions.harnessBin`, read at each session's start, else the Agent SDK's own bundled CLI, else the `claude` on PATH
+(`claudeExecutableOf`) — a held session is given it here, a job's own process as `AE_CLAUDE_EXECUTABLE`.
 
 - **Who holds them.** One process: the one whose engine took `hold()`. It spawns, adopts and resumes; another engine reads the
   run files under `<root>/runs/attached/` and writes a stop (`<name>.stop`) or words to say (`<name>.say.jsonl`) beside one, which

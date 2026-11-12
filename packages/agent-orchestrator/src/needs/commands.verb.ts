@@ -13,7 +13,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { carryHarnesses, type CarryRan } from '../release/carry.verb.ts';
+import { carryHarnesses, type CarryRan } from '../release/carry.store.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import { followFix, startFix } from './fix.verb.ts';
 import { readinessOf } from './readiness.verb.ts';

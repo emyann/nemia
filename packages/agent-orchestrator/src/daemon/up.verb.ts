@@ -38,9 +38,8 @@ import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
 import { raiseStoreFloor } from '../release/archive.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
-import type { Running } from '../release/release.ts';
-import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.verb.ts';
-import { upgradeCarries } from '../release/carry.ts';
+import { upgradeCarries, type Running } from '../release/index.ts';
+import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
 import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
 import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
 

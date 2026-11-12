@@ -11,7 +11,7 @@ import path from 'node:path';
 import { CODEX_PIN } from 'agent-runtime/vocabulary';
 import { scratch } from 'test-kit/scratch';
 import { toolsBinDir, toolsDir } from '../config/root.store.ts';
-import { bundledProgramIn, carryHarnesses, type HarnessCarried } from './carry.verb.ts';
+import { bundledProgramIn, carryHarnesses, type HarnessCarried } from './carry.store.ts';
 
 /** A store whose tools folder holds what `held` says, a tree that carries what `bundled` says, and an `npm` that exits `npm`. */
 type Row = {

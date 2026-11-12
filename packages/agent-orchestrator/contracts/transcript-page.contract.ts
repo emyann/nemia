@@ -10,7 +10,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** A page cut from a conversation, or the refusal of what it was asked with. Declared here until `src/steps/transcript-page.ts` holds it. */
+/** A page cut from a conversation, or the refusal of what it was asked with. */
 export type TranscriptPageCut =
   | { readonly from: number; readonly to: number; readonly more: boolean }
   | { readonly refused: 'limit' | 'last' | 'both' };

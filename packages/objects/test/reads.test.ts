@@ -34,9 +34,11 @@ test('REFUSED: a GET the Api gains with no entry in READS, a page whose query ta
     HttpApiEndpoint.get('list', '/api/planted', { query: { continue: Schema.optionalKey(Schema.String) }, success: Schema.String }),
   );
   assert.equal(readsUnbounded(withGroup(planted)).length, 1, 'no entry');
-  const refused = readsUnbounded(withGroup(planted), { ...READS, 'planted.list': { shape: 'page', narrow: ['limit', 'tail'] } });
-  // No limit, and limit and tail named though its query takes neither.
-  assert.equal(refused.length, 3);
+  const noLimitAndTwoKeysItLacks = readsUnbounded(withGroup(planted), {
+    ...READS,
+    'planted.list': { shape: 'page', narrow: ['limit', 'tail'] },
+  });
+  assert.equal(noLimitAndTwoKeysItLacks.length, 3);
 });
 
 /** A closeout with a short output field, a long one and a body of `body` characters. */

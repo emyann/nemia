@@ -6,7 +6,8 @@
  * next page is there, never to the feed's end: so a page that is not the last counts no `remainingItemCount`, which Kubernetes leaves a
  * server to omit, and the last counts 0. An event is read by its name, the byte its line starts at: one read from that byte of its first
  * line alone, never the rest of the feed. A line's start is the cursor before it — the end of the line before, or the cursor the read
- * began at — so where a line nobody can read lies between two, the one after it is named by where the unreadable one starts, and read from there all the same.
+ * began at — so where a line nobody can read lies between two, the one after it is named by where the unreadable one starts, and read
+ * from there all the same.
  */
 import { Effect } from 'effect';
 import { type Event, type EventList, LIST_PAGE, type PageBounds } from 'objects';

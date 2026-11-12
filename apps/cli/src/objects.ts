@@ -57,8 +57,9 @@ const failureOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
 /**
- * `call` asked of the client at `base`, each request of it carrying `headers` and run to its end or until `boundMs` is gone, when it is
- * interrupted and fails with a timeout (`timedOut`).
+ * `call` asked of the client at `base`, each request of it carrying `headers`, and the token this client calls with (`callerToken`) where
+ * `carried` is left on (a pairing turns it off, since that token is another server's, `askedBare`), and run to its end or until
+ * `boundMs` is gone, when it is interrupted and fails with a timeout (`timedOut`).
  */
 const attempt = <A, E>(
   base: string,
@@ -66,9 +67,10 @@ const attempt = <A, E>(
   boundMs: number,
   env: NodeJS.ProcessEnv,
   headers: Readonly<Record<string, string>>,
+  carried = true,
 ) =>
   Effect.runPromiseExit(
-    Effect.flatMap(apiClient({ baseUrl: base, token: callerToken(env), headers, boundMs }), call).pipe(
+    Effect.flatMap(apiClient({ baseUrl: base, token: carried ? callerToken(env) : undefined, headers, boundMs }), call).pipe(
       Effect.provide(FetchHttpClient.layer),
     ),
   );
@@ -120,6 +122,20 @@ export async function asked<A, E>(
 ): Promise<A> {
   const base = await served(verb, env);
   return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs);
+}
+
+/**
+ * What `call` answers of the objects' client at `base`, a server no context names yet (`nemia pair <url>`), for the verb `verb` names:
+ * asked once, within `boundMs`, carrying no token at all, since the token of the context in use is another server's and is never sent
+ * to this one. Refused as `asked` refuses.
+ */
+export async function askedBare<A, E>(
+  verb: string,
+  base: string,
+  call: (client: ObjectsClient) => Effect.Effect<A, E>,
+  boundMs: number = READ_BOUND_MS,
+): Promise<A> {
+  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs);
 }
 
 /**

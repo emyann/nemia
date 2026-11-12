@@ -16,6 +16,7 @@ const LEFT_OUT = [
   'service uninstall',
   'service status',
   'service restart',
+  'service addresses',
   'token add',
   'token ls',
   'token rm',

@@ -5,8 +5,9 @@
  * The file is the client's, not the store's: written with mode 0600, since it holds tokens, and read by `contextOf` alone.
  *
  * `nemia config use-context <name>`, `set-context <name> --server <url> --token-file <file>`, `get-contexts` and `current-context` write
- * and read it. The token is read from a file, never from the command line, where a shell's history and `ps` would keep it, and no verb
- * prints it.
+ * and read it, and `nemia pair <url>` (`pair.ts`) writes a context whose token a pairing minted. The token is read from a file, never
+ * from the command line, where a shell's history and `ps` would keep it. One verb prints it: `nemia config headers`, the header a
+ * harness asks for on its own stdout (Claude Code's `headersHelper`), never meant for a person's terminal.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +22,7 @@ export const LOCAL_CONTEXT = 'local';
 /** The variable that names a context for a single command, over the file's. */
 export const CONTEXT_VARIABLE = 'NEMIA_CONTEXT';
 
-/** The verb that reads and writes the client's config: `nemia config <use-context|set-context|get-contexts|current-context>`. */
+/** The verb that reads and writes the client's config: `nemia config <use-context|set-context|get-contexts|current-context|headers>`. */
 export const CONFIG_VERB = 'config';
 
 /** A context of the client's config: its name, the daemon's address (`http(s)://host:port`) and a person's token for it. */
@@ -157,7 +158,11 @@ const USAGE = [
   '                                         keep a token of yours for this machine’s own daemon, where its store is exposed',
   'nemia config get-contexts                list the contexts, the one in use marked *',
   'nemia config current-context             say the context a command uses now',
+  'nemia config headers [--context <name>]  print the Authorization header a harness sends (Claude Code’s headersHelper)',
 ];
+
+/** The variable whose token `nemia config headers` prints over every context's, as the plugin's static header read it before. */
+export const TOKEN_VARIABLE = 'NEMIA_TOKEN';
 
 /** A `nemia config` typed otherwise than its usage: refused, naming it. */
 const misused = (said: string): Refused => new Refused(`nemia config: ${said}. Type one of:\n${USAGE.join('\n')}`);
@@ -262,6 +267,32 @@ function currentContext(env: NodeJS.ProcessEnv): number {
   return 0;
 }
 
+/**
+ * The token `nemia config headers` prints, from `env` and the words after `headers`: `NEMIA_TOKEN` where set and not empty; else the
+ * context `--context` names, or the one in use, a remote one's token or, for `local`, the one kept for this machine's own daemon; none
+ * where neither holds one. Refused, naming the list, for a context the config does not hold.
+ */
+export function headersToken(args: readonly string[], env: NodeJS.ProcessEnv): string | undefined {
+  const given = env[TOKEN_VARIABLE];
+  if (given !== undefined && given.trim() !== '') return given.trim();
+  if (args.includes('--context') && flagOf(args, '--context') === undefined) throw misused('--context takes a context’s name');
+  const config = configRead(env);
+  const chosen = contextOf(config, flagOf(args, '--context') ?? env[CONTEXT_VARIABLE]?.trim());
+  if (chosen.kind === 'refused') throw unheld(chosen.name);
+  return chosen.kind === 'remote' ? chosen.token : config.localToken;
+}
+
+/**
+ * `nemia config headers [--context <name>]`: the one verb that prints a token — as `{"Authorization":"Bearer <token>"}` on stdout, for
+ * a harness that runs it for the headers of its connection (Claude Code's `headersHelper`, the nemia plugin's `.mcp.json`), never for a
+ * person's terminal; `{}` where no token is held (`headersToken`).
+ */
+function headers(args: readonly string[], env: NodeJS.ProcessEnv): number {
+  const token = headersToken(args, env);
+  process.stdout.write(`${JSON.stringify(token === undefined ? {} : { Authorization: `Bearer ${token}` })}\n`);
+  return 0;
+}
+
 /** `nemia config <verb> …`, on the words after `config`: answers its exit code, or throws its refusal. */
 export async function config(args: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const [verb, ...rest] = args;
@@ -273,5 +304,6 @@ export async function config(args: readonly string[], env: NodeJS.ProcessEnv = p
   if (verb === 'use-context') return useContext(rest, env);
   if (verb === 'get-contexts') return getContexts(env);
   if (verb === 'current-context') return currentContext(env);
+  if (verb === 'headers') return headers(rest, env);
   throw misused(`it has no verb ${verb}`);
 }

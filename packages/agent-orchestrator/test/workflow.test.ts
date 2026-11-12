@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, parseWorkflow, WorkflowError } from '../src/workflow.ts';
-import { workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
+import { workflowDescription, workflowFolder, workflowNeeds, workflowReadme, workflowReadmeWith } from '../src/folder/folder.store.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { CLOSEOUT_FIELDS, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, type StepDraft } from '../src/workflow.ts';
@@ -154,6 +154,44 @@ test('a workflow README is read whole, in any case, and none is null', () => {
   );
   assert.equal(workflowReadme(folder({ 'implement.md': '---\nplace: git\n---\nImplement it.\n' })), null, 'no README: null');
   assert.equal(workflowReadme(path.join(scratch('wf-none-'), 'no-such-folder')), null, 'no folder: null');
+});
+
+test('a README to write keeps the needs a read gave: the frontmatter written from them, its other keys kept, none left out', () => {
+  const tool = { name: 'tool', message: 'the tool', check: 'command -v tool' };
+  const other = { name: 'other', message: 'another tool', check: 'command -v other' };
+  const dir = folder({
+    'README.md': '---\nowner: ops\nneeds:\n  - name: tool\n    message: the tool\n    check: command -v tool\n---\n# dev\n',
+  });
+  const writtenAs = (text: string | undefined): string => {
+    const at = folder({ 'implement.md': 'Implement it.\n' });
+    if (text !== undefined) fs.writeFileSync(path.join(at, 'README.md'), text);
+    return at;
+  };
+
+  assert.equal(workflowReadmeWith(dir, undefined, undefined), undefined, 'neither the README nor the needs given: nothing to write');
+  const read = writtenAs(workflowReadmeWith(dir, workflowReadme(dir) ?? undefined, workflowNeeds(dir)));
+  assert.deepEqual(workflowNeeds(read), [tool], 'a read written back keeps its needs');
+  assert.equal(workflowReadme(read), '# dev\n', 'and its instruction');
+  assert.match(fs.readFileSync(path.join(read, 'README.md'), 'utf8'), /owner: ops/, "and the frontmatter's other keys");
+
+  const bodyOnly = writtenAs(workflowReadmeWith(dir, '# dev, again\n', undefined));
+  assert.deepEqual(workflowNeeds(bodyOnly), [tool], "needs left out: the README's own are kept");
+  assert.equal(workflowReadme(bodyOnly), '# dev, again\n', 'under the instruction given');
+
+  const needsOnly = writtenAs(workflowReadmeWith(dir, undefined, [other]));
+  assert.deepEqual(workflowNeeds(needsOnly), [other], "needs given: they replace the README's");
+  assert.equal(workflowReadme(needsOnly), '# dev\n', "over the README's own instruction");
+
+  const none = workflowReadmeWith(
+    folder({ 'README.md': '---\nneeds:\n  - name: tool\n    message: the tool\n    check: x\n---\n# dev\n' }),
+    undefined,
+    [],
+  );
+  assert.equal(none, '# dev\n', 'no needs and no other key: no frontmatter at all');
+
+  const fresh = writtenAs(workflowReadmeWith(folder({ 'implement.md': 'Implement it.\n' }), '# new\n', [tool]));
+  assert.deepEqual(workflowNeeds(fresh), [tool], 'a folder with no README yet: one written with the needs');
+  assert.equal(workflowReadme(fresh), '# new\n');
 });
 
 test('REFUSED: a folder with a README and no step, as a folder with no step is — saying the README is not one', () => {

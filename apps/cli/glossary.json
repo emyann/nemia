@@ -84,6 +84,14 @@
     {
       "term": "-L",
       "meaning": "a column of one label key, after the server's columns of the table of runs or cards listed, its name the key in capitals and each cell the value of the row's object's label, empty where it has none; given again for another, in the order typed."
+    },
+    {
+      "term": "Pair",
+      "meaning": "`nemia pair <url>`: this machine asks the server for a pairing, shows its code, waits for the person's approval there, and writes the context with the token the claim minted, 0600 and never printed (`apps/cli/src/pair.ts`); it then prints the `NEMIA_URL` line for Claude Code's plugin."
+    },
+    {
+      "term": "Headers",
+      "meaning": "`nemia config headers`: the one verb that prints a token, as `{\"Authorization\":\"Bearer …\"}` on stdout for a harness's connection (the nemia plugin's `headersHelper`): `NEMIA_TOKEN` first, then the context's, then this machine's own (`apps/cli/src/context.ts`)."
     }
   ]
 }

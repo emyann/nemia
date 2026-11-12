@@ -4,7 +4,8 @@
  * several workflows run, kept there once). So each `<variable>/<name>` a step of sdlc's checks names, bare or as `${<variable>:?…}`, is a
  * file of the folder that variable names. Held first on a scratch copy of sdlc with a step planted that names a script the carried folder
  * does not hold, then on sdlc as it ships: every script of either folder is run by a check or imported by one that is, so the lists are
- * the folders' own and a check moved or emptied cannot make the guard pass by reading nothing.
+ * the folders' own and a check moved or emptied cannot make the guard pass by reading nothing. A workflow's machine need (`spec.needs`)
+ * is read as a check too, its own check and each fix's command, since the daemon runs them with the same two variables.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,12 +18,28 @@ import { SDLC } from './template.ts';
 /** A file named under a frozen folder: `$<variable>/<name>` or `${<variable>:?<why>}/<name>` (`:-` too), the variable one of the two. */
 const FROZEN = /\$(?:(WF_WORKFLOW_FILES|WF_CARRIED_FILES)|\{(WF_WORKFLOW_FILES|WF_CARRIED_FILES):[?-][^}]*\})\/([\w.-]+)/g;
 
-type Manifest = { spec?: { steps?: Array<{ name?: unknown; check?: unknown }> } };
+type Manifest = {
+  spec?: {
+    steps?: Array<{ name?: unknown; check?: unknown }>;
+    needs?: Array<{ name?: unknown; check?: unknown; fixes?: Array<{ command?: unknown }> }>;
+  };
+};
+
+/** The commands of a manifest that run with the frozen folders: each step's check, and each need's check and its fixes' commands. */
+const commandsOf = (manifest: Manifest | null): Array<{ step: string; check: unknown }> => [
+  ...(manifest?.spec?.steps ?? []).map((step) => ({ step: String(step.name), check: step.check })),
+  ...(manifest?.spec?.needs ?? []).flatMap((need) =>
+    [need.check, ...(need.fixes ?? []).map((fix) => fix.command)].map((check) => ({ step: `needs/${String(need.name)}`, check })),
+  ),
+];
 
 /** A script a check names: the folder its variable names, relative to the template's root, and its file there. */
 type Named = { folder: string; name: string };
 
-/** Each step of the template `root` that has a check: its workflow, its name, and the scripts its check names under a frozen folder. */
+/**
+ * Each step of the template `root` that has a check, and each command of a need (`needs/<need>`): its workflow, its name, and the
+ * scripts its check names under a frozen folder.
+ */
 function checksOf(root: string): Array<{ workflow: string; step: string; scripts: Named[] }> {
   const workflows = path.join(root, 'workflows');
   return fs
@@ -31,12 +48,12 @@ function checksOf(root: string): Array<{ workflow: string; step: string; scripts
     .sort()
     .flatMap((workflow) => {
       const manifest = yaml.load(fs.readFileSync(path.join(workflows, workflow, 'workflow.yaml'), 'utf8')) as Manifest | null;
-      return (manifest?.spec?.steps ?? []).flatMap((step) =>
+      return commandsOf(manifest).flatMap((step) =>
         typeof step.check === 'string'
           ? [
               {
                 workflow,
-                step: String(step.name),
+                step: step.step,
                 scripts: [...step.check.matchAll(FROZEN)].map(([, bare, braced, name]) => ({
                   folder: (bare ?? braced) === 'WF_CARRIED_FILES' ? 'carried' : `workflows/${workflow}`,
                   name: name ?? '',

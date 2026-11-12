@@ -6,7 +6,7 @@
 import '../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bindOf, hostOf, isAddress, leaseHostOf, LOOPBACK } from './port.ts';
+import { acknowledgedHost, bindOf, hostOf, isAddress, leaseHostOf, LOOPBACK } from './port.ts';
 
 test('bindOf: unset or blank is the loopback, the loopback is bound, and another address only on a store marked exposed', () => {
   assert.deepEqual(bindOf(undefined, false), { kind: 'bound', host: LOOPBACK });
@@ -59,6 +59,19 @@ test('REFUSED exit 2: a bind beyond the loopback on a store not marked exposed n
   assert.equal(notAnAddress.exitCode, 2);
   assert.match(notAnAddress.message, /NEMIA_BIND/);
   assert.equal(hostOf('100.64.0.1', true), '100.64.0.1', 'bound where exposed');
+});
+
+test('acknowledgedHost: a loopback, private or shared bind listens; a wildcard or public one only acknowledged, else refused exit 2', () => {
+  for (const host of ['127.0.0.1', '::1', '10.0.0.4', '192.168.1.20', '100.64.0.1'])
+    assert.equal(acknowledgedHost(host, false), host, `${host} listens unacknowledged`);
+  for (const host of ['0.0.0.0', '::', '8.8.8.8']) {
+    assert.equal(acknowledgedHost(host, true), host, `${host} listens acknowledged`);
+    assert.throws(
+      () => acknowledgedHost(host, false),
+      (err: Error & { exitCode?: number }) => err.exitCode === 2,
+      `${host} unacknowledged is refused with exit 2`,
+    );
+  }
 });
 
 test('leaseHostOf: a wildcard bind leases the loopback, an IPv6 address is bracketed, any other is itself', () => {

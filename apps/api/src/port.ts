@@ -1,4 +1,4 @@
-import { everyOf, MAX_EVERY_MS } from 'agent-orchestrator';
+import { BIND_PUBLIC_VARIABLE, bindExposure, everyOf, kindOfBind, MAX_EVERY_MS } from 'agent-orchestrator';
 import type { BindOf } from '../contracts/bind.contract.ts';
 
 /** The port the api listens on when `PORT` is not set and it ticks: the daemon's, the one the web app's preview points at. */
@@ -101,6 +101,23 @@ export function hostOf(value: string | undefined, exposed: boolean): string {
   const bind = bindOf(value, exposed);
   if (bind.kind === 'bound') return bind.host;
   throw Object.assign(new Error(BIND_WORDS[bind.reason](asked(value))), { exitCode: 2 });
+}
+
+/**
+ * The host the api listens on, `host` as `hostOf` bound it, where a wildcard or public address is acknowledged (`acknowledged`:
+ * `NEMIA_BIND_PUBLIC=1`, which `nemia service install --bind <address> --public` writes) as `bindExposure` judges it, the same judgement
+ * `nemia service install` makes; or its refusal thrown (exit 2), naming the variable to set and the install that writes it. A loopback,
+ * private or shared address listens as before.
+ */
+export function acknowledgedHost(host: string, acknowledged: boolean): string {
+  if (bindExposure(kindOfBind(host), acknowledged) === 'listen') return host;
+  throw Object.assign(
+    new Error(
+      `NEMIA_BIND=${host} listens on ${host === '0.0.0.0' || host === '::' ? 'every interface, a public network among them' : 'a public address'}, which this machine's store would answer to anyone who reaches it. ` +
+        `Bind a private address of this machine (\`nemia service addresses\` lists them), or acknowledge it with ${BIND_PUBLIC_VARIABLE}=1 in the service's environment: \`nemia service install --bind ${host} --public\` writes it.`,
+    ),
+    { exitCode: 2 },
+  );
 }
 
 /**

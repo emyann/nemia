@@ -50,6 +50,8 @@ import { eventsFollowed, eventsHandlers, subscriptionsHandlers } from '../feed-o
 import { templatesHandlers } from '../template-objects/templates.ts';
 import { serverHandlers } from '../server/index.ts';
 import { nemiaHandlers } from '../nemia/index.ts';
+import { readinessHandlers } from '../readiness/readiness.ts';
+import { pairHandlers, pairingsHandlers } from '../pairing/pairing.ts';
 
 /** Where every path the api serves is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
@@ -186,6 +188,9 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         discoveryHandlers,
         serverHandlers,
         nemiaHandlers,
+        readinessHandlers,
+        pairHandlers,
+        pairingsHandlers,
       ]),
       Layer.provide(decodeRefused),
       Layer.provide(answerRefused),

@@ -146,6 +146,26 @@ export function mintPersonToken(home: string, name: string, now: Date = new Date
   return minted(personTokensDir(home), { name, createdAt: now.toISOString() } satisfies PersonTokenFiled);
 }
 
+/**
+ * Mints a person's token under `name`, or under the first of `name-2`, `name-3`… no token of the person's is kept under, for a token
+ * whose name the person did not type: a pairing's, after its client, and a first-visit link's. Answers the token, once, and the name it
+ * was minted under. Refused as `mintPersonToken` refuses: a name that is no name (`Invalid`); a name taken between the read and the write
+ * is tried again under the next.
+ */
+export function mintPersonTokenFree(home: string, name: string, now: Date = new Date()): { token: string; name: string } {
+  const taken = new Set(personFiles(home).map((f) => f.record.name));
+  for (let n = 1; ; n++) {
+    const free = n === 1 ? name : `${name}-${n}`;
+    if (taken.has(free)) continue;
+    try {
+      return { token: mintPersonToken(home, free, now), name: free };
+    } catch (err) {
+      if (!(err instanceof Conflict)) throw err;
+      taken.add(free);
+    }
+  }
+}
+
 /** The record of the person's token whose digest is `digest`, or null where the store keeps none: it was never minted, or was removed. */
 export function personTokenOf(home: string, digest: string): PersonTokenFiled | null {
   let text: string;

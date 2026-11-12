@@ -19,10 +19,10 @@ import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
 import { deleteCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
-import { TOKEN_COOKIE, type TokenRefusal } from 'objects';
+import { Forbidden, TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
-import { type ApiEnv, traceOf } from '../layer.ts';
+import { type ApiEnv, type Served, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
@@ -32,6 +32,13 @@ export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message
 
 /** The MCP port's path: it and every path under it need one of the person's tokens. */
 export const MCP_PATH = '/mcp';
+
+/**
+ * The pairing routes' path: asking for a pairing, claiming it with the secret it was answered, and claiming a first-visit link
+ * (`src/pairing/pairing.ts`). A client that holds no token yet reaches them, exposed or not: each judges its own secret, and none
+ * answers with the store's data. `/api/pairings`, the person's list and approval, is not under it.
+ */
+export const PAIR_PATH = '/api/pair';
 
 /** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
 export const API_PATHS = ['/api', '/openapi'] as const;
@@ -45,15 +52,19 @@ const under = (path: string, root: string): boolean => path === root || path.sta
 /** Whether `path` is the MCP port's, or under it. */
 export const onPort = (path: string): boolean => under(path, MCP_PATH);
 
+/** Whether `path` is a pairing route's (`PAIR_PATH`), or under it. */
+const onPairing = (path: string): boolean => under(path, PAIR_PATH);
+
 /** Whether `path` is one the api answers on (`API_PATHS`): any other but the port's is a page of the board (board/board.ts). */
 export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
 
 /**
- * What a request to `path` needs of a token: the person's on the MCP port; a token, any live one, on a route the api answers where the
- * store is `exposed`; and none on a page of the board, which carries no data of the store, so that a browser reaching an exposed store
- * loads the page that asks for a token.
+ * What a request to `path` needs of a token: the person's on the MCP port; none on a pairing route (`PAIR_PATH`), which judges its own
+ * secret; a token, any live one, on a route the api answers where the store is `exposed`; and none on a page of the board, which
+ * carries no data of the store, so that a browser reaching an exposed store loads the page that asks for a token.
  */
-export const needOf: NeedOf = (path, exposed) => (onPort(path) ? 'person' : exposed && answered(path) ? 'token' : 'none');
+export const needOf: NeedOf = (path, exposed) =>
+  onPort(path) ? 'person' : onPairing(path) ? 'none' : exposed && answered(path) ? 'token' : 'none';
 
 /** How a client sends a token, and where the person mints one. */
 const SEND = "send one as `Authorization: Bearer <token>`: `nemia token add <name>`, at the store's machine, mints one of yours";
@@ -130,3 +141,15 @@ async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Pro
   const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
   return callerBy(c, token, needOf(path, await exposedOf(c)));
 }
+
+/**
+ * A route that is the person's alone: throws `Forbidden` (403) unless the caller of `route` is the person, as a step's session must not
+ * act on the machine outside its agent's fence (approve a pairing, make a first-visit link, start a need's fix). Its words name
+ * `instead`, what the person types at the store's machine.
+ */
+export const personOnly = (s: Served, route: string, instead: string): void => {
+  if (s.caller.kind === 'person') return;
+  throw new Forbidden({
+    error: `${route} is the person's alone, and this request carries a session's token: run ${instead} at the store's machine, or send a token of yours (\`nemia token add <name>\` mints one).`,
+  });
+};

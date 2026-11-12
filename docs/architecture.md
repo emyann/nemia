@@ -56,6 +56,14 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**A machine's needs, the readiness read, fixes and tickets are the orchestrator's** (`src/needs/`, `src/pairing/`): whether a need
+holds a run is a meaning, decided in `assess` beside a person's hold (`needsHolding`), its checks run by a sweep beside the passes
+(`src/needs/needs.verb.ts`, `src/needs/sweep.verb.ts`) and handed to the pass level-triggered; a fix is filed on the runtime as a
+`command` task, whose output is the runtime's; a pairing or a first-visit link mints a person token at its claim through the token
+store. The runtime adds one read, Codex's sign-in (`codexSignIn`), which the spawn's refusal and the readiness read share. The api
+serves them and lets `/api/pair` through with no token (`PAIR_PATH`, `needOf`), each of its routes judging its own secret; it refuses
+a public or wildcard bind at its start unless acknowledged (`NEMIA_BIND_PUBLIC=1`), as `nemia service install` does.
+
 **Each run's judgement is the orchestrator's, held in memory by the daemon that serves it — the informer** (`Informer`,
 `src/rest/informer.verb.ts`): a per-daemon cache of each run's judgement, filled by the tick's pass as it judges each run it reads, and
 read by the api's run object, its list and its sub-resources (tries, a try, a closeout, told), so a request and the tick never judge one

@@ -730,3 +730,56 @@ export const SESSION_COOKIE_STATES = ['set', 'cleared'] as const;
 
 /** One of `SESSION_COOKIE_STATES`. */
 export type SessionCookieState = (typeof SESSION_COOKIE_STATES)[number];
+
+/**
+ * What a need's check said of it (`needStateOf`, agent-orchestrator's src/needs/needs.ts): exit 0 is `met`, any other exit `missing`,
+ * and a check that did not answer in its time, or whose shell did not start, `unknown` — never missing, so it holds no run.
+ */
+export const NEED_STATES = ['met', 'missing', 'unknown'] as const;
+
+/** One of `NEED_STATES`. */
+export type NeedState = (typeof NEED_STATES)[number];
+
+/**
+ * The kinds of address a bind is told as (`addressKind`, agent-orchestrator's src/service/address.ts): this machine alone, every
+ * interface, a private network's (RFC 1918), a carrier-grade or Tailscale network's (100.64.0.0/10), a link's own, an IPv6 private
+ * network's (fc00::/7), and any other.
+ */
+export const ADDRESS_KINDS = ['loopback', 'wildcard', 'private', 'shared', 'link-local', 'unique-local', 'public'] as const;
+
+/** One of `ADDRESS_KINDS`. */
+export type AddressKind = (typeof ADDRESS_KINDS)[number];
+
+/**
+ * The areas of the readiness read, each piece in one: the harness's sign-in, the service and its linger, the bind, the machine
+ * (cgroup v2, `systemd --user`, the tools folder on PATH), a place's need (the git identity), a workflow's need, the factories, the
+ * release, and the client's own pieces a laptop adds (its context reaches the server, its token is accepted).
+ */
+export const READINESS_AREAS = ['harness', 'service', 'bind', 'machine', 'place', 'workflow', 'factory', 'release', 'client'] as const;
+
+/** One of `READINESS_AREAS`. */
+export type ReadinessArea = (typeof READINESS_AREAS)[number];
+
+/**
+ * Where a fix stands, as the runtime's task that runs it says: filed and not yet started (`pending`), running, or ended — `succeeded`
+ * on exit 0, `failed` on any other end.
+ */
+export const FIX_PHASES = ['pending', 'running', 'succeeded', 'failed'] as const;
+
+/** One of `FIX_PHASES`. */
+export type FixPhase = (typeof FIX_PHASES)[number];
+
+/** One event of a fix's output stream: `output`, a chunk of what it printed; `ended`, its end, with its phase. */
+export const FIX_STREAM_EVENTS = ['output', 'ended'] as const;
+
+/** One of `FIX_STREAM_EVENTS`. */
+export type FixStreamEventName = (typeof FIX_STREAM_EVENTS)[number];
+
+/**
+ * Where a ticket stands (`ticketState`, agent-orchestrator's src/pairing/ticket.ts) — a pairing, or a first-visit link: waiting on the
+ * person's approval, claimable, claimed for good, or past its time unclaimed.
+ */
+export const TICKET_STATES = ['waiting', 'claimable', 'claimed', 'expired'] as const;
+
+/** One of `TICKET_STATES`. */
+export type TicketState = (typeof TICKET_STATES)[number];

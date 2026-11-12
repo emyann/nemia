@@ -323,7 +323,8 @@ const STEP: Shape = {
 
 /**
  * A machine need a workflow declares (`spec.needs`): its name, what it is, the shell command whose exit 0 says it is in place, the fixes
- * that put it there, each with the answers it asks and the pattern of a code its output shows, and the place need it `fills`.
+ * that put it there, each with the answers it asks, the pattern of a code its output shows and its kind (objects' `FIX_KINDS`), the
+ * place need it `fills`, and where it is checked (`scope`, objects' `NEED_SCOPES`): the words of both are refused where the need is read.
  */
 const NEED: Shape = {
   fields: {
@@ -337,11 +338,13 @@ const NEED: Shape = {
           message: 'string',
           asks: { list: { fields: { name: 'string', message: 'string' }, required: ['name', 'message'] } },
           code: 'string',
+          kind: 'string',
         },
         required: ['command', 'message'],
       },
     },
     fills: 'string',
+    scope: 'string',
   },
   required: ['name', 'message', 'check'],
 };

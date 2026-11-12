@@ -13,7 +13,9 @@
  *
  * Group `factories`: the factories, which no namespace holds, listed, read and removed, and each one's sub-resources — its rules and its
  * instruction, read, written and cleared, the lines a person types for it (`commands`), its cost line per workflow, its revisions
- * policy, its places trusted again, a workflow attached and detached, and a harness setting set and taken off. The factory's parts are
+ * policy, its places trusted again, a workflow attached and detached, and a harness setting set and taken off; and the writes that name a
+ * template or a folder: a factory filed, a volume mounted and taken off, a factory made from a template, a hand-made one taken over by
+ * one, either previewed, an upgrade filed and a conflict's choice, a template in the body as `TemplateGiven`. The factory's parts are
  * each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`,
  * the servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read
  * alone.
@@ -36,7 +38,22 @@ import { Card, CardFile, CardList, CardStart, CardWrite } from './card.ts';
 import { Table } from './table.ts';
 import {
   Factory,
+  FactoryAdopted,
+  FactoryAdoptWrite,
+  FactoryApplied,
+  FactoryApplyWrite,
   FactoryCommands,
+  FactoryCreate,
+  FactoryCreated,
+  FactoryDiffWrite,
+  FactoryPlan,
+  FactoryResolved,
+  FactoryResolveWrite,
+  FactoryUpgraded,
+  FactoryUpgradeWrite,
+  VolumeAdded,
+  VolumeRemoved,
+  VolumeWrite,
   FactoryCostLineWrite,
   FactoryInstruction,
   FactoryInstructionWords,
@@ -150,6 +167,9 @@ const factoryParams = { name: Schema.String };
 const factoryWorkflowParams = { name: Schema.String, workflow: Schema.String };
 const factorySettingParams = { name: Schema.String, setting: Schema.String };
 
+/** The path of a factory's write that a command of the factory's own spells `<factory>`: its name, under that key. */
+const factoryOwnParams = { factory: Schema.String };
+
 /**
  * The query of a list of cards: a list's (`listQuery`), and `fieldSelector`, the cards by whether they are still in play, in Kubernetes'
  * spelling: `status.inPlay=true` (or `==true`, `!=false`) the cards not started or whose run has not ended, `status.inPlay=false` those
@@ -220,7 +240,10 @@ const objectErrors = cardErrors;
 /** What a definition's verbs refuse with: a part's refusals, and a write the disk failed. */
 const definitionErrors = [...cardErrors, Failed];
 
-/** The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines. */
+/**
+ * The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines; filed, made from a template,
+ * taken over by one, previewed, upgraded and resolved, and its volumes mounted and taken off.
+ */
 export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }),
@@ -314,6 +337,49 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   HttpApiEndpoint.delete('deleteSetting', '/api/factories/:name/settings/:setting', {
     params: factorySettingParams,
     success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('create', '/api/factories', { payload: FactoryCreate, success: FactoryCreated, error: objectErrors }),
+  HttpApiEndpoint.post('addVolume', '/api/factories/:factory/volumes', {
+    params: factoryOwnParams,
+    payload: VolumeWrite,
+    success: VolumeAdded,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('removeVolume', '/api/factories/:factory/volumes', {
+    params: factoryOwnParams,
+    query: { path: Schema.String },
+    success: VolumeRemoved,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('apply', '/api/factories/:name/apply', {
+    params: factoryParams,
+    payload: FactoryApplyWrite,
+    success: FactoryApplied,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('adopt', '/api/factories/:factory/adopt', {
+    params: factoryOwnParams,
+    payload: FactoryAdoptWrite,
+    success: FactoryAdopted,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('diff', '/api/factories/:factory/diff', {
+    params: factoryOwnParams,
+    payload: FactoryDiffWrite,
+    success: FactoryPlan,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('upgrade', '/api/factories/:factory/upgrade', {
+    params: factoryOwnParams,
+    payload: FactoryUpgradeWrite,
+    success: FactoryUpgraded,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('resolve', '/api/factories/:factory/resolve', {
+    params: factoryOwnParams,
+    payload: FactoryResolveWrite,
+    success: FactoryResolved,
     error: objectErrors,
   }),
 ) {}

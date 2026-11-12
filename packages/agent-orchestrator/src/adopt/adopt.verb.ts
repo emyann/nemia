@@ -22,8 +22,16 @@ import { treeDir } from '../factory/applied/applied.store.ts';
 import { sourceGiven } from '../template/door/templates.ts';
 import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan } from './adopt.ts';
 import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
+import { templatePacked } from '../template/given.store.ts';
 
-const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board takes over no factory' } as const;
+/**
+ * Why the command line takes a takeover by its arguments: the api serves it as the Factory's `adopt`, calling its handler with the
+ * template by a builtin's name or packed.
+ */
+const HERE = {
+  side: 'cli',
+  why: "the api serves it as the Factory's `adopt` of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name",
+} as const;
 
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -215,6 +223,7 @@ const adoptedNow = Effect.fn('adoptedNow')(function* (args: Args) {
 /** `nemia factory adopt`: a hand-made factory taken over in place by the template whose takeover `nemia factory diff` previewed. */
 export const FACTORY_ADOPT: Command<Adopted> = {
   name: 'factory adopt',
+  served: [{ endpoint: 'factories.adopt', request: templatePacked }],
   usage: '<name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>',
   help: [
     'take a hand-made factory over by a template, in place, as nemia factory',

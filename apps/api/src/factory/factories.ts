@@ -8,7 +8,16 @@
  * a harness setting set and taken off (`nemia factory setting`), each answered with the factory as it then reads; its places trusted
  * again where the store runs (`nemia factory trust`), answered with what was asked of each; and the factory removed (`nemia factory rm`),
  * answered with what was removed.
+ *
+ * And the writes that name a template or a folder, each answered with what its entry answers: a factory filed (`nemia factory add`), a
+ * volume mounted and taken off (`nemia factory volume add`, `rm`), a factory made from a template (`nemia factory apply`), a hand-made one
+ * taken over (`nemia factory adopt`), either previewed (`nemia factory diff`), an upgrade filed (`nemia factory upgrade`) and a
+ * conflict's choice, sent as its text (`nemia factory resolve`). A repository's or a volume's path names a folder of this machine by its
+ * whole path; a template sent packed is kept under the store while a factory is made from it (`withTemplateTaken`), and a preview's or a
+ * refused request's is removed as the request ends.
  */
+import path from 'node:path';
+import type { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   factoryCommandsOf,
@@ -26,8 +35,29 @@ import {
   FACTORY_SETTING_RM,
   FACTORY_SETTING_SET,
   FACTORY_TRUST,
+  FACTORY_ADD,
+  FACTORY_ADOPT,
+  FACTORY_APPLY,
+  FACTORY_PLAN,
+  FACTORY_RESOLVE,
+  FACTORY_UPGRADE,
+  FACTORY_VOLUME_ADD,
+  FACTORY_VOLUME_RM,
+  Invalid as Refused,
+  withResolutionProposerAs,
+  withTemplateTaken,
 } from 'agent-orchestrator';
-import { Api } from 'objects';
+import {
+  Api,
+  type FactoryAdoptWrite,
+  type FactoryApplyWrite,
+  type FactoryCreate,
+  type FactoryDiffWrite,
+  type FactoryPlan,
+  type FactoryResolveWrite,
+  type FactoryUpgradeWrite,
+  type TemplateGiven,
+} from 'objects';
 import type { Served } from '../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
@@ -77,6 +107,115 @@ const writtenThen = (route: string, name: string, write: (s: Served) => Promise<
     factoryNamed(route, name);
     await write(s);
     return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+  });
+
+/**
+ * Each of `paths` as a folder of this machine, by its whole path: a relative one is refused `Invalid`, `route` and `key` named, since no
+ * folder the caller's command ran from is this machine's.
+ */
+const wholePaths = (route: string, key: string, paths: readonly string[] | undefined): void => {
+  const relative = (paths ?? []).filter((p) => !path.isAbsolute(p));
+  if (relative.length)
+    throw new Refused({
+      message: `${route}: ${key} names a folder of the machine the api runs on by its whole path, and ${relative.join(', ')} is not one: give it from /.`,
+    });
+};
+
+/**
+ * The program `run` makes of a template's source, given the template sent (`withTemplateTaken`, the archive kept as `keep` says), or
+ * of none where none was sent, for the verb to refuse in its own words.
+ */
+const withTemplate = <A, E, R>(
+  given: TemplateGiven | undefined,
+  keep: 'never' | 'made',
+  run: (source: string | undefined) => Effect.Effect<A, E, R>,
+) => (given === undefined ? run(undefined) : withTemplateTaken(given, keep, run));
+
+/**
+ * A preview as the Api answers it: an upgrade's merge without its files' builds, a version no status names left out; a takeover as it
+ * is.
+ */
+const planOf = (planned: Effect.Success<ReturnType<typeof FACTORY_PLAN.handler>>): FactoryPlan => {
+  if (planned.kind === 'adopt') return planned;
+  const { name, from, to, merge, next, switched } = planned;
+  return {
+    kind: 'upgrade',
+    name,
+    ...(from === undefined ? {} : { from }),
+    to,
+    merge: { base: merge.base, merged: merge.merged, conflicts: merge.conflicts },
+    next: { line: next.line, digest: next.digest, dropped: next.dropped },
+    ...(switched === undefined ? {} : { switched }),
+  };
+};
+
+/** `nemia factory add`: the factory `name` filed on `repos`, each by its whole path, its places trusted unless `noTrust`. */
+const created = ({ name, repos, noTrust }: FactoryCreate) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed('POST /api/factories', name);
+    wholePaths('POST /api/factories', 'repos', repos);
+    return s.inRequest(FACTORY_ADD.handler({ name, repos, noTrust }));
+  });
+
+/** `nemia factory volume add`: `volume`, a folder by its whole path and its mark, mounted for the factory's runs. */
+const volumeAdded = (factory: string, volume: string) =>
+  answeredWrite(async (s: Served) => {
+    const route = `POST /api/factories/${factory}/volumes`;
+    factoryNamed(route, factory);
+    wholePaths(route, 'volume', [volume]);
+    return s.inRequest(FACTORY_VOLUME_ADD.handler({ factory, volume }));
+  });
+
+/** `nemia factory volume rm`: the volume at `at`, by its whole path, taken off the factory. */
+const volumeRemoved = (factory: string, at: string) =>
+  answeredWrite(async (s: Served) => {
+    const route = `DELETE /api/factories/${factory}/volumes`;
+    factoryNamed(route, factory);
+    wholePaths(route, 'path', [at]);
+    return s.inRequest(FACTORY_VOLUME_RM.handler({ factory, path: at }));
+  });
+
+/** `nemia factory apply`: the factory `name` made from the template sent, kept under the store once it is filed. */
+const applied = (name: string, { template, repos, sets, noTrust }: FactoryApplyWrite) =>
+  answeredWrite(async (s: Served) => {
+    const route = `POST /api/factories/${name}/apply`;
+    factoryNamed(route, name);
+    wholePaths(route, 'repos', repos);
+    return s.inRequest(withTemplate(template, 'made', (source) => FACTORY_APPLY.handler({ name, template: source, repos, sets, noTrust })));
+  });
+
+/** `nemia factory adopt`: the hand-made `factory` taken over by the template sent, by the plan its preview printed. */
+const adopted = (factory: string, { template, sets, plan }: FactoryAdoptWrite) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed(`POST /api/factories/${factory}/adopt`, factory);
+    return s.inRequest(withTemplate(template, 'made', (source) => FACTORY_ADOPT.handler({ factory, template: source, sets, plan })));
+  });
+
+/** `nemia factory diff`: the upgrade or the takeover of `factory` previewed, nothing written and nothing sent kept. */
+const previewed = (factory: string, { to, template, sets }: FactoryDiffWrite) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed(`POST /api/factories/${factory}/diff`, factory);
+    return planOf(
+      await s.inRequest(withTemplate(template, 'never', (source) => FACTORY_PLAN.handler({ factory, to, template: source, sets }))),
+    );
+  });
+
+/** `nemia factory upgrade`: `factory`'s upgrade filed, from the template sent where one was. */
+const upgraded = (factory: string, { to, template, sets, plan, downgrade }: FactoryUpgradeWrite) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed(`POST /api/factories/${factory}/upgrade`, factory);
+    const { from, ...filed } = await s.inRequest(
+      withTemplate(template, 'made', (source) => FACTORY_UPGRADE.handler({ factory, to, template: source, sets, plan, downgrade })),
+    );
+    return { ...filed, ...(from === undefined ? {} : { from }) };
+  });
+
+/** `nemia factory resolve`: the choice for one conflict of `factory`'s upgrade, an owner's resolution proposed by the request's caller. */
+const resolved = (factory: string, { conflict, ours, theirs, text }: FactoryResolveWrite) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed(`POST /api/factories/${factory}/resolve`, factory);
+    const proposing = withResolutionProposerAs(s.caller, { home: s.home, repo: s.repo });
+    return s.inRequest(proposing(FACTORY_RESOLVE.handler({ factory, conflict, ours, theirs, text })));
   });
 
 export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handlers) =>
@@ -143,5 +282,13 @@ export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handler
         factoryNamed(`GET /api/factories/${name}/commands`, name);
         return s.inRequest(factoryCommandsOf(s.home, defaultRepo(s), name));
       }),
-    ),
+    )
+    .handle('create', ({ payload }) => created(payload))
+    .handle('addVolume', ({ params: { factory }, payload: { volume } }) => volumeAdded(factory, volume))
+    .handle('removeVolume', ({ params: { factory }, query: { path: at } }) => volumeRemoved(factory, at))
+    .handle('apply', ({ params: { name }, payload }) => applied(name, payload))
+    .handle('adopt', ({ params: { factory }, payload }) => adopted(factory, payload))
+    .handle('diff', ({ params: { factory }, payload }) => previewed(factory, payload))
+    .handle('upgrade', ({ params: { factory }, payload }) => upgraded(factory, payload))
+    .handle('resolve', ({ params: { factory }, payload }) => resolved(factory, payload)),
 );

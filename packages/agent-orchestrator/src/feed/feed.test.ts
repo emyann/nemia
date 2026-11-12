@@ -524,8 +524,8 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
             'nemia doctor fix mise --factory nemia',
             'nemia doctor fix repository-toolchain',
           ])
-            assert.ok(line.message?.includes(named), `${named} in ${line.message}`);
-          assert.ok(!line.message?.includes('linger'), 'a piece that keeps the server alone holds no run, and is not named');
+            assert.ok(line.note?.includes(named), `${named} in ${line.note}`);
+          assert.ok(!line.note?.includes('linger'), 'linger keeps the server alone');
         },
       );
       await t.test('a daemon with no fold says it no second time while it still holds', () => {
@@ -535,7 +535,7 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       await t.test('one of the two met moves what is missing, and is said again, naming the one left', () => {
         pass({ pieces: [met(mise), toolchain] });
         assert.deepEqual(said(), ['NotReady', 'NotReady']);
-        assert.ok(!storeLines()[1].message?.includes('mise:'), storeLines()[1].message);
+        assert.ok(!storeLines()[1].note?.includes('mise:'), storeLines()[1].note);
       });
       await t.test('every piece a run waits on met writes one Ready line, a missing server piece notwithstanding, and no second', () => {
         pass({ pieces: [met(mise), met(toolchain), linger] });

@@ -53,6 +53,12 @@ const upgradeOf = (tag: string, phase: string, exitCode?: number) => ({
 /** The chunks a succeeding upgrade to `tag` prints: the daemon stopped, then the new release's own lines, its readiness among them. */
 const chunksOf = (tag: string): readonly string[] => ['stopping the daemon\n', `now ${tag}\nreadiness: claude-token met\n`];
 
+/**
+ * How long the build of `v2.2.0` holds its first stream open before the daemon restarts: four times the bound its test gives the follow,
+ * so a bound counted from the start rather than from the restart gives up on it.
+ */
+const BUILD_MS = 800;
+
 /** The output stream of `tag`'s upgrade, opened for the `open`th time: what each tag's stream does. */
 function streamOf(stand: Stand, tag: string, open: number, res: http.ServerResponse): void {
   res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -60,6 +66,7 @@ function streamOf(stand: Stand, tag: string, open: number, res: http.ServerRespo
   const [first = '', rest = ''] = chunksOf(tag);
   res.write(sse('output', first));
   if (tag === 'v2.1.0' && open === 1) return void res.end();
+  if (tag === 'v2.2.0' && open === 1) return void setTimeout(() => res.end(), BUILD_MS);
   if (tag === 'v3.0.0') {
     res.write(sse('output', 'refused: see /srv/nemia/upgrade.log\n'));
     return void res.end(sse('ended', JSON.stringify(upgradeOf(tag, 'failed', 3))));
@@ -185,6 +192,14 @@ test('a stream that closes while the daemon restarts is opened again, the output
   assert.equal(said.code, 0, said.err);
   assert.equal(stand.opens.get('v2.1.0'), 2, 'opened again once it closed');
   assert.equal(said.out, chunksOf('v2.1.0').join(''), 'the first chunk printed once');
+});
+
+test('a build that holds the stream open longer than the bound, then restarts: followed to its end, exit 0, the bound counted from the restart', async () => {
+  const stand = freshStand();
+  const said = await inProcess(['upgrade', 'v2.2.0'], aLaptop('nemia-su-long-', await started(stand)), null, BUILD_MS / 4);
+  assert.equal(said.code, 0, said.err);
+  assert.equal(stand.opens.get('v2.2.0'), 2, 'opened again after the restart');
+  assert.equal(said.out, chunksOf('v2.2.0').join(''), 'each chunk once');
 });
 
 test('an upgrade that failed exits 1, its output, naming its log, on stdout', async () => {

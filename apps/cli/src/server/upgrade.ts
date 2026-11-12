@@ -188,22 +188,24 @@ const upgradeNow = (id: string, env: NodeJS.ProcessEnv): Promise<Upgrade | undef
   askedAcross(ASKED_AS, (client) => client.upgrades.upgradeOf({ params: { id } }), env).catch(() => undefined);
 
 /**
- * Upgrade `started` at `base` followed to its end: its stream read, and read again each time it closes without its end, once the
- * daemon answers again; the `Upgrade` it ended with, or the last read of it where the server did not come back within `withinMs`.
+ * Upgrade `started` at `base` followed to its end: its stream read, however long the build runs before the daemon restarts, and read
+ * again each time it closes without its end, once the daemon answers again; the `Upgrade` it ended with, or the last read of it where
+ * the server did not end it within `backWithinMs` of the stream first closing, the restart, which is when that bound starts.
  */
 async function followed(base: string, started: Upgrade, env: NodeJS.ProcessEnv, seams: ServerUpgradeSeams): Promise<Upgrade> {
-  const deadline = Date.now() + seams.backWithinMs;
+  let deadline: number | undefined;
   let printed = 0;
-  let restarting = false;
   let last = started;
   for (;;) {
     const read = await streamed(base, started.id, printed, env, seams.speak);
     if (typeof read.opened === 'object') return read.opened;
     printed = read.printed;
-    if (!restarting) seams.speak.err(`the server at ${base} is restarting onto ${started.tag}: waiting for it to answer again\n`);
-    restarting = true;
+    if (deadline === undefined) {
+      seams.speak.err(`the server at ${base} is restarting onto ${started.tag}: waiting for it to answer again\n`);
+      deadline = Date.now() + seams.backWithinMs;
+    }
     if (!(await answersBy(base, deadline, env))) return last;
-    if (read.opened === 'unopened') last = (await upgradeNow(started.id, env)) ?? last;
+    if (read.opened === 'unopened' || Date.now() >= deadline) last = (await upgradeNow(started.id, env)) ?? last;
     if (last.phase === 'succeeded' || last.phase === 'failed' || Date.now() >= deadline) return last;
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   }

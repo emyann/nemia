@@ -54,6 +54,8 @@ import * as verbs from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { forgetLine, sentBack, stepTaskId } from '../src/run.ts';
 import { main } from '../src/cli/main.ts';
+import { START, startedLines, type StartInput } from '../src/runner.ts';
+import { handled } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-folder-');
@@ -114,6 +116,9 @@ const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verb
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
+
+/** `nemia start` on its entry's handler, as the api calls it once the client has sent what it read: the run started, or its refusal. */
+const started = (input: StartInput) => handled(START, input, { env: ENV });
 
 /** What `main` printed, line by line, while it ran. */
 const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
@@ -376,7 +381,7 @@ test('nemia start from a directory that is no repository: a folder team starts, 
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
-    const out = await printed(['start', 'a note on tides', '--workflows', TEAM]);
+    const out = startedLines(await started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO }));
     const id = out[0].split(' ')[0];
     assert.equal(runRecord(ROOT, id).place?.kind, 'folder');
     assert.ok(
@@ -384,7 +389,7 @@ test('nemia start from a directory that is no repository: a folder team starts, 
       out.join('\n'),
     );
     await assert.rejects(
-      main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.'], undefined, undefined, undefined, ENV),
+      started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO, repoNamed: true }),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
     );
@@ -427,12 +432,12 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `---\nworkflow: ${TEAM}\nrepo: ${NOT_A_REPO}\n---\na note on tides\n`);
     await assert.rejects(
-      main(['start', file, '--repo', '.'], undefined, undefined, undefined, ENV),
+      started({ card: 'a-note-on-tides-old', at: NOT_A_REPO, repo: NOT_A_REPO, repoNamed: true }),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
-    const out = await printed(['start', file]);
+    const out = startedLines(await started({ card: 'a-note-on-tides-old', at: NOT_A_REPO }));
     const run = runRecord(ROOT, out[0].split(' ')[0]);
     assert.deepEqual(
       [run.place?.kind, run.from?.inbox, 'repo' in run],

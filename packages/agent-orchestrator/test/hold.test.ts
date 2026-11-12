@@ -58,6 +58,9 @@ import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed as onHandler } from './typed.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-hold-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
@@ -71,7 +74,13 @@ const RUNS = {
       return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
@@ -184,6 +193,12 @@ const typed = async (t: TestContext, ...argv: string[]) => {
     log.mock.restore();
   }
 };
+/** What `nemia hold` answers, as the client prints it: the run, whether its hold was lifted, and the hold. */
+type Held = { id: string; lifted: boolean; hold: { until: string[]; why?: string; by?: string } };
+
+/** `nemia hold <argv>` on its entry's handler, as the api runs it: what it answers. */
+const holdTyped = async (...argv: string[]): Promise<Held> => (await stage.main(['hold', ...argv])) as Held;
+
 /** `nemia <verb>` answered, printing what it printed. */
 const said = async (t: TestContext, ...argv: string[]): Promise<string> => {
   const { printed, error } = await typed(t, ...argv);
@@ -224,19 +239,17 @@ test('a run held until another lands: said by every screen with why and who, not
   const words = `held until ${target.id} lands (why: merge conflicts in five files; by operator)`;
   let run = { id: '' } as Run;
 
-  await s.test('`nemia hold <run> --until <run>` says the hold back, put by the OS user, and writes no why', async (sub) => {
+  await s.test('`nemia hold <run> --until <run>` answers the hold, put by the OS user, and writes no why', async () => {
     run = await aStarted(repo, 'waits for the target');
-    assert.equal(
-      await said(sub, 'hold', run.id, '--until', target.id),
-      `${run.id}  held until ${target.id} lands (by ${user}) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
-    );
+    const put = await holdTyped(run.id, '--until', target.id);
+    assert.deepEqual([put.id, put.lifted, put.hold.until, put.hold.by, put.hold.why], [run.id, false, [target.id], user, undefined]);
     const file = JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')) as Record<string, unknown>;
     assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
     assert.equal(file.by, user, 'nor --by: it is put by the OS user');
   });
   await s.test("`--why` and `--by` write the person's why, one line, and who they are into the file, and say them back", async (sub) => {
     const withWords = await aStarted(repo, 'held with words');
-    const printed = await said(sub, 'hold', withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
+    const put = await holdTyped(withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
     assert.deepEqual(
       (({ why: w, by }) => ({ why: w, by }))(JSON.parse(fs.readFileSync(holdFileOf(withWords.id), 'utf8')) as Record<string, unknown>),
       {
@@ -244,10 +257,7 @@ test('a run held until another lands: said by every screen with why and who, not
         by: 'operator',
       },
     );
-    assert.equal(
-      printed,
-      `${withWords.id}  held until ${target.id} lands (why: two words; by operator) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
-    );
+    assert.deepEqual([put.hold.until, put.hold.why, put.hold.by], [[target.id], 'two words', 'operator'], 'what nemia hold says back');
     const plain = await aStarted(repo, 'held with none');
     await said(sub, 'hold', plain.id, '--until=' + target.id, '--why=it waits');
     assert.equal(runRecord(ROOT, plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
@@ -344,10 +354,7 @@ test('a run held until another lands: said by every screen with why and who, not
       await tick(b, atGate.id);
       assert.ok(!b.filings.includes(`${atGate.id}-review`), 'a pass files nothing on an approval written by hand beside the hold');
       fs.rmSync(approvals, { recursive: true });
-      assert.equal(
-        await said(sub, 'hold', atGate.id, '--off'),
-        `${atGate.id}  hold lifted — the next tick goes on, and what its steps ask is asked`,
-      );
+      assert.equal((await holdTyped(atGate.id, '--off')).lifted, true);
       assert.match(await said(sub, 'ls', atGate.id), /waiting on you: approve implement/, 'lifted by hand, the gate is asked again');
       assert.match(await said(sub, 'decide', atGate.id), new RegExp(`nemia approve ${atGate.id} implement`));
     },
@@ -577,10 +584,9 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.match(await said(sub, 'ls', id), /waiting on you/);
     assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
   });
-  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async (sub) => {
-    const printed = await said(sub, 'hold', id, '--why', why);
-    assert.ok(printed.startsWith(`${id}  ${words}`), printed);
-    assert.match(printed, new RegExp(`nemia hold ${id} --off`), 'it says how to lift it');
+  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async () => {
+    const put = await holdTyped(id, '--why', why);
+    assert.deepEqual([put.hold.until, put.hold.why], [[], why], 'held until a person lifts it, and why');
     assert.deepEqual((JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { until: unknown }).until, []);
   });
   await s.test('`nemia decide`, `nemia ls` and the summary say it is held and why, and ask nothing', async (sub) => {

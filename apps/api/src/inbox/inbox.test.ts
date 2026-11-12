@@ -32,7 +32,7 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 /** A card filed, as a test reads the Card the create answers: its name, its file, the keys it writes, and its body. */
 type Filed = { name: string; file: string; workflow: string | null; repo: string | null; factory: string | null; body: string };
 /** What POST /api/runs answers a card it started (201): the run and the card, which stays in the inbox. */
-type CardStarted = { id: string; card: string; ignoredRepo?: string };
+type CardStarted = { id: string; card: string; ignoredRepo?: string; lines?: string[] };
 type Refused = { error: string };
 
 /** Rows ordered by their first cell, a card's name. */
@@ -173,7 +173,16 @@ test('a person starts a card: the run carries where it came from, and the card s
       });
       assert.equal(res.status, 201, await res.clone().text());
       const answered = (await res.json()) as CardStarted;
-      assert.deepEqual(answered, { id: answered.id, card: card.name }, 'the answer says no removal: the card is kept');
+      assert.deepEqual(
+        { ...answered, lines: undefined },
+        { id: answered.id, card: card.name, lines: undefined },
+        'the answer says no removal: the card is kept',
+      );
+      assert.equal(answered.lines?.[0]?.split(' ')[0], answered.id, 'and what `nemia start` prints of it, the run first');
+      assert.ok(
+        answered.lines?.some((line) => line.includes(card.name) && line.includes('kept in the inbox')),
+        answered.lines?.join('\n'),
+      );
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
       const run = runsAtOnce(root).runs.read(answered.id);

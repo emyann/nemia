@@ -40,6 +40,11 @@ import { RUN_LABELS, SESSION_TOKEN, STEP_FILES } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-closeouts-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -52,7 +57,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   NEMIA_DAEMON_START: 'off',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -702,13 +713,13 @@ test('a run given inputs', async (t) => {
   let repo = '';
   await s.test(
     "`nemia start --input` copies each file into the run's inputs/, its names frozen on the record, nothing in the workspace",
-    async (sub) => {
+    async () => {
       repo = aRepo();
       const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
       fs.writeFileSync(path.join(given, 'mock.png'), 'png bytes');
       fs.mkdirSync(path.join(given, 'notes'));
       fs.writeFileSync(path.join(given, 'notes', 'brief notes.md'), '# what the person meant\n');
-      const printed = await printedBy(sub, [
+      const started = (await stage.main([
         'start',
         'add a flag',
         '--workflows',
@@ -719,8 +730,9 @@ test('a run given inputs', async (t) => {
         '--input',
         path.join(given, 'mock.png'),
         `--input=${path.join(given, 'notes', 'brief notes.md')}`,
-      ]);
-      id = printed.split(' ')[0];
+      ])) as Started;
+      const printed = startedLines(started).join('\n');
+      id = started.id;
       dir = path.join(ROOT, 'runs', id, 'inputs');
       assert.deepEqual(runRecord(ROOT, id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
       assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
@@ -781,7 +793,6 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
     (...flags: string[]) =>
     () =>
       stage.main(['start', 'a run with files', '--workflows', twoSteps(), '--repo', repo, '--no-worktree', ...flags]);
-  const plan = folderOf({ 'a.md': `---\nworkflow: ${twoSteps()}\n---\nthe only card\n` });
   const rows: Array<[string, () => Promise<unknown>, string[]]> = [
     ['an `output:` file that is not there', starting(noSchema), ['review:', '`output: review.schema.json`', 'not there']],
     [
@@ -817,11 +828,6 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
       'a misspelt --inputs',
       typed('--inputs', a),
       ['nemia start does not take --inputs', '--input <file> once per file', '--gate <step>', '--factory <name>', '--brief "<brief>"'],
-    ],
-    [
-      '`nemia start <folder> --input`',
-      () => stage.main(['start', plan, '--repo', repo, '--input', a]),
-      ['nemia start <folder> does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
     ],
   ];
   for (const [name, refused, facts] of rows)

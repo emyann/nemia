@@ -9,6 +9,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { startExtras } from './run-actions.ts';
 
 /**
  * Where a card is in its life, closed: its own word until it starts — `filed`, `queued`, `refused` (queued, and the tick's start of it
@@ -138,7 +139,9 @@ export type CardFile = typeof CardFile.Type;
 /**
  * A card started: the workflow its run is started on and where it is read from — the card's own `workflow:` when it names none, as
  * `nemia start <card>` takes it — the runs it waits on (`after`) and reads as context
- * (`context`), the brief given in place of the card's body, and the labels it is started with (`key=value`, `key-`).
+ * (`context`), the brief given in place of the card's body, the labels it is started with (`key=value`, `key-`), the inbox cards it is
+ * handed (`cards`), the repository it works on in place of the card's `repo:` (`repo`, a path the daemon reads), and what a start of a
+ * brief takes beside (`startExtras`: models, gates, no worktree, inputs).
  */
 export const CardStart = Schema.Struct({
   workflow: Schema.optionalKey(Schema.String),
@@ -147,6 +150,9 @@ export const CardStart = Schema.Struct({
   context: Schema.optionalKey(Schema.Array(Schema.String)),
   brief: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(Schema.String)),
+  cards: Schema.optionalKey(Schema.Array(Schema.String)),
+  repo: Schema.optionalKey(Schema.String),
+  ...startExtras,
 });
 export type CardStart = typeof CardStart.Type;
 

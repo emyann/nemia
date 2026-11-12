@@ -97,6 +97,7 @@ import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
+import { CardStarted } from './run-actions.ts';
 import { StepsGroup } from './step-api.ts';
 import { NemiaGroup } from './nemia-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
@@ -225,9 +226,7 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.post('start', '/api/namespaces/:namespace/cards/:name/start', {
     params: cardParams,
     payload: CardStart,
-    success: Schema.Struct({ id: Schema.String, card: Schema.String, ignoredRepo: Schema.optionalKey(Schema.String) }).pipe(
-      Schema.annotate({ httpApiStatus: 201 }),
-    ),
+    success: CardStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: cardErrors,
   }),
   HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {

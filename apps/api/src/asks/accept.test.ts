@@ -251,7 +251,16 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       took = (await res.json()) as Acceptance & { file: string };
       assert.deepEqual(
         { ...took, at: undefined },
-        { step: 'review', try: 2, at: undefined, message: WHY, file: acceptFile(root, R, 'review', 2) },
+        {
+          step: 'review',
+          try: 2,
+          at: undefined,
+          message: WHY,
+          file: acceptFile(root, R, 'review', 2),
+          loop: true,
+          next: 'nothing',
+          caps: [],
+        },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
       assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });

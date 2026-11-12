@@ -17,7 +17,6 @@ import { feedSize } from '../feed/feed.store.ts';
 import type { FeedLine, FeedWords } from '../feed/feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { parseSelectors } from '../watch/selector.ts';
-import { watchedLine } from '../subscription/subscription.ts';
 import { steeredClock } from '../../test/steered.ts';
 import { waitForBound } from './await.ts';
 import { answerOf, readChunk, waitFeed } from './await.verb.ts';
@@ -155,18 +154,12 @@ test('REFUSED: a cursor inside a line is refused as followFeed refuses it', asyn
 });
 
 test('REFUSED: WAIT refuses a bad selector, a --for out of its form, none to wait and longer than a call lives, before reading', () => {
+  assert.equal(typeof WAIT.check?.({ from: 'start' }), 'string', 'a --from that is no cursor, refused by its words, in the client too');
   for (const args of [{ selector: ['run=='] }, { for: 'soon' }, { for: '0s' }, { for: '5m' }, { from: 'start' }]) {
-    assert.equal(typeof WAIT.check?.(args), 'string', JSON.stringify(args));
     const exit = Effect.runSyncExit(
       Effect.provideService(WAIT.handler(args) as unknown as Effect.Effect<unknown, unknown, StoreRoot>, StoreRoot, ROOT),
     );
     assert.ok(Exit.isFailure(exit) && Cause.squash(exit.cause) instanceof Invalid, `${JSON.stringify(args)} refused as Invalid`);
   }
   assert.equal(WAIT.check?.({ selector: ['run=x'], for: '30s', from: '0' }), null, 'a good wait is taken');
-});
-
-test('WAIT prints each line as nemia watch --once does, then the cursor', () => {
-  const line = { run: 'p-1', word: 'started', at: '2026-11-11T00:00:00.000Z' };
-  const printed = WAIT.print({ ended: 'matched', lines: [{ line, from: 0, to: 40 }], cursor: 40 }, {});
-  assert.deepEqual(printed, [watchedLine(line, 40, {}), 'cursor: 40']);
 });

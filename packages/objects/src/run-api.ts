@@ -58,6 +58,18 @@ const runReadErrors = [Missing, Invalid, Unjudged];
  */
 const runActionErrors = [BadRequest, Missing, Conflict, Invalid, WriteFailed];
 
+/**
+ * The query of a run's removal, each asked where it is `true`, as a decision's `diffs` is: `whole`, a run of a workflow removed as `nemia
+ * rm` removes it — its worktrees removed through git, what one held uncommitted committed first, its branches kept — where left out a try
+ * alone is removed (a run started from an agent's page, any other refused); `deleteBranches`, its branches merged into its base deleted
+ * too; `forceUnmerged` beside it, the others too, with their work.
+ */
+const removeQuery = {
+  whole: Schema.optionalKey(Schema.String),
+  deleteBranches: Schema.optionalKey(Schema.String),
+  forceUnmerged: Schema.optionalKey(Schema.String),
+};
+
 /** A run, by its namespace and its name. */
 const runParams = { namespace: Schema.String, name: Schema.String };
 
@@ -93,6 +105,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/runs/:name', {
     params: runParams,
+    query: removeQuery,
     success: RunRemoved,
     error: runActionErrors,
   }),

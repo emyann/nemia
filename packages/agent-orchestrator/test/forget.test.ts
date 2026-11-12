@@ -41,6 +41,10 @@ import { EngineService, engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed as onHandler } from './typed.ts';
+import { forgetTyped, type Typed } from './forgetting.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-forget-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -56,7 +60,13 @@ const ENV: Env = {
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
 const files = filesStoreAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 const world = () => stage.place().world;
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -156,8 +166,12 @@ const aParent = async (repo: string, { work, signed = Boolean(work) }: { work?: 
   return { run, wt, branch: runRecord(ROOT, run.id).steps.implement.branch! };
 };
 
-/** `nemia <argv>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const typed = async (t: TestContext, ...argv: string[]) => {
+/**
+ * `nemia <argv>` as a person types it: `rm` and `prune` as the client runs them over the api (`forgetTyped`), any other through the CLI;
+ * the lines it printed, and the error it ended with, if it did.
+ */
+const typed = async (t: TestContext, ...argv: string[]): Promise<Typed> => {
+  if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e(), effect), ROOT, argv);
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void printed.push(a.join(' ')));
   try {
@@ -230,13 +244,8 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
       const before = board().forgets.length;
       const dry = await typed(t, 'prune', id, '--artifacts');
       assert.equal(dry.error, undefined);
-      names(dry.printed.join('\n'), `${id}  would remove its files`, path.join(ROOT, 'runs', id, 'artifacts'), `nemia rm ${id}`, '--yes');
-      assert.ok(
-        board()
-          .forgets.slice(before)
-          .every((f) => !f.yes && f.taskIds.length === 3),
-        'what rm would forget is counted dry, over its three tasks',
-      );
+      names(dry.printed.join('\n'), `${id}  would remove its files`, path.join(ROOT, 'runs', id, 'artifacts'), '--yes');
+      assert.equal(board().forgets.length, before, 'a preview asks the engine nothing: what rm would forget is no longer counted');
       const done = await stage.runWith(e(), prune(id, { artifacts: true, yes: true }));
       assert.deepEqual([done.kind, done.worktrees], ['pruned', []]);
       assert.ok(!under('runs', id, 'artifacts') && under('runs', id, 'inputs', 'kept.md') && under('runs', `${id}.json`));
@@ -274,9 +283,10 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     },
   );
 
-  await s.test('a second `nemia rm` finds no such run, and is no refusal', async () => {
+  await s.test('a second `nemia rm` finds no such run: the Missing of the api, exit 2, its line saying so', async () => {
     const again = await typed(t, 'rm', id);
-    assert.deepEqual([again.error, again.printed], [undefined, [`${id}  no such run — nothing to forget`]]);
+    assert.equal(again.error?.exitCode, 2);
+    names(again.printed.join('\n'), `${id}  no such run — nothing to forget`);
   });
 
   await s.test(
@@ -400,7 +410,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
       fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
       fs.mkdirSync(path.join(ROOT, 'runs', 'gone-run-3c4d.asks', 'done'), { recursive: true });
       const leftover = await typed(t, 'rm', 'gone-run-3c4d');
-      assert.equal(leftover.error, undefined, 'no record is no refusal');
+      assert.equal(leftover.error?.exitCode, 2);
       assert.equal(leftover.printed.length, 1);
       names(leftover.printed[0], 'gone-run-3c4d  no such run', 'runs/gone-run-3c4d.cancelled', 'runs/gone-run-3c4d.asks/');
       assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
@@ -413,14 +423,16 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'checks', `${id}-implement-check.stderr`), "the live run's\n");
     const sibling = await typed(t, 'rm', `${id}-implement`);
-    assert.deepEqual([sibling.error, sibling.printed], [undefined, [`${id}-implement  no such run — nothing to forget`]]);
+    assert.equal(sibling.error?.exitCode, 2);
+    names(sibling.printed.join('\n'), `${id}-implement  no such run — nothing to forget`);
     assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
     const torn = 'torn-record-x2';
     fs.writeFileSync(path.join(ROOT, 'runs', `${torn}.json`), '{ "id": ');
     fs.writeFileSync(path.join(ROOT, 'checks', `${torn}-review-check.stderr`), "a torn run's\n");
     tt.after(() => fs.rmSync(path.join(ROOT, 'runs', `${torn}.json`), { force: true }));
     const prefix = await typed(t, 'rm', 'torn-record');
-    assert.deepEqual([prefix.error, prefix.printed], [undefined, ['torn-record  no such run — nothing to forget']]);
+    assert.equal(prefix.error?.exitCode, 2);
+    names(prefix.printed.join('\n'), 'torn-record  no such run — nothing to forget');
     assert.ok(under('checks', `${torn}-review-check.stderr`), 'nor a run whose record does not read');
     board().settle(`${id}-implement`, 'succeeded', SIGNED);
     await pass(id);
@@ -702,7 +714,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       assert.deepEqual([forgot.engine?.forgotten, forgot.engine?.waiting, forgot.engine?.marker], [[], [task], markerOf(run.id)]);
       assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
       const said = await typed(t, 'rm', run.id);
-      assert.equal(said.error, undefined, 'a second rm, the record gone, exits 0');
+      assert.equal(said.error?.exitCode, 2);
       names(said.printed[0], `${run.id}  no such run`, `${task} has not settled yet`);
       assert.ok(fs.existsSync(markerOf(run.id)), 'it is still not settled: the marker stands');
 
@@ -829,7 +841,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
   );
 
   await s.test(
-    '`nemia prune` of N runs asks the engine once, dry, over all their tasks, says what rm would forget of each, and forgets nothing — a step a pass filed and never wrote down among them',
+    '`runsForgetting` of N runs asks the engine once, dry, over all their tasks, counts what rm would forget of each, and forgets nothing — a step a pass filed and never wrote down among them',
     async () => {
       const runs = [(await aParent(aRepo(), { work: 'a.txt' })).run, (await aParent(aRepo(), { work: 'b.txt' })).run];
       for (const r of runs) await pass(r.id);
@@ -838,14 +850,6 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       const { counted } = await stage.runWith(e(), runsForgetting(runs.map((r) => r.id)));
       assert.deepEqual(board().forgets.slice(before), [{ taskIds: tasks, yes: false }], 'one dry call, over the union');
       for (const [i, r] of runs.entries()) assert.deepEqual(counted.get(r.id)?.forgotten, [tasks[i]], 'each run its own share');
-      const dry = await typed(t, 'prune', ...runs.map((r) => r.id), '--unmerged');
-      assert.equal(dry.error, undefined);
-      assert.equal(board().forgets.length, before + 2, 'the CLI asks once more, for both');
-      for (const r of runs)
-        assert.ok(
-          dry.printed.some((l) => l.startsWith('   the engine keeps 1 task of it') && l.endsWith(`nemia rm ${r.id} forgets them`)),
-          dry.printed.join('\n'),
-        );
       const left = await listed();
       assert.deepEqual(
         tasks.filter((id) => !left.includes(id)),
@@ -871,7 +875,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
   );
 
   await s.test(
-    '`nemia prune` says of a run whose record does not read that it was not counted, and why, and counts the other runs',
+    '`runsForgetting` says of a run whose record does not read that it was not counted, and why, and counts the other runs',
     async () => {
       const p = await aParent(aRepo(), { work: 'c.txt' });
       const file = path.join(ROOT, 'runs', 'garbled-c3d4.json');

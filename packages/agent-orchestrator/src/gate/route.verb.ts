@@ -3,11 +3,11 @@
  * folder (`routeAsk`), which wins over the condition's own answer on the next pass (`answeredRoute`). A controller, served on both sides:
  * the api's Run `route` (`POST /api/namespaces/:namespace/runs/:name/steps/:step/route`) calls it with its typed input (`RouteInput`).
  */
-import { renamed } from '../command/requests.verb.ts';
+import { ROUTE_WORDS } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
-import type { Command } from '../command/entry.verb.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { WorkflowError, type StepSpec } from '../step/step.ts';
 import { tryOf, type Run } from '../record/record.ts';
@@ -60,29 +60,8 @@ export const RouteInput = Schema.Struct({ runId: Schema.String, step: Schema.Str
 export type RouteInput = typeof RouteInput.Type;
 
 /** `nemia route`: the route written for the try the condition is on, and the file it is in. */
-export const ROUTE: Command<{ step: string; try: number; route: string; at: string; file: string }, RouteInput> = {
-  name: 'route',
-  served: [{ endpoint: 'runs.route', request: renamed({ runId: 'name' }) }],
-  usage: '<runId> <condition> <route>',
-  help: [
-    'route a condition by hand: the next tick takes your route over the',
-    "condition's own answer, for the try it is on, and files the nodes",
-    'whose when: names it. Refused once a node after it is filed or sent:',
-    'nemia cancel <runId>, and start again.',
-  ],
-  spec: {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'step', takes: 'required', kind: 'name' },
-      { key: 'route', takes: 'required', kind: 'name' },
-    ],
-    flags: [],
-    unknown: (arg) =>
-      `nemia route does not take ${arg}. It takes the run, the condition and the route: nemia route <runId> <condition> <route>.`,
-  },
-  writes: true,
-  ticks: true,
-  class: 'act',
+export const ROUTE: Served<{ step: string; try: number; route: string; at: string; file: string }, RouteInput> = {
+  ...ROUTE_WORDS,
   input: RouteInput,
   handler: Effect.fnUntraced(function* ({ runId: id, step, route }: RouteInput) {
     const home = yield* StoreRoot;
@@ -99,8 +78,4 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
     writeWhole(file, `${JSON.stringify({ route, at })}\n`);
     return { step, try: n, route, at, file };
   }),
-  print: ({ step, try: n, route, file }, { runId }) => [
-    `${runId}  routed: try ${n} of ${step} takes ${route} — the next tick files what its when: names`,
-    `   ${file}`,
-  ],
 };

@@ -21,6 +21,11 @@ import { isRepositoryRun } from '../src/run.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { workflowFolder } from '../src/folder/folder.store.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-filing-keys-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -32,7 +37,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** A strict `findings` schema and `again`, as the tests' team's `test/fixtures/team/agents/review.schema.json` declares them. */
@@ -157,28 +168,27 @@ test('every key a step sets reaches the runtime, on every filing — and a check
   );
   let id = '';
 
-  await s.test("`nemia start --workflows <name>` starts the repository's workflow of that name", async (c) => {
-    const printed: string[] = [];
-    c.mock.method(console, 'log', (...args: unknown[]) => {
-      printed.push(args.join(' '));
-    });
-    await stage.main(['start', 'add a flag', '--workflows', 'keys', '--repo', repo]);
-    id = printed[0].split(' ')[0];
+  await s.test("`nemia start --workflows <name>` starts the repository's workflow of that name", async () => {
+    const workflows = workflowFolder('keys', process.cwd(), repo);
+    id = ((await stage.main(['start', 'add a flag', '--workflows', workflows, '--repo', repo])) as { id: string }).id;
     assert.equal(runRecord(ROOT, id).workflowDir, dir);
   });
 
   await s.test('REFUSED: a name the repository does not have, naming both places and the workflows it has', async () => {
     const before = fs.readdirSync(path.join(ROOT, 'runs')).length;
-    await assert.rejects(stage.main(['start', 'add a flag', '--workflows', 'kyes', '--repo', repo]), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
-      for (const named of [
-        `no workflow folder at ${path.resolve('kyes')}`,
-        `nor a workflow named kyes in ${path.join(repo, 'workflows')}`,
-        ': keys',
-      ])
-        assert.ok(e.message.includes(named), e.message);
-      return true;
-    });
+    await assert.rejects(
+      Promise.resolve().then(() => workflowFolder('kyes', process.cwd(), repo)),
+      (e: Error & { exitCode?: number }) => {
+        assert.equal(e.exitCode, 2, e.message);
+        for (const named of [
+          `no workflow folder at ${path.resolve('kyes')}`,
+          `nor a workflow named kyes in ${path.join(repo, 'workflows')}`,
+          ': keys',
+        ])
+          assert.ok(e.message.includes(named), e.message);
+        return true;
+      },
+    );
     assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, before, 'no run is written');
   });
 

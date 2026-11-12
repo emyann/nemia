@@ -46,6 +46,10 @@ import { verdictWord } from '../src/check/check.ts';
 import { configRefusal, engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { SAY } from '../src/say/commands.verb.ts';
+import type { Place } from '../src/runner.ts';
+import { COMMAND_WORDS } from 'objects';
 
 const ROOT = scratch('wf-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -57,7 +61,13 @@ const ENV: Env = {
   WF_DEFAULT_FACTORY_STARTS: '1',
   WF_VERIFY_REST: '1',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 const filesStore = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -283,27 +293,24 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
     const listed = await printedBy(sub, ['ls']);
     assert.match(planOf(listed, id) ?? '', /^ {3}plan +succeeded · BLOCKED +main +· asks 2 questions$/, listed.join('\n'));
   });
-  await s.test(
-    "`nemia retry --answer` files a try whose message is the board's words for the answers, given at the terminal",
-    async (sub) => {
-      const printed = await printedBy(sub, ['retry', id, 'plan', '--answer', '1=b', '--answer', '2=A,b: both']);
-      const [ask] = asksOf(id);
-      const expected = answerText(
-        [cut, where],
-        [
-          { question: cut.title, chose: ['two cards'] },
-          { question: where.title, chose: ['retry', 'gate'], own: 'both' },
-        ],
-        undefined,
-        'at the terminal',
-      );
-      assert.equal(askRead(id, ask).message, expected);
-      assert.match(printed[0], new RegExp(`^${id}  asked: try 2 of plan \\(--continue\\), with your answers — `));
-    },
-  );
-  await s.test('another run answered in its own words, `--message` the note', async (sub) => {
+  await s.test("`nemia retry --answer` files a try whose message is the board's words for the answers, given at the terminal", async () => {
+    const asked = (await stage.main(['retry', id, 'plan', '--answer', '1=b', '--answer', '2=A,b: both'])) as { try?: number };
+    const [ask] = asksOf(id);
+    const expected = answerText(
+      [cut, where],
+      [
+        { question: cut.title, chose: ['two cards'] },
+        { question: where.title, chose: ['retry', 'gate'], own: 'both' },
+      ],
+      undefined,
+      'at the terminal',
+    );
+    assert.equal(askRead(id, ask).message, expected);
+    assert.equal(asked.try, 2, 'the answers ask for try 2 of plan');
+  });
+  await s.test('another run answered in its own words, `--message` the note', async () => {
     const noted = await asking();
-    await printedBy(sub, ['retry', noted, 'plan', '--answer', '1: neither', '--answer', '2=a', '--message', 'thanks']);
+    await stage.main(['retry', noted, 'plan', '--answer', '1: neither', '--answer', '2=a', '--message', 'thanks']);
     const message = askRead(noted, asksOf(noted)[0]).message as string;
     assert.ok(message.endsWith('\n\nNote: thanks\n\nAnswered by: person, at the terminal'), message);
     assert.ok(message.includes('1. How is the card cut?\n   In my own words: neither'), message);
@@ -328,8 +335,11 @@ test("a gated planner's questions are answered with its approval", async (t) => 
     const listed = await printedBy(sub, ['ls']);
     assert.ok(planOf(listed, id)?.includes(' · asks 2 questions'), listed.join('\n'));
   });
-  await s.test("`nemia approve --answer` approves with the board's words for the answers, given at the terminal", async (sub) => {
-    const printed = await printedBy(sub, ['approve', id, 'plan', '--answer', '1=a', '--answer', '2=b', '--message', 'go']);
+  await s.test("`nemia approve --answer` approves with the board's words for the answers, given at the terminal", async () => {
+    const approved = (await stage.main(['approve', id, 'plan', '--answer', '1=a', '--answer', '2=b', '--message', 'go'])) as {
+      step: string;
+      try: number;
+    };
     const expected = approvedAnswerText(
       'plan',
       [cut, where],
@@ -341,7 +351,7 @@ test("a gated planner's questions are answered with its approval", async (t) => 
       'at the terminal',
     );
     assert.equal(askRead(id, 'approve-plan-1').message, expected);
-    assert.match(printed[0], new RegExp(`^${id}  approved: try 1 of plan, with your answers — `));
+    assert.deepEqual([approved.step, approved.try], ['plan', 1]);
   });
   await s.test('approved, it waits on no one: `nemia ls` says nothing of its questions', async (sub) => {
     const listed = await printedBy(sub, ['ls']);
@@ -1189,16 +1199,13 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
   let run: RepositoryRun;
   const taskId = () => `${run.id}-implement`;
   const try2 = () => `${run.id}-implement-try2`;
-  await s.test('`nemia retry`, as a person types it, asks for try 2, and says the tick stops the session first', async (sub) => {
+  await s.test('`nemia retry`, as a person types it, asks for try 2, and says the tick stops the session first', async () => {
     run = await startedRun(implementThenReview());
     await tick(run.id);
     ended(taskId(), 'needs-human');
-    const printed = await printedBy(sub, ['retry', run.id, 'implement']);
+    const asked = (await stage.main(['retry', run.id, 'implement'])) as { try?: number; stopFirst?: boolean };
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2']);
-    assert.equal(
-      printed[0],
-      `${run.id}  asked: try 2 of implement (--continue) — its harness blocked its session: the next tick stops it, and files the try once it has stopped`,
-    );
+    assert.deepEqual([asked.try, asked.stopFirst], [2, true], 'try 2, its blocked session stopped first');
   });
   await s.test('`nemia ls` says the phase alone, and the try asked', async () => {
     const { note, ...row } = (await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0];
@@ -1344,25 +1351,20 @@ test('telling a running step something with `nemia say`, and the try that contin
   const saidTo = () => b.tasks.get(taskId())!.said;
   let record = '';
   let beside: string[] = [];
-  await s.test(
-    "`nemia say` hands the words to the step's task through the engine's `say`, and prints the line it journalled",
-    async (sub) => {
-      run = await startedRun(implementThenReview());
-      await tick(run.id);
-      ended(taskId(), 'working');
-      record = recordText(run.id);
-      beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
-      const printed = await printedBy(sub, ['say', run.id, 'implement', 'Widen', 'the', 'scope', 'to', 'apps/api', 'too.']);
-      const [first] = saidTo();
-      assert.deepEqual([first.attempt, first.text], [1, 'Widen the scope to apps/api too.'], 'an unquoted sentence is one message');
-      assert.deepEqual(printed, [
-        `${run.id}  said to implement, try 1, at ${first.at} — journalled on ${taskId()}: nemia decide ${run.id} prints it under the step`,
-        '   ```text',
-        '   Widen the scope to apps/api too.',
-        '   ```',
-      ]);
-    },
-  );
+  await s.test("`nemia say` hands the words to the step's task through the engine's `say`, and answers what it journalled", async () => {
+    run = await startedRun(implementThenReview());
+    await tick(run.id);
+    ended(taskId(), 'working');
+    record = recordText(run.id);
+    beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+    const told = await stage.runWith(
+      b.e,
+      SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope to apps/api too.', caller: PERSON }),
+    );
+    const [first] = saidTo();
+    assert.deepEqual([first.attempt, first.text], [1, 'Widen the scope to apps/api too.']);
+    assert.deepEqual([told.try, told.taskId, told.at, told.text], [1, taskId(), first.at, first.text], 'what nemia say prints of it');
+  });
   await s.test('it writes nothing of its own: the record untouched, no file beside it', () => {
     assert.equal(recordText(run.id), record);
     assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'the engine journal is the record');
@@ -1491,10 +1493,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   for (const words of [[''], [' \n '], []])
     await t.test(`by the engine, in its words: empty words, typed ${JSON.stringify(words)}`, async () => {
       ended(taskId, 'working');
-      await assert.rejects(
-        stage.main(['say', run.id, 'implement', ...words], e),
-        refusedAs('Conflict', '`text` is empty', 'Give the words'),
-      );
+      await assert.rejects(saying('implement', words.join(' ')), refusedAs('Conflict', '`text` is empty', 'Give the words'));
     });
   await t.test("each of those was the engine's to answer: it was asked once for each", () => {
     assert.deepEqual(asked, [taskId, taskId, taskId, taskId]);
@@ -1504,7 +1503,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
     assert.rejects(saying('deploy'), refusedAs('Conflict', `${run.id} has no step "deploy"`, 'implement, review')),
   );
   await t.test('by the package: empty words for a step not filed yet, refused as the engine refuses them, and nothing kept', () =>
-    assert.rejects(stage.main(['say', run.id, 'review', ' \n '], e), refusedAs('Conflict', '`text` is empty', 'Give the words')),
+    assert.rejects(saying('review', ' \n '), refusedAs('Conflict', '`text` is empty', 'Give the words')),
   );
   for (const phase of ['succeeded', 'failed', 'stopped'] as const)
     await t.test(`by the package: a task settled \`${phase}\`, offering the retry with words`, async () => {
@@ -1517,10 +1516,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   await t.test('by the package: a cancelled run, its task still running', async () => {
     ended(taskId, 'working');
     markCancelled(ROOT, run.id);
-    await assert.rejects(
-      stage.main(['say', run.id, 'implement', 'Widen the scope.'], e),
-      refusedAs('Conflict', `${run.id} was cancelled at `, 'not steered'),
-    );
+    await assert.rejects(saying('implement'), refusedAs('Conflict', `${run.id} was cancelled at `, 'not steered'));
   });
   await t.test('the engine was never asked by any of the package refusals; nothing said, nothing written', () => {
     assert.deepEqual(asked, [], 'the engine was never asked');

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { Invalid } from '../src/refusal/refusal.ts';
 import { runRecord } from '../src/record/record.store.ts';
-import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-tally-start-');
@@ -44,21 +44,12 @@ function triage(name: string, tally: string): string {
   return dir;
 }
 
-/** `nemia start` of `dir`, from the store, and the run's id. */
+/** `nemia start` of `dir`, on the store's own folder, as the api runs it (`typed`): the run's id. */
 async function started(dir: string): Promise<string> {
-  const out: string[] = [];
-  const { log, error } = console;
-  const cwd = process.cwd();
-  console.log = (...args: unknown[]) => void out.push(args.join(' '));
-  console.error = () => undefined;
-  process.chdir(ROOT);
-  try {
-    await main(['start', 'sort the issues', '--workflows', dir], undefined, undefined, undefined, ENV);
-  } finally {
-    process.chdir(cwd);
-    Object.assign(console, { log, error });
-  }
-  return out.join('\n').split(/\s+/)[0];
+  const { id } = (await typed(['start', 'sort the issues', '--workflows', dir, '--repo', ROOT], undefined, undefined, undefined, ENV)) as {
+    id: string;
+  };
+  return id;
 }
 
 const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);

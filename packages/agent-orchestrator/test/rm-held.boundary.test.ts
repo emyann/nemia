@@ -19,7 +19,7 @@ import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { advanceRun, forgetRun, forgetLine as forgetLineOf, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { markCancelled, runRecord } from '../src/record/record.store.ts';
-import { main } from '../src/cli/main.ts';
+import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-rm-held-');
@@ -225,21 +225,8 @@ const worktreesOf = (repo: string) =>
     .map((l) => l.slice('worktree '.length));
 const hasBranch = (repo: string, branch: string) => gitIn(repo, 'branch', '--list', branch) !== '';
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
-/** `nemia rm`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
-  try {
-    await main(['rm', ...args], e, undefined, undefined, ENV);
-    return { printed, error: undefined };
-  } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number } };
-  } finally {
-    log.mock.restore();
-  }
-};
+/** `nemia rm`, as the client runs it over the api, a run at a time on the entry's handler: the lines it printed, and its error. */
+const rmTyped = (_t: TestContext, e: Engine, ...args: string[]) => forgetTyped((effect) => runWith(e, effect), ROOT, ['rm', ...args]);
 
 test("REFUSED at shipped defaults: a locked worktree — git will not remove it, and neither does `nemia rm`: the run is held, its record, files and branch kept, exit 2, with the command that unlocks it; unlocked, `nemia rm` again finishes. A directory in the run's own that git does not know is held the same way", async (t) => {
   const repo = aRepo();

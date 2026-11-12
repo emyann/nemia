@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-owners-start-');
@@ -57,7 +57,7 @@ test('REFUSED: nemia start of a step declaring a field its agent declares exits 
   process.chdir(ROOT);
   try {
     await assert.rejects(
-      main(['start', 'judge it', '--workflows', dir], undefined, undefined, undefined, ENV),
+      typed(['start', 'judge it', '--workflows', dir, '--repo', ROOT], undefined, undefined, undefined, ENV),
       (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
         for (const fact of [

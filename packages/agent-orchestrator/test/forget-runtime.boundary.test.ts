@@ -26,7 +26,7 @@ import { advanceRun, forgetRun, retryRun, startRun, runWith as runEngine, gitPla
 import { runRecord } from '../src/record/record.store.ts';
 import { runTasks } from '../src/record/record.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
-import { main } from '../src/cli/main.ts';
+import { forgetTyped } from './forgetting.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -161,21 +161,8 @@ const finished = async () => {
 
 const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 
-/** `nemia <args>` through the CLI over the engine `engine`: the lines it printed, and the error it ended with, if it did. */
-const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
-  try {
-    await main(args, engine, undefined, undefined, ENV);
-    return { printed, error: undefined };
-  } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number } };
-  } finally {
-    log.mock.restore();
-  }
-};
+/** `nemia rm <args>`, as the client runs it over the api, on the engine `engine`: the lines it printed, and its error. */
+const typedOn = (_t: TestContext, engine: Engine, ...args: string[]) => forgetTyped((effect) => runWith(engine, effect), ROOT, args);
 
 test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed then read with the lines forgotten counted, the kept run's filings on it", async () => {
   const { run, tasks } = await finished();

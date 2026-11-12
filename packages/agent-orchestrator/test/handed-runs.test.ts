@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +19,11 @@ import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-handed-runs-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -31,7 +36,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   NEMIA_DAEMON_START: 'off',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -49,16 +60,7 @@ const folderOf = (steps: Record<string, string>): string => {
 };
 
 /** The id `nemia <argv>` started. */
-const startedBy = async (t: TestContext, argv: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => void printed.push(args.join(' ')));
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split(' ')[0] ?? '';
-};
+const startedBy = async (argv: string[]) => ((await stage.main(argv)) as Started).id;
 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
@@ -74,7 +76,7 @@ test('a run started --from an earlier run reads its artifacts and inputs on ever
   const repo = aRepo();
   const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'rows-C.md');
   fs.writeFileSync(given, 'the rows\n');
-  const earlier = await startedBy(t, ['start', 'design it', '--workflows', folderOf({ design: '' }), '--repo', repo, '--input', given]);
+  const earlier = await startedBy(['start', 'design it', '--workflows', folderOf({ design: '' }), '--repo', repo, '--input', given]);
   const design = artifactsDir(ROOT, runRecord(ROOT, earlier), 'design');
   fs.mkdirSync(design, { recursive: true });
   fs.writeFileSync(path.join(design, 'closeout.json'), '{"outcome":"done","summary":"designed, not built"}\n');
@@ -84,8 +86,8 @@ test('a run started --from an earlier run reads its artifacts and inputs on ever
 
   await s.test(
     "every step's first filing reads the earlier run's design closeout and its input, writes neither, and is told where",
-    async (sub) => {
-      id = await startedBy(sub, [
+    async () => {
+      id = await startedBy([
         'start',
         'build what it designed',
         '--workflows',
@@ -110,8 +112,8 @@ test('a run started --from an earlier run reads its artifacts and inputs on ever
     },
   );
 
-  await s.test('a run handed one whose folders are gone since is filed with no mount of them, and told so', async (sub) => {
-    const after = await startedBy(sub, [
+  await s.test('a run handed one whose folders are gone since is filed with no mount of them, and told so', async () => {
+    const after = await startedBy([
       'start',
       'check it',
       '--workflows',

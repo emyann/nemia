@@ -120,8 +120,8 @@ test('REFUSED: a verb that throws is unread in one sentence naming the verb and 
   assert.equal(later, 'inventory threw before it answered: spawn git ENOENT');
 });
 
-test('the deadline is two minutes a verb, ten for make, and it is what the place holds git to when given none', () => {
-  for (const verb of PLACE_VERBS) assert.equal(PLACE_DEADLINE_MS[verb], verb === 'make' ? 600_000 : 120_000, verb);
+test('the deadline is two minutes a verb, ten for make and clone, and it is what the place holds git to when given none', () => {
+  for (const verb of PLACE_VERBS) assert.equal(PLACE_DEADLINE_MS[verb], verb === 'make' || verb === 'clone' ? 600_000 : 120_000, verb);
   assert.equal(STOP_GRACE_MS, 2000);
   assert.ok(GRACE_MS < STOP_GRACE_MS, 'the deadline tests give a shorter grace, never a longer one');
 });

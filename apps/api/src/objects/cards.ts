@@ -4,6 +4,10 @@
  * with its file as written, written whole (`replaceCard`), filed (`nemia inbox add`), dropped (`inbox rm`), started (`nemia start
  * <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
  *
+ * A card started under a factory's namespace is placed in that factory (`placedIn`), as `nemia start <card> --factory <namespace>` is: its
+ * workflow found in the factory's tree first, and the card's own `workflow:` where the start names none. One started under `default` is
+ * placed by the request's own `?factory=`, as the board's start of a card that names no factory sends it.
+ *
  * A card's namespace is its factory, `default` for one that names none: a card read, dropped, started, queued or labelled under a
  * namespace it is not in is `Missing`, as one no card has the name of; a card filed under `default` names no factory, under another the
  * namespace's. `?labelSelector=` and its retired spelling `?selector=` are read the same, each given again for another (OR); a `limit`,
@@ -133,7 +137,9 @@ export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
       answered(
         orFailed(async (s) => {
           await cardIn(s, namespace, name);
-          const started = await cardStart(s, name, payload, factoryOf(namespace) ?? s.factory?.name);
+          const factory = factoryOf(namespace);
+          const placed = factory === undefined ? s : { ...s, ...s.placedIn(namespace) };
+          const started = await cardStart(placed, name, payload, factory ?? s.factory?.name);
           if ('status' in started) throw readerRefused(started);
           const { id, card, ignoredRepo } = started;
           return { id, card, ...(ignoredRepo !== undefined ? { ignoredRepo } : {}) };

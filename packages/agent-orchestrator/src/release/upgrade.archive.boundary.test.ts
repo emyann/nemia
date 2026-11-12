@@ -177,4 +177,19 @@ test('an archive install upgraded from its download base: the newest by default,
     assert.ok(message.includes(`${SOURCE}/download/v9.9.9/`), message);
     assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
   });
+
+  await s.test(
+    'REFUSED: a tag that is not v and three dotted numbers, named or read from latest.json, is Invalid before anything is fetched, as install.sh refuses it',
+    async () => {
+      const before = fs.readdirSync(releasesDir(ROOT)).sort();
+      for (const name of ['v1.0.0/../..', 'v1.0.0 ', 'v1.2.3-rc.1']) {
+        assert.equal((await refusalOf({ tag: name })).tag, 'Invalid', name);
+        assert.deepEqual(fs.readdirSync(releasesDir(ROOT)).sort(), before, `${JSON.stringify(name)}: nothing is placed or removed`);
+      }
+      published('v1.3.0 ', { latest: true });
+      assert.equal((await refusalOf({})).tag, 'Invalid', 'latest.json naming a tag with a space');
+      assert.deepEqual(fs.readdirSync(releasesDir(ROOT)).sort(), before);
+      assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
+    },
+  );
 });

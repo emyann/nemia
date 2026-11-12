@@ -15,9 +15,13 @@ export type { Version };
  */
 export const STORE_READABLE_FROM: Version = { major: 1, minor: 2, patch: 0 };
 
-/** A release's version as its tag or `release.json` says it, `v1.2.3` or `1.2.3`, read as three whole numbers; null for anything else. */
+/**
+ * A release's version as its tag or `release.json` says it, `v1.2.3` or `1.2.3`, read as three whole numbers; null for anything else,
+ * a space around it or a pre-release suffix included: a tag names its folder under `releases/`, so it is read exactly, as
+ * `tools/release/install.sh` reads one.
+ */
 export function parseVersion(text: string): Version | null {
-  const parts = /^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})$/.exec(text.trim());
+  const parts = /^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})$/.exec(text);
   if (parts === null) return null;
   const [, major, minor, patch] = parts;
   return { major: Number(major), minor: Number(minor), patch: Number(patch) };

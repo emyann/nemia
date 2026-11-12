@@ -1377,6 +1377,7 @@ test('telling a running step something with `nemia say`, and the try that contin
       note: 'said to 1×',
     });
     const told = await stage.runWith(b.e, sayRun(run.id, 'implement', 'Keep:\n```\n--flag\n```', { caller: PERSON }));
+    assert.ok('said' in told, 'said to the running session, not kept');
     assert.deepEqual([told.taskId, told.try, told.said], [taskId(), 1, saidTo()[1]]);
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'said to 2×');
   });
@@ -1502,11 +1503,8 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   await t.test('by the package, before the engine is asked: a step the run does not have', () =>
     assert.rejects(saying('deploy'), refusedAs('Conflict', `${run.id} has no step "deploy"`, 'implement, review')),
   );
-  await t.test('by the package: a step not filed yet', () =>
-    assert.rejects(
-      stage.main(['say', run.id, 'review', 'Look at the parser first.'], e),
-      refusedAs('Conflict', 'review has not been filed yet', `nemia ls ${run.id}`),
-    ),
+  await t.test('by the package: empty words for a step not filed yet, refused as the engine refuses them, and nothing kept', () =>
+    assert.rejects(stage.main(['say', run.id, 'review', ' \n '], e), refusedAs('Conflict', '`text` is empty', 'Give the words')),
   );
   for (const phase of ['succeeded', 'failed', 'stopped'] as const)
     await t.test(`by the package: a task settled \`${phase}\`, offering the retry with words`, async () => {
@@ -1528,6 +1526,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
     assert.deepEqual(asked, [], 'the engine was never asked');
     assert.deepEqual(b.said, []);
     assert.equal(recordText(run.id), record);
+    assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.said`)), false, 'no word kept for the step not filed');
   });
 });
 

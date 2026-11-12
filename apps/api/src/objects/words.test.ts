@@ -40,7 +40,7 @@ test('REFUSED: a card verb sent a body HttpApi does not decode — not JSON, or 
     ['/api/namespaces/default/cards', '{"body":42}', 'payload.body'],
     ['/api/namespaces/default/cards', '[]', 'payload'],
     ['/api/namespaces/default/cards/kept-card/labels', '{"labels":"team=core"}', 'payload.labels'],
-    ['/api/namespaces/default/cards/kept-card/start', '{}', 'payload.workflow'],
+    ['/api/namespaces/default/cards/kept-card/start', '{"workflow":7}', 'payload.workflow'],
   ] as const) {
     const refused = await refusal(await app.request(route, { method: 'POST', headers: JSON_TYPE, body }));
     assert.equal(refused.status, 400, `${route} ${body}`);

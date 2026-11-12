@@ -34,8 +34,11 @@ export function overHttps(request: HttpServerRequest.HttpServerRequest): boolean
 /** The board's cookie as the browser keeps it, `Secure` where `secure`. */
 const cookieOptions = (secure: boolean) => ({ httpOnly: true, sameSite: 'strict', path: '/', secure }) as const;
 
-/** The response's cookie, set to `token` or, with none, cleared, as the handler's answer is sent. */
-const cookieSent = (token: string | undefined, secure: boolean) =>
+/**
+ * The response's cookie, set to `token` or, with none, cleared, as the handler's answer is sent: what `POST /api/session` sets, and
+ * `POST /api/pair/link` too (pairing/pairing.ts), each over the request `overHttps` reads.
+ */
+export const cookieSent = (token: string | undefined, secure: boolean) =>
   HttpEffect.appendPreResponseHandler((_request, response) =>
     Effect.orDie(
       token === undefined

@@ -14,7 +14,8 @@ import { renderAgent, type AgentDraft } from '../../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../../harness/harness.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
-import { AGENTS_FOLDER, CARRIED_FOLDER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
+import { frontmatterOfValues, frontmatterValues } from '../../frontmatter/frontmatter.ts';
+import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
 import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../template/index.ts';
 import { renderStep } from '../../workflow/index.ts';
 import { baseSpelled } from '../../former/former.ts';
@@ -209,7 +210,10 @@ function agentHarness(specs: ReadonlyMap<string, Spec>, name: string | undefined
   return typeof harness === 'string' ? harness : DEFAULT_HARNESS;
 }
 
-/** The workflow `name`'s step files and carried files, into `out`. */
+/**
+ * The workflow `name`'s step files and carried files, into `out`, and its machine needs (`spec.needs`) as its README's frontmatter
+ * (`readmeWithNeeds`), since `workflow.yaml` is not carried into a factory.
+ */
 function renderWorkflow(
   name: string,
   read: TemplateRead,
@@ -226,11 +230,44 @@ function renderWorkflow(
     const text = stepFile(name, step, harness, read, params, out.refusals);
     if (text !== undefined) out.files.push({ path: `${folder}/${String(step.name)}.md`, text });
   }
+  const needs = (spec as { needs?: unknown } | undefined)?.needs;
+  const declares = Array.isArray(needs) && needs.length > 0;
+  carryWorkflowFiles(folder, read, declares, out);
+  if (declares) out.files.push({ path: `${folder}/README.md`, text: readmeWithNeeds(folder, needs, read) });
+}
+
+/**
+ * The files of the workflow at `folder` a render carries as they are, into `out`: every file that is no .md or .yaml, and its README
+ * unless its needs are written into one (`declares`).
+ */
+function carryWorkflowFiles(folder: string, read: TemplateRead, declares: boolean, out: Rendered): void {
   for (const file of read.folder.files) {
     const rest = file.slice(folder.length + 1);
     if (!file.startsWith(`${folder}/`) || rest === 'workflow.yaml') continue;
-    if (/^readme\.md$/i.test(rest) || !/\.(md|yaml)$/.test(rest)) out.copies.push({ path: file, from: file });
+    const readme = /^readme\.md$/i.test(rest);
+    if (readme ? !declares : !/\.(md|yaml)$/.test(rest)) out.copies.push({ path: file, from: file });
   }
+}
+
+/**
+ * The README of the workflow at `folder` with `needs` (its `spec.needs`, each `${{ parameters.<name> }}` already written with its value)
+ * as its frontmatter (`needs:`), which `workflowNeeds` reads back: the template's own README below it, its own frontmatter's other keys
+ * kept and its `needs` replaced, or only the frontmatter where the template has none.
+ */
+function readmeWithNeeds(folder: string, needs: readonly unknown[], read: TemplateRead): string {
+  const own = read.folder.files.find((file) => file.startsWith(`${folder}/`) && /^readme\.md$/i.test(file.slice(folder.length + 1)));
+  const text =
+    own === undefined
+      ? ''
+      : read
+          .text(own)
+          .replace(/^\uFEFF/, '')
+          .replace(/\r\n/g, '\n');
+  const block = FRONTMATTER.exec(text);
+  const kept: unknown = block?.[1] === undefined ? {} : frontmatterValues(block[1]);
+  const keys = isMap(kept) ? kept : {};
+  const body = block ? text.slice(block[0].length) : text;
+  return `---\n${frontmatterOfValues({ ...keys, needs })}---\n${body}`;
 }
 
 /** The agent `name` as its file, and its output schema beside it, into `out`. */

@@ -231,6 +231,7 @@ export {
   streamsOf,
 } from './endpoint-keys.ts';
 export { jsonBodied } from './write-body.ts';
+export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
@@ -268,6 +269,9 @@ export {
   WorkflowFile,
   WorkflowList,
   WorkflowSpec,
+  Need,
+  NeedAsk,
+  NeedFix,
   WorkflowStatus,
   WorkflowStep,
   WorkflowStepStatus,
@@ -516,6 +520,34 @@ export {
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
 export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
+export {
+  NEED_STATES,
+  type NeedState,
+  ADDRESS_KINDS,
+  type AddressKind,
+  READINESS_AREAS,
+  type ReadinessArea,
+  FIX_PHASES,
+  type FixPhase,
+  FIX_STREAM_EVENTS,
+  type FixStreamEventName,
+  TICKET_STATES,
+  type TicketState,
+} from './words.ts';
+export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
+export {
+  LinkClaimed,
+  LinkMinted,
+  LinkRequest,
+  Pairing,
+  PairingAsked,
+  PairingClaimed,
+  PairingList,
+  PairingRequest,
+  PairGroup,
+  PairingsGroup,
+  TicketClaim,
+} from './pairing.ts';
 export {
   ANSWER_MOST,
   BODY_PAGE,

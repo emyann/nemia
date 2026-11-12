@@ -38,6 +38,8 @@ import { LEVEL } from '../nemia/level.verb.ts';
 import { MEMORY } from '../nemia/memory.verb.ts';
 import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { TOKEN_COMMANDS } from '../token/commands.verb.ts';
+import { PAIRING_COMMANDS } from '../pairing/commands.verb.ts';
+import { NEEDS_COMMANDS } from '../needs/commands.verb.ts';
 import { CLAUDE_TOKEN_COMMANDS } from '../sign-in/sign-in.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
@@ -93,7 +95,9 @@ export const COMMANDS: readonly Command[] = [
   POLICY_REACH,
   ...CHAT_SPEAKER_ENTRIES,
   ...SERVICE_COMMANDS,
+  ...NEEDS_COMMANDS,
   ...TOKEN_COMMANDS,
+  ...PAIRING_COMMANDS,
   ...CLAUDE_TOKEN_COMMANDS,
   ...RELEASES,
   ...VERSIONS,

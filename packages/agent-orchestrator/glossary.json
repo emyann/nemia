@@ -1021,6 +1021,41 @@
       "term": "Claude token file",
       "meaning": "the person's own Claude subscription token, the one `claude setup-token` prints, kept in `<WF_ROOT>/claude-token` at mode 0600 by `nemia claude-token set` and never printed, logged or served (`packages/agent-orchestrator/src/sign-in/`). The daemon loads it at its start into `CLAUDE_CODE_OAUTH_TOKEN` where that is unset (`loadClaudeToken`), and refuses a file another user can read, naming `chmod 600`.",
       "type": "ClaudeTokenState"
+    },
+    {
+      "term": "Need",
+      "meaning": "a machine need a workflow declares in its README's frontmatter (`spec.needs` of a template's workflow.yaml, rendered there) or a builtin place declares (`PlaceDeclared.needs`, the git place's `git-identity`): a shell check whose exit 0 says it is in place, the fixes that put it there, and `fills`, a place need whose fixes its own go before (`packages/agent-orchestrator/src/needs/`).",
+      "type": "NeedState"
+    },
+    {
+      "term": "Waiting on needs",
+      "meaning": "a run that has filed nothing while a need of its workflow or place reads missing: it files nothing, takes no slot and is listed `waiting on <need>: <fix>` beside its phase, and the pass after the need reads met files its first step (`needsHolding`, `Assessment.waitingOnNeeds`). A check that does not answer reads unknown and holds nothing; a run that has filed a step is never held."
+    },
+    {
+      "term": "Fix",
+      "meaning": "a need's fix started on this server, filed on the runtime as a `command` task so its output is kept and followed (`startFix`, `followFix`); a workflow's fix only where its factory's places are trusted (`fixRefusal`, `nemia factory trust <factory>`), a builtin place's for any person; its answers reach it as `NEMIA_ANSWER_<NAME>`.",
+      "type": "FixFollowed"
+    },
+    {
+      "term": "Readiness",
+      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there: the harness's sign-in, the service and its linger, the bind, the machine, the place's and each workflow's needs, a factory, a newer release (`readinessOf`, `nemia readiness`, `GET /api/readiness`)."
+    },
+    {
+      "term": "Tools folder",
+      "meaning": "`<WF_ROOT>/tools`, where a fix installs a tool without root (`NEMIA_TOOLS`); its bin folder is put first on the daemon's PATH as it starts (`toolsDir`, `toolsOnPath`), so every session, check and fix finds what was installed there."
+    },
+    {
+      "term": "Pairing",
+      "meaning": "a single-use ticket a client asks for with no token (`nemia pair <url>`, `POST /api/pair`): a short code the person approves at the server (`nemia pairings approve <code>`, or the board's Setup page), then claimed with its secret, which mints a person token named after the client at that moment; the store keeps only digests, and it lapses unclaimed after ten minutes (`ticketState`, `packages/agent-orchestrator/src/pairing/`)."
+    },
+    {
+      "term": "First-visit link",
+      "meaning": "a single-use ticket the person makes at the server (`nemia board link`), needing no approval: the browser that opens it within ten minutes is signed in to the board by a person token minted then, set as its cookie and never shown (`linkMinted`, `linkClaimed`)."
+    },
+    {
+      "term": "Address kind",
+      "meaning": "what a bind's address is: loopback, wildcard, private (RFC 1918), shared (100.64.0.0/10, a carrier-grade or Tailscale network), link-local, unique-local or public (`addressKind`, `kindOfBind`, `packages/agent-orchestrator/src/service/address.ts`); a public or wildcard bind is listened on only where the person acknowledged it (`bindExposure`, `NEMIA_BIND_PUBLIC=1`, `nemia service install --public`).",
+      "type": "AddressKind"
     }
   ]
 }

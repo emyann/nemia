@@ -5,6 +5,7 @@
  * (`exportTree`), read through the loader's own readers and checked before the door writes it. What a template is read from and
  * written to is the door's: nothing here writes the disk.
  */
+import { SHIPPED_PLACE_NEEDS } from '../place/place.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { LineCounter, parse, parseAllDocuments, stringify, type Document } from 'yaml';
@@ -121,7 +122,7 @@ export function checkedTree(tree: TemplateTree, packageSkills: readonly string[]
     const found = byPath.get(file);
     return found === undefined ? '' : Buffer.from(found.bytes).toString('utf8');
   };
-  for (const refusal of checkTemplate(folder, [...packageSkills], text, (file) => sharedLinesOf(text(file)))) {
+  for (const refusal of checkTemplate(folder, [...packageSkills], text, (file) => sharedLinesOf(text(file)), SHIPPED_PLACE_NEEDS)) {
     const doc = parsed.get(refusal.file);
     const at = doc ? lineOf(doc, refusal.at) : { line: refusal.line, col: refusal.col };
     problems.push({ file: refusal.file, ...at, message: refusal.message });

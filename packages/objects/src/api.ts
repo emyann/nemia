@@ -101,6 +101,8 @@ import { Event, EventList } from './event.ts';
 import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
 import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
+import { ReadinessGroup } from './readiness.ts';
+import { PairGroup, PairingsGroup } from './pairing.ts';
 
 export {
   BadRequest,
@@ -817,7 +819,10 @@ export const Api = HttpApi.make('nemia')
   .add(DelegationsGroup)
   .add(DiscoveryGroup)
   .add(ServerGroup)
-  .add(NemiaGroup);
+  .add(NemiaGroup)
+  .add(ReadinessGroup)
+  .add(PairGroup)
+  .add(PairingsGroup);
 
 /** The groups `Api` holds. */
 type GroupsOf<A> = A extends HttpApi.HttpApi<string, infer G> ? G : never;

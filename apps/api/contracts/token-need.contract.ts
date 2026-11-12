@@ -9,7 +9,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { TokenNeed } from 'agent-orchestrator';
-import { MCP_PATH } from '../src/caller/caller.ts';
+import { MCP_PATH, PAIR_PATH } from '../src/caller/caller.ts';
 
 /** Whether `path` is `root` or a path under it. */
 const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
@@ -17,8 +17,14 @@ const under = (path: string, root: string): boolean => path === root || path.sta
 /** Whether `path` is the MCP port's. */
 const onPort = (path: string): boolean => under(path, MCP_PATH);
 
+/**
+ * Whether `path` is a pairing route's (`PAIR_PATH`, src/caller/caller.ts): asking for a pairing, claiming it with the secret it was
+ * answered, and opening a first-visit link. Each judges its own secret, and none answers with the store's data.
+ */
+const pairing = (path: string): boolean => under(path, PAIR_PATH);
+
 /** Whether `path` is one the api answers on with the store's data or its route table. */
-const answered = (path: string): boolean => under(path, '/api') || under(path, '/openapi');
+const answered = (path: string): boolean => !pairing(path) && (under(path, '/api') || under(path, '/openapi'));
 
 const needOfSpec = spec<(path: string, exposed: boolean) => TokenNeed>({
   ensures: {
@@ -29,6 +35,10 @@ const needOfSpec = spec<(path: string, exposed: boolean) => TokenNeed>({
     anExposedStoreNeedsATokenForItsData: {
       description: 'On a store marked exposed, a route the api answers with the store’s data or its route table needs a token',
       condition: ({ input: [path, exposed], output }) => !exposed || !answered(path) || output === 'token',
+    },
+    aPairingRouteNeedsNone: {
+      description: 'A pairing route — asking, claiming, a first-visit link — needs no token, exposed or not: it judges its own secret',
+      condition: ({ input: [path], output }) => !pairing(path) || output === 'none',
     },
     aBoardPageNeedsNone: {
       description: 'A page of the board, any path neither the port nor the api’s, needs no token, exposed or not',

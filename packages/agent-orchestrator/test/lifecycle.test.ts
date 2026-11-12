@@ -305,6 +305,52 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
   );
 });
 
+test("a run on a clone works from its remote's base: the checkout is brought up to it before each step, and left when it cannot be", async (t) => {
+  const s = story(t);
+  const origin = aRepo();
+  const clone = path.join(ROOT, `clone-${path.basename(origin)}`);
+  const cloned = stage.place().place.askNow('clone', { url: `file://${origin}`, into: clone });
+  assert.ok('answer' in cloned, JSON.stringify(cloned));
+  let id = '';
+  await s.test('someone else lands on the remote before the first step: its pass fast-forwards the checkout, and says so', async () => {
+    const run = await stage.runPlaced(startRun({ brief: 'follow', repo: clone, workflowDir: folderOf({ a: [], b: ['after: a'] }) }));
+    id = run.id;
+    const from = world().head(clone);
+    const landed = world().branch(origin, 'main', { 'theirs.txt': 'landed elsewhere\n' });
+    const pass = await tick(id);
+    assert.deepEqual(pass.filed, ['a']);
+    assert.equal(world().head(clone), landed, 'the checkout is where its remote is');
+    assert.equal(fs.readFileSync(path.join(clone, 'theirs.txt'), 'utf8'), 'landed elsewhere\n');
+    namesFor(
+      'fast-forwarded',
+      pass.notes.find((n) => n.startsWith('a: base:')),
+      clone,
+      from.slice(0, 12),
+      landed.slice(0, 12),
+      'origin/main',
+    );
+  });
+  await s.test(
+    'a checkout with a change not committed is left as it is when the remote moves again, and the step is cut all the same',
+    async () => {
+      const at = world().head(clone);
+      world().branch(origin, 'main', { 'theirs.txt': 'landed again\n' });
+      fs.writeFileSync(path.join(clone, 'mine.txt'), "a person's\n");
+      stage.board().settle(`${id}-a`, 'succeeded', SIGNED);
+      const pass = await tick(id);
+      assert.deepEqual(pass.filed, ['b']);
+      assert.equal(world().head(clone), at, 'nothing moved');
+      assert.equal(fs.readFileSync(path.join(clone, 'mine.txt'), 'utf8'), "a person's\n", 'the change is kept');
+      namesFor(
+        'left',
+        pass.notes.find((n) => n.startsWith('b: base:')),
+        clone,
+        'origin/main',
+      );
+    },
+  );
+});
+
 test('a failed step, then a cancelled run', async (t) => {
   const s = story(t);
   let failed = '';

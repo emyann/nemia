@@ -35,7 +35,11 @@ export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from '.
 export type { SessionHarness, SessionRelease } from './release/index.ts';
 export { currentRelease } from './release/release.store.ts';
 export { latestRelease, runningRelease } from './release/version.verb.ts';
-export { claudeTokenFile, loadClaudeToken, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
+export { claudeTokenFile, claudeTokenStatus, loadClaudeToken, tokenWarningLine, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
+export { readinessOf, liveFacts, type ReadinessFacts, type CommandRead } from './needs/readiness.verb.ts';
+export { startFix, fixOf, followFix, type FixFollowed } from './needs/fix.verb.ts';
+export { NeedsMemory, needsMemoryLayer, type NeedsMemo } from './needs/needs.verb.ts';
+export { toolsDir } from './config/root.store.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export {
   type Env,
@@ -171,7 +175,16 @@ export type {
 } from './run.ts';
 export type { AtWork, RunTokens, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode, StepRaise } from './retry/index.ts';
-export { agentUsers, formerKeyLines, workflowDescription, workflowFolder, workflowReadme, workflowsIn } from './folder/folder.store.ts';
+export {
+  agentUsers,
+  formerKeyLines,
+  workflowDescription,
+  workflowFolder,
+  workflowNeeds,
+  workflowReadme,
+  workflowReadmeWith,
+  workflowsIn,
+} from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export { BUILTIN_SKILLS, type Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
@@ -555,6 +568,20 @@ export { RunModel, RunObject };
 
 export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
 export type { CallerOf, PersonTokenFiled, TokenNeed } from './token/caller.verb.ts';
+export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
+export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
+export { LINK_TTL_MS, PAIRING_TTL_MS, ticketState, type Ticket } from './pairing/ticket.ts';
+export {
+  addressKind,
+  addressParsed,
+  BIND_PUBLIC_VARIABLE,
+  bindExposure,
+  kindOfBind,
+  machineAddresses,
+  type Exposure,
+  type MachineAddress,
+  type Parsed,
+} from './service/index.ts';
 export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export type { ProposalPlace } from './propose/current.verb.ts';

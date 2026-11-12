@@ -1,6 +1,6 @@
 /**
  * The api speaks MCP through the SDK's v2 packages alone (`@modelcontextprotocol/server` for the port, `@modelcontextprotocol/client` for
- * a factory's servers): its `package.json` lists no `@modelcontextprotocol/sdk`, the v1 line that speaks no 2026-07-28, and no file of
+ * a factory's servers): its `package.json` lists no `@modelcontextprotocol/sdk`, the v1 line that speaks no modern era, and no file of
  * the api imports it. The v1 package stays installed for others (it resolves through the workspace's `node_modules`), so a stray import
  * would typecheck: this refuses it. The scanner is shown to refuse a planted import, once.
  */

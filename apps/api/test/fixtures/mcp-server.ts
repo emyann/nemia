@@ -11,8 +11,8 @@
  * capability and has no `tools/list` to answer. `HKB_TEST_MODE=env` lists one tool, whose description is what the server was started with,
  * so a test reads how the api started it.
  *
- * A server that answers is served by the SDK's `serveStdio` in both eras, 2026-07-28 (`server/discover`) and 2025-11-25 (`initialize`);
- * `HKB_TEST_ERA=modern` refuses the 2025 opening, a server on 2026-07-28 alone. One that never learnt 2026-07-28 is
+ * A server that answers is served by the SDK's `serveStdio` in both eras, the modern (`server/discover`) and the legacy (`initialize`);
+ * `HKB_TEST_ERA=modern` refuses the legacy opening, a server of the modern era alone. One that never learnt the modern era is
  * `legacy-mcp-server.ts`, which imports no SDK.
  */
 import fs from 'node:fs';
@@ -26,7 +26,7 @@ if (process.env.HKB_TEST_MODE === 'crash') {
   process.exit(3);
 }
 
-/** The server `make` builds, served on stdio in both eras, or on 2026-07-28 alone where `HKB_TEST_ERA=modern`. */
+/** The server `make` builds, served on stdio in both eras, or in the modern era alone where `HKB_TEST_ERA=modern`. */
 function served(make: () => McpServer): void {
   serveStdio(make, { legacy: process.env.HKB_TEST_ERA === 'modern' ? 'reject' : 'serve' });
 }

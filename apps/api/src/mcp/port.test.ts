@@ -71,12 +71,12 @@ const fetchInto =
   async (url: string | URL, init?: RequestInit): Promise<Response> =>
     on().request(url, init);
 
-/** The two eras a host speaks to the port in: 2025-11-25 by `initialize`, and 2026-07-28 by `server/discover`. */
+/** The two eras a host speaks to the port in: the legacy by `initialize`, and the modern by `server/discover`. */
 const ERAS = ['legacy', 'modern'] as const;
 type Era = (typeof ERAS)[number];
 
 /**
- * The SDK's client connected to `/mcp` of `on` in `era` (the client's default for `legacy`, pinned to 2026-07-28 for `modern`),
+ * The SDK's client connected to `/mcp` of `on` in `era` (the client's default for `legacy`, pinned to the modern revision for `modern`),
  * presenting `token`, through `fetch` where given (a recording one), and checked to have landed in that era.
  */
 async function connected(
@@ -254,9 +254,12 @@ for (const era of ERAS)
     const port = new Hono().all('/mcp', mcpPort(app, { progressEveryMs: 20 }));
     const client = await connected(() => port, era);
     const told: number[] = [];
-    const result = await client.callTool({ name: 'wait', arguments: { for: '300ms' } }, {
-      onprogress: (progress) => told.push(progress.progress),
-    });
+    const result = await client.callTool(
+      { name: 'wait', arguments: { for: '300ms' } },
+      {
+        onprogress: (progress) => told.push(progress.progress),
+      },
+    );
     assert.notEqual(result.isError, true, textOf(result));
     assert.equal((result.structuredContent as { ended?: string } | undefined)?.ended, 'bound');
     assert.ok(told.length >= 1, `progress told ${told.length} times`);

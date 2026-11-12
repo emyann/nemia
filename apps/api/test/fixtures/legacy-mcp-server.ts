@@ -1,7 +1,7 @@
 /**
- * A stdio MCP server that speaks 2025-11-25 alone and imports no SDK, for the capabilities tests: a server written before 2026-07-28,
- * which never learnt `server/discover`. It reads a JSON-RPC message a line, answers `initialize` with `protocolVersion: '2025-11-25'`
- * and a `tools` capability, `tools/list` with one tool, and any other request with -32601; a notification it ignores.
+ * A stdio MCP server that speaks the legacy era alone and imports no SDK, for the capabilities tests: a server written before the modern
+ * era, which never learnt `server/discover`. It reads a JSON-RPC message a line, answers `initialize` with the legacy `protocolVersion` and
+ * a `tools` capability, `tools/list` with one tool, and any other request with -32601; a notification it ignores.
  *
  * `HKB_TEST_STARTS`, when set, names a file it adds its pid to each time it starts, as `mcp-server.ts` does.
  */

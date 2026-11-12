@@ -125,8 +125,8 @@ const settled = () => {
 };
 
 /**
- * The SDK's client connected to `/mcp` of this file's app, presenting the person's token: by `initialize` (2025-11-25, the client's
- * default), or pinned to 2026-07-28 where `modern`.
+ * The SDK's client connected to `/mcp` of this file's app, presenting the person's token: by `initialize` (the legacy era, the client's
+ * default), or pinned to the modern revision where `modern`.
  */
 async function connected(modern = false): Promise<Client> {
   const on = app();

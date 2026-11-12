@@ -26,7 +26,7 @@ assert.equal(
 );
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'mcp-server.ts');
-/** A server that speaks 2025-11-25 alone, imported from no SDK. */
+/** A server that speaks the legacy era alone, imported from no SDK. */
 const LEGACY_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'legacy-mcp-server.ts');
 
 /** A checkout with only these files in it. An object is written as JSON. */

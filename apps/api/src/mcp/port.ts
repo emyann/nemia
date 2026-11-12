@@ -1,12 +1,12 @@
 /**
- * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable HTTP, served
- * by the SDK's `createMcpHandler` in both eras — 2026-07-28 (`server/discover`, each request carrying its version in `_meta`, every
- * result its `resultType`, the tool list its `ttlMs` and `cacheScope`) and 2025-11-25 (`initialize`, each request answered on its own) —
- * a fresh low-level `Server` for each request (`portServer`), serving the tools generated from the command table (`portTools`,
- * tools.ts) in its order. A call of a tool is a request to the endpoint its verb links, presenting the caller's own `Authorization`,
- * handed to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and nothing of tokens or refusals
- * is said again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else is the tool's error, in the
- * api's own words, which say what to do next.
+ * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable HTTP, served by
+ * the SDK's `createMcpHandler` in both eras of the spec — the modern (`server/discover`, each request carrying its version in `_meta`,
+ * every result its `resultType`, the tool list its `ttlMs` and `cacheScope`) and the legacy (`initialize`, each request answered on its
+ * own) — a fresh low-level `Server` for each request (`portServer`), serving the tools generated from the command table (`portTools`,
+ * tools.ts) in its order. A call of a tool is a request to the endpoint its verb links, presenting the caller's own `Authorization`, handed
+ * to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and nothing of tokens or refusals is said
+ * again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else is the tool's error, in the api's own
+ * words, which say what to do next.
  *
  * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults
  * its link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
@@ -19,7 +19,7 @@
  */
 import { Effect, Schedule } from 'effect';
 import type { Context } from 'hono';
-import { type CallToolResult, createMcpHandler, Server } from '@modelcontextprotocol/server';
+import { type CallToolResult, createMcpHandler, Server, type Tool } from '@modelcontextprotocol/server';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
@@ -30,8 +30,8 @@ import { type PortTool, portTools } from './tools.ts';
 export const PROGRESS_EVERY_MS = 30_000;
 
 /**
- * How long a 2026-07-28 host may answer the port's `tools/list` from its cache (`ttlMs`): five minutes, the spec's own example, so a
- * daemon upgraded under a connected host shows its tools within that. A 2025-11-25 host is given none: that era has no such field.
+ * How long a host of the modern era may answer the port's `tools/list` from its cache (`ttlMs`): five minutes, the spec's own example, so a
+ * daemon upgraded under a connected host shows its tools within that. A legacy host is given none: its era has no such field.
  */
 export const PORT_LIST_TTL_MS = 300_000;
 
@@ -186,18 +186,21 @@ export async function called(
   }
 }
 
-/** A tool as `tools/list` says it: its name, description, input and hints, and nothing of how the port calls it. */
-const listed = (tool: PortTool) => ({
+/**
+ * A tool as `tools/list` says it: its name, description, input and hints, and nothing of how the port calls it. Its input is JSON by
+ * construction (`Schema.toJsonSchemaDocument`, tools.ts), which the SDK's type says as JSON values where ours says `unknown`.
+ */
+const listed = (tool: PortTool): Tool => ({
   name: tool.name,
   description: tool.description,
-  inputSchema: tool.inputSchema,
+  inputSchema: tool.inputSchema as Tool['inputSchema'],
   annotations: tool.annotations,
 });
 
 /**
  * The server that answers one request of `/mcp`, in whichever era it speaks (the SDK's `createMcpHandler` asks for one per request):
  * it says what Nemia is (`PORT_INSTRUCTIONS`) on `initialize` and on `server/discover`, lists `tools` in the order given, each list
- * cacheable by its caller alone for `PORT_LIST_TTL_MS` on 2026-07-28, and answers a call through `app` (`called`), presenting the
+ * cacheable by its caller alone for `PORT_LIST_TTL_MS` in the modern era, and answers a call through `app` (`called`), presenting the
  * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
  * go beside these.
  */
@@ -241,8 +244,8 @@ export function portServer(tools: readonly PortTool[], appOf: () => Fetching, pr
 
 /**
  * The handler of `/mcp`, calling the app `appOf` gives (the app it is mounted on: `mcpPort(() => app)` in app.ts): the SDK's serving
- * entry, made once, a fresh `portServer` for each request. A 2026-07-28 request (its version in `_meta`, `server/discover` among them)
- * is answered as JSON, or as a stream where its call is told progress; a 2025-11-25 one (`initialize`, then each request on its own)
+ * entry, made once, a fresh `portServer` for each request. A modern request (its version in `_meta`, `server/discover` among them)
+ * is answered as JSON, or as a stream where its call is told progress; a legacy one (`initialize`, then each request on its own)
  * by the SDK's stateless leg, which streams; a GET or a DELETE is a 405, as the port keeps no stream or session of its own. The tools
  * are generated once, as the handler is made, in the command table's order.
  */

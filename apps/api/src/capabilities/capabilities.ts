@@ -412,18 +412,18 @@ const endOf = (stream: { once(event: string, listener: () => void): unknown } | 
 type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 
 /**
- * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. The era it speaks is the SDK's to
- * find (`versionNegotiation: 'auto'`, as a step's session asks it): `server/discover` is sent to a short-lived sibling started first,
- * which answers 2026-07-28, refuses or says nothing within a third of `deadlineMs`, and the server is then started once more and asked in
- * that era, `initialize` for 2025-11-25 — so each ask starts a server twice, the sibling's stderr left unread. Succeeds with the tools, or with why
- * not and what it printed, quoting the entry as `.mcp.json` writes it; never fails. What it printed is read to its end: a server that
- * failed is stopped (`client.close()`) and its stderr waited on until it ends (`endOf`, at most `STDERR_END_MS`), so a line it printed
- * after the client saw it fail is quoted too; a server that never started has no stderr to wait on. The client and its server
- * are taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an
- * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The transport is
- * closed too, as the client alone does not reach it before it connects: a close during the era probe is what reaps the probe's sibling,
- * which the listing settles once it has (waited on at most `STDERR_END_MS`). The listing is given
- * no abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
+ * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. The era it speaks is the SDK's to find
+ * (`versionNegotiation: 'auto'`, as a step's session asks it): `server/discover` is sent to a short-lived sibling started first, which
+ * answers the modern era, refuses or says nothing within a third of `deadlineMs`, and the server is then started once more and asked in
+ * that era, `initialize` for the legacy — so each ask starts a server twice, the sibling's stderr left unread. Succeeds with the tools, or
+ * with why not and what it printed, quoting the entry as `.mcp.json` writes it; never fails. What it printed is read to its end: a server
+ * that failed is stopped (`client.close()`) and its stderr waited on until it ends (`endOf`, at most `STDERR_END_MS`), so a line it printed
+ * after the client saw it fail is quoted too; a server that never started has no stderr to wait on. The client and its server are taken in
+ * the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an answer,
+ * `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The transport is closed too,
+ * as the client alone does not reach it before it connects: a close during the era probe is what reaps the probe's sibling, which the
+ * listing settles once it has (waited on at most `STDERR_END_MS`). The listing is given no abort signal: the client closes itself on an
+ * aborted `connect` and does not wait for the server, which a close after it then misses.
  */
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {

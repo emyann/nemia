@@ -16,6 +16,7 @@ import { firstPiece } from '../piece/piece.ts';
 import { dollars } from '../money/money.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
 import type { NamedRepo, WorkflowRepo, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
+import type { ScheduleRepoRefusal, ScheduleRepoRefusalOf } from '../../contracts/schedule-repo.contract.ts';
 import type {
   ConditionStatus,
   DEFAULT_NAMESPACE as OBJECTS_DEFAULT,
@@ -52,8 +53,9 @@ export type InstructionAt = { path: string } | { store: true };
 
 /**
  * A schedule of a workflow a factory has attached: when the daemon starts a run of it, a cron expression of five or six fields (`cron`),
- * read in the IANA zone `tz`, the machine's when none; what the run is asked (`brief`); the repository it works on (`repo`), the factory's
- * one when none; and when the schedule was written (`since`), before which no fire counts.
+ * read in the IANA zone `tz`, the machine's when none; what the run is asked (`brief`); and when the schedule was written (`since`),
+ * before which no fire counts. Its run works on the repository the factory's wiring names for the workflow (`wiredRepo`). `repo` is
+ * retired: an old schedule's is read and ignored, and kept where a write sends it back as it is (`scheduleRepoRefusal`).
  */
 export type Schedule = { cron: string; brief: string; repo?: string; tz?: string; since: string };
 
@@ -398,10 +400,9 @@ export function hireRefusalOf(
 }
 
 /**
- * A schedule's repository, kept for schedules alone (a card and a brief are placed by `workflowRepo`): the repository a run in `factory`
- * works on: `named` when a person named one, else the factory's repository when it has only one, else
- * `fallback` — where `nemia start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
- * `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
+ * The repository a run in `factory` works on where no wiring places it (a card, a brief and a schedule are placed by `workflowRepo`):
+ * `named` when a person named one, else the factory's repository when it has only one, else `fallback` — where `nemia start` is typed.
+ * With no factory — the default — `named`, else `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
  */
 export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: string | undefined, fallback: string): string {
   if (named !== undefined) return named;
@@ -479,6 +480,35 @@ export function wiredRepo(
 ): { repo: string } | { refused: WorkflowRepoRefusal; message: string } {
   const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
   return 'repo' in of ? of : { refused: of.refused, message: workflowRepoRefusal(factory, workflow, of.refused) };
+}
+
+/** Why a schedule's write is refused for its repository, as `contracts/schedule-repo.contract.ts` words it. */
+export type { ScheduleRepoAsk, ScheduleRepoRefusal } from '../../contracts/schedule-repo.contract.ts';
+
+/**
+ * Whether a schedule may be written for what it says of its runs' repository, and why not: a `repo` it had none of, or another than
+ * the one it has, is retired (`repo`), since the factory's wiring places its runs (`wiredRepo`); and a workflow the wiring places on
+ * none of the factory's repositories is refused (`unwired`). The retired `repo` is said first. An old schedule's `repo` sent back as it
+ * is, or left out, is let through.
+ */
+export const scheduleRepoRefusal: ScheduleRepoRefusalOf = (ask) => {
+  if (ask.repoSent !== undefined && ask.repoSent !== ask.repoNow) return 'repo';
+  return ask.wired ? null : 'unwired';
+};
+
+/**
+ * Why `factory` refuses to schedule `workflow` for its repository (`refused`, `scheduleRepoRefusal`), naming the `nemia factory attach …
+ * --repo` that places its runs and its repositories' folder names: a `repo` set, which is retired; or a workflow the wiring places on
+ * none, in `workflowRepoRefusal`'s words for why (`wiring`, `wiredRepo`'s). Then that nothing was scheduled.
+ */
+export function scheduleRepoRefusalWords(
+  factory: Pick<Factory, 'name' | 'repos'>,
+  workflow: string,
+  refused: ScheduleRepoRefusal,
+  wiring: WorkflowRepoRefusal = 'unwired',
+): string {
+  if (refused === 'unwired') return workflowRepoRefusal(factory, workflow, wiring, 'Nothing was scheduled.');
+  return `A schedule names no repository: its runs work on the one the factory ${factory.name}'s wiring names for ${workflow}, else its only one. Leave --repo out, and place its runs with nemia factory attach ${factory.name} ${workflow} --repo <name>, one of ${repoNames(factory)}. Nothing was scheduled.`;
 }
 
 /**

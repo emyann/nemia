@@ -296,7 +296,7 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
 
   await s.test("a due schedule starts the tree's workflow, as a person's start does, never the repository's", async (t) => {
     await printedBy(t, 'factory', 'schedule', 'trip', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views');
-    const started = await stage.runWith(stage.board().e, startDue(repo, [], Date.parse('2100-01-01T00:00:00Z')));
+    const started = await stage.runWith(stage.board().e, startDue([], Date.parse('2100-01-01T00:00:00Z')));
     assert.ok(started && 'run' in started, `the due schedule started a run: ${JSON.stringify(started)}`);
     const run = runRecord(ROOT, started.run);
     assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));

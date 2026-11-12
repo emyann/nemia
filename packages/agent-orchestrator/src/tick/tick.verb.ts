@@ -304,7 +304,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
       : undefined;
   const scheduled =
     !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
-      ? yield* withinEffect('act', startDue(repo, runs))
+      ? yield* withinEffect('act', startDue(runs))
       : undefined;
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });

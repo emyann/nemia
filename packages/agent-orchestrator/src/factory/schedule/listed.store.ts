@@ -84,7 +84,10 @@ function refusedOf(r: Read): string | null {
   return r.kept?.refused && Date.parse(r.kept.due) === r.fires.latest ? (r.kept.why ?? null) : null;
 }
 
-/** Every factory's schedules as `nemia ls` and the api list them (`ScheduleListed`), at `now`. */
+/**
+ * Every factory's schedules as `nemia ls` and the api list them (`ScheduleListed`), at `now`. An old schedule's retired `repo` is listed
+ * as it reads, so a write that sends it back keeps it, and is ignored: its runs work on the factory's wiring's repository.
+ */
 export function schedulesListed(home: string, runs: readonly ScheduleRun[], now: number = Date.now()): ScheduleListed[] {
   return schedulesRead(home, runs, now).map((r) => ({
     factory: r.factory.name,

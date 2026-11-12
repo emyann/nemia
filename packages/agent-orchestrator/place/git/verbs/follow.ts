@@ -13,13 +13,43 @@ import type { PlaceRequests } from '../../../src/place/place.ts';
 /** Git asks no one at a terminal for a credential: one the machine does not hold fails the fetch at once. */
 const NO_PROMPT = { GIT_TERMINAL_PROMPT: '0' };
 
-/** The upstream of `branch` in `repo`: the remote it is read from (`.` for a branch of this repository) and the ref fetched there. */
-function* upstreamOf(repo: string, branch: string): Asking<{ remote: string; ref: string; name: string } | undefined> {
+/** A branch's upstream: the remote it is read from (`.` for a branch of this repository), the ref fetched there, and git's name for it. */
+type Upstream = { readonly remote: string; readonly ref: string; readonly name: string };
+
+/** The upstream of `branch` in `repo`, undefined where it follows none. */
+function* upstreamOf(repo: string, branch: string): Asking<Upstream | undefined> {
   const remote = yield* gitSays(repo, ['config', '--get', `branch.${branch}.remote`]);
   const ref = yield* gitSays(repo, ['config', '--get', `branch.${branch}.merge`]);
   const name = yield* gitSays(repo, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
   if (!remote || !ref) return undefined;
   return { remote, ref, name: name || `${remote}/${ref.replace(/^refs\/heads\//, '')}` };
+}
+
+/** What fetching `upstream`'s branch into `repo` failed with, in git's words and what to do; undefined once it is fetched. */
+function* unfetched(repo: string, upstream: Upstream): Asking<string | undefined> {
+  if (upstream.remote === '.') return undefined;
+  try {
+    yield* printed({
+      cmd: 'git',
+      cwd: repo,
+      args: ['fetch', '--quiet', '--no-tags', '--no-write-fetch-head', upstream.remote, upstream.ref],
+      env: NO_PROMPT,
+    });
+    return undefined;
+  } catch (err) {
+    return `${upstream.remote} could not be read, so ${repo} was not brought up to ${upstream.name}: ${failedWords(err)} — check that git can fetch it there (git -C ${repo} fetch ${upstream.remote})`;
+  }
+}
+
+/** Why `repo`, on `branch` and behind its upstream, is not to be fast-forwarded, with what to do; undefined when it is. */
+function* heldBack(repo: string, branch: string, upstream: string, own: number): Asking<string | undefined> {
+  if (own > 0)
+    return `and holds ${own} commit(s) of its own, so it is not fast-forwarded: push them, or move them to a branch of their own and put ${branch} back on ${upstream}`;
+  if ((yield* gitSays(repo, ['rev-parse', '--quiet', '--verify', 'MERGE_HEAD'])) !== undefined)
+    return `with a merge in progress, so it is left as it is: commit the merge or abort it (git -C ${repo} merge --abort)`;
+  if (yield* git(repo, ['status', '--porcelain', '--untracked-files=no']))
+    return `with changes not committed, so it is left as it is: commit or stash them there, then ${branch} follows before the next step`;
+  return undefined;
 }
 
 /** The verb's body. */
@@ -38,44 +68,23 @@ export function* follow({ repo }: PlaceRequests['follow']): Asking<Reply<'follow
   const upstream = yield* upstreamOf(repo, branch);
   if (!upstream) return { state: 'no-upstream' };
   const { name } = upstream;
-  if (upstream.remote !== '.') {
-    try {
-      yield* printed({
-        cmd: 'git',
-        cwd: repo,
-        args: ['fetch', '--quiet', '--no-tags', '--no-write-fetch-head', upstream.remote, upstream.ref],
-        env: NO_PROMPT,
-      });
-    } catch (err) {
-      return {
-        state: 'unfetched',
-        upstream: name,
-        message: `${upstream.remote} could not be read, so ${repo} was not brought up to ${name}: ${failedWords(err)} — check that git can fetch it there (git -C ${repo} fetch ${upstream.remote})`,
-      };
-    }
-  }
-  const counts = (yield* git(repo, ['rev-list', '--left-right', '--count', `HEAD...${name}`])).split(/\s+/).map(Number);
-  const [own = 0, behind = 0] = counts;
+  const failed = yield* unfetched(repo, upstream);
+  if (failed) return { state: 'unfetched', upstream: name, message: failed };
+  const [own = 0, behind = 0] = (yield* git(repo, ['rev-list', '--left-right', '--count', `HEAD...${name}`])).split(/\s+/).map(Number);
   if (behind === 0) return { state: own === 0 ? 'up-to-date' : 'ahead', upstream: name };
   const left = (why: string) => ({
     state: 'left' as const,
     upstream: name,
     message: `${repo} is ${behind} commit(s) behind ${name} ${why}`,
   });
-  if (own > 0)
-    return left(
-      `and holds ${own} of its own, so it is not fast-forwarded: push them to ${name}, or move them to a branch of their own and reset ${branch} to ${name}`,
-    );
-  if ((yield* gitSays(repo, ['rev-parse', '--quiet', '--verify', 'MERGE_HEAD'])) !== undefined)
-    return left(`with a merge in progress, so it is left as it is: commit the merge or abort it (git -C ${repo} merge --abort)`);
-  if (yield* git(repo, ['status', '--porcelain', '--untracked-files=no']))
-    return left(`with changes not committed, so it is left as it is: commit or stash them there, then ${branch} follows on the next step`);
+  const held = yield* heldBack(repo, branch, name, own);
+  if (held) return left(held);
   const from = yield* git(repo, ['rev-parse', 'HEAD']);
   try {
     yield* git(repo, ['merge', '--ff-only', '--quiet', name]);
   } catch (err) {
     return left(
-      `and git would not fast-forward it: ${failedWords(err)} — move what it names away, then ${branch} follows on the next step`,
+      `and git would not fast-forward it: ${failedWords(err)} — move what it names away, then ${branch} follows before the next step`,
     );
   }
   return { state: 'fast-forwarded', upstream: name, from, to: yield* git(repo, ['rev-parse', 'HEAD']) };

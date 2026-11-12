@@ -104,14 +104,16 @@ const listening = Effect.acquireRelease(
     }),
 );
 
+/** The folder the pass ticks in: the api's repository, else, for an api with none (`repoOf`), where it runs, as `tickRun` given none. */
+const tickedIn = repoOf(process.env, running) ?? process.cwd();
+
 const asked = args;
 if (!asked.ticks) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(
     up(e, {
       every: asked.every,
-      // An api with no repository of its own (`repoOf`) ticks where it runs, as a pass given none does (`tickRun`).
-      repo: repoOf(process.env, running) ?? process.cwd(),
+      repo: tickedIn,
       holder: 'api',
       series: [STEP_FOLLOWS],
       quota: (name) => Effect.promise(() => daemonQuota(asker, name, () => engineRead('quota', e.quota(name)))()),

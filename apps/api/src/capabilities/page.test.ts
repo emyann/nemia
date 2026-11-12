@@ -117,7 +117,7 @@ test('pageRead: the repository the page reads, or why none', async (t) => {
       name: 'a factory whose file does not read is no candidate',
       place: { repo: undefined, factory: undefined, named: false },
       own: undefined,
-      listings: [listedOn('solo', ['/r']), { name: 'broken', file: '/f', error: 'does not read' } as unknown as FactoryListing],
+      listings: [listedOn('solo', ['/r']), { name: 'broken', file: '/f', error: 'does not read' }],
       read: '/r',
     },
   ];
@@ -170,15 +170,13 @@ test('an install unpacked from an archive, its source an address: the page reads
     'kind' | 'root'
   >;
   const running: Running = { kind: 'install', root: release, ...file };
-  /** The api's environment: no `HKB_REPO`, so the install's source is what it serves, and a store not marked exposed, as a person's own. */
-  const { HKB_REPO: _repo, WF_EXPOSED: _exposed, ...env } = process.env;
+  const { HKB_REPO: _noRepoOfItsOwn, WF_EXPOSED: _notExposed, ...env } = process.env;
   const { app } = appOf(Layer.merge(liveOf(env), ApiConfig.layer(env, running)));
   const page = async (query = ''): Promise<CapabilitiesWithSteps> => {
     const res = await app.request(`/api/capabilities${query}`);
     assert.equal(res.status, 200, await res.clone().text());
     return (await res.json()) as CapabilitiesWithSteps;
   };
-  /** That nothing of `answer` names a path built from the source: the address joined under a folder. */
   const namesNoAddress = (answer: unknown): void =>
     assert.ok(!JSON.stringify(answer).includes('https:'), `the source's address is never a path: ${JSON.stringify(answer)}`);
 

@@ -24,7 +24,10 @@ import { WorkflowDoor } from '../../workflows/workflows.store.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
-/** A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository, none for the default factory of an api with none. */
+/**
+ * A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository, none for the
+ * default factory of an api with none.
+ */
 export type HiringFactory = Pick<Factory, 'name' | 'hires' | 'tree'> & {
   readonly workflows?: readonly string[] | undefined;
   readonly repo: string | undefined;

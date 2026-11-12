@@ -105,8 +105,8 @@ export function destinationHref(id: string, picked: string | undefined, first: s
 
 /**
  * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
- * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Capabilities — or of a workflow's page or a step's, which
- * read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
+ * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Capabilities — or of a workflow's page or a step's,
+ * which read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
   return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);

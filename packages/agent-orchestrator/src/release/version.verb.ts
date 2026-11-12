@@ -49,8 +49,8 @@ export function latestRelease(home: string, running: Running): Latest | undefine
 }
 
 /**
- * What `nemia version` reads: the package's version, this nemia's release, the store's pointer, the daemon's, the sessions at work by
- * release and harness version, the newest release the check read (`latest`), and its lines.
+ * What `nemia version` reads: the release's version (the root package.json's), this nemia's release, the store's pointer, the
+ * daemon's, the sessions at work by release and harness version, the newest release the check read (`latest`), and its lines.
  */
 export type Versions = {
   readonly version: string;

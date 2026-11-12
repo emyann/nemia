@@ -1,11 +1,18 @@
 /**
  * The release tool's rules (`tools/release/release.ts`), as data: which tags are releases, the bump a set of labels gives, the next
  * version with its floor, and the `release-label` check's verdict through `main`. Nothing here spawns: `release.boundary.test.ts` runs
- * the verbs that read git and GitHub on a scratch repository and a stub `gh`.
+ * the verbs that read git and GitHub on a scratch repository and a stub `gh`. And the version nemia prints, held to the file the release
+ * bump writes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bump, LABELS, main, nextVersion, releaseTag } from '../../release/release.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { VERSION } from 'agent-orchestrator';
+import { scratch } from 'test-kit/scratch';
+import { bump, LABELS, main, nextVersion, releaseTag, writeVersion } from '../../release/release.ts';
+
+const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
 test('a release is a tag v<x.y.z> and nothing else: the legacy tag and the local nemia-* tags are never read as one', () => {
   assert.equal(releaseTag('v0.3.0'), '0.3.0');
@@ -71,4 +78,14 @@ test('REFUSED: a verb the tool does not have', async () => {
   assert.equal(await main(['publish'], {}, () => {}), 2);
   assert.equal(await main(['proof'], {}, () => {}), 2, 'the proof is gone: no job waits on the dispatched runs');
   assert.equal(await main([], {}, () => {}), 2);
+});
+
+test("the version nemia prints, serves and shows is the release's: the root package.json's, the file the release bump writes", () => {
+  const world = scratch('release-version-');
+  fs.writeFileSync(path.join(world, 'package.json'), '{ "name": "nemia", "version": "1.2.3" }\n');
+  writeVersion(world, '1.3.0');
+  const bumped = JSON.parse(fs.readFileSync(path.join(world, 'package.json'), 'utf8')) as { version: string };
+  assert.equal(bumped.version, '1.3.0', 'the bump writes the version into the root package.json');
+  const released = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string };
+  assert.equal(VERSION, released.version, "the orchestrator's VERSION is the root package.json's version, the bump's file");
 });

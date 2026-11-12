@@ -3,6 +3,7 @@
  * name; given one, its words. Her session alone writes them, in her folder's `memory/`; the api serves both reads as the nemia group's
  * `memory` and `fact` (`objects`' Api), calling the handler by type (`MemoryInput`).
  */
+import { givesNone, renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -29,7 +30,10 @@ const memoryLines = (data: NemiaMemory): string[] => {
  */
 export const MEMORY: Command<NemiaMemory, MemoryInput> = {
   name: 'memory',
-  served: [{ endpoint: 'nemia.memory' }, { endpoint: 'nemia.fact', as: 'memory_fact' }],
+  served: [
+    { endpoint: 'nemia.memory', takes: givesNone('fact'), request: renamed({}, ['fact']) },
+    { endpoint: 'nemia.fact', as: 'memory_fact' },
+  ],
   usage: '[<fact>]',
   help: ["what Nemia keeps of the store: bare, her facts' names; given one, its", 'words. Read only: her session alone writes them'],
   spec: {

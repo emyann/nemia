@@ -2,6 +2,7 @@
  * `nemia retry`, an entry of the command table: another try of a step asked for, or another round of a loop out of rounds (`--round`),
  * and the file the ask is written to.
  */
+import { refusing, renamed, requiring } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { RunRetry } from 'objects';
 import { ANSWER_HELP, answerFlag, givenAnswers, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
@@ -107,7 +108,12 @@ export const RETRY: Command<
   RetryInput
 > = {
   name: 'retry',
-  served: [{ endpoint: 'runs.retry' }],
+  served: [
+    {
+      endpoint: 'runs.retry',
+      request: refusing('retry', ['answer'], requiring('step', 'nemia retry <runId> <step>', renamed({ runId: 'name' }))),
+    },
+  ],
   usage:
     '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
   help: [

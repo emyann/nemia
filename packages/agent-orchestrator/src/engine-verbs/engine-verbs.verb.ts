@@ -46,6 +46,7 @@ export const ENGINE_VERBS = {
   mcpState: { phase: 'runtime', changes: 'none' },
   mcpSignIn: { phase: 'runtime', changes: 'none' },
   mcpSignInState: { phase: 'runtime', changes: 'none' },
+  mcpSignInCallback: { phase: 'runtime', changes: 'none' },
   mcpSignOut: { phase: 'runtime', changes: 'none' },
   answer: { phase: 'act', changes: first },
   close: { phase: 'act', changes: first },

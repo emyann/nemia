@@ -8,9 +8,8 @@
  * is not a call, a key two of the three say, or a default for a key the query has not is thrown as the tools are built.
  */
 import { Schema } from 'effect';
-import { HttpApiSchema } from 'effect/http-api';
 import { type CommandSpec, toolsOf } from 'agent-orchestrator';
-import { type ApiEndpointName, Table } from 'objects';
+import { type ApiEndpointName, Table, keysOfEndpoint, streamsOf } from 'objects';
 import type { ToolHints, ToolMethod } from '../../contracts/tool-hints.contract.ts';
 import { PORT_PAGE } from './bound.ts';
 import { classWordOf, toolHints } from './hints.ts';
@@ -62,9 +61,6 @@ export type PortTool = {
   readonly defaults: Readonly<Record<string, string>>;
 };
 
-/** The query key a call never takes: a watch answers a stream, and a tool's call answers once. */
-const UNTAKEN_QUERY = ['watch'];
-
 /** The methods a tool calls by: every one but those that answer no body to read. */
 const METHODS: readonly ToolMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -74,12 +70,6 @@ const methodOf = (endpoint: string, method: string): ToolMethod => {
   if (found === undefined)
     throw new Error(`${endpoint} answers ${method}, which no tool calls: link a GET, POST, PUT, PATCH or DELETE endpoint`);
   return found;
-};
-
-/** Whether `schema`, or the one it carries headers on, is a stream of server-sent events. */
-const streams = (schema: Schema.Top): boolean => {
-  const inner: object = HttpApiSchema.isWithHeaders(schema) ? schema.schema : schema;
-  return '_tag' in inner && inner._tag === 'StreamSse';
 };
 
 /**
@@ -147,7 +137,7 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
   };
   const path = partOf(endpoint.params, 'path');
   const query = partOf(endpoint.query, 'query');
-  const queryKeys = Object.keys(query.properties).filter((k) => !UNTAKEN_QUERY.includes(k));
+  const { pathKeys, queryKeys } = keysOfEndpoint(endpoint);
   const payloads = [...endpoint.payload.values()].flatMap((p) => p.schemas).map((s) => documentOf(s, defs, name));
   const members = payloads.flatMap((p) => {
     const anyOf = p.anyOf ?? p.oneOf;
@@ -188,7 +178,7 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
       ...(parts.length > 1 ? { anyOf: members } : {}),
       ...(Object.keys(defs).length > 0 ? { $defs: defs } : {}),
     },
-    pathKeys: Object.keys(path.properties),
+    pathKeys,
     queryKeys,
   };
 }
@@ -236,7 +226,7 @@ export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[]
     toolsOf(verb).map((link): PortTool => {
       const endpoint = endpoints.get(link.endpoint);
       if (endpoint === undefined) throw new Error(`${link.tool} links ${link.endpoint}, no endpoint of the Api: link one it declares`);
-      if ([...endpoint.success].some(streams))
+      if ([...endpoint.success].some(streamsOf))
         throw new Error(`${link.tool} links ${link.endpoint}, which answers a stream: a tool answers once, so link an endpoint that does`);
       const method = methodOf(link.endpoint, endpoint.method);
       const input = inputOf(endpoint, link.tool);

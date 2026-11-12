@@ -111,11 +111,12 @@ export const away = scratch('nemia-api-home-');
 process.env.HOME = away;
 
 /**
- * No api test starts with a per-session variable of the daemon's (`SESSION_VARIABLES`): a test that means one sets it itself. The
+ * No api test starts with a per-session variable of the daemon's (`SESSION_VARIABLES`), nor a forwarding one (`FORWARD_VARIABLES`): a
+ * test that means one sets it itself. The
  * package is imported here, after every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
  */
-const { SESSION_VARIABLES } = await import('agent-orchestrator');
-for (const name of SESSION_VARIABLES) delete process.env[name];
+const { FORWARD_VARIABLES, SESSION_VARIABLES } = await import('agent-orchestrator');
+for (const name of [...SESSION_VARIABLES, ...FORWARD_VARIABLES]) delete process.env[name];
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

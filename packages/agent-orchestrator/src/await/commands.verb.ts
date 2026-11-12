@@ -1,4 +1,5 @@
 /** `nemia wait`, an entry of the command table: the feed read from a cursor until a line its selectors take, or its bound (`waitFeed`). */
+import { renamed, selectorQuery } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { checked, type Command } from '../command/entry.verb.ts';
 import type { Args } from '../command/command.ts';
@@ -95,7 +96,12 @@ export const WAIT: Command<WaitAnswer, WaitInput> = {
   check: waitArgsRefusal,
   writes: false,
   class: 'read',
-  served: [{ endpoint: 'server.wait' }],
+  served: [
+    {
+      endpoint: 'server.wait',
+      request: (input) => renamed({}, ['selector'])(input).then((rest) => ({ ...rest, ...selectorQuery(input) })),
+    },
+  ],
   input: WaitInput,
   handler: Effect.fnUntraced(function* (input: WaitInput) {
     yield* checked(waitArgsRefusal(input));

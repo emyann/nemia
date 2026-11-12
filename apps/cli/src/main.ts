@@ -3,12 +3,14 @@
  * client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) ask it whatever else is typed, each
  * saying its own help and refusing `--local`; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI,
  * spawned with the same words (`local.ts`), so the writes it has not moved keep their path exactly. Under a remote context a verb about
- * the store only that path has is refused (`notHere`), a verb about this machine (`MACHINE_VERBS`) still runs here, and `nemia config`
- * reads and writes the contexts themselves, whatever context is in use.
+ * the store only that path has is forwarded: that CLI spawned with the context's server and token (`forwardedEnv`), calling the daemon's
+ * endpoints; a verb about this machine (`MACHINE_VERBS`) still runs here, and `nemia config` reads and writes the contexts themselves,
+ * whatever context is in use.
  */
-import { CONFIG_VERB, chosenOf, config, LOCAL_CONTEXT, notHere, unheld } from './context.ts';
+import { CONFIG_VERB, chosenOf, config, factoryNotHere, unheld } from './context.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
 import { type ClientVerb, MACHINE_VERBS, nameOf, type ReadVerb, routeOf } from './route.ts';
+import { forwardedEnv } from './where.ts';
 import { apply } from './objects/apply.ts';
 import { decide } from './objects/decide.ts';
 import { explain } from './objects/explain.ts';
@@ -40,8 +42,16 @@ const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]
 const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly string[]).includes(name);
 
 /**
- * Runs `argv` and answers the exit code: on the api for a moved read, else on the old path under `entry`; refused, exit 2, under a
- * context the config does not hold, and for a verb about the store only the old path has under a remote one.
+ * Whether `words` are a `nemia template export` that holds a factory's parts (`--factory`), which it reads from the store in process: a
+ * machine verb in all its other forms.
+ */
+const exportsAFactory = (words: readonly string[]): boolean =>
+  words[0] === 'template' && words[1] === 'export' && words.some((word) => word === '--factory' || word.startsWith('--factory='));
+
+/**
+ * Runs `argv` and answers the exit code: on the api for a moved read, else on the old path under `entry`, forwarded to the daemon a
+ * remote context names for a verb about the store only that path has; refused, exit 2, under a context the config does not hold, and
+ * for a `template export --factory` under a remote one, which would read this machine's store (`factoryNotHere`).
  */
 export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const words = unlocal(argv);
@@ -49,10 +59,10 @@ export async function main(argv: readonly string[], entry: Entry = 'nemia'): Pro
   if (name === CONFIG_VERB) return config(words.slice(1));
   const chosen = chosenOf();
   if (chosen.kind === 'refused' && !ofTheMachine(name)) throw unheld(chosen.name);
-  const remote = chosen.kind === 'remote' ? chosen.name : undefined;
   const help = words.includes('--help') || name === '';
-  const route = routeOf({ name, local: words.length !== argv.length, help, remote: remote !== undefined });
-  if (route === 'refused') throw notHere(name, remote ?? LOCAL_CONTEXT);
+  if (chosen.kind === 'remote' && !help && exportsAFactory(words)) throw factoryNotHere(chosen.name);
+  const route = routeOf({ name, local: words.length !== argv.length, help, remote: chosen.kind === 'remote' });
+  if (route === 'forwarded' && chosen.kind === 'remote') return spawned(words, entry, forwardedEnv(chosen));
   if (route === 'process') return spawned(words, entry);
   if (entry === 'wf') process.stderr.write(`${WF_HINT}\n`);
   const verb = Object.entries(own(entry)).find(([word]) => word === name)?.[1];

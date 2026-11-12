@@ -2,20 +2,22 @@
 import { Effect } from 'effect';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import type { EngineShape } from './engine.ts';
-import { McpSignInRefused, type McpSignInState } from './mcp-sign-in.ts';
+import { callbackRefused, McpSignInRefused, type McpSignInState } from './mcp-sign-in.ts';
 import { mcpStateRefusal } from './options.ts';
 
 /**
- * The three sign-in verbs over a stand-in's memory: refused where the server has no OAuth client with a callback port, or (`held`)
+ * The four sign-in verbs over a stand-in's memory: refused where the server has no OAuth client with a callback port, or (`held`)
  * where a sign-in still waits on the port, as the real verbs are; a sign-in answers an address built from the client id and waits until
- * a test settles it (`settleSignIn`). It spawns nothing and stores nothing, so it refuses no engine for having no Claude Code harness:
- * that difference is declared on `APART`.
+ * a test settles it (`settleSignIn`). A pasted callback is judged as the real verb judges it (`callbackRefused`), and one handed on is
+ * recorded (`callbacks`) and leaves the sign-in waiting until a test settles it, as the real one waits for its poll. It spawns nothing
+ * and stores nothing, so it refuses no engine for having no Claude Code harness: that difference is declared on `APART`.
  */
 export const signInHeld = () => {
   const states = new Map<string, McpSignInState>();
   const byPort = new Map<number, string>();
   const signIns: Array<{ readonly name: string; readonly secret: boolean }> = [];
   const signOuts: string[] = [];
+  const callbacks: Array<{ readonly name: string; readonly url: string }> = [];
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
   const noPort = (name: string) => `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one.`;
   const noClient = (name: string, server: RemoteMcpServer) => {
@@ -23,7 +25,7 @@ export const signInHeld = () => {
     if (refused) return refused;
     return server.oauth?.callbackPort === undefined ? noPort(name) : undefined;
   };
-  const verbs: Pick<EngineShape, 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> = {
+  const verbs: Pick<EngineShape, 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'> = {
     mcpSignIn: (name, server, clientSecret) => {
       const refused = noClient(name, server);
       const oauth = server.oauth;
@@ -41,6 +43,13 @@ export const signInHeld = () => {
       });
     },
     mcpSignInState: (name) => Effect.sync(() => states.get(name) ?? { state: 'none' as const }),
+    mcpSignInCallback: (name, url) => {
+      const port = [...byPort.entries()].find(([, held]) => held === name)?.[0];
+      const refused = callbackRefused(name, port, url);
+      if (refused !== undefined) return Effect.fail(refused);
+      callbacks.push({ name, url });
+      return Effect.sync(() => states.get(name) ?? { state: 'none' as const });
+    },
     mcpSignOut: (name, server) => {
       const refused = noClient(name, server);
       if (refused) return refuse(refused);
@@ -54,5 +63,5 @@ export const signInHeld = () => {
     for (const [port, held] of byPort) if (held === name) byPort.delete(port);
     states.set(name, state);
   };
-  return { verbs, read: { signIns, signOuts, settleSignIn } };
+  return { verbs, read: { signIns, signOuts, callbacks, settleSignIn } };
 };

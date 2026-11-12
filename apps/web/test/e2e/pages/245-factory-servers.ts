@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page, Request } from 'playwright';
+import type { Locator, Page, Request, Route } from 'playwright';
 import { HEADER_MASK, type McpServerList } from 'objects';
 import { photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -222,6 +222,114 @@ function harnessFolder(): () => void {
   };
 }
 
+/** What a person pastes back on the paste page: the address the browser landed on, with a code and a state, and one that is not it. */
+const PASTE = {
+  landed: `http://localhost:${RECORDED.github.oauth.callbackPort}/callback?code=e2e-code&state=e2e-state`,
+  wrong: `http://localhost:${RECORDED.github.oauth.callbackPort}/callback?state=e2e-state`,
+};
+
+/** The path of `github`'s own route under the factory, and `sub` under it. */
+const githubAt = (sub = '') => `/api/namespaces/${FACTORY}/mcpservers/github${sub}`;
+
+/**
+ * A sign-in completed by pasting back the address the browser landed on, on a page of its own whose watch expects its one refusal.
+ *
+ * The e2e's api runs the real engine, whose sign-in opens a real harness session against GitHub and writes that harness's own store, so
+ * a sign-in is never started for real here: the page holds, by `route`, the four reads and writes a sign-in makes — the servers' read
+ * (github answered `needs-auth`, then `connected` once the paste was taken), the press of Sign in (an address answered, nothing
+ * spawned), the sign-in's state (`waiting`, then `connected`) and the paste of the landed address (its state answered). A paste that is
+ * not that address goes to the api itself, where no sign-in waits: it is refused, 409, and the panel shows the api's own words, the
+ * field still holding what was pasted. What the engine does with a paste is the runtime's and the api's tests' (`mcpSignInCallback`,
+ * `apps/api/test/sign-in.boundary.test.ts`).
+ */
+async function pastesBack(page: Page): Promise<void> {
+  const other = await page.context().newPage();
+  try {
+    const { problems } = watch(other);
+    let taken = false;
+    const until = '2099-01-01T00:00:00.000Z';
+    const answer = (route: Route, json: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) });
+    await other.route(
+      (url) => url.pathname === `/api/namespaces/${FACTORY}/mcpservers`,
+      async (route) => {
+        const read = await route.fetch();
+        const list = (await read.json()) as McpServerList;
+        const items = list.items.map((s) =>
+          s.metadata.name === 'github' ? { ...s, status: { ...s.status, state: taken ? 'connected' : 'needs-auth' } } : s,
+        );
+        await route.fulfill({ response: read, json: { ...list, items } });
+      },
+    );
+    await other.route(
+      (url) => url.pathname === githubAt('/sign-in'),
+      (route) =>
+        route.request().method() === 'POST'
+          ? answer(route, {
+              authUrl: `https://github.com/login/oauth/authorize?client_id=${RECORDED.github.oauth.clientId}&state=e2e`,
+              until,
+            })
+          : answer(route, taken ? { state: 'connected' } : { state: 'waiting', until }),
+    );
+    await other.route(
+      (url) => url.pathname === githubAt('/sign-in/callback'),
+      async (route) => {
+        const { url } = (route.request().postDataJSON() ?? {}) as { url?: string };
+        if (url !== PASTE.landed) return route.continue();
+        taken = true;
+        return answer(route, { state: 'waiting', until });
+      },
+    );
+    await other.goto(page.url(), { waitUntil: 'load' });
+    await idle(other);
+    const row = other.locator('section[data-factory-servers] [data-factory-server="github"]');
+    await row.getByRole('button', { name: 'Sign in', exact: true }).click();
+    const panel = row.locator('[data-server-sign-in="waiting"]');
+    await expectVisible(panel.locator('[data-sign-in-link]'), 'a sign-in started waits, with the address to open');
+    const field = panel.getByRole('textbox', { name: 'the address your browser landed on' });
+    await expectVisible(field, 'and a field to paste the address the browser landed on');
+    const complete = panel.getByRole('button', { name: 'Complete', exact: true });
+
+    await field.fill(PASTE.wrong);
+    const [refused] = await Promise.all([
+      other.waitForResponse((r) => new URL(r.url()).pathname === githubAt('/sign-in/callback'), { timeout: WAIT_MS }),
+      complete.click(),
+    ]);
+    const { error } = (await refused.json()) as { error?: string };
+    if (refused.status() !== 409 || !error)
+      throw new Refused(`a paste where no sign-in waits is refused — the api answered ${refused.status()}: ${JSON.stringify(error)}`);
+    const said = panel.locator('[data-sign-in-refused]');
+    await expectVisible(said, 'the refusal is said in the panel');
+    if ((await said.textContent()) !== error)
+      throw new Refused(
+        `the panel says the api's words — it says ${JSON.stringify(await said.textContent())}, the api ${JSON.stringify(error)}`,
+      );
+    if ((await field.inputValue()) !== PASTE.wrong) throw new Refused('the field still holds what was pasted after a refusal');
+    await settled(other);
+    await photograph(other, path.join(OUT, `factory-servers-paste-refused-${await themeOf(other)}.png`), { fullPage: true });
+
+    await field.fill(PASTE.landed);
+    const [handed] = await Promise.all([
+      other.waitForResponse((r) => new URL(r.url()).pathname === githubAt('/sign-in/callback'), { timeout: WAIT_MS }),
+      complete.click(),
+    ]);
+    if (handed.status() !== 200) throw new Refused(`the landed address is taken — it was answered ${handed.status()}`);
+    await expectVisible(row.locator('[data-server-sign-in="connected"]'), 'the sign-in reads connected once the paste was taken');
+    await expectVisible(row.locator('[data-server-state="connected"]'), "and the servers are read again: the row's chip says connected");
+    await expectCount(row.locator('[data-sign-in-refused]'), 0, 'and the refusal is gone');
+    await idle(other);
+    const expected = `request answered 409: POST ${refused.url()}`;
+    const seen = problems();
+    const others = seen.filter(
+      (p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
+    );
+    if (!seen.includes(expected) || others.length)
+      throw new Refused(`the paste page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+  } finally {
+    await other.close();
+  }
+}
+
 export default {
   /**
    * A factory's MCP servers on its settings page: the two the record holds, each a row with the state its harness reported — or none
@@ -231,7 +339,8 @@ export default {
    * The section says the servers are handed to the steps whose agent names one, before the checkout's `.mcp.json`, and that the state
    * is read on load and on a press alone, which Check again then does. The form records a remote server, which lands in the store's
    * record and in the list, and Remove takes it off again; a header's value is shown as the mask, and a recorded server loaded back
-   * into the form and recorded again keeps the value the record holds. The record is taken back whatever happens.
+   * into the form and recorded again keeps the value the record holds. A sign-in waiting is completed by pasting back the address the
+   * browser landed on, and a paste the api refuses is said in the panel (`pastesBack`). The record is taken back whatever happens.
    *
    * What the api refuses of a record — an `Authorization` header, a local server — is proven in its own tests of the McpServer's
    * write, each answered 422 by name, and not driven through the board, since the e2e's watch counts every 4xx against a page and a
@@ -264,6 +373,7 @@ export default {
       await photograph(page, path.join(OUT, `factory-servers-listed-${await themeOf(page)}.png`), { fullPage: true });
       await recordAndRemove(page, section, file);
       await keepsTheMask(page, section, file);
+      await pastesBack(page);
     } finally {
       fs.rmSync(folder, { recursive: true, force: true });
       harnessWas();

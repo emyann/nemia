@@ -72,6 +72,13 @@ export const SignInState = Schema.Struct({
 });
 export type SignInState = typeof SignInState.Type;
 
+/**
+ * The address a person's browser was sent back to once they approved a server's sign-in, pasted to complete it where the daemon's own
+ * machine could not receive it. It carries a one-time code: never logged, journalled or written to the feed.
+ */
+export const SignInCallback = Schema.Struct({ url: Schema.String });
+export type SignInCallback = typeof SignInCallback.Type;
+
 /** A server signed out of: whether a sign-in was cleared. */
 export const SignedOut = Schema.Struct({ signedOut: Schema.Boolean });
 export type SignedOut = typeof SignedOut.Type;

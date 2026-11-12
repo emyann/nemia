@@ -24,10 +24,13 @@ import {
   workflowAt,
   workflowFolder,
   type Args,
+  type StartInput,
   wfRoot,
   type Env,
 } from '../runner.ts';
-import { usage, placedIn, type Engine } from './flags.ts';
+import { forwardedAnswer, forwardedCall, forwardedOf, type Linked } from '../command/forward.verb.ts';
+import { INBOX_FROM } from '../inbox/commands.verb.ts';
+import { answered, usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -115,6 +118,7 @@ const pathLike = (arg: string): boolean => !/\s/.test(arg) && (/^[./~\\]/.test(a
  * mistyped, or not made yet, as the former spelling of a plan's start only ever meant a folder.
  */
 export async function startRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  if (forwardedOf(env) !== undefined) return startThere(env, args, e, place);
   const arg = textOf(args, 'brief') ?? '';
   const at = fs.statSync(arg, { throwIfNoEntry: false });
   if (at?.isDirectory()) return folderRun(env, arg, args, e, place);
@@ -126,6 +130,47 @@ export async function startRun(env: Env, args: Args, e: Engine, place: Place): P
   const asked = card !== null ? cardArgs(card, args) : briefArgs(env, arg, args);
   const data = await runWith(e, placedIn(env, place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
+}
+
+/** What a forwarded start says where it runs instead, for what it cannot send. */
+const RUN_THERE = "or run it on this machine's store with NEMIA_CONTEXT=local";
+
+/**
+ * `nemia start` forwarded to another machine's api: a brief in words or a file's text, read here, started on the workflow `--workflows`
+ * names there — by name, or a plan's card's own `workflow:` — on the repository `--repo` names there (`runs.create`); or a card of that
+ * machine's inbox, named by one word that names no file here (`cards.start`). Refused (`Invalid`): a plan folder, whose cards are read
+ * here, and a workflow given as a path or not given, which that machine resolves by name.
+ */
+async function startThere(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const arg = textOf(args, 'brief') ?? '';
+  const at = fs.statSync(arg, { throwIfNoEntry: false });
+  if (at?.isDirectory())
+    usage(
+      `nemia start ${arg} reads a plan folder on this machine, which is not sent to another machine's daemon: file each card there (nemia inbox add <card>) and start it by name, ${RUN_THERE}.`,
+    );
+  const asked = startedThereOf(arg, at?.isFile() === true, args) as StartInput;
+  const data = await answered(env, e, place, START, asked);
+  for (const line of START.print(data, asked)) console.log(line);
+}
+
+/**
+ * What a forwarded `nemia start` of `arg` sends (`startThere`): the file's text as the brief where `arg` is a file here (`isFile`), a
+ * plan's card's body and its `workflow:` among them; a card of that machine's inbox where `arg` is one word naming no file here; else the
+ * words. Refused (`Invalid`) for a workflow not named, or given as a path.
+ */
+function startedThereOf(arg: string, isFile: boolean, args: Args): Args {
+  const after = Array.isArray(args.after) ? args.after : [];
+  const text = isFile ? fs.readFileSync(arg, 'utf8') : undefined;
+  const card = text === undefined ? null : cardToStart(arg, text, after);
+  const named = text === undefined && !/\s/.test(arg) && !pathLike(arg) && arg !== '' ? arg : undefined;
+  const workflow = textOf(args, 'workflows') ?? card?.workflow;
+  if (workflow === undefined || /[\\/]/.test(workflow))
+    usage(
+      `nemia start forwarded to another machine's daemon starts a workflow of that machine, named: nemia start ${named ?? '"<brief>"'} --workflows <name>, ${RUN_THERE}.`,
+    );
+  return named !== undefined
+    ? { ...args, brief: undefined, card: named, workflows: workflow }
+    : { ...args, brief: card ? card.body : (text?.trim() ?? arg), workflows: workflow };
 }
 
 /**
@@ -152,7 +197,8 @@ async function folderRun(env: Env, folder: string, args: Args, e: Engine, place:
 
 /**
  * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is
- * typed (`workflowAt`); a directory is refused.
+ * typed (`workflowAt`); a directory is refused. Forwarded to another machine's api, the file's text is what is sent, and `--workflow` and
+ * `--repo` are that machine's, sent as typed.
  */
 export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const idea = textOf(args, 'idea') ?? '';
@@ -164,15 +210,16 @@ export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place)
   const workflow = textOf(args, 'workflow');
   const repo = textOf(args, 'repo');
   const factory = textOf(args, 'factory');
+  const there = forwardedOf(env) !== undefined;
   const asked = {
     idea: at ? fs.readFileSync(idea, 'utf8') : idea,
-    ...(at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
-    ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
-    ...(repo === undefined ? {} : { repo: path.resolve(repo) }),
+    ...(there ? {} : at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
+    ...(workflow === undefined ? {} : { workflow: there ? workflow : workflowAt(workflow, process.cwd()) }),
+    ...(repo === undefined ? {} : { repo: there ? repo : path.resolve(repo) }),
     ...(factory === undefined ? {} : { factory }),
     label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
-  const data = await runWith(e, placedIn(env, place, INBOX_ADD.handler(asked)));
+  const data = await answered(env, e, place, INBOX_ADD, asked);
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
@@ -183,9 +230,25 @@ export async function inboxQueueRun(env: Env, args: Args, e: Engine, place: Plac
   const workflow = textOf(args, 'workflow');
   const asked = {
     name: textOf(args, 'name') ?? '',
-    ...(workflow === undefined ? {} : { workflow: workflowAt(workflow, process.cwd()) }),
+    ...(workflow === undefined ? {} : { workflow: forwardedOf(env) !== undefined ? workflow : workflowAt(workflow, process.cwd()) }),
     ...(args.off === true ? { off: true } : {}),
   };
-  const data = await runWith(e, placedIn(env, place, INBOX_QUEUE.handler(asked)));
+  const data = await answered(env, e, place, INBOX_QUEUE, asked);
   for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
+}
+
+/** The card's read across namespaces, which `nemia inbox from` forwarded makes before it writes the card whole. */
+const CARD_READ: Linked = { name: 'inbox from', served: [{ endpoint: 'cards.getAll' }] };
+
+/**
+ * `nemia inbox from`: the runs a card is handed as context set, or taken off (`INBOX_FROM`). Forwarded to another machine's api, which
+ * writes a card whole, the card is read there first and handed to the entry's link beside what was typed (`current`).
+ */
+export async function inboxFromRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const forwarded = forwardedOf(env);
+  const current =
+    forwarded === undefined ? undefined : await forwardedAnswer(forwardedCall(forwarded, CARD_READ, { name: textOf(args, 'name') ?? '' }));
+  const asked = (current === undefined ? args : { ...args, current }) as Args;
+  const data = await answered(env, e, place, INBOX_FROM, asked);
+  for (const line of INBOX_FROM.print(data, asked)) console.log(line);
 }

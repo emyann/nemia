@@ -6,10 +6,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
+import { COMMAND_WORDS } from 'objects';
 import { RUNS, VERBS } from '../src/cli/main.ts';
+import { HELD, KEPT } from './held-commands.baseline.ts';
 
 test('the shipped table breaks none of its rules against the CLI’s verbs and runners, nor gives a tool a name its own verbs give', () => {
-  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS), []);
+  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS, [...KEPT, ...HELD]), []);
+});
+
+test('the store verbs this CLI still serves only shrink: each one held is an entry it serves whose words the client does not hold yet', () => {
+  const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
+  const moved = COMMAND_WORDS.map((w) => w.name);
+  assert.deepEqual(
+    [...KEPT, ...HELD].filter((name) => !served.includes(name) || moved.includes(name)),
+    [],
+    'take a name out of test/held-commands.baseline.ts in the change that moves it',
+  );
 });
 
 test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {

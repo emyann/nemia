@@ -13,6 +13,7 @@ import { doctor, RETIRED_VERB, retiredVerb } from './doctor.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
 import { PAIR_VERB, pair } from './pair.ts';
 import { type ClientVerb, MACHINE_VERBS, MOVED_COMMANDS, type MovedName, nameOf, type ReadVerb, routeOf } from './route.ts';
+import { renamedIn } from 'objects';
 import { Refused } from './refused.ts';
 import { commanded } from './commands/commanded.ts';
 import { forwardedEnv } from './where.ts';
@@ -90,12 +91,20 @@ const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number
  * else on the old path under `entry`, forwarded to the daemon a remote context names for a verb about the store only that path has;
  * refused, exit 2, where `--local` is typed (`localRefused`), under a context the config does not hold, for a `template export
  * --factory` under a remote one, which would read this machine's store (`factoryNotHere`), and for the retired word `readiness`
- * (`RETIRED_VERB`), naming `nemia doctor` (`retiredVerb`).
+ * (`RETIRED_VERB`), naming `nemia doctor` (`retiredVerb`). A former name is run as the name it became (`objects`' `renamedIn`), its hint
+ * said on stderr.
  */
-export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
-  const name = nameOf(argv);
+export async function main(typed: readonly string[], entry: Entry = 'nemia'): Promise<number> {
+  const renamed = renamedIn(typed);
+  const name = nameOf(renamed.words);
   const first = Object.entries(FIRST).find(([word]) => word === name)?.[1];
-  if (first !== undefined) return first(argv.slice(1));
+  if (first !== undefined) return first(renamed.words.slice(1));
+  if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
+  return routed(renamed.words, name, entry);
+}
+
+/** `argv`, named `name`, sent the way its route says (`routeOf`), under the context in use. */
+async function routed(argv: readonly string[], name: string, entry: Entry): Promise<number> {
   const chosen = chosenOf();
   const help = argv.includes('--help') || name === '';
   const route = routeOf({ name, local: unlocal(argv), help, remote: chosen.kind === 'remote' });

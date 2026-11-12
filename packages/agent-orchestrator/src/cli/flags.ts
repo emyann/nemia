@@ -57,6 +57,10 @@ export function answered<D extends object, I>(
   return forwardedOr(env, command, input, () => runWith(e, placedIn(env, place, around(command.handler(input)))));
 }
 
+/** The lines `command` prints of `data`, where it prints: a command the client holds prints there, and none here. */
+export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I): readonly string[] =>
+  command.print?.(data, input) ?? [];
+
 /**
  * What `entry`'s endpoint answers for `input` where `env` forwards the command line (`forwardedCall`), else what `here` answers in
  * process: for a runner whose call here is a program of its own rather than the entry's handler (`nemia pause --now`'s preview), and

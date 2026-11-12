@@ -5,7 +5,7 @@
  */
 import { commandLine, type CommandSpec } from '../command/command.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { fromNote } from '../start/index.ts';
 import type { Run } from '../record/record.ts';
 
@@ -13,7 +13,7 @@ import type { Run } from '../record/record.ts';
  * The command of the table (`COMMANDS`) named `name`: thrown as this module loads when the table holds none by that name, so a name the
  * table renamed is a failed start, not a page that fails as it is read.
  */
-function named(name: string): Command {
+function named(name: string): Served {
   const command = COMMANDS.find((c) => c.name === name);
   if (command === undefined) throw new Error(`No command '${name}' in the orchestrator's table (COMMANDS): name one it holds.`);
   return command;

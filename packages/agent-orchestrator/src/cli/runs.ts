@@ -41,7 +41,7 @@ import {
   wfRoot,
 } from '../runner.ts';
 import { forwardedOf } from '../command/forward.verb.ts';
-import { answered, HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
+import { printed, answered, HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
@@ -54,7 +54,7 @@ async function rmOne(env: Env, e: Engine, place: Place, id: string, args: Args):
   try {
     const input = { runId: id, deleteBranches: args.deleteBranches === true, forceUnmerged: args.forceUnmerged === true };
     const data = await answered(env, e, place, RM, input);
-    for (const line of RM.print(data, input)) console.log(line);
+    for (const line of printed(RM, data, input)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
     console.log(`${id}  not forgotten: ${(err as Error).message}`);
@@ -199,7 +199,7 @@ async function prunedThere(env: Env, args: Args, e: Engine, place: Place): Promi
   for (const runId of ids) {
     const input = { runId, unmerged: args.unmerged === true, artifacts: args.artifacts === true, yes: true, refuses: true };
     try {
-      for (const line of PRUNE.print(await answered(env, e, place, PRUNE, input), input)) console.log(line);
+      for (const line of printed(PRUNE, await answered(env, e, place, PRUNE, input), input)) console.log(line);
     } catch (err) {
       notPrunedLine(runId, err, tally);
     }
@@ -293,7 +293,7 @@ const factoryWords = (args: Args, command: string): { factory: string; words?: s
 export async function agentsRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = repoHere(env, args);
   const data = await answered(env, e, place, AGENTS, asked);
-  for (const line of AGENTS.print(data, asked)) console.log(line);
+  for (const line of printed(AGENTS, data, asked)) console.log(line);
 }
 
 /**
@@ -315,7 +315,7 @@ export async function agentsCardRun(env: Env, args: Args, e: Engine, place: Plac
   const at: { from?: 'repo' | 'yours' } = from === 'repo' ? { from: 'repo' } : from === 'yours' ? { from: 'yours' } : {};
   const asked = { name, ...repoHere(env, args), ...at };
   const data = await answered(env, e, place, AGENT_CARD, asked);
-  for (const line of AGENT_CARD.print(data, asked)) console.log(line);
+  for (const line of printed(AGENT_CARD, data, asked)) console.log(line);
   for (const line of AGENT_CARD.note?.(data, asked) ?? []) console.error(line);
 }
 
@@ -326,7 +326,7 @@ export async function agentsCardRun(env: Env, args: Args, e: Engine, place: Plac
 export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
   const data = await answered(env, e, place, AGENTS_CUSTOM, asked);
-  for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
+  for (const line of printed(AGENTS_CUSTOM, data, asked)) console.log(line);
 }
 
 /**
@@ -335,7 +335,7 @@ export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Pl
 export async function factoryInstructRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_INSTRUCT.name);
   const data = await answered(env, e, place, FACTORY_INSTRUCT, asked);
-  for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
+  for (const line of printed(FACTORY_INSTRUCT, data, asked)) console.log(line);
 }
 
 /**
@@ -344,7 +344,7 @@ export async function factoryInstructRun(env: Env, args: Args, e: Engine, place:
 export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_RULES.name);
   const data = await answered(env, e, place, FACTORY_RULES, asked);
-  for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
+  for (const line of printed(FACTORY_RULES, data, asked)) console.log(line);
 }
 
 /**
@@ -354,7 +354,7 @@ export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Pl
 export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = serverAddOf(args);
   const data = await answered(env, e, place, FACTORY_SERVER_ADD, asked);
-  for (const line of FACTORY_SERVER_ADD.print(data, asked)) console.log(line);
+  for (const line of printed(FACTORY_SERVER_ADD, data, asked)) console.log(line);
 }
 
 /**
@@ -363,7 +363,7 @@ export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place
 export async function policyProposeRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = inputFor(POLICY_PROPOSE, withWords(args, POLICY_PROPOSE.name));
   const data = await answered(env, e, place, POLICY_PROPOSE, asked);
-  for (const line of POLICY_PROPOSE.print(data, asked)) console.log(line);
+  for (const line of printed(POLICY_PROPOSE, data, asked)) console.log(line);
 }
 
 /**
@@ -401,5 +401,5 @@ export async function sayRun(env: Env, args: Args, e: Engine, place: Place): Pro
     ...(typeof args.as === 'string' ? { from: { kind: 'agent', name: args.as } } : {}),
   });
   const data = await answered(env, e, place, SAY, asked);
-  for (const line of SAY.print(data, asked)) console.log(line);
+  for (const line of printed(SAY, data, asked)) console.log(line);
 }

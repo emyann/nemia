@@ -6,12 +6,12 @@
  */
 import { Invalid } from '../refusal/refusal.ts';
 import { FORMER_MODES } from '../retry/index.ts';
-import { oneLine } from '../record/record.ts';
 import {
   amountOf as amountOfObjects,
-  CLI,
   COMMAND_WORDS,
   CommandRefused,
+  MACHINE_VERBS,
+  RENAMED,
   parseArgv as parseArgvOf,
   type Args,
   type CommandLink,
@@ -19,36 +19,28 @@ import {
   type Spec,
 } from 'objects';
 
-export { CLI, commandLine, helpOf, type Args, type CommandClass, type CommandWords, type Flag, type Positional, type Spec } from 'objects';
-
-/** What a former name became (`RENAMED`): the name it is now, and the flag that says an absorbed verb, where it says one. */
-export type Renamed = { readonly to: string; readonly flag?: string };
-
-/**
- * Each command renamed, by its former name of one word or two: `nemia auto …` is `nemia policy …`, and a verb another absorbed is that verb
- * with the flag that says it — `nemia round` is `nemia retry --round`, `nemia merge` is `nemia refresh --base`, `nemia accept` is `nemia
- * approve` (decision 7). Decision 8 gives a list, a read of one thing and a removal one spelling each, the rows of two words below: a
- * removal is `rm`, a one-off of an agent `agents run` (kubectl's run), a template's judgement `template lint` (so a check stays a step's),
- * an upgrade's preview `factory diff`, and a folder of cards `start <folder>`. A command line that opens with a former name
- * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not;
- * and no entry of the table is named by a former name (`commandBreaks`), which no line would ever reach.
- */
-export const RENAMED: ReadonlyMap<string, Renamed> = new Map([
-  ['auto', { to: 'policy' }],
-  ['round', { to: 'retry', flag: '--round' }],
-  ['merge', { to: 'refresh', flag: '--base' }],
-  ['accept', { to: 'approve' }],
-  ['plan', { to: 'start' }],
-  ['agents remove', { to: 'agents rm' }],
-  ['agents try', { to: 'agents run' }],
-  ['workflows remove', { to: 'workflows rm' }],
-  ['policy drop', { to: 'policy rm' }],
-  ['template check', { to: 'template lint' }],
-  ['factory plan', { to: 'factory diff' }],
-]);
-
-/** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
-export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
+export {
+  CLI,
+  commandLine,
+  helpOf,
+  leftOut,
+  RENAMED,
+  RENAMED_FLAGS,
+  renamedIn,
+  saidFlags,
+  saidOf,
+  saidRefusal,
+  takesFor,
+  takesOf,
+  type Args,
+  type CommandClass,
+  type CommandWords,
+  type Flag,
+  type Positional,
+  type Renamed,
+  type Said,
+  type Spec,
+} from 'objects';
 
 /**
  * Each value renamed, by the command that takes it, the key that carries it and its former spelling: a retry's mode `nudge` is
@@ -81,56 +73,6 @@ export function renamedValues(command: string, body: unknown): { body: unknown; 
   };
 }
 
-/** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
-const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {
-  if (flag === undefined) return [...rest];
-  const at = rest.findIndex((w) => w.startsWith('-'));
-  return at === -1 ? [...rest, flag] : [...rest.slice(0, at), flag, ...rest.slice(at)];
-};
-
-/** The former name `words` open with, the longest first, and how many words it is; none where they open with no former name. */
-function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: string; size: number; now: Renamed } | undefined {
-  for (const size of [2, 1]) {
-    const key = words.slice(0, size).join(' ');
-    const now = RENAMED.get(key);
-    if (words.length >= size && !used.has(key) && now) return { key, size, now };
-  }
-  return undefined;
-}
-
-/**
- * `words`, a command line's words after the program, its name put to the name it became where it opens with a former one (`RENAMED`, the
- * longest that matches, then again on what it became, each former name once, so `auto drop` is put to `policy …` and then to `policy rm`),
- * the flag that says an absorbed verb added before its other flags, and each former flag of the command put to its new spelling
- * (`RENAMED_FLAGS`); with the hint naming what was typed and what to type now, or `words` as given and no hint.
- */
-export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
-  let named = [...words];
-  let name = 0;
-  let typed = 0;
-  const added: string[] = [];
-  const used = new Set<string>();
-  for (let at = formerAt(named, used); at !== undefined; at = formerAt(named, used)) {
-    const now = at.now;
-    used.add(at.key);
-    typed += Math.max(0, at.size - name);
-    const to = now.to.split(' ');
-    named = [...to, ...withFlag(named.slice(at.size), now.flag)];
-    name = to.length;
-    if (now.flag !== undefined) added.push(now.flag);
-  }
-  const flags = RENAMED_FLAGS.get(named.slice(0, name || 1).join(' '));
-  const former = flags === undefined ? [] : named.slice(name || 1).filter((w) => flags.has(w));
-  if (!used.size && !former.length) return { words: [...words] };
-  const rewritten = flags === undefined ? named : [...named.slice(0, name || 1), ...named.slice(name || 1).map((w) => flags.get(w) ?? w)];
-  const was = [...(used.size ? [[CLI, ...words.slice(0, typed)].join(' ')] : []), ...former];
-  const is = [...(used.size ? [[CLI, ...named.slice(0, name), ...added].join(' ')] : []), ...former.flatMap((f) => flags?.get(f) ?? [])];
-  return {
-    words: rewritten,
-    hint: `${was.join(' and ')} ${was.length > 1 ? 'are' : 'is'} now ${is.join(' and ')}: type \`${[CLI, ...rewritten].join(' ')}\`; the former spelling stays accepted until a later release removes it.`,
-  };
-}
-
 /**
  * An endpoint of `objects`' `Api` that serves a verb (`CommandLink`), and what the command line forwarded to another machine's api
  * (`NEMIA_SERVER`, `src/command/forward.verb.ts`) reads of a link: `takes`, whether this link is the one a given input calls, on an entry
@@ -146,12 +88,10 @@ export type EndpointLink = CommandLink & {
 };
 
 /**
- * A command, as data: its words (`CommandWords`, `objects`' — the name, usage, help, spec, class and the rest, said there for a command
- * the client holds, `COMMAND_WORDS`), with `check`, the refusal of its arguments before anything is read, the same on both sides, or
- * null; and its `served` links as the forwarded command line reads them (`EndpointLink`).
+ * A command, as data: its words (`CommandWords`, `objects`' — the name, usage, help, spec, class, `check` and the rest, said there for a
+ * command the client holds, `COMMAND_WORDS`); and its `served` links as the forwarded command line reads them (`EndpointLink`).
  */
 export type CommandSpec = Omit<CommandWords, 'served'> & {
-  readonly check?: (args: Args) => string | null;
   readonly served?: readonly [EndpointLink, ...EndpointLink[]];
 };
 
@@ -184,73 +124,6 @@ export const amountIn = (args: Args, key: string): number | undefined => {
   const value = args[key];
   return typeof value === 'number' ? value : undefined;
 };
-
-/** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
-export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
-
-/** Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms. */
-export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
-  Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
-
-/**
- * The refusal of `flag`'s value left out, in `refusals`, which holds one for each text flag of its command (`takesOf`): a flag it holds
- * none for is thrown, naming it.
- */
-export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
-  const takes = refusals[flag];
-  if (takes === undefined) throw new Error(`${flag} has no refusal of its value left out: add it to its command's table of them`);
-  return takes;
-};
-
-/** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
-export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? oneLine(value, Number.POSITIVE_INFINITY) : undefined;
-};
-
-/**
- * Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out (its refusal in `takes`), blank, or longer than
- * its cap.
- */
-export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
-  const value = args[key];
-  if (typeof value !== 'string') return null;
-  if (value.startsWith('--')) return takesFor(refusals, flag);
-  const line = saidOf(args, key) ?? '';
-  if (!line) return `${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`;
-  if (line.length > cap) return `${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`;
-  return null;
-}
-
-/** `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words. */
-export const saidFlags = (
-  said: readonly Said[],
-  command: string,
-  puts: string,
-  refusals: Readonly<Record<string, string>>,
-  shape: string,
-) =>
-  said.map(({ flag, key }) => ({
-    flag,
-    kind: 'text' as const,
-    key,
-    takes: refusals[flag],
-    twice: `${command} takes ${flag} once: ${puts} says one ${key}. ${shape}.`,
-  }));
-
-/**
- * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
- * flag's own `takes`, or null.
- */
-export function leftOut(spec: Spec, args: Args): string | null {
-  for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined)) {
-    if (flag.key === undefined) continue;
-    const value = args[flag.key];
-    const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
-    if (values.some((v) => !v || v.startsWith('--'))) return flag.takes ?? null;
-  }
-  return null;
-}
 
 /**
  * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
@@ -351,6 +224,22 @@ function linkBreaks(c: Entry): string[] {
   return breaks;
 }
 
+/** Whether `name` is a verb about this machine (`objects`' `MACHINE_VERBS`, by its first word), which this CLI runs. */
+const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly string[]).includes(name.split(' ')[0] ?? '');
+
+/**
+ * Where an entry the command line serves is a store verb this CLI still holds: one whose words are not the client's (`COMMAND_WORDS`),
+ * that is no verb about this machine (`MACHINE_VERBS`), and that `kept` does not name, each of whose names says why beside it. Every
+ * store verb is parsed, worded and printed by the client and reaches the store through the api; an entry served on the api alone is none
+ * of the command line's.
+ */
+function heldBreaks(c: Entry, kept: readonly string[]): string[] {
+  if (c.only?.side === 'api' || ofTheMachine(c.name) || kept.includes(c.name) || COMMAND_WORDS.some((w) => w.name === c.name)) return [];
+  return [
+    `${c.name} is a store verb this CLI still serves: move its words into objects' COMMAND_WORDS and its runner into apps/cli, which asks the api, or serve it on the api alone`,
+  ];
+}
+
 /** Each tool name that two links give (`toolsOf`), of `entries`: a sentence naming the tool, the entries that give it, and the fix. */
 function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): string[] {
   const first = new Map<string, string>();
@@ -370,13 +259,15 @@ function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): s
  * serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's
  * name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); its links to the api (`linkBreaks`); a runner of
  * the CLI (`runners`) that runs no entry the CLI serves; and a tool name two links give, of the table and of the CLI's own verbs the api
- * serves (`linked`, `CLI_VERBS`), which the port could not tell apart (`toolBreaks`).
+ * serves (`linked`, `CLI_VERBS`), which the port could not tell apart (`toolBreaks`); and, where `kept` is given, a store verb this
+ * CLI still serves, which is the client's (`heldBreaks`).
  */
 export function commandBreaks(
   table: readonly Entry[],
   verbs: readonly string[],
   runners: readonly string[] = [],
   linked: readonly Pick<CommandSpec, 'name' | 'served'>[] = [],
+  kept?: readonly string[],
 ): string[] {
   const breaks: string[] = [];
   const seen = new Set<string>();
@@ -391,7 +282,7 @@ export function commandBreaks(
     if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))
       breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
-    breaks.push(...runBreaks(c, runners), ...sideBreaks(c), ...linkBreaks(c));
+    breaks.push(...runBreaks(c, runners), ...sideBreaks(c), ...linkBreaks(c), ...(kept === undefined ? [] : heldBreaks(c, kept)));
   }
   for (const name of runners.filter((r) => !table.some((c) => c.name === r && c.only?.side !== 'api')))
     breaks.push(`${name} has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS`);

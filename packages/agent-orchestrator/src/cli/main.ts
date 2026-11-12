@@ -59,6 +59,7 @@ import {
   type Args,
   type Command,
   type Ran,
+  type Served,
   currentRelease,
   runningRelease,
   claudeTokenFile,
@@ -81,7 +82,7 @@ import {
   PAUSE_NOW,
 } from '../runner.ts';
 import { forwardedOf, unlinked } from '../command/forward.verb.ts';
-import { answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
+import { printed, answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import {
   admitRun,
@@ -401,7 +402,7 @@ async function pauseRun(env: Env, args: Args, e: Engine, place: Place): Promise<
   }
   const given = inputOf(PAUSE, args);
   const data = await answered(env, e, place, PAUSE, given);
-  for (const line of PAUSE.print(data, given)) console.log(line);
+  for (const line of printed(PAUSE, data, given)) console.log(line);
 }
 
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
@@ -450,7 +451,7 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
  */
 async function commanded(
   env: Env,
-  command: Command | Ran,
+  command: Command | Served | Ran,
   rest: string[],
   e: Engine,
   demand: (root: string) => DemandHost,
@@ -466,10 +467,11 @@ async function commanded(
   if (runner) return runner(env, args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
-  const given = inputOf(command, args);
-  const data = await answered(env, e, place, command, given, withResolutionProposer);
-  for (const line of command.print(data, given)) console.log(line);
-  for (const line of command.note?.(data, given) ?? []) console.error(line);
+  const entry: Served & Partial<Pick<Command, 'print' | 'note'>> = command;
+  const given = inputOf<Readonly<Record<string, unknown>>, Args>(entry, args);
+  const data = await answered(env, e, place, entry, given, withResolutionProposer);
+  for (const line of printed(entry, data, given)) console.log(line);
+  for (const line of entry.note?.(data, given) ?? []) console.error(line);
 }
 
 /**
@@ -477,8 +479,8 @@ async function commanded(
  * handler takes that the parse left out or gave another type refused, exit 2, before anything is read. The decoded value is what the
  * typed entry takes, its input erased as the table holds it (`tableEntry`).
  */
-function inputOf<D extends object, I>(command: Command<D, I>, args: Args): I;
-function inputOf(command: Command, args: Args): Args {
+function inputOf<D extends object, I>(command: Served<D, I>, args: Args): I;
+function inputOf(command: Served, args: Args): Args {
   if (command.input === undefined) return args;
   const decoded = Schema.decodeUnknownExit(command.input)(args);
   if (decoded._tag === 'Success') return decoded.value as Args;

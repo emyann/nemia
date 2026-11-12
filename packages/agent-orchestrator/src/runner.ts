@@ -466,7 +466,7 @@ export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store
 export { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
-export type { Command, Ran } from './command/entry.verb.ts';
+export type { Command, Ran, Served } from './command/entry.verb.ts';
 /**
  * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes;
  * and the Factory's own writes, a workflow attached and detached, its revisions policy, its removal, the trust of its places and its

@@ -128,7 +128,8 @@ export type CommandLink = {
  * write the api guards; `class`, who answers for it when an agent calls it (`CommandClass`); `only`, the side it is served on alone and
  * why — one with none is served on both; `served`, the endpoints of the `Api` that serve it, each a tool of the MCP port (`CommandLink`);
  * `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on the
- * daemon's next pass; `asksAlways`, that an agent's call of it is asked of the person every time, on a command classed `ask` alone.
+ * daemon's next pass; `asksAlways`, that an agent's call of it is asked of the person every time, on a command classed `ask` alone;
+ * `check`, the refusal of its arguments before anything is read, pure, in its own words, or null: the client runs it on what it parsed.
  */
 export type CommandWords = {
   readonly name: string;
@@ -142,6 +143,7 @@ export type CommandWords = {
   readonly manual?: string;
   readonly ticks?: true;
   readonly asksAlways?: true;
+  readonly check?: (args: Args) => string | null;
 };
 
 /** A refusal of what was typed, before anything is read: exit 2. */

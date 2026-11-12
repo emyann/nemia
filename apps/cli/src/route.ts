@@ -7,7 +7,7 @@
  * Each list is spelled once, here, and read by the contract and the code: no file of `src` imports a value of a contract, which ships the
  * verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
-import { AGENTS_WRITE_WORDS, SKILLS_WRITE_WORDS, WORKFLOWS_WRITE_WORDS } from 'objects';
+import { MACHINE_VERBS, MOVED_COMMANDS, type MovedCommand } from 'objects';
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 /**
@@ -26,34 +26,14 @@ export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 
 export type ClientVerb = (typeof CLIENT_VERBS)[number];
 
 /**
- * The verbs about the machine this client runs on, never a remote daemon's (the distribution intent's Q6): its login service, its
- * releases, a daemon of its own, what it runs, the person's tokens of its store and its Claude token, and the verbs that read and write
- * files of this machine and no store (`template`, `frontmatter`, `admit`). Each runs on the old path, whatever context is in use.
+ * The verbs about the machine this client runs on, never a remote daemon's (`objects`' `MACHINE_VERBS`, where the orchestrator's guard
+ * reads them too), and the commands whose words this client holds (`objects`' `MOVED_COMMANDS`, the names of its `COMMAND_WORDS`): each
+ * of those parsed, helped, run and printed here through the api, under every context. Said here for the contract and the code to read.
  */
-export const MACHINE_VERBS = [
-  'service',
-  'upgrade',
-  'up',
-  'tick',
-  'version',
-  'token',
-  'claude-token',
-  'template',
-  'frontmatter',
-  'admit',
-] as const;
-
-/** One of `MACHINE_VERBS`. */
-export type MachineVerb = (typeof MACHINE_VERBS)[number];
-
-/**
- * The commands whose words this client holds (`objects`' `COMMAND_WORDS`, by name): each parsed, helped, run and printed here through
- * the api, under every context.
- */
-export const MOVED_COMMANDS = [WORKFLOWS_WRITE_WORDS.name, AGENTS_WRITE_WORDS.name, SKILLS_WRITE_WORDS.name] as const;
+export { MACHINE_VERBS, MOVED_COMMANDS };
 
 /** One of `MOVED_COMMANDS`. */
-export type MovedName = (typeof MOVED_COMMANDS)[number];
+export type MovedName = MovedCommand;
 
 /**
  * Where a command goes: refused (`--local`, which names what to type instead), the api, the orchestrator's CLI in a process of its own on

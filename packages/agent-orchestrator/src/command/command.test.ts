@@ -1053,6 +1053,13 @@ test("a tool of a CLI verb the api serves counts against the table's tools, and 
   assert.deepEqual(commandBreaks([{ name: 'a', input, handler, served: LINK }], [], [], [decide]), []);
 });
 
+test('REFUSED: a store verb the CLI still serves, whose words the client does not hold; a verb about this machine and one kept by name break nothing', () => {
+  const stray = { name: 'held stray', input, handler, served: LINK };
+  names(commandBreaks([stray], [], [], [], []).join('\n'), 'held stray', 'COMMAND_WORDS', 'apps/cli');
+  assert.deepEqual(commandBreaks([stray], [], [], [], ['held stray']), []);
+  assert.deepEqual(commandBreaks([{ ...stray, name: 'template stray' }], [], [], [], []), []);
+});
+
 /** What each flag `nemia stats` takes, as its refusal of one it does not take lists them. */
 const STATS_FLAGS = ['--from', '--to', '--by', '--agent', '--step', '--factory', '--workflow', '--repo', '--line', '--json'];
 

@@ -40,6 +40,7 @@ import { nemiaFence } from '../admission/fence.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { ADDRESS_KINDS } from 'objects';
 import type { MachineAddress } from './address.ts';
+import type { Command } from '../command/entry.verb.ts';
 
 const ROOT = scratch('wf-service-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -949,14 +950,14 @@ test("nemia service addresses lists this machine's addresses with their kinds, l
   const data = Effect.runSync(entry.handler({}) as Effect.Effect<{ addresses: MachineAddress[] }>);
   assert.ok(data.addresses.length > 0, 'a machine has its loopback at least');
   assert.equal(data.addresses[0]?.kind, 'loopback');
-  const lines = entry.print(data, {});
+  const lines = (entry as Command).print(data, {});
   assert.equal(lines.length, data.addresses.length);
   for (const [i, line] of lines.entries()) {
     const [address, iface, kind] = line.split(' ');
     assert.deepEqual([address, iface, kind], [data.addresses[i]?.address, data.addresses[i]?.interface, data.addresses[i]?.kind]);
     assert.ok((ADDRESS_KINDS as readonly string[]).includes(kind ?? ''), line);
   }
-  const [json] = entry.print(data, { json: true });
+  const [json] = (entry as Command).print(data, { json: true });
   const read = JSON.parse(json ?? '') as { addresses: MachineAddress[] };
   assert.deepEqual(read, { addresses: data.addresses });
   assert.ok(read.addresses.every((a) => ADDRESS_KINDS.includes(a.kind) && (a.family === 4 || a.family === 6)));

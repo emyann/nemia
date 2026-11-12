@@ -38,6 +38,7 @@ import { pausedRead, runsListed } from '../list/list.verb.ts';
 import { PAUSE_WAIT } from '../list/list.ts';
 import { COMMANDS } from '../command/commands.verb.ts';
 import { pausedLines, pausedWords, type Finishing } from '../pause/pause.ts';
+import type { Command } from '../command/entry.verb.ts';
 
 const ROOT = scratch('wf-pause-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -315,7 +316,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   assert.equal(runRecord(ROOT, landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await runWith(h.e, pausedRead()), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
-  assert.deepEqual(ls.print(listed, {}).slice(0, 3), pausedLines(listed.paused), 'nemia ls says it first');
+  assert.deepEqual((ls as Command).print(listed, {}).slice(0, 3), pausedLines(listed.paused), 'nemia ls says it first');
 
   const spoiled = h.tasks.get(taskOf(landing, 'ship')!)!;
   spoiled.push(MISWRITTEN as never);

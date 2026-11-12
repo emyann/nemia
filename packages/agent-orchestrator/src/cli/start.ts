@@ -30,7 +30,7 @@ import {
 } from '../runner.ts';
 import { forwardedAnswer, forwardedCall, forwardedOf, type Linked } from '../command/forward.verb.ts';
 import { INBOX_FROM } from '../inbox/commands.verb.ts';
-import { answered, usage, placedIn, type Engine } from './flags.ts';
+import { printed, answered, usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -129,7 +129,7 @@ export async function startRun(env: Env, args: Args, e: Engine, place: Place): P
     );
   const asked = card !== null ? cardArgs(card, args) : briefArgs(env, arg, args);
   const data = await runWith(e, placedIn(env, place, START.handler(asked)));
-  for (const line of START.print(data, asked)) console.log(line);
+  for (const line of printed(START, data, asked)) console.log(line);
 }
 
 /** What a forwarded start says where it runs instead, for what it cannot send. */
@@ -150,7 +150,7 @@ async function startThere(env: Env, args: Args, e: Engine, place: Place): Promis
     );
   const asked = startedThereOf(arg, at?.isFile() === true, args) as StartInput;
   const data = await answered(env, e, place, START, asked);
-  for (const line of START.print(data, asked)) console.log(line);
+  for (const line of printed(START, data, asked)) console.log(line);
 }
 
 /**
@@ -230,7 +230,7 @@ export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place)
     label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
   const data = await answered(env, e, place, INBOX_ADD, asked);
-  for (const line of INBOX_ADD.print(data, asked)) console.log(line);
+  for (const line of printed(INBOX_ADD, data, asked)) console.log(line);
 }
 
 /**
@@ -244,7 +244,7 @@ export async function inboxQueueRun(env: Env, args: Args, e: Engine, place: Plac
     ...(args.off === true ? { off: true } : {}),
   };
   const data = await answered(env, e, place, INBOX_QUEUE, asked);
-  for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
+  for (const line of printed(INBOX_QUEUE, data, asked)) console.log(line);
 }
 
 /** The card's read across namespaces, which `nemia inbox from` forwarded makes before it writes the card whole. */
@@ -260,5 +260,5 @@ export async function inboxFromRun(env: Env, args: Args, e: Engine, place: Place
     forwarded === undefined ? undefined : await forwardedAnswer(forwardedCall(forwarded, CARD_READ, { name: textOf(args, 'name') ?? '' }));
   const asked = (current === undefined ? args : { ...args, current }) as Args;
   const data = await answered(env, e, place, INBOX_FROM, asked);
-  for (const line of INBOX_FROM.print(data, asked)) console.log(line);
+  for (const line of printed(INBOX_FROM, data, asked)) console.log(line);
 }

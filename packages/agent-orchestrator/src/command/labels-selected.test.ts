@@ -19,6 +19,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
 import { filesStoreAt } from '../record/files.store.ts';
+import type { Command } from '../command/entry.verb.ts';
 
 const ROOT = scratch('wf-ls-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -48,7 +49,7 @@ const started = async (brief: string) => {
 /** What `nemia ls <argv>` prints, its arguments parsed as the CLI parses them. */
 const printed = async (...argv: string[]): Promise<string[]> => {
   const args = parseArgv(LS.spec, argv) ?? {};
-  return [...LS.print(await runWith(noEngine(), LS.handler(args)), args)];
+  return [...(LS as Command).print(await runWith(noEngine(), LS.handler(args)), args)];
 };
 
 /** The head line of the run `id` among `lines`. */

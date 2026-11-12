@@ -604,14 +604,45 @@ export {
   type Spec,
 } from './command.ts';
 export {
-  AGENTS_WRITE_WORDS,
   COMMAND_WORDS,
+  MOVED_COMMANDS,
+  type DefinitionCommand,
+  type FactoryCommand,
+  type InboxCommand,
+  type MovedCommand,
+  type ReadCommand,
+  type RestCommand,
+  type RunCommand,
+  type WriterCommand,
+} from './commands.ts';
+export {
+  AGENTS_WRITE_WORDS,
   FROM,
   SKILLS_WRITE_WORDS,
   WORKFLOWS_WRITE_WORDS,
+  WRITER_WORDS,
   cliPath,
   factoryFlag,
   versionFlag,
   writerSpec,
-  type MovedCommand,
-} from './commands.ts';
+} from './commands-writers.ts';
+export { RENAMED, RENAMED_FLAGS, renamedIn, type Renamed } from './commands-renamed.ts';
+export {
+  SELECTOR_FLAG_FORM,
+  labelFlags,
+  leftOut,
+  saidFlags,
+  saidOf,
+  saidRefusal,
+  selectorFlag,
+  takesFor,
+  takesOf,
+  type Said,
+} from './commands-flags.ts';
+export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
+export { RUN_WORDS } from './commands-runs.ts';
+export { INBOX_WORDS } from './commands-inbox.ts';
+export { FACTORY_WORDS } from './commands-factories.ts';
+export { DEFINITION_WORDS } from './commands-definitions.ts';
+export { READ_WORDS } from './commands-reads.ts';
+export { REST_WORDS } from './commands-rest.ts';

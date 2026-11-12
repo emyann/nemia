@@ -88,18 +88,13 @@ const routeSpec = spec<(command: Routed) => Route>({
     theOldPathIsThisMachines: {
       description:
         'The old path runs a command only where it reads no remote daemon’s store: under this machine’s context, for a help, or for a verb about this machine',
-      condition: ({ input: [command], output }) =>
-        output !== 'process' || !command.remote || command.help || ofTheMachine(command.name),
+      condition: ({ input: [command], output }) => output !== 'process' || !command.remote || command.help || ofTheMachine(command.name),
     },
     unheldHereIsTheOldPaths: {
       description:
         'Under this machine’s context, a word the client does not answer goes to the old path here, which runs it if it is a verb of this machine and refuses it in its own words if not',
       condition: ({ input: [command], output }) =>
-        command.local ||
-        command.remote ||
-        answeredHere(command.name) ||
-        (movedRead(command.name) && !command.help) ||
-        output === 'process',
+        command.local || command.remote || answeredHere(command.name) || (movedRead(command.name) && !command.help) || output === 'process',
     },
   },
 });

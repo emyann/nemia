@@ -109,7 +109,7 @@ export const CODEX_SIGN_IN_MS = 15_000;
  * Whether Codex is signed in on this machine, as `codex login status` answers within `ms` under the environment `env` from the folder
  * `cwd`: exit 0 is `signed-in`; any other exit `signed-out`, with the last line Codex printed (`said`); an answer that never comes, and a
  * `codex` that does not start, `unknown` — an unknown answer is not a signed-out one. The runtime's read of a harness's sign-in, which
- * the spawn's refusal (`signedOutRefusal`) and a readiness read above it share.
+ * the spawn's refusal (`signedOutRefusal`) and a layer above it share.
  */
 export type CodexSignIn =
   | { readonly state: 'signed-in' }
@@ -129,7 +129,7 @@ export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string): C
   return { state: 'signed-out', said, code: ran.status };
 };
 
-/** The command that signs Codex in on a machine with no browser, which a refusal and a readiness read name. */
+/** The command that logs Codex in on a machine with no browser, which a refusal and a layer above name. */
 export const CODEX_SIGN_IN_COMMAND = 'codex login --device-auth';
 
 /**

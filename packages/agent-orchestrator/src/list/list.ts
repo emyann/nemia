@@ -4,6 +4,7 @@
  */
 import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type RunSlot } from '../cap/cap.ts';
+import { waitingOnNeedsWord, type NeedWaited } from '../needs/needs.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
@@ -395,7 +396,7 @@ function listedSteps(
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'base' }), branch };
-      return { name, ...unfiled(step, waiting, held), branch };
+      return { name, ...unfiled(step, waiting, held, assessed.waitingOnNeeds), branch };
     }
     if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };
 
@@ -447,12 +448,19 @@ function listedSteps(
 }
 
 /**
- * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on a run slot
- * the limit `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
+ * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on the needs
+ * of its run that are missing (`waitingOnNeedsWord`, `waiting on <need>: <fix>`, beside its phase: `Pending`), on a run slot the limit
+ * `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
  */
-function unfiled(step: StepSpec, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { message: string } {
+function unfiled(
+  step: StepSpec,
+  waits: readonly Wait[],
+  held: RunSlot | undefined,
+  needs: readonly NeedWaited[] | undefined,
+): CodedStep & { message: string } {
   if (step.after.length) return { message: 'pending', ...coded({ reason: 'Pending' }) };
   if (waits.length) return { message: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
+  if (needs?.length) return { message: waitingOnNeedsWord(needs), ...coded({ reason: 'Pending' }) };
   return held
     ? { message: slotWord(held), ...coded({ reason: 'Waiting', on: 'limit' }) }
     : { message: 'pending', ...coded({ reason: 'Pending' }) };

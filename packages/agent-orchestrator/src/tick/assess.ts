@@ -34,6 +34,8 @@ import { roundsDue } from '../round/round.ts';
 import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
 import { answeredRoute, routedWords } from '../route/routed/index.ts';
 import type { RunStatusWord } from 'objects';
+import { hasStarted } from '../wait/wait.ts';
+import { needsWaited, type NeedHeld, type NeedWaited } from '../needs/needs.ts';
 
 export type Assessment = {
   /**
@@ -74,6 +76,12 @@ export type Assessment = {
    * try or round — nor asked of anyone (`toDecide`). What is in flight runs on. Absent on a run nobody holds.
    */
   holdUntil?: string[];
+  /**
+   * The needs of the run's workflow and place a run that has filed nothing waits on (`needsHolding`), each with what it is and what puts it
+   * in place: nothing is due nor asked of anyone, the run is `running` and takes no slot, since it has filed nothing, and its next pass
+   * after a need reads met files its first step. Absent on a run no need holds.
+   */
+  waitingOnNeeds?: NeedWaited[];
   /**
    * What waits on the store's pause (`Run.pause`) on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
@@ -124,6 +132,11 @@ export type AssessRead = {
   readonly standings: readonly BranchStanding[];
   /** The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold`), if one is. */
   readonly checkout: CheckoutHold | undefined;
+  /**
+   * The needs of the run's workflow and of its place as the latest sweep read them, each with its words (`runNeeds`): what holds a run that
+   * has filed nothing. Left out, none, as where the process keeps no reading.
+   */
+  readonly needs?: readonly NeedHeld[];
 };
 
 /**
@@ -134,6 +147,8 @@ export type AssessRead = {
  * - A pruned run honours no person's ask, since its worktrees are gone (`mayFile`): an ask written by hand is no try due. A held run
  *   honours none until the hold lifts, files nothing and asks nothing of a person; it is `running`, since a hold is no decision about the
  *   work, with `holdUntil`, and keeps `unreachable`, since what can never run is a fact about the steps.
+ * - A run that has filed nothing waits on each need of its workflow and place read missing (`needsWaited`), after a person's hold: it
+ *   files nothing, asks nothing, is `running` with `waitingOnNeeds`, and takes no slot; a run that has filed a task is never held so.
  * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
  *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
  * - An ending step that `waitsOnCheckout` is not filed, neither a first session nor a person's try of it, since two sessions trial merging
@@ -196,6 +211,8 @@ export function assess(read: AssessRead): Assessment {
       : 'running';
 
   if (run.hold) return { ...nothing, unreachable, status: 'running', holdUntil: [...run.hold.until] };
+  const waitingOnNeeds = needsWaited(hasStarted(run), read.needs ?? []);
+  if (waitingOnNeeds.length) return { ...nothing, unreachable, status: 'running', waitingOnNeeds };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,

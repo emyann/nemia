@@ -1,6 +1,7 @@
 /**
- * What the git place declares of itself: the tools a landing session is denied, and the sentences the code prints that name git's own
- * commands, as templates with `{name}` holes (`SAY_HOLES`).
+ * What the git place declares of itself: the tools a landing session is denied, the sentences the code prints that name git's own
+ * commands, as templates with `{name}` holes (`SAY_HOLES`), and its one machine need, the git identity a commit is made under
+ * (`git-identity`), with the fix that sets it from a name and an email the person gives.
  */
 import type { PlaceDeclared } from '../../src/place/place.ts';
 
@@ -25,4 +26,21 @@ export const declared: PlaceDeclared = {
     showMerge: 'git show --remerge-diff',
     lastMerge: 'git log --merges -1',
   },
+  needs: [
+    {
+      name: 'git-identity',
+      message: 'git has a name and an email to commit under (git config --global user.name and user.email)',
+      check: 'git config --global user.name >/dev/null && git config --global user.email >/dev/null',
+      fixes: [
+        {
+          message: 'set the name and the email git commits under, for this machine',
+          command: 'git config --global user.name "$NEMIA_ANSWER_NAME" && git config --global user.email "$NEMIA_ANSWER_EMAIL"',
+          asks: [
+            { name: 'name', message: 'the name your commits are made under' },
+            { name: 'email', message: 'the email your commits are made under' },
+          ],
+        },
+      ],
+    },
+  ],
 };

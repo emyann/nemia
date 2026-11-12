@@ -28,8 +28,8 @@ import {
 /** A key path into a document. */
 type At = ReadonlyArray<string | number>;
 
-/** A workflow of the folder: its file, and its steps' data by index. */
-type ReadWorkflow = { file: string; steps: ReadonlyArray<Record<string, unknown>> };
+/** A workflow of the folder: its file, its steps' data by index, and its machine needs' (`spec.needs`) by index. */
+type ReadWorkflow = { file: string; steps: ReadonlyArray<Record<string, unknown>>; needs: ReadonlyArray<Record<string, unknown>> };
 
 /** What the folder holds, by name: its workflows, its agents' specs, its skills, the manifest's spec and its parameters. */
 type Held = {
@@ -61,8 +61,9 @@ function heldOf(folder: ReadFolder, packageSkills: readonly string[]): Held {
   const workflows = new Map(
     foldersOf(folder.files, 'workflows').map((name): [string, ReadWorkflow] => {
       const file = `workflows/${name}/workflow.yaml`;
-      const steps = specOf(folder, file).steps;
-      return [name, { file, steps: Array.isArray(steps) ? steps.map((step) => (isMap(step) ? step : {})) : [] }];
+      const { steps, needs } = specOf(folder, file);
+      const maps = (list: unknown) => (Array.isArray(list) ? list.map((item) => (isMap(item) ? item : {})) : []);
+      return [name, { file, steps: maps(steps), needs: maps(needs) }];
     }),
   );
   const agents = new Map(foldersOf(folder.files, 'agents').map((name) => [name, specOf(folder, `agents/${name}/agent.yaml`)]));
@@ -199,6 +200,35 @@ function stepRefusals(held: Held): Refusal[] {
         ...outputRefusals(file, at, workflow, step),
         ...skillRefusals(file, [...at, 'overrides', 'skills'], overrides.skills, held),
         ...harnessRefusals(file, [...at, 'overrides'], overrides, typeof hired.harness === 'string' ? hired.harness : undefined),
+      ];
+    });
+  });
+}
+
+/**
+ * What each workflow's machine needs (`spec.needs`) break beyond their shape (`layout.ts`): a name declared twice in one workflow, and a
+ * `fills` naming no need of the builtin places (`placeNeeds`), whose fixes it would go before.
+ */
+function needRefusals(held: Held, placeNeeds: readonly string[]): Refusal[] {
+  return [...held.workflows].flatMap(([workflow, { file, needs }]) => {
+    const names = needs.map((need) => need.name);
+    return needs.flatMap((need, i): Refusal[] => {
+      const at = ['spec', 'needs', i];
+      const twice = names.indexOf(need.name) !== i;
+      const fills = need.fills;
+      return [
+        ...(twice
+          ? [{ file, at: [...at, 'name'], message: `need ${String(need.name)} is declared twice in ${workflow}: declare each once.` }]
+          : []),
+        ...(typeof fills === 'string' && !placeNeeds.includes(fills)
+          ? [
+              {
+                file,
+                at: [...at, 'fills'],
+                message: `fills names ${fills}, which no builtin place declares${placeNeeds.length ? ` (${placeNeeds.join(', ')})` : ''}: name one of those, or remove fills to make it a need of ${workflow}'s own.`,
+              },
+            ]
+          : []),
       ];
     });
   });
@@ -445,13 +475,15 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
  * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
  * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
  * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
- * undefined where it is no YAML list of strings. None for a template that passes.
+ * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin places declare, which a workflow's
+ * need may fill. None for a template that passes.
  */
 export function checkTemplate(
   folder: ReadFolder,
   packageSkills: readonly string[],
   text: (file: string) => string,
   lines: (file: string) => readonly string[] | undefined,
+  placeNeeds: readonly string[] = [],
 ): Refusal[] {
   const held = heldOf(folder, packageSkills);
   const documents = [...folder.documents].flatMap(([file, doc]) =>
@@ -463,6 +495,7 @@ export function checkTemplate(
     ...hireRefusals(held),
     ...agentRefusals(held),
     ...stepRefusals(held),
+    ...needRefusals(held, placeNeeds),
     ...stepFileRefusals(folder, held),
     ...refRefusals(folder, held),
     ...sharedFileRefusals(folder, held, lines),

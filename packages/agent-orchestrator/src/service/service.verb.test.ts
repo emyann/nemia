@@ -38,6 +38,8 @@ import { putPause, readPause, readPauseFile, pauseFile, resumePause } from '../p
 import { EngineService, engineOf, runWith as runEngine } from '../runtime-client.ts';
 import { nemiaFence } from '../admission/fence.ts';
 import { TABLE } from '../command/commands.verb.ts';
+import { ADDRESS_KINDS } from 'objects';
+import type { MachineAddress } from './address.ts';
 
 const ROOT = scratch('wf-service-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -912,4 +914,50 @@ test('REFUSED: a --size other than auto, a machine too small to size, a --bind t
     await assert.rejects(install(args, host), refusedWith('Invalid'), JSON.stringify(args));
     assert.equal(fs.existsSync(UNIT), false, JSON.stringify(args));
   }
+});
+
+test('REFUSED: a public or wildcard --bind without --public, and --public with no --bind: exit 2, no unit written', async () => {
+  for (const args of [{ bind: '0.0.0.0' }, { bind: '::' }, { bind: '203.0.113.5' }, { public: true }] as Args[]) {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null });
+    await assert.rejects(install(args, host), refusedWith('Invalid'), JSON.stringify(args));
+    assert.equal(fs.existsSync(UNIT), false, JSON.stringify(args));
+  }
+});
+
+test('--bind 0.0.0.0 --public writes the acknowledgement beside the address; a private network address needs none', async (t) => {
+  await t.test('--public: NEMIA_BIND_PUBLIC=1 written with NEMIA_BIND and WF_EXPOSED', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null });
+    await install({ bind: '0.0.0.0', public: true }, host);
+    const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
+    assert.equal(env.get('NEMIA_BIND'), '0.0.0.0');
+    assert.equal(env.get('WF_EXPOSED'), '1');
+    assert.equal(env.get('NEMIA_BIND_PUBLIC'), '1');
+  });
+
+  await t.test('--bind 100.100.1.2, a shared network (Tailscale), with no flag: listened on, no acknowledgement written', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null });
+    await install({ bind: '100.100.1.2' }, host);
+    const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
+    assert.equal(env.get('NEMIA_BIND'), '100.100.1.2');
+    assert.equal(env.has('NEMIA_BIND_PUBLIC'), false);
+  });
+});
+
+test("nemia service addresses lists this machine's addresses with their kinds, loopback first; --json as one object", () => {
+  const entry = TABLE.find((c) => c.name === 'service addresses');
+  assert.ok(entry?.handler, 'the table serves service addresses');
+  const data = Effect.runSync(entry.handler({}) as Effect.Effect<{ addresses: MachineAddress[] }>);
+  assert.ok(data.addresses.length > 0, 'a machine has its loopback at least');
+  assert.equal(data.addresses[0]?.kind, 'loopback');
+  const lines = entry.print(data, {});
+  assert.equal(lines.length, data.addresses.length);
+  for (const [i, line] of lines.entries()) {
+    const [address, iface, kind] = line.split(' ');
+    assert.deepEqual([address, iface, kind], [data.addresses[i]?.address, data.addresses[i]?.interface, data.addresses[i]?.kind]);
+    assert.ok((ADDRESS_KINDS as readonly string[]).includes(kind ?? ''), line);
+  }
+  const [json] = entry.print(data, { json: true });
+  const read = JSON.parse(json ?? '') as { addresses: MachineAddress[] };
+  assert.deepEqual(read, { addresses: data.addresses });
+  assert.ok(read.addresses.every((a) => ADDRESS_KINDS.includes(a.kind) && (a.family === 4 || a.family === 6)));
 });

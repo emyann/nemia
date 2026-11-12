@@ -70,18 +70,20 @@ ssh -t nemia@<address> 'curl -fsSL https://github.com/emyann/nemia/releases/late
 
 It asks three things ([Install](/install/#install) explains each one):
 
-- **The Claude token.** Answer yes. Make the token with `claude setup-token` on a machine that has a browser and a signed-in Claude
-  Code, then paste it at the prompt. It is not shown as you paste. [Your Claude token](/install/#your-claude-token) explains whose
-  token a server may run on.
+- **The Claude token.** Make the token with `claude setup-token` on a machine that has a browser and a signed-in Claude Code, then
+  paste it at the prompt, which asks it outright. It is not shown as you paste. [Your Claude token](/install/#your-claude-token)
+  explains whose token a server may run on.
 - **Start at login.** Answer yes. The installer sizes the service to the machine. The 8 vCPU, 16 GB server read as about 15.2 GiB and
   was sized to 6 sessions at once, each limited to 7.6 GiB: the limit is half the machine, a ceiling on one session and not its share.
 - **The address to bind.** `--bind` already gave it the Tailscale address, so it does not ask
-  ([Bind it to a private network](/install/#bind-it-to-a-private-network)).
+  ([Bind it to a private network](/install/#bind-it-to-a-private-network)). Without `--bind`, it lists the machine's private
+  addresses by number; a public one, or every interface, is refused unless you pass `--public`.
 
-Because the store is bound beyond the machine, the installer prints the first person token, once. **Write it to a file at once, and
-paste it nowhere else**: no chat, no ticket, no log. Anyone holding it is you on the api.
+Because the store is bound beyond the machine, every caller needs a person token. The installer prints none: it mints the server's own
+straight into its local context, and prints a first-visit link for the board (step 4). It ends on `nemia readiness`, which lists what
+is in place and the command that fixes each piece that is not; the board's Setup page shows the same read.
 
-You can always mint another token straight into a file on your laptop, without it ever being shown:
+You can still mint a token straight into a file on your laptop, without it ever being shown:
 
 ```bash
 ssh <server> '~/.local/bin/nemia token add laptop' | sed -n 's/^Authorization: Bearer //p' > ~/.nemia-token
@@ -98,7 +100,10 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 
 ## 4. The board
 
-Open `http://<address>:8787` on your laptop and paste a person token once. The board keeps it in a cookie.
+Open the first-visit link the installer printed, `http://<address>:8787/?link=…`, on your laptop within ten minutes: it signs that
+browser in once, and the board keeps the token in a cookie no script reads. `nemia board link` on the server makes another; given
+`--base` and the address your browser uses, it prints the link under that name, since a browser keeps one cookie per host name. Or
+press _Pair this browser_ on the board's sign-in, and approve the code it shows with `nemia pairings approve <code>` on the server.
 
 The browser marks the page as "Not secure" because the board speaks plain HTTP. The traffic between your machines is still encrypted,
 because Tailscale tunnels it.
@@ -107,7 +112,20 @@ because Tailscale tunnels it.
 
 A factory on GitHub pushes each run's branch with git and opens its pull request with the GitHub CLI
 (`packages/templates/sdlc/carried/pull-request.ts`). The daemon clones a repository named by its URL with git too. All of it uses the
-server's own credentials. **Nemia holds none.** So the server's Nemia user signs in to GitHub once, as below.
+server's own credentials. **Nemia holds none.** So the server's Nemia user signs in to GitHub once.
+
+The `sdlc` template's `build` and `quick` declare these as needs, each with its fix: a run of one waits before its first session while
+one is missing, naming it, and starts by itself once it is met. On the board's Setup page, or on the server:
+
+```bash
+nemia readiness fix gh --factory <factory> --workflow build
+nemia readiness fix gh-sign-in --factory <factory> --workflow build
+nemia readiness fix git-identity --factory <factory> --workflow build
+```
+
+The first installs the GitHub CLI into `~/.agent-workflows/tools`, without root. The second signs it in with the `workflow` scope and
+shows the one-time code set apart, with the link to enter it at. The third gives git the account's name and its noreply address. The
+sections below do the same by hand.
 
 ### The GitHub CLI
 
@@ -167,15 +185,17 @@ that URL, and git pushes over SSH. The pull request is still opened by the GitHu
 
 ## 6. The laptop
 
-Install Nemia on your laptop as a client of the server, with the token file you wrote in step 3. The laptop must be on the same tailnet:
+Install Nemia on your laptop as a client of the server. The laptop must be on the same tailnet:
 
 ```bash
-curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://<address>:8787 --token-file ~/.nemia-token
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://<address>:8787
 nemia ls
 ```
 
-The installer writes a context for the server and makes it the current one. From then on, the laptop's `nemia` drives the server: the
-reads, the runs, the inbox, the decisions and every other verb about the store. [A client of another machine](/install/#a-client-of-another-machine)
+The installer pairs: it shows a short code, which you approve on the server with `nemia pairings approve <code>` or on the board's
+Setup page, and a token named for your laptop lands in a context it makes the current one, never shown (`--token-file` still takes a
+token file instead). Put the `NEMIA_URL` line it prints in your shell profile for Claude Code's nemia plugin. From then on, the
+laptop's `nemia` drives the server: the reads, the runs, the inbox, the decisions and every other verb about the store. [A client of another machine](/install/#a-client-of-another-machine)
 explains contexts, and which verbs always act on the machine you type them on.
 
 ## 7. A factory and its first run

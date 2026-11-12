@@ -8,24 +8,17 @@ import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import { Effect, Schema } from 'effect';
-import { folderTrust, tried, trustFolder } from '../runtime-client.ts';
+import { tried, trustFolder } from '../runtime-client.ts';
 import type { Flag } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
+import { noFactoryLine } from '../factory/factory.ts';
 import { HARNESSES } from '../harness/harness.ts';
-import { PlaceService, type Place } from '../place/place.store.ts';
-import { unansweredWords } from '../place/place.ts';
+import { PlaceService } from '../place/place.store.ts';
 import { Missing } from '../refusal/refusal.ts';
-import { trustedLines, type PlaceTrust, type Untrusted } from './trust.ts';
+import { trustedLines, type PlaceTrust } from './trust.ts';
+import { rootOf, untrustedPlaces } from './untrusted.verb.ts';
 
-/** How many places are asked of at once. */
-const AT_ONCE = 4;
-
-/** The repository `dir` is in as `place` answers it, undefined for a folder in none; or why it was not answered. */
-const rootOf = (place: Place, dir: string): Effect.Effect<{ readonly root: string | undefined } | { readonly unasked: string }> =>
-  Effect.map(place.ask('root', { dir }), (outcome) =>
-    'answer' in outcome ? { root: outcome.answer.root ?? undefined } : { unasked: unansweredWords(outcome) },
-  );
+export { untrustedPlaces };
 
 /** What a throw of the runtime's write says, as one sentence. */
 const threwWords = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -63,33 +56,6 @@ export const trustPlaces = Effect.fn('trustPlaces')(function* (repos: readonly s
     { concurrency: 1 },
   );
   return asked.flat();
-});
-
-/** The harnesses' trusts of `dir` that are not given now, one a harness's folder. */
-function lacking(factory: string, dir: string, root: string | undefined): Untrusted[] {
-  const seen = new Set<string>();
-  return HARNESSES.flatMap((harness): Untrusted[] => {
-    const trust = folderTrust(harness, dir, undefined, root);
-    if (!trust || trust.trusted || seen.has(`${trust.harness}\n${trust.folder}`)) return [];
-    seen.add(`${trust.harness}\n${trust.folder}`);
-    return [{ factory, place: dir, harness: trust.harness, folder: trust.folder, withheld: trust.grants, never: trust.never }];
-  });
-}
-
-/**
- * The places of `factories` that a harness does not trust now, read fresh off the place and the harness's own file: nothing is kept
- * of an earlier read. A factory that does not read has no place, and a place whose repository was not answered is left out — not
- * known is never said as not trusted.
- */
-export const untrustedPlaces = Effect.fn('untrustedPlaces')(function* (factories: readonly FactoryListing[]) {
-  const place = yield* PlaceService;
-  const places = factories.flatMap((f) => ('error' in f ? [] : f.repos.map((dir) => ({ factory: f.name, dir }))));
-  const read = yield* Effect.forEach(
-    places,
-    ({ factory, dir }) => Effect.map(rootOf(place, dir), (rooted) => ('unasked' in rooted ? [] : lacking(factory, dir, rooted.root))),
-    { concurrency: AT_ONCE },
-  );
-  return read.flat();
 });
 
 /** `--no-trust`, on `nemia factory add` and `apply`: the factory filed, and no place of it trusted. */

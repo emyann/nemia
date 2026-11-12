@@ -42,6 +42,7 @@ test("a tab's page is drawn under the strip of Settings' tabs, each a link to it
   assert.deepEqual(tabsIn(html), [
     { tag: 'a', href: '/settings', name: 'Settings', selected: false },
     { tag: 'a', href: '/capabilities', name: 'Capabilities', selected: true },
+    { tag: 'a', href: '/setup', name: 'Setup', selected: false },
   ]);
   assert.match(
     html,

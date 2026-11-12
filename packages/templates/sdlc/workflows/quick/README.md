@@ -34,6 +34,12 @@ hold a part for each.
 - **`github: true`: on GitHub** (`--set github=true`). What the rest of this README says of the check and the landing, a pull request
   judged by CI and merged on GitHub, is this way's.
 
+## What a machine needs before a run starts
+
+The same needs as [`build`](../build/README.md) (*What a machine needs before a run starts*), declared in `workflow.yaml`: `gh` and
+`gh-sign-in` where `github` is true, and the git identity, filled from the account gh is signed in to. The sign-in with no terminal is
+not measured yet, as that section says.
+
 ## The implement step's check
 
 On GitHub, the check is the cheap set, and CI: it runs `change.ts size`, `probe.ts`, `parts.ts`, the factory's own check, its

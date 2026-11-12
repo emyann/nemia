@@ -39,13 +39,15 @@ export const startable = (r: SpawnRequest, at: ScopeAt): { memoryLimit?: number;
  * engine's environment less its telemetry (`withoutTelemetry`), which a runner hands a session itself. With `scope`, the argv that
  * makes a scope under a memory limit (`scopeArgv`), the worker is run in it: `systemd-run --scope` runs it itself, as its parent, so
  * the pid, the group and the stop path are the worker's, and the worker sits beside its harness in the cgroup, outliving it there to
- * read what the cgroup saw.
+ * read what the cgroup saw. Answers the pid of the process launched, the worker's own (the spawn records it, `.launched`, so a look
+ * tells a slow worker from a gone one), or `undefined` where the launch failed at once.
  */
-export const startWorker = (file: string, cwd: string, scope: readonly string[] = []): void => {
+export const startWorker = (file: string, cwd: string, scope: readonly string[] = []): number | undefined => {
   const [program, ...prefix] = [...scope, process.execPath];
   const env = withoutTelemetry(process.env);
   const child = spawn(program ?? process.execPath, [...prefix, WORKER, file], { detached: true, stdio: 'ignore', cwd, env });
   child.on('error', () => {});
   child.unref();
   countSpawn();
+  return child.pid;
 };

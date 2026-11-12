@@ -25,12 +25,14 @@ import { forgetFiles, keptOf } from '../forget.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
-import type { Instant } from '../../core/clock.ts';
+import { elapsedMs, type Instant } from '../../core/clock.ts';
 import { quote } from '../../core/quote.ts';
 import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
-import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { firstRunFile, leased, runFileIn, stateOfWord, type Carried, type Run, type RunFile } from './run-file.ts';
+import { workerSeen, writeLaunched } from './launched.ts';
+import { firstAsked, groupLeft, leftSignal } from './left.ts';
 import { carriedOf, lessCarried } from './carried.ts';
 import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
@@ -235,14 +237,14 @@ export type RunInput = { first: string; inbox: string; from: number; closesOn: {
 const sightingOf = (
   name: string,
   run: RunFile,
-  now: Instant,
+  word: string,
   statement: Sighting['closeout'],
   output: { read: HarnessOutput } | undefined,
   usage: Usage | undefined,
   failed: boolean,
 ): Sighting => ({
   sessionId: name,
-  state: failed ? 'failed' : detachedStateOf(run, now),
+  state: failed ? 'failed' : stateOfWord(word),
   nativeId: run.nativeId,
   closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
@@ -269,13 +271,13 @@ type Told = { read: HarnessOutput } | { wrong: string } | undefined;
 type RunLook = { as: 'read' | 'unread' | 'failed'; output?: { read: HarnessOutput }; warning?: string };
 
 /**
- * How the run under `name` is read as of `now` (`RunLook`), its output read through `told` and named by `log`. A run whose start
+ * How the run under `name` is read, its word as of now `word` (`wordOf`) (`RunLook`), its output read through `told` and named by `log`. A run whose start
  * was refused is unread at work, its output not read, and once ended failed with what its output says, whose refusal, often of that
  * same start event, is read as nothing said (`startRefusalOf`). Any other run whose output is refused is unread at work, and once
  * ended failed with nothing its output says (`outputRefusalOf`). The harness's other runs are read either way.
  */
-const lookOf = (spec: HarnessSpec, name: string, run: RunFile, now: Instant, told: () => Told, log: string): RunLook => {
-  const atWork = detachedStateOf(run, now) === 'working';
+const lookOf = (spec: HarnessSpec, name: string, run: RunFile, word: string, told: () => Told, log: string): RunLook => {
+  const atWork = word === 'working';
   if (run.startRefused) {
     const warning = startRefusalOf(spec, name, run.startRefused);
     if (atWork) return { as: 'unread', warning };
@@ -369,14 +371,24 @@ export const detachedFind =
       return at && 'run' in at ? { sessionId: name } : undefined;
     });
 
+/** The end of the file beside a run that names its worker (`launched.ts`), written by the spawn. */
+const LAUNCHED_END = 'launched';
+
 /**
- * Whether the run of `spec` under `name` lost its worker: its run file says `working` and its heartbeat is stale (`leased`), so its
- * worker died without writing an end, killed or with the machine. `false` where there is no run file, it does not read, or its worker
- * wrote an end. Read off the run file alone, as the lease is.
+ * The word the run of `spec` under `name` is read as now (`leased`): its worker looked for by the identity its spawn recorded
+ * (`workerSeen`) only where its beat is stale. Every reader of a run's state on a look takes it from here.
+ */
+const wordOf = (spec: HarnessSpec, root: string, name: string, run: RunFile, now: Instant): string =>
+  leased(run, now, () => workerSeen(besideRun(spec, root, name, LAUNCHED_END)));
+
+/**
+ * Whether the run of `spec` under `name` lost its worker: its run file says `working`, its heartbeat is stale and its worker is not
+ * seen running (`wordOf`), so its worker died without writing an end, killed or with the machine. `false` where there is no run file,
+ * it does not read, or its worker wrote an end.
  */
 export const leaseGone = (spec: HarnessSpec, root: string, name: string): boolean => {
   const at = runAt(spec, root, name);
-  return at !== undefined && 'run' in at && at.run.state === 'working' && leased(at.run, instantNow()) !== 'working';
+  return at !== undefined && 'run' in at && at.run.state === 'working' && wordOf(spec, root, name, at.run, instantNow()) !== 'working';
 };
 
 /** When a run file says its harness started: `NaN` for one that does not say, which is before and after nothing. */
@@ -419,7 +431,7 @@ const sayTo =
           throw new Error(
             `\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
           );
-        const state = leased(run, instantNow());
+        const state = wordOf(spec, root, name, run, instantNow());
         if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
         const line = input.line(text);
         if (/[\r\n]/.test(line))
@@ -576,7 +588,7 @@ const followOps = (spec: HarnessSpec, root: string, dir: string): Pick<RunnerOps
   const runOf = (name: string) => {
     const at = runAt(spec, root, name);
     if (!at || 'unread' in at) return at;
-    return { state: detachedStateOf(at.run, instantNow()), ...(at.run.nativeId ? { nativeId: at.run.nativeId } : {}) };
+    return { state: stateOfWord(wordOf(spec, root, name, at.run, instantNow())), ...(at.run.nativeId ? { nativeId: at.run.nativeId } : {}) };
   };
   return {
     follow: (name) =>
@@ -698,6 +710,11 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
 export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps =>
   runnerOf(spec, root, workerBoundsOf(options), options);
 
+/** Why a release of the run under `name` is asked again: what its harness's group `group` left still runs, and has been signalled. */
+const LEFT_RUNNING = (name: string, group: number): string =>
+  `\`${name}\` has ended, and its harness's process group ${group} still holds a process: it was sent SIGTERM, and SIGKILL once its` +
+  ` stop grace has passed, on the passes that ask again. A process that outlives SIGKILL is stuck in the kernel: \`ps -o pid,stat,cmd -g ${group}\` names it.`;
+
 /** `detachedOps`, its workers' bounds read. */
 const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>, at: ScopeAt): RunnerOps => {
   const dir = path.join(root, 'runs', spec.name);
@@ -709,6 +726,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
   const requestFile = (name: string) => path.join(dir, `${safe(name)}.request.json`);
   const inboxFile = (name: string) => inboxFileOf(spec, root, name);
   const stopFile = (name: string) => path.join(dir, `${safe(name)}.stop`);
+  const launchedFile = (name: string) => besideRun(spec, root, name, LAUNCHED_END);
   const saidFiles = (name: string) => saidFilesAt(path.join(dir, safe(name)), spec.streams);
 
   const readAll = (): Run[] => {
@@ -741,12 +759,12 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
   };
 
   const outputs: SaidMemo = new Map();
-  const outputOf = (name: string, run: RunFile): { read: HarnessOutput } | { wrong: string } | undefined =>
-    spec.readOutput && outputIn(spec.readOutput, outputs, name, saidFiles(name), saidWhen(run, spec.keepOutput));
+  const outputOf = (name: string, run: RunFile, word: string): { read: HarnessOutput } | { wrong: string } | undefined =>
+    spec.readOutput && outputIn(spec.readOutput, outputs, name, saidFiles(name), saidWhen(run, word !== 'working', spec.keepOutput));
 
   const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
     const parent = parentOf(all, resumeFrom, before, except);
-    const told = parent && outputOf(parent.name, parent.run);
+    const told = parent && outputOf(parent.name, parent.run, wordOf(spec, root, parent.name, parent.run, instantNow()));
     return carriedOf(told && 'read' in told ? told.read : undefined);
   };
 
@@ -756,10 +774,52 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
       : lessCarried(read.usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)), read.ownTokens);
 
   const lookAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]): { sighting?: Sighting; warning?: string } => {
-    const { as, output, warning } = lookOf(spec, name, run, now, () => outputOf(name, run), logFile(name));
+    const word = wordOf(spec, root, name, run, now);
+    const { as, output, warning } = lookOf(spec, name, run, word, () => outputOf(name, run, word), logFile(name));
     if (as === 'unread') return { warning };
     const usage = usageOf(run, output?.read, all);
-    return { sighting: sightingOf(name, run, now, statementOf(name), output, usage, as === 'failed'), warning };
+    return { sighting: sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning };
+  };
+
+  /**
+   * A stop of the run under `name`, whatever its word, and whether it left a process behind, still to end (`stop`, `release`):
+   *
+   * 1. Nothing to do for a run whose worker can no longer run and whose harness's group is empty (`groupLeft`), or for no run.
+   * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
+   *    the grace below is measured from the instant it holds.
+   * 3. A run file that says `working` whose worker is not seen gone: SIGTERM to the worker, read again, whose pid is above 0
+   *    (`process.kill(0, …)` signals this process's entire group). The worker ends its harness's group and writes `stopped`.
+   * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
+   *    sent what `leftSignal` picks, SIGTERM within the run's stop grace since the first ask and SIGKILL after.
+   */
+  const stopRun = (name: string): boolean => {
+    const hit = find(name);
+    if (!hit) return false;
+    const now = instantNow();
+    let seen: ReturnType<typeof workerSeen> | undefined;
+    const worker = () => (seen ??= workerSeen(launchedFile(name)));
+    const word = leased(hit.run, now, worker);
+    const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
+    const workerMayRun = hit.run.state === 'working' && worker() !== 'gone';
+    if (!workerMayRun && group === undefined) return false;
+    const asked = firstAsked(stopFile(name), now);
+    if (workerMayRun) {
+      const again = find(name);
+      if (again && again.run.state === 'working' && again.run.pid > 0) {
+        try {
+          process.kill(again.run.pid, 'SIGTERM');
+        } catch {}
+      }
+    }
+    if (group === undefined) return false;
+    const grace = hit.run.stopGraceMs ?? bounds.stopGraceMs;
+    const signal = leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), grace);
+    if (signal !== 'none') {
+      try {
+        process.kill(-group, signal);
+      } catch {}
+    }
+    return true;
   };
 
   return {
@@ -780,6 +840,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
             log: logFile(r.name),
             kept: saidFiles(r.name).kept,
             stop: stopFile(r.name),
+            launched: launchedFile(r.name),
             streams,
           });
           const { cmd, args, env, ranIn } = spec.command(r, io);
@@ -801,7 +862,8 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
           };
           fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
 
-          startWorker(runFile(r.name), r.cwd, argv);
+          const pid = startWorker(runFile(r.name), r.cwd, argv);
+          if (pid !== undefined) writeLaunched(launchedFile(r.name), pid);
         },
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),
@@ -840,18 +902,20 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
 
     stop: (sessionId) =>
       Effect.try({
-        try: () => {
-          const hit = find(sessionId);
-          if (!hit || hit.run.state !== 'working') return;
-          fs.writeFileSync(stopFile(sessionId), '');
-          const now = find(sessionId);
-          if (now && now.run.state === 'working' && now.run.pid > 0) {
-            try {
-              process.kill(now.run.pid, 'SIGTERM');
-            } catch {}
-          }
-        },
+        try: () => void stopRun(sessionId),
         catch: (cause) => new RunnerError({ verb: 'stop', message: String(cause) }),
+      }),
+
+    release: (session) =>
+      Effect.try({
+        try: () => {
+          const name = session.sessionId;
+          const hit = find(name);
+          if (!hit || wordOf(spec, root, name, hit.run, instantNow()) === 'working') return;
+          if (stopRun(name)) throw new Error(LEFT_RUNNING(name, hit.run.harness?.pid ?? 0));
+        },
+        catch: (cause) =>
+          new RunnerError({ verb: 'release', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),
 
     logs: (sessionId) =>

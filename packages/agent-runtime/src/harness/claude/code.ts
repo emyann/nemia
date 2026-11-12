@@ -371,7 +371,8 @@ export const attachedLongLived = (r: Pick<SpawnRequest, 'restartPolicy'>, attach
 /**
  * The jobs' runner `job`, with the sessions `attached` runs beside them, both named by the engine (`ae/<task>/<n>`): a long-lived
  * spawn runs attached while this process holds them (`attachedLongLived`), a job on its own process always; each verb given a name
- * goes to the one whose run file it has, so a job spawned before goes on being read; a look lists both.
+ * goes to the one whose run file it has, so a job spawned before goes on being read; a look lists both. `release` is the jobs' alone:
+ * a holder kills its session's child group itself, before a resume.
  */
 const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
   const a = attached.ops;
@@ -396,6 +397,8 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     },
     stop: (name) => to(name).stop(name),
     logs: (name) => to(name).logs(name),
+    release: (session, task) =>
+      attached.has(session.sessionId) || !job.release ? Effect.succeed(undefined) : job.release(session, task),
     interrupt: (session) => interruptThrough(to(session.name), session),
     transcript: (name, after) => verbOf(to(name), 'transcript')(name, after),
     say: (session, text) => verbOf(to(session.name), 'say')(session, text),

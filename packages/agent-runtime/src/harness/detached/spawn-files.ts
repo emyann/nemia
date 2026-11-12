@@ -20,12 +20,14 @@ type SpawnAt = {
   log: string;
   kept: string;
   stop: string;
+  /** Who the previous attempt's worker was (`launched.ts`): cleared, so this run is never taken for it. */
+  launched: string;
   streams: Record<string, string>;
 };
 
 /**
  * The files for the run `r` of `spec`, written, and the `io` they give its command. What the previous attempt under the name left
- * goes first — its answer, its output and its streams, what was read of that output, its own request, and the stop asked of it,
+ * goes first — its answer, its output and its streams, what was read of that output, its own request, who its worker was, and the stop asked of it,
  * which its worker would otherwise read as asked of this one and start nothing. A spec with `needsRequest` is handed its
  * servers in the request and names no config file, though its own config under the name is written or cleared all the same, so a
  * re-spawn leaves no servers behind; `sessionMcp` is read on either road, since it is what refuses a `projectMcp` name the
@@ -33,7 +35,7 @@ type SpawnAt = {
  * may hold an `env` or a header that is a secret.
  */
 export const spawnFiles = (spec: HarnessSpec, r: SpawnRequest, at: SpawnAt): HarnessIO => {
-  for (const f of [at.answer, at.log, at.kept, at.stop, at.request, ...Object.values(at.streams)]) fs.rmSync(f, { force: true });
+  for (const f of [at.answer, at.log, at.kept, at.stop, at.launched, at.request, ...Object.values(at.streams)]) fs.rmSync(f, { force: true });
   let io: HarnessIO = {};
   if (r.closeoutSchema) {
     fs.writeFileSync(at.schema, JSON.stringify(r.closeoutSchema));

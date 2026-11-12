@@ -21,6 +21,7 @@ import { decide, fold, nameFor, observe, type Action, type Sighting } from '../s
 import { endOf, formerStateOf, isSessionState, SESSION_STATES, type SessionState, type TaskPhase } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
+import type { WorkerSeen } from '../src/harness/detached/run-file.ts';
 import { Engine } from '../src/index.ts';
 import { at, corpusOf, ended, filed, S, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from 'test-kit/scratch';
@@ -161,25 +162,28 @@ test("a session's words, name by name: its journal and view words, the former wo
   });
 
   await t.test(
-    "the detached worker's words on its run file: each is one name, a lease gone is failed, and a word no worker writes is failed",
+    "the detached worker's words on its run file: each is one name, a lease gone with its worker is failed, a slow worker is working, and a word no worker writes is failed",
     () => {
       const now = Date.parse('2026-09-25T12:00:00Z');
       const fresh = new Date(now - 1_000).toISOString();
       const stale = new Date(now - 60 * 60_000).toISOString();
-      const rows: Array<[string, string, SessionState]> = [
-        ['working', fresh, 'working'],
-        ['working', stale, 'failed'],
-        ['done', fresh, 'completed'],
-        ['done', stale, 'completed'],
-        ['failed', fresh, 'failed'],
-        ['stopped', stale, 'canceled'],
-        ['blocked', fresh, 'failed'],
-        ['completed', fresh, 'failed'],
-        ['constructor', fresh, 'failed'],
-        ['toString', fresh, 'failed'],
+      const rows: Array<[string, string, WorkerSeen, SessionState]> = [
+        ['working', fresh, 'unknown', 'working'],
+        ['working', fresh, 'gone', 'working'],
+        ['working', stale, 'running', 'working'],
+        ['working', stale, 'gone', 'failed'],
+        ['working', stale, 'unknown', 'failed'],
+        ['done', fresh, 'unknown', 'completed'],
+        ['done', stale, 'gone', 'completed'],
+        ['failed', fresh, 'running', 'failed'],
+        ['stopped', stale, 'gone', 'canceled'],
+        ['blocked', fresh, 'unknown', 'failed'],
+        ['completed', fresh, 'unknown', 'failed'],
+        ['constructor', fresh, 'unknown', 'failed'],
+        ['toString', fresh, 'unknown', 'failed'],
       ];
-      for (const [state, heartbeatAt, name] of rows)
-        assert.equal(detachedStateOf({ state, heartbeatAt }, { at: now }), name, `${state} at ${heartbeatAt}`);
+      for (const [state, heartbeatAt, worker, name] of rows)
+        assert.equal(detachedStateOf({ state, heartbeatAt }, { at: now }, worker), name, `${state} at ${heartbeatAt}, its worker ${worker}`);
     },
   );
 

@@ -3,9 +3,11 @@
  * answer (`ANSWER_BOUND`, characters), which Claude Code reads whole only under 50,000 characters, and what the port does with an answer
  * past it. An answer within the bound is answered. One past it is never cut: where it is a page of a list (the call asked `limit`, the
  * caller's or the port's own default page) and a smaller page is still a page, the port asks again for one at most half as long, so the
- * loop ends; where it is no page, or a page of one already, it is refused, in words that say how to narrow it. Pure.
+ * loop ends; where it is no page, or a page of one already, it is refused, in words that say how to narrow it. A page is judged up to
+ * `PAGE_MOST` long, where half of it is a whole number exactly. Pure.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import { PAGE_MOST } from '../src/mcp/bound.ts';
 
 /** What the port does with an answer: answer it, ask again for a page of `limit`, or refuse it with how to narrow it. */
 export type AnswerFit = { readonly kind: 'answer' } | { readonly kind: 'smaller'; readonly limit: number } | { readonly kind: 'refuse' };
@@ -20,7 +22,7 @@ const past = (size: number, bound: number): boolean => size > bound;
 const shrinks = (limit: number | null): boolean => limit !== null && limit > 1;
 
 const answerFitSpec = spec<(size: number, bound: number, limit: number | null) => AnswerFit>({
-  requires: ({ input: [size, bound, limit] }) => countFrom(size, 0) && countFrom(bound, 1) && (limit === null || countFrom(limit, 1)),
+  requires: ({ input: [size, bound, limit] }) => countFrom(size, 0) && countFrom(bound, 1) && (limit === null || (countFrom(limit, 1) && limit <= PAGE_MOST)),
   ensures: {
     answeredExactlyWithinTheBound: {
       description: 'An answer is sent exactly when its text is within the bound',

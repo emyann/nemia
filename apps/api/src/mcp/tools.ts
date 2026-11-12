@@ -2,14 +2,17 @@
  * The tools of the MCP port, generated, never listed by hand: one for each endpoint a verb of the command table links (`served`, read by
  * the package's `toolsOf`, which names it), described by the verb's help and its CLI usage, its input the JSON Schema of the endpoint's
  * path, query and payload joined into one object (`objects`' `Api`, read by reflection), its hints its verb's class and its endpoint's
- * method (`toolHints`), and what the port needs to call it: the endpoint's method and path, and which keys of the input fill the path
- * and the query. A link to a stream, a method that is not a call, or a key two of the three say is thrown as the tools are built.
+ * method (`toolHints`), and what the port needs to call it: the endpoint's method and path, which keys of the input fill the path
+ * and the query, whether the endpoint answers a `Table` (`objects`' server-side printing, which the port asks for and answers as its
+ * lines), and the query values its link sends where a call gives none (`defaults`, the link's `query`). A link to a stream, a method that
+ * is not a call, a key two of the three say, or a default for a key the query has not is thrown as the tools are built.
  */
 import { Schema } from 'effect';
 import { HttpApiSchema } from 'effect/http-api';
 import { type CommandSpec, toolsOf } from 'agent-orchestrator';
-import type { ApiEndpointName } from 'objects';
+import { type ApiEndpointName, Table } from 'objects';
 import type { ToolHints, ToolMethod } from '../../contracts/tool-hints.contract.ts';
+import { PORT_PAGE } from './bound.ts';
 import { classWordOf, toolHints } from './hints.ts';
 
 /** A verb of a table as the port reads it: its name, its usage and help, its class, and the endpoints it links. */
@@ -55,6 +58,8 @@ export type PortTool = {
   readonly path: string;
   readonly pathKeys: readonly string[];
   readonly queryKeys: readonly string[];
+  readonly table: boolean;
+  readonly defaults: Readonly<Record<string, string>>;
 };
 
 /** The query key a call never takes: a watch answers a stream, and a tool's call answers once. */
@@ -75,6 +80,22 @@ const methodOf = (endpoint: string, method: string): ToolMethod => {
 const streams = (schema: Schema.Top): boolean => {
   const inner: object = HttpApiSchema.isWithHeaders(schema) ? schema.schema : schema;
   return '_tag' in inner && inner._tag === 'StreamSse';
+};
+
+/**
+ * Whether a success of an endpoint is `objects`' `Table`, or a union holding it among its members: read through the schema the endpoint
+ * carries it on (its status or headers), as `HttpApiEndpoint` keeps each success.
+ */
+const printsTable = (success: Schema.Top): boolean => {
+  const schema: unknown = 'schema' in success ? success.schema : success;
+  return (
+    schema === Table ||
+    ((typeof schema === 'object' || typeof schema === 'function') &&
+      schema !== null &&
+      'members' in schema &&
+      Array.isArray(schema.members) &&
+      schema.members.includes(Table))
+  );
 };
 
 /** A JSON Schema's object part: its keys and those it requires, resolved through a root `$ref` into `definitions`. */
@@ -172,9 +193,37 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
   };
 }
 
-/** A tool's description: its verb's help, how the CLI says it, and the endpoint it calls. */
-const describe = (verb: PortVerb, method: string, path: string): string =>
-  [...verb.help, '', `nemia ${[verb.name, verb.usage].filter(Boolean).join(' ')}`, `${method} ${path}`].join('\n');
+/**
+ * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then how the port answers it — a `Table` as its
+ * lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends unless the call gives the key.
+ */
+const describe = (
+  verb: PortVerb,
+  method: string,
+  path: string,
+  how: Pick<PortTool, 'table' | 'defaults' | 'queryKeys'>,
+): string => {
+  const usage = `nemia ${[verb.name, verb.usage].filter(Boolean).join(' ')}`;
+  return [
+    ...verb.help,
+    '',
+    usage,
+    `${method} ${path}`,
+    ...(how.table ? [`Answers a line per item, as \`${verb.name} -o wide\` prints them.`] : []),
+    ...(how.queryKeys.includes('limit')
+      ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
+      : []),
+    ...Object.entries(how.defaults).map(([key, value]) => `Sends ${key}=${value} unless ${key} is given ("" lifts it).`),
+  ].join('\n');
+};
+
+/** The defaults `link` sends, thrown where one names a key `queryKeys` has not: a call could never send it. */
+const defaultsOf = (tool: string, query: Readonly<Record<string, string>>, queryKeys: readonly string[]): Record<string, string> => {
+  for (const key of Object.keys(query))
+    if (!queryKeys.includes(key))
+      throw new Error(`${tool}'s link sends ${key} by default, which its endpoint's query does not take: drop it from the link's query`);
+  return { ...query };
+};
 
 /**
  * The port's tools: one per link of `table`'s verbs then of `verbs`' (the verbs the CLI runs by hand, `CLI_VERBS`), in their order, each
@@ -193,15 +242,23 @@ export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[]
       if ([...endpoint.success].some(streams))
         throw new Error(`${link.tool} links ${link.endpoint}, which answers a stream: a tool answers once, so link an endpoint that does`);
       const method = methodOf(link.endpoint, endpoint.method);
+      const input = inputOf(endpoint, link.tool);
+      const how = {
+        table: [...endpoint.success].some(printsTable),
+        defaults: defaultsOf(link.tool, link.query, input.queryKeys),
+        queryKeys: input.queryKeys,
+      };
       return {
         name: link.tool,
         entry: verb.name,
-        description: describe(verb, method, endpoint.path),
+        description: describe(verb, method, endpoint.path, how),
         annotations: toolHints(classWordOf(verb.class), method),
         endpoint: link.endpoint,
         method,
         path: endpoint.path,
-        ...inputOf(endpoint, link.tool),
+        ...input,
+        table: how.table,
+        defaults: how.defaults,
       };
     }),
   );

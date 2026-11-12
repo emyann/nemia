@@ -74,6 +74,15 @@ test("hold takes the run's path, required, and the payload's until", () => {
   assert.equal(hold.method, 'POST');
 });
 
+test('factory_add and factory_apply are tools that POST their repositories, each a path or a git URL the server clones', () => {
+  for (const name of ['factory_add', 'factory_apply']) {
+    const t = tool(name);
+    assert.equal(t.method, 'POST', name);
+    assert.ok('repos' in t.inputSchema.properties, `${name} takes repos`);
+    assert.ok(t.description.includes('--repo <path|url>'), `${name}'s description names a --repo by its URL`);
+  }
+});
+
 test('wait takes the query of GET /api/feed/wait', () => {
   const wait = tool('wait');
   for (const key of ['labelSelector', 'from', 'for']) assert.ok(key in wait.inputSchema.properties, key);

@@ -168,9 +168,16 @@ https://github.com/login/device, then `gh auth setup-git`. The third, `git-ident
 first fix sets git's name and email from the account gh is signed in to, the email its noreply address
 `<id>+<login>@users.noreply.github.com` (`needs.ts identity`); the place's own fix, which asks for a name and an email, comes after it.
 
-**Not measured yet: the sign-in with no terminal.** A fix runs with no terminal, so the sign-in gives gh `</dev/null`. Whether gh then
-prints its code and polls until the browser approves, without waiting on Enter, has not been run on a real gh: the first real run of
-the fix must confirm it, and record the gh version it ran.
+**Measured: the sign-in with no terminal.** A fix runs with no terminal, so the sign-in gives gh `</dev/null`. On 2026-11-12, `gh auth
+login --hostname github.com --git-protocol https --web --scopes workflow </dev/null` was run with no TTY, in a throwaway
+`GH_CONFIG_DIR`, and stopped after 12 seconds. It was still polling each time, with no "Press Enter" prompt:
+
+- gh 2.103.3, on a headless Ubuntu 24.04 server, printed `! Failed to copy one-time code to clipboard` with its reason, then `! First
+  copy your one-time code: XXXX-XXXX` and `Open this URL to continue in your web browser: https://github.com/login/device`;
+- gh 2.45.0, Ubuntu's package, on a machine with a clipboard and `BROWSER=false`, printed the same two lines, code and address.
+
+So the fix shows the code that matches `one-time code: ([A-Z0-9]{4}-[A-Z0-9]{4})`, which the need declares as its `code`, and the
+person approves it in a browser while gh waits.
 
 ## What design hands the review: the pages it read
 

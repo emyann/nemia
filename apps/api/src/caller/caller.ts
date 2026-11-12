@@ -19,10 +19,10 @@ import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
 import { deleteCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
-import { TOKEN_COOKIE, type TokenRefusal } from 'objects';
+import { Forbidden, TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
-import { type ApiEnv, traceOf } from '../layer.ts';
+import { type ApiEnv, type Served, traceOf } from '../layer.ts';
 import { Engine, runPlaced, StoreConfig, StoreRoot } from '../store.ts';
 
 /** A request whose token the api refuses, with the reason where it presented one: the api's 401 (`objects`' `Unauthorized`). */
@@ -141,3 +141,15 @@ async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Pro
   const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
   return callerBy(c, token, needOf(path, await exposedOf(c)));
 }
+
+/**
+ * A route that is the person's alone: throws `Forbidden` (403) unless the caller of `route` is the person, as a step's session must not
+ * act on the machine outside its agent's fence (approve a pairing, make a first-visit link, start a need's fix). Its words name
+ * `instead`, what the person types at the store's machine.
+ */
+export const personOnly = (s: Served, route: string, instead: string): void => {
+  if (s.caller.kind === 'person') return;
+  throw new Forbidden({
+    error: `${route} is the person's alone, and this request carries a session's token: run ${instead} at the store's machine, or send a token of yours (\`nemia token add <name>\` mints one).`,
+  });
+};

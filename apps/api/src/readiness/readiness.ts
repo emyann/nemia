@@ -21,7 +21,7 @@ import { readsBounded } from '../objects/answer-bound.ts';
 import { followFix, fixOf, liveFacts, readinessOf, startFix, type FixFollowed, type ReadinessFacts } from 'agent-orchestrator';
 import { Api, type FixStreamEvent } from 'objects';
 import { answered, answeredWrite } from '../objects/refused.ts';
-import { personOnly } from '../caller/person-only.ts';
+import { personOnly } from '../caller/caller.ts';
 
 /**
  * The machine's facts the readiness read asks, over the environment `env` the api listens under: the process's own (`liveFacts`) by

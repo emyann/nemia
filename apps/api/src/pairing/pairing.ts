@@ -37,7 +37,7 @@ import {
 } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
-import { personOnly } from '../caller/person-only.ts';
+import { personOnly } from '../caller/caller.ts';
 import { answeredWrite } from '../objects/refused.ts';
 import { cookieSent, overHttps } from '../server/session.ts';
 

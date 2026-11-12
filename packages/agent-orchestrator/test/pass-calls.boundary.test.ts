@@ -312,7 +312,7 @@ test(
   told(FILED),
 );
 
-test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, a worktree's make, a hand-off", async (t) => {
+test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, the checkout's follow, a worktree's make, a hand-off", async (t) => {
   const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: base\ngate: true' }), true);
   const b = board();
   const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
@@ -340,8 +340,12 @@ test("each question a pass asks its place is one call of its place phase, and ea
 
   const filed = await placed();
   assert.deepEqual(filed.advanced.filed, ['implement']);
-  assert.equal(filed.calls, 2, "two questions: the standing, and the make of implement's worktree");
-  assert.ok(filed.git >= 2, `each of them ran git: ${filed.git}`);
+  assert.equal(
+    filed.calls,
+    3,
+    "three questions: the standing, the follow of the checkout before implement is cut, and the make of implement's worktree",
+  );
+  assert.ok(filed.git >= 3, `each of them ran git: ${filed.git}`);
   assert.deepEqual(
     [filed.spawned, filed.all],
     [filed.git, filed.git],

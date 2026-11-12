@@ -332,8 +332,8 @@ test(
       const res = await app.request(streamUrl('implement', `?after=${encodeURIComponent(paged.cursor)}`));
       assert.equal(res.status, 200);
       assert.deepEqual(eventsIn(blocks(await res.text())), engines.events.slice(2), 'none of the two the page answered, every one after');
-      const refused = await app.request(streamUrl('implement', `?after=${encodeURIComponent(`${engines.cursor}~x`)}`));
-      assert.equal(refused.status, 422, 'a cursor whose count is no whole number is refused, as the read refuses it');
+      const badCount = await app.request(streamUrl('implement', `?after=${encodeURIComponent(`${engines.cursor}~x`)}`));
+      assert.equal(badCount.status, 422, 'a cursor whose count is no whole number, as the read takes none');
     });
     await s.test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
       const sessionId = randomUUID();

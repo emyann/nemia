@@ -311,9 +311,14 @@ test('a person works in a factory with hires: the listing names what is unfilled
     'POST /api/namespaces/<factory>/runs on a factory of two repositories: unwired, a 422 naming the attach; wired, the run works on the wired one, whatever `?repo=` says',
     async (t) => {
       addFactory({ name: 'twin', repos: [repoR, repoS] });
-      t.after(() => removeFactory('twin'));
+      const implementer = path.join(repoR, 'workflows', 'agents', 'implementer.md');
+      write(implementer, '---\nharness: claude\n---\nYou implement what you are asked.\n');
+      t.after(() => {
+        removeFactory('twin');
+        fs.rmSync(implementer, { force: true });
+      });
       attachWorkflow({ factory: 'twin', workflow: 'alpha' });
-      hireAgent({ factory: 'twin', agent: 'ada', step: 'alpha/implement' });
+      hireAgent({ factory: 'twin', agent: 'implementer', step: 'alpha/implement' });
       const before = runFiles();
       const unwired = await post(`/api/namespaces/twin/runs?repo=${encodeURIComponent(repoS)}`, {
         workflow: 'alpha',

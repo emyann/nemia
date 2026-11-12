@@ -106,27 +106,43 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
 export const CODEX_SIGN_IN_MS = 15_000;
 
 /**
- * Why Codex cannot start the session `r` because it is signed out on this machine, or `undefined`. It asks `codex login status`,
- * in the session's working root and environment — the engine's, less its telemetry, under the task's own `config.env` — as the
- * user the engine runs as, which is the user Codex would run as. A nonzero exit is signed out: the words quote the last line Codex
- * printed and name the command that signs in. An answer that never comes within `ms`, and a `codex` that does not start, refuse
- * nothing: an unknown answer is not a signed-out one, and a missing binary fails the spawn in its own words, as it did before.
+ * Whether Codex is signed in on this machine, as `codex login status` answers within `ms` under the environment `env` from the folder
+ * `cwd`: exit 0 is `signed-in`; any other exit `signed-out`, with the last line Codex printed (`said`); an answer that never comes, and a
+ * `codex` that does not start, `unknown` — an unknown answer is not a signed-out one. The runtime's read of a harness's sign-in, which
+ * the spawn's refusal (`signedOutRefusal`) and a readiness read above it share.
  */
-const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
-  const ran = spawnSync('codex', ['login', 'status'], {
-    cwd: r.cwd,
-    encoding: 'utf8',
-    timeout: ms,
-    env: { ...withoutTelemetry(process.env), ...r.config?.env },
-  });
-  if (ran.error !== undefined || ran.status === null || ran.status === 0) return undefined;
+export type CodexSignIn =
+  | { readonly state: 'signed-in' }
+  | { readonly state: 'signed-out'; readonly said: string | undefined; readonly code: number }
+  | { readonly state: 'unknown' };
+
+/** Asks `codex login status` (`CodexSignIn`). */
+export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string): CodexSignIn => {
+  const ran = spawnSync('codex', ['login', 'status'], { ...(cwd === undefined ? {} : { cwd }), encoding: 'utf8', timeout: ms, env });
+  if (ran.error !== undefined || ran.status === null) return { state: 'unknown' };
+  if (ran.status === 0) return { state: 'signed-in' };
   const said = `${ran.stdout ?? ''}\n${ran.stderr ?? ''}`
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
     .at(-1);
-  const answer = said === undefined ? `exited ${ran.status}` : `said "${quote(said, WORDS_QUOTE)}"`;
-  return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`codex login --device-auth\`, as the user the engine runs as, then try again.`;
+  return { state: 'signed-out', said, code: ran.status };
+};
+
+/** The command that signs Codex in on a machine with no browser, which a refusal and a readiness read name. */
+export const CODEX_SIGN_IN_COMMAND = 'codex login --device-auth';
+
+/**
+ * Why Codex cannot start the session `r` because it is signed out on this machine, or `undefined`. It asks `codex login status`
+ * (`codexSignIn`), in the session's working root and environment — the engine's, less its telemetry, under the task's own `config.env`
+ * — as the user the engine runs as, which is the user Codex would run as. Signed out, the words quote the last line Codex printed and
+ * name the command that signs in. Unknown refuses nothing: a missing binary fails the spawn in its own words, as it did before.
+ */
+const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
+  const read = codexSignIn({ ...withoutTelemetry(process.env), ...r.config?.env }, ms, r.cwd);
+  if (read.state !== 'signed-out') return undefined;
+  const answer = read.said === undefined ? `exited ${read.code}` : `said "${quote(read.said, WORDS_QUOTE)}"`;
+  return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`${CODEX_SIGN_IN_COMMAND}\`, as the user the engine runs as, then try again.`;
 };
 
 /**

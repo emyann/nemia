@@ -144,7 +144,7 @@ export { heldHarnessesOf } from './service/options.ts';
  * from a file of its own and words the refusal there.
  */
 export { remoteConfigRefusal } from './a2a/index.ts';
-export { codex } from './harness/codex/codex.ts';
+export { codex, codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from './harness/codex/codex.ts';
 /** The harnesses an engine given none runs, by the name each is configured under: for a caller that hands the engine a map of its own. */
 export { DEFAULT_HARNESSES } from './service/default-harnesses.ts';
 /**

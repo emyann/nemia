@@ -9,10 +9,10 @@ import { pausedLines } from '../pause/pause.ts';
  * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the RunList
  * (`runList`), judged off the same judgement of each (`informedJudgements`), at `GET /api/runs`: its links (`served`), the tools of the
  * MCP port, are that list, which `nemia ls` and the port both ask for its `Table` and print a run a line, and one Run (`GET
- * /api/runs/:name`), never each run's whole record. The api serves this entry's answer whole on `GET /api/listing` and
- * `GET /api/listing/:runId`, which `nemia ls <run>` reads and prints with this entry's lines, as a client of it.
+ * /api/runs/:name`), never each run's whole record. The api serves no route of this entry's answer: it is the in-process read alone,
+ * which `nemia ls --local` prints with this entry's lines.
  */
-/** What `nemia ls` takes, and the api's listing calls it with: a run's id or none, its selectors, and the labels shown. */
+/** What `nemia ls` takes: a run's id or none, its selectors, and the labels shown. */
 const LsInput = Schema.Struct({
   runId: Schema.optionalKey(Schema.String),
   selector: Schema.optionalKey(Schema.Array(Schema.String)),

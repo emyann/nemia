@@ -5,7 +5,7 @@
  * asked by `status.state=finished` answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with the `continue` token
  * that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
-import { DEFAULT_NAMESPACE, RUN_STATES, type RunState } from 'objects';
+import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_STATES, type RunState } from 'objects';
 import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';
 import type { RunNamespace } from '../../contracts/run-namespace.contract.ts';
 import type { RunStateSelector, RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
@@ -77,15 +77,19 @@ export const finishedAfter = (token: string): Finished | Invalid => {
 
 /**
  * The page `asked` cuts of `sorted`, the finished runs in their order (`finishedBefore`): it starts at the first run the token's place
- * comes before, so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage`.
- * `Invalid` for a limit `listPage` refuses or a token that is no finished token.
+ * comes before, so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage` within
+ * `bounds` (`LIST_PAGE` unless a test shortens them). `Invalid` for a limit `listPage` refuses or a token that is no finished token.
  */
-export const finishedPageOf = <T extends Finished>(sorted: readonly T[], asked: PageAsked): Paged<T> | Invalid => {
+export const finishedPageOf = <T extends Finished>(
+  sorted: readonly T[],
+  asked: PageAsked,
+  bounds: PageBounds = LIST_PAGE,
+): Paged<T> | Invalid => {
   const after = asked.continue === undefined ? undefined : finishedAfter(asked.continue);
   if (after instanceof Invalid) return after;
   const found = after === undefined ? 0 : sorted.findIndex((run) => finishedBefore(keyOf(after), keyOf(run)));
   const start = found === -1 ? sorted.length : found;
-  const cut = listPage(sorted.length, start, asked.limit);
+  const cut = listPage(sorted.length, start, asked.limit, bounds);
   if ('refused' in cut) return badLimit(asked.limit);
   const items = sorted.slice(cut.from, cut.to);
   const last = items.at(-1);

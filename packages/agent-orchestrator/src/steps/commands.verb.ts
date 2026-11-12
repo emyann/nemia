@@ -11,6 +11,8 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun } from '../record/record.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import { transcriptAskedRead, transcriptCursorRead, transcriptPaged } from './transcript-page.ts';
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });
@@ -33,8 +35,24 @@ export type StepFileInput = typeof StepFileInput.Type;
 export const StepTaskInput = Schema.Struct({ runId: Schema.String, step: Schema.String, task: Schema.String });
 export type StepTaskInput = typeof StepTaskInput.Type;
 
-/** What a read of a step's conversation takes: its task's, and the cursor to read from, none for the start. */
-export const StepTranscriptInput = Schema.Struct({ ...StepTaskInput.fields, after: Schema.optionalKey(Schema.String) });
+/**
+ * What a read of a step's conversation takes: its task's, and the cursor to read from, none for the start; and `page`, where it is read
+ * as the api's `GET …/transcript` answers, a page: the first `limit` events or the `last` ones, of the `kinds` asked, within `bounds`
+ * (`TRANSCRIPT_PAGE`, unless a test shortens them), the cursor `<engine cursor>~<n>` (`transcriptPaged`). With no `page`, the engine's
+ * whole read after its own cursor, as the stream follows it.
+ */
+export const StepTranscriptInput = Schema.Struct({
+  ...StepTaskInput.fields,
+  after: Schema.optionalKey(Schema.String),
+  page: Schema.optionalKey(
+    Schema.Struct({
+      limit: Schema.optionalKey(Schema.String),
+      last: Schema.optionalKey(Schema.String),
+      kinds: Schema.optionalKey(Schema.String),
+      bounds: Schema.Struct({ byDefault: Schema.Number, most: Schema.Number }),
+    }),
+  ),
+});
 export type StepTranscriptInput = typeof StepTranscriptInput.Type;
 
 /** The file `name` of the files directory of the step `step` of the run `id` (`artifactFile`), or null where there is none. */
@@ -104,14 +122,17 @@ export type ConversationEvent = Effect.Success<ReturnType<Engine['transcript']>>
 
 /**
  * One read of the conversation of the task `task` — the current one of the step `step` of the run `id`, as the api resolved it — from
- * the cursor `after`, none for the start: the engine's events, and the cursor to read on from.
+ * the cursor `after`, none for the start: the engine's events, and the cursor to read on from. Asked a `page`, the engine reads from the
+ * engine's cursor `after` carries, and the page is cut of its read (`transcriptPaged`): `more` says events already said are left after it;
+ * `Invalid` for a cursor, a count or a kind the page refuses, before the engine is asked. The port's tool reads the last 50 events where
+ * its call asks neither `limit` nor `last`: an agent reads where a conversation is.
  */
-export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string }, StepTranscriptInput> = {
+export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: string; more?: boolean }, StepTranscriptInput> = {
   name: 'step transcript',
-  served: [{ endpoint: 'steps.transcript' }],
+  served: [{ endpoint: 'steps.transcript', query: { last: '50' } }],
   usage: '<runId> <step>',
   help: ["a read of a step's conversation"],
-  spec: stepSpec([], ['task', 'after']),
+  spec: stepSpec([], ['task', 'after', 'limit', 'last', 'kinds']),
   writes: false,
   class: 'read',
   only: {
@@ -119,10 +140,20 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
     why: "the board reads a step's conversation as it goes; at the command line, nemia logs reads what its session printed",
   },
   input: StepTranscriptInput,
-  handler: Effect.fnUntraced(function* ({ task, after }: StepTranscriptInput) {
+  handler: Effect.fnUntraced(function* ({ task, after, page }: StepTranscriptInput) {
     const e = yield* EngineService;
-    const { events, cursor } = yield* asked('transcript', e.transcript(task, after));
-    return { events: [...events], cursor };
+    if (page === undefined) {
+      const { events, cursor } = yield* asked('transcript', e.transcript(task, after));
+      return { events: [...events], cursor };
+    }
+    const at = transcriptCursorRead(after);
+    if (at instanceof Invalid) return yield* Effect.fail(at);
+    const checked = transcriptAskedRead(page, page.bounds);
+    if (checked instanceof Invalid) return yield* Effect.fail(checked);
+    const read = yield* asked('transcript', e.transcript(task, at.engine));
+    const paged = transcriptPaged(read, at, page, page.bounds);
+    if (paged instanceof Invalid) return yield* Effect.fail(paged);
+    return { ...paged, events: [...paged.events] };
   }),
   print: () => [],
 };

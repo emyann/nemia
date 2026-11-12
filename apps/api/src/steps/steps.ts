@@ -18,6 +18,9 @@ import {
   STEP_PATH,
   STEP_TRANSCRIPT,
   tailOf,
+  transcriptAskedRead,
+  transcriptCursorRead,
+  type TranscriptAsked,
   type TaskView,
   TOLD,
   TRIES,
@@ -37,6 +40,8 @@ import {
   type StepPath,
   type StepStreamEvent,
   type StepTranscript,
+  TRANSCRIPT_PAGE,
+  type PageBounds,
 } from 'objects';
 import { pathToTurn, tryOfStep } from './path.ts';
 import type { Followings, Relayed, TranscriptEvent } from './following.ts';
@@ -72,9 +77,17 @@ const servedFile = (name: string, file: Buffer) =>
 /** A request's reads of the engine: the engine, and the request's services a program of the package's runs over. */
 type Reader = Pick<Served, 'e' | 'inRequest'>;
 
-/** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`STEP_TRANSCRIPT`). */
-const transcriptOf = (r: Reader, id: string, step: string, task: string, after?: string) =>
-  r.inRequest(STEP_TRANSCRIPT.handler({ runId: id, step, task, ...(after !== undefined && { after }) }));
+/** What a page of a conversation asks (`STEP_TRANSCRIPT`'s `page`): the query's counts and kinds, and the bounds it is cut within. */
+type PageAskedOf = TranscriptAsked & { readonly bounds: PageBounds };
+
+/**
+ * One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`STEP_TRANSCRIPT`): the engine's whole
+ * read after its cursor, or, asked a `page`, the page cut of it, its cursor `<engine cursor>~<n>`.
+ */
+const transcriptOf = (r: Reader, id: string, step: string, task: string, after?: string, page?: PageAskedOf) =>
+  r.inRequest(
+    STEP_TRANSCRIPT.handler({ runId: id, step, task, ...(after !== undefined && { after }), ...(page !== undefined && { page }) }),
+  );
 
 /** A read as the stream takes it: the engine's events, as the `Api`'s `StepTranscript` serves them, and a cursor always. */
 type Read = Omit<StepTranscript, 'events' | 'cursor'> & { events: TranscriptEvent[]; cursor: string };
@@ -115,7 +128,14 @@ const unreadAs = (err: unknown): unknown =>
  * refused read from a cursor is asked again from the start, which refuses only the harness: the words of the engine's refusal are the
  * engine's to change, and are never parsed.
  */
-async function readTranscript(r: Reader, id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
+async function readTranscript(
+  r: Reader,
+  id: string,
+  step: string,
+  taskId: string,
+  after: string | undefined,
+  page?: PageAskedOf,
+): Promise<Read> {
   let view: TaskView;
   try {
     view = await engineRead('view', r.e.view(taskId));
@@ -134,8 +154,14 @@ async function readTranscript(r: Reader, id: string, step: string, taskId: strin
     );
   }
   try {
-    const { events, cursor } = await transcriptOf(r, id, step, taskId, after);
-    return { events, cursor, live: phase === 'running' || phase === 'pending', open: view.state.settled === null };
+    const { events, cursor, more } = await transcriptOf(r, id, step, taskId, after, page);
+    return {
+      events,
+      cursor,
+      live: phase === 'running' || phase === 'pending',
+      open: view.state.settled === null,
+      ...(more !== undefined && { more }),
+    };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     if ((err as { exitCode?: unknown }).exitCode !== 2) {
@@ -434,12 +460,20 @@ const pathOf = (runId: string, step: string, tried: string | undefined) =>
     }
   });
 
-/** The step's conversation read once from `after` (`readTranscript`), nothing for a step not filed yet. */
-const transcriptAt = (runId: string, step: string, after: string | undefined) =>
+/**
+ * A page of the step's conversation read once from `after` (`readTranscript`), as `asked` cuts it within `bounds` (`TRANSCRIPT_PAGE`,
+ * unless a test shortens them), nothing for a step not filed yet. A cursor whose count is no whole number from 0, a `limit` or a `last`
+ * that is no whole number from 1, both asked, or a kind that is none are `Invalid` (422), refused before anything is read.
+ */
+export const transcriptAt = (runId: string, step: string, after: string | undefined, asked: TranscriptAsked, bounds = TRANSCRIPT_PAGE) =>
   answered(async (s): Promise<StepTranscript> => {
+    const at = transcriptCursorRead(after);
+    if (at instanceof Error) throw at;
+    const checked = transcriptAskedRead(asked, bounds);
+    if (checked instanceof Error) throw checked;
     const { taskId } = stepOf(s, runId, step);
     if (!taskId) return { events: [], cursor: null, live: false, open: false };
-    return readTranscript(s, runId, step, taskId, after).catch((err: unknown) => Promise.reject(unreadAs(err)));
+    return readTranscript(s, runId, step, taskId, after, { ...asked, bounds }).catch((err: unknown) => Promise.reject(unreadAs(err)));
   });
 
 /** The step's conversation followed from `after`: read once before the stream opens, so its refusals are statuses, then streamed. */
@@ -480,10 +514,11 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
  * - `file` — one file of a folder step's own folder, by name and never by path (`STEP_FILE`), as `files` on the step links it: what the
  *   step made, named in its closeout or not. `BadRequest` for a name that is not one; `Missing` for a step that works on a branch, or a
  *   file the folder does not have.
- * - `transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read from the start): the engine's
- *   events for the step's current task, whether it is live and whether it may yet say more (`open`), read through `STEP_TRANSCRIPT`. A
- *   step not filed yet has nothing to read, is neither live nor open, and nothing of it moves until a tick files it. Refusals are
- *   `readTranscript`'s.
+ * - `transcript` — a page of the step's conversation read once from the cursor `after` (an empty one is none, read from the start): the
+ *   engine's events for the step's current task — the first `limit`, or the `last`, of the `kinds` asked, `TRANSCRIPT_PAGE`'s default
+ *   page where neither count is asked — whether events are left after the page (`more`), whether it is live and whether it may yet say
+ *   more (`open`), read through `STEP_TRANSCRIPT`; its cursor `<engine cursor>~<n>`. A step not filed yet has nothing to read, is neither
+ *   live nor open, and nothing of it moves until a tick files it. Refusals are `transcriptAt`'s and `readTranscript`'s.
  * - `transcriptStream` — the same conversation followed, as server-sent events. It starts after the Last-Event-ID an EventSource sends
  *   when it reconnects, else after `after`. The first read is made before the stream opens, so a refused cursor or a lost task is an
  *   answer with a status (`readTranscript`'s), not an event; a step not filed yet is `Missing`.
@@ -527,7 +562,9 @@ export const stepsHandlers = HttpApiBuilder.group(Api, 'steps', (handlers) =>
     .handle('artifact', ({ params: { runId, step, file } }) => artifactOf(runId, step, file))
     .handle('file', ({ params: { runId, step, file } }) => fileOf(runId, step, file))
     .handle('path', ({ params: { runId, step }, query }) => pathOf(runId, step, query.try))
-    .handle('transcript', ({ params: { runId, step }, query }) => transcriptAt(runId, step, query.after || undefined))
+    .handle('transcript', ({ params: { runId, step }, query: { after, limit, last, kinds } }) =>
+      transcriptAt(runId, step, after || undefined, { limit, last, kinds }),
+    )
     .handle('transcriptStream', ({ params: { runId, step }, query, headers }) =>
       followedFrom(runId, step, headers['last-event-id'] || query.after || undefined),
     ),

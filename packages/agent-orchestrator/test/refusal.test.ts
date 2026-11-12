@@ -143,6 +143,10 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * more; `agent-orchestrator/workflow`, which exports the policy's line (`checkFailurePolicyLine`) through that face, four more: those two,
  * `check/check.ts` behind the face and `out-of-memory/out-of-memory.ts`, which it reads the words of a check killed at its limit by. All
  * four pure, importing nothing but pure files and their contracts' types, and none touching a disk.
+ *
+ * `agent-orchestrator/run` is two more since `list/list.ts` and `tick/assess.ts` read a run's needs through the needs folder's face rather
+ * than `needs/needs.ts` itself: `needs/index.ts`, the face, and `needs/harness.ts` behind it, whose mark of a harness's removal and
+ * install command the face exports beside the needs' judgements. Both pure, importing nothing but types, and neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 206, effect: 15 },

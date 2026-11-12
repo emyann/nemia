@@ -26,6 +26,9 @@ import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
 import { claudeTokenFile, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
 import { signInNeedOf } from './harness.ts';
 import { readinessOf, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
+import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
+import type { Run } from '../record/record.ts';
+import { aRun } from '../../test/run-walks.ts';
 
 const ROOT = scratch('wf-readiness-');
 delete process.env[TOKEN_VARIABLE];
@@ -232,11 +235,82 @@ test('a harness nobody activated and no workflow runs on is inactive, its instal
   const repo = fs.mkdtempSync(path.join(ROOT, 'named-'));
   const dir = path.join(repo, 'workflows', 'dev');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nharness: ${other}\n---\nimplement it\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: folder\nharness: ${other}\n---\nimplement it\n`);
   createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
   const named = await read(facts({ PATH }), identity('exit 0'));
   assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
   assert.equal(named.ready, false);
+});
+
+/**
+ * The second harness the runtime declares with needs, its program taken off this process's PATH for the test `t`, and a read of the store
+ * `home` that answers that harness's two pieces' states and whether the read is ready.
+ */
+const secondHarness = (t: { after: (fn: () => void) => void }) => {
+  const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
+  assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
+  const program = declaration.needs.program;
+  const ambient = process.env.PATH;
+  process.env.PATH = (ambient ?? '')
+    .split(path.delimiter)
+    .filter((dir) => !fs.existsSync(path.join(dir, program)))
+    .join(path.delimiter);
+  t.after(() => {
+    process.env.PATH = ambient;
+  });
+  const readAt = async (home: string) => {
+    const got = await Effect.runPromise(
+      readinessOf(facts({ PATH: '/usr/bin:/bin' })).pipe(
+        Effect.provide(PlaceService.layer({ ...testPlace().place, declared: { ...declared, needs: [] } })),
+        Effect.provideService(StoreRoot, home),
+      ),
+    );
+    return { states: got.pieces.filter((p) => p.harness?.name === other).map((p) => p.state), ready: got.ready };
+  };
+  return { other, readAt };
+};
+
+test("a store agent hired into a factory's step names its harness to the read, as it holds a run on it", async (t) => {
+  const { other, readAt } = secondHarness(t);
+  const home = scratch('wf-readiness-hired-');
+  const agents = path.join(home, 'workflows', 'agents');
+  fs.mkdirSync(agents, { recursive: true });
+  fs.writeFileSync(path.join(agents, 'coder.md'), `---\nrole: Coder\ndescription: Writes the code.\nharness: ${other}\n---\nwrite it\n`);
+  const repo = fs.mkdtempSync(path.join(home, 'hired-'));
+  const dir = path.join(repo, 'workflows', 'dev');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: folder\n---\nimplement it\n');
+
+  createFactoryAt(home, { name: 'unhired', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'the store agent alone, hired nowhere, runs no step');
+
+  createFactoryAt(home, { name: 'hired', repos: [repo], workflows: ['dev'], hires: { 'dev/implement': 'coder' }, schedules: {} });
+  const hired = await readAt(home);
+  assert.deepEqual(hired.states, ['missing', 'missing'], "hired into the factory's step, the store agent's harness counts");
+  assert.equal(hired.ready, false);
+});
+
+test('a run of no factory that has filed nothing names the harness its frozen steps run on, and names it no more once a step is filed', async (t) => {
+  const { other, readAt } = secondHarness(t);
+  const home = scratch('wf-readiness-run-');
+  const runs = <A, E>(program: (door: RunDoorShape) => Effect.Effect<A, E>) =>
+    Effect.runPromise(Effect.provideService(Effect.flatMap(RunDoor, program), StoreRoot, home));
+  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'no factory and no run: nothing runs on it');
+
+  const run: Run = {
+    ...aRun('r-folder'),
+    workflowFiles: 'ab',
+    workflow: [{ name: 'implement', after: [], body: 'do it', harness: other }],
+    steps: { implement: { taskId: null } },
+  };
+  assert.equal(run.factory, undefined, 'the run is of no factory');
+  await runs((door) => door.runs.create(run));
+  const held = await readAt(home);
+  assert.deepEqual(held.states, ['missing', 'missing'], 'its frozen step runs on it, so the run would be held on it');
+  assert.equal(held.ready, false);
+
+  await runs((door) => door.runs.rewrite({ ...run, steps: { implement: { taskId: 'r-folder-implement' } } }));
+  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'a run that has filed a step is held on no need');
 });
 
 test('every piece declares what it costs while missing: linger and the bind keep the server up or open, a harness and a need a run waits on; and the read says whether a run was ever started', async () => {

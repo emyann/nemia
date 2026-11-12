@@ -11,14 +11,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { Effect } from 'effect';
+import { Effect, Exit } from 'effect';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import type { Env } from '../config/config.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
-import type { FactoryListing } from '../factory/factory.ts';
-import { workflowNeedsRead } from '../folder/folder.store.ts';
+import type { Factory, FactoryListing } from '../factory/factory.ts';
+import { workflowDirAt, workflowNeedsRead } from '../folder/folder.store.ts';
+import { placesOf } from '../folder/lookup.store.ts';
+import { factoryFills } from '../factory/rules/rules.store.ts';
+import { stepsOf } from '../steps/steps.verb.ts';
+import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { tried } from '../runtime-client.ts';
@@ -26,7 +30,6 @@ import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
 import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
-import { frontmatterKey } from '../former/former.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { fixCommandOf, type FixAt } from './needs.ts';
 import { harnessOfNeed, harnessVersionWord, signInNeedOf, versionIn } from './harness.ts';
@@ -35,6 +38,9 @@ import {
   checkKey,
   factoryRepository,
   factoryWorkflows,
+  harnessesHolding,
+  heldOnNeeds,
+  runHarnesses,
   harnessCheckOf,
   isRepositoryNeed,
   repositoryCheckOf,
@@ -244,48 +250,54 @@ const VERSION_WORDS = {
   unread: () => 'its version could not be read',
 } as const;
 
-/** The text of `file`, none where it does not read: such a file names no harness, and its workflow's own load says why. */
-const textOf = (file: string): string | undefined => {
-  try {
-    return fs.readFileSync(file, 'utf8');
-  } catch {
-    return undefined;
-  }
-};
-
-/** The harnesses the agents and steps of `workflows` name (`harness:` in their files), read off their folders as they are now. */
-function harnessesNamed(workflows: readonly FactoryWorkflow[]): Set<string> {
+/**
+ * The harnesses a run would be held on (`harnessesHolding`, `runHarnesses`, by which `runNeeds` holds runs), each read as a run reads its
+ * steps, so the read and the holding cannot drift: each factory's workflow as a start in it would load it — through the Workflow door,
+ * its agents found along the places a run of it looks (`lookupRoots`: its tree, which a template's overlays render into, the factory's
+ * repository, then the store's own), its steps filled by the factory's hires (`factoryFills`) — and each run's frozen steps while its needs
+ * may hold it, a run of a folder that is no factory's among them. A folder that does not load names none: a start of it is refused, and
+ * says why.
+ */
+const harnessesNamed = Effect.fnUntraced(function* (home: string, factories: readonly FactoryListing[]) {
   const named = new Set<string>();
-  const read = (file: string) => {
-    const text = textOf(file);
-    const harness = text === undefined ? undefined : frontmatterKey(text, 'harness');
-    if (harness !== undefined) named.add(harness);
-  };
-  const mdIn = (dir: string): string[] => {
-    try {
-      return fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
-    } catch {
-      return [];
-    }
-  };
-  for (const w of workflows) {
-    for (const f of mdIn(w.dir)) read(path.join(w.dir, f));
-    const agents = path.join(path.dirname(w.dir), 'agents');
-    for (const f of mdIn(agents)) read(path.join(agents, f));
+  for (const f of factories) {
+    if ('error' in f) continue;
+    for (const w of factoryWorkflows([f])) for (const h of yield* workflowHarnesses(home, f, w)) named.add(h);
+  }
+  for (const run of yield* (yield* RunDoor).runs.list()) {
+    if (!heldOnNeeds(run)) continue;
+    const steps = yield* stepsOf(run).pipe(Effect.orElseSucceed(() => []));
+    for (const h of harnessesHolding(run, steps)) named.add(h);
   }
   return named;
-}
+});
 
 /**
- * The harnesses the read counts: the default, each a factory's workflow or agent names (`harnessesNamed`), and each whose install is in
- * place, which a person activated. Any other is `inactive`.
+ * The harnesses the steps of the workflow `w` of the factory `f` run sessions on (`runHarnesses`), its folder loaded as a start in `f`
+ * loads it: its agents looked for in the factory's repository, its tree where it names none, and in the store `home`, its steps filled by
+ * the factory's hires. None where it does not load.
  */
-const harnessesWanted = (memo: NeedsMemo, workflows: readonly FactoryWorkflow[]): Set<string> => {
+const workflowHarnesses = Effect.fnUntraced(function* (home: string, f: Factory, w: FactoryWorkflow) {
+  const door = (yield* WorkflowDoor).workflows;
+  const loaded = yield* Effect.exit(
+    Effect.flatMap(
+      tried(() => ({ dir: workflowDirAt(w.dir), fills: factoryFills(home, f, w.workflow).fills })),
+      ({ dir, fills }) => door.read(dir, placesOf(home, f.repos[0] ?? f.tree), fills),
+    ),
+  );
+  return Exit.isSuccess(loaded) ? runHarnesses(loaded.value) : [];
+});
+
+/**
+ * The harnesses the read counts: the default, each a run would be held on (`harnessesNamed`), and each whose install is in place, which a
+ * person activated. Any other is `inactive`.
+ */
+const harnessesWanted = (memo: NeedsMemo, named: ReadonlySet<string>): Set<string> => {
   const installed = memo.harnessNeeds.flatMap((need) => {
     const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
     return of?.part === 'install' && memo.readings.get(checkKey(harnessCheckOf(need))) === 'met' ? [of.name] : [];
   });
-  return new Set([DEFAULT_HARNESS, ...harnessesNamed(workflows), ...installed]);
+  return new Set([DEFAULT_HARNESS, ...named, ...installed]);
 };
 
 /**
@@ -488,7 +500,7 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
   const trusted = new Set((yield* trustedOf(factories)).map((f) => f.name));
   const untrusted = new Set(factories.map((f) => f.name).filter((name) => !trusted.has(name)));
   const pieces: ReadinessPiece[] = [
-    ...harnessPieces(home, memo, facts, harnessesWanted(memo, workflows)),
+    ...harnessPieces(home, memo, facts, harnessesWanted(memo, yield* harnessesNamed(home, factories))),
     ...servicePieces(facts),
     bindPiece(facts),
     ...machinePieces(home, facts),

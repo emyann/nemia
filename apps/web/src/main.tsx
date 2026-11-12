@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { TokenPage } from './components/frame/TokenPage';
 import { tokenAsked } from './lib/api/read';
+import { claimLinkOnLoad } from './lib/linkClaim';
 import { useTokenAsked } from './lib/token';
 import { routeTree } from './routeTree.gen';
 import './styles.css';
@@ -45,10 +46,18 @@ function Board() {
   return ask ? <TokenPage asked={ask} /> : <RouterProvider router={router} />;
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <Board />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+/**
+ * Draws the board once a first-visit link the address carries is claimed (`claimLinkOnLoad`), so its first read is made with the cookie
+ * the claim set; an address with no link is drawn at once.
+ */
+function render(): void {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <Board />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
+void claimLinkOnLoad().then(render);

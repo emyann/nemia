@@ -12,6 +12,7 @@ import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-a
 import { Effect } from 'effect';
 import type { HarnessQuota, QuotaLimit } from '../seam.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
+import { programIn } from '../harness-bin.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
 /** How long an ask may take before it is given up on, and its query closed. */
@@ -51,9 +52,9 @@ export const EXECUTABLE_VARIABLE = 'AE_CLAUDE_EXECUTABLE';
 
 /**
  * Which Claude Code an ask drives: the one the sessions run. The engine's `claudeExecutable` where one is `named`; else the one `env`
- * names as `EXECUTABLE_VARIABLE`, which a job inherits from the engine and runs; else `undefined`, the Agent SDK's own — the native CLI
- * it bundles for this platform, which a job runs when nothing is named. Never resolved on PATH: a `claude` there may be another version,
- * or signed in as another account, and on a machine with only a release there is none. Pure.
+ * names as `EXECUTABLE_VARIABLE`, which a job inherits from the engine and runs; else `undefined`: `claudeQuota` then asks the one in
+ * the engine's `harnessBin` where there is one, as a job's spawn does, and otherwise the Agent SDK's own — the native CLI it bundles for
+ * this platform. Never resolved on PATH: a `claude` there may be another version, or signed in as another account. Pure.
  */
 export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined =>
   named ?? (env[EXECUTABLE_VARIABLE] || undefined);
@@ -222,23 +223,30 @@ class Unopened {
 
 /**
  * Ask Claude Code for the plan's usage: the Claude Code the sessions run (`quotaExecutable` of `command`, the engine's `claudeExecutable`,
- * and of `env`, this process's environment by default), read at each ask. Open a query for the question (`sdkUsageAsk`, or the `ask`
- * given), put it, and read what it answers (`quotaOfUsage`), how it refused (`quotaOfRefusal`), or why it could not be opened
- * (`quotaOfUnopened`), each answer a person meets by running Claude Code by hand naming the one asked as a path to type (`program`:
- * `claudeExecutableOf`, the one named, else the SDK's own bundled CLI, which on an install is the release's). The query is taken in the
- * ask's scope and closed as it closes, whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an
- * interruption. Never fails: every way it can go is a `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there,
- * or the SDK bundles none for this platform.
+ * and of `env`, this process's environment by default, else `<harnessBin>/claude` where it exists), read at each ask. Open a query
+ * for the question (`sdkUsageAsk`, or the `ask` given), put it, and read what it answers (`quotaOfUsage`), how it refused
+ * (`quotaOfRefusal`), or why it could not be opened (`quotaOfUnopened`), each answer a person meets by running Claude Code by hand
+ * naming the one asked as a path to type (`program`: `claudeExecutableOf`, the one named, else `<harnessBin>/claude`, else the SDK's
+ * own bundled CLI, else the one on PATH). The query is taken in the ask's scope and closed as it closes, whatever ends it: an
+ * outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never fails: every way it can go is a
+ * `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there, or the SDK bundles none for this platform.
  */
 export const claudeQuota = ({
   command,
   timeoutMs = QUOTA_TIMEOUT_MS,
   env = process.env,
   ask = sdkUsageAsk(env),
-}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
+  harnessBin,
+}: {
+  command?: string;
+  timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
+  ask?: OpenUsage;
+  harnessBin?: string;
+} = {}): Effect.Effect<HarnessQuota> =>
   Effect.suspend(() => {
-    const executable = quotaExecutable(command, env);
-    const program = claudeExecutableOf(executable) ?? null;
+    const executable = quotaExecutable(command, env) ?? programIn(harnessBin, 'claude');
+    const program = claudeExecutableOf(executable, harnessBin) ?? null;
     return Effect.acquireRelease(Effect.try({ try: () => ask(executable), catch: (cause) => new Unopened(cause) }), (open) =>
       Effect.promise(() => open.close().catch(() => undefined)),
     ).pipe(

@@ -10,9 +10,16 @@
  * `harness/declaration.ts`, `harness/claude/rules.ts`, `harness/choices.ts`, `harness/reach.ts`, `harness/config-folders.ts`,
  * `core/memory.ts` and `core/own.ts` alone (`test/vocabulary-door.test.ts`).
  */
-export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/vocabulary.ts';
+export {
+  CLAUDE_AUTO_DROPPED,
+  CLAUDE_CONTEXT_TOKENS,
+  CLAUDE_EFFORTS,
+  CLAUDE_PERMISSION_MODES,
+  CLAUDE_PIN,
+  CLAUDE_SDK_VERSION,
+} from './harness/claude/vocabulary.ts';
 export { CLAUDE_RULES, type ClaudeRules, type Dated } from './harness/claude/rules.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_PIN, CODEX_SANDBOXES, CODEX_SIGN_IN_COMMAND } from './harness/codex/vocabulary.ts';
 export {
   CAPABILITIES,
   DEFAULT_HARNESS,
@@ -26,6 +33,8 @@ export {
   type Capability,
   type HarnessDeclaration,
   type HarnessDeclared,
+  type HarnessNeeds,
+  type HarnessSignInFix,
   type OwnArgs,
   type VerbHarness,
 } from './harness/declaration.ts';

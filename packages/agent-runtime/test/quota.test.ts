@@ -242,6 +242,17 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
       assert.equal(stand.seen.command, asked, 'the ask was opened over that Claude Code');
       assert.equal(usageOptions(asked, env).pathToClaudeCodeExecutable, asked, "and the SDK's query is given it, or nothing");
     });
+  await t.test("the one in the engine's `harnessBin` where neither names one, before the SDK's own; the one named over it", async () => {
+    const harnessBin = scratch('ae-quota-harness-bin-');
+    const inBin = path.join(harnessBin, 'claude');
+    fs.writeFileSync(inBin, '#!/bin/sh\n', { mode: 0o755 });
+    const found = standIn(async () => usageOf('plan'));
+    assert.deepEqual(await Effect.runPromise(claudeQuota({ env: { PATH }, ask: found.ask, harnessBin })), PLAN);
+    assert.equal(found.seen.command, inBin);
+    const named = standIn(async () => usageOf('plan'));
+    await Effect.runPromise(claudeQuota({ command: '/engine/claude', env: { PATH }, ask: named.ask, harnessBin }));
+    assert.equal(named.seen.command, '/engine/claude');
+  });
 });
 
 test('REFUSED: an ask whose query cannot be opened — the SDK throwing in words, with no errorClass, as it does when its platform package is not installed — answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {

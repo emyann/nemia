@@ -35,7 +35,7 @@ import { conditionOf, nodeFate, nodeKind } from '../route/index.ts';
 import { answeredRoute, routedWords } from '../route/routed/index.ts';
 import type { RunStatusWord } from 'objects';
 import { hasStarted } from '../wait/wait.ts';
-import { needsWaited, type NeedHeld, type NeedWaited } from '../needs/needs.ts';
+import { needsWaited, type NeedHeld, type NeedWaited } from '../needs/index.ts';
 
 export type Assessment = {
   /**

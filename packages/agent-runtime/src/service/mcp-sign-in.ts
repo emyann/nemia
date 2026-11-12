@@ -174,13 +174,15 @@ export const noSignInHarness = (declared: readonly HarnessDeclared[]): string =>
 /**
  * The four verbs over the harnesses this engine has, the hold of each waiting sign-in kept here by its callback port (`portsHeld`).
  * Each is refused, with nothing spawned, where no harness of the engine declares `mcp`: only Claude Code is measured to sign in
- * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret.
+ * (`signsInMcp`), and Codex 0.154 hands GitHub no client secret. The Claude Code each runs is found at each ask (`claudeExecutableOf`):
+ * `executable`, else the one in `harnessBin`, else the SDK's bundled one, else the one on PATH.
  */
 export const mcpSignInVerbsOf = (
   harnesses: Record<string, HarnessConfig>,
   root: string,
   executable: string | undefined,
   seams: SignInSeams = {},
+  harnessBin?: string,
 ) => {
   const states = new Map<string, McpSignInState>();
   const { byPort, claimed, waitsOn, portOf, settle } = portsHeld(states);
@@ -191,9 +193,9 @@ export const mcpSignInVerbsOf = (
   const noClaude = () => (verbHarnessOf('mcp', undefined, declared).kind === 'taken' ? undefined : noSignInHarness(declared));
   const cliOf = (): McpCli | string => {
     if (seams.cli) return seams.cli;
-    const claude = claudeExecutableOf(executable);
+    const claude = claudeExecutableOf(executable, harnessBin);
     return claude === undefined
-      ? "no Claude Code was found to run `claude mcp` with: the Agent SDK bundles none for this platform. Set the engine's `claudeExecutable`."
+      ? "no Claude Code was found to run `claude mcp` with: none in the engine's `harnessBin`, none bundled by the Agent SDK for this platform and none on PATH. Put one at `<harnessBin>/claude`, or set the engine's `claudeExecutable`."
       : claudeCli(claude);
   };
   const opened = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, port: number, clientSecret?: string) {
@@ -206,7 +208,7 @@ export const mcpSignInVerbsOf = (
     }
     const ask = seams.ask ?? claudeMcpSignIn;
     const session = yield* Effect.tryPromise({
-      try: () => ask(name, server, { cwd, executable, redirectUri: redirectUriOf(port) }),
+      try: () => ask(name, server, { cwd, executable: claudeExecutableOf(executable, harnessBin), redirectUri: redirectUriOf(port) }),
       catch: (e) => new McpSignInRefused({ message: `the harness gave no address to sign in at: ${(e as Error).message}`, held: false }),
     });
     const until = new Date(Date.now() + withinMs).toISOString();

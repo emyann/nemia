@@ -97,18 +97,19 @@ const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked
 
 /**
  * Whether Claude Code is signed in on this machine under `env` (less its telemetry), by `auth status` as a job's spawn asks it: the
- * Claude Code `AE_CLAUDE_EXECUTABLE` names, else the SDK's bundled one, `unknown` where none is found or it does not start. What a
- * caller that is no session reads, to say whether a session would start; as the spawn's ask, it cannot see a credential that no longer
- * works.
+ * Claude Code `AE_CLAUDE_EXECUTABLE` names, else `<harnessBin>/claude`, else the SDK's bundled one, else the one on PATH
+ * (`claudeExecutableOf`), `unknown` where none is found or it does not start. What a caller that is no session reads, to say whether a
+ * session would start; as the spawn's ask, it cannot see a credential that no longer works.
  */
-export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string): ClaudeSignIn => {
-  const claude = claudeExecutableOf(env.AE_CLAUDE_EXECUTABLE ?? process.env.AE_CLAUDE_EXECUTABLE);
+export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string, harnessBin?: string): ClaudeSignIn => {
+  const claude = claudeExecutableOf(env.AE_CLAUDE_EXECUTABLE ?? process.env.AE_CLAUDE_EXECUTABLE, harnessBin);
   return claude === undefined ? 'unknown' : claudeSignInOf(askedIn(claude, cwd, withoutTelemetry(env), ms).ask);
 };
 
 /**
  * Why Claude Code cannot start the session `r` because this machine is not signed in, or `undefined`. The Claude Code asked is the one
- * the session would run: `executable` (the engine's), else `AE_CLAUDE_EXECUTABLE`, else the SDK's bundled one; with none found, or one
+ * the session would run: `executable` (the engine's), else `AE_CLAUDE_EXECUTABLE`, else `<harnessBin>/claude`, else the SDK's bundled
+ * one, else the one on PATH (`claudeExecutableOf`); with none found, or one
  * that does not start or answers neither way, nothing is refused, and the spawn fails in its own words as before. An ask with no
  * answer within `ms` refuses, saying so: the sign-in is unknown, and a Claude Code that hangs would hang the session too.
  */
@@ -116,8 +117,9 @@ export const claudeSignedOutRefusal = (
   r: SpawnRequest,
   executable: string | undefined,
   ms: number = CLAUDE_SIGN_IN_MS,
+  harnessBin?: string,
 ): string | undefined => {
-  const claude = claudeExecutableOf(executable ?? process.env.AE_CLAUDE_EXECUTABLE);
+  const claude = claudeExecutableOf(executable ?? process.env.AE_CLAUDE_EXECUTABLE, harnessBin);
   if (claude === undefined) return undefined;
   const { ask, status } = askClaudeSignIn(claude, r, ms);
   const judged = claudeSignInOf(ask);

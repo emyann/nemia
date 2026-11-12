@@ -58,9 +58,12 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const CHECK = (exit: number) =>
   `node -e "require('fs').writeFileSync(process.env.SEEN_FILE, JSON.stringify({WF_ROOT: process.env.WF_ROOT, AE_ROOT: process.env.AE_ROOT, HKB_REPO: process.env.HKB_REPO ?? null})); process.exit(${exit})"`;
 
-/** The scripts of a fixture tag: a build that writes `built.txt`, and a check, each exiting as said. */
+/**
+ * The scripts of a fixture tag: a build that writes `built.txt` and puts the tag's `nemia.sh` as the tree's npm bin `nemia`, as a
+ * release's build links the CLI, and a check, each exiting as said.
+ */
 const scripts = ({ build = 0, check = 0 }: { build?: number; check?: number | null } = {}): Record<string, string> => ({
-  build: `node -e "require('fs').writeFileSync('built.txt', 'built'); process.exit(${build})"`,
+  build: `node -e "const fs = require('fs'); fs.writeFileSync('built.txt', 'built'); fs.mkdirSync('node_modules/.bin', { recursive: true }); fs.copyFileSync('nemia.sh', 'node_modules/.bin/nemia'); fs.chmodSync('node_modules/.bin/nemia', 0o755); process.exit(${build})"`,
   ...(check === null ? {} : { 'release:check': CHECK(check) }),
 });
 
@@ -79,13 +82,20 @@ const REPO = (() => {
   return dir;
 })();
 
-/** Commits a fixture package with `scripts` and `marker` in it, tags it `tag`, and answers the commit. */
-function tagged(tag: string, marker: string, given: Record<string, string> = scripts()): string {
+/** The file the fixture's `nemia` appends each command it was given to, with the store it was given. */
+const CARRIED = path.join(scratch('wf-upgrade-carried-'), 'carried.txt');
+
+/**
+ * Commits a fixture package with `scripts` and `marker` in it, and a `nemia.sh` that appends its arguments and `WF_ROOT` to `CARRIED`
+ * and exits `carry`, tags it `tag`, and answers the commit.
+ */
+function tagged(tag: string, marker: string, given: Record<string, string> = scripts(), carry = 0): string {
   fs.writeFileSync(
     path.join(REPO, 'package.json'),
     `${JSON.stringify({ name: 'fx', version: '1.0.0', private: true, scripts: given }, null, 2)}\n`,
   );
   fs.writeFileSync(path.join(REPO, 'marker.txt'), `${marker}\n`);
+  fs.writeFileSync(path.join(REPO, 'nemia.sh'), `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nexit ${carry}\n`);
   const commit = stand().world.commit(REPO, marker);
   stand().world.tag(REPO, tag, commit);
   return commit;
@@ -481,4 +491,29 @@ test('an upgrade removes the releases no one needs: not the two newest, not one 
       assert.deepEqual(leftovers(), []);
     },
   );
+});
+
+test("the new tree's nemia doctor carry runs on the store before the switch: its failure switches nothing, its pass switches", async (t) => {
+  const s = story(t);
+  const before = currentRelease(ROOT)?.tag;
+
+  await s.test('a carry that exits 1 is Invalid, and releases/current stays where it was with no release placed', async () => {
+    tagged('v10', 'ten', scripts(), 1);
+    fs.rmSync(CARRIED, { force: true });
+    const { tag } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
+    assert.equal(tag, 'Invalid');
+    assert.equal(currentRelease(ROOT)?.tag, before);
+    assert.equal(fs.existsSync(releaseDir('v10', ROOT)), false);
+    assert.deepEqual(leftovers(), []);
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`], 'run once, on the store');
+  });
+
+  await s.test('a carry that exits 0 lets the upgrade switch to the new release', async () => {
+    tagged('v11', 'eleven');
+    fs.rmSync(CARRIED, { force: true });
+    const done = await run({ tag: 'v11', repo: REPO }, idle().host);
+    assert.equal(done.built, true);
+    assert.equal(currentRelease(ROOT)?.tag, 'v11');
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`]);
+  });
 });

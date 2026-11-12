@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import type { Fix, FixStart } from 'objects';
+import type { Fix, FixPhase, FixStart } from 'objects';
 import { FixRun } from '@/components/setup/FixRun';
+import { HarnessChoice, HarnessSkipped } from '@/components/setup/HarnessChoice';
 import { PairingApprovals } from '@/components/setup/PairingApprovals';
 import { ReadinessList } from '@/components/setup/ReadinessList';
 import { approvePairing, pairingsQuery } from '@/lib/api/pairing';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
+import { forgetHarnessSkip, keepHarnessSkip, readHarnessSkipped } from '@/lib/harnessSkip';
+import { harnessAsked, harnessChoices } from '@/lib/setup';
 import { useFixFollow } from '@/lib/useFixFollow';
 
 /** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
@@ -23,7 +26,7 @@ export const Route = createFileRoute('/setup')({
 });
 
 /** A started fix followed live (`useFixFollow`) and drawn as it runs (`FixRun`); its end reads the readiness again (`onEnded`). */
-function FollowedFix({ fix, onEnded }: { fix: Fix; onEnded: () => void }) {
+function FollowedFix({ fix, onEnded }: { fix: Fix; onEnded: (ended: Fix) => void }) {
   const followed = useFixFollow(fix, onEnded);
   return (
     <FixRun
@@ -38,36 +41,83 @@ function FollowedFix({ fix, onEnded }: { fix: Fix; onEnded: () => void }) {
 }
 
 /**
- * The fixes started on this visit, newest first, each followed as it runs; the readiness read, each piece with its fixes, a press
- * starting one the server runs; and the pairings that wait on the person's approval.
+ * The fixes started on this visit, newest first, each followed as it runs; over the read, while no harness is activated and the person has
+ * not skipped it in this browser (`harnessAsked`), the question of which to activate (`HarnessChoice`), kept on this visit once one is
+ * activated so its install's run and then its sign-in show there; the readiness read, each piece with its fixes, a press starting one
+ * the server runs; and the pairings that wait on the person's approval.
  */
 function Readiness() {
   const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(readinessQuery);
   const [fixes, setFixes] = useState<Fix[]>([]);
+  const [endedAs, setEndedAs] = useState<Record<string, FixPhase>>({});
+  const [activating, setActivating] = useState<string>();
+  const [skipped, setSkipped] = useState(readHarnessSkipped);
   const start = useMutation({
     mutationFn: ({ start }: { start: FixStart; key: string }) => startFix(start),
     onSuccess: (fix) => setFixes((started) => [fix, ...started.filter((f) => f.id !== fix.id)]),
   });
-  const ended = () => void queryClient.invalidateQueries({ queryKey: readinessQuery.queryKey });
+  const ended = (fix: Fix) => {
+    setEndedAs((was) => ({ ...was, [fix.id]: fix.phase }));
+    void queryClient.invalidateQueries({ queryKey: readinessQuery.queryKey });
+  };
+  const onStart = (fix: FixStart, key: string) => start.mutate({ start: fix, key });
+  const starts = {
+    onStart,
+    ...(start.isPending ? { starting: start.variables.key } : {}),
+    ...(start.isError ? { refused: { key: start.variables.key, message: start.error.message } } : {}),
+  };
+  const choices = harnessChoices(data.pieces);
+  const chosen = choices.find((choice) => choice.name === activating);
+  const installRun = chosen === undefined ? undefined : fixes.find((fix) => fix.need === chosen.install.name);
+  const others = fixes.filter((fix) => fix !== installRun);
   return (
     <section aria-labelledby="setup-readiness" className="flex flex-col gap-4">
       <h2 id="setup-readiness" className="text-title-medium font-title-medium">
         What the server has in place
       </h2>
-      {fixes.length > 0 && (
+      {chosen !== undefined ? (
+        <HarnessChoice
+          choices={choices}
+          activation={{
+            choice: chosen,
+            ...(installRun === undefined ? {} : { run: <FollowedFix key={installRun.id} fix={installRun} onEnded={ended} /> }),
+            installed: chosen.install.state === 'met' || (installRun !== undefined && endedAs[installRun.id] === 'succeeded'),
+          }}
+          {...starts}
+        />
+      ) : harnessAsked(data.pieces, skipped) ? (
+        <HarnessChoice
+          choices={choices}
+          onSkip={() => {
+            keepHarnessSkip();
+            setSkipped(true);
+          }}
+          {...starts}
+          onStart={(fix, key) => {
+            const name = choices.find((choice) => choice.install.name === fix.need)?.name;
+            start.mutate({ start: fix, key }, { onSuccess: () => setActivating(name) });
+          }}
+        />
+      ) : (
+        skipped &&
+        harnessAsked(data.pieces, false) && (
+          <HarnessSkipped
+            onAskAgain={() => {
+              forgetHarnessSkip();
+              setSkipped(false);
+            }}
+          />
+        )
+      )}
+      {others.length > 0 && (
         <div data-fix-runs className="flex flex-col gap-3">
-          {fixes.map((fix) => (
+          {others.map((fix) => (
             <FollowedFix key={fix.id} fix={fix} onEnded={ended} />
           ))}
         </div>
       )}
-      <ReadinessList
-        readiness={data}
-        onStart={(fix, key) => start.mutate({ start: fix, key })}
-        {...(start.isPending ? { starting: start.variables.key } : {})}
-        {...(start.isError ? { refused: { key: start.variables.key, message: start.error.message } } : {})}
-      />
+      <ReadinessList readiness={data} {...starts} />
     </section>
   );
 }

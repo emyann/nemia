@@ -11,7 +11,7 @@ import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { TypedGraph } from './graph.ts';
 import { CardSkill, WriteMeta, definitionStatus } from './definition.ts';
-import { PLACE_KINDS } from './words.ts';
+import { FIX_KINDS, NEED_SCOPES, PLACE_KINDS } from './words.ts';
 
 const Strings = Schema.Array(Schema.String);
 const Text = Schema.NullOr(Schema.String);
@@ -199,20 +199,23 @@ export const NeedAsk = Schema.Struct({ name: Schema.String, message: Schema.Stri
 export type NeedAsk = typeof NeedAsk.Type;
 
 /**
- * A fix of a need: the shell command that puts it in place, what it does in words, the answers it asks first, and the pattern of a code
- * its output shows a person (a device code), which the board and the client show large.
+ * A fix of a need: the shell command that puts it in place, what it does in words, the answers it asks first, the pattern of a code
+ * its output shows a person (a device code), which the board and the client show large, and its kind (`FIX_KINDS`: `puts` where left
+ * out, `typed` for one a person types on the server, `removes` for one that takes the need away).
  */
 export const NeedFix = Schema.Struct({
   command: Schema.String,
   message: Schema.String,
   asks: Schema.optionalKey(Schema.Array(NeedAsk)),
   code: Schema.optionalKey(Schema.String),
+  kind: Schema.optionalKey(Schema.Literals(FIX_KINDS)),
 });
 export type NeedFix = typeof NeedFix.Type;
 
 /**
  * A machine need a workflow or a place declares: its name, what it is in words, the shell command whose exit 0 says it is in place, the
- * fixes that put it there, and `fills`, the name of a place's need whose fixes this one's come before (sdlc fills the git identity).
+ * fixes that put it there, `fills`, the name of a place's need whose fixes this one's come before (sdlc fills the git identity), and
+ * `scope` (`NEED_SCOPES`: `machine` where left out, `repository` for a need checked and fixed in each factory's repository).
  */
 export const Need = Schema.Struct({
   name: Schema.String,
@@ -220,6 +223,7 @@ export const Need = Schema.Struct({
   check: Schema.String,
   fixes: Schema.optionalKey(Schema.Array(NeedFix)),
   fills: Schema.optionalKey(Schema.String),
+  scope: Schema.optionalKey(Schema.Literals(NEED_SCOPES)),
 });
 export type Need = typeof Need.Type;
 

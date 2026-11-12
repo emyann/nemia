@@ -22,7 +22,30 @@ test('a workflow carries its needs, a readiness read its pieces, a fix its phase
   assert.deepEqual(Schema.decodeUnknownSync(Need)(need), need);
   const spec = { steps: [], needs: [need] };
   assert.deepEqual(Schema.decodeUnknownSync(WorkflowSpec)(spec), spec);
-  const read = { ready: false, pieces: [piece] };
+  const read = {
+    ready: false,
+    pieces: [
+      piece,
+      {
+        name: 'claude',
+        area: 'harness',
+        state: 'met',
+        message: 'installed',
+        harness: { name: 'claude', part: 'install' },
+        fixes: [{ message: 'deactivate', command: 'nemia doctor fix claude --index 1', startable: true, index: 1, kind: 'removes' }],
+      },
+      {
+        name: 'toolchain',
+        area: 'repository',
+        state: 'met',
+        message: 'in place',
+        factory: 'acme',
+        fixes: [{ message: 'sign in', command: 'claude auth login', startable: false, kind: 'typed' }],
+      },
+    ],
+  };
+  const scoped = { ...need, scope: 'repository', fixes: [{ command: 'mise install', message: 'install', kind: 'puts' }] };
+  assert.deepEqual(Schema.decodeUnknownSync(Need)(scoped), scoped);
   assert.deepEqual(Schema.decodeUnknownSync(Readiness)(read), read);
   const fix = {
     id: 'f1',
@@ -39,8 +62,12 @@ test('a workflow carries its needs, a readiness read its pieces, a fix its phase
 test('REFUSED: a need without its check, a state, an area, a phase outside their words', () => {
   assert.throws(() => Schema.decodeUnknownSync(Need)({ name: 'gh', message: 'm' }), 'a need says its check');
   const read = (p: unknown) => Schema.decodeUnknownSync(Readiness)({ ready: true, pieces: [p] });
-  assert.throws(() => read({ ...piece, state: 'broken' }), 'a state is one of NEED_STATES');
+  assert.throws(() => read({ ...piece, state: 'broken' }), 'a state is one of READINESS_STATES');
   assert.throws(() => read({ ...piece, area: 'laptop' }), 'an area is one of READINESS_AREAS');
+  assert.throws(() => read({ ...piece, harness: { name: 'claude', part: 'login' } }), 'a part is one of HARNESS_PARTS');
+  const fix = (f: unknown) => read({ ...piece, fixes: [f] });
+  assert.throws(() => fix({ message: 'm', command: 'c', startable: true, kind: 'deletes' }), 'a fix kind is one of FIX_KINDS');
+  assert.throws(() => Schema.decodeUnknownSync(Need)({ ...need, scope: 'factory' }), 'a scope is one of NEED_SCOPES');
   assert.throws(() => read({ ...piece, cost: 'later' }), 'a cost is one of READINESS_COSTS');
   assert.throws(() => Schema.decodeUnknownSync(Fix)({ id: 'f', need: 'n', phase: 'done', output: '' }), 'a phase is one of FIX_PHASES');
   assert.throws(() => Schema.decodeUnknownSync(PairingClaimed)({ phase: 'approved' }), 'a phase is one of TICKET_STATES');

@@ -42,6 +42,16 @@
       "type": "MachineVerb"
     },
     {
+      "term": "Doctor",
+      "meaning": "`nemia doctor [--json]` (`apps/cli/src/doctor.ts`): what the server the context in use names needs before a first run, read from `GET /api/readiness`, and this laptop's own pieces under the area `client`, each met, missing or unknown, with under a missing piece the command of each fix (`start: nemia doctor fix <need> …` where the server runs it, `fix: <command>` where the person types it) and under a met one the fix that removes it; it exits 0 when no piece is missing. `nemia doctor fix <need> [--factory <f>] [--workflow <w>] [--index <n>] [--answer <name>=<value>]…` starts a fix there and follows its output; `nemia doctor carry` runs on this machine, in process. The api and the board keep the word readiness. The retired verb is refused, exit 2, naming `nemia doctor`.",
+      "retired": [
+        {
+          "spelling": "nemia readiness",
+          "card": "distribution: Nemia installs with no harness"
+        }
+      ]
+    },
+    {
       "term": "get",
       "meaning": "`nemia get <resource>[/<name>] [<name>] [-n <namespace> | -A] [-l <selector>]... [-o json|yaml|name]` (`apps/cli/src/objects/get.ts`): a resource's objects as a table (NAMESPACE with `-A`, NAME, STATE, AGE), or one by its name; `-o yaml` is what `nemia apply -f` reads back."
     },

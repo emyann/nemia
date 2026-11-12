@@ -70,6 +70,11 @@ export type HarnessSpec = {
    */
   prepare?: (r: SpawnRequest, beside: (end: string) => string) => Partial<HarnessIO>;
   /**
+   * This spec with its program looked for first in `harnessBin` (`EngineOptions.harnessBin`), at every spawn: what the engine runs in
+   * its place where it is given one. Absent: the spec runs as it is, its `cmd` found as it names it.
+   */
+  inHarnessBin?: (harnessBin: string) => HarnessSpec;
+  /**
    * The harness is a process of ours that reads the spawn request itself, and the runner writes it one: `<name>.request.json`,
    * holding `{ request, io }` — the request whole and the `io` the runner computed — whose path `command` is given as
    * `io.requestFile`. For a spec whose command is not a third party's CLI but a bin of this package (`claudeJobSpec`,

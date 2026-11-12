@@ -1,7 +1,8 @@
 /**
  * What the daemon says of a pass (`passSaid`) and how it says it (`logPass`): as logs, through whatever logger the process provides, each
  * annotated with the run and the steps it is about, and each failure said once while it stands; and the tools folder the daemon puts
- * first on its own PATH as it starts (`toolsOnPath`); that a check finds a tool installed there is `src/needs/needs.test.ts`'s.
+ * first on its own PATH as it starts, with its place's tools after it (`toolsOnPath`); that a check finds a tool installed there is
+ * `src/needs/needs.test.ts`'s; and the harness a release carries adopted into the tools folder before the first pass (`adoptedAtStart`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Logger, References } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import { logPass, NOTHING_SAID, passSaid, toolsOnPath, type UpSaid } from './up.verb.ts';
-import { toolsBinDir } from '../config/root.store.ts';
+import { adoptedAtStart, logPass, NOTHING_SAID, passSaid, toolsOnPath, type UpSaid } from './up.verb.ts';
+import { toolsBinDir, toolsDir } from '../config/root.store.ts';
 import type { Pass } from '../tick/tick.verb.ts';
 
 /** A pass that advanced one run, `r-1`: a note, `implement` filed and `review` checking; the rest of an `Advanced` is not read here. */
@@ -142,6 +143,42 @@ test("the daemon's tools folder is made and led on its PATH once", () => {
   const bin = toolsOnPath(home, env);
   toolsOnPath(home, env);
   assert.equal(bin, toolsBinDir(home));
-  assert.deepEqual(env.PATH?.split(path.delimiter), [bin, '/usr/bin', '/bin']);
+  assert.deepEqual(env.PATH?.split(path.delimiter), [bin, '/usr/bin', '/bin', path.dirname(process.execPath)]);
   assert.ok(fs.statSync(bin).isDirectory());
+});
+
+test("the place's tools folders follow the tools bin on the daemon's PATH, once, and its variables are set under the tools folder", () => {
+  const home = scratch('wf-up-place-tools-');
+  const env: Record<string, string | undefined> = { PATH: '/usr/bin:/bin' };
+  const declared = { toolsEnv: { TOOL_DATA_DIR: 'tool' }, toolsPath: ['tool/shims'] };
+  const bin = toolsOnPath(home, env, declared);
+  toolsOnPath(home, env, declared);
+  const shims = path.join(toolsDir(home), 'tool', 'shims');
+  assert.deepEqual(env.PATH?.split(path.delimiter), [bin, shims, '/usr/bin', '/bin', path.dirname(process.execPath)]);
+  assert.equal(env.TOOL_DATA_DIR, path.join(toolsDir(home), 'tool'));
+});
+
+test('a harness another release carries is adopted into the tools folder at start, where the tools folder has none', async () => {
+  const home = scratch('wf-up-adopt-');
+  const release = path.join(home, 'releases', 'v1');
+  const sdk = path.join(release, 'node_modules', '@anthropic-ai');
+  const bundled = path.join(sdk, `claude-agent-sdk-${process.platform}-${process.arch}`);
+  fs.mkdirSync(bundled, { recursive: true });
+  fs.writeFileSync(path.join(bundled, 'claude'), '#!/bin/sh\necho bundled\n');
+  fs.mkdirSync(path.join(sdk, 'claude-agent-sdk'));
+  fs.writeFileSync(path.join(sdk, 'claude-agent-sdk', 'package.json'), JSON.stringify({ claudeCodeVersion: '2.1.300' }));
+  fs.writeFileSync(
+    path.join(release, 'release.json'),
+    JSON.stringify({ tag: 'v1', commit: 'abc1234', source: 'https://example.com', builtAt: new Date().toISOString() }),
+  );
+  const checkout = { kind: 'checkout', root: scratch('wf-up-adopt-checkout-') } as const;
+  const adopted = await Effect.runPromise(adoptedAtStart(home, checkout));
+  assert.deepEqual(
+    adopted.map((a) => [a.name, a.version]),
+    [['claude', '2.1.300']],
+  );
+  const link = path.join(toolsBinDir(home), 'claude');
+  assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(toolsDir(home), 'harnesses', 'claude', '2.1.300', 'claude')));
+  assert.ok((fs.statSync(link).mode & 0o111) !== 0, 'the adopted program runs');
+  assert.deepEqual(await Effect.runPromise(adoptedAtStart(home, checkout)), [], 'a tools folder that has the program adopts nothing again');
 });

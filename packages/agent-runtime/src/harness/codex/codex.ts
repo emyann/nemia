@@ -8,9 +8,10 @@ import path from 'node:path';
 import type { McpServer, SpawnRequest } from '../seam.ts';
 import type { HarnessIO, HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
-import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
+import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES, CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
+import { programIn } from '../harness-bin.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 import { quote, WORDS_QUOTE } from '../../core/quote.ts';
 
@@ -116,9 +117,15 @@ export type CodexSignIn =
   | { readonly state: 'signed-out'; readonly said: string | undefined; readonly code: number }
   | { readonly state: 'unknown' };
 
-/** Asks `codex login status` (`CodexSignIn`). */
-export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string): CodexSignIn => {
-  const ran = spawnSync('codex', ['login', 'status'], { ...(cwd === undefined ? {} : { cwd }), encoding: 'utf8', timeout: ms, env });
+/**
+ * The Codex a session runs and its sign-in asks: `<harnessBin>/codex` where it exists, read at every call (`programIn`), else the
+ * `codex` on PATH.
+ */
+export const codexProgramOf = (harnessBin?: string): string => programIn(harnessBin, 'codex') ?? 'codex';
+
+/** Asks `<program> login status` (`CodexSignIn`): the `codex` on PATH unless a caller names the one it runs (`codexProgramOf`). */
+export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string, program: string = 'codex'): CodexSignIn => {
+  const ran = spawnSync(program, ['login', 'status'], { ...(cwd === undefined ? {} : { cwd }), encoding: 'utf8', timeout: ms, env });
   if (ran.error !== undefined || ran.status === null) return { state: 'unknown' };
   if (ran.status === 0) return { state: 'signed-in' };
   const said = `${ran.stdout ?? ''}\n${ran.stderr ?? ''}`
@@ -129,8 +136,7 @@ export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string): C
   return { state: 'signed-out', said, code: ran.status };
 };
 
-/** The command that logs Codex in on a machine with no browser, which a refusal and a layer above name. */
-export const CODEX_SIGN_IN_COMMAND = 'codex login --device-auth';
+export { CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
 
 /**
  * Why Codex cannot start the session `r` because it is signed out on this machine, or `undefined`. It asks `codex login status`
@@ -138,12 +144,31 @@ export const CODEX_SIGN_IN_COMMAND = 'codex login --device-auth';
  * — as the user the engine runs as, which is the user Codex would run as. Signed out, the words quote the last line Codex printed and
  * name the command that signs in. Unknown refuses nothing: a missing binary fails the spawn in its own words, as it did before.
  */
-const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
-  const read = codexSignIn({ ...withoutTelemetry(process.env), ...r.config?.env }, ms, r.cwd);
+const signedOutRefusal = (r: SpawnRequest, ms: number, program: string): string | undefined => {
+  const read = codexSignIn({ ...withoutTelemetry(process.env), ...r.config?.env }, ms, r.cwd, program);
   if (read.state !== 'signed-out') return undefined;
   const answer = read.said === undefined ? `exited ${read.code}` : `said "${quote(read.said, WORDS_QUOTE)}"`;
   return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`${CODEX_SIGN_IN_COMMAND}\`, as the user the engine runs as, then try again.`;
 };
+
+/** The argv of `codex exec` for `r`, in the order `codexHarness` gives it. */
+const codexExecArgs = (r: SpawnRequest, io?: HarnessIO): string[] => [
+  'exec',
+  '--json',
+  '--skip-git-repo-check',
+  '-C',
+  r.cwd,
+  '-s',
+  sandboxOf(r),
+  ...(r.config?.model ? ['-m', r.config?.model] : []),
+  ...(r.config?.worktree ? ['--worktree'] : []),
+  ...(io?.closeoutFile && io.closeoutSchemaFile ? ['--output-schema', io.closeoutSchemaFile, '-o', io.closeoutFile] : []),
+  ...(r.config?.effort ? ['-c', `model_reasoning_effort="${r.config?.effort}"`] : []),
+  ...codexMcpArgs({ ...io?.pickedMcp, ...r.config?.mcp }),
+  ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
+  ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
+  r.brief,
+];
 
 /**
  * Signed out, the spawn is refused before anything else is read (`signedOutRefusal`).
@@ -167,8 +192,8 @@ const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
  * command with the operator's args and env — or fails to load when the
  * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
  */
-const codexPrepare = (r: SpawnRequest, signInMs: number): Partial<HarnessIO> => {
-  const signedOut = signedOutRefusal(r, signInMs);
+const codexPrepare = (r: SpawnRequest, signInMs: number, program: string): Partial<HarnessIO> => {
+  const signedOut = signedOutRefusal(r, signInMs, program);
   if (signedOut) throw new Error(signedOut);
   const pickedMcp = codexPicked(r);
   const picked = pickedMcp ? { pickedMcp } : {};
@@ -230,30 +255,16 @@ const codexPrepare = (r: SpawnRequest, signInMs: number): Partial<HarnessIO> => 
  * writes them, each message whole (`codexPartials`), its stdout decoded as it comes.
  *
  * Its `prepare` refuses a spawn while Codex is signed out (`signedOutRefusal`), asking for no longer than `signInMs`,
- * `CODEX_SIGN_IN_MS` unless a test shortens it.
+ * `CODEX_SIGN_IN_MS` unless a test shortens it. Its program, spawned and asked, is `<harnessBin>/codex` where it exists at that spawn,
+ * else the `codex` on PATH (`codexProgramOf`), found by its `prepare` and run by its `command` as `io.program`; the engine gives its
+ * `harnessBin` through `inHarnessBin`.
  */
-export const codexHarness = (o: { signInMs?: number } = {}): HarnessSpec => ({
+export const codexHarness = (o: { signInMs?: number; harnessBin?: string } = {}): HarnessSpec => ({
   name: 'codex',
   can: CODEX_DECLARATION.can,
   command: (r, io) => ({
-    cmd: 'codex',
-    args: [
-      'exec',
-      '--json',
-      '--skip-git-repo-check',
-      '-C',
-      r.cwd,
-      '-s',
-      sandboxOf(r),
-      ...(r.config?.model ? ['-m', r.config?.model] : []),
-      ...(r.config?.worktree ? ['--worktree'] : []),
-      ...(io?.closeoutFile && io.closeoutSchemaFile ? ['--output-schema', io.closeoutSchemaFile, '-o', io.closeoutFile] : []),
-      ...(r.config?.effort ? ['-c', `model_reasoning_effort="${r.config?.effort}"`] : []),
-      ...codexMcpArgs({ ...io?.pickedMcp, ...r.config?.mcp }),
-      ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
-      ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
-      r.brief,
-    ],
+    cmd: io?.program ?? 'codex',
+    args: codexExecArgs(r, io),
     ...(r.config?.env ? { env: r.config.env } : {}),
     ranIn: sandboxOf(r),
   }),
@@ -288,7 +299,11 @@ export const codexHarness = (o: { signInMs?: number } = {}): HarnessSpec => ({
   noChannel:
     '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words, its `resumeFrom` naming this session (`ae file`).',
   start: CODEX_START,
-  prepare: (r) => codexPrepare(r, o.signInMs ?? CODEX_SIGN_IN_MS),
+  prepare: (r) => {
+    const program = codexProgramOf(o.harnessBin);
+    return { ...codexPrepare(r, o.signInMs ?? CODEX_SIGN_IN_MS, program), program };
+  },
+  inHarnessBin: (harnessBin) => codexHarness({ ...o, harnessBin }),
 });
 
 /** Codex as the runtime ships it (`codexHarness`). */

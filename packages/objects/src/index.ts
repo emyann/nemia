@@ -528,6 +528,8 @@ export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,
+  READINESS_STATES,
+  type ReadinessState,
   ADDRESS_KINDS,
   type AddressKind,
   READINESS_AREAS,
@@ -538,6 +540,12 @@ export {
   type FixPhase,
   FIX_STREAM_EVENTS,
   type FixStreamEventName,
+  FIX_KINDS,
+  type FixKind,
+  NEED_SCOPES,
+  type NeedScope,
+  HARNESS_PARTS,
+  type HarnessPart,
   TICKET_STATES,
   type TicketState,
 } from './words.ts';

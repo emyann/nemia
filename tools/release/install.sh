@@ -5,13 +5,14 @@
 #
 # It fetches the release archive for this machine and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
 # $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia.
-# Then it asks, on the server, or reads from its flags under --yes: the Claude token (made by claude setup-token, read without echo
-# and handed to nemia claude-token set by its stdin; skipped with a warning only under --yes without --claude-token-file), starting at
-# login, and the address to bind, picked from the private ones nemia service addresses lists or typed (a public or wildcard one refused
-# but with --public). A bind exposes the store: this machine's own person token is minted straight into the local context's file and
-# never printed, and the board's single-use first-visit link (nemia board link) is printed in its place. With --client it starts no
-# service and pairs this machine with its server (nemia pair <url>), or takes a token by --token-file. It ends on nemia readiness, the
-# read of what is in place and what is missing, whose exit fails no install. It never prints a token.
+# Then it asks, on the server, or reads from its flags under --yes: starting at login, and the address to bind, picked from the
+# private ones nemia service addresses lists or typed (a public or wildcard one refused but with --public). A bind exposes the store:
+# this machine's own person token is minted straight into the local context's file and never printed, and the board's single-use
+# first-visit link (nemia board link) is printed in its place. With --client it starts no
+# service and pairs this machine with its server (nemia pair <url>), or takes a token by --token-file. A release carries no harness
+# and the installer asks for no harness's sign-in: it ends on nemia doctor, the read of what is in place and what is missing, whose
+# exit fails no install, and a harness is activated after, on the board's Setup page or by nemia doctor fix <harness>. It never
+# prints a token.
 #
 # NEMIA_INSTALL_TTY names a file read in place of the terminal, one answer a line, its prompts on stderr: the test's seam alone.
 #
@@ -29,7 +30,6 @@ server=
 context=remote
 context_given=0
 token_file=
-claude_token_file=
 public=0
 board_base=
 
@@ -37,7 +37,6 @@ usage() {
   cat <<'EOF'
 usage: install.sh [--yes] [--version <tag>] [--base <download base>]
                   [--no-service] [--bind <address> [--public]] [--board-base <url>]
-                  [--claude-token-file <file>]
                   [--client --server <url> [--context <name>] [--token-file <file>]]
 EOF
 }
@@ -71,7 +70,6 @@ while [ "$#" -gt 0 ]; do
     --context) value "$@"; context=$2; context_given=1; shift ;;
     --board-base) value "$@"; board_base=${2%/}; shift ;;
     --token-file) value "$@"; token_file=$2; shift ;;
-    --claude-token-file) value "$@"; claude_token_file=$2; shift ;;
     --help | -h) usage; exit 0 ;;
     *)
       printf 'nemia install: no argument %s\n' "$1" >&2
@@ -104,20 +102,6 @@ ask() {
   printf '%s ' "$1" >&4
   read -r answer <&3 || answer=
   [ -n "$answer" ] || answer=$2
-}
-
-# secret <prompt>: a line read with the terminal's echo off, in $answer; 1 where nothing is left to read.
-secret() {
-  printf '%s' "$1" >&4
-  if [ -t 3 ]; then stty -echo <&3; fi
-  answer=
-  read -r answer <&3 || [ -n "$answer" ] || {
-    if [ -t 3 ]; then stty echo <&3; fi
-    printf '\n' >&4
-    return 1
-  }
-  if [ -t 3 ]; then stty echo <&3; fi
-  printf '\n' >&4
 }
 
 has() { command -v "$1" >/dev/null 2>&1; }
@@ -252,11 +236,13 @@ case ":$PATH:" in
 esac
 nemia=$bindir/nemia
 
-# readiness: the last thing the install does, on either side, whose exit fails no install.
-readiness() {
+# doctor: the last thing the install does, on either side, whose exit fails no install. No harness comes with a release: the person
+# activates the one their sessions run on, by the fix nemia doctor names or on the board's Setup page.
+doctor() {
   say "what is in place and what is missing, each with the command that fixes it:"
-  "$nemia" readiness || warn "something is still missing: run the fix each line above names, then nemia readiness to read it again"
-  say "done: nemia readiness reads it again, nemia version says what runs"
+  "$nemia" doctor || warn "something is still missing: run the fix each line above names, then nemia doctor to read it again"
+  say "a harness is activated on the board's Setup page or by nemia doctor fix <harness>, then signed in by the fix nemia doctor names"
+  say "done: nemia doctor reads it again, nemia version says what runs"
 }
 
 if [ "$client" = 1 ]; then
@@ -280,27 +266,8 @@ if [ "$client" = 1 ]; then
     fi
   fi
   say "nemia now talks to $server; no service was installed"
-  readiness
+  doctor
   exit 0
-fi
-
-# The Claude token goes to nemia's own 0600 file by stdin, never through an argument or a line printed. A person is asked it
-# outright; only a run under --yes with no file goes on without it.
-if [ -n "$claude_token_file" ]; then
-  "$nemia" claude-token set <"$claude_token_file"
-elif [ "$interactive" = 1 ]; then
-  claude_token=
-  while [ -z "$claude_token" ]; do
-    secret "The Claude token (claude setup-token on any machine with a browser prints it; it is not shown): " ||
-      fail "no Claude token was read: make one with claude setup-token, then run this again or pass --claude-token-file <file>"
-    claude_token=$answer
-    [ -n "$claude_token" ] || printf 'Sessions run Claude Code on it: paste the token claude setup-token printed.\n' >&4
-  done
-  answer=
-  printf '%s\n' "$claude_token" | "$nemia" claude-token set
-  claude_token=
-else
-  warn "no Claude token was set: make one with claude setup-token, then hand it to nemia claude-token set on its stdin"
 fi
 
 [ "$service" = 1 ] && {
@@ -387,4 +354,4 @@ if [ "$service" = 1 ]; then
     say "on another machine: install with --client --server http://<this machine's address>:8787, then approve its code here with nemia pairings approve <code>"
   fi
 fi
-readiness
+doctor

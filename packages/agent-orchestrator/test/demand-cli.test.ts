@@ -45,7 +45,7 @@ const TICKING: Record<string, string[]> = {
   'factory upgrade': ['factory', 'upgrade', 'no-factory', '--to', '0.2.0'],
   'factory resolve': ['factory', 'resolve', 'no-factory', 'review.md#rounds', '--ours'],
   daemon: ['daemon'],
-  'readiness fix': ['readiness', 'fix', 'no-piece'],
+  'doctor fix': ['doctor', 'fix', 'no-piece'],
 };
 
 /** Reads, typed the same way. */

@@ -1,6 +1,6 @@
 /**
- * The verbs of the test place that change a repository or a directory: `make`, `handoff`, `land`, `remove`, `export`, `seal` and
- * `clone`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
+ * The verbs of the test place that change a repository or a directory: `follow`, `make`, `handoff`, `land`, `remove`, `export`,
+ * `seal` and `clone`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,8 +8,39 @@ import { fileURLToPath } from 'node:url';
 import { checkoutAt, committed, dirty, headOf, mergedIn, repositoryAt, takenBack } from './acts.ts';
 import { isDirectory, OWN, real, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
-import { commitAt, commitOf, type Held, type Repository } from './world.ts';
+import { commitAt, commitOf, within, type Held, type Repository } from './world.ts';
 import type { PlaceRequests } from '../../src/place/place.ts';
+
+/**
+ * `follow`: a checkout of a repository the test place cloned brought up to the branch it follows in the repository it was cloned from,
+ * named as git names it (`origin/<branch>`), when it is clean and only behind; one with commits of its own or anything uncommitted left,
+ * with why. A repository not cloned, or a checkout on another branch, follows none (`no-upstream`); an origin the place no longer holds
+ * cannot be read (`unfetched`).
+ */
+export function follow(held: Held, { repo: dir }: PlaceRequests['follow']): Reply<'follow'> {
+  if (!isDirectory(dir)) return refused(`${dir} is not a directory, so there is no checkout to follow its remote`);
+  const at = checkoutAt(held, dir);
+  if (!at) return refused(noRepository(dir));
+  const { repo, checkout } = at;
+  if (repo.follows?.branch !== checkout.branch) return { state: 'no-upstream' };
+  const upstream = `origin/${checkout.branch}`;
+  const origin = held.repositories.get(repo.follows.origin);
+  const tip = origin?.branches.get(checkout.branch);
+  if (!origin || tip === undefined)
+    return {
+      state: 'unfetched',
+      upstream,
+      message: `${repo.follows.origin} is no repository this test place holds with ${checkout.branch}`,
+    };
+  for (const [id, commit] of origin.commits) if (!repo.commits.has(id)) repo.commits.set(id, commit);
+  const head = headOf(repo, checkout);
+  if (within(repo, tip, head)) return { state: tip === head ? 'up-to-date' : 'ahead', upstream };
+  const left = (why: string) => ({ state: 'left' as const, upstream, message: `${dir} is behind ${upstream} ${why}` });
+  if (!within(repo, head, tip)) return left('and holds commits of its own: push them, or move them to a branch of their own');
+  if (dirty(repo, checkout)) return left('with changes not committed: commit them or take them back');
+  mergedIn(held, at, tip, true, '');
+  return { state: 'fast-forwarded', upstream, from: head, to: tip };
+}
 
 /** A workspace cut at `at` on the new branch `name` from `from`, its files written there; why not, where it cannot be. */
 function cut(repo: Repository, at: string, name: string, from: string): string | undefined {
@@ -174,6 +205,7 @@ export function cloned(held: Held, { url, into }: PlaceRequests['clone']): Reply
   const dir = real(into);
   held.repositories.set(dir, {
     root: dir,
+    follows: { branch: checkout.branch, origin: from.root },
     commits: new Map(from.commits),
     branches: new Map([[checkout.branch, head.id]]),
     tags: new Map(from.tags),

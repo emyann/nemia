@@ -25,6 +25,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
+import { modelsRefusal, withModels, type RunModels } from './models.ts';
 import { isRepositoryRun, type Mount, type Run } from '../record/record.ts';
 import type { HarnessSettings } from '../harness-settings/harness-settings.ts';
 import { settingsAt } from '../harness-settings/harness-settings.verb.ts';
@@ -114,6 +115,9 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
  *   `gates` beside the workflow's own and given the factory's judged `harnessSettings`: a word, a window, a cap or a bridge
  *   (`remote: true`) its harness does not take;
+ * - a step `models` names that it cannot run on (`modelsRefusal`): one the workflow does not have, one on a remote agent, and a Claude
+ *   Code step in `auto` on a model that drops it; the steps are then judged with their models set (`withModels`), so what the harness
+ *   refuses of a step's config on its model is refused as `refused` refuses it;
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).
  *
@@ -132,9 +136,13 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   allows: Allows = NO_ALLOWS,
   known?: SkillsFound,
   harnessSettings?: HarnessSettings,
+  models: RunModels = {},
 ) {
   const home = yield* StoreRoot;
-  const steps = yield* stepsIn(workflowDir, places, factory);
+  const read = yield* stepsIn(workflowDir, places, factory);
+  const unmodelled = modelsRefusal(read, models, (step) => `--model ${step}=${models[step] ?? ''}`);
+  if (unmodelled) return yield* Effect.fail(new Invalid({ message: unmodelled }));
+  const steps = withModels(read, models);
   const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
   const asked = { refused, given, allows, harnessSettings };
   return yield* tried(() => startable(home, steps, workflowDir, isolate, places, denied, found, gates, asked));
@@ -313,6 +321,12 @@ export type StartOptions = {
   from?: { inbox: string };
   scheduled?: { factory: string; workflow: string; due: string };
   gates?: readonly string[];
+  /**
+   * The model each step it names runs on, for this run alone (`nemia start --model <step>=<model>`, a card's `model:`), by the step's
+   * name: refused before anything is written where a step cannot run on its model (`modelsRefusal`), set on the steps the run freezes
+   * (`withModels`), and frozen on the record as `models`. Left out, every step runs on its agent's.
+   */
+  models?: RunModels;
   factory?: string;
   /**
    * The labels the run is created with, beside what its `after` and `context` runs agree on: the card's own (`card`), and the start's
@@ -340,6 +354,7 @@ type Told = Pick<
   | 'from'
   | 'scheduled'
   | 'gates'
+  | 'models'
   | 'factory'
   | 'mounts'
   | 'volumes'
@@ -470,6 +485,7 @@ function toldOf(
   const after = opts.after ?? [];
   const context = opts.context ?? [];
   const gates = opts.gates ?? [];
+  const models = Object.entries(opts.models ?? {});
   const costLine = factory?.costLines?.[path.basename(opts.workflowDir)];
   return {
     brief: opts.brief,
@@ -484,6 +500,7 @@ function toldOf(
       ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
       : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
+    ...(models.length ? { models: Object.fromEntries(models) } : {}),
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
     ...(volumes.length ? { volumes } : {}),
@@ -640,6 +657,10 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
  * (`nemia start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  *
+ * `models` names the model a step runs on in this run alone (`nemia start --model <step>=<model>`, a card's `model:`): refused before
+ * anything is written where a step cannot run on it (`stepsToStart`), set on the steps the record freezes, and frozen on the record as
+ * `models`, which every revision the run takes after it keeps (`withModels`). Left out, the record has none.
+ *
  * A team that says `place: folder` runs no git: the repository is not looked at, and refused when a person named it (`repoNamed`); the
  * run's own directory in the store is its workspace, each step's folder made beneath it when the step is filed (`folderPlace`).
  *
@@ -710,6 +731,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     yield* tried(() => repoAllows(opts.repo, opts.factory)),
     found,
     harnessSettings,
+    opts.models,
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(home, opts.repo) }));

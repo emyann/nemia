@@ -295,6 +295,13 @@ const runFields = {
    */
   gates: Schema.optional(Schema.Array(StepName.OnRead)),
   /**
+   * The model each step this run names runs on, for this run alone, by the step's name, frozen at start: `nemia start --model
+   * <step>=<model>`, and an inbox card's `model:`. Set on the step in `workflow` at start and on every revision the run takes after it
+   * (`withModels`), so each filing reads it where it reads a step's `model:`; every other step runs on its agent's. Absent on a run given
+   * none.
+   */
+  models: Schema.optional(Schema.Record(StepName.OnRead, Schema.String)),
+  /**
    * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a repository run's
    * `repo` is one of its repositories. Absent on a run in the default factory, which is every record written before a run named its
    * factory.

@@ -12,6 +12,7 @@
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
  */
+import { withModels } from '../start/models.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -283,11 +284,12 @@ export const pinsOf = Effect.fn('pinsOf')(function* (
 /**
  * The run's workflow folder as it stands now, read through `read` so a pass loads it once for every run on it, or undefined where it does
  * not load, so the run keeps the workflow it froze. Each run is handed its own copy of the steps, since `firstResolve` puts them on the
- * record and a write onto one run's must leave the other's alone.
+ * record and a write onto one run's must leave the other's alone. Each step the run names a model for is on it (`withModels`), as the
+ * run froze it at start, so a revision it takes keeps the model the run was started with.
  */
-const folderNow = (run: FolderRun, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
+const folderNow = (run: FolderRun & Pick<Run, 'models'>, read: PassRevisions): Effect.Effect<StepSpec[] | undefined> =>
   read.steps(run).pipe(
-    Effect.map((steps): StepSpec[] | undefined => structuredClone(steps)),
+    Effect.map((steps): StepSpec[] | undefined => withModels(structuredClone(steps), run.models)),
     Effect.catchCause(() => Effect.succeed(undefined)),
   );
 
@@ -303,7 +305,7 @@ const folderNow = (run: FolderRun, read: PassRevisions): Effect.Effect<StepSpec[
  * given is not filed by an edit made while the run waited.
  */
 export const resolvedNow = Effect.fn('resolvedNow')(function* (
-  run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate'>,
+  run: Pick<Run, 'workflowDir' | 'repo' | 'factory' | 'isolate' | 'models'>,
   at: string,
   given?: PassRevisions,
 ) {

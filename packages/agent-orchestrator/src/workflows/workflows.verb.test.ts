@@ -316,6 +316,7 @@ test('REFUSED: a card queued on the folder, freed by the commands its refusal na
   );
   queueInInbox('queued-idea', { off: true });
   queueInInbox('queued-idea', { workflow: path.basename(other) });
+  await assert.rejects(remove(other), Conflict, 'a card queued by the folder name, as a card names its workflow now, holds it too');
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
   const idle = folder('card-idle', { 'only.md': '---\nplace: git\n---\nDo it.\n' });

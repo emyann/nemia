@@ -6,10 +6,11 @@
 import { modelsText, type RunModels } from '../start/index.ts';
 import { setting } from '../config/config.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
+import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { WorkflowError } from '../step/step.ts';
-import { workflowFolder, workflowsIn } from '../folder/folder.store.ts';
+import { workflowDirAt, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import {
@@ -141,14 +142,16 @@ const cardPlace = Effect.fn('cardPlace')(function* (
 });
 
 /**
- * The folder of the workflow `name` for a card started on `repo`: in the factory's `tree`, then in the repository (`workflowFolder`).
- * Refused as a `WorkflowError`: where it is the card's own `workflow:` (`card`), in the card's file and line, then `workflowFolder`'s
- * words.
+ * The folder of the workflow `name` for a card started on `repo`: in the factory's `tree`, then in the repository (`workflowFolder`), then
+ * in yours (`<home>/workflows`), as a factory looks a name up. Refused as a `WorkflowError`: where it is the card's own `workflow:`
+ * (`card`), in the card's file and line, then `workflowFolder`'s words.
  */
 function cardWorkflow(home: string, name: string, card: InboxCard | undefined, repo: string, tree?: string): WorkflowDir {
   try {
     return workflowFolder(name, inboxDir(home), repo, tree);
   } catch (err) {
+    const yours = path.join(home, 'workflows', name);
+    if (fs.statSync(yours, { throwIfNoEntry: false })?.isDirectory()) return workflowDirAt(yours);
     throw new WorkflowError(
       card === undefined ? (err as Error).message : `${card.file}: \`workflow: ${name}\` — ${(err as Error).message}`,
     );

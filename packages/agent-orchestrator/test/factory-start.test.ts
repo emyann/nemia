@@ -1051,4 +1051,19 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', 'in-g'])));
     assert.deepEqual([run.factory, run.repo], ['g', c]);
   });
+
+  await s.test("a card's workflow by name that only yours holds starts from yours, on the factory's repository", async () => {
+    const d = aRepo();
+    addFactoryAt(ROOT, { name: 'h', repos: [d] });
+    attachWorkflowAt(ROOT, { factory: 'h', workflow: 'dev' });
+    const yours = path.join(ROOT, 'workflows');
+    fs.cpSync(path.dirname(dev), yours, { recursive: true });
+    try {
+      aCard('in-h', '---\nworkflow: dev\nfactory: h\n---\nFrom yours.\n');
+      const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', 'in-h'])));
+      assert.deepEqual([run.repo, run.workflowDir], [d, path.join(yours, 'dev')]);
+    } finally {
+      fs.rmSync(yours, { recursive: true, force: true });
+    }
+  });
 });

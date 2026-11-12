@@ -178,7 +178,8 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
 
 /**
  * What still needs the workflow folder `dir`, one sentence each (`stillNeeded`): every run that froze no steps at its start and reads them
- * from the folder; every card queued to start on it, by its `workflow:` read from the inbox, but one a record says was started, which the
+ * from the folder; every card queued to start on it, by its `workflow:` — the folder's name, which its factory finds it by, or an old
+ * card's path read from the inbox — but one a record says was started, which the
  * tick never starts again; and every factory that attaches its name while none of its repositories has a workflow of that name, with its
  * hires into it. A run that froze its steps, a card not queued and a factory with a repository's workflow of the name go on without it.
  */
@@ -190,7 +191,12 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
   const cards = (yield* readInbox())
-    .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(home), card.workflow) === dir)
+    .filter(
+      (card) =>
+        card.queued?.place != null &&
+        card.workflow !== null &&
+        (card.workflow === name || path.resolve(inboxDir(home), card.workflow) === dir),
+    )
     .map((card) => stillNeeded.card(card.name, dir));
   const factories = (yield* (yield* FactoryDoor).factories.listed()).flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(name)) return [];

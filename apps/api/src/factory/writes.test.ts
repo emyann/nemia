@@ -1,15 +1,14 @@
 /**
  * The Factory's own writes the command line had alone, served as endpoints of `objects`' `Api` and calling the package's entries by
- * type: its revisions policy (`nemia factory revisions`), its places trusted again (`nemia factory trust`), a workflow attached and
+ * type: its revisions policy (`nemia factory revisions`), a workflow attached and
  * detached (`nemia factory attach`, `detach`), a harness setting set and taken off (`nemia factory setting`) and the factory removed
  * (`nemia factory rm`). Each is a story in a scratch store whose factories are filed with the package's own verb: the write answered and
- * read back from disk, then its refusals, each by its status, leaving the factory's file as it was. The trust writes Claude Code's
- * `.claude.json` in the harness's scratch `CLAUDE_CONFIG_DIR`, never the person's.
+ * read back from disk, then its refusals, each by its status, leaving the factory's file as it was. Its places trusted again (`nemia
+ * factory trust`) are trust.boundary.test.ts's, which a real repository needs.
  */
-import { config, root } from '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
@@ -18,18 +17,10 @@ import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 
 type Factory = import('objects').Factory;
-type FactoryTrusted = import('objects').FactoryTrusted;
 type FactoryRemoved = import('objects').FactoryRemoved;
 
-/** A git repository with one commit: a factory's place, whose root the git place answers. */
-const gitRepo = (prefix: string): string => {
-  const repo = scratch(prefix);
-  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
-  return repo;
-};
-
-const repo = gitRepo('nemia-api-factory-writes-');
+/** A factory's place: a plain folder, since no write here asks the place for anything. */
+const repo = scratch('nemia-api-factory-writes-');
 for (const name of ['mill', 'gone', 'kept']) addFactory({ name, repos: [repo] });
 attachWorkflow({ factory: 'mill', workflow: 'alpha' });
 
@@ -72,35 +63,6 @@ test("a person sets a factory's revisions policy: the Factory answers it, and a 
     await refused('mill', () => send('PUT', route, { revisions: 'always' }), 400);
     await refused('nowhere', () => send('PUT', '/api/factories/nowhere/revisions', { revisions: 'follow' }), 404);
     await refused('default', () => send('PUT', '/api/factories/default/revisions', { revisions: 'follow' }), 409);
-  });
-});
-
-test("a person trusts a factory's places again: each is trusted for Claude Code where the store runs, and a factory unknown is refused", async (t) => {
-  const s = story(t);
-  const claudeJson = path.join(config, '.claude.json');
-  const trusted = (): boolean =>
-    fs.existsSync(claudeJson) &&
-    Object.values(
-      (JSON.parse(fs.readFileSync(claudeJson, 'utf8')) as { projects?: Record<string, { hasTrustDialogAccepted?: boolean }> }).projects ??
-        {},
-    ).some((p) => p.hasTrustDialogAccepted === true);
-
-  await s.test('REFUSED: a factory not filed is a 404, and nothing is trusted', async () => {
-    assert.equal((await send('POST', '/api/factories/nowhere/trust')).status, 404);
-    assert.equal(trusted(), false);
-  });
-
-  await s.test('a POST answers what was asked of its place, written in the scratch .claude.json; a second writes nothing', async () => {
-    const first = await answered<FactoryTrusted>(send('POST', '/api/factories/mill/trust'));
-    assert.equal(first.name, 'mill');
-    const claude = first.trusts.find((one) => 'harness' in one && one.wrote);
-    assert.ok(claude !== undefined, JSON.stringify(first.trusts));
-    assert.equal(trusted(), true);
-    const again = await answered<FactoryTrusted>(send('POST', '/api/factories/mill/trust'));
-    assert.deepEqual(
-      again.trusts.filter((one) => 'wrote' in one && one.wrote),
-      [],
-    );
   });
 });
 

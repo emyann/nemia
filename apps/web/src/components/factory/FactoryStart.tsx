@@ -1,17 +1,17 @@
 /**
  * A run's start: the rail's FAB that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
- * factory yet, the factories to start it in; then the repository the run starts on, the factory's one or picked among its several, the
- * workflows the factory offers there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as
- * the CLI's `start --factory` starts it.
+ * factory yet, the factories to start it in; then the repository the run starts on — the factory's one, or, where it has several, the
+ * one its wiring gives the workflow picked (`startRepo`), said and never picked — the workflows the factory offers there, each that
+ * cannot start saying why, and `StartRun` in the factory for the one picked, as the CLI's `start --factory` starts it.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import KitButton from '@/components/ui/ds/components/Button';
 import { PlusIcon } from '@/components/ui/ds/icons';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api/workflows';
-import { floorPlace, whyNotStarted } from '@/lib/factories';
+import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
 import { FloatingBar } from '../frame/FloatingBar';
@@ -156,29 +156,70 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
   );
 }
 
-/** The repository a run starts on in `place`'s factory, fixed when it has one, else a person's pick; then its workflows there. */
+/**
+ * The repository a run starts on in `place`'s factory, fixed when it has one; then its workflows there. Where it has several, the
+ * workflow is picked first, by name among those the factory offers, and the repository is the one its wiring gives it (`startRepo`),
+ * said and never picked, or why it gives none, naming the attach (`data-unwired`): the api places the run there whatever it is sent.
+ */
 function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: string | null } }) {
-  const [picked, setPicked] = useState<string | null>(null);
-  const repo = place.repo ?? picked;
-  return (
-    <>
-      {place.repo === null ? (
-        <RepoPicker
-          repos={place.repos}
-          picked={picked}
-          onPick={setPicked}
-          note={
-            <>
-              The factory {code(place.factory)} works on {place.repos.length}: the run starts on the one picked.
-            </>
-          }
-        />
-      ) : (
+  const factory = useQuery(factoriesQuery).data?.find((f) => f.name === place.factory);
+  if (place.repo !== null)
+    return (
+      <>
         <p data-repo className="text-body-medium">
           On {path(place.repo)}
         </p>
+        <Workflows key={place.repo} place={{ factory: place.factory, repo: place.repo }} />
+      </>
+    );
+  return factory === undefined ? null : <Unfixed factory={factory} repos={place.repos.length} />;
+}
+
+/** The start in `factory`, of `repos` repositories: the workflow picked by name, then the repository its wiring gives it. */
+function Unfixed({ factory, repos }: { factory: Factory; repos: number }) {
+  const [picked, setPicked] = useState<string | null>(null);
+  const field = useId();
+  const offered = factory.workflows ?? [];
+  const on = picked === null ? null : startRepo(factory, picked);
+  return (
+    <>
+      <div className="space-y-1.5">
+        <label htmlFor={field} className="block text-body-medium font-medium">
+          Workflow
+        </label>
+        {offered.length === 0 ? (
+          <p data-no-workflow className="text-body-small text-yours">
+            The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
+          </p>
+        ) : (
+          <select id={field} value={picked ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
+            <option value="" disabled>
+              Pick what runs
+            </option>
+            {offered.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+        <p className="text-body-small text-muted-foreground">
+          The factory {code(factory.name)} works on {repos} repositories: its wiring says which one each workflow runs on.
+        </p>
+      </div>
+      {on !== null && 'why' in on && (
+        <p data-unwired={on.refused} className="text-body-small break-words text-yours">
+          {on.why}
+        </p>
       )}
-      {repo !== null && <Workflows key={repo} place={{ factory: place.factory, repo }} />}
+      {on !== null && picked !== null && 'repo' in on && (
+        <>
+          <p data-repo className="text-body-medium">
+            On {path(on.repo)}, where the factory runs {code(picked)}
+          </p>
+          <Workflows key={`${picked}:${on.repo}`} place={{ factory: factory.name, repo: on.repo }} only={picked} />
+        </>
+      )}
     </>
   );
 }
@@ -186,10 +227,11 @@ function OnRepo({ place }: { place: { factory: string; repos: string[]; repo: st
 /**
  * The workflows `place`'s factory offers on its repository, read with its hires, one a radio: one that cannot start says why, in the
  * package's words (`whyNotStarted`), and cannot be picked. Then `StartRun` in the factory for the one picked. Where it offers none there,
- * the line that attaches one, as the api answers it on the factory (`commands.attach`).
+ * the line that attaches one, as the api answers it on the factory (`commands.attach`). With `only`, the workflow of that name alone.
  */
-function Workflows({ place }: { place: Place }) {
-  const workflows = useQuery(factoryWorkflowsQuery(place));
+function Workflows({ place, only }: { place: Place; only?: string }) {
+  const read = useQuery(factoryWorkflowsQuery(place));
+  const workflows = { ...read, data: only === undefined ? read.data : read.data?.filter((w) => w.name === only) };
   const { data: factories } = useQuery(factoriesQuery);
   const attach = factories?.find((f) => f.name === place.factory)?.commands.attach;
   const [picked, setPicked] = useState<string | null>(null);
@@ -267,38 +309,5 @@ function WorkflowRow({
         </span>
       </label>
     </li>
-  );
-}
-
-/** A factory's repositories to start a run on, when it has several: a person picks one; `note` says, under it, why the pick is theirs. */
-function RepoPicker({
-  repos,
-  picked,
-  onPick,
-  note,
-}: {
-  repos: readonly string[];
-  picked: string | null;
-  onPick: (repo: string) => void;
-  note: ReactNode;
-}) {
-  const field = useId();
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-body-medium font-medium">
-        Repository
-      </label>
-      <select id={field} value={picked ?? ''} onChange={(event) => onPick(event.target.value)} className={`${FIELD} sm:max-w-md`}>
-        <option value="" disabled>
-          Pick where it runs
-        </option>
-        {repos.map((repo) => (
-          <option key={repo} value={repo}>
-            {repo}
-          </option>
-        ))}
-      </select>
-      <p className="text-body-small text-muted-foreground">{note}</p>
-    </div>
   );
 }

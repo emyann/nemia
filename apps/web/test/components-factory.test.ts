@@ -158,6 +158,14 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
 });
 
+test("REFUSED: the floor's start in a factory of several repositories offers no repository to pick: the workflow is picked, and the wiring places it", async () => {
+  const { StartBar } = await import('../src/components/factory/FactoryStart.tsx');
+  const factory = filed('quay', { repos: ['/code/a', '/code/b'], workflows: ['dev'], workflowRepos: { dev: 'b' } });
+  const html = await pagedWith(createElement(StartBar, { factory: 'quay' }), [[['factories'], [factory]], STORE_ANSWER]);
+  assert.doesNotMatch(html, /<option value="\/code\/a"/, 'refused: a repository a person picks, which the api would not run on');
+  assert.match(html, /<option value="" disabled="" selected="">Pick what runs<\/option><option value="dev">dev<\/option>/);
+});
+
 /** A factory's rules as its settings page draws them over the api's answer `read`: the file is `/store/factories/hiring/RULES.md`. */
 async function rulesMarkup(read: { words: string | null; error: string | null }): Promise<string> {
   const { FactoryRules } = await import('../src/components/factory/FactoryRules.tsx');

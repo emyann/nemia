@@ -278,7 +278,7 @@ export const runs = {
     ),
   /** The run object (`GET /api/runs/:name`). */
   show: (name: string): Promise<Run> => call((c) => c.runs.show({ params: { name } }), read(Run)),
-  /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */
+  /** A run started in `namespace`, `?repo=` finding the factory: the api places it on the repository its wiring gives. Its name. */
   create: (namespace: string, start: RunStart, may: string, repo?: string): Promise<RunStarted> =>
     call(
       (c) => c.runs.create({ params: { namespace }, query: repo === undefined ? {} : { repo }, payload: start }),

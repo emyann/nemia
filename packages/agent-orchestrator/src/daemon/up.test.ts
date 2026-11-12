@@ -1,11 +1,16 @@
 /**
  * What the daemon says of a pass (`passSaid`) and how it says it (`logPass`): as logs, through whatever logger the process provides, each
- * annotated with the run and the steps it is about, and each failure said once while it stands.
+ * annotated with the run and the steps it is about, and each failure said once while it stands; and the tools folder the daemon puts
+ * first on its own PATH as it starts (`toolsOnPath`); that a check finds a tool installed there is `src/needs/needs.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Effect, Logger, References } from 'effect';
-import { logPass, NOTHING_SAID, passSaid, type UpSaid } from './up.verb.ts';
+import { scratch } from 'test-kit/scratch';
+import { logPass, NOTHING_SAID, passSaid, toolsOnPath, type UpSaid } from './up.verb.ts';
+import { toolsBinDir } from '../config/root.store.ts';
 import type { Pass } from '../tick/tick.verb.ts';
 
 /** A pass that advanced one run, `r-1`: a note, `implement` filed and `review` checking; the rest of an `Advanced` is not read here. */
@@ -129,4 +134,14 @@ test("a scheduled start is said about its run, a refusal and a failure as a warn
     [true],
   );
   assert.deepEqual(said({ ...at, failed: 'EIO', again: true }), []);
+});
+
+test("the daemon's tools folder is made and led on its PATH once", () => {
+  const home = scratch('wf-up-tools-');
+  const env: Record<string, string | undefined> = { PATH: '/usr/bin:/bin' };
+  const bin = toolsOnPath(home, env);
+  toolsOnPath(home, env);
+  assert.equal(bin, toolsBinDir(home));
+  assert.deepEqual(env.PATH?.split(path.delimiter), [bin, '/usr/bin', '/bin']);
+  assert.ok(fs.statSync(bin).isDirectory());
 });

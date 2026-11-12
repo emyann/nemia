@@ -1010,3 +1010,47 @@ test("a Workflow's spec carries its folder's other text files: served sorted, wr
     );
   });
 });
+
+test("a Workflow's spec carries the needs its README's frontmatter declares: served apart from the README, and kept by a read then a write", async (t) => {
+  const dir = path.join(root, 'workflows', 'needful');
+  const tool = { name: 'tool', message: 'the tool is installed', check: 'command -v tool' };
+  write(path.join(dir, 'plan.md'), '---\nplace: git\n---\nPlan it.\n');
+  write(
+    path.join(dir, 'README.md'),
+    '---\nneeds:\n  - name: tool\n    message: the tool is installed\n    check: command -v tool\n---\n# Needful\n',
+  );
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const url = '/api/namespaces/default/workflows/needful';
+  const got = async () => (await (await app.request(`${url}?origin=yours`)).json()) as import('objects').Workflow;
+  const put = (body: unknown) =>
+    app.request(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  const read = await got();
+  await t.test('GET serves the needs in spec.needs, and the README without its frontmatter', () => {
+    assert.deepEqual(read.spec.needs, [tool]);
+    assert.equal(read.spec.readme, '# Needful\n');
+  });
+
+  await t.test('PUT of the Workflow as it was read keeps the needs in the README', async () => {
+    const res = await put({ metadata: { resourceVersion: read.metadata.resourceVersion }, spec: read.spec });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(((await res.json()) as import('objects').Workflow).spec.needs, [tool]);
+    assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /^---\nneeds:/, 'the frontmatter written back');
+  });
+
+  await t.test('PUT of a new README with no needs given keeps the needs; needs given replace them', async () => {
+    const now = await got();
+    const res = await put({
+      metadata: { resourceVersion: now.metadata.resourceVersion },
+      spec: { steps: now.spec.steps, readme: '# Needful, again\n' },
+    });
+    assert.equal(res.status, 200, await res.clone().text());
+    const kept = (await res.json()) as import('objects').Workflow;
+    assert.deepEqual(kept.spec.needs, [tool], 'needs left out: the README keeps its own');
+    assert.equal(kept.spec.readme, '# Needful, again\n');
+    const other = { name: 'other', message: 'another tool', check: 'command -v other' };
+    const replaced = await put({ metadata: { resourceVersion: kept.metadata.resourceVersion }, spec: { ...kept.spec, needs: [other] } });
+    assert.equal(replaced.status, 200, await replaced.clone().text());
+    assert.deepEqual(((await replaced.json()) as import('objects').Workflow).spec.needs, [other]);
+  });
+});

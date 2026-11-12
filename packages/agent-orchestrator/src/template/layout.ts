@@ -321,6 +321,31 @@ const STEP: Shape = {
   required: ['name'],
 };
 
+/**
+ * A machine need a workflow declares (`spec.needs`): its name, what it is, the shell command whose exit 0 says it is in place, the fixes
+ * that put it there, each with the answers it asks and the pattern of a code its output shows, and the place need it `fills`.
+ */
+const NEED: Shape = {
+  fields: {
+    name: 'string',
+    message: 'string',
+    check: 'string',
+    fixes: {
+      list: {
+        fields: {
+          command: 'string',
+          message: 'string',
+          asks: { list: { fields: { name: 'string', message: 'string' }, required: ['name', 'message'] } },
+          code: 'string',
+        },
+        required: ['command', 'message'],
+      },
+    },
+    fills: 'string',
+  },
+  required: ['name', 'message', 'check'],
+};
+
 /** Each kind's spec. */
 const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
   FactoryTemplate: {
@@ -338,7 +363,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
     },
     required: ['version', 'hires'],
   },
-  Workflow: { fields: { steps: { list: STEP } }, required: ['steps'] },
+  Workflow: { fields: { steps: { list: STEP }, needs: { list: NEED } }, required: ['steps'] },
   Agent: {
     fields: {
       role: 'string',

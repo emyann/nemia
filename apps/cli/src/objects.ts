@@ -45,16 +45,21 @@ export const READ_BOUND_MS = 30_000;
 
 /**
  * The typed client of the `Api` at `base`: each write with no body sent as `{}` in JSON (`jsonBodied`), as the api's write guard takes
- * it, and each request carrying the session's token where `env` holds one (`sessionHeaders`) and `headers` beside it (an `Accept` that
- * asks a list for its `Table`).
+ * it, and each request carrying the session's token where `env` holds one and `carried` is left on (`sessionHeaders`; a pairing turns
+ * it off, since that token is another server's, `askedBare`) and `headers` beside it (an `Accept` that asks a list for its `Table`).
  */
-export const clientAt = (base: string, env: NodeJS.ProcessEnv = process.env, headers: Readonly<Record<string, string>> = {}) =>
+export const clientAt = (
+  base: string,
+  env: NodeJS.ProcessEnv = process.env,
+  headers: Readonly<Record<string, string>> = {},
+  carried = true,
+) =>
   HttpApiClient.make(Api, {
     baseUrl: base,
     transformClient: (client) =>
       HttpClient.mapRequest(
         HttpClient.mapRequest(client, jsonBodied),
-        HttpClientRequest.setHeaders({ ...sessionHeaders(env), ...headers }),
+        HttpClientRequest.setHeaders({ ...(carried ? sessionHeaders(env) : {}), ...headers }),
       ),
   });
 
@@ -93,9 +98,10 @@ const attempt = <A, E>(
   boundMs: number,
   env: NodeJS.ProcessEnv,
   headers: Readonly<Record<string, string>>,
+  carried = true,
 ) =>
   Effect.runPromiseExit(
-    Effect.flatMap(clientAt(base, env, headers), call).pipe(
+    Effect.flatMap(clientAt(base, env, headers, carried), call).pipe(
       Effect.timeout(Duration.millis(boundMs)),
       Effect.provide(FetchHttpClient.layer),
     ),
@@ -149,6 +155,20 @@ export async function asked<A, E>(
 ): Promise<A> {
   const base = await served(verb, env);
   return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs);
+}
+
+/**
+ * What `call` answers of the objects' client at `base`, a server no context names yet (`nemia pair <url>`), for the verb `verb` names:
+ * asked once, within `boundMs`, carrying no token at all, since the token of the context in use is another server's and is never sent
+ * to this one. Refused as `asked` refuses.
+ */
+export async function askedBare<A, E>(
+  verb: string,
+  base: string,
+  call: (client: ObjectsClient) => Effect.Effect<A, E>,
+  boundMs: number = READ_BOUND_MS,
+): Promise<A> {
+  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs);
 }
 
 /**

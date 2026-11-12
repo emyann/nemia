@@ -13,7 +13,7 @@
  * the folder. `nemia frontmatter rewrite` still recognises it (`inFormerForm`), for a person's folder written before, and turns it into
  * YAML with every value the same, byte for byte. A block in neither form is refused, naming its line and the fix.
  */
-import { Document, isMap, isScalar, isSeq, LineCounter, parseDocument, Scalar, YAMLSeq, type Node, type Pair } from 'yaml';
+import { Document, isMap, isScalar, isSeq, LineCounter, parseDocument, Scalar, stringify, YAMLSeq, type Node, type Pair } from 'yaml';
 import { firstPiece } from '../piece/piece.ts';
 import { LIST_KEYS, refuse, STEP_KEYS } from '../step/step.ts';
 
@@ -169,6 +169,15 @@ export function frontmatterValues(block: string): unknown {
   const [error] = doc.errors;
   if (error !== undefined) throw error;
   return doc.toJS();
+}
+
+/**
+ * The block for `values`, YAML's own values written as YAML writes them, no line folded, every line ending in a line break, with no `---`
+ * around it: the writer beside `frontmatterValues`, for a block whose keys hold maps and lists of maps (a workflow README's `needs:`),
+ * which `renderFrontmatter`'s pairs do not.
+ */
+export function frontmatterOfValues(values: Readonly<Record<string, unknown>>): string {
+  return stringify(values, { lineWidth: 0 });
 }
 
 /**

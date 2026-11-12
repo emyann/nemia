@@ -13,6 +13,7 @@ import { plantStepOutput, STEP_OUTPUT_SCHEMA, teamCopy } from '../../../test/tea
 import { templated } from '../../../test/templated.ts';
 import { loadWorkflows } from '../../workflows/workflows.store.ts';
 import { renderFactory, resolveParams } from './index.ts';
+import { workflowNeeds, workflowReadme } from '../../folder/folder.store.ts';
 
 const ROOT = scratch('wf-render-');
 const { exportTemplate, openTemplate } = templated(ROOT);
@@ -239,6 +240,20 @@ test("what a render writes into a factory's tree, read back as today's folder re
     assert.equal(fs.readFileSync(path.join(tree, 'NEMIA.md'), 'utf8'), 'Operate this factory.\n');
     const { tree: other } = rendered(dir, ['budget=9', 'model=haiku']);
     assert.match(fs.readFileSync(path.join(other, 'workflows/agents/reviewer.md'), 'utf8'), /^model: haiku$/m);
+  });
+  await t.test("a workflow's needs are written as its README's frontmatter, a parameter given its value, the README kept below", () => {
+    const { repo, dir } = exported();
+    edit(dir, 'nemia.yaml', (spec) => {
+      spec.parameters = { tool: { type: 'string', description: 'the tool', default: 'make' } };
+    });
+    edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
+      spec.needs = [{ name: 'tool', message: 'the tool is installed', check: 'command -v ${{ parameters.tool }}' }];
+    });
+    const { tree, out } = rendered(dir, ['tool=just']);
+    assert.deepEqual(out.refusals, []);
+    const folder = path.join(tree, 'workflows', 'dev');
+    assert.deepEqual(workflowNeeds(folder), [{ name: 'tool', message: 'the tool is installed', check: 'command -v just' }]);
+    assert.equal(workflowReadme(folder), fs.readFileSync(path.join(repo, 'workflows/dev/README.md'), 'utf8'));
   });
   await t.test(
     'a ${{ parameters.<name> }} is written with its value in a check, a step, an agent, NEMIA.md and RULES.md, and a carried file is left as it is',

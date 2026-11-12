@@ -25,19 +25,22 @@ lays the release down:
 - the command, `~/.local/bin/nemia`, a link to the release's own launcher. Put `~/.local/bin` on your PATH if the installer says it is
   not.
 
-Then it asks three things, each of which you can also answer by a flag with `--yes`, for a machine you set up by script:
+Then it asks three things, on the server, each of which you can also answer by a flag with `--yes`, for a machine you set up by
+script:
 
-- **Your Claude token** (below), which it hands to `nemia claude-token set` on its standard input. With `--yes`, pass it as a file:
-  `--claude-token-file <file>`.
+- **Your Claude token** (below), asked outright and read without echo, which it hands to `nemia claude-token set` on its standard
+  input. With `--yes`, pass it as a file: `--claude-token-file <file>`; without one, it warns and goes on.
 - **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
   with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
   `loginctl enable-linger`, so Nemia keeps running after you log out. `--no-service` skips it; `nemia up` runs the daemon by hand.
-- **The address to bind** (below). Left empty, the daemon listens on this machine alone.
+- **The address to bind** (below), picked by number from this machine's private addresses (`nemia service addresses` lists them with
+  their kind), or typed. Left at its default, the daemon listens on this machine alone.
 
-Other flags: `--version <tag>` installs that release instead of the latest, and `--base <url>` downloads from another place laid out
-as GitHub lays out a release.
+Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
+as GitHub lays out a release, and `--board-base <url>` is the address the first-visit link is printed under (below).
 
-The installer never prints your Claude token. It prints one token only: the first person token, once, when you choose a bind address.
+The installer prints no token. It ends on `nemia readiness` (below): what is in place, and the command that fixes each piece that is
+not.
 
 ## Bind it to a private network
 
@@ -48,18 +51,23 @@ the daemon to an address of a private network you trust, such as your Tailscale 
 curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind 100.64.0.1
 ```
 
-or answer the installer's question with that address. A store bound beyond this machine is marked exposed: every caller then needs a
-person token, the board included, and the server's own `nemia` too. The installer runs `nemia token add` once and prints the first
-token; keep it, it is not shown again. It also keeps that token for the server's own `nemia`, so `nemia ls` and the other reads work
-there as before and the store's other verbs still run on the server itself. Where you bound the daemon by hand, do the same with a
-token of yours in a file:
+or pick that address at the installer's question. A public address, or every interface (`0.0.0.0`), is refused unless you acknowledge
+it with `--public`, which writes `NEMIA_BIND_PUBLIC=1` into the service: the daemon refuses to start on such an address without it.
+
+A store bound beyond this machine is marked exposed: every caller then needs a person token, the board included, and the server's own
+`nemia` too. The installer mints the server's own token straight into its local context, never printed, so `nemia ls` and the other
+verbs work there as before. In place of a token, it prints a first-visit link: open it within ten minutes and that browser is signed
+in to the board, once. `nemia board link` makes another (`--base <url>` prints it under the name your browser uses, a Tailscale name
+or a proxy's, since a browser keeps one cookie per host name). Where you bound the daemon by hand, keep a token for the server's own
+`nemia` in a file:
 
 ```bash
 nemia token add server
 nemia config set-context local --token-file ~/.nemia-token
 ```
 
-The board asks for a token once and keeps it in a cookie only the board's own origin is sent.
+The board signs in by a first-visit link, by pairing (_Pair this browser_ on its sign-in shows a code you approve at the server), or by
+a pasted token, and keeps it in a cookie only the board's own origin is sent.
 
 Nemia speaks plain HTTP. TLS stays outside it: a private network such as Tailscale, which encrypts the traffic between your machines,
 or a reverse proxy of your own in front of it.
@@ -69,11 +77,14 @@ or a reverse proxy of your own in front of it.
 On your laptop, Nemia can be just the command that talks to the daemon of your server:
 
 ```bash
-curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.64.0.1:8787 --token-file ~/.nemia-token
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.64.0.1:8787
 ```
 
-A client install starts no service. It writes a context, a name for that server and the file holding your person token, into
-`~/.config/nemia/config.yaml` (readable by you alone), and makes it the current one. A context is the same idea as kubectl's:
+A client install starts no service. It pairs with the server: `nemia pair <url>` shows a short code, you approve it on the server
+(`nemia pairings approve <code>`, or the board's Setup page), and a person token named for your laptop lands in a context, a name for
+that server in `~/.config/nemia/config.yaml` (readable by you alone), made the current one. No token is shown or copied; `nemia token
+rm <name>` on the server revokes it. `--token-file <file>` still takes a token you minted by hand. A context is the same idea as
+kubectl's:
 
 ```bash
 nemia config set-context vps --server http://100.64.0.1:8787 --token-file ~/.nemia-token
@@ -94,6 +105,31 @@ The machine's own verbs always act on the machine you type them on: the service,
 version, tokens and the Claude token, and the verbs that read and write files and no store (`nemia template`, `nemia frontmatter`,
 `nemia admit`). `nemia template export --factory` reads a factory of this machine's store, so under a remote context it is refused:
 run it on the server.
+
+Claude Code's nemia plugin asks the server through the current context's token (`nemia config headers`, its `headersHelper`), at the
+address `NEMIA_URL` names: `nemia pair` prints the line to put in your shell profile.
+
+## What is in place
+
+```bash
+nemia readiness
+nemia readiness fix <need>
+```
+
+One read lists every piece a server needs before a factory's first run, each in place, missing or unknown, with the command or fix
+that puts it there: the Claude token, or Claude Code's own sign-in where none is set (set and loading; a wrong or expired token shows
+only when a session is refused), the service and
+its linger, the bind, cgroup v2 and `systemd --user`, the git identity, the needs each factory's workflows declare, a factory, and a
+newer release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
+same read, and a banner on every page while a piece is missing.
+
+A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
+the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need is missing,
+naming it and its fix, and starts by itself once the need is met. `nemia readiness fix <need>` (or its button on Setup) runs the fix on
+the server and shows its output as it runs, a sign-in's device code set apart: open the link it shows on any device and type the
+code. A fix installs a tool into `~/.agent-workflows/tools`, never as root, and the daemon puts its `bin` first on its PATH. A
+factory's fix runs only once you trusted its places (`nemia factory trust <factory>`), and so does its check: an untrusted factory's
+needs read unknown, with that command.
 
 ## Your Claude token
 

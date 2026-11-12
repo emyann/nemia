@@ -516,7 +516,8 @@ function cliBreaks(sources: Sources): string[] {
  * through the Feed door and its hub alone; and the listing of objects (`src/object/listed.verb.ts`),
  * which reads no store and no runtime, only a page of the objects its caller read and the time a file was made; and a command line
  * forwarded to a remote daemon (`src/command/forward.verb.ts`, `src/command/requests.verb.ts`), which calls its api over HTTP and builds
- * no engine. Named one by one, so any
+ * no engine; and the machine's needs read (`src/needs/needs.verb.ts`), which runs each declared check as a short shell command of its own,
+ * beside the engine and never on it, and reads the factories and folders. Named one by one, so any
  * other controller that stops reaching the client is still refused.
  */
 const DOORED_ONLY: readonly string[] = [
@@ -528,6 +529,7 @@ const DOORED_ONLY: readonly string[] = [
   'src/await/await.verb.ts',
   'src/command/forward.verb.ts',
   'src/command/requests.verb.ts',
+  'src/needs/needs.verb.ts',
 ];
 
 /**

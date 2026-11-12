@@ -419,7 +419,8 @@ What is called dead is stopped. The worker writes its harness's pid and start on
 once a run has ended — its worker wrote its end, or is gone — what is left in its harness's process group is ended by the runner's
 `stop` and `release` (`stopRunOf`, `src/harness/detached/left.ts`): SIGTERM from the first ask, kept in `.stop`, and SIGKILL once the
 run's stop grace has passed since (`leftSignal`, proved by `contracts/left.contract.ts`). A process that left the group with
-`setsid` is not reached.
+`setsid` is not reached. A worker is signalled only where its beat is fresh or its identity is proven: a stale run that names no
+worker is left `.stop` alone, so one that starts late starts nothing, and no pid nothing proves is its worker is signalled.
 
 The beat is written on two clocks: `heartbeatAt` on the wall clock, and `beat`, `{ boot, ms }`, on the monotonic clock every
 process of a boot shares. The lease is measured on `beat` when it was written in this boot, so a wall clock stepped forward

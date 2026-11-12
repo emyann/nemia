@@ -745,12 +745,14 @@ const signalGroup = (group: number, signal: LeftSignal): void => {
  * A stop of the run of `spec` under `name`, whatever its word, and whether it left a process behind, still to end (`stop`, `release`),
  * its stop grace the run's own, else `graceMs`:
  *
- * 1. Nothing to do for no run, or a run whose worker can no longer run and whose harness's group is empty (`groupLeft`).
+ * 1. Nothing to do for no run, or a run whose worker is gone and whose harness's group is empty (`groupLeft`).
  * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
- *    the grace below is measured from the instant it holds.
- * 3. A run file that says `working` whose word is too (a fresh beat: somebody beats it, a worker started again by hand that its
- *    spawn's `.launched` does not name included), or whose worker is not seen gone: SIGTERM to the worker (`signalWorker`). The
- *    worker ends its harness's group and writes `stopped`.
+ *    the grace below is measured from the instant it holds. A run whose beat is stale and whose worker cannot be told (`unknown`: no
+ *    `.launched`, as a run spawned before it was written, or no `/proc`) gets the file alone, so a worker that starts late starts
+ *    nothing: no signal goes to a pid nothing proves is its worker, which after a reboot may be any process of this user.
+ * 3. A run whose word is `working` (a fresh beat: somebody beats it, a worker started again by hand that its spawn's `.launched` does
+ *    not name included; or a stale one whose worker is seen running, by pid, start and boot): SIGTERM to the worker
+ *    (`signalWorker`). The worker ends its harness's group and writes `stopped`.
  * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
  *    sent what `leftSignal` picks, SIGTERM within the stop grace since the first ask and SIGKILL after.
  */
@@ -764,10 +766,11 @@ const stopRunOf =
     const worker = () => (seen ??= workerSeen(besideRun(spec, root, name, LAUNCHED_END)));
     const word = leased(hit.run, now, worker);
     const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
-    const workerMayRun = hit.run.state === 'working' && (word === 'working' || worker() !== 'gone');
-    if (!workerMayRun && group === undefined) return false;
+    const atWork = word === 'working';
+    const mayStartLate = hit.run.state === 'working' && !atWork && worker() === 'unknown';
+    if (!atWork && !mayStartLate && group === undefined) return false;
     const asked = firstAsked(besideRun(spec, root, name, 'stop'), now);
-    if (workerMayRun) signalWorker(spec, root, name);
+    if (atWork) signalWorker(spec, root, name);
     if (group === undefined) return false;
     signalGroup(group, leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), hit.run.stopGraceMs ?? graceMs));
     return true;

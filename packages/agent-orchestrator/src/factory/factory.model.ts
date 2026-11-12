@@ -59,10 +59,11 @@ const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
  * A factory as its store reads it (`Factory`): its hires by `<workflow>/<step>`, its schedules by workflow. Its invariants are the door's:
  * it works on one repository at least (`factoryRepos`), names only the harness settings a factory may set (`harnessSettingsRefusal`),
  * mounts no volume that is one of its repositories or named twice, and it hires and schedules only into a workflow it offers, and sets a
- * cost line only for one (`costLines`, dollars above zero), names the URL only of a repository it has (`origins`) — a hire, a schedule or a line of one it has not attached is refused, and a
- * workflow it still hires into, schedules or sets a line for is not detached (`wiringRefusal`, `wiring.ts`, whose contract proves those
- * refusals); this struct's own checks refuse a factory the door writes that breaks them. Its `generation`, the count of changes to its
- * spec, is the door's to count (`generationWritten`), never a caller's.
+ * cost line only for one (`costLines`, dollars above zero), and names the URL only of a repository it has (`origins`) — a hire, a
+ * schedule or a line of one it has not attached is refused, and a workflow it still hires into, schedules or sets a line for is not
+ * detached (`wiringRefusal`, `wiring.ts`, whose contract proves those refusals); this struct's own checks refuse a factory the door
+ * writes that breaks them. Its `generation`, the count of changes to its spec, is the door's to count (`generationWritten`), never a
+ * caller's.
  */
 export const Factory = Schema.Struct({
   name: FactoryName.OnRead,

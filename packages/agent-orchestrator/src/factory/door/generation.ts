@@ -32,8 +32,8 @@ const specKey = (factory: Factory): string =>
 
 /**
  * Whether `now` changes the spec of `was`: its repositories, workflows, hires, volumes (each by its path and mark: a name given changes no
- * mount), harness settings, cost lines, origins, revisions policy or template. Its schedules, its instruction's place and its name are no part of
- * it; its level is, and is written beside it (`factories.store.ts`).
+ * mount), harness settings, cost lines, origins, revisions policy or template. Its schedules, its instruction's place and its name are
+ * no part of it; its level is, and is written beside it (`factories.store.ts`).
  */
 export const specDiffers = (was: Factory, now: Factory): boolean => specKey(was) !== specKey(now);
 

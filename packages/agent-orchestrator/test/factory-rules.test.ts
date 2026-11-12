@@ -26,7 +26,7 @@ import { staged, story } from './story.ts';
 import { FACTORY_INSTRUCT, FACTORY_RULES, factoryInstruction, factoryRules, runWith as runEngine, startRun } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, readFactoryAt, setInstructionAt } from '../src/factory/factory.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { factoryTyped } from './factory-typed.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { agentFilesDir } from '../src/agents/agents.store.ts';
 import { WORKFLOWS_STEP } from '../src/workflows/workflows.verb.ts';
@@ -35,7 +35,7 @@ import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-rules-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: factoryTyped, engineOf, env: ENV });
 const { runPlaced } = stage;
 
 const RULES = 'Reply in German.';
@@ -80,21 +80,11 @@ const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
 const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
 
-type Mocker = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
+/** What `nemia factory instruction` and `instruct` answer: the instruction read after, and whether a clear took words off. */
+type Instruction = ReturnType<typeof factoryInstruction> & { removed?: boolean };
 
-/** What `nemia <argv>` printed, line by line. */
-const printedBy = async (t: Mocker, ...argv: string[]): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-};
+/** What `nemia <argv>` answers, run onto its entry's handler as the api calls it. */
+const answeredBy = async (...argv: string[]): Promise<Instruction> => (await stage.main(argv)) as Instruction;
 
 /** A step's keys, its words and its rules set aside: what the rules must not move. */
 const keysOf = (steps: readonly StepSpec[]) =>
@@ -113,25 +103,15 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.deepEqual(readRules(FILE), { words: null, error: null }, 'no file: no rules, and nothing wrong');
     const read = await rulesOf({ factory: 'pipao' });
     assert.deepEqual(read, { name: 'pipao', file: FILE, words: null, error: null });
-    names(FACTORY_RULES.print(read, { factory: 'pipao' })[0], 'pipao', 'nemia factory rules');
     none = await started(here, 'no rules', 'pipao');
     for (const step of frozen(none.id)) assert.equal('factoryRules' in step.agent!, false, step.name);
   });
 
-  await s.test('`nemia factory rules` writes them trimmed, read back and printed', async () => {
+  await s.test('`nemia factory rules` writes them trimmed, and reads them back', async () => {
     const written = await rulesOf({ factory: 'pipao', words: '\n\nBefore: never push on a Friday.\n\n' });
     assert.deepEqual(written, { name: 'pipao', file: FILE, words: 'Before: never push on a Friday.', error: null });
     assert.equal(fs.readFileSync(FILE, 'utf8'), 'Before: never push on a Friday.\n');
-    const said = FACTORY_RULES.print(written, { factory: 'pipao', words: 'x' })[0];
-    assert.ok(said.startsWith(`pipao: rules written to ${FILE}, `), said);
-    assert.match(said, /told to every agent hired into it/);
-    assert.match(said, /a run already started keeps/);
     assert.deepEqual(factoryRules(ROOT, 'pipao'), written);
-    assert.deepEqual(FACTORY_RULES.print(written, { factory: 'pipao' }), [
-      `pipao: rules kept in ${FILE}`,
-      '',
-      'Before: never push on a Friday.',
-    ]);
   });
 
   await s.test("`nemia start` freezes them on every step, after the agent's own, and they are all that was added", async () => {
@@ -209,17 +189,16 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     },
   );
 
-  await s.test('rules that cannot be told are read with why, and printed so; cleared, they are gone', async () => {
+  await s.test('rules that cannot be told are read with why; cleared, they are gone', async () => {
     fs.writeFileSync(FILE, '---\nmodel: opus\n---\n');
     const read = await rulesOf({ factory: 'pipao' });
     names(read.error, 'frontmatter');
-    assert.match(FACTORY_RULES.print(read, { factory: 'pipao' })[1], /^they cannot be told: /);
     assert.equal(clearRules(ROOT, { name: 'pipao' }), true);
   });
 
   await s.test(
     'the instruction, kept in the folder by default: NEMIA.md in its first folder, no words while no file is there',
-    async (sub) => {
+    async () => {
       assert.deepEqual(factoryInstruction(ROOT, 'pipao'), {
         name: 'pipao',
         path: null,
@@ -231,12 +210,8 @@ test("a factory's rules and its instruction, from none to cleared: told as their
       });
       fs.writeFileSync(path.join(here.repo, 'NEMIA.md'), 'Ship small.\n');
       assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Ship small.\n');
-      assert.deepEqual(await printedBy(sub, 'factory', 'instruction', 'pipao'), [
-        `pipao: read from ${path.join(here.repo, 'NEMIA.md')}, in the factory's first folder`,
-        '',
-        'Ship small.',
-        '',
-      ]);
+      const read = await answeredBy('factory', 'instruction', 'pipao');
+      assert.deepEqual([read.file, read.store, read.words], [path.join(here.repo, 'NEMIA.md'), false, 'Ship small.\n']);
     },
   );
 
@@ -249,7 +224,7 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').instruction, { store: true });
   });
 
-  await s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and from --file', async (sub) => {
+  await s.test('kept in the store: `nemia factory instruct` writes its words trimmed, and the words a file holds', async () => {
     const written = await stage.runWith(
       stage.board().e,
       FACTORY_INSTRUCT.handler({ factory: 'pipao', words: '  Ship small.  ', clear: false }),
@@ -257,9 +232,8 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
     assert.equal(written.words, 'Ship small.\n');
     assert.equal(fs.readFileSync(kept, 'utf8'), 'Ship small.\n');
-    const source = path.join(ROOT, 'words.md');
-    fs.writeFileSync(source, 'Be brief.\n');
-    assert.deepEqual(await printedBy(sub, 'factory', 'instruct', 'pipao', '--file', source), [`pipao: instruction written to ${kept}`]);
+    const again = await stage.runWith(stage.board().e, FACTORY_INSTRUCT.handler({ factory: 'pipao', words: 'Be brief.\n' }));
+    assert.deepEqual([again.file, again.removed], [kept, undefined]);
     assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
 
@@ -271,16 +245,14 @@ test("a factory's rules and its instruction, from none to cleared: told as their
     assert.equal(factoryInstruction(ROOT, 'pipao').words, 'Be brief.\n');
   });
 
-  await s.test(
-    '`nemia factory instruct --clear` removes the words; a clear of where it is kept removes the key, never null',
-    async (sub) => {
-      const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
-      assert.deepEqual(await printedBy(sub, 'factory', 'instruct', 'pipao', '--clear'), [`pipao: instruction removed, ${kept}`]);
-      assert.equal(factoryInstruction(ROOT, 'pipao').stored, false);
-      setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
-      assert.ok(!('instruction' in JSON.parse(fs.readFileSync(record, 'utf8'))), 'the key removed, never null');
-    },
-  );
+  await s.test('`nemia factory instruct --clear` removes the words; a clear of where it is kept removes the key, never null', async () => {
+    const kept = path.join(ROOT, 'factories', 'pipao', 'NEMIA.md');
+    const cleared = await answeredBy('factory', 'instruct', 'pipao', '--clear');
+    assert.deepEqual([cleared.file, cleared.removed], [kept, true]);
+    assert.equal(factoryInstruction(ROOT, 'pipao').stored, false);
+    setInstructionAt(ROOT, { factory: 'pipao', at: undefined });
+    assert.ok(!('instruction' in JSON.parse(fs.readFileSync(record, 'utf8'))), 'the key removed, never null');
+  });
 });
 
 test('REFUSED at shipped defaults: rules that cannot be told stop a start in the factory, naming the file and the clear; no run written', async (t) => {

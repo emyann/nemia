@@ -33,37 +33,7 @@ export const HELD_RUN: readonly string[] = [
 export const HELD_INBOX: readonly string[] = ['inbox add', 'inbox queue', 'inbox from', 'inbox rm', 'label run', 'label inbox'];
 
 /** The factories' verbs. */
-export const HELD_FACTORY: readonly string[] = [
-  'factory',
-  'factory ls',
-  'factory add',
-  'factory apply',
-  'factory adopt',
-  'factory diff',
-  'factory upgrade',
-  'factory resolve',
-  'factory attach',
-  'factory detach',
-  'factory hire',
-  'factory fire',
-  'factory schedule',
-  'factory unschedule',
-  'factory servers',
-  'factory server add',
-  'factory server rm',
-  'factory volume add',
-  'factory volume rm',
-  'factory setting set',
-  'factory setting rm',
-  'factory cost-line set',
-  'factory cost-line rm',
-  'factory rules',
-  'factory instruction',
-  'factory instruct',
-  'factory revisions',
-  'factory trust',
-  'factory rm',
-];
+export const HELD_FACTORY: readonly string[] = [];
 
 /** The policies and the rest of the agents' and workflows' verbs. */
 export const HELD_DEFINITION: readonly string[] = [

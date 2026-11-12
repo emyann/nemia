@@ -4,17 +4,14 @@
  * settings are the person's, never the template's. Served on both sides, typed by their `input`: the api's `putSetting` and
  * `deleteSetting` call these handlers.
  */
-import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
-import type { Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { FACTORY_SETTING_RM_WORDS, FACTORY_SETTING_SET_WORDS } from 'objects';
+import { tableEntry, type Served } from '../command/entry.verb.ts';
 import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories.store.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Factory } from '../factory/factory.ts';
 import {
-  SETTABLE,
-  SETTINGS_HARNESS,
   harnessSettingsRefusal,
   isHarnessSettings,
   type HarnessSettings,
@@ -34,52 +31,6 @@ export type SettingSetInput = typeof SettingSetInput.Type;
 /** What `nemia factory setting rm` takes: the factory, and the setting taken back, as `<harness>.<key>`. */
 export const SettingRmInput = Schema.Struct({ factory: Schema.String, setting: Schema.String });
 export type SettingRmInput = typeof SettingRmInput.Type;
-
-const SET_USAGE = '<factory> <harness>.<key> <json>';
-const RM_USAGE = '<factory> <harness>.<key>';
-
-/** The forms of `nemia factory setting`, as `nemia factory --help` lists them beside the factory's others. */
-export const SETTING_FORMS = `nemia factory setting set ${SET_USAGE}  (nemia factory setting set --help)
-nemia factory setting rm ${RM_USAGE}`;
-
-/** `nemia factory setting set --help`: what a harness setting is, which a factory may set, and why. */
-const SETTING_HELP = `${SETTING_FORMS}
-
-A harness setting is a setting of a harness a factory gives every session of its runs' steps on that
-harness, on top of the repository's own settings, as a container is given its configuration by its
-Pod: the Agent SDK's settings option, never a file written into the repository. Its value is
-JSON: nemia factory setting set f ${SETTINGS_HARNESS}.attribution '{"commit":"","pr":""}' writes no
-Co-Authored-By trailer and no pull request line. A step's own agent's settings win a key both name.
-
-A factory sets these alone: ${SETTABLE.map((k) => `${SETTINGS_HARNESS}.${k}`).join(', ')}.
-Each changes what a session writes or says, and none what it may reach or run. Every other key is
-refused, those that widen a fence (permissions, hooks, MCP servers, the sandbox, env) or run a
-program among them: each keeps its own field or fence, which the refusal names.
-
-Kept in the factory's own file (factories/<name>.json, "harnessSettings"), never in a template, and
-kept by nemia factory adopt and upgrade. Frozen on a run at its start, so a run in flight keeps what
-it began with; a key written into the file by hand that a factory may not set refuses the start.
-nemia factory lists them under the factory.
-
-Refused, and nothing written: a key that is not <harness>.<key>, a harness other than the default
-one (${SETTINGS_HARNESS}), a key or a value a factory may not set, a value that is not JSON, the default
-factory, and a setting rm of a key it does not set.`;
-
-/** A spec of `nemia factory setting <verb>`: the factory, the setting, and its value where `valued`. */
-const specOf = (verb: string, usage: string, valued: boolean): Spec => ({
-  positionals: [
-    { key: 'factory', takes: 'required', kind: 'name' },
-    { key: 'setting', takes: 'required', kind: 'name' },
-    ...(valued ? [{ key: 'value', takes: 'required', kind: 'text' } as const] : []),
-  ],
-  flags: [],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory setting ${verb} does not take ${arg}: nemia factory setting ${verb} ${usage}.`
-      : `nemia factory setting ${verb} takes one setting, and ${arg} is one more: nemia factory setting ${verb} ${usage}, once per setting (quote a JSON value).`,
-  missing: `nemia factory setting ${verb} takes ${usage}. Nothing was changed.`,
-  flagFirst: true,
-});
 
 /** `<harness>.<key>` as typed, split, or `Invalid` naming how to type it. */
 const keyOf = (spelled: string) => {
@@ -101,18 +52,8 @@ const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
  * is not JSON, and a harness, key or value a factory may not set (`harnessSettingsRefusal`); the default factory and a name with no
  * factory, as every factory write refuses them.
  */
-export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: unknown }, SettingSetInput> = {
-  name: 'factory setting set',
-  served: [{ endpoint: 'factories.putSetting', request: renamed({ factory: 'name' }) }],
-  usage: SET_USAGE,
-  help: [
-    "give every session of a factory's runs on a harness one of its settings,",
-    `${SETTINGS_HARNESS}.attribution among them; its value is JSON`,
-  ],
-  spec: specOf('set', SET_USAGE, true),
-  manual: SETTING_HELP,
-  writes: true,
-  class: 'ask',
+export const FACTORY_SETTING_SET: Served<{ file: string; name: string; value: unknown }, SettingSetInput> = {
+  ...FACTORY_SETTING_SET_WORDS,
   input: SettingSetInput,
   handler: ({ factory: name, setting, value: text }) =>
     Effect.gen(function* () {
@@ -127,21 +68,11 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
       const file = yield* door.factories.rewrite({ ...factory, harnessSettings });
       return { file, name: `${harness}.${key}`, value };
     }),
-  print: ({ file, name, value }, { factory }) => [
-    `${factory}  setting ${name} ${JSON.stringify(value)}`,
-    `changed: ${file} — runs started from now on are given it; a run in flight keeps what it was started with`,
-  ],
 };
 
 /** `nemia factory setting rm`: a harness setting taken off a factory, by its key; runs started after are given it no more. */
-export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }, SettingRmInput> = {
-  name: 'factory setting rm',
-  served: [{ endpoint: 'factories.deleteSetting', request: renamed({ factory: 'name' }) }],
-  usage: RM_USAGE,
-  help: ['take a harness setting off a factory, by its key'],
-  spec: specOf('rm', RM_USAGE, false),
-  writes: true,
-  class: 'ask',
+export const FACTORY_SETTING_RM: Served<{ file: string; removed: string }, SettingRmInput> = {
+  ...FACTORY_SETTING_RM_WORDS,
   input: SettingRmInput,
   handler: ({ factory: name, setting }) =>
     Effect.gen(function* () {
@@ -162,7 +93,6 @@ export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }, Sett
       const file = yield* door.factories.rewrite(left ? { ...rest, harnessSettings: left } : rest);
       return { file, removed };
     }),
-  print: ({ file, removed }, { factory }) => [`${factory}  setting ${removed} removed`, `changed: ${file}`],
 };
 
 /**
@@ -177,4 +107,4 @@ export const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessS
 };
 
 /** `nemia factory setting`'s entries, in the order `nemia`'s help lists them. */
-export const FACTORY_SETTINGS: readonly Command[] = [FACTORY_SETTING_SET, FACTORY_SETTING_RM] as readonly Command[];
+export const FACTORY_SETTINGS: readonly Served[] = [tableEntry(FACTORY_SETTING_SET), tableEntry(FACTORY_SETTING_RM)];

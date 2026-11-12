@@ -9,6 +9,7 @@
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 import { HarnessSettings } from './factory.ts';
+import { FactoryWritten } from './written.ts';
 import { FILL_ORIGINS, SETTING_ORIGINS } from './words.ts';
 
 /** The step, by its workflow and its name, and the agent the factory hires into it (absent where it hires none). */
@@ -53,13 +54,14 @@ export const HireStatus = Schema.Struct({
 });
 export type HireStatus = typeof HireStatus.Type;
 
-/** A step's hire, as an object. */
+/** A step's hire, as an object; a write's answer says what it wrote (`written`). */
 export const Hire = Schema.Struct({
   apiVersion: Schema.Literal(API_VERSION),
   kind: Schema.Literal('Hire'),
   metadata: ObjectMeta,
   spec: HireSpec,
   status: HireStatus,
+  written: Schema.optionalKey(FactoryWritten),
 });
 export type Hire = typeof Hire.Type;
 

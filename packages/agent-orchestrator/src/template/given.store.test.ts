@@ -1,10 +1,9 @@
 /**
- * A template as it travels to another machine's api and as that api takes it (`given.store.ts`), and the links of the verbs that send
- * one: a `--template` word made the request's — a builtin's name as it is, an archive's bytes, a folder packed as `nemia template pack`
- * packs it, a place that is neither refused as an apply here refuses it — and the source a verb reads of what was sent: a name as it
- * is, an archive kept by its name and the digest of its content, removed after a preview and after a failure, kept where a factory is
- * made from it. Then what the forwarded command line sends of `nemia factory resolve --file` (its text, never its path) and reads back
- * of `nemia factory ls` (the listing its print takes, made of the Factories).
+ * A template as it travels to another machine's api and as that api takes it (`given.store.ts`), and the links of the verbs that send one:
+ * a `--template` word made the request's — a builtin's name as it is, an archive's bytes, a folder packed as `nemia template pack` packs
+ * it, a place that is neither refused as an apply here refuses it — and the source a verb reads of what was sent: a name as it is, a whole
+ * path of the api's machine as it is, an archive kept by its name and the digest of its content, removed after a preview and after a
+ * failure, kept where a factory is made from it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,12 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import { API_VERSION } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { unpackArchive } from '../archive/archive.ts';
 import { sentTemplatesDir, templateGiven, templatePacked, withTemplateTaken } from './given.store.ts';
-import { FACTORY_RESOLVE } from '../factory/upgrade/upgrade.verb.ts';
-import { FACTORY } from '../factory/factory.verb.ts';
 
 const ROOT = scratch('wf-template-given-');
 
@@ -85,80 +81,9 @@ test('what was sent is the source a verb reads: kept where a factory is made of 
   assert.equal(await Effect.runPromise(Effect.provideService(withTemplateTaken({ name: 'sdlc' }, 'made', read), StoreRoot, ROOT)), 'sdlc');
   assert.equal(refusedAs(await exitOf(withTemplateTaken({ archive: Buffer.from('plain').toString('base64') }, 'made', read))), 'Invalid');
   assert.equal(refusedAs(await exitOf(withTemplateTaken({ name: '../sdlc' }, 'made', read))), 'Invalid');
-});
-
-test("a forwarded resolve sends a --file's text, never its path; REFUSED: a file that is not there", async () => {
-  const request = FACTORY_RESOLVE.served?.[0].request;
-  assert.ok(request);
-  const file = path.join(scratch('wf-template-given-choice-'), 'choice.md');
-  fs.writeFileSync(file, 'Draft it together.\n');
-  assert.deepEqual(await request({ factory: 'mill', conflict: 'RULES.md', file }), {
-    factory: 'mill',
-    conflict: 'RULES.md',
-    text: 'Draft it together.\n',
-  });
-  assert.deepEqual(await request({ factory: 'mill', conflict: 'RULES.md', ours: true }), {
-    factory: 'mill',
-    conflict: 'RULES.md',
-    ours: true,
-  });
-  assert.equal(
-    refusedAs(
-      await Effect.runPromiseExit(
-        Effect.tryPromise({ try: () => request({ factory: 'mill', conflict: 'x', file: `${file}.gone` }), catch: (refused) => refused }),
-      ),
-    ),
-    'Invalid',
-  );
-});
-
-test('a forwarded factory listing reads the Factories as its print takes them: the default left out, a file that does not read by its error', () => {
-  const answer = FACTORY.served?.[0].answer;
-  assert.ok(answer);
-  const meta = (name: string) => ({ name, creationTimestamp: '2026-11-11T00:00:00.000Z', resourceVersion: 'v' });
-  const list = {
-    apiVersion: API_VERSION,
-    kind: 'FactoryList',
-    metadata: {},
-    items: [
-      {
-        apiVersion: API_VERSION,
-        kind: 'Factory',
-        metadata: meta('default'),
-        spec: { repos: ['/r'], hires: {}, volumes: [] },
-        status: { conditions: [], untrusted: [] },
-      },
-      {
-        apiVersion: API_VERSION,
-        kind: 'Factory',
-        metadata: meta('mill'),
-        spec: { repos: ['/r'], workflows: ['press'], hires: {}, volumes: [{ path: '/d', readOnly: true }] },
-        status: { conditions: [], untrusted: [{ place: '/r', harness: 'Claude Code', withheld: 'its hooks' }] },
-      },
-      {
-        apiVersion: API_VERSION,
-        kind: 'Factory',
-        metadata: meta('broken'),
-        spec: { repos: [], hires: {}, volumes: [] },
-        status: { conditions: [], untrusted: [], error: '/s/broken.json does not read as JSON' },
-      },
-    ],
-  };
-  const listed = answer(list, {}) as { factories: Array<Record<string, unknown>>; untrusted: Array<Record<string, unknown>> };
-  assert.deepEqual(
-    listed.factories.map((f) => [f.name, f.repos ?? f.error]),
-    [
-      ['mill', ['/r']],
-      ['broken', 'does not read as JSON'],
-    ],
-  );
-  assert.deepEqual(
-    listed.untrusted.map((u) => [u.factory, u.place]),
-    [['mill', '/r']],
-  );
-  const lines = FACTORY.print(listed as Parameters<typeof FACTORY.print>[0], {});
-  assert.ok(
-    lines.some((l) => l.startsWith('mill') && l.includes('/r')),
-    lines.join('\n'),
-  );
+  const at = folder('kept');
+  const before = sent();
+  assert.equal(await Effect.runPromise(Effect.provideService(withTemplateTaken({ path: at }, 'made', read), StoreRoot, ROOT)), at);
+  assert.deepEqual(sent(), before, "a path of the api's machine is read where it is, and nothing kept");
+  assert.equal(refusedAs(await exitOf(withTemplateTaken({ path: 'kept' }, 'made', read))), 'Invalid');
 });

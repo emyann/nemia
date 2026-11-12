@@ -208,6 +208,8 @@ export {
   MERGE_BASES,
   HIRE_CHANGE_KINDS,
 } from './factory.ts';
+/** What a write of a factory or of one of its parts did, on its answer alone. */
+export { FactoryWritten } from './written.ts';
 export {
   McpServer,
   McpServerList,
@@ -642,7 +644,51 @@ export {
 export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
 export { RUN_WORDS } from './commands-runs.ts';
 export { INBOX_WORDS } from './commands-inbox.ts';
-export { FACTORY_WORDS } from './commands-factories.ts';
+export {
+  FACTORY_ADD_WORDS,
+  FACTORY_ATTACH_WORDS,
+  FACTORY_DETACH_WORDS,
+  FACTORY_LIST_WORDS,
+  FACTORY_LS_WORDS,
+  FACTORY_REVISIONS_WORDS,
+  FACTORY_RM_WORDS,
+  FACTORY_TRUST_WORDS,
+  FACTORY_WORDS,
+} from './commands-factories.ts';
+export {
+  FACTORY_FIRE_WORDS,
+  FACTORY_HIRE_WORDS,
+  FACTORY_SCHEDULE_WORDS,
+  FACTORY_SERVER_ADD_WORDS,
+  FACTORY_SERVER_RM_WORDS,
+  FACTORY_SERVERS_WORDS,
+  FACTORY_UNSCHEDULE_WORDS,
+} from './commands-factories-parts.ts';
+export {
+  COST_LINE_FORMS,
+  FACTORY_COST_LINE_RM_WORDS,
+  FACTORY_COST_LINE_SET_WORDS,
+  FACTORY_SETTABLE,
+  FACTORY_SETTING_RM_WORDS,
+  FACTORY_SETTING_SET_WORDS,
+  FACTORY_SETTINGS_HARNESS,
+  FACTORY_VOLUME_ADD_WORDS,
+  FACTORY_VOLUME_RM_WORDS,
+  NOT_THE_WORKSPACE,
+  SETTING_FORMS,
+  VOLUME_FORMS,
+} from './commands-factories-settings.ts';
+export {
+  APPLY_USAGE,
+  FACTORY_ADOPT_WORDS,
+  FACTORY_APPLY_WORDS,
+  FACTORY_DIFF_WORDS,
+  FACTORY_RESOLVE_WORDS,
+  FACTORY_UPGRADE_WORDS,
+  NO_TRUST,
+} from './commands-factories-templated.ts';
+export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
+export { FACTORY_MANUAL } from './commands-factories-manual.ts';
 export { DEFINITION_WORDS } from './commands-definitions.ts';
 export { READ_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';

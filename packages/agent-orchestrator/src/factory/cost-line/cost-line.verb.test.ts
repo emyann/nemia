@@ -19,7 +19,7 @@ import { factoryDoorMemory } from '../door/memory.store.ts';
 import { runWith as runEngine } from '../../runner.ts';
 import { engineOf } from '../../runtime-client.ts';
 import type { Env } from '../../config/config.store.ts';
-import type { Command } from '../../command/entry.verb.ts';
+import type { Served } from '../../command/entry.verb.ts';
 import {
   CostLineSetInput,
   FACTORY_COST_LINE_RM,
@@ -40,7 +40,7 @@ function planted() {
   const door = doorFrom(FactoryDoor, memory);
   done(door.factories.create(aFactory('mill', { workflows: ['build', 'intake'] })));
   done(door.factories.create(aFactory('bare')));
-  const run = <D extends object, I>(command: Command<D, I>, input: I) =>
+  const run = <D extends object, I>(command: Served<D, I>, input: I) =>
     runWith(engineOf(engine().layer), Effect.provide(command.handler(input), memory));
   return {
     door,

@@ -84,19 +84,7 @@ import {
 import { forwardedOf, unlinked } from '../command/forward.verb.ts';
 import { printed, answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import {
-  admitRun,
-  agentsCustomRun,
-  agentsRun,
-  agentsCardRun,
-  policyProposeRun,
-  factoryInstructRun,
-  factoryRulesRun,
-  factoryServerAddRun,
-  pruneVerb,
-  rmVerb,
-  sayRun,
-} from './runs.ts';
+import { admitRun, agentsCustomRun, agentsRun, agentsCardRun, policyProposeRun, pruneVerb, rmVerb, sayRun } from './runs.ts';
 import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
@@ -414,10 +402,9 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
- * `nemia agents custom`, `nemia factory instruct` and `nemia policy propose`, whose runners read the files and folders a command line
+ * `nemia agents custom` and `nemia policy propose`, whose runners read the files and folders a command line
  * names before their handlers; `nemia inbox from`,
- * whose runner reads the card first where the command line is forwarded; `nemia factory server
- * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
+ * whose runner reads the card first where the command line is forwarded; `nemia say`, whose runner reads who calls off the session's token;
  * and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
  */
@@ -434,9 +421,6 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['agents', agentsRun],
   ['agents card', agentsCardRun],
   ['agents custom', agentsCustomRun],
-  ['factory instruct', factoryInstructRun],
-  ['factory rules', factoryRulesRun],
-  ['factory server add', factoryServerAddRun],
   ['policy propose', policyProposeRun],
   ['admit', admitRun],
   ['pause', pauseRun],

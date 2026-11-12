@@ -25,6 +25,7 @@ export const PAGES = [
   'nemia',
   'glossary',
   'getting-started',
+  'install',
 ];
 
 /** The SVGs of a built page. */

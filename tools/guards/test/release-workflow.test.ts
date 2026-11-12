@@ -2,7 +2,9 @@
  * The release's two workflows and GitHub's generated-notes configuration agree with the release tool (`tools/release/release.ts`).
  *
  * `.github/workflows/release.yml` keeps the release pull request and makes the release its merge asks for; `release-label.yml` is the
- * `release-label` check; `.github/release.yml` groups the notes by label. Nothing here can run them: their first real verdict is on
+ * `release-label` check; `.github/release.yml` groups the notes by label. Its `archive` matrix builds a release's archive on a runner of
+ * each platform `tools/release/archive.ts` names, and its `upload` job attaches every asset `install.sh` and the upgrade read, while the
+ * release `tag` names has no `latest.json`. Nothing here can run them: their first real verdict is on
  * GitHub. What drifts is held instead — a job granted a write it does not make, a job outside the concurrency that keeps two runs from
  * writing the release branch at once, a check that takes the labels into its command line, a label check that cannot be dispatched
  * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a
@@ -17,8 +19,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { actionDrift, stallDrift, statusDrift, targetDrift, type Workflow } from './ci-workflow.ts';
+import { actionDrift, stallDrift, statusDrift, targetDrift, type Job, type Workflow } from './ci-workflow.ts';
 import { LABELS, type Label } from '../../release/release.ts';
+import { PLATFORMS } from '../../release/archive.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -32,15 +35,47 @@ const parse = (source: string): Workflow => yaml.load(source) as Workflow;
 /** The command every job of the release runs, followed by its verb. */
 const TOOL = 'node tools/release/release.ts';
 
+/** The command that builds one platform's archive, followed by its flags. */
+const ARCHIVE = 'node tools/release/archive.ts';
+
 /**
- * What each job of the release is: the verb it runs, the jobs it waits for, its token's grants, and its concurrency. `pr`'s
- * `actions: write` is the dispatch of `DISPATCHED` (`release.ts`) on the release head.
+ * What each job of the release is: the command it runs, the jobs it waits for, its token's grants, and its concurrency (none for the
+ * archive's legs, which one group would cancel while pending). `pr`'s `actions: write` is the dispatch of `DISPATCHED` (`release.ts`)
+ * on the release head; `upload`'s `contents: write` attaches the assets.
  */
-const JOBS: Record<string, { needs: string[]; permissions: Record<string, string>; group: string; cancel: boolean }> = {
-  labels: { needs: [], permissions: { contents: 'read', issues: 'write' }, group: 'release', cancel: false },
-  tag: { needs: ['labels'], permissions: { contents: 'write' }, group: 'release', cancel: false },
-  pr: { needs: ['tag'], permissions: { actions: 'write', contents: 'write', 'pull-requests': 'write' }, group: 'release', cancel: false },
+const JOBS: Record<string, { run: string; needs: string[]; permissions: Record<string, string>; group?: string; cancel?: boolean }> = {
+  labels: { run: `${TOOL} labels`, needs: [], permissions: { contents: 'read', issues: 'write' }, group: 'release', cancel: false },
+  tag: { run: `${TOOL} tag`, needs: ['labels'], permissions: { contents: 'write' }, group: 'release', cancel: false },
+  pr: {
+    run: `${TOOL} pr`,
+    needs: ['tag'],
+    permissions: { actions: 'write', contents: 'write', 'pull-requests': 'write' },
+    group: 'release',
+    cancel: false,
+  },
+  archive: { run: ARCHIVE, needs: ['tag'], permissions: { contents: 'read' } },
+  upload: {
+    run: 'gh release upload',
+    needs: ['tag', 'archive'],
+    permissions: { contents: 'write' },
+    group: 'release-upload',
+    cancel: false,
+  },
 };
+
+/**
+ * The runner each platform's archive is built on: GitHub's standard runners of that operating system and architecture (GitHub's
+ * "GitHub-hosted runners" reference: `ubuntu-24.04` x64, `ubuntu-24.04-arm` arm64, `macos-15` arm64).
+ */
+const RUNNERS: Record<(typeof PLATFORMS)[number], string> = {
+  'linux-x64': 'ubuntu-24.04',
+  'linux-arm64': 'ubuntu-24.04-arm',
+  'darwin-arm64': 'macos-15',
+};
+
+/** The assets the upload attaches, `latest.json` in the last call, so its presence says the release is whole. */
+const ASSETS = ['nemia-*.tar.gz', 'SHA256SUMS', 'install.sh'];
+const LAST = 'latest.json';
 
 /** The pull_request events that can change a pull request's labels or its head, each of which reruns the check. */
 const TYPES = ['opened', 'reopened', 'synchronize', 'labeled', 'unlabeled'];
@@ -88,8 +123,8 @@ function releaseDrift(workflow: Workflow): string[] {
       sentences.push(`${RELEASE} has no ${name} job: add it, running ${TOOL} ${name}`);
       continue;
     }
-    if (!(job.steps ?? []).some((step) => step.run?.trim() === `${TOOL} ${name}`))
-      sentences.push(`the ${name} job in ${RELEASE} does not run ${TOOL} ${name}: give it the step that does`);
+    if (!(job.steps ?? []).some((step) => step.run?.trim().startsWith(want.run) === true))
+      sentences.push(`the ${name} job in ${RELEASE} does not run ${want.run}: give it the step that does`);
     if (!same(job.needs ?? [], want.needs))
       sentences.push(
         `the ${name} job in ${RELEASE} needs ${JSON.stringify(job.needs ?? [])}, not ${JSON.stringify(want.needs)}: write needs: ${JSON.stringify(want.needs)}`,
@@ -98,12 +133,76 @@ function releaseDrift(workflow: Workflow): string[] {
       sentences.push(
         `the ${name} job in ${RELEASE} is granted ${JSON.stringify(job.permissions ?? {})}, not ${JSON.stringify(want.permissions)}: grant it what it uses and nothing more`,
       );
-    if (job.concurrency?.group !== want.group || job.concurrency?.['cancel-in-progress'] !== want.cancel)
+    if (want.group === undefined) {
+      if (job.concurrency !== undefined)
+        sentences.push(`the ${name} job in ${RELEASE} is in a concurrency group: take it out, or its matrix legs cancel each other`);
+    } else if (job.concurrency?.group !== want.group || job.concurrency?.['cancel-in-progress'] !== want.cancel)
       sentences.push(
-        `the ${name} job in ${RELEASE} is not in concurrency ${want.group} with cancel-in-progress: ${want.cancel}: write it so, or two runs write the release at once`,
+        `the ${name} job in ${RELEASE} is not in concurrency ${want.group} with cancel-in-progress: ${String(want.cancel)}: write it so, or two runs write the release at once`,
       );
   }
+  return [...sentences, ...dueDrift(workflow), ...archiveDrift(workflow), ...uploadDrift(workflow)];
+}
+
+/** A job with what the release's own clauses read beyond `Job`: its outputs and its runner. */
+type ReleaseJob = Job & { outputs?: Record<string, string>; 'runs-on'?: string };
+
+/** The tag job's outputs: the tag main names, and whether its release lacks its assets, from its step `due`. */
+function dueDrift(workflow: Workflow): string[] {
+  const job = workflow.jobs.tag as ReleaseJob | undefined;
+  const due = (job?.steps ?? []).find((step) => step.id === 'due');
+  const outputs = job?.outputs ?? {};
+  if (due === undefined || !outputs.tag?.includes('steps.due.outputs.tag') || !outputs.due?.includes('steps.due.outputs.due'))
+    return [
+      `the tag job in ${RELEASE} does not output tag and due from a step with id due: add the step that says whether the release lacks ${LAST}, and outputs tag: and due: from it`,
+    ];
+  return due.run?.includes(LAST) === true
+    ? []
+    : [`the due step of the tag job in ${RELEASE} does not look for ${LAST}: a release is whole once ${LAST}, attached last, is on it`];
+}
+
+/** The archive's matrix: built where the tag job says the assets are due, one leg per platform on its runner, at the tag. */
+function archiveDrift(workflow: Workflow): string[] {
+  const job = workflow.jobs.archive as ReleaseJob | undefined;
+  if (job === undefined) return [];
+  const sentences: string[] = [];
+  if (!(job.if ?? '').includes("needs.tag.outputs.due == 'true'"))
+    sentences.push(`the archive job in ${RELEASE} runs whatever the tag job says: write if: needs.tag.outputs.due == 'true'`);
+  const legs = (job.strategy?.matrix?.include ?? []) as { platform?: string; runner?: string }[];
+  const given = Object.fromEntries(legs.map((leg) => [String(leg.platform), String(leg.runner)]));
+  if (!same(sortedKeys(given), sortedKeys(RUNNERS)) || job['runs-on'] !== '${{ matrix.runner }}')
+    sentences.push(
+      `the archive job's matrix in ${RELEASE} reads ${JSON.stringify(given)}, not ${JSON.stringify(RUNNERS)} with runs-on: \${{ matrix.runner }}: give each platform of archive.ts a leg on its runner`,
+    );
+  const build = (job.steps ?? []).find((step) => step.run?.trim().startsWith(ARCHIVE) === true);
+  const read = (key: string, from: string) => build?.env?.[key]?.includes(from) === true;
+  if (!read('PLATFORM', 'matrix.platform') || !read('TAG', 'needs.tag.outputs.tag') || !read('SOURCE', 'github.repository'))
+    sentences.push(
+      `the archive job's build in ${RELEASE} is not given PLATFORM from matrix.platform, TAG from needs.tag.outputs.tag and SOURCE from github.repository: pass them through its env`,
+    );
+  const checkout = (job.steps ?? []).find((step) => step.uses?.startsWith('actions/checkout@') === true);
+  if (String(checkout?.with?.ref ?? '').includes('needs.tag.outputs.tag') !== true)
+    sentences.push(`the archive job in ${RELEASE} does not check out the tag: give its checkout ref: \${{ needs.tag.outputs.tag }}`);
   return sentences;
+}
+
+/** The upload: every asset with --clobber onto the tag's release, `latest.json` in the last call. */
+function uploadDrift(workflow: Workflow): string[] {
+  const calls = (workflow.jobs.upload?.steps ?? [])
+    .flatMap((step) => (step.run ?? '').split('\n'))
+    .filter((line) => line.includes('gh release upload'));
+  if (calls.length === 0) return [];
+  const missing = ASSETS.filter((asset) => !calls.slice(0, -1).some((line) => line.includes(asset)));
+  const last = calls.at(-1) ?? '';
+  if (missing.length > 0 || !last.includes(LAST) || calls.slice(0, -1).some((line) => line.includes(LAST)))
+    return [
+      `the upload job in ${RELEASE} does not attach ${ASSETS.join(', ')} and then ${LAST} alone, last: write the two gh release upload calls in that order`,
+    ];
+  return calls.every((line) => line.includes('--clobber') && line.includes('"$TAG"'))
+    ? []
+    : [
+        `an upload of the upload job in ${RELEASE} has no --clobber or names no "$TAG": write both, so a rerun replaces what an earlier one attached`,
+      ];
 }
 
 /**
@@ -355,4 +454,45 @@ test('REFUSED: a category drifted from LABELS, internal given a category, and th
     "  categories:\n    - title: Not labelled\n      labels:\n        - '*'\n",
   );
   refused(notes(notLast), NOTES, 'the catch-all first');
+});
+
+test("REFUSED: a platform's leg gone or on another runner, the archive built whatever the tag job says or off the tag, latest.json attached before the rest, an upload that cannot rerun, and no due step", () => {
+  const all = (release: string) => drift(release, text(LABEL_CHECK), text(NOTES));
+  refused(all(planted(RELEASE, '          - platform: darwin-arm64\n            runner: macos-15\n', '')), 'matrix', 'the macOS leg gone');
+  refused(all(planted(RELEASE, 'runner: ubuntu-24.04-arm\n', 'runner: ubuntu-24.04\n')), 'matrix', 'the arm leg built on x64');
+  refused(all(planted(RELEASE, "    if: needs.tag.outputs.due == 'true'\n", '')), 'due', 'every push rebuilding the archives');
+  refused(
+    all(planted(RELEASE, '          PLATFORM: ${{ matrix.platform }}\n', '          PLATFORM: linux-x64\n')),
+    'PLATFORM',
+    'every leg building one platform',
+  );
+  refused(
+    all(
+      planted(
+        RELEASE,
+        '        with:\n          ref: ${{ needs.tag.outputs.tag }}\n      - uses: actions/setup-node@v7',
+        '      - uses: actions/setup-node@v7',
+      ),
+    ),
+    'check out the tag',
+    'the archive built from the pushed commit',
+  );
+  refused(
+    all(
+      planted(
+        RELEASE,
+        'assets/SHA256SUMS assets/install.sh --clobber\n          gh release upload "$TAG" assets/latest.json --clobber\n',
+        'assets/SHA256SUMS assets/install.sh assets/latest.json --clobber\n',
+      ),
+    ),
+    'latest.json alone, last',
+    'latest.json attached with the rest',
+  );
+  refused(
+    all(planted(RELEASE, 'gh release upload "$TAG" assets/latest.json --clobber', 'gh release upload "$TAG" assets/latest.json')),
+    '--clobber',
+    'a rerun refused by an asset already there',
+  );
+  refused(all(planted(RELEASE, '        id: due\n', '')), 'id due', 'no step says the assets are due');
+  refused(all(planted(RELEASE, '    needs: [tag, archive]\n', '    needs: [tag]\n')), 'the upload job', 'the upload before the archives');
 });

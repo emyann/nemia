@@ -70,6 +70,7 @@ import {
   SKILLS_STREAM,
   stream,
   MODE_STREAM,
+  SETTLED_STREAM,
   VERSIONED_STREAM,
 } from './reader-streams.ts';
 import { IMAGE } from '../src/harness/image.ts';
@@ -2474,6 +2475,22 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
       assert.equal('ranIn' in claudeStreamOutput(resultLine({})), false, 'no init line: nothing said');
       assert.equal('ranIn' in claudeResultOutput(MODE_STREAM), false, 'json output has no events');
       assert.equal(claudeStreamOutput(claudeStreamKept(MODE_STREAM)).ranIn, 'default', 'a kept capture reads the same');
+    },
+  );
+
+  await t.test(
+    "claude -p's stream says the mode a `status` line settles after its `init` line named another, and a kept capture keeps it once",
+    () => {
+      assert.equal(claudeStreamOutput(SETTLED_STREAM).ranIn, 'default', 'the init line said `auto`; the status line, the mode it ran in');
+      const lines = SETTLED_STREAM.split('\n');
+      assert.equal(claudeStreamOutput([lines[0], lines[1], lines.at(-1)].join('\n')).ranIn, 'auto', 'a status line naming no mode');
+      const kept = claudeStreamKept(SETTLED_STREAM);
+      assert.equal(claudeStreamOutput(kept).ranIn, 'default', 'a kept capture reads the same');
+      assert.deepEqual(
+        kept.split('\n').filter((l) => l.includes('"status"')),
+        [JSON.stringify({ type: 'system', subtype: 'status', permissionMode: 'default' })],
+        'the one status line that changes the mode, cut to it',
+      );
     },
   );
 

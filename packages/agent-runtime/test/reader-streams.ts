@@ -213,6 +213,20 @@ export const MODE_STREAM = [
   resultLine({}),
 ].join('\n');
 
+/**
+ * A session whose `init` line names a mode Claude Code had not settled, and whose `status` line names the one it ran in, as
+ * `claude-haiku-4-5` filed in `auto` printed it on Claude Code 2.1.322 in 1 run of 10: `status` lines naming no mode around it, and
+ * the mode said once more by a line that changes nothing.
+ */
+export const SETTLED_STREAM = [
+  JSON.stringify({ ...JSON.parse(stream.init), permissionMode: 'auto' }),
+  JSON.stringify({ type: 'system', subtype: 'status', status: 'requesting', session_id: SESSION }),
+  JSON.stringify({ type: 'system', subtype: 'status', status: null, permissionMode: 'default', session_id: SESSION }),
+  JSON.stringify({ type: 'system', subtype: 'status', status: null, permissionMode: 'default', session_id: SESSION }),
+  JSON.stringify({ type: 'system', subtype: 'status', status: null, session_id: SESSION }),
+  resultLine({}),
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [
@@ -241,6 +255,7 @@ const STREAMS = [
   [JSON.stringify({ ...JSON.parse(stream.init), cwd: 5 }), resultLine({})].join('\n'),
   VERSIONED_STREAM,
   MODE_STREAM,
+  SETTLED_STREAM,
 ];
 
 const CODEX = [

@@ -1292,7 +1292,9 @@ the end).
   `CLAUDE_AUTO_DROPPED` no longer lists the `haiku` alias (2026-11-09): measured on 2.1.316 by the `init` line's `permissionMode`,
   `haiku` keeps `auto`, while `claude-haiku-4-5` and `claude-sonnet-4-5` still say `default`, and stay listed. Measured again on
   2.1.322, 2026-11-11, model by model (`test/live-sdk.boundary.test.ts`): the same two say `default`, and `haiku`, `sonnet`, `opus`
-  and `fable` keep `auto`; the list is unchanged.
+  and `fable` keep `auto`; the list is unchanged. Ten runs a model that day: the two listed in `default` every time, `haiku` and
+  `sonnet` in `auto` every time; in one run of ten each listed model's `init` line said `auto` and a `status` line after it
+  `default`, the mode it ran in, which the reader now takes (`docs/harness.md`, `auto` on haiku).
 - **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
 - **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
   stopped first). So a job may continue a background session, and the new attempt's mode is the job's.

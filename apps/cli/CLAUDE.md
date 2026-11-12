@@ -1,7 +1,7 @@
 # apps/cli — `nemia` (`wf`, its alias), a client of the api
 
-`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
-inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
+`nemia` and `wf` as a person types them: the reads (`READ_VERBS` in `src/route.ts`: `doctor` alone, the others moved commands)
+asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
 `explain`, over every kind the api serves, `propose` and `proposals`, and `decide`) asked of it whatever else is typed, the commands
 whose words it holds (`MOVED_COMMANDS`, `objects`' `COMMAND_WORDS`) parsed, helped and run here through the api under every context, and
 every other verb and a help of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). `--local` is refused,
@@ -25,13 +25,12 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
   `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
   the runs' Table, from server reads that serve no Table: the pause first, how old where the branches stand is (`Daemon.branchesLine`), a
-  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path on this machine's context;
-  under a remote one it is refused, exit 2, naming `nemia show <run>` (`oneRunAway`): forwarded, the old path would print the Run
-  `GET /api/runs/:name` answers with its in-process listing's printer.
+  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, reads the Run
+  `GET /api/runs/:name` answers under every context and prints it a step a line (`src/reads/run-lines.ts`).
 - **Which daemon, in `src/context.ts`**: kubectl's contexts, the client's own config (`${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml`,
   0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
   remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` forwards a
-  verb about the store only the old path has (`forwarded`), and `handedOn` (`src/local.ts`) the words a moved read hands on: the old path
+  verb about the store only the old path has (`forwarded`): the old path
   spawned with `forwardedEnv(chosen)` (`src/where.ts`, the one file that spells the store's variable), the context's server and token
   in `NEMIA_SERVER` and `NEMIA_SERVER_TOKEN` (never on argv; the orchestrator's `FORWARD_VARIABLES`, spelled once there, since `src`
   imports nothing of it) and no `WF_ROOT`, so it calls that daemon's endpoints and refuses in its own words a command none serves. A machine verb (`MACHINE_VERBS`:
@@ -63,9 +62,8 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it. `agent-orchestrator` is in
   `dependencies` for that resolve alone.
 - **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`.
-- **The printers it still has hold parity with the in-process reads until those retire**: `nemia show`, `nemia closeout` and `nemia
-  watch`'s lines (`src/watch/lines.ts`: the feed has no server table) print what the old path prints for the same store, line for line,
-  and their tests compare the two. A change to one of those outputs on either side changes both.
+- **The printers it still has are the only ones**: `nemia show`, `nemia closeout`, `nemia ls <run>` and `nemia watch`'s lines
+  (`src/watch/lines.ts`: the feed has no server table); their tests hold the lines the retired in-process reads printed, literally.
 - **`nemia decide` is a verb of the client's own** (`src/objects/decide.ts`, the untangle intent's Q14): it prints the screen of the
   api's one decide read model and, at a terminal, runs the `nemia` command a person picks as this client runs it; a `git` command it
   prints and never runs. **Every write but `apply`, the proposals' and the moved commands' stays on the old path.** The client judges nothing, and moves `nemia apply -f`

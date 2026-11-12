@@ -23,6 +23,8 @@ import { asksDir, markCancelled, runRecord } from '../src/record/record.store.ts
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-rounds-');
@@ -455,12 +457,14 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       const asked = await over(list(stage.board().e, runRecord(ROOT, id)));
       assert.deepEqual([asked.steps.map((x) => x.message), asked.waitingOnYou], [['verified ✓', 'unverified · done'], []]);
       assert.deepEqual((await over(decideRun(id))).decision, { kind: 'running', waiting: ['review'] });
+      const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
+      const listed = JSON.stringify(runs[0]?.listed);
+      assert.doesNotMatch(listed, /over budget|waiting on you|OVER BUDGET/i, listed);
       const printed: string[] = [];
       const log = t.mock.method(console, 'log', (...args: unknown[]) => {
         printed.push(args.join(' '));
       });
       try {
-        await stage.main(['ls', id]);
         await stage.main(['decide', id]);
       } finally {
         log.mock.restore();

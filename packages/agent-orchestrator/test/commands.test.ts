@@ -182,7 +182,6 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['workflows step', 'api'],
       ['tick', 'cli'],
       ['up', 'cli'],
-      ['watch', 'cli'],
       ['admit', 'cli'],
     ],
   );
@@ -236,7 +235,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'claude-token status',
       'version',
       'workflows step',
-      'watch',
       'admit',
     ],
   );

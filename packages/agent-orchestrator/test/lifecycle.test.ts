@@ -28,6 +28,8 @@ import { LINE_NAME } from '../src/run.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-lifecycle-');
@@ -90,12 +92,16 @@ const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<s
   }
   return out.join('\n').split('\n');
 };
-/** The step names `nemia ls <id>` prints, in its order. */
-const lsNames = async (t: TestContext, id: string): Promise<string[]> =>
-  (await printedBy(t, () => stage.main(['ls', id])))
-    .slice(1)
-    .map((line) => /^ {3}([a-z][\w-]*) /.exec(line)?.[1])
-    .filter((name): name is string => Boolean(name));
+/** The step names `nemia ls <id>` reads of the run, in its order. */
+const lsNames = async (id: string): Promise<string[]> => {
+  const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
+  assert.deepEqual(
+    runs.map(({ run }) => run.id),
+    [id],
+    '`nemia ls <id>` reads that one run',
+  );
+  return (runs[0]?.listed.steps ?? []).map((step) => step.name);
+};
 /** The step sections `nemia decide <id>` prints, in its order. */
 const decideNames = async (t: TestContext, id: string, steps: readonly string[]): Promise<string[]> =>
   (await printedBy(t, () => stage.main(['decide', id]))).filter((l) => steps.includes(l.trim()) && /^ {2}\S/.test(l)).map((l) => l.trim());
@@ -177,7 +183,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.match(uncommitted(line), /coverage\.out/, 'left untracked');
   });
   await s.test('`nemia ls` names the steps in the order they run', async () => {
-    assert.deepEqual(await lsNames(t, id), ORDER);
+    assert.deepEqual(await lsNames(id), ORDER);
   });
   await s.test('the check passes: the run succeeded, each step handed off once, and `nemia decide` reads in order', async () => {
     stage.board().settle(`${id}-review-check`, 'succeeded', undefined, 0);
@@ -220,7 +226,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
           ORDER,
           legacyId,
         );
-        assert.deepEqual(await lsNames(t, legacyId), ORDER, legacyId);
+        assert.deepEqual(await lsNames(legacyId), ORDER, legacyId);
         if (frozen) assert.deepEqual(await decideNames(t, legacyId, ORDER), ORDER, legacyId);
       }
     },

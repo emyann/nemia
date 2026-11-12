@@ -32,6 +32,8 @@ import { workflowsOf } from '../src/summary/reads.verb.ts';
 import { loadWorkflows } from '../src/workflows/workflows.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 
 const ROOT = scratch('wf-broken-runs-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -120,16 +122,15 @@ const printedBy = async (t: test.TestContext, argv: string[], engine: Parameters
   return { out, err, threw };
 };
 
-/** The lines `nemia ls` printed for one run: its own line and those under it, up to the next run's. */
-const blockOf = (lines: readonly string[], id: string): string[] => {
-  const from = lines.findIndex((l) => l.startsWith(`${id}  `));
-  assert.ok(from >= 0, `nemia ls lists ${id}:\n${lines.join('\n')}`);
-  const to = lines.findIndex((l, i) => i > from && !l.startsWith(' '));
-  return lines.slice(from, to < 0 ? undefined : to);
+/** What `nemia ls` reads of `id` among `listed`: its listing, or why nobody judged it. */
+const listingOf = (listed: RunsListed, id: string): RunsListed['runs'][number]['listed'] => {
+  const one = listed.runs.find((r) => r.run.id === id);
+  assert.ok(one, `nemia ls lists ${id}: ${listed.runs.map((r) => r.run.id).join(', ')}`);
+  return one.listed;
 };
 
-const unreadableLine = (block: readonly string[]) =>
-  block.find((l) => l.startsWith('   → unreadable: '))?.slice('   → unreadable: '.length);
+/** Why nobody judged the run `listed` lists, or undefined where it was judged. */
+const unreadableOf = (listed: RunsListed['runs'][number]['listed']): string | undefined => ('said' in listed ? listed.said : undefined);
 
 /** Whether the feed says `id` was removed. */
 const saidRemoved = (id: string) => readFeed(ROOT).lines.some((l) => 'run' in l && l.run === id && l.word === REMOVED);
@@ -139,6 +140,7 @@ test('one broken run does not stop the others: each left out and said once, the 
   const { b, e } = broken();
   stage.place().world.repository(REPO, {});
   const pass = () => stage.runWith(e, tickRun({ repo: ROOT }));
+  const lsOf = async (...argv: string[]) => (await typed(['ls', ...argv], e, undefined, stage.place().place, ENV)) as RunsListed;
   const runs: Record<'journal' | 'gone' | 'unplaced' | 'checked' | 'tried' | 'waiting' | 'good', string> = {
     journal: '',
     gone: '',
@@ -243,48 +245,43 @@ test('one broken run does not stop the others: each left out and said once, the 
     );
   });
 
-  await s.test('`nemia ls` says each broken run unreadable, on the step whose task does not read, and lists every other run', async (c) => {
-    const { out: lines, threw } = await printedBy(c, ['ls'], e);
-    assert.equal(threw, undefined);
+  await s.test('`nemia ls` says each broken run unreadable, on the step whose task does not read, and lists every other run', async () => {
+    const lines = await lsOf();
     for (const [id, task] of [
       [runs.checked, runRecord(ROOT, runs.checked).steps.work.check!.taskId],
       [runs.tried, runRecord(ROOT, runs.tried).steps.work.tries![0].taskId],
     ]) {
-      const block = blockOf(lines, id);
-      const said = unreadableLine(block);
+      const listed = listingOf(lines, id);
+      const said = unreadableOf(listed);
       assert.ok(
         said?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${spoiled.get(task)}`),
-        block.join('\n'),
+        JSON.stringify(listed),
       );
       assert.ok(said?.includes('So nemia ls does not judge the run, and the tick does not advance it'), said);
-      assert.match(
-        block.find((l) => l.startsWith('   work'))!,
-        /^ {3}work\s+unreadable\s/,
-        block.join('\n'),
-      );
+      assert.equal(listed.steps.find((step) => step.name === 'work')?.message, 'unreadable', JSON.stringify(listed));
     }
-    const waiting = unreadableLine(blockOf(lines, runs.waiting));
+    const waiting = unreadableOf(listingOf(lines, runs.waiting));
     assert.ok(waiting?.startsWith(`${runs.waiting}'s record reads, but the journal of a task of a run it waits on does not: `), waiting);
     for (const id of [runs.unplaced, runs.gone])
       assert.ok(
-        unreadableLine(blockOf(lines, id))?.startsWith(`${id}'s workflow folder does not load, so nemia ls does not judge the run`),
+        unreadableOf(listingOf(lines, id))?.startsWith(`${id}'s workflow folder does not load, so nemia ls does not judge the run`),
       );
-    assert.doesNotMatch(blockOf(lines, runs.good).join('\n'), /unreadable/);
+    assert.doesNotMatch(JSON.stringify(listingOf(lines, runs.good)), /unreadable/);
 
-    const one = await printedBy(c, ['ls', runs.tried], e);
+    const one = await lsOf(runs.tried);
     assert.ok(
-      unreadableLine(blockOf(one.out, runs.tried))?.startsWith(`${runs.tried}'s record reads, but the journal of its task `),
-      one.out.join('\n'),
+      unreadableOf(listingOf(one, runs.tried))?.startsWith(`${runs.tried}'s record reads, but the journal of its task `),
+      JSON.stringify(one.runs),
     );
   });
 
   await s.test("`nemia decide` refuses a broken run in the list's words, and decides a run whose tasks read", async (c) => {
-    const { out: listed } = await printedBy(c, ['ls'], e);
+    const listed = await lsOf();
     for (const id of [runs.checked, runs.tried]) {
       const { threw } = await printedBy(c, ['decide', id], e);
       assert.equal(
         (threw as Error)?.message,
-        unreadableLine(blockOf(listed, id))!.replace('So nemia ls does not', 'So nemia decide does not'),
+        unreadableOf(listingOf(listed, id))?.replace('So nemia ls does not', 'So nemia decide does not'),
       );
     }
     const good = await printedBy(c, ['decide', runs.good], e);
@@ -347,9 +344,11 @@ test('one broken run does not stop the others: each left out and said once, the 
         JSON.stringify(paused.unreadable),
       );
       assert.ok(!paused.pause.finishing.some((f) => f.run === runs.gone));
-      const { out, threw } = await printedBy(c, ['ls'], e);
-      assert.equal(threw, undefined);
-      assert.ok(unreadableLine(blockOf(out, runs.gone))?.startsWith(`${runs.gone}'s workflow folder does not load`), out.join('\n'));
+      const listed = await lsOf();
+      assert.ok(
+        unreadableOf(listingOf(listed, runs.gone))?.startsWith(`${runs.gone}'s workflow folder does not load`),
+        JSON.stringify(listed.runs),
+      );
     },
   );
 

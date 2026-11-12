@@ -11,10 +11,10 @@ import { MACHINE_VERBS, MOVED_COMMANDS, type MovedCommand } from 'objects';
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 /**
- * The reads this client asks the api for, which the orchestrator's CLI answers too: `doctor` among them, whose `fix` starts a fix on
- * the server the context names and follows it (`src/doctor.ts`).
+ * The reads this client asks the api for whose words and help the orchestrator's CLI still holds: `doctor`, whose `fix` starts a fix on
+ * the server the context names and follows it (`src/doctor.ts`). The other reads' words are the client's (`MOVED_COMMANDS`).
  */
-export const READ_VERBS = ['show', 'closeout', 'ls', 'inbox', 'watch', 'doctor'] as const;
+export const READ_VERBS = ['doctor'] as const;
 
 /** A read this client asks the api for. */
 export type ReadVerb = (typeof READ_VERBS)[number];

@@ -644,5 +644,5 @@ export { RUN_WORDS } from './commands-runs.ts';
 export { INBOX_WORDS } from './commands-inbox.ts';
 export { FACTORY_WORDS } from './commands-factories.ts';
 export { DEFINITION_WORDS } from './commands-definitions.ts';
-export { READ_WORDS } from './commands-reads.ts';
+export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';

@@ -193,16 +193,11 @@ test('the sub-resources of a step: its tries, one, its closeout and what it was 
   }
 });
 
-test('nemia show prints the object and points to --raw; show --raw prints the record', async () => {
+test("nemia show's handler answers the object, nemia/v1's Run; with raw, the record", async () => {
   const id = await started({ work: null });
   const shown = await handled<object>(SHOW, { runId: id });
-  const lines = SHOW.print(shown as never, { runId: id });
-  const printed = JSON.parse(lines.join('\n')) as { apiVersion: string; kind: string };
-  assert.deepEqual([printed.apiVersion, printed.kind], ['nemia/v1', 'Run']);
-  assert.equal(SHOW.note?.(shown as never, { runId: id }).length, 1, 'a line on stderr points to --raw');
+  assert.deepEqual([(shown as { apiVersion?: string }).apiVersion, (shown as { kind?: string }).kind], ['nemia/v1', 'Run']);
   const raw = await handled<object>(SHOW, { runId: id, raw: true } as never);
-  const record = JSON.parse(SHOW.print(raw as never, { runId: id, raw: true }).join('\n')) as { id: string; steps: object };
-  assert.equal(record.id, id);
-  assert.ok('steps' in record);
-  assert.deepEqual(SHOW.note?.(raw as never, { runId: id, raw: true }), [], 'none with --raw');
+  assert.equal((raw as { id?: string }).id, id);
+  assert.ok('steps' in raw);
 });

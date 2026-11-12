@@ -1,9 +1,8 @@
 /**
- * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `nemia tick`, `nemia up` and `nemia watch` here, the
- * others beside.
+ * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `nemia tick` and `nemia up` here, the others beside.
  */
 import path from 'node:path';
-import { Effect, Layer, Schema, Stream, type Duration } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
 import { COMMAND_WORDS } from 'objects';
 import {
   breakdownLines,
@@ -13,27 +12,7 @@ import {
   pausedLines,
   engine,
   everyOf,
-  feedCursorRefusal,
   feedHubLayer,
-  readFeedEnds,
-  cursorFileStart,
-  cutCursorFile,
-  keepCursor,
-  BOOKMARK_EVERY,
-  bookmarkLine,
-  formerHints,
-  parseSelectors,
-  selects,
-  type Selectors,
-  pausedRead,
-  pausedWords,
-  daemonStanding,
-  livenessLine,
-  livenessWords,
-  watchedLine,
-  type DaemonStanding,
-  type Liveness,
-  type Watched,
   lastPassCost,
   queueLine,
   refusalLines,
@@ -52,7 +31,6 @@ import {
   telemetryLayer,
   up,
   waitWord,
-  watchFeed,
   type TakenStore,
   parseArgv,
   TABLE,
@@ -98,113 +76,6 @@ import {
   sayRun,
 } from './runs.ts';
 import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
-
-/** How often `nemia watch` reads the lease for its liveness. */
-export const LIVENESS_EVERY: Duration.Input = '2 seconds';
-
-/** What a watch that has read nothing yet takes the store to be: up, so a store already down is said at once, and one up is not. */
-const ASSUMED: Liveness = { state: 'up', at: '', text: '' };
-
-/**
- * The store's liveness as it changes: `lease` read at once and every `every`, judged (`livenessLine`), and each reading said only when its
- * state is not the last one's — `down` at once when the store is already down, then a line for each fall and each recovery. Read again on
- * every poll, never carried: a watch started again reads the same. Its lines are the watch's own, never the feed's. Never ends.
- */
-export const livenessLines = (
-  lease: () => DaemonStanding,
-  every: Duration.Input = LIVENESS_EVERY,
-  now: () => number = Date.now,
-): Stream.Stream<Liveness> =>
-  Stream.tick(every).pipe(
-    Stream.map(() => livenessLine(lease(), now())),
-    Stream.prepend([ASSUMED]),
-    Stream.changesWith((a, b) => a.state === b.state),
-    Stream.drop(1),
-  );
-
-/** What a watch keeps beside the lines it prints: the selectors a line must pass, and the file it writes its cursor to. */
-type WatchKept = { selectors?: Selectors; cursorFile?: string };
-
-/** Writes `cursor` to the watch's cursor file, where it has one: after every line it reads, and after every bookmark. */
-const kept = (cursorFile: string | undefined, cursor: number): void => {
-  if (cursorFile !== undefined) keepCursor(cursorFile, cursor);
-};
-
-/**
- * `nemia watch` from a cursor already checked: the feed's lines of the store at `home` as they are written, on stdout, until `stop()` —
- * those its selectors take (`selects`), as `how` prints them (`watchedLine`), in words or as JSON; a feed cut under the watch is said once
- * on stderr, and followed from the start of the feed there is now (`watchFeed`), its cursor file rewritten to 0 with it. In JSON the
- * banner goes to stderr too, so stdout holds nothing but JSON.
- *
- * The cursor it has read to is written to its cursor file after every line, selected or not, and answered by `at()`, which the bookmark
- * says while the feed is still: a watcher resumes where the feed ended, never where the last line it printed did.
- *
- * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
- * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
- */
-export function watchPrinted(home: string, from: number, how: Watched = {}, keeps: WatchKept = {}): { stop(): void; at(): number } {
-  const selectors = keeps.selectors ?? [];
-  let at = from;
-  const watch = watchFeed(home, {
-    from,
-    onLine: (line, cursor) => {
-      at = cursor;
-      kept(keeps.cursorFile, cursor);
-      if (!selects(selectors, line)) return;
-      console.log(watchedLine(line, cursor, how));
-    },
-    onCut: (said) => {
-      console.error(`nemia watch: ${said}`);
-      at = 0;
-      if (keeps.cursorFile !== undefined) cutCursorFile(keeps.cursorFile);
-    },
-    onError: (err) => console.error(`nemia watch: ${(err as Error).message ?? String(err)}`),
-  });
-  (how.json === true ? console.error : console.log)(`watching from ${from}, ^C to stop`);
-  return { stop: () => watch.stop(), at: () => at };
-}
-
-/**
- * The bookmark of a watch at `at`: under `--json` a line of its own carrying the cursor and nothing else (`bookmarkLine`), nothing printed
- * in words, and the cursor written to the watch's file either way — so a watch that has fallen silent still says where it is, at one
- * cadence (`BOOKMARK_EVERY`), the same on every surface.
- */
-const bookmarked = (at: number, how: Watched, cursorFile: string | undefined): void => {
-  const printed = bookmarkLine(at, how);
-  if (printed !== undefined) console.log(printed);
-  kept(cursorFile, at);
-};
-
-/**
- * `nemia watch` as an Effect: `watchPrinted(home, from, how, keeps)` held in its scope until it is interrupted, and stopped as that scope
- * closes, so an interrupted watch leaves no watcher and no timer behind; beside it, the store's liveness read off `lease` and printed as
- * it changes (`livenessLines`), whatever its selectors take, and the bookmark of where it has read to every `BOOKMARK_EVERY`
- * (`bookmarked`) — the tick's first emission dropped, since it comes at once and a watch that has just started has said where it is in its
- * banner. It never ends of itself; a cursor it cannot read from fails it.
- */
-export const watching = (
-  home: string,
-  from: number,
-  how: Watched = {},
-  lease: () => DaemonStanding = () => daemonStanding(home),
-  keeps: WatchKept = {},
-): Effect.Effect<never, unknown> =>
-  Effect.acquireRelease(Effect.try({ try: () => watchPrinted(home, from, how, keeps), catch: (err) => err }), (watch) =>
-    Effect.sync(() => watch.stop()),
-  ).pipe(
-    Effect.tap((watch) =>
-      Effect.forkScoped(
-        Stream.runForEach(Stream.tick(BOOKMARK_EVERY).pipe(Stream.drop(1)), () =>
-          Effect.sync(() => bookmarked(watch.at(), how, keeps.cursorFile)),
-        ),
-      ),
-    ),
-    Effect.tap(() =>
-      Effect.forkScoped(Stream.runForEach(livenessLines(lease), (l) => Effect.sync(() => console.log(livenessWords(l, how.json))))),
-    ),
-    Effect.andThen(Effect.never),
-    Effect.scoped,
-  );
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
@@ -316,81 +187,6 @@ function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<v
 }
 
 /**
- * `nemia watch --once`: the store's pause while one stands, the lines its selectors take from `from` to the feed's end, and the cursor to
- * read on from — `cursor: <n>` in words, a bookmark line of its own under `--json`, where stdout holds JSON alone. The cursor file, where
- * it has one, is left at the feed's end.
- */
-async function watchedOnce(
-  env: Env,
-  from: number,
-  how: Watched,
-  selectors: Selectors,
-  cursorFile: string | undefined,
-  e: Engine,
-  place: Place,
-): Promise<void> {
-  const paused = pausedWords(await runWith(e, placedIn(env, place, pausedRead())));
-  if (paused && how.json !== true) console.log(paused);
-  const { lines, ends, cursor } = readFeedEnds(wfRoot(env), from);
-  for (const [i, line] of lines.entries()) {
-    if (!selects(selectors, line)) continue;
-    const end = ends[i];
-    if (end === undefined) continue;
-    console.log(watchedLine(line, end, how));
-  }
-  if (how.json === true) bookmarked(cursor, how, cursorFile);
-  else {
-    console.log(`cursor: ${cursor}`);
-    kept(cursorFile, cursor);
-  }
-}
-
-/**
- * Where a watch starts: the cursor its cursor file holds, where the file is there — a watch resumes its own place — else the cursor it was
- * given, else the start of the feed. A cursor given beside a cursor file is refused before this (`WATCH.check`).
- *
- * **A saved cursor the feed cannot be read from starts the watch over**, at 0, said once on stderr: the feed was cut while no watch of
- * this file ran, which is the same world a cut under a running watch leaves (`feedCut`), read at the start instead of noticed in flight.
- * Refusing it would leave an unattended watch dead on every start until a person deleted the file, and the fix the cursor's refusal names
- * (`nemia watch --once 0`) is itself refused beside `--cursor-file`. A cursor a person typed is refused as it always was: that is a typo,
- * not a feed that moved.
- */
-function watchFrom(home: string, args: Args, cursorFile: string | undefined): number {
-  const saved = cursorFile === undefined ? undefined : cursorFileStart(cursorFile);
-  if (saved !== undefined) {
-    const refusal = feedCursorRefusal(home, saved);
-    if (refusal === undefined) return saved;
-    console.error(
-      `nemia watch: ${cursorFile} held cursor ${saved}, which the feed cannot be read from (${refusal}) — reading the feed there is ` +
-        'now from its start, and keeping 0 there: a line said before may be said again.',
-    );
-    return 0;
-  }
-  const given = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
-  const refusal = feedCursorRefusal(home, given);
-  if (refusal) usage(refusal);
-  return given;
-}
-
-/**
- * `nemia watch`: the feed's lines its selectors take, from a cursor — read once to the feed's end with `--once`, else followed with the
- * store's liveness until it is stopped (`watching`). Where it starts is `watchFrom`; its cursor file, where it has one, is written at
- * once, so a path in a directory that is not there is refused before a line is read.
- */
-function watchVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
-  const home = wfRoot(env);
-  const how: Watched = { json: args.json === true };
-  const typed = Array.isArray(args.selector) ? args.selector : [];
-  for (const hint of typed.flatMap(formerHints)) console.error(`nemia watch: ${hint}`);
-  const selectors = parseSelectors(typed);
-  const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
-  const from = watchFrom(home, args, cursorFile);
-  kept(cursorFile, from);
-  if (args.once === true) return watchedOnce(env, from, how, selectors, cursorFile, e, place);
-  return runMain(watching(home, from, how, undefined, { selectors, cursorFile }));
-}
-
-/**
  * `nemia pause`'s runner: the CLI asks before it pauses at once — `--now` says what it would cut and writes nothing, and acts on `--yes`
  * alone, since the verb takes no yes (`PAUSE`); every other pause is handed to its handler as any command is.
  */
@@ -424,7 +220,6 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
 export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['tick', tickVerb],
   ['up', upVerb],
-  ['watch', watchVerb],
   ['rm', rmVerb],
   ['prune', pruneVerb],
   ['start', startRun],

@@ -260,7 +260,13 @@ test('each command the client holds is named once', () => {
   assert.deepEqual([...new Set(named)], named);
 });
 
-test('each endpoint a command the client holds links is one the Api declares', () => {
+/**
+ * The one command the client holds that links no endpoint: `nemia watch` follows the feed's stream, which no tool of the port can call,
+ * so it has none to link.
+ */
+const LINKS_NONE: readonly string[] = ['watch'];
+
+test('each endpoint a command the client holds links is one the Api declares, and every command but a stream links one', () => {
   const declared = new Set(
     Object.values(Api.groups).flatMap((group) =>
       Object.values(group.endpoints).map((endpoint) => `${group.identifier}.${endpoint.identifier}`),
@@ -268,6 +274,10 @@ test('each endpoint a command the client holds links is one the Api declares', (
   );
   assert.ok(declared.has('workflows.create'), 'the Api is read by `<group>.<endpoint>`');
   for (const command of COMMAND_WORDS) {
+    if (LINKS_NONE.includes(command.name)) {
+      assert.equal(command.served, undefined, `${command.name} follows a stream, and links no endpoint`);
+      continue;
+    }
     assert.ok(command.served, `${command.name} links an endpoint`);
     for (const link of command.served)
       assert.ok(declared.has(link.endpoint), `${command.name} links ${link.endpoint}, which the Api declares`);

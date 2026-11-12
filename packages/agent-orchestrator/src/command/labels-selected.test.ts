@@ -1,6 +1,6 @@
 /**
- * `nemia ls` and `nemia stats` and a run's labels, in process: `-l` keeps the runs a selector takes, `--show-labels` and `-L <key>` add
- * segments to each run's head line, and with neither the lines are as they were; `stats -l` sums the facts of the runs it takes alone.
+ * `nemia ls` and `nemia stats` and a run's labels, on their handlers: `-l` keeps the runs a selector takes, and `stats -l` sums the facts
+ * of the runs it takes alone. The labels `nemia ls` prints beside each run are the client's to print (`apps/cli/test/reads.test.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +12,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { COMMANDS } from './commands.verb.ts';
+import { LS } from '../list/commands.verb.ts';
 import { parseArgv } from './command.ts';
 import { advanceRun, startRun, runWith as runEngine } from '../runner.ts';
 import { runRecord } from '../record/record.store.ts';
@@ -19,7 +20,6 @@ import { Invalid } from '../refusal/refusal.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
 import { filesStoreAt } from '../record/files.store.ts';
-import type { Command } from '../command/entry.verb.ts';
 
 const ROOT = scratch('wf-ls-labels-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -29,7 +29,6 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 const engine = eachTest(testEngine);
 const noEngine = () => engineOf(engine().layer);
-const LS = COMMANDS.find((c) => c.name === 'ls')!;
 
 /** A folder workflow of one step, named `name`. */
 const oneStep = (name: string): string => {
@@ -46,46 +45,27 @@ const started = async (brief: string) => {
   return await runPlaced(startRun({ brief, repo, workflowDir: oneStep('build') }));
 };
 
-/** What `nemia ls <argv>` prints, its arguments parsed as the CLI parses them. */
-const printed = async (...argv: string[]): Promise<string[]> => {
+/** The runs `nemia ls <argv>` reads, by id, its arguments parsed by its own words. */
+const listedBy = async (...argv: string[]): Promise<string[]> => {
   const args = parseArgv(LS.spec, argv) ?? {};
-  return [...(LS as Command).print(await runWith(noEngine(), LS.handler(args)), args)];
+  return (await runWith(noEngine(), LS.handler(args))).runs.map(({ run }) => run.id);
 };
 
-/** The head line of the run `id` among `lines`. */
-const headOf = (lines: readonly string[], id: string): string => lines.find((l) => l.startsWith(`${id}  `)) ?? '';
-
-test('nemia ls selects by -l, and adds the labels to each run’s head line by --show-labels and -L, the lines as before with neither', async () => {
+test("nemia ls selects by -l, two of them either; the labels it prints beside each run are the client's (apps/cli/test/reads.test.ts)", async () => {
   fs.rmSync(path.join(ROOT, 'runs'), { recursive: true, force: true });
   const core = await started('the core one');
   const bare = await started('the bare one');
-  const before = await printed();
   filed.labels.put(core.id, { team: 'core', tier: 'gold' });
-  const plain = await printed();
-  assert.deepEqual(plain, before, 'with neither flag, a labelled run prints its lines byte for byte as before');
-  const shown = await printed('--show-labels', '-L', 'team', '-L', 'workflow');
-  assert.equal(
-    headOf(shown, core.id),
-    `${headOf(plain, core.id)}  labels: factory=default,team=core,tier=gold,workflow=build  team: core  workflow: build`,
-    'the whole map, then each column in the order given',
-  );
-  assert.equal(headOf(shown, bare.id), `${headOf(plain, bare.id)}  labels: factory=default,workflow=build  team: <none>  workflow: build`);
+  assert.deepEqual((await listedBy()).sort(), [core.id, bare.id].sort(), 'with no -l, every run');
+  assert.deepEqual(await listedBy('-l', 'team=core'), [core.id], 'the run the selector takes, and not the one it does not');
   assert.deepEqual(
-    shown.filter((l) => !l.startsWith(`${core.id}  `) && !l.startsWith(`${bare.id}  `)),
-    plain.filter((l) => !l.startsWith(`${core.id}  `) && !l.startsWith(`${bare.id}  `)),
-    'no other line changes',
+    (await listedBy('-l', 'team=core', '-l', 'team notin (core)')).sort(),
+    [core.id, bare.id].sort(),
+    'two selectors are either',
   );
-  const selected = await printed('-l', 'team=core');
-  assert.ok(headOf(selected, core.id), 'the run the selector takes is listed');
-  assert.equal(headOf(selected, bare.id), '', 'and the one it does not take is not');
-  const either = await printed('-l', 'team=core', '-l', 'team notin (core)');
-  assert.ok(headOf(either, core.id) && headOf(either, bare.id), 'two selectors are either');
 });
 
-test('REFUSED by kind: nemia ls -l of no selector, before anything is read', async () => {
-  const check = LS.check?.({ selector: ['no/pe=x'] });
-  assert.ok(check, 'the command line refuses it');
-  names(check, 'no/pe');
+test('REFUSED by kind: nemia ls -l of no selector, by its handler, before anything is read', async () => {
   await assert.rejects(runWith(noEngine(), LS.handler({ selector: ['no/pe=x'] })), (err: Error & { exitCode?: number }) => {
     assert.ok(err instanceof Invalid, String(err));
     assert.equal(err.exitCode, 2);

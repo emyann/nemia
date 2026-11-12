@@ -15,15 +15,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { Hono } from 'hono';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
-import { RUN_STATES } from 'objects';
+import { Api, RUN_STATES } from 'objects';
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
-import { mcpPort } from './port.ts';
+import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
+import { portTools } from './tools.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -71,16 +71,62 @@ const fetchInto =
   async (url: string | URL, init?: RequestInit): Promise<Response> =>
     on().request(url, init);
 
-/** The SDK's client connected to `/mcp` of `on`, presenting `token`. */
-async function connected(on: Parameters<typeof fetchInto>[0], token = personToken): Promise<Client> {
-  const client = new Client({ name: 'port-test', version: '0.0.0' });
+/** The two eras a host speaks to the port in: the legacy by `initialize`, and the modern by `server/discover`. */
+const ERAS = ['legacy', 'modern'] as const;
+type Era = (typeof ERAS)[number];
+
+/**
+ * The SDK's client connected to `/mcp` of `on` in `era` (the client's default for `legacy`, pinned to the modern revision for `modern`),
+ * presenting `token`, through `fetch` where given (a recording one), and checked to have landed in that era.
+ */
+async function connected(
+  on: Parameters<typeof fetchInto>[0],
+  era: Era = 'legacy',
+  token = personToken,
+  fetch: (url: string | URL, init?: RequestInit) => Promise<Response> = fetchInto(on),
+): Promise<Client> {
+  const client = new Client(
+    { name: 'port-test', version: '0.0.0' },
+    era === 'modern' ? { versionNegotiation: { mode: { pin: '2026-07-28' } } } : {},
+  );
   await client.connect(
     new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8787/mcp'), {
-      fetch: fetchInto(on),
+      fetch,
       requestInit: { headers: { authorization: `Bearer ${token}` } },
     }),
   );
+  assert.equal(client.getProtocolEra(), era, `the client connected in the ${era} era`);
   return client;
+}
+
+/** A JSON-RPC message the port answered, read off a response as JSON or as the `data:` lines of a stream. */
+type Answered = { id?: unknown; method?: string; result?: Record<string, unknown> };
+
+/** Each message of a response's text, whether it is JSON or a stream of `data:` lines. */
+const messagesOf = (text: string, contentType: string): Answered[] =>
+  contentType.includes('text/event-stream')
+    ? text
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => JSON.parse(line.slice('data:'.length)) as Answered)
+        .filter((m) => typeof m === 'object' && m !== null)
+    : text.trim() === ''
+      ? []
+      : [JSON.parse(text) as Answered];
+
+/** A fetch into `on` that keeps, for each request, the JSON-RPC method sent, the response's content type and the messages it answered. */
+function recording(on: Parameters<typeof fetchInto>[0]) {
+  const seen: { method: string | undefined; contentType: string; messages: Answered[] }[] = [];
+  const into = fetchInto(on);
+  const fetch = async (url: string | URL, init?: RequestInit): Promise<Response> => {
+    const res = await into(url, init);
+    const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as { method?: string }) : {};
+    const contentType = res.headers.get('content-type') ?? '';
+    const text = await res.clone().text();
+    seen.push({ method: body.method, contentType, messages: messagesOf(text, contentType) });
+    return res;
+  };
+  return { fetch, seen, resultOf: (method: string) => seen.find((s) => s.method === method)?.messages.find((m) => m.result)?.result };
 }
 
 /** The first text a tool's result carries. */
@@ -89,47 +135,51 @@ const textOf = (result: object): string => {
   return content.find((c) => c.type === 'text')?.text ?? '';
 };
 
-test("with a person's token, tools/list lists the generated tools, wait, hold, cancel and decide among them", async () => {
-  const client = await connected(app);
-  const { tools } = await client.listTools();
-  const names = tools.map((t) => t.name);
-  for (const name of ['wait', 'hold', 'cancel', 'decide']) assert.ok(names.includes(name), name);
-  const hold = tools.find((t) => t.name === 'hold');
-  assert.equal(hold?.annotations?.readOnlyHint, false);
-  assert.equal(hold?.inputSchema.type, 'object');
-  await client.close();
-});
+for (const era of ERAS)
+  test(`${era}: with a person's token, tools/list lists the generated tools, wait, hold, cancel and decide among them`, async () => {
+    const client = await connected(app, era);
+    const { tools } = await client.listTools();
+    const names = tools.map((t) => t.name);
+    for (const name of ['wait', 'hold', 'cancel', 'decide']) assert.ok(names.includes(name), name);
+    const hold = tools.find((t) => t.name === 'hold');
+    assert.equal(hold?.annotations?.readOnlyHint, false);
+    assert.equal(hold?.inputSchema.type, 'object');
+    await client.close();
+  });
 
-test('tools/call hold on a planted run holds it, through the endpoint the tool is linked to', async () => {
-  planted('r-port-held');
-  const client = await connected(app);
-  const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: 'r-port-held', why: 'by the port' } });
-  assert.notEqual(result.isError, true, textOf(result));
-  assert.equal((result.structuredContent as { id?: string } | undefined)?.id, 'r-port-held');
-  assert.ok(fs.existsSync(path.join(root, 'runs', 'r-port-held.hold')), 'the hold is written');
-  await client.close();
-});
+for (const era of ERAS)
+  test(`${era}: tools/call hold on a planted run holds it, through the endpoint the tool is linked to`, async () => {
+    const id = `r-port-held-${era}`;
+    planted(id);
+    const client = await connected(app, era);
+    const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: id, why: 'by the port' } });
+    assert.notEqual(result.isError, true, textOf(result));
+    assert.equal((result.structuredContent as { id?: string } | undefined)?.id, id);
+    assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.hold`)), 'the hold is written');
+    await client.close();
+  });
 
-test('initialize answers instructions under the bound a host keeps whole, every tool they name one tools/list lists', async () => {
-  const client = await connected(app);
-  const instructions = client.getInstructions() ?? '';
-  const { tools } = await client.listTools();
-  const names = new Set(tools.map((t) => t.name));
-  assert.ok(instructions.length > 0, 'the port sends instructions');
-  assert.ok(instructions.length <= INSTRUCTIONS_BOUND, `${instructions.length} characters, at most ${INSTRUCTIONS_BOUND}`);
-  const named = [...instructions.matchAll(/`([a-z][a-z_-]*)`/g)].map((m) => m[1]);
-  for (const name of ['ls', 'show', 'decide', 'approve', 'retry', 'inbox_add', 'inbox_start', 'say', 'closeout', 'try'])
-    assert.ok(named.includes(name), `the instructions name ${name}`);
-  for (const name of named) assert.ok(names.has(name), `${name}, named by the instructions, is a tool the port lists`);
-  const ls = tools.find((t) => t.name === 'ls');
-  assert.ok(
-    ls !== undefined && 'fieldSelector' in (ls.inputSchema.properties ?? {}),
-    'ls takes the fieldSelector the instructions give it',
-  );
-  assert.ok(instructions.includes('fieldSelector: "status.state!=finished"'), 'the instructions select the runs in play');
-  for (const state of RUN_STATES) assert.ok(instructions.includes(state), `the instructions say the state ${state}`);
-  await client.close();
-});
+for (const era of ERAS)
+  test(`${era}: initialize or server/discover answers instructions under the bound a host keeps whole, every tool they name one tools/list lists`, async () => {
+    const client = await connected(app, era);
+    const instructions = client.getInstructions() ?? '';
+    const { tools } = await client.listTools();
+    const names = new Set(tools.map((t) => t.name));
+    assert.ok(instructions.length > 0, 'the port sends instructions');
+    assert.ok(instructions.length <= INSTRUCTIONS_BOUND, `${instructions.length} characters, at most ${INSTRUCTIONS_BOUND}`);
+    const named = [...instructions.matchAll(/`([a-z][a-z_-]*)`/g)].map((m) => m[1]);
+    for (const name of ['ls', 'show', 'decide', 'approve', 'retry', 'inbox_add', 'inbox_start', 'say', 'closeout', 'try'])
+      assert.ok(named.includes(name), `the instructions name ${name}`);
+    for (const name of named) assert.ok(names.has(name), `${name}, named by the instructions, is a tool the port lists`);
+    const ls = tools.find((t) => t.name === 'ls');
+    assert.ok(
+      ls !== undefined && 'fieldSelector' in (ls.inputSchema.properties ?? {}),
+      'ls takes the fieldSelector the instructions give it',
+    );
+    assert.ok(instructions.includes('fieldSelector: "status.state!=finished"'), 'the instructions select the runs in play');
+    for (const state of RUN_STATES) assert.ok(instructions.includes(state), `the instructions say the state ${state}`);
+    await client.close();
+  });
 
 test("every listed tool's description opens with its one-line summary, never a flag", async () => {
   const client = await connected(app);
@@ -142,14 +192,15 @@ test("every listed tool's description opens with its one-line summary, never a f
   await client.close();
 });
 
-test("REFUSED as a tool's error: hold on a run the store has not, answered isError with the api's words", async () => {
-  const client = await connected(app);
-  const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: 'r-port-nothing' } });
-  assert.equal(result.isError, true);
-  assert.ok(textOf(result).length > 0, 'the refusal carries words');
-  assert.equal(fs.existsSync(path.join(root, 'runs', 'r-port-nothing.hold')), false, 'nothing written');
-  await client.close();
-});
+for (const era of ERAS)
+  test(`${era}: REFUSED as a tool's error: hold on a run the store has not, answered isError with the api's words`, async () => {
+    const client = await connected(app, era);
+    const result = await client.callTool({ name: 'hold', arguments: { namespace: 'default', name: 'r-port-nothing' } });
+    assert.equal(result.isError, true);
+    assert.ok(textOf(result).length > 0, 'the refusal carries words');
+    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-port-nothing.hold')), false, 'nothing written');
+    await client.close();
+  });
 
 test("REFUSED 401 at the port: no token, a session's token, a token never minted, and one revoked", async () => {
   const sessionToken = door((d) =>
@@ -165,40 +216,124 @@ test("REFUSED 401 at the port: no token, a session's token, a token never minted
     method: 'initialize',
     params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'port-test', version: '0.0.0' } },
   });
-  for (const [bearer, reason] of [
-    [undefined, 'token-required'],
-    [sessionToken, 'person-token-required'],
-    ['never-minted', 'unknown-token'],
-    [revoked, 'unknown-token'],
-  ] as const) {
-    const res = await app().request('/mcp', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-        ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+  const discover = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'server/discover',
+    params: {
+      _meta: {
+        'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+        'io.modelcontextprotocol/clientInfo': { name: 'port-test', version: '0.0.0' },
+        'io.modelcontextprotocol/clientCapabilities': {},
       },
-      body: initialize,
-    });
-    assert.equal(res.status, 401, reason);
-    assert.equal(((await res.json()) as { reason?: string }).reason, reason);
+    },
+  });
+  for (const body of [initialize, discover])
+    for (const [bearer, reason] of [
+      [undefined, 'token-required'],
+      [sessionToken, 'person-token-required'],
+      ['never-minted', 'unknown-token'],
+      [revoked, 'unknown-token'],
+    ] as const) {
+      const res = await app().request('/mcp', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+        },
+        body,
+      });
+      assert.equal(res.status, 401, reason);
+      assert.equal(((await res.json()) as { reason?: string }).reason, reason);
+    }
+});
+
+for (const era of ERAS)
+  test(`${era}: a pending wait given a progress token is told progress every interval, the interval injected short`, async () => {
+    const port = new Hono().all('/mcp', mcpPort(app, { progressEveryMs: 20 }));
+    const client = await connected(() => port, era);
+    const told: number[] = [];
+    const result = await client.callTool(
+      { name: 'wait', arguments: { for: '300ms' } },
+      {
+        onprogress: (progress) => told.push(progress.progress),
+      },
+    );
+    assert.notEqual(result.isError, true, textOf(result));
+    assert.equal((result.structuredContent as { ended?: string } | undefined)?.ended, 'bound');
+    assert.ok(told.length >= 1, `progress told ${told.length} times`);
+    assert.deepEqual(
+      told,
+      [...told].sort((a, b) => a - b),
+      'progress only grows',
+    );
+    await client.close();
+  });
+
+test('on 2026-07-28 tools/list carries resultType complete, ttlMs PORT_LIST_TTL_MS and cacheScope private, and server/discover names 2026-07-28', async () => {
+  const wire = recording(app);
+  const client = await connected(app, 'modern', personToken, wire.fetch);
+  await client.listTools();
+  const listed = wire.resultOf('tools/list');
+  assert.equal(listed?.resultType, 'complete');
+  assert.equal(listed?.ttlMs, PORT_LIST_TTL_MS);
+  assert.equal(listed?.cacheScope, 'private');
+  const discovered = wire.resultOf('server/discover');
+  assert.ok(
+    Array.isArray(discovered?.supportedVersions) && discovered.supportedVersions.includes('2026-07-28'),
+    'server/discover offers 2026-07-28',
+  );
+  assert.equal(discovered?.resultType, 'complete');
+  await client.close();
+});
+
+test('tools/list answers the same tools in the same order on every request and in both eras, the order of the command table', async () => {
+  const table = portTools(TABLE, CLI_VERBS, Api).map((t) => t.name);
+  for (const era of ERAS) {
+    const client = await connected(app, era);
+    for (let i = 0; i < 2; i++)
+      assert.deepEqual(
+        (await client.listTools()).tools.map((t) => t.name),
+        table,
+        `${era}, list ${i + 1}`,
+      );
+    await client.close();
   }
 });
 
-test('a pending wait given a progress token is told progress every interval, the interval injected short', async () => {
-  const port = new Hono().all('/mcp', mcpPort(app, { progressEveryMs: 20 }));
-  const client = await connected(() => port);
-  const told: number[] = [];
-  const result = await client.callTool({ name: 'wait', arguments: { for: '300ms' } }, undefined, {
-    onprogress: (progress) => told.push(progress.progress),
+test("in an exposed store a person's call reaches its endpoint with their token, in both eras", async () => {
+  const exposed = appOver(standIn(), stand(), storeConfigLayer({ ...process.env, WF_ROOT: root, WF_EXPOSED: '1' }));
+  for (const era of ERAS) {
+    const client = await connected(() => exposed, era);
+    const result = await client.callTool({ name: 'ls', arguments: {} });
+    assert.notEqual(result.isError, true, textOf(result));
+    await client.close();
+  }
+});
+
+test('a call given a progress token answers text/event-stream from its start; on 2026-07-28 one given none answers application/json', async () => {
+  for (const era of ERAS) {
+    const wire = recording(app);
+    const client = await connected(app, era, personToken, wire.fetch);
+    await client.callTool({ name: 'ls', arguments: {} });
+    await client.callTool({ name: 'ls', arguments: {} }, { onprogress: () => {} });
+    const calls = wire.seen.filter((s) => s.method === 'tools/call');
+    assert.equal(calls.length, 2, era);
+    if (era === 'modern') assert.ok(calls[0]?.contentType.includes('application/json'), `${era}, no token: ${calls[0]?.contentType}`);
+    assert.ok(calls[1]?.contentType.includes('text/event-stream'), `${era}, a token: ${calls[1]?.contentType}`);
+    assert.ok(
+      calls[1]?.messages.some((m) => m.method === 'notifications/progress'),
+      `${era}: the call is told progress at once`,
+    );
+    await client.close();
+  }
+});
+
+test("GET /mcp with a person's token answers 405: the port keeps no stream", async () => {
+  const res = await app().request('/mcp', {
+    method: 'GET',
+    headers: { accept: 'text/event-stream', authorization: `Bearer ${personToken}` },
   });
-  assert.notEqual(result.isError, true, textOf(result));
-  assert.equal((result.structuredContent as { ended?: string } | undefined)?.ended, 'bound');
-  assert.ok(told.length >= 1, `progress told ${told.length} times`);
-  assert.deepEqual(
-    told,
-    [...told].sort((a, b) => a - b),
-    'progress only grows',
-  );
-  await client.close();
+  assert.equal(res.status, 405);
 });

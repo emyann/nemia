@@ -145,7 +145,7 @@
     },
     {
       "term": "Port",
-      "meaning": "the MCP endpoint of the api, `POST /mcp` (`apps/api/src/mcp/port.ts`): Streamable HTTP, stateless, a Hono route beside the OpenAPI routes and the board's pages (`apps/api/src/board/board.ts`), none of them an endpoint of `objects`' `Api`. It needs a person's token, and serves the port tools by calling the `Api`'s own endpoints in-process with the caller's `Authorization`, so every refusal is the api's own."
+      "meaning": "the MCP endpoint of the api, `POST /mcp` (`apps/api/src/mcp/port.ts`): Streamable HTTP in both eras of the MCP spec — 2026-07-28, opened by its discover request, and 2025-11-25, opened by `initialize` — each request answered on its own by the SDK's `createMcpHandler`, its tool list cacheable by the caller alone for `PORT_LIST_TTL_MS`; a Hono route beside the OpenAPI routes and the board's pages (`apps/api/src/board/board.ts`), none of them an endpoint of `objects`' `Api`. It needs a person's token, and serves the port tools by calling the `Api`'s own endpoints in-process with the caller's `Authorization`, so every refusal is the api's own."
     },
     {
       "term": "Port tool",

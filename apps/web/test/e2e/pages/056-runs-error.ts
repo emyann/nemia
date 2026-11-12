@@ -44,7 +44,8 @@ export default {
       await contrastHolds(other, ['[role="alert"] p:first-child', '[data-error-reason]']);
       const seen = problems();
       const refused = /^request answered 500: GET .*\/api\/runs\?.*fieldSelector=status\.state(%3D|=)finished/;
-      const said = new RegExp(`^console error: \\w+: ${WHY}\\b`);
+      // The error's class name, as the bundle minifies it: an identifier, which may hold a `$` (`$L`), so a build that renames it says the same.
+      const said = new RegExp(`^console error: [\\w$]+: ${WHY}\\b`);
       const others = seen.filter(
         (p) =>
           !refused.test(p) &&

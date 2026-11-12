@@ -111,6 +111,13 @@ export type EngineOptions = {
    */
   claudeExecutable?: string;
   /**
+   * The folder each harness's program is looked for in first (`<harnessBin>/claude`, `<harnessBin>/codex`), read at every spawn so a
+   * program put there after the engine started is run: a layer above's tools folder, where a person activates a harness. Named by
+   * `claudeExecutable` or `AE_CLAUDE_EXECUTABLE`, Claude Code is run as named; absent or empty, the Agent SDK's own bundled CLI, then
+   * the program on PATH.
+   */
+  harnessBin?: string;
+  /**
    * The engines that hold the sessions this one only reads, by the harness each holds: for each, a function asked at every follow
    * of that harness's sessions, answering the card that engine served on its own port (`Served.cards`), as the JSON it answered, or
    * `undefined` for a harness no one holds now. Given a card, this engine's `follow` of that session is dialled on that port

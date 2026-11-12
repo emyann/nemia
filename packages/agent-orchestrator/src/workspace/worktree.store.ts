@@ -31,7 +31,7 @@ import type { StepSpec } from '../step/step.ts';
 import { lstatOf, runsDir } from '../record/record.store.ts';
 import { countSpawn } from '../meter/tally.store.ts';
 import type { Place } from '../place/place.store.ts';
-import type { PlaceRequests } from '../place/place.ts';
+import type { Followed, PlaceRequests } from '../place/place.ts';
 
 /**
  * The real path of a repository run's repository, its symlinks resolved; undefined for a folder run, and for a repository no longer there
@@ -352,6 +352,30 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
   return { made: outcome.answer } as const;
 });
 
+/** What the run's log says of a checkout `follow` answered of, in the place's words: nothing where nothing was to be said. Pure. */
+export function followedNotes(repo: string, followed: Followed): string[] {
+  if (followed.state === 'fast-forwarded')
+    return [
+      `base: ${repo} fast-forwarded from ${followed.from.slice(0, 12)} to ${followed.to.slice(0, 12)}, where ${followed.upstream} is`,
+    ];
+  if (followed.state === 'left' || followed.state === 'unfetched') return [`base: ${followed.message}`];
+  return [];
+}
+
+/**
+ * The checkout of `repo` brought up to its remote by `place` (`follow`, off the event loop), before a step works from it: what the run's
+ * log says of it. A refusal, or a follow not heard, is said and keeps no step from being cut: it is asked again before the next one.
+ */
+const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string) {
+  const outcome = yield* place.ask('follow', { repo });
+  if ('refused' in outcome) return [`base: ${repo} was not brought up to its remote — the place refused: ${outcome.refused}`];
+  if ('unread' in outcome)
+    return [
+      `base: ${repo} was not brought up to its remote — the place's follow was not heard: ${outcome.unread.said}; asked again before the next step`,
+    ];
+  return followedNotes(repo, outcome.answer);
+});
+
 /**
  * The workspace a step runs in, made real: `{ cut }`, or `{ uncut }` with why, for the run's log, when the place made none.
  *
@@ -369,6 +393,10 @@ const madeBy = Effect.fn('madeBy')(function* (place: Place, request: PlaceReques
  * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
+ *
+ * Before any of it, a run that cuts worktrees has its place bring the repository's checkout up to its remote (`follow`): the base a step
+ * merges (`main-worktree/HEAD` in git's words) is then the remote's, whoever landed on it, and a checkout that cannot be moved is left
+ * as it is and said in the notes, what to do with it. A run without isolation works in the checkout itself, and is never moved under it.
  *
  * A step is cut from the parents that ran (`ranShape`): a condition cuts no worktree, so a step after one is cut as if it followed the
  * condition's first parent, and a parent never filed — skipped, off the route taken — is left out, so a fan-in merges only what ran and
@@ -390,10 +418,12 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);
     return s as { workspace: string; branch: string };
   };
-  if (!run.isolate || plan.kind === 'base') return cut({ workspace: run.repo, branch: run.branch, notes: [] });
+  if (!run.isolate) return cut({ workspace: run.repo, branch: run.branch, notes: [] });
+  const followed = yield* followedBy(place, run.repo);
+  if (plan.kind === 'base') return cut({ workspace: run.repo, branch: run.branch, notes: followed });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
-    return cut({ workspace: parent.workspace, branch: parent.branch, notes: [] });
+    return cut({ workspace: parent.workspace, branch: parent.branch, notes: followed });
   }
   const asked = yield* madeBy(place, {
     repo: run.repo,
@@ -411,7 +441,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
     branch: made.branch,
     ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: place.declared.say.conflicts } } : {}),
     deps,
-    notes: [...made.notes, ...depsNotes(deps)],
+    notes: [...followed, ...made.notes, ...depsNotes(deps)],
   });
 });
 

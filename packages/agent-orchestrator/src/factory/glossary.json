@@ -174,8 +174,14 @@
     },
     {
       "term": "Upgrade resolution",
-      "meaning": "how an upgrade's conflict in a text file directly in a workflow's folder is resolved: a proposal of that Workflow carrying the folder as the choices compose it, which `nemia factory resolve` makes and the factory's resolutions name by workflow; the pass takes the workflow's files from the tree once it applied, and its conflicts wait until then (`WorkflowResolution`, `packages/agent-orchestrator/contracts/resolution.contract.ts`).",
-      "type": "WorkflowResolution"
+      "meaning": "how an upgrade's conflict is resolved: by a proposal of the object that holds its file in the factory's tree, its owner — a file directly in a workflow's folder by that Workflow, an agent's file or result schema by that Agent, a text file of a skill's folder at any depth by that Skill, a step's hire in the wiring (`factory.json#hires.<workflow>/<step>`) by the Hire `<workflow>.<step>`, the rules and the instruction (RULES.md, NEMIA.md) by the Factory itself — carrying it as the choices compose it, which `nemia factory resolve` makes and the factory's resolutions name by the owner's key (`<Kind>/<name>`, a bare name a Workflow's); the pass takes the owner's files from the tree once it applied, and its conflicts wait until then (`UpgradeResolution`, `ResolutionOwner`, `packages/agent-orchestrator/contracts/resolution.contract.ts`). Everything else stays the person's choice: a carried file, in the tree's carried folder, shared by every workflow and code a check runs, which a proposal's access judgement cannot measure, so no object holds it; the wiring's other keys, its revisions policy the person's setting; the wiring whole; a file nested deeper in a workflow's folder; and a file that is not text. A choice that would remove a Skill, the rules or the instruction, which no proposal removes, is refused.",
+      "type": "UpgradeResolution",
+      "retired": [
+        {
+          "spelling": "WorkflowResolution",
+          "card": "factory: an upgrade conflict outside a workflow folder is a proposal of its own kind too, and carried files get a way to be proposed"
+        }
+      ]
     }
   ]
 }

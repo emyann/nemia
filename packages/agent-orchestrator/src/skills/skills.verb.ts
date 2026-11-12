@@ -1,9 +1,9 @@
 /**
  * The skill library as entries of the command table, each through the Skill door (`SkillDoor`, run at the store's root (`StoreRoot`) the
- * handler is given): the skill folders the board lists, each read (`SKILLS_LIST`), and one skill read for its page (`SKILLS_READ`), on
- * the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's builtin skills (`SKILLS_WRITE`), served on
- * both sides. The api resolves which folders a read names, guards each write, and words the board's answer around what each entry
- * answers.
+ * handler is given): the skill folders the board lists, each read (`SKILLS_LIST`), and one skill read for its page with its other text
+ * files (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's builtin skills
+ * (`SKILLS_WRITE`), served on both sides. The api resolves which folders a read names, guards each write, and words the board's answer
+ * around what each entry answers.
  */
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
@@ -17,6 +17,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import { SkillName } from '../agents/agents.model.ts';
 import { SkillDoor, type SkillPage } from './skill-door.store.ts';
 import type { SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills.store.ts';
+import type { SkillOther } from './skills.ts';
 
 export type { SkillPage } from './skill-door.store.ts';
 
@@ -63,11 +64,14 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>, SkillsInput> = {
 export const SkillShowInput = Schema.Struct({ name: Schema.String, dir: Schema.String });
 export type SkillShowInput = typeof SkillShowInput.Type;
 
+/** One skill read for its page (`SkillPage`), and the other text files of its folder (`files`, by path, sorted; none where it has none). */
+export type SkillShown = SkillPage & { readonly files: readonly SkillOther[] };
+
 /**
  * The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`) through the door,
- * in the folder of skills `dir` is in.
+ * in the folder of skills `dir` is in, with its other text files (`files`).
  */
-export const SKILLS_READ: Command<SkillPage, SkillShowInput> = {
+export const SKILLS_READ: Command<SkillShown, SkillShowInput> = {
   name: 'skills show',
   served: [{ endpoint: 'skills.get' }],
   usage: '<from> <name>',
@@ -89,7 +93,8 @@ export const SKILLS_READ: Command<SkillPage, SkillShowInput> = {
   handler: ({ name, dir }) =>
     Effect.gen(function* () {
       const door = yield* SkillDoor;
-      return yield* door.skills.read(SkillName.read(name), path.dirname(dir));
+      const page = yield* door.skills.read(SkillName.read(name), path.dirname(dir));
+      return { ...page, files: yield* door.skills.others(SkillName.read(name), path.dirname(dir)) };
     }),
   print: () => [],
 };

@@ -14,7 +14,7 @@ import { Result, Schema } from 'effect';
 import { PROPOSAL_PHASES } from 'objects';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_STATUSES, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory.ts';
 import { firstRefusal } from '../../record/record.store.ts';
-import { choicesApply, type MergeAt } from '../upgrade/index.ts';
+import { choicesApply, ownerKey, ownerOfKey, type MergeAt } from '../upgrade/index.ts';
 import { writeWhole } from '../../whole-file/whole-file.store.ts';
 
 /** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
@@ -334,11 +334,14 @@ export const choicesFor = (resolutions: Resolutions | undefined, merge: MergeAt)
   resolutions !== undefined && choicesApply(resolutions, merge) ? resolutions.choices : {};
 
 /**
- * The proposals of `resolutions`, by workflow, that resolve the merge `merge`: those recorded beside the choices that apply to it
- * (`choicesApply`); none else.
+ * The proposals of `resolutions`, by the key of the owner each resolves (`ownerKey`), that resolve the merge `merge`: those recorded
+ * beside the choices that apply to it (`choicesApply`); none else. A bare key, as a store written before any owner but a workflow had a
+ * proposal names one, is that Workflow's (`ownerOfKey`).
  */
 export const proposalsFor = (resolutions: Resolutions | undefined, merge: MergeAt): Readonly<Record<string, string>> =>
-  resolutions !== undefined && choicesApply(resolutions, merge) ? (resolutions.proposals ?? {}) : {};
+  resolutions !== undefined && choicesApply(resolutions, merge)
+    ? Object.fromEntries(Object.entries(resolutions.proposals ?? {}).map(([key, name]) => [ownerKey(ownerOfKey(key)), name]))
+    : {};
 
 /** The person's choices for the factory `name`'s upgrade written whole. */
 export const writeResolutions = (home: string, name: string, resolutions: Resolutions): void =>

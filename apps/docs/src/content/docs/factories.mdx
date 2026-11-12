@@ -193,12 +193,26 @@ factory's file, held to the plan you previewed, and the daemon merges on its nex
 tree changed the same line. A parameter changed in the file by hand is merged the same way. A template whose files changed under the
 version the factory was applied at is still refused: give it a new version, and upgrade to that.
 
-A conflict in a text file directly in a workflow's folder — a step, its README, a script beside them — is resolved by a proposal of
-that Workflow. `nemia factory resolve` records each choice, and once every conflict of that workflow has one it proposes the
-workflow's folder as the choices compose it, its other files in `spec.files`, at the version the tree's workflow is at, and prints the
-line that approves it, `nemia proposals approve <proposal> -n <factory>`. The daemon merges once that proposal has applied; declined,
-or gone stale, the factory's status says to resolve again. Any other conflict — the factory's file, its instruction and rules, an
-agent's, a skill's, a carried file — is settled by its choice alone.
+A conflict in a file an object of the tree holds is resolved by a proposal of that object, its owner:
+
+| The conflicted file                                                                   | Its owner                                      |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| A text file directly in a workflow's folder: a step, its README, a script beside them | that Workflow, its other files in `spec.files` |
+| An agent's file, or the result schema beside it                                       | that Agent, its schema in `spec.output`        |
+| A text file of a skill's folder, at any depth                                         | that Skill, its other files in `spec.files`    |
+| A step's hire in the factory's file (`hires`)                                         | the Hire named `<workflow>.<step>`             |
+| The rules and the instruction, RULES.md and NEMIA.md                                  | the Factory itself                             |
+
+`nemia factory resolve` records each choice, and once every conflict of an owner has one it proposes that object as the choices compose
+it, at the version it is at now, and prints the line that approves it, `nemia proposals approve <proposal> -n <factory>`. The daemon
+merges once each such proposal has applied; declined, or gone stale, the factory's status says to resolve again. A choice that would
+remove a skill, the rules or the instruction, which no proposal removes, is refused, and the choice kept: keep it with `--ours`, or give
+a file.
+
+Every other conflict is settled by its choice alone: the factory file's other keys (its revisions policy is your setting) or that file
+whole, a file nested deeper in a workflow's folder, and a file that is not text. A carried file, in the tree's carried folder, a script a
+check runs, stays your choice too: every workflow shares it, so no object holds it, and a proposal's access judgement reads what an
+agent may do, not what a script does. Giving carried files a kind of their own waits on a way to judge that code.
 
 ## Sources
 

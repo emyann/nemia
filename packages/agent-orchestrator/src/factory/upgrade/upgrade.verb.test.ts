@@ -369,7 +369,7 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
     });
   });
   await t.test(
-    'rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a choice',
+    'rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a Factory proposal that a pass leaves fresh',
     async (t) => {
       t.mock.method(console, 'log', () => {});
       const { dir } = await applied('both');
@@ -385,6 +385,12 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
       ]);
       assert.equal(textIn(treeDir(ROOT, 'both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
       await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
+      const proposal: string = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'both'), 'utf8')).proposals?.['Factory/both'] ?? '';
+      assert.ok(proposal, 'the rules are proposed as the Factory');
+      const recorded = reconciled(templated('both'));
+      assert.equal(recorded.version, '0.1.0', 'the merge waits on the proposal');
+      assert.deepEqual(recorded.upgrade?.conflicts[0]?.proposal, { name: proposal, phase: 'waiting' }, 'the status names it');
+      await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT, repo: ROOT }));
       const merged = reconciled(templated('both'));
       assert.equal(merged.version, '0.2.0');
       assert.equal(merged.upgrade, undefined);
@@ -546,13 +552,13 @@ test('a parameter set again at the version applied: previewed, filed with its pl
       assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 8$/m, 'left as it is while the conflict waits');
       await main(['factory', 'resolve', 'clash', `${REVIEW}#budget`, '--theirs'], noEngine());
       const resolutions = JSON.parse(fs.readFileSync(resolutionsFile(ROOT, 'clash'), 'utf8'));
-      const proposal: string = resolutions.proposals?.dev ?? '';
+      const proposal: string = resolutions.proposals?.['Workflow/dev'] ?? '';
       assert.deepEqual(resolutions, {
         to: '0.1.0',
         template: 'team',
         base: digestOf(entriesIn(appliedDir(ROOT, 'clash'))),
         choices: { [`${REVIEW}#budget`]: 'theirs' },
-        proposals: { dev: proposal },
+        proposals: { 'Workflow/dev': proposal },
       });
       assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
       await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT, repo: ROOT }));

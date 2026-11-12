@@ -2,7 +2,8 @@
  * What a proposed object is now, in its factory: the `resourceVersion` it is served at (null where nothing is at its name) and its spec as
  * a proposal carries it, so a proposal's changes, their access and its stale check are read the one way, and an undo proposes the spec it
  * read. A factory's Workflows, Agents and Skills are its tree's (`<tree>/workflows`, and its `agents/` and `skills/`), read through the
- * Workflow, Agent and Skill doors; its Hires, McpServers and the Factory itself are read as the objects the api serves
+ * Workflow, Agent and Skill doors — an Agent with the result schema its `output:` names (`agentSpecOf`), a Skill with its folder's other
+ * text files (`skillSpecOf`); its Hires, McpServers and the Factory itself are read as the objects the api serves
  * (`hireObject`, `mcpServerObject`, `factoryObject`), their versions those objects'.
  */
 import fs from 'node:fs';
@@ -18,7 +19,9 @@ import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { workflowDirAt } from '../folder/folder.store.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
-import { fileParts, workflowSpecOf } from './workflow-spec.ts';
+import { workflowSpecOf } from './workflow-spec.ts';
+import { agentSpecOf } from './agent-spec.ts';
+import { skillSpecOf } from './skill-spec.ts';
 import { textIn } from '../folder/folder.ts';
 import { FactoryDoor, filedAtOnce, treeChecked } from '../factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../factory/factory.model.ts';
@@ -90,7 +93,7 @@ const workflowNow = (place: ProposalPlace, factory: string, name: string) =>
     return there.kind === 'folder' ? { version: there.version, spec: yield* tried(() => workflowSpecAt(dir)) } : NONE;
   });
 
-/** The Agent `name` of the factory's tree, now. */
+/** The Agent `name` of the factory's tree, now: its spec with the result schema its `output:` names, read beside it, where it reads. */
 const agentNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
     const dir = yield* tried(() => treeDir(place.home, factory, 'agents'));
@@ -98,19 +101,13 @@ const agentNow = (place: ProposalPlace, factory: string, name: string) =>
     const there = yield* door.there(AgentName.read(name), { dir });
     if (there.kind !== 'held') return NONE;
     const a = yield* door.read(AgentName.read(name), { dir });
-    const spec = {
-      ...(a.role !== undefined && { role: a.role }),
-      ...(a.description !== undefined && { description: a.description }),
-      keys: a.keys,
-      ...(a.skills !== undefined && { skills: a.skills.join(', ') }),
-      ...(a.harnessPrompt !== undefined && { harnessPrompt: a.harnessPrompt }),
-      ...(a.mcp !== undefined && { mcp: a.mcp.join(', ') }),
-      instructions: a.body,
-    };
-    return { version: there.version, spec };
+    const file = a.keys.output;
+    const text = file === undefined ? undefined : a.read(file);
+    const schema = file === undefined || text === undefined ? null : { file, text };
+    return { version: there.version, spec: agentSpecOf(a, schema) };
   });
 
-/** The Skill `name` of the factory's tree, now. */
+/** The Skill `name` of the factory's tree, now: its SKILL.md and its folder's other text files. */
 const skillNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
     const at = yield* tried(() => treeDir(place.home, factory, 'skills'));
@@ -118,12 +115,8 @@ const skillNow = (place: ProposalPlace, factory: string, name: string) =>
     const there = yield* door.there(SkillName.read(name), at);
     if (there.kind !== 'held') return NONE;
     const page = yield* door.read(SkillName.read(name), at);
-    const { keys, body } = fileParts(name, page.text);
-    const pick = (key: string) => (keys[key] === undefined ? {} : { [key]: keys[key] });
-    return {
-      version: there.version,
-      spec: { ...pick('title'), ...pick('description'), ...pick('tags'), ...pick('examples'), preload: page.preload, body },
-    };
+    const others = yield* door.others(SkillName.read(name), at);
+    return { version: there.version, spec: skillSpecOf(name, page.text, others, page.preload) };
   });
 
 /** `object`'s version and spec as a `Current`, from a served object. */

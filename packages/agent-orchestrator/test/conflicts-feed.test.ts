@@ -3,12 +3,12 @@
  * 0.1.0 with its rules, the person's line of the rules and the template's 0.2.0 changing the same line, the upgrade filed, and the
  * controller writing `ConflictsPending` True to its status (`reconcileFactory`). The tick's next pass writes one `ConflictsPending` line
  * about the factory, labelled with it, which Nemia's selectors take; later passes, and a daemon restarted with no fold of its own, write
- * none. The person chooses, the controller merges and writes the condition False, and the next pass writes one `ConflictsSettled` line,
- * then none. A factory with no conflict is never said. Neither the verbs nor the controller write a line: the tick reads the condition on
- * each pass, as it reads the levels and the pause.
+ * none. The person chooses, and approves the rules as the Factory's proposal that choice makes, the controller merges and writes the
+ * condition False, and the next pass writes one `ConflictsSettled` line, then none. A factory with no conflict is never said. Neither the
+ * verbs nor the controller write a line: the tick reads the condition on each pass, as it reads the levels and the pause.
  *
- * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing, as `level-feed.test.ts`
- * gives it. The store is its own, at `ROOT`, given as `ENV`.
+ * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing, as `level-feed.test.ts` gives
+ * it. The store is its own, at `ROOT`, given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +22,9 @@ import { teamCopy } from './team.ts';
 import { templated as programsAt } from './templated.ts';
 import { tickRun, readFeed } from '../src/runner.ts';
 import { readFactoryAt } from '../src/factory/factory.store.ts';
-import { treeDir } from '../src/factory/applied/applied.store.ts';
+import { readResolutions, treeDir } from '../src/factory/applied/applied.store.ts';
+import { approveProgram } from '../src/approval/approve.verb.ts';
+import { PERSON } from '../src/caller/caller.ts';
 import { conflictsNow } from '../src/factory/applied/applied.verb.ts';
 import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { parseSelectors, selects } from '../src/watch/selector.ts';
@@ -124,17 +126,22 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     assert.equal(factorySaid().length, 1);
   });
 
-  await s.test('the person chooses, the controller merges and says it False: a pass says it settled, once', async (sub) => {
-    await typed(sub, 'factory', 'resolve', 'acme', LINE, '--theirs');
-    const status = reconciled(factory('acme'));
-    assert.deepEqual(
-      status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => [c.status, c.reason]),
-      [['False', 'Merged']],
-    );
-    await pass();
-    await pass();
-    assert.deepEqual(factorySaid().slice(1), [['acme', 'ConflictsSettled', { factory: 'acme' }, 'tick']]);
-  });
+  await s.test(
+    'the person chooses and approves the rules as the Factory, the controller merges and says it False: a pass says it settled, once',
+    async (sub) => {
+      await typed(sub, 'factory', 'resolve', 'acme', LINE, '--theirs');
+      const proposal = readResolutions(ROOT, 'acme')?.proposals?.['Factory/acme'] ?? '';
+      await stage.runWith(stage.board().e, approveProgram(PERSON, 'acme', proposal, { home: ROOT, repo: ROOT }));
+      const status = reconciled(factory('acme'));
+      assert.deepEqual(
+        status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => [c.status, c.reason]),
+        [['False', 'Merged']],
+      );
+      await pass();
+      await pass();
+      assert.deepEqual(factorySaid().slice(1), [['acme', 'ConflictsSettled', { factory: 'acme' }, 'tick']]);
+    },
+  );
 
   await s.test('a factory that never had a conflict is never said', () => {
     assert.deepEqual([...new Set(factorySaid().map((l) => l[0]))], ['acme']);

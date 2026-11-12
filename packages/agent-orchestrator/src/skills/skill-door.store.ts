@@ -6,8 +6,9 @@
  * Two layers: the files (`skillFiles`, over `read.store.ts` and `skills.store.ts` at a store's root, so a skill is the very bytes today's
  * writer writes), and the memory stand-in (`skillDoorMemory`, `skill-memory.store.ts`), which a test gives its program. Both are built by
  * `skillDoorOver`, so each write is checked the one way on both, before the layer acts: the name as `SkillName.OnCreate` checks it, a
- * whole skill drafted through the model's `Skill` — a one-line description, required — or `Invalid` names the check broken and nothing
- * is written; then the write judged against the version it was read at (`definitionVersionRefusal`), refused with the kind it chooses.
+ * whole skill drafted through the model's `Skill` — a one-line description, required — and the other text files it gives, each at a path
+ * inside its folder and given once (`skillFilesRefusal`), or `Invalid` names the check broken and nothing is written; then the write
+ * judged against the version it was read at (`definitionVersionRefusal`), refused with the kind it chooses.
  * What stays the layer's: where a skill may be written (the store's `skills/`, or a repository's the store knows), a link, a change of
  * `preload:` alone where no skill is, the card reader's refusal of what a draft renders to, and a copy's source and target.
  *
@@ -24,11 +25,12 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { definitionVersionRefusal, type DefinitionThere, type SkillsFound } from '../agents/agents.ts';
 import { Skill, SkillName } from '../agents/agents.model.ts';
 import type { VersionRefused } from '../folder/folder.ts';
-import type { SkillDraft } from './skills.ts';
+import { skillFilesRefusal, type SkillDraft, type SkillOther } from './skills.ts';
 import { skillsFor, skillVersion, type Places } from './read.store.ts';
 import {
   copySkill,
   skillFolders,
+  skillOthers,
   skillRead,
   skillText,
   skillThere,
@@ -47,15 +49,17 @@ export type SkillWhere = { readonly anywhere?: boolean };
 
 /**
  * A layer of the Skill door, as plain synchronous methods: the skills a workflow's agents are given, found where a start finds them
- * (`skillsFor`); the skills a folder of skills holds, by name; a skill of a folder of skills (`at`) read for its page, and what is there
- * now (`DefinitionThere`); a skill made or changed (`version` the one it was read at, none for a skill made); and a skill copied whole from
- * one folder of skills into another, under its name.
+ * (`skillsFor`); the skills a folder of skills holds, by name; a skill of a folder of skills (`at`) read for its page, its other text
+ * files at any depth by their path in its folder, sorted (none where no skill is), and what is there now (`DefinitionThere`); a skill
+ * made or changed (`version` the one it was read at, none for a skill made), its other text files replaced whole where the change gives
+ * them; and a skill copied whole from one folder of skills into another, under its name.
  */
 export type SkillLayer = {
   readonly skills: {
     readonly found: (at: { readonly dir: string; readonly places?: Places }) => SkillsFound;
     readonly list: (holder: string) => readonly string[];
     readonly read: (name: string, at: string) => SkillPage;
+    readonly others: (name: string, at: string) => readonly SkillOther[];
     readonly there: (name: string, at: string) => DefinitionThere;
     readonly write: (name: string, change: SkillChange, version: string | undefined, at: string, where?: SkillWhere) => SkillWritten;
     readonly copy: (name: string, from: string, to: string, where?: SkillWhere) => SkillCopied;
@@ -113,12 +117,17 @@ export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
           ? door.list(holder as SkillName)
           : Effect.fail(new Invalid({ message: `${holder} is not absolute: name the folder of skills by its whole path.` })),
       read: (name, at) => door.read(name, at),
+      others: (name, at) => door.others(name, at),
       there: (name, at) => door.there(name, at),
       write: (name, change, version, at, where) =>
         Effect.gen(function* () {
           yield* nameChecked(name);
           const named = { ...change, name };
-          if ('body' in named) yield* skillChecked(draftedSkill(name, named));
+          if ('body' in named) {
+            yield* skillChecked(draftedSkill(name, named));
+            const files = skillFilesRefusal(named.files);
+            if (files !== undefined) return yield* Effect.fail(new Invalid({ message: `skills/${name}: ${files}` }));
+          }
           const refused = definitionVersionRefusal('skill', name, 'write', yield* door.there(name, at), version);
           if (refused !== null) return yield* Effect.fail(refusalOf(refused));
           return yield* door.write(name, named, version, at, where);
@@ -138,6 +147,7 @@ export function skillFiles(home: string): SkillLayer {
         const dir = path.join(at, name);
         return { ...skillRead(name, dir), text: skillText(dir), version: skillVersion(dir) };
       },
+      others: (name, at) => skillOthers(path.join(at, name)),
       there: (name, at) => skillThere(path.join(at, name)),
       write: (name, change, version, at, where) =>
         writeSkill(home, at, { ...change, name }, { version: version ?? null, anywhere: where?.anywhere }),

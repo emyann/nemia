@@ -235,6 +235,7 @@ const inboxCardOf = (card: Card): InboxCard => {
     ...(spec.repo === undefined ? {} : { repo: spec.repo }),
     ...(spec.queued === undefined ? {} : { queued: spec.queued }),
     ...(spec.gate === undefined ? {} : { gate: spec.gate }),
+    ...(spec.model === undefined ? {} : { model: { ...spec.model } }),
     ...(spec.from === undefined ? {} : { from: [...spec.from] }),
     ...(metadata.namespace === undefined || metadata.namespace === 'default' ? {} : { factory: metadata.namespace }),
     ...(metadata.labels === undefined || Object.keys(metadata.labels).length === 0 ? {} : { labels: { ...metadata.labels } }),

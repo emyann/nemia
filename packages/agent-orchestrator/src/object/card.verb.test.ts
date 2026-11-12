@@ -217,9 +217,11 @@ test("cardTable says the repository a card naming no factory was tried on only w
           return yield* cardTable(e, how, {}).pipe(Effect.provide(configGiven(STORE, env)));
         }),
       ),
-    ).rows.map((row) => String(row.cells[7]));
-  assert.match(tried({ WF_DEFAULT_FACTORY_STARTS: '1' }).join(), /\/the\/daemon\/repo/);
-  assert.doesNotMatch(tried({}).join(), /\/the\/daemon\/repo/);
+    );
+  const lastStart = (table: { columnDefinitions: readonly { name: string }[]; rows: readonly { cells: readonly unknown[] }[] }) =>
+    table.rows.map((row) => String(row.cells[table.columnDefinitions.findIndex((c) => c.name === 'Last start')]));
+  assert.match(lastStart(tried({ WF_DEFAULT_FACTORY_STARTS: '1' })).join(), /\/the\/daemon\/repo/);
+  assert.doesNotMatch(lastStart(tried({})).join(), /\/the\/daemon\/repo/);
 });
 
 test('REFUSED: a card of another namespace and a card not there are Missing; a bad limit, token or selector is Invalid', () => {

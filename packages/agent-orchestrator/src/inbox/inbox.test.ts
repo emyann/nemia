@@ -132,6 +132,23 @@ test('an inbox card is its file: the name without .md, `workflow:` and `repo:` f
   );
 });
 
+test("`model:` names a step's model in the card's run alone, carried by the card, its listing, its line, a queue and a filing", () => {
+  const text = '---\nworkflow: dev\nmodel: implement=fable, review=opus\n---\nCache the views.\n';
+  const card = read(text);
+  assert.deepEqual(card.model, { implement: 'fable', review: 'opus' });
+  assert.equal(read('---\nworkflow: dev\n---\nx\n').model, undefined, 'no model unless it says so');
+
+  const [listed] = inboxListing([{ file: 'cache-the-views-k2q9.md', text }], [], isDirectory);
+  assert.deepEqual(listed.model, { implement: 'fable', review: 'opus' });
+  assert.deepEqual(inboxLines([listed]), ['cache-the-views-k2q9  Cache the views.  workflow: dev  model: implement=fable, review=opus']);
+  assert.equal(
+    queuedText(card, '2026-09-16T10:00:00.000Z', isDirectory),
+    '---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\nmodel: implement=fable, review=opus\n---\nCache the views.\n',
+    'queued: the models stay, in their order',
+  );
+  assert.equal(ideaCard('./idea.md', text, {}, isDirectory).text, text, "filed from a file whose frontmatter is a card's: kept");
+});
+
 test("`gate:` names the step a card's run waits at for a person, carried by the card, its listing, its line, a queue and a filing", () => {
   const card = read('---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n');
   assert.deepEqual(card, {
@@ -894,10 +911,10 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
   const rows: Record<string, [text: string, facts: string[]]> = {
     'a key it does not have, naming the keys it has': [
       '---\nworkflow: dev\nharness: codex\n---\nx\n',
-      [F, '`harness`', 'workflow, repo, queued, gate, factory, from', 'Correct the spelling or delete the line'],
+      [F, '`harness`', 'workflow, repo, queued, gate, model, factory, from', 'Correct the spelling or delete the line'],
     ],
     'a key spelt as another': ['---\nrepos: /home/me/code/app\n---\nx\n', [F, '`repos`']],
-    'a misspelt `factory`': ['---\nfactry: pipao\n---\nx\n', [F, '`factry`', 'workflow, repo, queued, gate, factory,']],
+    'a misspelt `factory`': ['---\nfactry: pipao\n---\nx\n', [F, '`factry`', 'workflow, repo, queued, gate, model, factory,']],
     '`after:`, with where it is said instead': [
       '---\nworkflow: dev\nafter: parse-the-flag-1x2y\n---\nx\n',
       [F, '`after`', `nemia start <inbox>/${F}`, '--after <runId>', 'Delete the line.'],
@@ -934,6 +951,8 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
       '---\nworkflow: dev\ngate: plan, review\n---\nx\n',
       [F, '`gate: plan, review`', 'names more than one step', `nemia start <inbox>/${F}`, '--gate <step>.'],
     ],
+    '`model:` a pair with no model': ['---\nworkflow: dev\nmodel: implement=\n---\nx\n', [F, '`model: implement=`']],
+    '`model:` a step named twice': ['---\nworkflow: dev\nmodel: implement=fable, implement=opus\n---\nx\n', [F, 'implement twice']],
     "`gate:` a step's own `true`": [
       '---\nworkflow: dev\ngate: true\n---\nx\n',
       [F, '`gate: true`', '`gate: plan`', 'Name the step, or delete the line.'],

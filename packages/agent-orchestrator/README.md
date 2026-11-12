@@ -3150,7 +3150,8 @@ run 'wf tick' (or 'wf up') to start it
   starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)). A sixth, `from: a-1x2y, b-3z4w`, names the
   runs the card is handed as context when it starts, as `--from` names them ([above](#context-without-a-wait-wf-start---from)):
   `wf inbox from <name> <run>...` writes it, refused for a run the store does not have, and `wf inbox from <name> --off` takes it
-  back; a started card is not rewritten.
+  back; a started card is not rewritten. A seventh, `model: implement=fable, review=opus`, names the model a step of its workflow
+  runs on in the run it starts, and in no other run, as `--model` names it ([*A step's model for one run*](#a-steps-model-for-one-run-wf-start---model)).
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
@@ -3178,7 +3179,8 @@ run 'wf tick' (or 'wf up') to start it
   - the factory is `--factory`, else the card's `factory:`, else the default;
   - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
     `workflow:` is found in it;
-  - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`.
+  - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`, and
+    a `--model` for a step the card's `model:` names too is taken over the card's.
 - **The card is kept: it has a life of its own.** The record carries `from: { inbox: <name> }`, and `wf decide` prints
   `from inbox card <name>` under the run's line. The card stays in the inbox, and `wf inbox` lists it as `started as <runId>`.
   Its state is one closed word, `CardState` — `filed`, `queued`, `refused` (queued, and its start as it stands refused) or
@@ -4258,6 +4260,26 @@ and the transcript records what actually ran.
 board showed them as `needs-human` within seconds, which is the system working: the wrong
 combination is visible rather than mysterious. Check that a cheaper model supports the permission
 mode you are relying on before you put it in a workflow.
+
+### A step's model for one run: `wf start --model`
+
+```bash
+wf start ./flag.md --workflows build --model implement=fable   # implement runs on fable in this run; review and every other run keep their agents'
+```
+
+A step's `model:` is its workflow's, and so every run's. A run can be told otherwise when it is started: `--model <step>=<model>`,
+once per step, or an inbox card's `model: <step>=<model>, …`, a `--model` for the same step taken over the card's. The models are
+frozen on the run's record as `models`, by step, and set on the steps it freezes, so every filing of the step reads its model where it
+reads a step's `model:` — a retry and a round included, `wf retry --model` still starting a fresh session on another — and the board's
+Details and `nemia show` say it as the step's. A revision the run takes after it (`wf refresh`, a factory that follows revisions)
+keeps them (`withModels`). Its other steps, and every other run of the workflow, keep their agents' models: the Kubernetes test, a
+Pod's container takes its image per Pod. `wf start` says them (`models: implement=fable`).
+
+Refused before a run is written, exit 2, naming where the model was said: a step the workflow does not have; `inherit`; a step on a
+remote agent, which runs as its operator configured it; and a Claude Code step in `auto` on a model that drops it
+(`CLAUDE_AUTO_DROPPED`), naming the models that keep it, as `wf retry --model` is refused. What the step's harness then refuses of the
+config it would be filed with is refused as any start's (`configRefused`). `wf start <folder> --model` is refused by name, and so is a
+`--model` sent to another machine's api: say it on the card there.
 
 ## Measured: what a handoff actually costs
 

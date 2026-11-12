@@ -2227,7 +2227,7 @@ of pure code sits beside it.
 | `test/memory-limit.boundary.test.ts` | a memory limit on a real cgroup: a runaway child of a 256Mi task killed in its scope, the attempt carrying the limit, the kill and the peak, and a neighbour untouched; skipped with the probe's words off systemd |
 | `test/attached-memory.test.ts` | a held long-lived session under a memory limit: refused its start where the host makes no scope (its unlimited neighbour started), ended `failed` rather than taken up again when a holder that makes none finds it parked, and run in a scope of its own whose memory its run file and sighting say where the host makes one |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
-| `test/detached-left.test.ts` | a slow worker read working and a gone one failed, and what an ended run left in its harness group stopped by `stop`, `release` and the engine's pass — `sh` as the harness |
+| `test/detached-left.boundary.test.ts` | a slow worker read working and a gone one failed, and what an ended run left in its harness group stopped by `stop`, `release` and the engine's pass — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
 | `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |

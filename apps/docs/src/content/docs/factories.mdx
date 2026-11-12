@@ -195,13 +195,13 @@ version the factory was applied at is still refused: give it a new version, and 
 
 A conflict in a file an object of the tree holds is resolved by a proposal of that object, its owner:
 
-| The conflicted file | Its owner |
-| --- | --- |
+| The conflicted file                                                                   | Its owner                                      |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | A text file directly in a workflow's folder: a step, its README, a script beside them | that Workflow, its other files in `spec.files` |
-| An agent's file, or the result schema beside it | that Agent, its schema in `spec.output` |
-| A text file of a skill's folder, at any depth | that Skill, its other files in `spec.files` |
-| A step's hire in the factory's file (`hires`) | the Hire named `<workflow>.<step>` |
-| The rules and the instruction, RULES.md and NEMIA.md | the Factory itself |
+| An agent's file, or the result schema beside it                                       | that Agent, its schema in `spec.output`        |
+| A text file of a skill's folder, at any depth                                         | that Skill, its other files in `spec.files`    |
+| A step's hire in the factory's file (`hires`)                                         | the Hire named `<workflow>.<step>`             |
+| The rules and the instruction, RULES.md and NEMIA.md                                  | the Factory itself                             |
 
 `nemia factory resolve` records each choice, and once every conflict of an owner has one it proposes that object as the choices compose
 it, at the version it is at now, and prints the line that approves it, `nemia proposals approve <proposal> -n <factory>`. The daemon

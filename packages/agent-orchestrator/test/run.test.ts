@@ -10,7 +10,6 @@ import {
   listing,
   saidLines,
   saidWord,
-  saidAhead,
   sayRefusal,
   type RetryBriefing,
   type RepositoryRun,
@@ -23,6 +22,7 @@ import { type Closeout } from '../src/closeout/closeout.ts';
 import { type EarlierTry } from '../src/retry/retry-ask.ts';
 import { type OutputSchema, type StepSpec } from '../src/workflow.ts';
 import { listingInput, names, phases, run, step, STEPS } from './assessed.ts';
+import { saidAhead } from '../src/say/say.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 
@@ -124,7 +124,7 @@ const saidIn =
   (name: string): Closeout | undefined =>
     name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined;
 
-test('REFUSED by `sayRefusal` before the engine is asked: a step the run does not have, a cancelled run, a pruned run\'s step not filed, a step whose tries are behind it with none filed, and a task settled each way — and null for a task in flight, one only the engine can answer for, or a step nothing of which is filed, whose words are kept', () => {
+test("REFUSED by `sayRefusal` before the engine is asked: a step the run does not have, a cancelled run, a pruned run's step not filed, a step whose tries are behind it with none filed, and a task settled each way — and null for a task in flight, one only the engine can answer for, or a step nothing of which is filed, whose words are kept", () => {
   const live = run({ implement: 't1', review: null });
   const inFlight = phases({ t1: 'running' });
   assert.equal(sayRefusal(STEPS, live, 'deploy', inFlight), 'r-1 has no step "deploy" — its steps are implement, review.');
@@ -136,10 +136,10 @@ test('REFUSED by `sayRefusal` before the engine is asked: a step the run does no
   assert.equal(saidAhead(live, 'review'), true);
   assert.equal(saidAhead(live, 'implement'), false, 'a step with a task is said to through the engine');
   const pruned = run({ implement: 't1', review: null }, { pruned: { at: '2026-01-03T00:00:00Z', worktrees: [] } });
-  names(sayRefusal(STEPS, pruned, 'review', inFlight)!, 'review has not been filed', 'r-1 was pruned');
+  names(sayRefusal(STEPS, pruned, 'review', inFlight), 'review has not been filed', 'r-1 was pruned');
   const sentBack = run({}, { steps: { implement: { taskId: 't1' }, review: { taskId: null, tries: [{ taskId: 'r1', cause: 'back' }] } } });
   assert.equal(saidAhead(sentBack, 'review'), false, 'a try behind it: no first try is left to carry the words');
-  names(sayRefusal(STEPS, sentBack, 'review', inFlight)!, 'review has no session', 'try 1 is behind it', 'nemia ls r-1');
+  names(sayRefusal(STEPS, sentBack, 'review', inFlight), 'review has no session', 'try 1 is behind it', 'nemia ls r-1');
   for (const phase of ['succeeded', 'failed', 'stopped'] as const) {
     names(
       sayRefusal(STEPS, live, 'implement', phases({ t1: phase })),

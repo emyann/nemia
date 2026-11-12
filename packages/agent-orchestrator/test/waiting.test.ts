@@ -712,23 +712,26 @@ test('words said to a step of a run waiting on another are kept, and its first t
     const r = await tick(child.id);
     assert.deepEqual([r.filed, r.waiting], [[], [{ run: parent.run.id }]]);
   });
-  await s.test("`nemia say` to its step keeps the words, a person's and an agent's under its name, and says they were kept, not delivered", async (sub) => {
-    const told = await stage.runWith(board().e, sayRun(child.id, 'implement', person, { caller: PERSON }));
-    assert.ok('kept' in told, 'kept, not said to a session');
-    assert.deepEqual([told.try, told.kept.text, told.from], [1, person, { kind: 'person' }]);
-    kept.push(told.kept.at);
-    const printed = await printedBy(sub, () => stage.main(['say', child.id, 'implement', 'Mind the cursor format.']));
-    assert.match(printed[0], new RegExp(`^${child.id}  kept for implement's first try, at `), printed.join('\n'));
-    const byAgent = await stage.runWith(
-      board().e,
-      sayRun(child.id, 'implement', agent, { caller: { kind: 'agent', agent: 'operator', factory: null } }),
-    );
-    assert.ok('kept' in byAgent);
-    assert.deepEqual(byAgent.from, { kind: 'agent', name: 'operator' });
-    kept.push(byAgent.kept.at);
-    assert.deepEqual(board().said, [], 'no session was told anything');
-    assert.deepEqual(Object.keys(runRecord(ROOT, child.id).saidBefore ?? {}), ['implement'], 'composed onto the run read');
-  });
+  await s.test(
+    "`nemia say` to its step keeps the words, a person's and an agent's under its name, and says they were kept, not delivered",
+    async (sub) => {
+      const told = await stage.runWith(board().e, sayRun(child.id, 'implement', person, { caller: PERSON }));
+      assert.ok('kept' in told, 'kept, not said to a session');
+      assert.deepEqual([told.try, told.kept.text, told.from], [1, person, { kind: 'person' }]);
+      kept.push(told.kept.at);
+      const printed = await printedBy(sub, () => stage.main(['say', child.id, 'implement', 'Mind the cursor format.']));
+      assert.match(printed[0], new RegExp(`^${child.id}  kept for implement's first try, at `), printed.join('\n'));
+      const byAgent = await stage.runWith(
+        board().e,
+        sayRun(child.id, 'implement', agent, { caller: { kind: 'agent', agent: 'operator', factory: null } }),
+      );
+      assert.ok('kept' in byAgent);
+      assert.deepEqual(byAgent.from, { kind: 'agent', name: 'operator' });
+      kept.push(byAgent.kept.at);
+      assert.deepEqual(board().said, [], 'no session was told anything');
+      assert.deepEqual(Object.keys(runRecord(ROOT, child.id).saidBefore ?? {}), ['implement'], 'composed onto the run read');
+    },
+  );
   await s.test('`nemia ls` notes the step said to before it ran', async () => {
     const listed = await stage.runWith(board().e, list(board().e, runRecord(ROOT, child.id)));
     assert.match(listed.steps[0].note ?? '', /said to 3× before it ran/);

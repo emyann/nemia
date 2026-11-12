@@ -128,7 +128,7 @@ export type { MainClaim, RunSlot } from './cap/cap.ts';
 export { resultSteps, tipBranches, tipsSeen, workChecks } from './branches/index.ts';
 export { cutName, GIVEN, givenPlan, handOffDue, LINE_NAME, workspacePlan } from './workspace/workspace.ts';
 export type { Given } from './workspace/workspace.ts';
-export { saidAhead, saidBeforeWord, saidLines, saidWord, sayRefusal } from './say/say.ts';
+export { saidLines, saidWord, sayRefusal } from './say/say.ts';
 export type { Said } from './say/say.ts';
 export { assess } from './tick/assess.ts';
 export type { Assessment } from './tick/assess.ts';

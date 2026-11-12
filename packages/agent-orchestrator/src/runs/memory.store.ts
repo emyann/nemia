@@ -255,7 +255,7 @@ function holdsOf(st: State): RunsLayer['holds'] {
   };
 }
 
-/** What was said to the run's steps before each was filed, by step, in the order kept, as `saidBefore` composes it: none where nothing was. */
+/** What was said to the run's steps before each was filed, by step, in the order kept, as `saidBefore` composes it; none where none. */
 function saidBeforeOf(st: State, id: string): Pick<Run, 'saidBefore'> {
   const byStep: Record<string, SaidBefore[]> = {};
   for (const { step, at, text } of st.said.get(id) ?? []) (byStep[step] ??= []).push({ at, text });

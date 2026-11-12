@@ -84,7 +84,9 @@ export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, 
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   if (saidAhead(run, stepName)) return yield* keptFor(run, stepName, text, from);
   if (!taskId)
-    return yield* Effect.fail(new Conflict({ message: `${stepName} has no task filed, so there is no session to hear anything: nemia ls ${run.id}.` }));
+    return yield* Effect.fail(
+      new Conflict({ message: `${stepName} has no task filed, so there is no session to hear anything: nemia ls ${run.id}.` }),
+    );
   const said = yield* toldBy(e, taskId, framedForStep(from, text));
   return { run, taskId, try: tryOf(run, stepName), said, from } satisfies Told;
 });
@@ -97,7 +99,9 @@ export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, 
 const keptFor = Effect.fnUntraced(function* (run: Run, stepName: string, text: string, from: Speaker) {
   if (!text.trim())
     return yield* Effect.fail(
-      new Conflict({ message: `\`text\` is empty: there is nothing to keep for ${stepName}. Give the words: nemia say ${run.id} ${stepName} "<words>".` }),
+      new Conflict({
+        message: `\`text\` is empty: there is nothing to keep for ${stepName}. Give the words: nemia say ${run.id} ${stepName} "<words>".`,
+      }),
     );
   const kept = yield* (yield* RunDoor).said.put(RunId.read(run.id), stepName, framedForStep(from, text));
   return { run, try: 1, kept, from } satisfies Kept;

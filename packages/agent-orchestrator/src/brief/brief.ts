@@ -100,6 +100,20 @@ const contractsOf = (
 const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
 
 /**
+ * What was said to the step before it was filed, for its first try alone (`saidBeforeSection`): none for a try or a round past it, nor for
+ * a filing with a try behind it on the record.
+ */
+const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: RoundBriefing): string[] =>
+  !retry && !round && !run.steps[step.name]?.tries?.length ? saidBeforeSection(run.saidBefore?.[step.name]) : [];
+
+/**
+ * The head of a brief for a step that continues another's session (`resume`), on its first filing: what it is handed (`handed`, what was
+ * said before it ran and a person's decisions), and the tree the run installed, never the spec again.
+ */
+const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]): string =>
+  opened(step) + handed.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '');
+
+/**
  * What a step is told. THE decision about what one step knows of another.
  *
  * It gets: its own prose, the original request, and where to look. It does NOT get the previous
@@ -205,18 +219,9 @@ export function composeBrief(
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
-  const firstTry = !retry && !round && !run.steps[step.name]?.tries?.length;
-  const saidBefore = firstTry ? saidBeforeSection(run.saidBefore?.[step.name]) : [];
+  const saidBefore = saidBeforeOf(step, run, retry, round);
 
-  if (step.resume && !retry && !round)
-    return (
-      opened(step) +
-      saidBefore.join('\n') +
-      handed.decided.join('') +
-      (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') +
-      given +
-      contracts
-    );
+  if (step.resume && !retry && !round) return resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts;
 
   const earlier = step.after.length
     ? step.after

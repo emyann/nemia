@@ -479,14 +479,15 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
  * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
  * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), read by the Run door alone (`RunDoor`,
  * `src/runs/runs.store.ts`). What the tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`,
- * `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a person's cards,
- * which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a
+ * person's cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
     /**
      * A run: its record, with the person's files composed onto it — the cancellation, the pruning, the hold, the labels, what was said to
-     * a step before it was filed, the approvals and the acceptances. Refused: an id with no record (`Missing`), and a record that does not read as a run (`UnreadableRecord`).
+     * a step before it was filed, the approvals and the acceptances. Refused: an id with no record (`Missing`), and a record that does
+     * not read as a run (`UnreadableRecord`).
      */
     readonly read: (id: string) => Run;
     /**
@@ -529,9 +530,8 @@ export type RunStore = {
     readonly cancel: (id: string) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
-     * the hold, the refresh ask, the labels, the asks, what was said before a step was filed and the run's own
-     * directory, in that order — and answer with each path removed, from
-     * `WF_ROOT`, a directory's with a trailing `/`. Writes nothing.
+     * the hold, the refresh ask, the labels, the asks, what was said before a step was filed and the run's own directory, in that
+     * order — and answer with each path removed, from `WF_ROOT`, a directory's with a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
     /**

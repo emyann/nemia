@@ -61,9 +61,9 @@ const StepRecordSchema = Kept({
 });
 
 /**
- * A run's record as any version of the tick writes it: `Run`, with the person's files composed on read
- * (`approvals`, `acceptances`, `pruned`, `hold`, `labels`, `saidBefore`) left to their own readers. Every key it does not name is kept, so a key a
- * newer or an older `nemia` wrote survives `rewriteRun`.
+ * A run's record as any version of the tick writes it: `Run`, with the person's files composed on read (`approvals`, `acceptances`,
+ * `pruned`, `hold`, `labels`, `saidBefore`) left to their own readers. Every key it does not name is kept, so a key a newer or an older
+ * `nemia` wrote survives `rewriteRun`.
  */
 const runBase = {
   id: Schema.String,
@@ -278,12 +278,12 @@ export const removeHold = (home: string, id: string, at: string): boolean => {
 };
 
 /**
- * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
- * hold (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
- * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
- * keys is dropped, the store's pause's, the run's labels and what was said before a step was filed (`pause`, `labels`, `saidBefore`,
- * which the Run door composes) with them. Counted as one
- * record read (`countRecord`) under `records` while a pass is metered.
+ * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold
+ * (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate (`readApprovals`), and each loop a
+ * person ended as it stands (`readAcceptances`), off one listing of its asks directory. None of them is ever written into the record
+ * (`rewriteRun`), and whatever the record carries under their keys is dropped, the store's pause's, the run's labels and what was said
+ * before a step was filed (`pause`, `labels`, `saidBefore`, which the Run door composes) with them. Counted as one record read
+ * (`countRecord`) under `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
@@ -394,7 +394,9 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
     }
     if (!isKeptSaid(json)) {
-      sayOnce(`run ${id}: ${file} is no word kept for a step ({ step, at, text }), and is left out: remove the file, or say the words again with nemia say`);
+      sayOnce(
+        `run ${id}: ${file} is no word kept for a step ({ step, at, text }), and is left out: remove the file, or say the words again with nemia say`,
+      );
       continue;
     }
     const { step, at, text } = json;
@@ -814,7 +816,8 @@ export const restStamps = (home: string): Map<string, string> =>
   });
 
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>): string => JSON.stringify(run, null, 2);
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>): string =>
+  JSON.stringify(run, null, 2);
 
 /**
  * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, the run's labels and what was said before a
@@ -835,8 +838,9 @@ export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, 
  * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
  * removed after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause,
- * labels and words said before a step was filed the run store did: they are a person's files, and a copy in the record would outlive the file it was read from.
+ * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause, labels
+ * and words said before a step was filed the run store did: they are a person's files, and a copy in the record would outlive the file it
+ * was read from.
  */
 export const rewriteRun = (home: string, run: Run): boolean => within('act', () => rewriteNow(home, run));
 

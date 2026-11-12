@@ -43,12 +43,12 @@ export const saidAhead = (run: Run, name: string): boolean => {
  *
  * The package's own refusals, before the engine is asked: a step the run does not have; a cancelled run, whose sessions are being stopped;
  * a step with no task filed whose tries are behind it (sent back, or a round to be filed again), where no session is there to hear and no
- * first try is left to carry them; and a step whose current try's task has settled, where no session is running to hear anything — words for
- * such a step go into its next try's brief, with `nemia retry --message`. A step nothing of which is filed yet is no refusal, nor is it the
- * engine's: its words are kept for its first try (`saidAhead`), unless the run was pruned, which files nothing more. Everything else
- * about the session — words that are empty, an attempt not started, a harness with no way in, a session its harness does not list — is
- * the engine's to refuse, in its own words (`Engine.say`).
- * A settled step of a pruned or a held run is told that the try that would carry the words is refused (`prunedRefusal`, `heldRefusal`).
+ * first try is left to carry them; and a step whose current try's task has settled, where no session is running to hear anything — words
+ * for such a step go into its next try's brief, with `nemia retry --message`. A step nothing of which is filed yet is no refusal, nor is it
+ * the engine's: its words are kept for its first try (`saidAhead`), unless the run was pruned, which files nothing more. Everything else
+ * about the session — words that are empty, an attempt not started, a harness with no way in, a session its harness does not list — is the
+ * engine's to refuse, in its own words (`Engine.say`). A settled step of a pruned or a held run is told that the try that would carry the
+ * words is refused (`prunedRefusal`, `heldRefusal`).
  */
 export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
   if (!steps.some((s) => s.name === name) || !run.steps[name])

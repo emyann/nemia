@@ -381,7 +381,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
         headers: json,
         body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours', repo: notARepo }),
       });
-      assert.equal(refused.status, 422, "a card's `repo` is retired, for a folder team as for any other");
+      assert.equal(refused.status, 422, 'a repo is retired for every team');
       const { error } = (await refused.json()) as { error: string };
       names(error, notARepo, 'nemia factory attach');
       assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');

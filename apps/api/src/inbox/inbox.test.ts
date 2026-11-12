@@ -167,8 +167,8 @@ const onFolder = (about: string): string => {
     .basename(about)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')}`;
-  write(path.join(about, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: ada\n---\nImplement it.\n');
-  write(path.join(about, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+  write(path.join(about, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: implementer\n---\nImplement it.\n');
+  write(path.join(about, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
   addFactory({ name, repos: [about] });
   attachWorkflow({ factory: name, workflow: 'dev' });
   return name;
@@ -444,8 +444,8 @@ write(path.join(first, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n--
 write(path.join(second, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it there.\n');
 write(path.join(second, 'workflows', 'solo', 'implement.md'), '---\nplace: git\n---\nImplement it alone.\n');
 for (const at of [first, second]) {
-  write(path.join(at, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: ada\n---\nImplement it.\n');
-  write(path.join(at, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+  write(path.join(at, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: implementer\n---\nImplement it.\n');
+  write(path.join(at, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: at });
 }
 addFactory({ name: 'mill', repos: [first] });

@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { AGENTS, WORKFLOWS } from '../seed.ts';
+import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
@@ -63,16 +63,21 @@ export default {
   /**
    * The Agents page's character cards, as a person meets them. Each face is awake with nothing hovering its card; hovered anywhere, a card
    * lifts its face, as hovering the face itself would, and the pointer gone, the lift goes and the face stays awake. On a phone held
-   * upright, each card has a row of its own, holds its face, and the page does not scroll sideways. Read-only; the runner's viewport is put
+   * upright, each card has a row of its own, holds its face, and the page does not scroll sideways. The list is yours, `scribe`, the
+   * default factory reading no repository. Read-only; the runner's viewport is put
    * back before the page ends.
    */
   name: 'agent-cards',
   route: '/agents',
   expect: async (page) => {
     await sidebar(page);
-    const people = [AGENTS.seeded.name, WORKFLOWS.good.agent.name];
-    await expectCount(page.locator('section[data-agent]'), people.length, 'the list draws a card an agent');
-    const card = `section[data-agent="${WORKFLOWS.good.agent.name}"]`;
+    const people = [AGENTS.seeded.name];
+    await expectCount(
+      page.locator('section[data-agent]'),
+      people.length,
+      'the list draws a card an agent: yours, the default reading no repository',
+    );
+    const card = `section[data-agent="${AGENTS.seeded.name}"]`;
     await waitForFace(page, card, false, 'a face is awake and unlifted while nothing hovers its card');
     await page.locator(`${card} [data-agent-role]`).scrollIntoViewIfNeeded();
     const role = await page.locator(`${card} [data-agent-role]`).boundingBox();

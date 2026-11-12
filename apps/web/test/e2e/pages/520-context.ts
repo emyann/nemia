@@ -4,7 +4,7 @@ import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { cardOf, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { CARDS, DIAMOND, FAKE, WORKFLOWS } from '../seed.ts';
+import { CARDS, DIAMOND, FACTORIES, FAKE, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -243,8 +243,9 @@ async function wideThenPhone(page: Page, look: (what: string) => Promise<void>):
 export default {
   /**
    * Context is no wait, on the board. A run that waits on a run still in flight and reads two others: its card says so in a chip, each run
-   * by id and title on hover, and draws the faint line of what it reads only while hovered, from a run on the floor; the start form's
-   * Reads list shows what each pick would hand, badged where it has not landed; an inbox card's `from:` is changed through the same list
+   * by id and title on hover, and draws the faint line of what it reads only while hovered, from a run on the floor; the start form's Reads
+   * list shows what each pick would hand, badged where it has not landed — on the checkout's `dev` in FACTORIES' `hiring`, made able to
+   * start it and taken back after, the default factory working on no repository; an inbox card's `from:` is changed through the same list
    * and taken back; and once its step is filed, its run page draws its task in parts, each run handed a block headed by how. The page
    * writes READER and takes it back, its journal and its feed line with it, so each visit reads the store as seeded.
    */
@@ -256,8 +257,13 @@ export default {
     let files = written(false);
     try {
       await onTheFactory(page);
-      await goto(page, `/workflows/repo/${WORKFLOWS.good.name}`);
-      await wideThenPhone(page, (what) => onTheStartForm(page, what));
+      const starts = hiringStarts(store!);
+      try {
+        await goto(page, `/workflows/repo/${WORKFLOWS.good.name}?factory=${FACTORIES.hiring.name}`);
+        await wideThenPhone(page, (what) => onTheStartForm(page, what));
+      } finally {
+        starts();
+      }
       await goto(page, '/inbox');
       await wideThenPhone(page, (what) => onTheCard(page, what));
       files = written(true);

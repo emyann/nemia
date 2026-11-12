@@ -3,12 +3,16 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The repository's agent the page writes custom instructions for, the words it saves, and the words the package refuses. */
+/**
+ * The agent the page writes custom instructions for — yours, `scribe`: a repository's is read only in a factory on it, whose writes of
+ * yours the api refuses, and `default` reads no repository — the words it saves, and the words the package refuses.
+ */
 const CUSTOM = {
-  agent: 'implementer',
+  agent: AGENTS.seeded.name,
   words: 'Write every commit message in the imperative, under sixty columns.',
   frontmatter: '---\nmodel: opus\n---\nBe bold.',
 } as const;
@@ -59,13 +63,13 @@ async function refusedOn(page: Page, file: string): Promise<void> {
 
 export default {
   /**
-   * A person's custom instructions for the repository's `implementer`, on its page, between the form and Try. The panel says a run already
+   * A person's custom instructions for an agent, yours `scribe`, on its page, between the form and Try. The panel says a run already
    * started keeps the words it froze, and that there are none yet, in the store's `custom-instructions/`. Words opening with a frontmatter
    * block are refused in the package's words, on a page of their own. Saved, the words are the file's, and read again on a reload; cleared,
    * asked twice, the file is gone and the panel says none again — so each visit reads the store as seeded.
    */
   name: 'custom-instructions',
-  route: `/agents/repo/${CUSTOM.agent}`,
+  route: `/agents/yours/${CUSTOM.agent}`,
   expect: async (page) => {
     const file = path.join(store!, 'custom-instructions', `${CUSTOM.agent}.md`);
     if (fs.existsSync(file)) throw new Refused(`the store holds no custom instructions before the page writes any — ${file} is there`);
@@ -77,7 +81,7 @@ export default {
       );
       await expectVisible(panel.locator('[data-custom-file]', { hasText: `${file} — none yet` }), 'and where they would be, none yet');
       await expectVisible(
-        page.locator('article > section[data-custom-instructions] + section[data-try-yours]'),
+        page.locator('article > section[data-custom-instructions] + section[aria-label="Try it"]'),
         'the panel comes just before Try',
       );
 

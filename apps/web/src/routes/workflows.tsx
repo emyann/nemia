@@ -55,7 +55,7 @@ function WorkflowsPage() {
           A workflow is a folder of steps:{' '}
           {where.kind === 'every' ? (
             <>
-              this repository&apos;s under {folder}, and yours under <YoursFolder />.
+              yours, under <YoursFolder />. A repository&apos;s, under its {folder}, are listed in the factory that works on it.
             </>
           ) : (
             <>
@@ -107,8 +107,8 @@ function Every({ address }: { address: PagePlace }) {
       ))}
       {all.length === 0 && (
         <p className="text-body-medium text-muted-foreground">
-          No workflows. Add a folder of steps under {folder} in the repository —{' '}
-          <code className="font-mono text-body-small">workflows/dev/implement.md</code>, say — or under <YoursFolder />.
+          No workflows. Add a folder of steps under <YoursFolder /> — <code className="font-mono text-body-small">dev/implement.md</code>,
+          say — or pick a factory to list its repository&apos;s.
         </p>
       )}
     </>

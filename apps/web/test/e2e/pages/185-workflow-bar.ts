@@ -2,17 +2,19 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { WORKFLOWS } from '../seed.ts';
+import { checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 const { good, yours } = WORKFLOWS;
+/** The factory the checkout's `dev` is read in: FACTORIES' `hiring`, on the checkout; the default one works on no repository. */
+const { hiring } = FACTORIES;
 
 /** The step the page inspects first, which waits on the other: `review`, after `implement`. */
 const [FIRST, WAITS] = good.steps;
 
-/** The page of the workflow `name`, read from `from`. */
-const pageOf = (from: string, name: string) => `/workflows/${from}/${name}`;
+/** The page of the workflow `name`, read from `from`: the checkout's in FACTORIES' `hiring`, yours with no factory. */
+const pageOf = (from: string, name: string) => `/workflows/${from}/${name}${from === 'repo' ? `?factory=${hiring.name}` : ''}`;
 
 /** The canvas of the workflow `name`, whose page is open. */
 const canvasOf = (page: Page, name: string) => page.locator(`article[aria-label="Workflow ${name}"] .react-flow`);
@@ -84,7 +86,7 @@ async function presses(page: Page): Promise<void> {
   await nodeOf(page, good.name, WAITS).click();
   const bar = await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node shows the step in the bar`);
   await expectVisible(bar.getByRole('heading', { name: WAITS }), `the bar is titled ${WAITS}`);
-  await expectVisible(bar.getByText(`a step of ${good.name} · this repository`), `and says it is a step of ${good.name}, the repository's`);
+  await expectVisible(bar.getByText(`a step of ${good.name} · the factory's`), `and says it is a step of ${good.name}, the factory's`);
   await expectVisible(bar.locator('[data-runs-on]', { hasText: new RegExp(`^${good.runsOn}$`) }), `what it runs on (${good.runsOn})`);
   await expectVisible(
     bar.locator('dd', { hasText: new RegExp(`^${good.loop}$`) }),
@@ -110,7 +112,7 @@ async function presses(page: Page): Promise<void> {
   await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node then switches the bar to it`);
   await settled(page);
   const [mine] = yours.steps;
-  await visit(page, `${pageOf('yours', yours.name)}?bar=spec:repo/${good.name}/${WAITS}`);
+  await visit(page, `${pageOf('yours', yours.name)}?factory=${hiring.name}&bar=spec:repo/${good.name}/${WAITS}`);
   await expectVisible(specBar(page, 'repo', good.name, WAITS), `the bar showing ${WAITS} stays open on ${yours.name}'s page`);
   await nodeOf(page, yours.name, mine).click();
   const theirs = await expectSpec(
@@ -136,13 +138,19 @@ async function presses(page: Page): Promise<void> {
 /** The bar's Open and a double click on a step each open the step's page, with no bar. */
 async function opens(page: Page): Promise<void> {
   const to = `/workflows/repo/${good.name}/${WAITS}`;
+  const inHiring = (assertion: string) => {
+    if (new URL(page.url()).searchParams.get('factory') !== hiring.name)
+      throw new Refused(`${assertion}, in ${hiring.name} — it is ${page.url()}`);
+  };
   await nodeOf(page, good.name, WAITS).click();
   const bar = await expectSpec(page, 'repo', good.name, WAITS, `a click on ${WAITS}'s node shows it`);
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
   await expectAt(page, to, "the bar's Open opens the step's page");
+  inHiring("the bar's Open opens the step's page");
   await visit(page, pageOf('repo', good.name));
   await nodeOf(page, good.name, WAITS).dblclick();
   await expectAt(page, to, `a double click on ${WAITS}'s node opens its page`);
+  inHiring(`a double click on ${WAITS}'s node opens its page`);
   if (barInUrl(page) !== null) throw new Refused(`the step's page opens with no bar — it is ${page.url()}`);
 }
 
@@ -176,13 +184,20 @@ export default {
    * A workflow's canvas, on its page, and the frame's bar: a click or Enter on a step shows it in the bar, ringed, clear of the bar; the
    * bar says what it runs on, its keys and what it waits on; again, or the empty canvas, closes it, and another step, on this canvas or
    * another workflow's page, switches it. Open and a double click open the step's page. Build swaps the canvas for the builder, closes the
-   * bar showing one of its steps, and keeps a click on a step to edit it.
+   * bar showing one of its steps, and keeps a click on a step to edit it. The checkout's `dev` is read in FACTORIES' `hiring`, made to
+   * offer it and yours and taken back after.
    */
   name: 'workflow-bar',
   route: pageOf('repo', good.name),
   expect: async (page) => {
-    await presses(page);
-    await opens(page);
-    await builds(page);
+    const takeBack = checkoutIn(store!, [good.name, yours.name]);
+    try {
+      await visit(page, pageOf('repo', good.name));
+      await presses(page);
+      await opens(page);
+      await builds(page);
+    } finally {
+      takeBack();
+    }
   },
 } satisfies PageSpec;

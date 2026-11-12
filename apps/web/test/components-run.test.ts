@@ -303,6 +303,15 @@ test("REFUSED: a card's start says nothing of a card's repository, retired: the 
   assert.match(await startMarkup(false, '/code/app'), /Runs in <code[^>]*>\/code\/app<\/code>/, 'the repository its factory wires, said');
 });
 
+test('a start given no repository, the default factory working on none, lists no run to wait on and calls no repository its own', async () => {
+  const none = await startMarkup(false);
+  const after = /<legend[^>]*>After<\/legend>.*?<\/fieldset>/.exec(none)?.[0] ?? assert.fail(`no After list: ${none}`);
+  assert.match(after, /data-no-repo/, 'the After list says why it lists no run');
+  assert.doesNotMatch(after, /Reading the runs/, 'and waits on no repository of the api');
+  assert.doesNotMatch(none, /this repository/, 'nor says it runs in one');
+  assert.doesNotMatch(await startMarkup(false, '/code/app'), /data-no-repo/, 'a repository given lists its runs');
+});
+
 test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow, linked to its page in the run's place", async () => {
   const { StartedFrom } = await import('../src/components/run/TryTag.tsx');
   const html = await routedWith(

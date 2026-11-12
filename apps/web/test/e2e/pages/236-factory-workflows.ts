@@ -82,19 +82,18 @@ async function expectIn(page: Page, pathname: string, assertion: string): Promis
 
 export default {
   /**
-   * A factory's workflows are read in that factory. TREED is on a repository that is not the checkout, and its workflows are in its
-   * tree: picked, the Workflows page lists what the api lists in it, by name — its tree's `dev`, which shadows the checkout's, its
-   * `tree-only`, and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the
-   * origin `factory`. Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or
-   * this repository, and why it cannot start there; a press on its step
-   * opens the bar on the tree's step, whose Open, as a double click on the step, lands on the step's page in the factory. One of yours it
-   * hires into still opens its builder, which drafts from the list read with no factory, and starts its run in the factory. TWIN, on two
-   * repositories, asks which on the list and on a workflow's page, and is read on the one picked; a name no factory has says so on the
-   * page and in the bar; a factory that does not offer a workflow says so on its page. With no factory picked, the tree's workflows are
-   * not listed, and `dev` is the checkout's. The tree's own agent, pressed on its workflow's step, and its skill each open on their page
-   * in the factory, the top bar saying it, which says the factory's way and offers no write: the agent's skill found in its tree, none
-   * read as not found, and the skill given by the agent. Each state is photographed, and the
-   * factories are taken back.
+   * A factory's workflows are read in that factory. TREED is on a repository that is not the checkout, and its workflows are in its tree:
+   * picked, the Workflows page lists what the api lists in it, by name — its tree's `dev`, which shadows the checkout's, its `tree-only`,
+   * and the one of yours it attaches — each tagged with it alone, none said to be this repository's, the tree's by the origin `factory`.
+   * Its `dev` leads to the tree's folder: its one step, no builder but the factory's way, nothing about a checkout or this repository, and
+   * why it cannot start there; a press on its step opens the bar on the tree's step, whose Open, as a double click on the step, lands on
+   * the step's page in the factory. One of yours it hires into still opens its builder, which drafts from the list read with no factory,
+   * and starts its run in the factory. TWIN, on two repositories, asks which on the list and on a workflow's page, and is read on the one
+   * picked; a name no factory has says so on the page and in the bar; a factory that does not offer a workflow says so on its page. With no
+   * factory picked, the tree's workflows are not listed, nor the checkout's `dev`, the default factory working on no repository: yours are.
+   * The tree's own agent, pressed on its workflow's step, and its skill each open on their page in the factory, the top bar saying it,
+   * which says the factory's way and offers no write: the agent's skill found in its tree, none read as not found, and the skill given by
+   * the agent. Each state is photographed, and the factories are taken back.
    */
   name: 'factory-workflows',
   route: '/workflows',
@@ -257,7 +256,8 @@ export default {
 
       await goto(page, '/workflows');
       await expectCount(card(OWN.name), 0, "with no factory picked, the tree's own workflow is not listed");
-      await expectVisible(card(good.name).getByText('this repository', { exact: true }), `and ${good.name} is this repository's`);
+      await expectCount(card(good.name), 0, `nor the checkout's ${good.name}: the default factory works on no repository`);
+      await expectVisible(card(yours.name).getByText('yours', { exact: true }), `and ${yours.name}, yours, is`);
     } finally {
       takeBack();
     }

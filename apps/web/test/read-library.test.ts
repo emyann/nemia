@@ -141,11 +141,11 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
         listOfItems('Agent', path.includes('origin=yours') ? [agentObject(listedAgent({ card: [bare], untried: null }))] : []),
       );
       const [read, ...more] = await readAgents();
-      assert.deepEqual(more, [], "the repository's answered none");
+      assert.deepEqual(more, []);
       assert.deepEqual(
-        [...asked].sort(),
-        ['/api/namespaces/default/agents?limit=500&origin=repo', '/api/namespaces/default/agents?limit=500&origin=yours'],
-        'each origin of the default namespace read whole, shadowed or not',
+        [...asked],
+        ['/api/namespaces/default/agents?limit=500&origin=yours'],
+        'yours read whole, shadowed or not: the default namespace has no repository to read',
       );
       assert.equal(Object.hasOwn(read.card?.[0] ?? {}, 'examples'), false);
       assert.deepEqual(read, listedAgent({ card: [bare], untried: null }));
@@ -197,10 +197,15 @@ test('the skills are read a place at a time, by origin, each place its folder; a
   const places = await readSkills();
   assert.deepEqual(
     places.map((place) => place.from),
-    ['yours', 'repo', 'builtin'],
-    'in the order an agent of yours finds a name, the builtin last',
+    ['yours', 'builtin'],
+    'in the order an agent of yours finds a name, the builtin last; the default namespace has no repository to read',
   );
-  assert.deepEqual(places[2], { from: 'builtin', dir: '/work/workflows/skills', skills: [{ ...builtin, usedBy: [] }] });
+  assert.equal(
+    asked.some((path) => path.includes('origin=repo')),
+    false,
+    `no repository asked for in the default namespace: ${asked.join(', ')}`,
+  );
+  assert.deepEqual(places[1], { from: 'builtin', dir: '/work/workflows/skills', skills: [{ ...builtin, usedBy: [] }] });
   assert.equal(places[0].dir, null, 'a place with no skill says no folder');
   assert.ok(
     asked.some((path) => path.includes('origin=builtin') && path.includes('continue=next')),

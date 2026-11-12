@@ -41,7 +41,7 @@ export type FactoryTemplate = {
 
 /**
  * A workflow a factory schedules, from its `Schedule`: its cron and the time zone it is read in (null: the daemon's), what each run is
- * asked, the repository its runs work on (null: the factory's), its next fire (null: its cron gives none), its last scheduled run, why
+ * asked, its next fire (null: its cron gives none), its last scheduled run, why
  * its latest fire was refused (null: it was not), and the line that takes it back.
  */
 export type FactorySchedule = {
@@ -49,7 +49,6 @@ export type FactorySchedule = {
   cron: string;
   tz: string | null;
   brief: string;
-  repo: string | null;
   next: string | null;
   last: { run: string; at: string } | null;
   refused: string | null;
@@ -98,13 +97,15 @@ export type Factory = {
   workflowRepos: Record<string, string>;
 };
 
-/** A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. */
+/**
+ * A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. Its retired `repo` is not carried: the
+ * factory's wiring places its runs.
+ */
 const scheduleViewOf = (schedule: Schedule, unschedule: string): FactorySchedule => ({
   workflow: schedule.metadata.name,
   cron: schedule.spec.cron,
   tz: schedule.spec.tz ?? null,
   brief: schedule.spec.brief,
-  repo: schedule.spec.repo ?? null,
   next: schedule.status.next ?? null,
   last: schedule.status.last ?? null,
   refused: schedule.status.refused ?? null,

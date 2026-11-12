@@ -645,3 +645,28 @@ test('a link to a factory definition given no place is read in the factory of th
   );
   assert.match(html, /href="\/agents\/factory\/drafter\?factory=treed"/, "the page's factory is carried");
 });
+
+test("a link to a repository's agent, or to a node of a repository's workflow, keeps the factory it is read in: the default reads no repository", async () => {
+  const { AgentLink, UsedBy } = await import('../src/components/agent/AgentParts.tsx');
+  const place = { factory: 'treed', repo: '/r' };
+  const agent = await routedWith(createElement(AgentLink, { from: 'repo', name: 'drafter', place }));
+  assert.match(agent, /href="\/agents\/repo\/drafter\?factory=treed&amp;repo=%2Fr"/, "a repository's agent link names the factory");
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({
+    routeTree: createRootRoute(),
+    history: createMemoryHistory({ initialEntries: ['/agents/repo/drafter?factory=treed'] }),
+  });
+  await router.load();
+  const usedBy = {
+    usedBy: [
+      { from: 'repo' as const, workflow: 'dev', step: 'implement' },
+      { from: 'yours' as const, workflow: 'mine', step: 'plan' },
+    ],
+  };
+  const html = renderToStaticMarkup(
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+    createElement(RouterContextProvider, { router, children: createElement(UsedBy, { listing: usedBy }) }),
+  );
+  assert.match(html, /href="\/workflows\/repo\/dev\/implement\?factory=treed"/, "a repository's node, in the page's factory");
+  assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
+});

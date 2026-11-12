@@ -8,7 +8,8 @@
  * every page its plan names, in their order.
  *
  *  1. Seeds the store, which must be empty, with six fake runs, the first with a real repository and branch to decide on, and beside it
- *     a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for the Workflows page (seed.ts).
+ *     a checkout, read through FACTORIES' `hiring`, the factory filed on it (the api's own folder, `HKB_REPO`, being the tick's alone),
+ *     and workflows in both for the Workflows page (seed.ts).
  *  2. Starts the api on a free port (`PORT=0`, reading the port it prints), ticking nothing (`--no-tick`: the pages seed the store's
  *     daemon themselves), and `vite preview` of the app run.ts built on another, proxying `/api` to it (`HKB_API_URL`, vite.config.ts):
  *     the same two processes and the same proxy as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers, the

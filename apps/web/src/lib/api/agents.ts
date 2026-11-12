@@ -131,10 +131,13 @@ export const agentViewOf = (agent: Agent): LibraryAgent => {
   };
 };
 
-/** The origins the Agents page reads, each listed whole, shadowed or not: the repository's, then yours. */
-const LISTED: readonly DefinitionOrigin[] = ['repo', 'yours'];
+/**
+ * The origins the Agents page reads, each listed whole, shadowed or not: yours, the default namespace working on no repository and Nemia
+ * shipping no agent.
+ */
+const LISTED: readonly DefinitionOrigin[] = ['yours'];
 
-/** Every agent of the repository's and of yours, with the factories each fills a step in, read from disk on each request. */
+/** Every agent of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
   queryFn: async (): Promise<LibraryAgent[]> =>

@@ -22,7 +22,8 @@ const past = (size: number, bound: number): boolean => size > bound;
 const shrinks = (limit: number | null): boolean => limit !== null && limit > 1;
 
 const answerFitSpec = spec<(size: number, bound: number, limit: number | null) => AnswerFit>({
-  requires: ({ input: [size, bound, limit] }) => countFrom(size, 0) && countFrom(bound, 1) && (limit === null || (countFrom(limit, 1) && limit <= PAGE_MOST)),
+  requires: ({ input: [size, bound, limit] }) =>
+    countFrom(size, 0) && countFrom(bound, 1) && (limit === null || (countFrom(limit, 1) && limit <= PAGE_MOST)),
   ensures: {
     answeredExactlyWithinTheBound: {
       description: 'An answer is sent exactly when its text is within the bound',

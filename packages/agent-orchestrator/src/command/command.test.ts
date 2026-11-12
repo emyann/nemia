@@ -1346,7 +1346,10 @@ test("a link's tool carries the query values its link sends where a call gives n
   assert.deepEqual(
     toolsOf({
       name: 'inbox',
-      served: [{ endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' } }, { endpoint: 'cards.getAll', as: 'inbox_card' }],
+      served: [
+        { endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' } },
+        { endpoint: 'cards.getAll', as: 'inbox_card' },
+      ],
     }).map((t) => [t.tool, t.query]),
     [
       ['inbox', { fieldSelector: 'status.inPlay=true' }],

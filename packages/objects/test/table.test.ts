@@ -42,4 +42,3 @@ test('-o wide shows every column; --show-labels the Labels column alone; -L a co
 test('a table with no row prints no line, so the read says why itself', () => {
   assert.deepEqual(tableLines({ ...table, rows: [] }, plain), []);
 });
-

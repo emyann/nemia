@@ -1,9 +1,10 @@
 /**
- * What a host reads off the MCP port, on a store of a planted size: every list tool's answer, called with no more than its path, stays
- * under the port's bound (`ANSWER_BOUND`); `ls` answers a run a line, as `nemia ls -o wide` prints them, a page at a time; `inbox` the cards
- * still in play unless asked for every one, a card a line and never its body, which `inbox_card` reads; a list of long items is asked a
- * page short enough to fit; and a read that is no page, past the bound, is refused with how to narrow it, never cut. The bound's own
- * decision is proved by its contract (`contracts/answer-fit.contract.ts`); refusal words are not asserted, only that they name a way.
+ * What a host reads off the MCP port, on a store of a planted size: every list tool's answer, called with no more than its path,
+ * stays under the port's bound (`ANSWER_BOUND`); `ls` answers a run a line, as `nemia ls -o wide` prints them, a page at a time;
+ * `inbox` the cards still in play unless asked for every one, a card a line and never its body, which `inbox_card` reads; a list of
+ * long items is asked a page short enough to fit; `closeout` and `try` read a closeout narrowly, its output's fields asked by name;
+ * and a read that is no page, past the bound, is refused with how to narrow it, never cut. The bound's own decision is proved by its
+ * contract (`contracts/answer-fit.contract.ts`); refusal words are not asserted, only that they name a way.
  *
  * On the stand-ins: the runtime's test engine, its tasks filed and settled by hand, and the test place, under the records this file
  * seeds; driven by the SDK's own `Client`, as `port.test.ts` drives it.
@@ -98,7 +99,10 @@ write(
   }),
 );
 for (let i = 0; i < 20; i++)
-  write(path.join(root, 'workflows', 'agents', `agent-${String(i).padStart(2, '0')}.md`), `---\nharness: claude\n---\n${words(8_000, `agent ${i}`)}\n`);
+  write(
+    path.join(root, 'workflows', 'agents', `agent-${String(i).padStart(2, '0')}.md`),
+    `---\nharness: claude\n---\n${words(8_000, `agent ${i}`)}\n`,
+  );
 
 /**
  * Each ended card's run, its one task settled failed; the long closeout's task settled with 60,000 characters it carries as it came (its
@@ -172,10 +176,10 @@ test('ls answers a run a line, its status, cost, waits and steps among the colum
   const more = lines.at(-1) ?? '';
   const token = /continue (\S+)$/.exec(more)?.[1];
   assert.ok(token, `a last line names the next page's token: ${more}`);
-  const runLines = (text: string) => text.split('\n').filter((l) => /^r-/.test(l));
+  const runLines = (text: string) => text.split('\n').filter((l) => l.startsWith('r-'));
   assert.equal(runLines(first.text).length, PORT_PAGE, 'a page of the port, where the call gives no limit');
   const names = new Set(runLines(first.text).map((l) => l.split(' ')[0]));
-  for (let next: string | undefined = token; next !== undefined; ) {
+  for (let next: string | undefined = token; next !== undefined;) {
     const page = await call(client, 'ls', { continue: next });
     for (const l of runLines(page.text)) names.add(l.split(' ')[0]);
     next = /continue (\S+)$/.exec(page.text.split('\n').at(-1) ?? '')?.[1];

@@ -37,8 +37,8 @@ export type DecisionRead = { run: Run; decision: RunDecision; decided?: Decided;
 export type DecisionHow = { sensitive?: readonly string[] };
 
 /**
- * A diff `git diff` gave for several files, one entry per file, each cut to `DIFF_LINES`. Named for a person — `from → to` for a rename —
- * off the file's own header lines, before its first hunk.
+ * A diff `git diff` gave for several files, one entry per file, each cut to `DIFF_LINES`, with the lines its hunks add and remove counted
+ * whole. Named for a person — `from → to` for a rename — off the file's own header lines, before its first hunk.
  */
 export function diffFiles(diff: string): DiffFile[] {
   const files: string[][] = [];
@@ -47,7 +47,18 @@ export function diffFiles(diff: string): DiffFile[] {
     if (line.startsWith('diff --git ') || last === undefined) files.push([line]);
     else last.push(line);
   }
-  return files.map((lines) => ({ path: diffPath(lines), lines: lines.slice(0, DIFF_LINES), cut: Math.max(0, lines.length - DIFF_LINES) }));
+  return files.map((lines) => {
+    const first = lines.findIndex((line) => line.startsWith('@@'));
+    const hunks = first < 0 ? [] : lines.slice(first);
+    const counted = (sign: string) => hunks.filter((line) => line.startsWith(sign)).length;
+    return {
+      path: diffPath(lines),
+      lines: lines.slice(0, DIFF_LINES),
+      cut: Math.max(0, lines.length - DIFF_LINES),
+      added: counted('+'),
+      removed: counted('-'),
+    };
+  });
 }
 
 /**

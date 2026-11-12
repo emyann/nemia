@@ -133,11 +133,12 @@ export const CardFile = Schema.Struct({
 export type CardFile = typeof CardFile.Type;
 
 /**
- * A card started: the workflow its run is started on and where it is read from, the runs it waits on (`after`) and reads as context
+ * A card started: the workflow its run is started on and where it is read from — the card's own `workflow:` when it names none, as
+ * `nemia start <card>` takes it — the runs it waits on (`after`) and reads as context
  * (`context`), the brief given in place of the card's body, and the labels it is started with (`key=value`, `key-`).
  */
 export const CardStart = Schema.Struct({
-  workflow: Schema.String,
+  workflow: Schema.optionalKey(Schema.String),
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
   after: Schema.optionalKey(Schema.Array(Schema.String)),
   context: Schema.optionalKey(Schema.Array(Schema.String)),

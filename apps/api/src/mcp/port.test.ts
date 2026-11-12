@@ -21,6 +21,8 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import { RUN_STATES } from 'objects';
+import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort } from './port.ts';
 
 const stand = eachTest(testPlace);
@@ -105,6 +107,38 @@ test('tools/call hold on a planted run holds it, through the endpoint the tool i
   assert.notEqual(result.isError, true, textOf(result));
   assert.equal((result.structuredContent as { id?: string } | undefined)?.id, 'r-port-held');
   assert.ok(fs.existsSync(path.join(root, 'runs', 'r-port-held.hold')), 'the hold is written');
+  await client.close();
+});
+
+test('initialize answers instructions under the bound a host keeps whole, every tool they name one tools/list lists', async () => {
+  const client = await connected(app);
+  const instructions = client.getInstructions() ?? '';
+  const { tools } = await client.listTools();
+  const names = new Set(tools.map((t) => t.name));
+  assert.ok(instructions.length > 0, 'the port sends instructions');
+  assert.ok(instructions.length <= INSTRUCTIONS_BOUND, `${instructions.length} characters, at most ${INSTRUCTIONS_BOUND}`);
+  const named = [...instructions.matchAll(/`([a-z][a-z_-]*)`/g)].map((m) => m[1]);
+  for (const name of ['ls', 'show', 'decide', 'approve', 'retry', 'inbox_add', 'inbox_start', 'say', 'closeout', 'try'])
+    assert.ok(named.includes(name), `the instructions name ${name}`);
+  for (const name of named) assert.ok(names.has(name), `${name}, named by the instructions, is a tool the port lists`);
+  const ls = tools.find((t) => t.name === 'ls');
+  assert.ok(
+    ls !== undefined && 'fieldSelector' in (ls.inputSchema.properties ?? {}),
+    'ls takes the fieldSelector the instructions give it',
+  );
+  assert.ok(instructions.includes('fieldSelector: "status.state!=finished"'), 'the instructions select the runs in play');
+  for (const state of RUN_STATES) assert.ok(instructions.includes(state), `the instructions say the state ${state}`);
+  await client.close();
+});
+
+test("every listed tool's description opens with its one-line summary, never a flag", async () => {
+  const client = await connected(app);
+  const { tools } = await client.listTools();
+  for (const t of tools) {
+    const first = (t.description ?? '').split('\n')[0] ?? '';
+    assert.ok(first.trim().length > 0, `${t.name}'s description opens with a line`);
+    assert.ok(!first.trimStart().startsWith('-'), `${t.name}'s description opens with a summary, not a flag: ${first}`);
+  }
   await client.close();
 });
 

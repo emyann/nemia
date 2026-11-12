@@ -24,6 +24,7 @@ import { workflowsListed } from '../../test/definitions.ts';
 import { addToInbox, loadWorkflows, readInbox, runsAtOnce, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
 import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, setSchedule } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
+import { TABLE_ACCEPT, tableLines } from 'objects';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
 const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
@@ -36,6 +37,7 @@ type FactoryCommands = import('objects').FactoryCommands;
 type VolumeList = import('objects').VolumeList;
 type Schedule = import('objects').Schedule;
 type ScheduleList = import('objects').ScheduleList;
+type Table = import('objects').Table;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -739,4 +741,36 @@ test("a person sets a workflow's cost line on a factory: the Factory answers it,
       assert.equal(await linesOfSolo(), undefined);
     },
   );
+});
+
+/** The cell of `row` under the column `name` of `table`. */
+const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+  row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
+
+test('the factories asked as a Table answer the columns of a factory, the default row first, its metadata alone, and a line each', async () => {
+  const res = await app.request('/api/factories', { headers: { accept: TABLE_ACCEPT } });
+  assert.equal(res.status, 200);
+  const table = (await res.json()) as Table;
+  assert.equal(table.kind, 'Table');
+  assert.deepEqual(
+    table.columnDefinitions.filter((c) => c.priority === 0).map((c) => c.name),
+    ['Name', 'Repositories', 'Note'],
+  );
+  const list = (await (await app.request('/api/factories')).json()) as FactoryList;
+  assert.equal(list.kind, 'FactoryList', 'a list asked for no Table is the FactoryList');
+  assert.deepEqual(
+    table.rows.map((row) => cellOf(table, row, 'Name')),
+    list.items.map((f) => f.metadata.name),
+  );
+  assert.equal(cellOf(table, table.rows[0] ?? { cells: [] }, 'Name'), 'default');
+  assert.ok(
+    table.rows.every((row) => !JSON.stringify(row.object).includes('"spec"')),
+    "a row's object is the factory's metadata alone",
+  );
+  const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
+  assert.equal(lines.length, list.items.length + 1, 'a header, then a line per factory');
+  const withRepos = list.items.find((f) => f.metadata.name !== 'default' && f.spec.repos.length > 0);
+  assert.ok(withRepos, 'a factory filed on a repository');
+  const line = lines.find((l) => l.startsWith(`${withRepos.metadata.name} `));
+  assert.ok(line?.includes(withRepos.spec.repos.join(', ')), 'its repositories');
 });

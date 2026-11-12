@@ -26,6 +26,7 @@ import { foundInOf, listSkills, BUILTIN_SKILLS, yourSkillsRead } from './skills.
 import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
 import { asAgentListing } from '../../test/definitions.ts';
+import { TABLE_ACCEPT, tableLines, type SkillList, type Table } from 'objects';
 import { runWith } from '../../test/builtin-place.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
@@ -691,4 +692,38 @@ test("the picker finds a skill and the agents of yours that give it through the 
     [[kept, [agent]]],
     "yours are the door's skills alone, each with the door's agents that give it",
   );
+});
+
+/** The cell of `row` under the column `name` of `table`. */
+const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+  row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
+
+test('the skills asked as a Table answer the columns of a skill, a row per skill of the page with its metadata alone, and a line each', async () => {
+  const URL = '/api/namespaces/default/skills';
+  const res = await app.request(URL, { headers: { accept: TABLE_ACCEPT } });
+  assert.equal(res.status, 200);
+  const table = (await res.json()) as Table;
+  assert.equal(table.kind, 'Table');
+  assert.deepEqual(
+    table.columnDefinitions.filter((c) => c.priority === 0).map((c) => c.name),
+    ['Name', 'Origin', 'Description', 'Note'],
+  );
+  const list = (await (await app.request(URL)).json()) as SkillList;
+  assert.equal(list.kind, 'SkillList', 'a list asked for no Table is the SkillList');
+  assert.ok(list.items.length > 0);
+  assert.deepEqual(
+    table.rows.map((row) => cellOf(table, row, 'Name')),
+    list.items.map((s) => s.metadata.name),
+  );
+  assert.ok(
+    table.rows.every((row) => !JSON.stringify(row.object).includes('"spec"')),
+    "a row's object is the skill's metadata alone",
+  );
+  const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
+  assert.equal(lines.length, list.items.length + 1, 'a header, then a line per skill');
+  const shared = list.items.find((s) => s.metadata.name === 'shared');
+  assert.ok(shared, "the repository's skill planted above is listed");
+  const line = lines.find((l) => l.startsWith('shared '));
+  assert.ok(line?.includes(shared.status.origin));
+  assert.ok(line?.includes("The repository's."), 'its description');
 });

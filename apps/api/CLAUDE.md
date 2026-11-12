@@ -59,8 +59,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   the write guard asks for. An answer fits what a host reads (`src/mcp/bound.ts`): a link's `query` gives the defaults a call is sent
   with, a list is asked a page of `PORT_PAGE`, a `Table` endpoint is asked for its Table and answered as its lines (`objects`'
   `tableLines`), and no answer passes `ANSWER_BOUND` (`answerFit`), a page past it asked again shorter and any other refused, never
-  cut. A store marked exposed (`WF_EXPOSED=1`) refuses a request with no token on every route of the api (`/api`, `/openapi`), and
-  `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
+  cut. It says what Nemia is on `initialize`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
+  `src/mcp/instructions.ts`), every tool it names one the port lists. A store marked exposed (`WF_EXPOSED=1`) refuses a request with
+  no token on every route of the api (`/api`, `/openapi`), and `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
   running code's `apps/web/dist`, `index.html` for a route of the board's, never a path under `/api`, `/openapi` or `/mcp`. The board's
   token is an HttpOnly cookie (`TOKEN_COOKIE`) the api sets and clears (`POST` and `DELETE /api/session`, `src/server/session.ts`);
@@ -81,7 +82,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`decodeRefused` in
   `src/objects/serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
 - **A server-side `Table`** (Kubernetes' `Accept: application/json;as=Table;g=meta.k8s.io;v=v1`, `TABLE_ACCEPT`) is answered where an
-  endpoint declares `Table` beside its list (runs, cards) and the request accepts it (`wantsTable`, `src/objects/table.ts`).
+  endpoint declares `Table` beside its list (runs, cards, agents, skills, factories, a factory's MCP servers) and the request accepts
+  it (`wantsTable`, `src/objects/table.ts`); its columns are the orchestrator's (`runTable`, `cardTable`, `src/kind-table/`), and a row's
+  object is the item's metadata (`PartialObjectMetadata`) but a card's, the card whole.
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
   runtime always writes fails the read, not the assertion you meant.
 - **A handler reads what it needs through `served(c, …)`** (`layer.ts`), never off a module: the engine, the store's root, the

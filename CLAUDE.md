@@ -65,7 +65,9 @@ holds what every change needs.
   pushed; outside a run, type `npx turbo run test --force --continue` after touching one. The tests that read files of every package —
   `tools/guards`' `claude-md-cites.test.ts` over every `CLAUDE.md`, `test-rules.test.ts` over every test file, `test-kit.test.ts` over
   every workspace's tests and `comments.test.ts` over every source — are re-run the same way after a test, a doc or a name moves
-  anywhere.
+  anywhere. So is `agent-orchestrator`'s `words.test.ts`, which reads every source and test file of every package for harness words,
+  team names and paths into the team's workflows: due after a source or test file is added or renamed in any package, it is
+  `node --import ./test/ambient.ts --test test/words.test.ts` in `packages/agent-orchestrator`, and takes under a second.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.

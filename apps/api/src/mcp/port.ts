@@ -23,6 +23,7 @@ import { type CallToolResult, CallToolRequestSchema, ListToolsRequestSchema } fr
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
+import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { type PortTool, portTools } from './tools.ts';
 
 /** How often a pending call is told as progress, where its caller gave a progress token: under any host's idle bound. */
@@ -34,7 +35,7 @@ export type Fetching = { readonly fetch: (request: Request) => Response | Promis
 /** The port's knobs: how often a pending call is told as progress (`PROGRESS_EVERY_MS` unless a test gives a shorter one). */
 export type PortOptions = { readonly progressEveryMs?: number };
 
-/** What the server says of itself on `initialize`. */
+/** What the server says of itself on `initialize`, beside its instructions (`PORT_INSTRUCTIONS`, instructions.ts). */
 const SERVER_INFO = { name: 'nemia', version: '1' };
 
 /** A value of a call's arguments as a path segment or a query value says it: a string as it is, anything else as its JSON. */
@@ -213,7 +214,7 @@ export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVER
       .clone()
       .json()
       .catch(() => undefined);
-    const server = new Server(SERVER_INFO, { capabilities: { tools: {} } });
+    const server = new Server(SERVER_INFO, { capabilities: { tools: {} }, instructions: PORT_INSTRUCTIONS });
     server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: tools.map(listed) }));
     server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
       const tool = byName.get(params.name);

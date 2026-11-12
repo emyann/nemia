@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Quota, QuotaWindow } from '../src/lib/api/quota.ts';
-import { clockWord, lastWords, quotaTitle, windowWords } from '../src/lib/quota.ts';
+import { clockWord, lastWords, quotaTitle, readingAge, windowWords } from '../src/lib/quota.ts';
 
 const NOW = new Date('2026-09-19T10:00:00.000Z');
 const win = (over: Partial<QuotaWindow> = {}): QuotaWindow => ({
@@ -62,6 +62,11 @@ test("clockWord, windowWords, quotaTitle and lastWords: the quota's words", asyn
       quotaTitle(fresh, NOW, 'UTC'),
       'Asked of Claude Code (get_usage, max plan) at 9:58 AM; asked again at most every 3m while a board is open. A window 80% used or more is marked.',
     );
+    assert.equal(readingAge(fresh, NOW), 'read 2 minutes ago', "an ask's answer is as old as the ask");
+    const heard: Quota = { ...fresh, subscription: null, heard: { at: '2026-09-19T09:53:00Z', ageMs: 420_000 } };
+    assert.equal(readingAge(heard, NOW), "as of a session's turn 7 minutes ago", 'windows a session heard are as old as its turn');
+    assert.match(quotaTitle(heard, NOW, 'UTC'), /rate_limit_event\), at 9:53 AM;/, 'and the hover says where they came from, and when');
+    assert.equal(readingAge({ ...fresh, askedAt: null }, NOW), null);
     const failed: Quota = {
       ...fresh,
       state: 'timeout',

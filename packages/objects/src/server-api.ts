@@ -392,6 +392,12 @@ export const Quota = Schema.Struct({
   keepMs: Schema.Number,
   markAt: Schema.Number,
   said: OrNull(Schema.String),
+  /**
+   * Where Claude Code is signed in by a long-lived token, whose `get_usage` has no limits: the windows are those the newest
+   * `rate_limit_event` of the sessions said, and this is when a session's turn received it and how long ago, in ms (`fresh`); null while
+   * no session has reported one (`no-plan`). Left out where the windows are `get_usage`'s own, for every other answer, and by an older api.
+   */
+  heard: Schema.optionalKey(OrNull(Schema.Struct({ at: Schema.String, ageMs: Schema.Number }))),
 });
 export type Quota = typeof Quota.Type;
 

@@ -49,6 +49,15 @@ export function lastWords(q: Quota, now: Date, timeZone?: string): { windows: Wi
   };
 }
 
+/**
+ * How old a `fresh` reading is, as the header says it beside its windows: `read 4 minutes ago` for an ask's answer, and `as of a
+ * session's turn 4 minutes ago` for windows a token's sessions heard (`heard`), which no ask read. Null where neither time is held.
+ */
+export function readingAge(q: Quota, now: Date): string | null {
+  if (q.heard) return `as of a session's turn ${agoWords(new Date(q.heard.at), now)}`;
+  return q.askedAt ? `read ${agoWords(new Date(q.askedAt), now)}` : null;
+}
+
 /** What the hover says of a reading: where it came from, how often it is asked again, and the rule the header shows it by. */
 export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
   const every = q.keepMs > 0 ? `asked again at most every ${keepWord(q.keepMs)} while a board is open` : 'asked again on every read';
@@ -56,8 +65,9 @@ export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
     q.state === 'unanswered' && q.againAt
       ? `asked again at ${clockWord(new Date(q.againAt), now, timeZone)} at the soonest, and less often each time the usage service gives nothing`
       : every;
-  const from =
-    q.state === 'fresh' && q.askedAt
+  const from = q.heard
+    ? `This machine is signed in by a token, whose get_usage gives no plan limits: these are the newest the sessions' own turns were told (rate_limit_event), at ${clockWord(new Date(q.heard.at), now, timeZone)}; ${how}.`
+    : q.state === 'fresh' && q.askedAt
       ? `Asked of Claude Code (get_usage${q.subscription ? `, ${q.subscription} plan` : ''}) at ${clockWord(new Date(q.askedAt), now, timeZone)}; ${how}.`
       : `Asked of Claude Code (get_usage); ${how}.`;
   const rule = `A window ${q.markAt}% used or more is marked.`;

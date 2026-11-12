@@ -13,7 +13,7 @@
  * `againAt`, `last`) is on the wall clock.
  */
 import { Context, Layer } from 'effect';
-import type { HarnessQuota, QuotaLimit } from 'agent-orchestrator';
+import type { HarnessQuota, HeardQuota, QuotaLimit } from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 
 /**
@@ -75,6 +75,11 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
  *   failed     Claude Code ended before it answered, or the engine would not ask it (`rejected`), each said in its own words
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
  *
+ * Where the sessions' harness is signed in by a long-lived token, whose `get_usage` has no limits, the plan's windows are those the newest
+ * `rate_limit_event` of the engine's sessions said (`HarnessQuota`'s `heard`): `fresh`, with `heard` saying when a session's turn
+ * received them and how long ago (`at`, `ageMs`); `no-plan` with `heard` null while no session has reported one yet. `heard` is left out
+ * wherever the windows are `get_usage`'s own, as on a `/login` sign-in, and for every other answer.
+ *
  * `said` is the plain sentence for every case but `fresh`, with what to do. `askedAt` and `ageMs` are the held ask's, null while none is;
  * `againAt` is when a read will next ask, null while none is held. `last` is the last answer that had windows, when the state is not
  * `fresh` and it is younger than `QUOTA_LAST_MS`: shown dimmed, with its time, and never as now.
@@ -90,6 +95,7 @@ export type Quota = {
   keepMs: number;
   markAt: number;
   said: string | null;
+  heard?: { at: string; ageMs: number } | null;
 };
 
 const LABELS: Record<string, string> = {
@@ -139,8 +145,11 @@ function windowsOf(limits: readonly QuotaLimit[], now: number): QuotaWindow[] {
   });
 }
 
-/** What an outcome says to the board: its state, its sentence but for when it is asked again (null when `fresh`), its windows and plan. */
-export type Read = Pick<Quota, 'state' | 'subscription' | 'windows'> & { said: string | null };
+/**
+ * What an outcome says to the board: its state, its sentence but for when it is asked again (null when `fresh`), its windows and plan,
+ * and, for a token's answer, what its sessions heard (`heard`: the reading's time, null while there is none to show).
+ */
+export type Read = Pick<Quota, 'state' | 'subscription' | 'windows'> & { said: string | null; heard?: { at: string } | null };
 
 /** An answer in a shape the board does not read, `what` saying what it found. */
 const unknownRead = (what: string): Read => ({
@@ -158,6 +167,16 @@ export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
  * with no Claude Code on PATH is the one the release carries; `claude` where the engine found none to name.
  */
 const typed = (program: string | null): string => program ?? 'claude';
+
+/**
+ * The windows a token's sessions heard (`HeardQuota`), as the board shows them at `now`: `fresh`, with when a session's turn received
+ * them. Null where none was heard, or none of its windows is one the board shows: an absent reading is never 0%.
+ */
+const heardRead = (heard: HeardQuota | null, now: number): Read | null => {
+  const windows = heard ? windowsOf(heard.limits, now) : [];
+  if (heard === null || !windows.length) return null;
+  return { state: 'fresh', subscription: null, windows, said: null, heard: { at: heard.at } };
+};
 
 /**
  * What the engine's answer says to the board, judged at `now` for the windows' resets: the plan's windows (`fresh`), or why there are none,
@@ -199,11 +218,14 @@ export function readOf(asked: Asked, now: number): Read {
         said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run ${typed(asked.program)}, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.`,
       };
     case 'token':
-      return {
-        ...none,
-        state: 'no-plan',
-        said: `No plan limits to show: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
-      };
+      return (
+        heardRead(asked.heard, now) ?? {
+          ...none,
+          state: 'no-plan',
+          heard: null,
+          said: `No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
+        }
+      );
     case 'unanswered':
       return {
         ...none,
@@ -251,12 +273,14 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
     markAt: QUOTA_MARK_PERCENT,
   };
   if (!held) return { ...base, state: 'asking', subscription: null, windows: [], said: 'Asking Claude Code for the quota…' };
-  const read = readOf(held.asked, now);
-  if (read.state === 'fresh') return { ...base, ...read, last: null };
+  const { heard, ...read } = readOf(held.asked, now);
+  const heardOn = heard === undefined ? {} : { heard: heard && { at: heard.at, ageMs: Math.max(0, now - Date.parse(heard.at)) } };
+  if (read.state === 'fresh') return { ...base, ...read, ...heardOn, last: null };
   const left = held.at + keptMs - now;
   return {
     ...base,
     ...read,
+    ...heardOn,
     said: `${read.said} ${left >= 60_000 ? `Asked again in ${ageWord(left)}.` : 'Asked again on the next read.'}`,
   };
 }
@@ -316,9 +340,9 @@ type Kept = Held & { began: number };
 
 /**
  * A quota asker with nothing held, as a fresh api has, one for each harness a read names (`ReadQuota`'s `harness`): what it holds is the
- * last ask's outcome, the last with windows, how many `unanswered` outcomes in a row since it, the ask in flight and the one queued behind
- * it, in its own memory and nobody's file. Every age it judges is on the monotonic clock (`mono`): a wall clock stepped back makes no held
- * answer younger, nor an ask begun before a read one begun after it.
+ * last ask's outcome, the last with windows of its own (not those a token's sessions heard), how many `unanswered` outcomes in a row
+ * since it, the ask in flight and the one queued behind it, in its own memory and nobody's file. Every age it judges is on the monotonic
+ * clock (`mono`): a wall clock stepped back makes no held answer younger, nor an ask begun before a read one begun after it.
  *
  * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
  * outcome's wait — counted from when its ask began; otherwise from an ask begun within the keep of the read (with a keep of 0, only one
@@ -345,11 +369,11 @@ function oneQuota(): ReadQuota {
   let running: Flight | null = null;
   let queued: Flight | null = null;
   const hold = (asked: Asked, at: number, began: number, backoffMs: number) => {
-    const read = readOf(asked, at).state;
+    const { state: read, heard } = readOf(asked, at);
     if (read === 'fresh') unanswered = 0;
     if (read === 'unanswered') unanswered += 1;
     held = read === 'unanswered' ? { asked, at, began, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at, began };
-    if (read === 'fresh') good = held;
+    if (read === 'fresh' && heard === undefined) good = held;
   };
   const begin = (flight: Flight, ask: () => Promise<HarnessQuota>, clocks: Clocks, backoffMs: number): Promise<void> => {
     const at = clocks.now();
@@ -406,10 +430,12 @@ export const QUOTA_DAEMON_WAIT_MS = 30_000;
 
 /**
  * A board's quota as the runtime words an answer: a `fresh` one's windows, as the board shows them, keys the board does not know left out;
- * any other state an answer with no windows, which the daemon records nothing of. Pure.
+ * any other state an answer with no windows, which the daemon records nothing of — and so is a token's windows its sessions heard
+ * (`heard`), a reading of a turn gone by and no ask's answer, which the daemon records nothing of either, as before. Pure.
  */
 export function harnessQuotaOf(q: Quota): HarnessQuota {
   if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` };
+  if (q.heard) return { kind: 'unknown', what: "the board's quota is what a token's sessions heard" };
   const limits = q.windows.map(({ key, usedPercentage, resetsAt }) => ({ key, usedPercentage, resetsAt }));
   return { kind: 'windows', limits, subscription: q.subscription };
 }

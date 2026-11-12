@@ -3,7 +3,7 @@
  * 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said in a
  * sentence; the pure judgement under it (`quotaOf`); and that the read starts no process of its own.
  */
-import { asks, recorded, usageAnswer } from '../../test/harness.ts';
+import { asks, recorded, root, usageAnswer } from '../../test/harness.ts';
 import { story } from 'test-kit/checkpoints';
 import { until, WAITED } from '../../test/waits.ts';
 import { test } from 'node:test';
@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { HarnessQuota } from 'agent-orchestrator';
+import type { HarnessQuota, HeardQuota } from 'agent-orchestrator';
 import { appOf, liveOf } from '../app.ts';
 import {
   backoffOf,
@@ -56,6 +56,15 @@ const plan = (five = 38.4, week = 86): HarnessQuota => ({
 });
 const UNANSWERED: HarnessQuota = { kind: 'unanswered', subscription: 'max' };
 const heard = (asked: HarnessQuota, at = NOW): Held => ({ asked, at });
+/** When a session received the `rate_limit_event` measured on the server, five minutes before `NOW`. */
+const HEARD_AT = '2026-09-19T09:55:00.000Z';
+/**
+ * A token's answer as the runtime gives it once a session received that event (`{"seven_day":{"utilization":0.4,"resetsAt":1794999600,
+ * "status":"allowed"}}` in its `unifiedWindows`): the week at 40%, resetting at its `resetsAt`.
+ */
+const tokenHeard = (
+  limits: HeardQuota['limits'] = [{ key: 'seven_day', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', status: 'allowed' }],
+): HarnessQuota => ({ kind: 'token', program: null, heard: { at: HEARD_AT, limits } });
 
 /** What the fake ask answers next, and how many times it has been asked. */
 const fake = { next: plan(), asked: 0 };
@@ -245,8 +254,8 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
       /AE_CLAUDE_EXECUTABLE[^.]*\. Asked again in 10 min\.$/,
       'and names the variable that names another',
     );
-    const token = quotaOf({ asked: { kind: 'token', program: null }, at: NOW }, null, NOW);
-    assert.equal(token.state, 'no-plan', 'a token of claude setup-token has no plan limits to show');
+    const token = quotaOf({ asked: { kind: 'token', program: null, heard: null }, at: NOW }, null, NOW);
+    assert.equal(token.state, 'no-plan', 'a token of claude setup-token has no plan limits to show while no session heard any');
     assert.notEqual(
       token.said,
       quotaOf({ asked: { kind: 'no-plan', program: null }, at: NOW }, null, NOW).said,
@@ -259,7 +268,7 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
     );
     const release = '/srv/nemia/releases/current/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude';
     for (const asked of [
-      { kind: 'token', program: release },
+      { kind: 'token', program: release, heard: null },
       { kind: 'no-plan', program: release },
       { kind: 'timeout', ms: 15_000, program: release },
       { kind: 'failed', code: 3, signal: null, said: '', program: release },
@@ -285,6 +294,31 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
     );
     assert.equal(asking.last?.windows.length, 2);
   });
+  await t.test(
+    "a token's answer shows the windows its sessions heard (the measured rate_limit_event, 40% of the week), their reset and the reading's age; none heard, it says none yet, never 0%",
+    () => {
+      const q = quotaOf(heard(tokenHeard(), NOW), null, NOW + 7 * 60e3);
+      assert.deepEqual(
+        [q.state, q.windows, q.heard],
+        [
+          'fresh',
+          [{ key: 'seven_day', label: 'week', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', reset: false, marked: false }],
+          { at: HEARD_AT, ageMs: 7 * 60e3 + (NOW - Date.parse(HEARD_AT)) },
+        ],
+      );
+      assert.equal(q.last, null);
+      const none = quotaOf(heard({ kind: 'token', program: null, heard: null }), heard(plan()), NOW);
+      assert.deepEqual([none.state, none.windows, none.heard], ['no-plan', [], null], 'none yet: no window, and heard says so');
+      const unshown = tokenHeard([{ key: 'nimbus_quill', usedPercentage: 12, resetsAt: null, status: 'allowed' }]);
+      assert.deepEqual(
+        [quotaOf(heard(unshown), null, NOW).state, quotaOf(heard(unshown), null, NOW).heard],
+        ['no-plan', null],
+        'REFUSED: a reading with no window the board shows is none yet, not an empty fresh',
+      );
+      assert.equal(quotaOf(heard(plan()), null, NOW).heard, undefined, "a sign-in's own windows carry no heard at all");
+      assert.notEqual(harnessQuotaOf(q).kind, 'windows', 'REFUSED: the daemon records nothing of a reading heard, as before');
+    },
+  );
   await t.test("the daemon's answer is the board's: a fresh quota's windows the board shows, and no windows for any other state", () => {
     assert.deepEqual(harnessQuotaOf(quotaOf(heard(plan()), null, NOW)), {
       kind: 'windows',
@@ -398,6 +432,36 @@ test('The board polls the quota: one ask through the harness, kept, asked again 
           /^Claude Code stopped before it answered the usage request \(exit 3: claude: the harness was told to fail\)\./,
         );
       } finally {
+        usageAnswer(recorded('plan'));
+      }
+    },
+  );
+  await s.test(
+    "a claude signed in by a token: the route says none yet, then shows the newest reading the engine's sessions heard, kept in the engine's store under the store's root, with its age",
+    async () => {
+      fresh();
+      usageAnswer(recorded('no-plan'));
+      const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = 'sk-ant-oat-test';
+      const kept = path.join(root, 'engine', 'quota', 'claude.json');
+      try {
+        const none = await get();
+        assert.deepEqual([none.state, none.windows, none.heard], ['no-plan', [], null], 'no session has reported one yet');
+        fs.mkdirSync(path.dirname(kept), { recursive: true });
+        const at = new Date(Date.now() - 5 * 60e3).toISOString();
+        const limits = [{ key: 'seven_day', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', status: 'allowed' }];
+        fs.writeFileSync(kept, JSON.stringify({ at, limits }));
+        forgetQuota();
+        const q = await get();
+        assert.deepEqual(
+          [q.state, q.windows.map((w) => [w.key, w.usedPercentage, w.resetsAt]), q.heard?.at],
+          ['fresh', [['seven_day', 40, '2026-11-18T11:00:00.000Z']], at],
+        );
+        assert.ok(q.heard && q.heard.ageMs >= 5 * 60e3, 'the reading is as old as the turn that received it');
+      } finally {
+        if (token === undefined) delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+        else process.env.CLAUDE_CODE_OAUTH_TOKEN = token;
+        fs.rmSync(kept, { force: true });
         usageAnswer(recorded('plan'));
       }
     },

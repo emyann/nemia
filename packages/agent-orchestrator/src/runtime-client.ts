@@ -2,7 +2,8 @@
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the
  * runtime's types the controllers use (`Engine`, `TaskView`, `TranscriptEvent`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`,
- * `QuotaLimit`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
+ * `HeardQuota`, `QuotaLimit`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from
+ * the runtime.
  *
  * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
  * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
@@ -83,6 +84,7 @@ export type {
   CodexArgs,
   Denial,
   HarnessQuota,
+  HeardQuota,
   QuotaLimit,
   RefusedMove,
   TaskView,

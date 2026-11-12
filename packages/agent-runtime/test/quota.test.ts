@@ -9,8 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit, Tracer } from 'effect';
 import {
+  claudeHeardFile,
   claudeQuota,
   EXECUTABLE_VARIABLE,
+  heardOf,
+  keepHeard,
+  readHeard,
   type OpenUsage,
   quotaExecutable,
   quotaOfRefusal,
@@ -105,8 +109,8 @@ test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — 
       const token = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
       assert.deepEqual(
         quotaOfUsage(usageOf('no-plan'), token, '/opt/claude'),
-        { kind: 'token', program: '/opt/claude' },
-        'naming the Claude Code asked, to sign in otherwise',
+        { kind: 'token', program: '/opt/claude', heard: null },
+        'naming the Claude Code asked, to sign in otherwise, and no session heard of the plan',
       );
       assert.deepEqual(
         quotaOfUsage(usageOf('no-plan'), { CLAUDE_CODE_OAUTH_TOKEN: '' }),
@@ -252,6 +256,69 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
     const named = standIn(async () => usageOf('plan'));
     await Effect.runPromise(claudeQuota({ command: '/engine/claude', env: { PATH }, ask: named.ask, harnessBin }));
     assert.equal(named.seen.command, '/engine/claude');
+  });
+});
+
+/**
+ * The `rate_limit_info` of a `rate_limit_event`, as a session signed in by a token received it with a model turn, measured on a server
+ * (`docs/harness.md`, *The plan's utilization a session hears*): `unifiedWindows` is in no SDK type.
+ */
+const HEARD_INFO = {
+  status: 'allowed',
+  resetsAt: 1794999600,
+  rateLimitType: 'seven_day',
+  overageStatus: 'rejected',
+  overageDisabledReason: 'org_level_disabled',
+  isUsingOverage: false,
+  unifiedWindows: { seven_day: { utilization: 0.4, resetsAt: 1794999600, status: 'allowed' } },
+};
+
+const HEARD_AT = Date.parse('2026-11-12T09:00:00.000Z');
+
+test("what a session heard of the plan: the newest rate_limit_event, decoded, kept in one file of the store, and carried by a token's quota", async (t) => {
+  const SEVEN_DAY = { key: 'seven_day', usedPercentage: 40, resetsAt: new Date(1794999600 * 1000).toISOString(), status: 'allowed' };
+  await t.test('the measured event reads as its window: its use in percent, its reset, its status, and when it was received', () => {
+    assert.deepEqual(heardOf(HEARD_INFO, HEARD_AT), { at: '2026-11-12T09:00:00.000Z', limits: [SEVEN_DAY] });
+  });
+  await t.test('REFUSED: an event that names no window, or whose window does not decode, is unread, never 0%', () => {
+    assert.equal(heardOf({ status: 'allowed', rateLimitType: 'seven_day' }, HEARD_AT), null, 'no unifiedWindows');
+    assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 'high', status: 'allowed' } } }, HEARD_AT), null);
+    assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.4, status: 'blocked' } } }, HEARD_AT), null);
+  });
+  await t.test(
+    'the store keeps the newest event of any session, one file for all; an older one received later in turn order is not kept',
+    () => {
+      const file = claudeHeardFile(scratch('ae-heard-'));
+      assert.equal(readHeard(file), null, 'none heard yet');
+      keepHeard(file, HEARD_INFO, HEARD_AT);
+      const newer = { ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.41, resetsAt: 1794999600, status: 'allowed' } } };
+      keepHeard(file, newer, HEARD_AT + 60_000);
+      keepHeard(file, HEARD_INFO, HEARD_AT + 30_000);
+      assert.deepEqual(
+        readHeard(file)?.limits.map((l) => l.usedPercentage),
+        [41],
+      );
+      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString());
+      keepHeard(file, { status: 'allowed' }, HEARD_AT + 90_000);
+      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString(), 'an event with no window leaves the reading as it was');
+      fs.writeFileSync(file, JSON.stringify({ at: 'soon', limits: [] }));
+      assert.equal(readHeard(file), null, 'REFUSED: a file that does not decode is unread');
+    },
+  );
+  await t.test("a token's ask carries what the store's sessions heard, and null while none has", async () => {
+    const file = claudeHeardFile(scratch('ae-heard-'));
+    const env = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
+    const ask = () =>
+      Effect.runPromise(claudeQuota({ command: '/opt/claude', env, heardFile: file, ask: standIn(async () => usageOf('no-plan')).ask }));
+    assert.deepEqual(await ask(), { kind: 'token', program: '/opt/claude', heard: null });
+    keepHeard(file, HEARD_INFO, HEARD_AT);
+    assert.deepEqual(await ask(), {
+      kind: 'token',
+      program: '/opt/claude',
+      heard: { at: '2026-11-12T09:00:00.000Z', limits: [SEVEN_DAY] },
+    });
+    const plan = await Effect.runPromise(claudeQuota({ env, heardFile: file, ask: standIn(async () => usageOf('plan')).ask }));
+    assert.deepEqual(plan, PLAN, 'where get_usage answers with limits, they stay the source');
   });
 });
 

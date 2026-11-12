@@ -805,7 +805,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
         '--workflow writes both',
       );
       assert.deepEqual(await printedBy(c, ['inbox', 'queue', bare.card.name, '--off']), [
-        `${bare.card.name}  taken back: it no longer starts on its own — start it with nemia start ${bare.file}`,
+        `${bare.card.name}  taken back: it no longer starts on its own — start it with nemia start ${bare.card.name}`,
       ]);
       assert.equal(fs.readFileSync(bare.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nNo workflow yet\n`);
       const runs = listRuns(ROOT).length;
@@ -940,7 +940,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
       assert.deepEqual(
         await printedBy(c, ['inbox', 'queue', 'gone-a1b2', '--off']),
-        [`gone-a1b2  taken back: it no longer starts on its own — start it with nemia start ${gone}`],
+        [`gone-a1b2  taken back: it no longer starts on its own — start it with nemia start gone-a1b2`],
         'taken back though its repository is gone',
       );
       assert.equal(fs.readFileSync(gone, 'utf8'), `---\nworkflow: dev\nrepo: ${doomed}\n---\nIts repository is gone\n`);

@@ -154,7 +154,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
       assert.deepEqual(added, [
         `${name.slice(0, -3)}  Cache the engine's views between passes`,
-        `filed: ${card} — start it with nemia start ${card} --workflows <w>`,
+        `filed: ${card} — start it with nemia start ${name.slice(0, -3)} --workflows <w>`,
       ]);
 
       await printedBy(
@@ -239,7 +239,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
       assert.deepEqual(lines.slice(-2), [
         '',
-        `start one: nemia start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
+        `start one: nemia start <name> [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
       ]);
       fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
       fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
@@ -389,6 +389,18 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     assert.ok(fs.existsSync(file), 'the card stays in the inbox');
     assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
   });
+  await s.test(
+    '`nemia start <name>` and `nemia start <name>.md`, the card named with or without its .md, each start the card',
+    async (t) => {
+      emptyInbox();
+      const repo = aRepoWith('dev');
+      for (const named of [(name: string) => name, (name: string) => `${name}.md`]) {
+        const { card } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
+        const run = runRecord(ROOT, (await printedBy(t, 'start', named(card.name)))[0].split(' ')[0]);
+        assert.deepEqual([run.brief, run.from], ['Cache the views between passes', { inbox: card.name }], named(card.name));
+      }
+    },
+  );
   await s.test(
     "a start says what the card does not, over what it does: --workflows over `workflow:`, --repo over `repo:`, the caller's repository without either, --brief in place of the body, and --after to wait on",
     async (t) => {

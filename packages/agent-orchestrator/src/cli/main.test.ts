@@ -10,10 +10,13 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { TaskPhase } from '../run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
+import { story } from '../../test/story.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { advanceRun, CLI, TABLE, startRun, runWith as runEngine } from '../runner.ts';
@@ -387,5 +390,89 @@ test("forwarded to a daemon no one serves, a linked verb fails naming the server
     assert.match(err.message, /127\.0\.0\.1:9/);
     assert.notEqual(err.exitCode, 2);
     return true;
+  });
+});
+
+/** A card of another machine's inbox as its api answers it: `name`, in the factory `nemia`, naming the workflow `quick`. */
+const cardThere = (name: string) => ({
+  apiVersion: 'nemia/v1',
+  kind: 'Card',
+  metadata: { name, namespace: 'nemia', creationTimestamp: '2026-11-12T00:00:00.000Z', resourceVersion: '1' },
+  spec: { workflow: 'quick', body: 'Fix it' },
+  status: { state: 'filed', runs: [], inPlay: true, file: `${name}.md` },
+});
+
+test("a card filed on another machine's daemon is started by the command its filing printed, its workflow and factory the card's own", async (t) => {
+  const asked: { method: string; url: string; body: string }[] = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+    req.on('end', () => {
+      asked.push({ method: req.method ?? '', url: req.url ?? '', body });
+      const answer = (status: number, value: unknown) => {
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(value));
+      };
+      if (req.method === 'POST' && req.url === '/api/namespaces/default/cards') return answer(201, cardThere('fix-it-ab12'));
+      if (req.method === 'GET' && req.url === '/api/cards/fix-it-ab12') return answer(200, cardThere('fix-it-ab12'));
+      if (req.method === 'POST' && req.url === '/api/namespaces/nemia/cards/fix-it-ab12/start')
+        return answer(201, { id: 'fix-it-ab12-r1', card: 'fix-it-ab12' });
+      return answer(404, { _tag: 'Missing', message: `no route ${req.method} ${req.url}` });
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const there: Env = { ...ENV, NEMIA_SERVER: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, NEMIA_SERVER_TOKEN: 't' };
+  const typedThere = async (...argv: string[]): Promise<string[]> => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
+    try {
+      await main(argv, undefined, undefined, undefined, there);
+    } finally {
+      log.mock.restore();
+    }
+    return out;
+  };
+  const s = story(t);
+
+  let printed = '';
+  await s.test('`nemia inbox add` prints a start that names the card by its name, as the remote start takes it', async () => {
+    const filed = await typedThere('inbox', 'add', 'Fix it');
+    printed = /start it with (nemia start \S+)/.exec(filed.join('\n'))?.[1] ?? '';
+    assert.equal(printed, 'nemia start fix-it-ab12', filed.join('\n'));
+  });
+
+  await s.test('the printed start, typed as it stands, starts the card in its factory on its own workflow', async () => {
+    asked.length = 0;
+    const started = await typedThere(...printed.split(' ').slice(1));
+    assert.match(started.join('\n'), /fix-it-ab12-r1/);
+    const start = asked.find((a) => a.url.endsWith('/start'));
+    assert.equal(start?.url, '/api/namespaces/nemia/cards/fix-it-ab12/start', "started in the card's factory, its namespace");
+    assert.equal(JSON.parse(start?.body || '{}').workflow, undefined, "no workflow sent: the api takes the card's own");
+  });
+
+  await s.test('the card named with its .md starts the same card', async () => {
+    asked.length = 0;
+    await typedThere('start', 'fix-it-ab12.md');
+    assert.ok(
+      asked.some((a) => a.url === '/api/namespaces/nemia/cards/fix-it-ab12/start'),
+      asked.map((a) => a.url).join('\n'),
+    );
+  });
+
+  await s.test('`--workflows` given is still sent, by name', async () => {
+    asked.length = 0;
+    await typedThere('start', 'fix-it-ab12', '--workflows', 'build');
+    assert.equal(JSON.parse(asked.find((a) => a.url.endsWith('/start'))?.body || '{}').workflow, 'build');
+  });
+
+  await s.test('REFUSED: a brief in words names no card, and with no workflow is Invalid, exit 2, before anything is asked', async () => {
+    asked.length = 0;
+    await assert.rejects(typedThere('start', 'fix the login page'), (err: { _tag?: string; exitCode?: number; message?: string }) => {
+      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
+      assert.match(err.message ?? '', /--workflows/);
+      return true;
+    });
+    assert.deepEqual(asked, []);
   });
 });

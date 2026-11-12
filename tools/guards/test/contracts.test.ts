@@ -2,8 +2,8 @@
  * The legs CI proves the contracts in (`tools/contracts/legs.ts`), and the `contracts` job of `.github/workflows/ci.yml` that runs
  * them: every file a contract may be in proved by exactly one leg, a leg of its own whose file is gone refused by every leg, the files
  * a contract may be in found as tsverify's CLI finds them, and the job wired to the legs — a matrix of every leg, each with its own
- * verdict cache, none cancelled by another — while `npm run contracts` still proves them all. `prove.ts` itself is proved by running
- * it: CI's job does on every push.
+ * verdict cache, none cancelled by another — while `npm run contracts` still proves them all. `prove.ts` ends a failed run on the
+ * contracts not proved, on a planted report; its commands are proved by running it: CI's job does on every push.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +14,7 @@ import { readWorkflow, type Workflow } from './ci-workflow.ts';
 import ts from 'typescript';
 import { loadProject, readContract, sourceFile } from '@emyann/tsverify/api';
 import { ALONE, LEGS, commandsOf, contractFilesUnder, legOf } from '../../contracts/legs.ts';
+import { main, type Ran } from '../../contracts/prove.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -154,4 +155,53 @@ test("REFUSED: a leg left out of the matrix, legs cancelled by one, a leg's comm
     ['a script of one leg', shipped, `${SCRIPT} rest`],
   ];
   for (const [why, workflow, script] of cases) assert.equal(contractsDrift(workflow, script).length, 1, why);
+});
+
+/** A report as tsverify prints it: two files proved, and between them one whose contract is undecided, with its fix under it. */
+const PLANTED = `packages/a/src/one.ts
+  ✓ first  3 laws  (12 ms)
+packages/a/src/wiring.ts
+  ◐ rewired        8 laws · trusts withName  (94702 ms)
+    ◐ undecided  (output.origins === undefined)
+      both { … }
+      e.g. (…)
+      add the law that picks one, or say in the spec that the choice is the code's: \`open: ["output.origins"]\`
+packages/a/src/three.ts
+  ✓ third  2 laws  (8 ms)
+    ✓ A law with a note  (keeps, 4 ms)
+      whether it says anything of the function was not settled: read as saying something
+
+◐ 1 undecided
+✓ 13 laws proved
+  3 contracts in 3 files · 95 s
+`;
+
+const UNDECIDED = PLANTED.split('\n').slice(2, 8);
+
+test('a run whose tsverify left a contract undecided ends on that contract and its fix, after every passing line', async () => {
+  const written: string[] = [];
+  let first = true;
+  const run = async (): Promise<Ran> => {
+    const ran = first ? { status: 1, output: PLANTED } : { status: 0, output: PLANTED.replace(/◐/g, '✓') };
+    first = false;
+    return ran;
+  };
+  assert.equal(await main(['rest'], ROOT, (line) => written.push(...line.split('\n')), run), 1);
+  assert.deepEqual(written.slice(-UNDECIDED.length), UNDECIDED);
+  assert.equal(written.filter((l) => l.includes('three.ts')).length, 0, 'a proved file is not repeated');
+
+  const passed: string[] = [];
+  assert.equal(
+    await main(
+      ['rest'],
+      ROOT,
+      (line) => passed.push(line),
+      async () => ({ status: 0, output: PLANTED.replace(/◐/g, '✓') }),
+    ),
+    0,
+  );
+  assert.ok(
+    passed.every((l) => l === '' || l.startsWith('\ntsverify ')),
+    'a run that proved everything repeats nothing',
+  );
 });

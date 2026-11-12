@@ -52,6 +52,29 @@ const HALF: Readiness = {
   ],
 };
 
+/** A harness installed and signed out: its install in place, offering Deactivate, and its sign-in's commands to type. */
+const ACTIVATED: Readiness = {
+  ready: false,
+  pieces: [
+    {
+      name: 'agent-one',
+      area: 'harness',
+      state: 'met',
+      message: 'Agent One is installed: 1.2.3, the version this release was tested with',
+      fixes: [{ message: 'deactivate it', command: 'tool doctor fix agent-one --index 1', startable: true, index: 1, kind: 'removes' }],
+      harness: { name: 'agent-one', part: 'install' },
+    },
+    {
+      name: 'agent-one-sign-in',
+      area: 'harness',
+      state: 'missing',
+      message: 'Agent One is signed in',
+      fixes: [{ message: 'sign in through the browser', command: 'agent-one auth login', startable: false, kind: 'typed' }],
+      harness: { name: 'agent-one', part: 'sign-in' },
+    },
+  ],
+};
+
 /** Everything in place. */
 const READY: Readiness = {
   ready: true,
@@ -90,6 +113,22 @@ export const Refused: StoryObj = {
         readiness={HALF}
         onStart={() => undefined}
         refused={{ key: 'acme/build/tool-sign-in/0', message: 'the factory acme is not trusted: trust it, then start the fix again' }}
+      />
+    </div>
+  ),
+};
+
+/** A harness's Deactivate refused while a run that needs it has not finished, said under it as any refused start is. */
+export const DeactivateRefused: StoryObj = {
+  render: () => (
+    <div style={WIDE}>
+      <ReadinessList
+        readiness={ACTIVATED}
+        onStart={() => undefined}
+        refused={{
+          key: '//agent-one/1',
+          message: 'agent-one is needed by a run that has not finished: stop it (tool cancel run-1), then deactivate it again',
+        }}
       />
     </div>
   ),

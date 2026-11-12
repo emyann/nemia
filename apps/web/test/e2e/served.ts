@@ -151,13 +151,14 @@ export function seedStore(root: string): void {
 }
 
 /**
- * First on the api's PATH, and the Claude Code its engine's sessions run (`AE_CLAUDE_EXECUTABLE`, `apiEnvOf`), is a `claude` of the store's
- * own, so the pages are about the store, not about the sessions on this machine. It answers the api's usage control request too (quota.ts),
- * which the runtime asks through the Agent SDK: anything whose first argument is a flag — the SDK's argv, never matched here, since it is
- * the SDK's to change — it hands to the api's own stand-in Claude Code, which answers the SDK as Claude Code does from the store's answer
- * (QUOTA.file) under the request's own id, and waits on its stdin as Claude Code does. With no answer in the store it ends as a claude that
- * cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word, and ends well having said nothing.
- * Returns the directory it is in.
+ * The Claude Code the api's engine's sessions run (`AE_CLAUDE_EXECUTABLE`, `apiEnvOf`) is a `claude` of the store's own, so the pages are
+ * about the store, not about the sessions on this machine. It is on no PATH the api has, nor in the store's tools folder: the readiness
+ * read finds no harness installed on a fresh seed, so Setup asks which to activate. It answers the api's usage control request too
+ * (quota.ts), which the runtime asks through the Agent SDK: anything whose first argument is a flag — the SDK's argv, never matched here,
+ * since it is the SDK's to change — it hands to the api's own stand-in Claude Code, which answers the SDK as Claude Code does from the
+ * store's answer (QUOTA.file) under the request's own id, and waits on its stdin as Claude Code does. With no answer in the store it ends
+ * as a claude that cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word, and ends well
+ * having said nothing. Returns the directory it is in.
  */
 export function fakeClaude(root: string): string {
   const bin = path.join(root, 'bin');
@@ -185,6 +186,13 @@ export function fakeClaude(root: string): string {
   return bin;
 }
 
+/** `pathValue` (a PATH) without each folder that holds `program`, every other folder kept in its order. */
+export const withoutProgram = (pathValue: string, program: string): string =>
+  pathValue
+    .split(path.delimiter)
+    .filter((dir) => dir === '' || !fs.existsSync(path.join(dir, program)))
+    .join(path.delimiter);
+
 /**
  * The api's environment over `root`: Claude Code's transcripts are in the store (CLAUDE_CONFIG_DIR), where the engine reads a session's
  * conversation, never from this machine's.
@@ -205,7 +213,11 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
   /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
   OTEL_EXPORTER_OTLP_ENDPOINT: '',
-  PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+  /**
+   * This machine's PATH without a folder that holds a `claude`, the store's or one installed here: the readiness read checks a harness
+   * installed by finding its program on PATH, and a fresh seed has none.
+   */
+  PATH: withoutProgram(process.env.PATH ?? '', 'claude'),
   /**
    * The store's `claude` is the Claude Code the engine's sessions run, as the engine's environment names one: the quota asks the one a
    * job runs, never a `claude` on PATH, so without it the Agent SDK's own would answer the quota pages.

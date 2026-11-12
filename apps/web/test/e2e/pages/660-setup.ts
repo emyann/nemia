@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Page, Route } from 'playwright';
 import { answered, photograph, themeOf, topBarOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
+import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import { serveExposed } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
@@ -88,21 +89,27 @@ const sse = (event: string, data: string): string =>
     .join('\n')}\n\n`;
 
 /**
- * The fix's start and its output held by the page (`route`): nothing ticks the e2e's store (`--no-tick`), so a fix the api filed would
- * never run; the page answers the start with the fix pending, and its output as the api streams it — two `output` chunks, then
- * `ended` with the fix as it ended — so the board's drawing of a running fix is what is held here, the api's running of one in its own
- * tests. Returns what unroutes both.
+ * A fix's start and its output held by the page (`route`): nothing ticks the e2e's store (`--no-tick`), so a fix the api filed would
+ * never run; the page answers the start with the fix `made` pending, and its output as the api streams it — each of `chunks` an
+ * `output` event, then `ended` with the fix as it ended, done — so the board's drawing of a running fix is what is held here, the api's
+ * running of one in its own tests. Each start's body is kept in `sent`. Returns what unroutes both.
  */
-async function holdFix(page: Page): Promise<() => Promise<void>> {
-  const start = (route: Route) =>
-    route.request().method() === 'POST'
-      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixOf('pending', '')) })
-      : route.fallback();
+async function holdFix(
+  page: Page,
+  made: (phase: 'pending' | 'succeeded', output: string, exitCode?: number) => object,
+  chunks: readonly string[],
+  sent: unknown[] = [],
+): Promise<() => Promise<void>> {
+  const start = (route: Route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    sent.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(made('pending', '')) });
+  };
   const output = (route: Route) =>
     route.fulfill({
       status: 200,
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
-      body: [...CHUNKS.map((chunk) => sse('output', chunk)), sse('ended', JSON.stringify(fixOf('succeeded', CHUNKS.join(''), 0)))].join(''),
+      body: [...chunks.map((chunk) => sse('output', chunk)), sse('ended', JSON.stringify(made('succeeded', chunks.join(''), 0)))].join(''),
     });
   await page.route('**/api/readiness/fixes', start);
   await page.route('**/api/readiness/fixes/*/output', output);
@@ -112,8 +119,33 @@ async function holdFix(page: Page): Promise<() => Promise<void>> {
   };
 }
 
+/** A fix of a piece, as the api answers it: the keys the page reads. */
+type PieceFix = { message: string; command: string; startable: boolean; index?: number; kind?: 'puts' | 'typed' | 'removes' };
+
 /** A piece of the readiness read, as the api answers it: the keys the page reads. */
-type Piece = { name: string; state: 'met' | 'missing' | 'unknown'; fixes: unknown[] };
+type Piece = {
+  name: string;
+  state: 'met' | 'missing' | 'unknown';
+  message: string;
+  fixes: PieceFix[];
+  harness?: { name: string; part: 'install' | 'sign-in' };
+};
+
+/** A harness the read declares: its install piece and its sign-in piece, as the api answers them. */
+type Harness = { name: string; install: Piece; signIn: Piece };
+
+/** The harnesses the api's read declares, each with its two pieces; refused where it declares none, as every release declares one. */
+async function harnessesRead(page: Page): Promise<Harness[]> {
+  const { pieces } = await answered<{ pieces: Piece[] }>(page, '/api/readiness');
+  const of = (name: string, part: 'install' | 'sign-in') => pieces.find((p) => p.harness?.name === name && p.harness.part === part);
+  const harnesses = [...new Set(pieces.flatMap((p) => (p.harness ? [p.harness.name] : [])))].flatMap((name) => {
+    const install = of(name, 'install');
+    const signIn = of(name, 'sign-in');
+    return install && signIn ? [{ name, install, signIn }] : [];
+  });
+  if (!harnesses.length) throw new Refused('the readiness read declares a harness, its install and its sign-in pieces — it declares none');
+  return harnesses;
+}
 
 /** The readiness read: every piece drawn with the state the api answered, a piece not in place with each of its fixes, and NEED's. */
 async function readsPieces(page: Page): Promise<void> {
@@ -140,7 +172,7 @@ async function readsPieces(page: Page): Promise<void> {
 
 /** NEED's fix started: its output drawn as it comes, its link a link that opens a new tab, its code large over it, and its end. */
 async function runsFix(page: Page): Promise<void> {
-  const unroute = await holdFix(page);
+  const unroute = await holdFix(page, fixOf, CHUNKS);
   try {
     await page.locator(`li[data-piece="${NEED}"] [data-fix-press]`).click();
     const run = page.locator(`section[data-fix-run="${NEED}"]`);
@@ -157,6 +189,165 @@ async function runsFix(page: Page): Promise<void> {
     await photograph(run, path.join(OUT, `setup-fix-${await themeOf(page)}.png`));
   } finally {
     await unroute();
+  }
+}
+
+/** What the harness's install prints, in two chunks. */
+const INSTALLED = ['added 1 package in 2s\n', 'linked into the tools folder\n'] as const;
+
+/**
+ * On a fresh seed no harness is installed (the store's `claude` is on no PATH of the api, served.ts), so Setup asks which to activate:
+ * one option for each harness the read declares, titled by its install piece's sentence. Activate starts the install's fix (held by
+ * `holdFix`: nothing ticks the store) with the install's need and its first fix, its output drawn in the question as it comes, and once
+ * done the harness's sign-in fixes are shown there, a command to type with the control that copies it. A reload forgets the activation.
+ */
+async function asksAndActivates(page: Page): Promise<void> {
+  const harnesses = await harnessesRead(page);
+  for (const harness of harnesses)
+    if (harness.install.state === 'met') throw new Refused(`a fresh seed has no harness installed — ${harness.name} is in place`);
+  const asked = page.locator('section[data-harness-choice="asked"]');
+  await expectVisible(asked, 'a first visit with no harness installed asks which to activate');
+  await expectCount(asked.locator('[data-harness-option]'), harnesses.length, 'one option for each harness the read declares');
+  for (const harness of harnesses)
+    await expectVisible(
+      asked.locator(`[data-harness-option="${harness.name}"]`, { hasText: harness.install.message }),
+      `${harness.name}'s option is titled by its install piece's sentence`,
+    );
+  await settled(page);
+  await photograph(page, path.join(OUT, `setup-harness-asked-${await themeOf(page)}.png`));
+
+  const [first] = harnesses;
+  const sent: unknown[] = [];
+  const made = (phase: 'pending' | 'succeeded', output: string, exitCode?: number) => ({
+    id: 'fix-e2e-harness',
+    need: first.install.name,
+    phase,
+    output,
+    ...(exitCode === undefined ? {} : { exitCode }),
+  });
+  const unroute = await holdFix(page, made, INSTALLED, sent);
+  try {
+    await asked.locator(`[data-harness-option="${first.name}"] [data-harness-activate]`).click();
+    const chosen = page.locator(`section[data-harness-choice] [data-harness-option="${first.name}"]`);
+    const run = chosen.locator(`section[data-fix-run="${first.install.name}"]`);
+    await expectVisible(run, 'Activate starts the install, its run drawn in the question');
+    const start = sent[0] as { need?: string; index?: number } | undefined;
+    if (start?.need !== first.install.name || (start.index ?? 0) !== 0)
+      throw new Refused(
+        `Activate starts the install piece's first fix (${first.install.name}, index 0) — it sent ${JSON.stringify(start)}`,
+      );
+    await expectVisible(
+      run.locator('[data-fix-output]', { hasText: 'linked into the tools folder' }),
+      "the install's output is drawn as it comes",
+    );
+    await expectVisible(
+      page.locator('section[data-harness-choice="installed"]'),
+      'once the install is done, the question says it is installed',
+    );
+    const signIn = page.locator(`[data-harness-sign-in="${first.signIn.name}"]`);
+    const fixes = first.signIn.fixes.filter((fix) => fix.kind !== 'removes');
+    await expectCount(signIn.locator('[data-fix]'), fixes.length, `then ${first.signIn.name}'s fixes are shown, each of them`);
+    for (const fix of fixes.filter((f) => !f.startable || f.kind === 'typed'))
+      await expectVisible(
+        signIn.locator(`[data-fix="typed"] [data-copy-text="${fix.command}"] button`),
+        `a fix typed on the server is its command, ${fix.command}, with the control that copies it`,
+      );
+    await idle(page);
+    await settled(page);
+    await photograph(page, path.join(OUT, `setup-harness-installed-${await themeOf(page)}.png`));
+  } finally {
+    await unroute();
+  }
+  await page.reload();
+  await idle(page);
+  await expectVisible(
+    page.locator('section[data-harness-choice="asked"]'),
+    'a reload forgets the activation, and the question is asked again',
+  );
+}
+
+/**
+ * Skip keeps the skip in this browser (`lib/stored.ts`): the question goes, a line says it is skipped, and a reload does not ask it
+ * again; the skip forgotten, it is asked again.
+ */
+async function skipsTheQuestion(page: Page): Promise<void> {
+  const asked = page.locator('section[data-harness-choice="asked"]');
+  try {
+    await asked.locator('[data-harness-skip]').click();
+    await expectCount(asked, 0, 'Skip takes the question away');
+    await expectVisible(page.locator('[data-harness-choice="skipped"]'), 'and one line says it is skipped in this browser');
+    await page.reload();
+    await idle(page);
+    await expectVisible(page.locator('article[data-setup] [data-readiness]'), 'Setup draws the readiness read again');
+    await expectCount(asked, 0, 'reloaded, the question stays skipped');
+    await settled(page);
+    await photograph(page, path.join(OUT, `setup-harness-skipped-${await themeOf(page)}.png`));
+  } finally {
+    await page.evaluate((key) => localStorage.removeItem(key), HARNESS_SKIP_KEY);
+  }
+  await page.reload();
+  await idle(page);
+  await expectVisible(asked, 'the skip forgotten, the question is asked again');
+}
+
+/**
+ * Deactivate, on a harness installed, is refused while an unfinished run of the seed needs it: the api's 409, said under the press as a
+ * fix's refusal is, naming `nemia cancel <run>` for each run that holds it. The api's read is frozen at its first sweep (`--no-tick`), so
+ * a second page of the browser answers it with the first harness's install in place, its one fix the removal the api offers on a met
+ * install (index 1, `removes`); the start itself is the api's. That page's watch expects the 409 and nothing else.
+ */
+async function deactivateRefused(page: Page): Promise<void> {
+  const [first] = await harnessesRead(page);
+  const install = first.install;
+  const other = await page.context().newPage();
+  const { problems } = watch(other);
+  try {
+    await other.route('**/api/readiness', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      const answer = await route.fetch();
+      const read = (await answer.json()) as { ready: boolean; pieces: Piece[] };
+      const removal: PieceFix = {
+        message: `deactivate ${first.name}: remove what its install put in the tools folder`,
+        command: `nemia doctor fix ${install.name} --index 1`,
+        startable: true,
+        index: 1,
+        kind: 'removes',
+      };
+      const pieces = read.pieces.map((p) => (p.name === install.name ? { ...p, state: 'met' as const, fixes: [removal] } : p));
+      await route.fulfill({ response: answer, json: { ...read, pieces } });
+    });
+    await other.goto(new URL('/setup', page.url()).href, { waitUntil: 'load' });
+    await idle(other);
+    const piece = other.locator(`li[data-piece="${install.name}"][data-piece-state="met"]`);
+    await expectVisible(
+      piece.locator('[data-fix="removes"] [data-fix-press]', { hasText: 'Deactivate' }),
+      'a harness installed offers Deactivate',
+    );
+    await expectCount(other.locator('section[data-harness-choice]'), 0, 'and with one installed, the question is not asked');
+    const [refusal] = await Promise.all([
+      other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/readiness/fixes'),
+      piece.locator('[data-fix="removes"] [data-fix-press]').click(),
+    ]);
+    if (refusal.status() !== 409)
+      throw new Refused(`Deactivate is refused while a seeded unfinished run needs ${install.name} — the api answered ${refusal.status()}`);
+    const { users } = (await refusal.json()) as { users?: string[] };
+    if (!users?.length) throw new Refused(`the refusal names the runs that hold ${install.name} — it names none`);
+    const said = piece.locator('[data-fix-refused]');
+    await expectVisible(said, "the refusal is said under Deactivate, as a fix's refusal is");
+    for (const run of users) await expectVisible(said.filter({ hasText: `nemia cancel ${run}` }), `it names nemia cancel ${run}`);
+    await idle(other);
+    await piece.scrollIntoViewIfNeeded();
+    await settled(other);
+    await photograph(other, path.join(OUT, `setup-deactivate-refused-${await themeOf(other)}.png`));
+    const fixes = new URL('/api/readiness/fixes', page.url()).href;
+    const others = problems().filter(
+      (p) =>
+        p !== `request answered 409: POST ${fixes}` &&
+        !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p),
+    );
+    if (others.length) throw new Refused(`Deactivate's page saw its 409 alone — it saw:\n    ${others.join('\n    ')}`);
+  } finally {
+    await other.close();
   }
 }
 
@@ -241,6 +432,8 @@ export default {
   /**
    * Settings' Setup: the readiness read grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
    * in place with each of its fixes — with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in);
+   * the first visit's question of which harness to activate, Activate drawing the install's run and then the sign-in's fixes, and Skip
+   * kept across a reload; Deactivate on a harness installed refused while a seeded run needs it, naming the run;
    * that fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks
    * the store); a pairing a client asks for, listed by its name and approved by the code typed; and, on a second seat marked exposed, a
    * first-visit link that signs a browser in and leaves the address, refused once used. The README, the tokens, the pairings and the
@@ -257,7 +450,10 @@ export default {
       await page.reload();
       await idle(page);
       await readsPieces(page);
+      await asksAndActivates(page);
+      await skipsTheQuestion(page);
       await runsFix(page);
+      await deactivateRefused(page);
       await approvesPairing(page);
       await signsInByLink(page);
     } finally {

@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { CircleAlert, CircleCheck, CircleHelp, Play, type LucideIcon } from 'lucide-react';
+import { CircleAlert, CircleCheck, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
 import type { FixStart, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
 import { CutField, CutFrame, CutPress } from '@/components/look';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/ds/utils';
 import { container, dashed, ringed } from '@/lib/meaning';
-import { answered, answersOf, AREA_WORDS, piecesByArea } from '@/lib/setup';
+import { answered, AREA_WORDS, fixKeyOf, piecesByArea, shownFixes, startOf } from '@/lib/setup';
 import { CopyText } from './CopyText';
 
 /**
@@ -18,29 +18,21 @@ const STATE: Record<NeedState, { word: string; icon: LucideIcon; className: stri
   unknown: { word: 'Unknown', icon: CircleHelp, className: dashed.grey },
 };
 
-/** The key a fix is started and said under: its piece's factory, workflow and name, and its index among the piece's fixes. */
-const fixKeyOf = (piece: ReadinessPiece, fix: ReadinessFix, i: number): string =>
-  [piece.factory ?? '', piece.workflow ?? '', piece.name, String(fix.index ?? i)].join('/');
-
-/** What starts `fix` of `piece`, with `answers` to its asks. */
-const startOf = (piece: ReadinessPiece, fix: ReadinessFix, i: number, answers: Record<string, string>): FixStart => ({
-  need: piece.name,
-  ...(piece.factory === undefined ? {} : { factory: piece.factory }),
-  ...(piece.workflow === undefined ? {} : { workflow: piece.workflow }),
-  index: fix.index ?? i,
-  ...(fix.asks?.length ? { answers: answersOf(fix.asks, answers) } : {}),
-});
-
 /** What the list is told to do, and what it says of a start: the key being started, and a start refused, in the api's words. */
-type Starts = {
+export type Starts = {
   onStart: (start: FixStart, key: string) => void;
   starting?: string;
   refused?: { key: string; message: string };
 };
 
+/** What a fix's press says: starting while its start is sent, Deactivate for a removal, else whether it asks before it starts. */
+const pressWord = (fix: ReadinessFix, pending: boolean): string =>
+  pending ? 'Starting…' : fix.kind === 'removes' ? 'Deactivate' : fix.asks?.length ? 'Answer and start' : 'Start the fix';
+
 /**
  * One fix the server starts: a Start press, or for a fix that asks first, a press that opens a small form of its asks — a field each,
- * labelled by what it asks — whose Start sends the answers with the fix. A refusal of its start is said under it.
+ * labelled by what it asks — whose Start sends the answers with the fix; a fix that takes a piece away (`removes`) is a Deactivate press.
+ * A refusal of its start is said under it.
  */
 function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: ReadinessFix; i: number; starts: Starts }) {
   const key = fixKeyOf(piece, fix, i);
@@ -89,8 +81,8 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
       ) : (
         <div>
           <Button variant="outline" data-fix-press isDisabled={pending} onPress={asks.length > 0 ? () => setOpen(true) : start}>
-            <Play aria-hidden />
-            {pending ? 'Starting…' : asks.length > 0 ? 'Answer and start' : 'Start the fix'}
+            {fix.kind === 'removes' ? <Power aria-hidden /> : <Play aria-hidden />}
+            {pressWord(fix, pending)}
           </Button>
         </div>
       )}
@@ -100,6 +92,33 @@ function StartableFix({ piece, fix, i, starts }: { piece: ReadinessPiece; fix: R
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The fixes a piece offers (`shownFixes`): for a piece not in place, what puts it there; for one in place, what takes it away
+ * (Deactivate). A fix a person types is its command, with the control that copies it; one the server runs is a press (`StartableFix`).
+ */
+export function PieceFixes({ piece, starts }: { piece: ReadinessPiece; starts: Starts }) {
+  const shown = shownFixes(piece);
+  if (shown.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-3 border-l-2 border-outline-variant pl-3">
+      {shown.map(({ fix, i }) => (
+        <li
+          key={fixKeyOf(piece, fix, i)}
+          data-fix={!fix.startable || fix.kind === 'typed' ? 'typed' : fix.kind === 'removes' ? 'removes' : 'startable'}
+          className="flex flex-col gap-1.5"
+        >
+          <p className="text-body-small text-on-surface">{fix.message}</p>
+          {fix.startable && fix.kind !== 'typed' ? (
+            <StartableFix piece={piece} fix={fix} i={i} starts={starts} />
+          ) : (
+            <CopyText text={fix.command} label={`the command: ${fix.command}`} />
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -122,20 +141,7 @@ function Piece({ piece, starts }: { piece: ReadinessPiece; starts: Starts }) {
         {whose !== '' && <span className="text-body-small text-on-surface-variant">{whose}</span>}
       </div>
       <p className="text-body-medium break-words text-on-surface-variant">{piece.message}</p>
-      {piece.state !== 'met' && piece.fixes.length > 0 && (
-        <ul className="flex flex-col gap-3 border-l-2 border-outline-variant pl-3">
-          {piece.fixes.map((fix, i) => (
-            <li key={fixKeyOf(piece, fix, i)} data-fix={fix.startable ? 'startable' : 'typed'} className="flex flex-col gap-1.5">
-              <p className="text-body-small text-on-surface">{fix.message}</p>
-              {fix.startable ? (
-                <StartableFix piece={piece} fix={fix} i={i} starts={starts} />
-              ) : (
-                <CopyText text={fix.command} label={`the command: ${fix.command}`} />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <PieceFixes piece={piece} starts={starts} />
     </li>
   );
 }
@@ -144,7 +150,8 @@ function Piece({ piece, starts }: { piece: ReadinessPiece; starts: Starts }) {
  * The readiness read, grouped by area in `objects`' order (`piecesByArea`), each area in a cut frame under its heading: each piece's
  * state — in place, missing or unknown, said in a word and a glyph as well as a hue — its sentence, and, for a piece not in place, its
  * fixes: a command to type, shown with the control that copies it, or a fix the server runs, started by a press (`onStart`), which asks
- * its answers first where it has asks. Above, whether everything is in place.
+ * its answers first where it has asks; for a piece in place, the fix that takes it away, a Deactivate press, its refusal said under it.
+ * Above, whether everything is in place.
  */
 export function ReadinessList({ readiness, ...starts }: { readiness: Readiness } & Starts) {
   const missing = readiness.pieces.filter((piece) => piece.state === 'missing').length;

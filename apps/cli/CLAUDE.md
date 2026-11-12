@@ -2,8 +2,10 @@
 
 `nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
 inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
-`explain`, over every kind the api serves, `propose` and `proposals`, and `decide`) asked of it whatever else is typed, and every other verb, a help, and a read typed with `--local`
-run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). It sits beside the board, above the api: the order is
+`explain`, over every kind the api serves, `propose` and `proposals`, and `decide`) asked of it whatever else is typed, the commands
+whose words it holds (`MOVED_COMMANDS`, `objects`' `COMMAND_WORDS`) parsed, helped and run here through the api under every context, and
+every other verb and a help of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). `--local` is refused,
+exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract, each verb list spelled once there and read by the code (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
@@ -35,8 +37,18 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   machine's files and no store) runs here whatever the context, but for `template export --factory`, which reads a factory from the
   store in process: under a remote context `main` refuses it, naming `NEMIA_CONTEXT=local` (`factoryNotHere`).
   On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
-  <file>`, `local-token` in the file, `chosenToken`); `local` stays this machine's store, so its verbs still run in process.
+  <file>`, `local-token` in the file, `chosenToken`).
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
+- **A command whose words the client holds is run under `src/commands/`** (`commanded.ts`): parsed by `objects`' `parseArgv` against
+  its `COMMAND_WORDS` spec, its help printed from those words, a `CommandRefused` a `Refused`, exit 2. The person's files are read here
+  (`files.ts`: a folder's regular files directly in it, a link refused by name, a subfolder not read), read into the kind's spec by the
+  api (`workflows.read`, `agents.read`, `skills.read`, which write nothing: the client never parses a definition's frontmatter), and
+  written through `create` or `replace` in `default`, the board's one write path; on `factory`, proposed to `--factory` through the call
+  `nemia propose` makes (`proposalMade`), since a factory's own definitions change by a proposal. A command moves by joining
+  `COMMAND_WORDS`, and its old path's runner is deleted with the move.
+- **A client and a daemon of two releases are refused** (`src/release.ts`, `releaseMet`, proved by `contracts/release.contract.ts`): the
+  client's release is its install's `release.json` `tag`, the daemon's `GET /api/health`'s `release`, either null for a checkout;
+  `served` refuses one that `differs`, exit 2, naming `nemia version`.
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
   live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
@@ -52,20 +64,21 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   and their tests compare the two. A change to one of those outputs on either side changes both.
 - **`nemia decide` is a verb of the client's own** (`src/objects/decide.ts`, the untangle intent's Q14): it prints the screen of the
   api's one decide read model and, at a terminal, runs the `nemia` command a person picks as this client runs it; a `git` command it
-  prints and never runs. **Every write but `apply` and the proposals' stays in process.** The client judges nothing, and moves `nemia apply -f`
+  prints and never runs. **Every write but `apply`, the proposals' and the moved commands' stays on the old path.** The client judges nothing, and moves `nemia apply -f`
   (`src/objects/apply.ts`, resource-objects' decision 5), which writes each object a file holds through the typed client as its kind
   takes it (`applyOf`, proved by `contracts/apply.contract.ts`), and `nemia propose` and `nemia proposals approve|decline`
   (`src/objects/propose.ts`), which ask the api to make and judge a proposal; the api judges who may. A verb in neither `READ_VERBS` nor `CLIENT_VERBS` goes to the old path
-  unchanged, and a verb moves by joining one of them, whose laws say the rest. A command's name is its first word (`nameOf`): a moved read
+  unchanged, and a verb moves by joining one of them, whose laws say the rest. A command's name is the longest of `MOVED_COMMANDS` its words
+  open with, else its first word (`nameOf`): a moved read
   typed with words it does not read (`inbox rm <card>`) hands them to the old path itself (`apps/cli/test/route.test.ts`).
 - **The client's own verbs, `get`, `apply` and `explain`, call each kind through `KIND_CALLS`** (`src/objects/kinds.ts`), a table total
-  over `objects`' `KINDS`: a kind added to the package fails the typecheck here until it is mapped. Each says its own `--help` and
-  refuses `--local`, naming `nemia service status`: no process has them. A word names a resource by discovery (`GET /api`,
+  over `objects`' `KINDS`: a kind added to the package fails the typecheck here until it is mapped. Each says its own `--help`. A word names a resource by discovery (`GET /api`,
   `resourceNamed`), and `explain` reads the fields off `OpenApi.fromApi(Api)`, the document the api serves, computed here. YAML is read
   and written with `yaml`.
 - **Every request carries the session's token** where `WF_SESSION_TOKEN` is set and not empty, as `Authorization: Bearer <token>`
   (`sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is the person.
-  A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is.
+  A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is; a `Conflict` (a stale
+  version) exits 1.
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a
   usage refusal; the bin prints the words and exits with the code. A test asserts the code and that a command is named, never the
   sentence.

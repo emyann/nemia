@@ -20,8 +20,7 @@ const releaseMetSpec = spec<(client: string | null, daemon: string | null) => Re
   ensures: {
     differsExactlyWhenBothSayAndDisagree: {
       description: 'A client and a daemon that both say their release are refused exactly where the two are not the same',
-      condition: ({ input: [client, daemon], output }) =>
-        (output === 'differs') === (bothSay(client, daemon) && client !== daemon),
+      condition: ({ input: [client, daemon], output }) => (output === 'differs') === (bothSay(client, daemon) && client !== daemon),
     },
     metExactlyWhenBothSayTheSame: {
       description: 'A client and a daemon that both say the same release meet',

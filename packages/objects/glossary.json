@@ -294,6 +294,16 @@
     {
       "term": "Answer bound",
       "meaning": "the most an answer's JSON is, in characters (`ANSWER_MOST`, 8 MiB, `packages/objects/src/reads.ts`): past it the api refuses the read, naming the keys that narrow it from its `READS` entry, before it builds the answer; and the default and the most of each page beside it (`LIST_PAGE`, `TRANSCRIPT_PAGE`, `BODY_PAGE`, `LOG_TAIL`)."
+    },
+    {
+      "term": "Command words",
+      "meaning": "a command said once as data, which every layer above the runtime reads (`CommandWords`, `packages/objects/src/command.ts`): its name, usage, help, the spec a command line is parsed by (`parseArgv`, refusing with `CommandRefused`), its class, the side it is served on alone and the endpoints that serve it. `COMMAND_WORDS` (`packages/objects/src/commands.ts`) holds those of the commands the client holds; the orchestrator's table spreads them under each command's handler.",
+      "type": "CommandWords"
+    },
+    {
+      "term": "Definition files",
+      "meaning": "a workflow's, an agent's or a skill's files as a person keeps them, each by its path and text, sent to `POST /api/{workflows|agents|skills}/read`, which reads them into the kind's spec by the orchestrator's readers and writes nothing (`DefinitionFiles`, `packages/objects/src/workflow.ts`).",
+      "type": "DefinitionFiles"
     }
   ]
 }

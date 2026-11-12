@@ -222,7 +222,7 @@ test('an agent whose output: names out.json beside it is written with its schema
   const made = await store.nemia(['agents', 'write', 'yours', '--file', file]);
   assert.equal(made.code, 0, made.err);
   assert.match(made.out, /^agents\/scribe created, at version \S+$/m);
-  const agents = path.join(store.root, 'agents');
+  const agents = path.join(store.root, 'workflows', 'agents');
   assert.equal(fs.readFileSync(path.join(agents, 'scribe.md'), 'utf8'), SCRIBE);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agents, 'out.json'), 'utf8')), JSON.parse(SCHEMA));
 });
@@ -233,7 +233,7 @@ test('`nemia skills write yours other --file s/SKILL.md` naming another skill is
   const other = await store.nemia(['skills', 'write', 'yours', 'other', '--file', file]);
   assert.equal(other.code, 2, other.err);
   assert.match(other.err, /tidy/);
-  assert.equal(fs.existsSync(path.join(store.root, 'skills', 'tidy')), false, 'nothing written');
+  assert.equal(fs.existsSync(path.join(store.root, 'workflows', 'skills', 'tidy')), false, 'nothing written');
   const made = await store.nemia(['skills', 'write', 'yours', 'tidy', '--file', file]);
   assert.equal(made.code, 0, made.err);
   assert.match(made.out, /^skills\/tidy created, at version \S+$/m);

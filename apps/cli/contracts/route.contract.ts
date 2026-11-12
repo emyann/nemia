@@ -75,10 +75,8 @@ const routeSpec = spec<(command: Routed) => Route>({
       condition: ({ input: [command], output }) => command.local || !movedRead(command.name) || command.help || output === 'api',
     },
     helpIsTheTables: {
-      description:
-        'A help of a verb whose words the old path still holds is that table’s one help, printed by the old path here',
-      condition: ({ input: [command], output }) =>
-        command.local || answeredHere(command.name) || !command.help || output === 'process',
+      description: 'A help of a verb whose words the old path still holds is that table’s one help, printed by the old path here',
+      condition: ({ input: [command], output }) => command.local || answeredHere(command.name) || !command.help || output === 'process',
     },
     machineVerbsStayHere: {
       description: 'A verb about this machine runs on the old path here, whatever context is in use',
@@ -88,11 +86,7 @@ const routeSpec = spec<(command: Routed) => Route>({
       description:
         'A verb that is neither a moved read, one of the client’s own, nor a command whose words the client holds runs on the old path: in process here, or forwarded to the remote daemon the context names',
       condition: ({ input: [command], output }) =>
-        command.local ||
-        movedRead(command.name) ||
-        answeredHere(command.name) ||
-        output === 'process' ||
-        output === 'forwarded',
+        command.local || movedRead(command.name) || answeredHere(command.name) || output === 'process' || output === 'forwarded',
     },
     remoteStoreVerbsAreForwarded: {
       description:

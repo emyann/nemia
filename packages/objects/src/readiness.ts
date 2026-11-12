@@ -7,12 +7,13 @@ import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { NeedAsk } from './workflow.ts';
-import { ADDRESS_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, NEED_STATES, READINESS_AREAS } from './words.ts';
+import { ADDRESS_KINDS, FIX_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, HARNESS_PARTS, NEED_STATES, READINESS_AREAS } from './words.ts';
 
 /**
  * A way to put a piece in place: what it does in words and its command — typed by the person where `startable` is false (`nemia
  * claude-token set`, `loginctl enable-linger`), or started by the server where it is true, which `index` names among the need's fixes —
- * with the answers it asks first and the pattern of a code its output shows.
+ * with the answers it asks first, the pattern of a code its output shows, and its kind where it is no `puts` (`typed`, a command the
+ * person types on the server; `removes`, one that takes a met piece away, a harness deactivated).
  */
 export const ReadinessFix = Schema.Struct({
   message: Schema.String,
@@ -21,12 +22,15 @@ export const ReadinessFix = Schema.Struct({
   index: Schema.optionalKey(Schema.Number),
   asks: Schema.optionalKey(Schema.Array(NeedAsk)),
   code: Schema.optionalKey(Schema.String),
+  kind: Schema.optionalKey(Schema.Literals(FIX_KINDS)),
 });
 export type ReadinessFix = typeof ReadinessFix.Type;
 
 /**
  * One piece of the read: its name (a need's name for a declared need), its area, its state, a sentence of what it is or why it is not in
- * place, its fixes, the factory and workflow of a workflow's need, and the kind of the bind's address for the `bind` piece.
+ * place, its fixes, the factory and workflow of a workflow's need (the factory alone of a repository's), the kind of the bind's address
+ * for the `bind` piece, and, for a harness's piece, the harness it is of and which of its two needs (`harness`), so a reader groups a
+ * harness's pieces without naming one.
  */
 export const ReadinessPiece = Schema.Struct({
   name: Schema.String,
@@ -37,6 +41,7 @@ export const ReadinessPiece = Schema.Struct({
   factory: Schema.optionalKey(Schema.String),
   workflow: Schema.optionalKey(Schema.String),
   addressKind: Schema.optionalKey(Schema.Literals(ADDRESS_KINDS)),
+  harness: Schema.optionalKey(Schema.Struct({ name: Schema.String, part: Schema.Literals(HARNESS_PARTS) })),
 });
 export type ReadinessPiece = typeof ReadinessPiece.Type;
 
@@ -45,7 +50,8 @@ export const Readiness = Schema.Struct({ ready: Schema.Boolean, pieces: Schema.A
 export type Readiness = typeof Readiness.Type;
 
 /**
- * `POST /api/readiness/fixes`' body: the need whose fix to start, the factory and workflow of a workflow's need (none for a place's),
+ * `POST /api/readiness/fixes`' body: the need whose fix to start, the factory and workflow of a workflow's need (the factory alone of a
+ * repository's need, none for a place's or a harness's),
  * which of its fixes (`index`, the first where left out), and the answers its asks were given, by their names.
  */
 export const FixStart = Schema.Struct({

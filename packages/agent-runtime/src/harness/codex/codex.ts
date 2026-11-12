@@ -8,7 +8,7 @@ import path from 'node:path';
 import type { McpServer, SpawnRequest } from '../seam.ts';
 import type { HarnessIO, HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
-import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
+import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES, CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
 import { withoutTelemetry } from '../telemetry.ts';
@@ -129,8 +129,7 @@ export const codexSignIn = (env: NodeJS.ProcessEnv, ms: number, cwd?: string): C
   return { state: 'signed-out', said, code: ran.status };
 };
 
-/** The command that logs Codex in on a machine with no browser, which a refusal and a layer above name. */
-export const CODEX_SIGN_IN_COMMAND = 'codex login --device-auth';
+export { CODEX_SIGN_IN_COMMAND } from './vocabulary.ts';
 
 /**
  * Why Codex cannot start the session `r` because it is signed out on this machine, or `undefined`. It asks `codex login status`

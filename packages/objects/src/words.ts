@@ -751,11 +751,23 @@ export const ADDRESS_KINDS = ['loopback', 'wildcard', 'private', 'shared', 'link
 export type AddressKind = (typeof ADDRESS_KINDS)[number];
 
 /**
- * The areas of the readiness read, each piece in one: the harness's sign-in, the service and its linger, the bind, the machine
- * (cgroup v2, `systemd --user`, the tools folder on PATH), a place's need (the git identity), a workflow's need, the factories, the
- * release, and the client's own pieces a laptop adds (its context reaches the server, the server takes its token).
+ * The areas of the readiness read, each piece in one: a harness's install and sign-in, the service and its linger, the bind, the machine
+ * (cgroup v2, `systemd --user`, the tools folder on PATH), a place's need (the git identity), a workflow's need, a factory's repository's
+ * need (its toolchain), the factories, the release, and the client's own pieces a laptop adds (its context reaches the server, the
+ * server takes its token).
  */
-export const READINESS_AREAS = ['harness', 'service', 'bind', 'machine', 'place', 'workflow', 'factory', 'release', 'client'] as const;
+export const READINESS_AREAS = [
+  'harness',
+  'service',
+  'bind',
+  'machine',
+  'place',
+  'workflow',
+  'repository',
+  'factory',
+  'release',
+  'client',
+] as const;
 
 /** One of `READINESS_AREAS`. */
 export type ReadinessArea = (typeof READINESS_AREAS)[number];
@@ -774,6 +786,31 @@ export const FIX_STREAM_EVENTS = ['output', 'ended'] as const;
 
 /** One of `FIX_STREAM_EVENTS`. */
 export type FixStreamEventName = (typeof FIX_STREAM_EVENTS)[number];
+
+/**
+ * What a need's fix is (`NeedFix.kind`): one the server runs to put the need in place (`puts`, a fix that says no kind); one a person
+ * types on the server, since it asks them for what a fix task cannot read, a code pasted back (`typed`); and one that takes a met need
+ * away, a harness deactivated (`removes`), refused while an unfinished run needs it.
+ */
+export const FIX_KINDS = ['puts', 'typed', 'removes'] as const;
+
+/** One of `FIX_KINDS`. */
+export type FixKind = (typeof FIX_KINDS)[number];
+
+/**
+ * Where a need's check and fix run (`Need.scope`): once on the machine (`machine`, a need that says no scope), or in each factory's
+ * repository checkout (`repository`, its toolchain), read and fixed per factory.
+ */
+export const NEED_SCOPES = ['machine', 'repository'] as const;
+
+/** One of `NEED_SCOPES`. */
+export type NeedScope = (typeof NEED_SCOPES)[number];
+
+/** Which of a harness's two needs a readiness piece is (`ReadinessPiece.harness.part`): its program installed, or its sign-in. */
+export const HARNESS_PARTS = ['install', 'sign-in'] as const;
+
+/** One of `HARNESS_PARTS`. */
+export type HarnessPart = (typeof HARNESS_PARTS)[number];
 
 /**
  * Where a ticket stands (`ticketState`, agent-orchestrator's src/pairing/ticket.ts) — a pairing, or a first-visit link: waiting on the

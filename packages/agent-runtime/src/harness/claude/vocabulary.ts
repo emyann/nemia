@@ -3,7 +3,7 @@
  * asked for, as sentences. Harness vocabulary, so it lives beside the runners
  * that speak it and never in `domain.ts`.
  */
-import type { FenceReach, HarnessDeclaration } from '../declaration.ts';
+import type { FenceReach, HarnessDeclaration, HarnessNeeds } from '../declaration.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_RULES } from './rules.ts';
 
@@ -17,6 +17,45 @@ export const CLAUDE_SIGN_IN = {
   maker: 'claude setup-token',
   login: 'claude auth login',
 } as const;
+
+/**
+ * The Claude Code this release was tested with: the Agent SDK's own platform package at the SDK's version (`CLAUDE_SDK_VERSION`), whose
+ * `claude` answers `CLAUDE_PIN` (the SDK's `claudeCodeVersion`). Both move with the SDK's exact pin, held equal to its `package.json`
+ * by `test/harness-needs.test.ts`.
+ */
+export const CLAUDE_SDK_VERSION = '0.3.322';
+export const CLAUDE_PIN = '2.1.322';
+
+/**
+ * Claude Code's needs: the SDK's platform package for this machine (`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, the package the
+ * SDK resolves its bundled binary by) at `CLAUDE_SDK_VERSION`, installed by npm under the tools folder and its `claude` linked into the
+ * folder's `bin/`; signed in by its own login, or by a long-lived token (`CLAUDE_SIGN_IN`), each typed by the person on the server, since
+ * both ask for what a task cannot read.
+ */
+function claudeNeeds(): HarnessNeeds {
+  const home = `"$NEMIA_TOOLS/harnesses/claude/${CLAUDE_PIN}"`;
+  const pkg = `@anthropic-ai/claude-agent-sdk-$p`;
+  return {
+    program: 'claude',
+    title: 'Claude Code',
+    pin: CLAUDE_PIN,
+    version: 'claude --version',
+    check: 'command -v claude >/dev/null',
+    install: `p=$(node -p 'process.platform+"-"+process.arch') && mkdir -p ${home} "$NEMIA_TOOLS/bin" && npm install --no-save --no-package-lock --no-audit --no-fund --prefix ${home} "${pkg}@${CLAUDE_SDK_VERSION}" && ln -sfn ${home}/node_modules/${pkg}/claude "$NEMIA_TOOLS/bin/claude"`,
+    remove: `rm -f "$NEMIA_TOOLS/bin/claude" && rm -rf "$NEMIA_TOOLS/harnesses/claude"`,
+    signIn: {
+      check: 'claude auth status >/dev/null',
+      fixes: [
+        { command: CLAUDE_SIGN_IN.login, message: 'sign in with your Claude account, as the user the daemon runs as', typed: true },
+        {
+          command: CLAUDE_SIGN_IN.maker,
+          message: 'make a long-lived token where no browser can sign in, then keep it on the server',
+          typed: true,
+        },
+      ],
+    },
+  };
+}
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
@@ -360,4 +399,5 @@ export const CLAUDE_DECLARATION: HarnessDeclaration = {
   runsBrief: true,
   recordsDenials: true,
   rules: CLAUDE_RULES,
+  needs: claudeNeeds(),
 };

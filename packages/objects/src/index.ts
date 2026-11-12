@@ -530,6 +530,12 @@ export {
   type FixPhase,
   FIX_STREAM_EVENTS,
   type FixStreamEventName,
+  FIX_KINDS,
+  type FixKind,
+  NEED_SCOPES,
+  type NeedScope,
+  HARNESS_PARTS,
+  type HarnessPart,
   TICKET_STATES,
   type TicketState,
 } from './words.ts';

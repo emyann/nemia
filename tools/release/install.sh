@@ -5,8 +5,15 @@
 #
 # It fetches the release archive for this machine and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
 # $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia.
-# Then it asks, or reads from its flags under --yes: the Claude token, starting at login and the address to bind; or, with --client,
-# the server this machine's nemia talks to, and no service. It never prints a token.
+# Then it asks, on the server, or reads from its flags under --yes: the Claude token (made by claude setup-token, read without echo
+# and handed to nemia claude-token set by its stdin; skipped with a warning only under --yes without --claude-token-file), starting at
+# login, and the address to bind, picked from the private ones nemia service addresses lists or typed (a public or wildcard one refused
+# but with --public). A bind exposes the store: this machine's own person token is minted straight into the local context's file and
+# never printed, and the board's single-use first-visit link (nemia board link) is printed in its place. With --client it starts no
+# service and pairs this machine with its server (nemia pair <url>), or takes a token by --token-file. It ends on nemia readiness, the
+# read of what is in place and what is missing, whose exit fails no install. It never prints a token.
+#
+# NEMIA_INSTALL_TTY names a file read in place of the terminal, one answer a line, its prompts on stderr: the test's seam alone.
 #
 # Exit codes: 0 installed, 1 refused or failed (the line says what to do), 2 an argument it does not take.
 # tools/guards/test/install.test.ts holds it.
@@ -20,13 +27,17 @@ bind=
 client=0
 server=
 context=remote
+context_given=0
 token_file=
 claude_token_file=
+public=0
+board_base=
 
 usage() {
   cat <<'EOF'
 usage: install.sh [--yes] [--version <tag>] [--base <download base>]
-                  [--no-service] [--bind <address>] [--claude-token-file <file>]
+                  [--no-service] [--bind <address> [--public]] [--board-base <url>]
+                  [--claude-token-file <file>]
                   [--client --server <url> [--context <name>] [--token-file <file>]]
 EOF
 }
@@ -52,11 +63,13 @@ while [ "$#" -gt 0 ]; do
     --yes | -y) yes=1 ;;
     --no-service) service=0 ;;
     --client) client=1 ;;
+    --public) public=1 ;;
     --version) value "$@"; tag=$2; shift ;;
     --base) value "$@"; base=${2%/}; shift ;;
     --bind) value "$@"; bind=$2; shift ;;
     --server) value "$@"; server=$2; shift ;;
-    --context) value "$@"; context=$2; shift ;;
+    --context) value "$@"; context=$2; context_given=1; shift ;;
+    --board-base) value "$@"; board_base=${2%/}; shift ;;
     --token-file) value "$@"; token_file=$2; shift ;;
     --claude-token-file) value "$@"; claude_token_file=$2; shift ;;
     --help | -h) usage; exit 0 ;;
@@ -69,11 +82,16 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-# A person answers on the terminal, even when the script itself comes down a pipe; with no terminal it goes on as --yes would.
+# A person answers on the terminal, even when the script itself comes down a pipe; with no terminal it goes on as --yes would. The
+# answers are read on descriptor 3 and the prompts written on 4, opened once, so each read takes the next line.
 interactive=0
 if [ "$yes" = 0 ]; then
-  if (: </dev/tty) 2>/dev/null; then
+  if [ -n "${NEMIA_INSTALL_TTY:-}" ] && [ -r "$NEMIA_INSTALL_TTY" ]; then
     interactive=1
+    exec 3<"$NEMIA_INSTALL_TTY" 4>&2
+  elif (: </dev/tty) 2>/dev/null; then
+    interactive=1
+    exec 3</dev/tty 4>/dev/tty
   else
     warn "no terminal to ask on: going on as with --yes"
   fi
@@ -83,9 +101,23 @@ fi
 ask() {
   answer=$2
   [ "$interactive" = 1 ] || return 0
-  printf '%s ' "$1" >/dev/tty
-  read -r answer </dev/tty || answer=
+  printf '%s ' "$1" >&4
+  read -r answer <&3 || answer=
   [ -n "$answer" ] || answer=$2
+}
+
+# secret <prompt>: a line read with the terminal's echo off, in $answer; 1 where nothing is left to read.
+secret() {
+  printf '%s' "$1" >&4
+  if [ -t 3 ]; then stty -echo <&3; fi
+  answer=
+  read -r answer <&3 || [ -n "$answer" ] || {
+    if [ -t 3 ]; then stty echo <&3; fi
+    printf '\n' >&4
+    return 1
+  }
+  if [ -t 3 ]; then stty echo <&3; fi
+  printf '\n' >&4
 }
 
 has() { command -v "$1" >/dev/null 2>&1; }
@@ -220,49 +252,55 @@ case ":$PATH:" in
 esac
 nemia=$bindir/nemia
 
+# readiness: the last thing the install does, on either side, whose exit fails no install.
+readiness() {
+  say "what is in place and what is missing, each with the command that fixes it:"
+  "$nemia" readiness || warn "something is still missing: run the fix each line above names, then nemia readiness to read it again"
+  say "done: nemia readiness reads it again, nemia version says what runs"
+}
+
 if [ "$client" = 1 ]; then
   [ -n "$server" ] || {
     ask "The URL of the Nemia server this machine talks to:" ""
     server=$answer
   }
   [ -n "$server" ] || fail "a client install needs its server: pass --server <url>"
-  # A context holds a token of the person's for its server, read from a file and never typed on a command line: pasted here, it is
-  # written to a 0600 file in the install's own temporary folder, removed as the script ends.
-  if [ -z "$token_file" ]; then
-    [ "$interactive" = 1 ] ||
-      fail "a client install needs a token of yours for $server: mint one there with nemia token add <name>, write it to a file and pass --token-file <file>"
-    printf 'Paste a token of yours for %s (nemia token add <name> on its machine mints one; it is not shown): ' "$server" >/dev/tty
-    stty -echo </dev/tty
-    read -r server_token </dev/tty || server_token=
-    stty echo </dev/tty
-    printf '\n' >/dev/tty
-    [ -n "$server_token" ] || fail "no token pasted: run this again, or pass --token-file <file>"
-    token_file=$work/server-token
-    (umask 077 && printf '%s\n' "$server_token" >"$token_file")
-    server_token=
+  if [ -n "$token_file" ]; then
+    # The old way: a token of the person's for its server, read from a file and never typed on a command line.
+    "$nemia" config set-context "$context" --server "$server" --token-file "$token_file"
+    "$nemia" config use-context "$context"
+  else
+    # A pairing: nemia pair shows a short code, the person approves it on the server (nemia pairings approve <code>, or the board),
+    # and a person token named for this machine lands in its context, never printed.
+    say "pairing with $server: approve the code it shows there, with nemia pairings approve <code> or on the board"
+    if [ "$context_given" = 1 ]; then
+      "$nemia" pair "$server" --context "$context" || fail "the pairing with $server did not finish: run nemia pair $server --context $context again"
+    else
+      "$nemia" pair "$server" || fail "the pairing with $server did not finish: run nemia pair $server again"
+    fi
   fi
-  "$nemia" config set-context "$context" --server "$server" --token-file "$token_file"
-  "$nemia" config use-context "$context"
-  say "nemia now talks to $server (context $context); no service was installed"
+  say "nemia now talks to $server; no service was installed"
+  readiness
   exit 0
 fi
 
-# The Claude token goes to nemia's own 0600 file by stdin, never through an argument or a line printed.
+# The Claude token goes to nemia's own 0600 file by stdin, never through an argument or a line printed. A person is asked it
+# outright; only a run under --yes with no file goes on without it.
 if [ -n "$claude_token_file" ]; then
   "$nemia" claude-token set <"$claude_token_file"
 elif [ "$interactive" = 1 ]; then
-  ask "Set the Claude token now (claude setup-token prints it)? [y/N]" n
-  case $answer in
-    y* | Y*)
-      printf 'Paste the token (it is not shown): ' >/dev/tty
-      stty -echo </dev/tty
-      read -r claude_token </dev/tty || claude_token=
-      stty echo </dev/tty
-      printf '\n' >/dev/tty
-      printf '%s\n' "$claude_token" | "$nemia" claude-token set
-      claude_token=
-      ;;
-  esac
+  claude_token=
+  while [ -z "$claude_token" ]; do
+    secret "The Claude token (claude setup-token on any machine with a browser prints it; it is not shown): " ||
+      fail "no Claude token was read: make one with claude setup-token, then run this again or pass --claude-token-file <file>"
+    claude_token=$answer
+    [ -n "$claude_token" ] || printf 'Sessions run Claude Code on it: paste the token claude setup-token printed.\n' >&4
+  done
+  answer=
+  printf '%s\n' "$claude_token" | "$nemia" claude-token set
+  claude_token=
+else
+  warn "no Claude token was set: make one with claude setup-token, then hand it to nemia claude-token set on its stdin"
 fi
 
 [ "$service" = 1 ] && {
@@ -270,29 +308,74 @@ fi
   case $answer in n* | N*) service=0 ;; esac
 }
 if [ "$service" = 1 ]; then
-  [ -n "$bind" ] || {
-    ask "The address the board and the api listen on (empty: 127.0.0.1, this machine alone):" ""
-    bind=$answer
-  }
+  # This machine's addresses, one a line: <address> <interface> <kind>, loopback first.
+  addresses=$work/addresses
+  "$nemia" service addresses >"$addresses" ||
+    warn "nemia service addresses did not answer: type the address to bind, or pass --bind <address>"
+  if [ -z "$bind" ] && [ "$interactive" = 1 ]; then
+    # The offer: this machine alone, then each private, shared (a VPN's) or unique-local address, numbered; a typed address is
+    # taken too.
+    printf '127.0.0.1\n' >"$work/offered"
+    printf 'The address the board and the api listen on:\n  1) 127.0.0.1, this machine alone\n' >&4
+    while read -r address iface kind; do
+      case $kind in
+        private | shared | unique-local)
+          printf '%s\n' "$address" >>"$work/offered"
+          printf '  %s) %s, %s on %s\n' "$(wc -l <"$work/offered" | tr -d ' ')" "$address" "$kind" "$iface" >&4
+          ;;
+      esac
+    done <"$addresses"
+    ask "Pick a number, or type an address [1]:" 1
+    case $answer in
+      *[!0-9]*) bind=$answer ;;
+      *)
+        bind=$(awk -v n="$answer" 'NR == n' "$work/offered")
+        [ -n "$bind" ] || fail "no address is numbered $answer: run this again and pick one of the numbers shown, or pass --bind <address>"
+        [ "$bind" != 127.0.0.1 ] || bind=
+        ;;
+    esac
+  fi
   if [ -n "$bind" ]; then
-    "$nemia" service install --size auto --bind "$bind"
-  else
+    # Its kind, from the list where the address is in it; one that is not is judged by nemia service install itself.
+    case $bind in
+      0.0.0.0 | :: | '[::]') kind=wildcard ;;
+      *) kind=$(awk -v a="$bind" '$1 == a { print $3; exit }' "$addresses") ;;
+    esac
+    case $kind in
+      public | wildcard)
+        [ "$public" = 1 ] ||
+          fail "$bind is a $kind address: anyone who reaches it reaches the board's sign-in; pick a private address, or put a firewall before it and pass --bind $bind --public"
+        ;;
+    esac
+  fi
+  if [ -z "$bind" ]; then
     "$nemia" service install --size auto
+  elif [ "$public" = 1 ]; then
+    "$nemia" service install --size auto --bind "$bind" --public
+  else
+    "$nemia" service install --size auto --bind "$bind"
   fi
   if [ "$os" = linux ]; then
     loginctl enable-linger "$(id -un)" ||
       warn "loginctl enable-linger failed: Nemia stops when you log out until you run loginctl enable-linger $(id -un)"
   fi
   if [ -n "$bind" ]; then
-    # An exposed store asks every caller for a token, this machine's own nemia too: the first token is minted, shown this once for
-    # the person's other machines and browsers, and kept for this machine's nemia (set-context local) in a 0600 file removed after.
-    say "the store is exposed on $bind: every caller needs a person token; here is the first, shown this once"
-    minted=$("$nemia" token add "$(id -un)")
-    printf '%s\n' "$minted"
-    (umask 077 && printf '%s\n' "$minted" | sed -n 's/^Authorization: Bearer //p' >"$work/local-token")
-    minted=
+    # An exposed store asks every caller for a token, this machine's own nemia too: its token is minted straight into a 0600 file,
+    # read off the Authorization: line and never printed, handed to the local context and removed. A browser signs in by the
+    # first-visit link instead, and another machine pairs.
+    say "the store is exposed on $bind: every caller needs a person token; this machine's nemia keeps its own, never shown"
+    (umask 077 && "$nemia" token add "$(id -un)" | sed -n 's/^Authorization: Bearer //p' >"$work/local-token")
+    [ -s "$work/local-token" ] ||
+      fail "nemia token add $(id -un) gave no token: run nemia token add <name> >file by hand, then nemia config set-context local --token-file <file>"
     "$nemia" config set-context local --token-file "$work/local-token"
-    say "this machine's nemia asks its daemon with that token; on another machine: nemia config set-context <name> --server http://<this machine's address>:8787 --token-file <file>"
+    rm -f "$work/local-token"
+    say "open this link in a browser within ten minutes: it signs that browser in to the board, once"
+    if [ -n "$board_base" ]; then
+      "$nemia" board link --base "$board_base" || warn "no first-visit link was made: run nemia board link --base $board_base once Nemia is up"
+    else
+      "$nemia" board link || warn "no first-visit link was made: run nemia board link once Nemia is up"
+    fi
+    say "on another machine: install with --client --server http://<this machine's address>:8787, then approve its code here with nemia pairings approve <code>"
   fi
 fi
-say "done: run nemia version"
+readiness

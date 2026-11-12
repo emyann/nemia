@@ -23,7 +23,8 @@ import {
   type FactoryListing,
   type RevisionsPolicy,
 } from './factory.ts';
-import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, refuseName } from './door/factories.store.ts';
+import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, originsOf, refuseName } from './door/factories.store.ts';
+import { cloned } from './clones/clones.verb.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -44,8 +45,8 @@ import { FACTORY_SETTINGS, SETTING_FORMS } from '../harness-settings/harness-set
 import { COST_LINE_FORMS, FACTORY_COST_LINES } from './cost-line/cost-line.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
-nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
-nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
+nemia factory add <name> --repo <path|url> [--repo <path|url> ...] [--no-trust]
+nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]
 nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
 nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
 nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
@@ -317,7 +318,7 @@ const REPOS = {
   kind: 'text',
   key: 'repos',
   many: true,
-  takes: "--repo takes a repository's directory: nemia factory add <name> --repo <path> [--repo <path> ...]",
+  takes: "--repo takes a repository's directory or its git URL: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]",
 } satisfies Flag;
 
 /** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository, and `--no-trust`. */
@@ -330,7 +331,7 @@ const ADD_SPEC: Spec = {
       : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
   apart: () => REPOS.takes,
   missing:
-    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]. Nothing was filed.",
 };
 
 /**
@@ -340,8 +341,11 @@ const ADD_SPEC: Spec = {
 export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
   name: 'factory add',
   served: [{ endpoint: 'factories.create' }],
-  usage: '<name> --repo <path> [--repo <path> ...] [--no-trust]',
-  help: ['file a factory: a lowercase slug naming one or more directories,', 'each trusted for its steps unless --no-trust'],
+  usage: '<name> --repo <path|url> [--repo <path|url> ...] [--no-trust]',
+  help: [
+    'file a factory: a lowercase slug naming one or more directories or git URLs,',
+    'each URL cloned, each trusted for its steps unless --no-trust',
+  ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
@@ -351,11 +355,13 @@ export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file
     Effect.gen(function* () {
       const name = textOf(args, 'name');
       const given = Array.isArray(args.repos) ? args.repos : [];
-      const repos = yield* tried(() => {
+      const home = yield* StoreRoot;
+      const { repos, origins } = yield* tried(() => {
         refuseName(name, 'add');
-        return factoryRepos(name, given);
+        return factoryRepos(home, name, given);
       });
-      const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {} };
+      yield* cloned(origins);
+      const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, ...originsOf(origins) };
       const file = yield* Effect.gen(function* () {
         const door = yield* FactoryDoor;
         return yield* door.factories.create(factory);

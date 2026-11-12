@@ -35,6 +35,7 @@ const LIES: { readonly [V in PlaceVerb]: (answer: PlaceAnswers[V]) => PlaceAnswe
   remove: (answer) => ({ ...answer, removed: [...answer.removed, ...answer.left.map((l) => l.path)], left: [] }),
   export: () => ({ commit: NO_COMMIT }),
   seal: (answer) => ({ removed: !answer.removed }),
+  clone: (answer) => ({ ...answer, made: !answer.made }),
 };
 
 /** A new test place whose `verb` does what it does and answers `lie` of its true answer; a refusal and an unread outcome as they are. */

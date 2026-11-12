@@ -182,6 +182,11 @@
           "card": "factory: an upgrade conflict outside a workflow folder is a proposal of its own kind too, and carried files get a way to be proposed"
         }
       ]
+    },
+    {
+      "term": "Clone",
+      "meaning": "a factory's repository named by its git URL: kept in the store under `clones/<host>/<path>` (`cloneTarget`, proved by `packages/agent-orchestrator/contracts/clone-target.contract.ts`, in `packages/agent-orchestrator/src/factory/clones/clones.ts`), its URL recorded beside it in the factory's `origins`, cloned by the place's `clone` when the factory is added and again by the daemon's sweep when its folder is gone (`clonesOnce`). The machine's own git credentials make it; Nemia holds none.",
+      "type": "CloneTarget"
     }
   ]
 }

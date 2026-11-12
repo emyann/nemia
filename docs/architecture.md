@@ -199,7 +199,11 @@ read in place; going back is refused past the oldest release that reads it, whic
 to its own release's floor as it takes the store, never lowering it (`src/release/floor.ts`). An archive install's daemon asks for the
 newest release every six hours unless `NEMIA_RELEASE_CHECK=off` (`src/release/check.verb.ts`), which `nemia version` and the board say.
 The daemon, however started, loads the person's own sign-in token from its 0600 file (`nemia claude-token set`, `loadClaudeToken`,
-`src/sign-in/`) into the environment its sessions inherit where none is set; it never sends, logs or serves it. `nemia service install
+`src/sign-in/`) into the environment its sessions inherit where none is set; it never sends, logs or serves it. A factory's
+repository named by its git URL is cloned under the store's `clones/<host>/<path>` by the place's `clone`, at `nemia factory add`, and
+made again by a daemon sweep when its folder is gone (`src/factory/clones/`), with the machine's own git credentials: Nemia holds none.
+A Codex step is refused at its spawn while `codex login status` says Codex is signed out (`prepare`, the runtime's
+`harness/codex/codex.ts`). `nemia service install
 --size auto` sizes the sessions at once and each one's memory limit to the machine (`sizedFor`, `src/service/sizing.ts`).
 A release that is not current, not among the two newest, and that no running Nemia process nor session in flight runs on is removed
 after `nemia upgrade` and on a sweep of the daemon's every five minutes (`retain`, `src/retention/retention.verb.ts`).

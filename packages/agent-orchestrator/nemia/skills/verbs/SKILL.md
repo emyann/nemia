@@ -405,11 +405,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia inbox rm <name>
                                drop a card without starting it
                                on the port: inbox_rm
-  nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
-                               file a factory: a lowercase slug naming one or more directories,
-                               each trusted for its steps unless --no-trust
+  nemia factory add <name> --repo <path|url> [--repo <path|url> ...] [--no-trust]
+                               file a factory: a lowercase slug naming one or more directories or git URLs,
+                               each URL cloned, each trusted for its steps unless --no-trust
                                on the port: factory_add
-  nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
+  nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
                                on the port: factory_apply

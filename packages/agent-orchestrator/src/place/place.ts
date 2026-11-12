@@ -22,12 +22,16 @@ export const PLACE_VERBS = [
   'remove',
   'export',
   'seal',
+  'clone',
 ] as const;
 
 /** A verb a place may answer. */
 export type PlaceVerb = (typeof PLACE_VERBS)[number];
 
-/** How long a verb may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow. */
+/**
+ * How long a verb may take before it is unread, in milliseconds: two minutes, and ten for `make`, whose fan-in merge is slow, and for
+ * `clone`, which fetches a whole repository.
+ */
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   root: 120_000,
   open: 120_000,
@@ -42,6 +46,7 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   remove: 120_000,
   export: 120_000,
   seal: 120_000,
+  clone: 600_000,
 };
 
 /**
@@ -194,6 +199,12 @@ export type Exported = { readonly commit: string };
 /** What `seal` answers: whether an exported tree held the empty repository `export` gave it, now removed. */
 export type Sealed = { readonly removed: boolean };
 
+/**
+ * What `clone` answers: the repository it made or found at the folder asked of, and whether it made it now (`made`) or found one there
+ * already. The place clones with the machine's own credentials and holds none.
+ */
+export type Cloned = { readonly repo: string; readonly made: boolean };
+
 /** Each verb's answer. */
 export type PlaceAnswers = {
   readonly root: Rooted;
@@ -209,6 +220,7 @@ export type PlaceAnswers = {
   readonly remove: Removed;
   readonly export: Exported;
   readonly seal: Sealed;
+  readonly clone: Cloned;
 };
 
 /**
@@ -255,6 +267,7 @@ export type PlaceRequests = {
   readonly remove: { readonly repo: string; readonly workspaces: readonly string[]; readonly branches: readonly string[] };
   readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
   readonly seal: { readonly tree: string };
+  readonly clone: { readonly url: string; readonly into: string };
 };
 
 /** A verb that gave no answer: which, the place's words on why it was not heard, and when, as an ISO time. */

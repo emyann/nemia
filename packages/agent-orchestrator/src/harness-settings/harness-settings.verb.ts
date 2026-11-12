@@ -4,6 +4,7 @@
  * settings are the person's, never the template's. Served on both sides, typed by their `input`: the api's `putSetting` and
  * `deleteSetting` call these handlers.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import type { Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -102,7 +103,7 @@ const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
  */
 export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: unknown }, SettingSetInput> = {
   name: 'factory setting set',
-  served: [{ endpoint: 'factories.putSetting' }],
+  served: [{ endpoint: 'factories.putSetting', request: renamed({ factory: 'name' }) }],
   usage: SET_USAGE,
   help: [
     "give every session of a factory's runs on a harness one of its settings,",
@@ -135,7 +136,7 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
 /** `nemia factory setting rm`: a harness setting taken off a factory, by its key; runs started after are given it no more. */
 export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }, SettingRmInput> = {
   name: 'factory setting rm',
-  served: [{ endpoint: 'factories.deleteSetting' }],
+  served: [{ endpoint: 'factories.deleteSetting', request: renamed({ factory: 'name' }) }],
   usage: RM_USAGE,
   help: ['take a harness setting off a factory, by its key'],
   spec: specOf('rm', RM_USAGE, false),

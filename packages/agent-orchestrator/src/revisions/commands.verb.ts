@@ -2,6 +2,7 @@
  * `nemia refresh`, an entry of the command table: a run's definitions pinned again (`refreshRun`), or, with `--base`, its base merged
  * into its looping step (`mergeRun`).
  */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { RunRefresh } from 'objects';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -58,7 +59,7 @@ export const REFRESH: Command<
   RefreshInput
 > = {
   name: 'refresh',
-  served: [{ endpoint: 'runs.refresh' }],
+  served: [{ endpoint: 'runs.refresh', request: renamed({ runId: 'name' }) }],
   usage: '<runId> [<step>] [--base]',
   help: [
     'take the new revisions: a run keeps the workflow, agents, skills and',

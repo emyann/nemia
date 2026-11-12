@@ -9,7 +9,15 @@
  * (`FactoryCommands`), with the bodies their writes are sent; and what its other writes are sent and answer: its revisions policy, a
  * harness setting, its places trusted again (`FactoryTrusted`) and its removal (`FactoryRemoved`). The rules and the instruction share
  * the Factory's `resourceVersion`, as a Kubernetes subresource shares its object's: a write of either moves it, as a change of its spec
- * or its status does. Plain Schemas of JSON, as every object of this package is.
+ * or its status does.
+ *
+ * And the writes that name a template or a folder, with what each answers: a factory filed (`FactoryCreate`, `FactoryCreated`), a volume
+ * mounted and taken off (`VolumeWrite`, `VolumeAdded`, `VolumeRemoved`), a factory made from a template (`FactoryApplyWrite`,
+ * `FactoryApplied`), a hand-made one taken over by one (`FactoryAdoptWrite`, `FactoryAdopted`), the preview of either change
+ * (`FactoryDiffWrite`, `FactoryPlan`), an upgrade filed (`FactoryUpgradeWrite`, `FactoryUpgraded`) and a conflict's choice
+ * (`FactoryResolveWrite`, `FactoryResolved`). A template travels as `TemplateGiven`: a builtin template by its name, any other packed as
+ * `nemia template pack` packs it; a repository's or a volume's path names a folder of the machine the api runs on. Plain Schemas of JSON,
+ * as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
@@ -18,6 +26,7 @@ import {
   FACTORY_CONDITION_STATUSES,
   FACTORY_CONDITION_TYPES,
   LEVELS,
+  PROPOSABLE_KINDS,
   PROPOSAL_PHASES,
   REVISIONS_POLICIES,
 } from './words.ts';
@@ -242,3 +251,238 @@ export const FactoryCommands = Schema.Struct({
   volumeRm: Schema.Record(Schema.String, Schema.String),
 });
 export type FactoryCommands = typeof FactoryCommands.Type;
+
+/**
+ * A template as a request gives it: a builtin template by its name (`{ name }`), or a template's folder or archive packed as `nemia
+ * template pack` packs one — a gzipped tar of its one folder — in base64 (`{ archive }`). The api reads no path of the caller's machine.
+ */
+export const TemplateGiven = Schema.Union([Schema.Struct({ name: Schema.String }), Schema.Struct({ archive: Schema.String })]);
+export type TemplateGiven = typeof TemplateGiven.Type;
+
+/**
+ * A factory filed (`POST /api/factories`): its name, its repositories, each a folder of the machine the api runs on by its whole path,
+ * and, with `noTrust`, its places left untrusted. A key left out is refused by the verb, in the command line's words.
+ */
+export const FactoryCreate = Schema.Struct({
+  name: Schema.String,
+  repos: Schema.optionalKey(Schema.Array(Schema.String)),
+  noTrust: Schema.optionalKey(Schema.Boolean),
+});
+export type FactoryCreate = typeof FactoryCreate.Type;
+
+/** What a filing answers: the factory, its repositories, its file, and what was asked for each of its places' trust. */
+export const FactoryCreated = Schema.Struct({
+  name: Schema.String,
+  repos: Schema.Array(Schema.String),
+  file: Schema.String,
+  trusts: Schema.Array(FactoryPlaceTrust),
+});
+export type FactoryCreated = typeof FactoryCreated.Type;
+
+/**
+ * A volume mounted for a factory's runs (`POST /api/factories/<factory>/volumes`): a folder of the machine the api runs on by its whole
+ * path, marked `:ro` or `:rw`, as `nemia factory volume add` spells it.
+ */
+export const VolumeWrite = Schema.Struct({ volume: Schema.String });
+export type VolumeWrite = typeof VolumeWrite.Type;
+
+/** A volume mounted: the factory's file written, the volume, and what a volume of its path was marked before (null for none). */
+export const VolumeAdded = Schema.Struct({ file: Schema.String, volume: FactoryVolume, was: Schema.NullOr(Schema.Boolean) });
+export type VolumeAdded = typeof VolumeAdded.Type;
+
+/** A volume taken off (`DELETE /api/factories/<factory>/volumes?path=`): the factory's file written, and the path it mounts no more. */
+export const VolumeRemoved = Schema.Struct({ file: Schema.String, removed: Schema.String });
+export type VolumeRemoved = typeof VolumeRemoved.Type;
+
+/**
+ * A factory made from a template (`POST /api/factories/<name>/apply`): the template, its repositories, each a folder of the machine the api
+ * runs on, its parameters as `--set` words (`<key>=<value>`), and, with `noTrust`, its places left untrusted. A template or the
+ * repositories left out are refused by the verb, in the command line's words.
+ */
+export const FactoryApplyWrite = Schema.Struct({
+  template: Schema.optionalKey(TemplateGiven),
+  repos: Schema.optionalKey(Schema.Array(Schema.String)),
+  sets: Schema.optionalKey(Schema.Array(Schema.String)),
+  noTrust: Schema.optionalKey(Schema.Boolean),
+});
+export type FactoryApplyWrite = typeof FactoryApplyWrite.Type;
+
+/**
+ * What an apply filed: the factory, its repositories, its file, the template it was made from and where that is read, the tree it runs
+ * from, and what was asked for each of its places' trust.
+ */
+export const FactoryApplied = Schema.Struct({
+  name: Schema.String,
+  repos: Schema.Array(Schema.String),
+  file: Schema.String,
+  template: FactoryTemplate,
+  place: Schema.String,
+  tree: Schema.String,
+  trusts: Schema.Array(FactoryPlaceTrust),
+});
+export type FactoryApplied = typeof FactoryApplied.Type;
+
+/**
+ * A hand-made factory taken over by a template (`POST /api/factories/<factory>/adopt`): the template, its parameters as `--set` words,
+ * and the digest of the plan its preview printed (`plan`); the template or the plan left out refused by the verb, in its words.
+ */
+export const FactoryAdoptWrite = Schema.Struct({
+  template: Schema.optionalKey(TemplateGiven),
+  sets: Schema.optionalKey(Schema.Array(Schema.String)),
+  plan: Schema.optionalKey(Schema.String),
+});
+export type FactoryAdoptWrite = typeof FactoryAdoptWrite.Type;
+
+/** What a takeover wrote: the factory, its file, the template it is now made from, and the tree it runs from. */
+export const FactoryAdopted = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  template: FactoryTemplate,
+  tree: Schema.String,
+});
+export type FactoryAdopted = typeof FactoryAdopted.Type;
+
+/**
+ * The preview of a factory's change (`POST /api/factories/<factory>/diff`), nothing written: of a templated factory, its upgrade to `to`,
+ * from the template it names or another (`template`); of a hand-made one, its takeover by `template`; each with its parameters as `--set`
+ * words.
+ */
+export const FactoryDiffWrite = Schema.Struct({
+  to: Schema.optionalKey(Schema.String),
+  template: Schema.optionalKey(TemplateGiven),
+  sets: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+export type FactoryDiffWrite = typeof FactoryDiffWrite.Type;
+
+/** Which side a cleanly merged file's change came from: the template's, the factory's, or both alike. */
+export const MERGED_FROM = ['template', 'factory', 'both'] as const;
+
+/** Whether an upgrade's merge has a common base, or none (a switch onto a template of another name). */
+export const MERGE_BASES = ['common', 'none'] as const;
+
+/** How a takeover changes one step's hire: hired by the template only, by the factory only, or by both, apart. */
+export const HIRE_CHANGE_KINDS = ['added', 'dropped', 'changed'] as const;
+
+/** A conflict of an upgrade's merge: its address, and each side's text, null where that side has none. */
+const MergeConflict = Schema.Struct({ at: Schema.String, base: Side, ours: Side, theirs: Side });
+
+/**
+ * The preview of a templated factory's upgrade: the factory, the version its base holds (absent where no status names it) and the one
+ * wanted, what merges cleanly and from which side, each conflict, the line that files it with the plan's digest and the parameters it
+ * drops, and, onto a template of another name, the switch.
+ */
+export const FactoryUpgradePlan = Schema.Struct({
+  kind: Schema.Literal('upgrade'),
+  name: Schema.String,
+  from: Schema.optionalKey(Schema.String),
+  to: Schema.String,
+  merge: Schema.Struct({
+    base: Schema.Literals(MERGE_BASES),
+    merged: Schema.Array(Schema.Struct({ at: Schema.String, from: Schema.Literals(MERGED_FROM) })),
+    conflicts: Schema.Array(MergeConflict),
+  }),
+  next: Schema.Struct({ line: Schema.String, digest: Schema.String, dropped: Schema.Array(Schema.String) }),
+  switched: Schema.optionalKey(Schema.Struct({ from: Schema.String, to: Schema.String })),
+});
+export type FactoryUpgradePlan = typeof FactoryUpgradePlan.Type;
+
+/**
+ * The preview of a hand-made factory's takeover by a template: what it keeps, the workflows added, dropped and kept, each hire changed,
+ * the revisions policy before and after, the store's rules no longer read (their file, null where they hold no words), its runs waiting
+ * or in flight and the policy they follow after, and each card and schedule it would strand; with the plan's digest and the adopt line.
+ */
+export const FactoryAdoptPlan = Schema.Struct({
+  kind: Schema.Literal('adopt'),
+  plan: Schema.Struct({
+    factory: Schema.String,
+    kept: Schema.Struct({
+      repos: Schema.Array(Schema.String),
+      schedules: Schema.Array(Schema.String),
+      instruction: Schema.Boolean,
+      volumes: Schema.Array(Schema.String),
+      settings: Schema.Array(Schema.String),
+    }),
+    workflows: Schema.Struct({
+      added: Schema.Array(Schema.String),
+      dropped: Schema.Array(Schema.String),
+      kept: Schema.Array(Schema.String),
+    }),
+    hires: Schema.Array(
+      Schema.Struct({
+        step: Schema.String,
+        kind: Schema.Literals(HIRE_CHANGE_KINDS),
+        was: Schema.optionalKey(Schema.String),
+        now: Schema.optionalKey(Schema.String),
+      }),
+    ),
+    revisions: Schema.Struct({ was: Schema.Literals(REVISIONS_POLICIES), now: Schema.Literals(REVISIONS_POLICIES) }),
+    rules: Schema.NullOr(Schema.String),
+    runs: Schema.Struct({ ids: Schema.Array(Schema.String), policy: Schema.Literals(REVISIONS_POLICIES) }),
+    stranded: Schema.Struct({
+      cards: Schema.Array(Schema.Struct({ name: Schema.String, workflow: Schema.NullOr(Schema.String), started: Schema.Boolean })),
+      schedules: Schema.Array(Schema.String),
+    }),
+  }),
+  digest: Schema.String,
+  line: Schema.String,
+});
+export type FactoryAdoptPlan = typeof FactoryAdoptPlan.Type;
+
+/** What a preview answers: a templated factory's upgrade, or a hand-made one's takeover, told apart by `kind`. */
+export const FactoryPlan = Schema.Union([FactoryUpgradePlan, FactoryAdoptPlan]);
+export type FactoryPlan = typeof FactoryPlan.Type;
+
+/**
+ * An upgrade filed (`POST /api/factories/<factory>/upgrade`): the version wanted, the template where it is read from another, the
+ * parameters as `--set` words, the digest of the plan its preview printed (`plan`), and, for a version below the one applied, `downgrade`.
+ */
+export const FactoryUpgradeWrite = Schema.Struct({
+  to: Schema.optionalKey(Schema.String),
+  template: Schema.optionalKey(TemplateGiven),
+  sets: Schema.optionalKey(Schema.Array(Schema.String)),
+  plan: Schema.optionalKey(Schema.String),
+  downgrade: Schema.optionalKey(Schema.Boolean),
+});
+export type FactoryUpgradeWrite = typeof FactoryUpgradeWrite.Type;
+
+/**
+ * What an upgrade filed: the factory, the version its base holds (absent where no status names it) and the one wanted, its file, the
+ * parameters it drops, and how many conflicts wait for a choice.
+ */
+export const FactoryUpgraded = Schema.Struct({
+  name: Schema.String,
+  from: Schema.optionalKey(Schema.String),
+  to: Schema.String,
+  file: Schema.String,
+  dropped: Schema.Array(Schema.String),
+  conflicts: Schema.Number,
+});
+export type FactoryUpgraded = typeof FactoryUpgraded.Type;
+
+/**
+ * The person's choice for one conflict of an upgrade (`POST /api/factories/<factory>/resolve`): the conflict, as the preview names it,
+ * and one of `ours`, `theirs` and `text`, the words it becomes — the text of a file, never its path.
+ */
+export const FactoryResolveWrite = Schema.Struct({
+  conflict: Schema.String,
+  ours: Schema.optionalKey(Schema.Boolean),
+  theirs: Schema.optionalKey(Schema.Boolean),
+  text: Schema.optionalKey(Schema.String),
+});
+export type FactoryResolveWrite = typeof FactoryResolveWrite.Type;
+
+/**
+ * What a choice wrote: the factory, the conflict, the version, the file the choices are kept in, the conflicts still without one, the
+ * object proposed as the choices of its conflicts compose it where one was (its kind, name and proposal), and the proposals the merge
+ * waits on.
+ */
+export const FactoryResolved = Schema.Struct({
+  name: Schema.String,
+  at: Schema.String,
+  to: Schema.String,
+  file: Schema.String,
+  left: Schema.Array(Schema.String),
+  proposed: Schema.optionalKey(Schema.Struct({ kind: Schema.Literals(PROPOSABLE_KINDS), name: Schema.String, proposal: Schema.String })),
+  waits: Schema.Array(Schema.String),
+});
+export type FactoryResolved = typeof FactoryResolved.Type;

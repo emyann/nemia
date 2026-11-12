@@ -69,7 +69,7 @@ test('the builtin MCP servers are a McpServerList, at their own path', () => {
   assert.ok(answers.some((e) => e.method === 'GET' && e.path === '/api/builtin/mcpservers' && e.kinds.includes('McpServerList')));
 });
 
-test("a factory's sub-resources are served under its path: rules, instruction, its words, and its commands", () => {
+test("a factory's sub-resources are served under its path: rules, instruction, its words, its commands, and the writes that name a template", () => {
   for (const [method, path] of [
     ['GET', '/api/factories'],
     ['GET', '/api/factories/:name/rules'],
@@ -81,6 +81,12 @@ test("a factory's sub-resources are served under its path: rules, instruction, i
     ['PUT', '/api/factories/:name/instruction/words'],
     ['DELETE', '/api/factories/:name/instruction/words'],
     ['GET', '/api/factories/:name/commands'],
+    ['POST', '/api/factories'],
+    ['POST', '/api/factories/:name/apply'],
+    ['POST', '/api/factories/:factory/adopt'],
+    ['POST', '/api/factories/:factory/diff'],
+    ['POST', '/api/factories/:factory/upgrade'],
+    ['POST', '/api/factories/:factory/resolve'],
     ['POST', '/api/namespaces/:namespace/mcpservers/:name/sign-in'],
     ['GET', '/api/namespaces/:namespace/mcpservers/:name/sign-in'],
     ['DELETE', '/api/namespaces/:namespace/mcpservers/:name/sign-in'],
@@ -91,14 +97,19 @@ test("a factory's sub-resources are served under its path: rules, instruction, i
     );
 });
 
-test('the namespaced kinds a person writes take PUT and DELETE by name; a Volume is read-only over the api', () => {
+test("the namespaced kinds a person writes take PUT and DELETE by name; a Volume is read-only in its namespace, mounted and taken off under its factory's path", () => {
   for (const kind of ['mcpservers', 'schedules', 'hires'])
     for (const method of ['PUT', 'DELETE'])
       assert.ok(
         endpoints.some((e) => e.method === method && e.path === `/api/namespaces/:namespace/${kind}/:name`),
         `${method} ${kind}`,
       );
-  assert.ok(!endpoints.some((e) => e.method !== 'GET' && e.path.includes('/volumes')));
+  assert.ok(!endpoints.some((e) => e.method !== 'GET' && e.path.startsWith('/api/namespaces/') && e.path.includes('/volumes')));
+  for (const method of ['POST', 'DELETE'])
+    assert.ok(
+      endpoints.some((e) => e.method === method && e.path === '/api/factories/:factory/volumes'),
+      `${method} a factory's volumes`,
+    );
 });
 
 test('Card has its CardList, of kind CardList, and list endpoints across namespaces and in one', () => {

@@ -317,6 +317,23 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.
 
+What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, off the installed
+files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):
+
+- **`Query.mcpSubmitOAuthCallbackUrl(name, callbackUrl)` is now relied on**, for a browser that runs on another machine than the
+  daemon, whose redirect to `http://localhost:<callbackPort>/callback` never reaches the Claude Code child listening there: the person
+  pastes the address the browser landed on, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322
+  (`mcpSubmitOAuthCallbackUrl(e,t)`, a control request of the subtype `mcp_oauth_callback_url` carrying `serverName` and
+  `callbackUrl`), and it is absent from `sdk.d.ts` and from the SDK's TypeScript reference, so it is called through the one
+  `Authenticating` type, as `mcpAuthenticate` is, and a missing method throws naming `sdk.mjs`. The table above measured it refusing a
+  URL with no code or a mismatched state on 0.3.308; the runtime refuses, before handing it on, an address that is not the sign-in's
+  redirect or carries no code or no state (`callbackRefusal`, proved by `contracts/mcp-callback.contract.ts`), and leaves the state's
+  match to the harness. A whole exchange by paste, with a real token, is unmeasured, as the token exchange above is.
+- **`mcpAuthenticate`'s third argument, `{ redirectUriOnly }`, is refused for a server with a client id**: the bundled Claude Code says
+  `MCP OAuth refused: redirectUriOnly with a configured client` where the server's config sets `oauth.clientId` (or `oauth.xaa`),
+  since such a sign-in may need a callback on the child's own computer. Every server a factory signs in to names a client id, so the
+  runtime never gives it, and the paste-back is the callback the child listens for, handed on by the SDK.
+
 What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
 2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's
 cost*, `AE_LIVE=1`). `total_cost_usd` is the running total of one `query()` call, and a resumed one "continues from the total its

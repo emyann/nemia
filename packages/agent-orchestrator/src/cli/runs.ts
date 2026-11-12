@@ -11,6 +11,7 @@ import {
   admitted,
   AGENTS_CUSTOM,
   POLICY_PROPOSE,
+  PRUNE,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
   FACTORY_SERVER_ADD,
@@ -37,7 +38,8 @@ import {
   type Env,
   wfRoot,
 } from '../runner.ts';
-import { HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
+import { forwardedOf } from '../command/forward.verb.ts';
+import { answered, HELP, inputFor, placedIn, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (the many positional of `RM`, and of `nemia prune`). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
@@ -49,7 +51,7 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
 async function rmOne(env: Env, e: Engine, place: Place, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
     const input = { runId: id, deleteBranches: args.deleteBranches === true, forceUnmerged: args.forceUnmerged === true };
-    const data = await runWith(e, placedIn(env, place, RM.handler(input)));
+    const data = await answered(env, e, place, RM, input);
     for (const line of RM.print(data, input)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -181,12 +183,36 @@ async function removing(
 }
 
 /**
+ * `nemia prune` forwarded to another machine's api, which prunes one run a call and always as `--yes` does: each run named pruned through
+ * its entry (`PRUNE`), a line each, a refusal tallied; refused, before anything is asked, with no run named or no `--yes`, since the api
+ * lists nothing for a person to confirm.
+ */
+async function prunedThere(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const ids = idsOf(args);
+  if (!ids.length || args.yes !== true)
+    usage(
+      "nemia prune, forwarded to another machine's daemon, prunes the runs it names at once, as --yes does: name them and say so, nemia prune <runId> ... --yes; or list what it would free on that machine.",
+    );
+  const tally: PruneTally = { notPruned: [], failed: false };
+  for (const runId of ids) {
+    const input = { runId, unmerged: args.unmerged === true, artifacts: args.artifacts === true, yes: true, refuses: true };
+    try {
+      for (const line of PRUNE.print(await answered(env, e, place, PRUNE, input), input)) console.log(line);
+    } catch (err) {
+      notPrunedLine(runId, err, tally);
+    }
+  }
+  return refusedNamed(tally);
+}
+
+/**
  * `nemia prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each
  * on its own, a line each, a refusal included; with none, every run. The runs are judged side by side and printed in the order named
  * (`judgingMany`), a run that could not be judged first; those ready are removed a turn at a time, each turn said as it ends
  * (`freeingMany`): on the listing's judgement under `--yes`, judged again after a person's y.
  */
 export async function pruneVerb(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  if (forwardedOf(env) !== undefined) return prunedThere(env, args, e, place);
   const home = wfRoot(env);
   const ids = idsOf(args);
   const unmerged = args.unmerged === true;
@@ -263,7 +289,7 @@ const factoryWords = (args: Args, command: string): { factory: string; words?: s
  */
 export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
-  const data = await runWith(e, placedIn(env, place, AGENTS_CUSTOM.handler(asked)));
+  const data = await answered(env, e, place, AGENTS_CUSTOM, asked);
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
@@ -272,7 +298,7 @@ export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Pl
  */
 export async function factoryInstructRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_INSTRUCT.name);
-  const data = await runWith(e, placedIn(env, place, FACTORY_INSTRUCT.handler(asked)));
+  const data = await answered(env, e, place, FACTORY_INSTRUCT, asked);
   for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }
 
@@ -281,7 +307,7 @@ export async function factoryInstructRun(env: Env, args: Args, e: Engine, place:
  */
 export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = factoryWords(args, FACTORY_RULES.name);
-  const data = await runWith(e, placedIn(env, place, FACTORY_RULES.handler(asked)));
+  const data = await answered(env, e, place, FACTORY_RULES, asked);
   for (const line of FACTORY_RULES.print(data, asked)) console.log(line);
 }
 
@@ -291,7 +317,7 @@ export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Pl
  */
 export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = serverAddOf(args);
-  const data = await runWith(e, placedIn(env, place, FACTORY_SERVER_ADD.handler(asked)));
+  const data = await answered(env, e, place, FACTORY_SERVER_ADD, asked);
   for (const line of FACTORY_SERVER_ADD.print(data, asked)) console.log(line);
 }
 
@@ -300,7 +326,7 @@ export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place
  */
 export async function policyProposeRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const asked = inputFor(POLICY_PROPOSE, withWords(args, POLICY_PROPOSE.name));
-  const data = await runWith(e, placedIn(env, place, POLICY_PROPOSE.handler(asked)));
+  const data = await answered(env, e, place, POLICY_PROPOSE, asked);
   for (const line of POLICY_PROPOSE.print(data, asked)) console.log(line);
 }
 
@@ -323,7 +349,10 @@ export async function admitRun(env: Env, args: Args, e: Engine, place: Place): P
  */
 export async function sayRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const token = env[SESSION_TOKEN];
-  const caller = await runWith(e, placedIn(env, place, sessionCaller(token === undefined || token === '' ? undefined : token)));
+  const caller =
+    forwardedOf(env) !== undefined
+      ? ({ kind: 'person' } as const)
+      : await runWith(e, placedIn(env, place, sessionCaller(token === undefined || token === '' ? undefined : token)));
   if (caller.kind === 'refused')
     throw new Conflict({
       message: `nemia say refuses this session's token (${caller.reason}, ${SESSION_TOKEN}): ${caller.reason === 'unknown-token' ? 'no session the store filed was given it' : "the try it was minted for is no longer its step's live one"}. Run it from the session its run filed, or unset ${SESSION_TOKEN} to say it as yourself.`,
@@ -335,6 +364,6 @@ export async function sayRun(env: Env, args: Args, e: Engine, place: Place): Pro
     caller: caller.kind === 'agent' ? { kind: 'agent', agent: caller.agent, factory: caller.factory } : { kind: 'person' },
     ...(typeof args.as === 'string' ? { from: { kind: 'agent', name: args.as } } : {}),
   });
-  const data = await runWith(e, placedIn(env, place, SAY.handler(asked)));
+  const data = await answered(env, e, place, SAY, asked);
   for (const line of SAY.print(data, asked)) console.log(line);
 }

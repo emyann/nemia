@@ -26,17 +26,22 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path.
 - **Which daemon, in `src/context.ts`**: kubectl's contexts, the client's own config (`${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml`,
   0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
-  remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` refuses a
-  verb about the store only the old path has (`refused`), and `handedOn` (`src/local.ts`) the words a moved read hands on; a machine
-  verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`) runs here whatever the context.
+  remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` forwards a
+  verb about the store only the old path has (`forwarded`), and `handedOn` (`src/local.ts`) the words a moved read hands on: the old path
+  spawned with `forwardedEnv(chosen)` (`src/where.ts`, the one file that spells the store's variable), the context's server and token
+  in `NEMIA_SERVER` and `NEMIA_SERVER_TOKEN` (never on argv; the orchestrator's `FORWARD_VARIABLES`, spelled once there, since `src`
+  imports nothing of it) and no `WF_ROOT`, so it calls that daemon's endpoints and refuses in its own words a command none serves. A machine verb (`MACHINE_VERBS`:
+  `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and `template`, `frontmatter`, `admit`, which touch this
+  machine's files and no store) runs here whatever the context, but for `template export --factory`, which reads a factory from the
+  store in process: under a remote context `main` refuses it, naming `NEMIA_CONTEXT=local` (`factoryNotHere`).
   On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
   <file>`, `local-token` in the file, `chosenToken`); `local` stays this machine's store, so its verbs still run in process.
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
   live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
-  (`daemon.json`), read only under this machine's context. No other file of `src` spells a store path or reads a file of the store: what
-  it shows comes from the api.
+  (`daemon.json`), read only under this machine's context, and `forwardedEnv`, which drops `WF_ROOT` from a forwarded CLI's
+  environment. No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
   other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it. `agent-orchestrator` is in

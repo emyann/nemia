@@ -11,6 +11,7 @@ import { tried } from '../runtime-client.ts';
 import { daemonLine, type DaemonStanding, type HolderKind } from './daemon.ts';
 import { daemonStanding } from './daemon.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import type { Daemon } from 'objects';
 
 /** Where the store's daemon stands: the lease's state (`DaemonStanding`'s kind), and its holder's kind and pid where it names them, and
  * the url it serves at while it ticks: a lease that stopped or whose process is gone serves nothing. */
@@ -50,6 +51,12 @@ export const daemonRead = Effect.fn('daemonRead')(function* () {
   } satisfies DaemonAnswer;
 });
 
+/** What another machine's api answers of where it stands (`GET /api/daemon`, the `Daemon`), as `nemia daemon` prints it. */
+const standingThere = (answer: unknown): DaemonAnswer => {
+  const { kind, by, pid, url, line } = answer as Daemon;
+  return { state: kind, by: by as HolderKind | null, pid, url, line };
+};
+
 /** `nemia daemon`. */
 export const DAEMON: Command<DaemonAnswer> = {
   name: 'daemon',
@@ -67,7 +74,8 @@ export const DAEMON: Command<DaemonAnswer> = {
   writes: true,
   class: 'act',
   ticks: true,
-  only: { side: 'cli', why: 'the api is the daemon: it answers where it stands at GET /api/daemon' },
+  only: { side: 'cli', why: 'the api is the daemon: it answers where it stands at GET /api/daemon, the endpoint it links' },
+  served: [{ endpoint: 'server.daemon', request: () => Promise.resolve({}), answer: standingThere }],
   handler: () => daemonRead(),
   print: (data, args) => {
     if (args.json !== true) return [data.line];

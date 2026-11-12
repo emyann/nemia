@@ -221,7 +221,7 @@ test("a bare `nemia upgrade` under a remote context upgrades this machine, then 
   assert.deepEqual(JSON.parse(remote.out), { argv: ['upgrade', 'v9.9.9'], NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: root });
   assert.match(remote.said.slice(remote.out.length), /`nemia server upgrade/, 'the hint names the remote form, on stderr');
   const help = await nemia(['upgrade', '--help'], env, hook);
-  assert.doesNotMatch(help.said, /nemia server upgrade/, 'a help is the old path\'s alone');
+  assert.doesNotMatch(help.said, /nemia server upgrade/, "a help is the old path's alone");
   const local = localLaptop('nemia-route-upgrade-local-');
   const here = await nemia(['upgrade', 'v9.9.9'], local.env, hook);
   assert.equal(here.code, 0, here.said);

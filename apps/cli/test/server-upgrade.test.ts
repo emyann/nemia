@@ -27,7 +27,10 @@ const sse = (event: string, data: string): string =>
     .map((l) => `data: ${l}`)
     .join('\n')}\n\n`;
 
-/** A stand-in's state: the release its health says, its newest read, the previous release, what was posted, how often each stream opened. */
+/**
+ * A stand-in's state: the release its health says, its newest read, the previous release, what was posted, how often each stream
+ * opened.
+ */
 type Stand = {
   release: string;
   latest: { version: string; newer: boolean; tag?: string } | undefined;
@@ -47,18 +50,22 @@ const upgradeOf = (tag: string, phase: string, exitCode?: number) => ({
   ...(exitCode === undefined ? {} : { exitCode }),
 });
 
+/** The chunks a succeeding upgrade to `tag` prints: the daemon stopped, then the new release's own lines, its readiness among them. */
+const chunksOf = (tag: string): readonly string[] => ['stopping the daemon\n', `now ${tag}\nreadiness: claude-token met\n`];
+
 /** The output stream of `tag`'s upgrade, opened for the `open`th time: what each tag's stream does. */
 function streamOf(stand: Stand, tag: string, open: number, res: http.ServerResponse): void {
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   if (tag === 'v4.0.0') return void res.end();
-  res.write(sse('output', 'stopping the daemon\n'));
+  const [first = '', rest = ''] = chunksOf(tag);
+  res.write(sse('output', first));
   if (tag === 'v2.1.0' && open === 1) return void res.end();
   if (tag === 'v3.0.0') {
     res.write(sse('output', 'refused: see /srv/nemia/upgrade.log\n'));
     return void res.end(sse('ended', JSON.stringify(upgradeOf(tag, 'failed', 3))));
   }
   stand.release = tag;
-  res.write(sse('output', `now ${tag}\nreadiness: claude-token met\n`));
+  res.write(sse('output', rest));
   res.end(sse('ended', JSON.stringify(upgradeOf(tag, 'succeeded', 0))));
 }
 
@@ -168,7 +175,7 @@ test('`nemia server upgrade v2.0.0` posts the tag, prints every chunk of its out
   const said = await nemia(['server', 'upgrade', 'v2.0.0'], aLaptop('nemia-su-ok-', await started(stand)));
   assert.equal(said.code, 0, said.err);
   assert.deepEqual(stand.posted, ['v2.0.0']);
-  assert.equal(said.out, 'stopping the daemon\nnow v2.0.0\nreadiness: claude-token met\n', 'the output, with the readiness lines it holds');
+  assert.equal(said.out, chunksOf('v2.0.0').join(''), 'the output, with the readiness lines it holds, each chunk once');
   assert.match(said.err, /v2\.0\.0/, 'the release the health says');
 });
 
@@ -177,7 +184,7 @@ test('a stream that closes while the daemon restarts is opened again, the output
   const said = await nemia(['server', 'upgrade', 'v2.1.0'], aLaptop('nemia-su-restart-', await started(stand)));
   assert.equal(said.code, 0, said.err);
   assert.equal(stand.opens.get('v2.1.0'), 2, 'opened again once it closed');
-  assert.equal(said.out, 'stopping the daemon\nnow v2.1.0\nreadiness: claude-token met\n', 'the first chunk printed once');
+  assert.equal(said.out, chunksOf('v2.1.0').join(''), 'the first chunk printed once');
 });
 
 test('an upgrade that failed exits 1, its output, naming its log, on stdout', async () => {
@@ -232,7 +239,7 @@ test('a client of another release than the server is let through, and after a su
   assert.deepEqual(stand.posted, ['v2.0.0'], 'the start was made across two releases');
   assert.match(said.err, /`nemia upgrade v2\.0\.0`/);
   const level = await inProcess(['upgrade', 'v2.0.0'], aLaptop('nemia-su-level-', await started(freshStand())), 'v2.0.0');
-  assert.doesNotMatch(level.err, /`nemia upgrade /, 'a client of the release the server now runs is not told to upgrade');
+  assert.doesNotMatch(level.err, /`nemia upgrade /, 'a client level with the server is told nothing');
 });
 
 test('a server that never says its upgrade ended within the bound: exit 1, naming where to read it', async () => {

@@ -35,7 +35,7 @@ const USAGE = [
   'nemia server upgrade [<tag>]   upgrade the server the context in use names, through its api, to <tag> or its newer release',
   'nemia server upgrade --back    take that server back to the release before the one it runs',
   '',
-  'The server is the daemon a context names (`nemia config get-contexts`). This machine\'s install is upgraded with `nemia upgrade`,',
+  "The server is the daemon a context names (`nemia config get-contexts`). This machine's install is upgraded with `nemia upgrade`,",
   'and its login unit is `nemia service`.',
 ];
 
@@ -71,10 +71,14 @@ function askedOf(args: readonly string[]): ServerUpgradeAsked {
 
 /** Why no release is asked for, as a person reads it, naming the command to type. */
 const TARGET_REFUSED: Readonly<Record<UpgradeTargetRefusal, string>> = {
-  'tag-and-back': '`--back` goes to the release the server names as previous, and takes no tag: type `nemia server upgrade --back`, or `nemia server upgrade <tag>`',
-  'none-older': 'the server has no release older than the one it runs installed to go back to: type `nemia server upgrade <tag>` to install one',
-  'below-floor': 'the store has been run by a release the previous one cannot read, so going back is refused (see Settings on the board): type `nemia server upgrade <tag>` for a release that reads it',
-  'unknown-latest': 'the server has read no newer release to name (its release check is off, or it runs from a checkout): type `nemia server upgrade <tag>`',
+  'tag-and-back':
+    '`--back` goes to the release the server names as previous, and takes no tag: type `nemia server upgrade --back`, or `nemia server upgrade <tag>`',
+  'none-older':
+    'the server has no release older than the one it runs installed to go back to: type `nemia server upgrade <tag>` to install one',
+  'below-floor':
+    'the store has been run by a release the previous one cannot read, so going back is refused (see Settings on the board): type `nemia server upgrade <tag>` for a release that reads it',
+  'unknown-latest':
+    'the server has read no newer release to name (its release check is off, or it runs from a checkout): type `nemia server upgrade <tag>`',
 };
 
 /** A server older than the remote upgrade, which serves no `/api/upgrades`: refused, naming the upgrade on its own machine. */
@@ -90,9 +94,12 @@ async function readOf(env: NodeJS.ProcessEnv): Promise<ServerUpgradeRead | 'unse
     askedAcross(
       ASKED_AS,
       (client) =>
-        client.upgrades
-          .read()
-          .pipe(Effect.catchIf((err) => err instanceof Answered && err.status === 404, () => Effect.succeed('unserved' as const))),
+        client.upgrades.read().pipe(
+          Effect.catchIf(
+            (err) => err instanceof Answered && err.status === 404,
+            () => Effect.succeed('unserved' as const),
+          ),
+        ),
       env,
     ),
   ]);
@@ -133,7 +140,15 @@ async function streamed(
     await response.body?.cancel();
     return { opened: 'unopened', printed };
   }
-  const reader = response.body.getReader();
+  return readTo(response.body.getReader(), printed, speak);
+}
+
+/** A stream's events read to its end, each `output` chunk printed past the `printed` characters already said. */
+async function readTo(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  printed: number,
+  speak: Speak,
+): Promise<{ readonly opened: Opened; readonly printed: number }> {
   const decoder = new TextDecoder();
   let text = '';
   let at = 0;
@@ -147,8 +162,7 @@ async function streamed(
       for (const s of sent) {
         if (s.event === 'ended') return { opened: decodeUpgrade(JSON.parse(s.data)), printed: said };
         if (s.event !== 'output') continue;
-        const from = Math.max(0, said - at);
-        if (from < s.data.length) speak.out(s.data.slice(from));
+        if (said - at < s.data.length) speak.out(s.data.slice(Math.max(0, said - at)));
         at += s.data.length;
         said = Math.max(said, at);
       }

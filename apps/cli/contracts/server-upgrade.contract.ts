@@ -44,8 +44,7 @@ export type UpgradeTarget =
 const asks = (output: UpgradeTarget, tag: string): boolean => output.kind === 'tag' && output.tag === tag;
 
 /** Whether `output` is refused for `reason`. */
-const refusedFor = (output: UpgradeTarget, reason: UpgradeTargetRefusal): boolean =>
-  output.kind === 'refused' && output.reason === reason;
+const refusedFor = (output: UpgradeTarget, reason: UpgradeTargetRefusal): boolean => output.kind === 'refused' && output.reason === reason;
 
 /** Nothing was typed but the verb: the newest release the server read is the one asked for. */
 const bare = (asked: ServerUpgradeAsked): boolean => asked.tag === null && !asked.back;
@@ -70,11 +69,11 @@ const upgradeTargetSpec = spec<(asked: ServerUpgradeAsked, read: ServerUpgradeRe
     },
     backWithNoneOlderIsRefused: {
       description: 'Back is refused where no release older than the one the server runs is installed there',
-      condition: ({ input: [asked, read], output }) =>
-        refusedFor(output, 'none-older') === (backAlone(asked) && read.previous === null),
+      condition: ({ input: [asked, read], output }) => refusedFor(output, 'none-older') === (backAlone(asked) && read.previous === null),
     },
     backPastTheFloorIsRefused: {
-      description: 'Back is refused where the store has been run by a release the previous one cannot read, as the board shows Back refused',
+      description:
+        'Back is refused where the store has been run by a release the previous one cannot read, as the board shows Back refused',
       condition: ({ input: [asked, read], output }) =>
         refusedFor(output, 'below-floor') === (backAlone(asked) && read.previous !== null && read.previous.refused),
     },
@@ -91,8 +90,7 @@ const upgradeTargetSpec = spec<(asked: ServerUpgradeAsked, read: ServerUpgradeRe
     anUnknownNewestIsRefused: {
       description: 'With nothing typed, it is refused where the server names no newer release to go to, so the tag is to be typed',
       condition: ({ input: [asked, read], output }) =>
-        refusedFor(output, 'unknown-latest') ===
-          (bare(asked) && (read.latest === null || (read.latest.newer && read.latest.tag === null))),
+        refusedFor(output, 'unknown-latest') === (bare(asked) && (read.latest === null || (read.latest.newer && read.latest.tag === null))),
     },
   },
 });
@@ -106,7 +104,8 @@ export type UpgradeEnd = { readonly code: 0 | 1; readonly behind: boolean };
 const upgradeEndSpec = spec<(phase: UpgradePhase, client: string | null, server: string | null) => UpgradeEnd>({
   ensures: {
     zeroExactlyWhenItSucceeded: {
-      description: 'The verb exits 0 exactly where the upgrade succeeded: a failed one, or one still at work when the follow gave up, exits 1',
+      description:
+        'The verb exits 0 exactly where the upgrade succeeded: a failed one, or one still at work when the follow gave up, exits 1',
       condition: ({ input: [phase], output }) => (output.code === 0) === (phase === 'succeeded'),
     },
     behindExactlyWhenTheReleasesDiffer: {

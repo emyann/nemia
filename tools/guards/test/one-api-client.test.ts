@@ -31,19 +31,23 @@ function clientNames(text: string): string[] {
 
 /** Each line of `text` that calls a constructor of `HttpApiClient`, as `<line>: <text>`. */
 function clientsMade(text: string): string[] {
-  const names = clientNames(text).map((n) => n.replace(/\$/g, '\\$')).join('|');
+  const names = clientNames(text)
+    .map((n) => n.replace(/\$/g, '\\$'))
+    .join('|');
   const made = new RegExp(`\\b(?:${names})\\s*\\.\\s*(?:make|makeWith|group|endpoint)\\s*\\(`);
   return text.split('\n').flatMap((line, i) => (made.test(line) ? [`${i + 1}: ${line.trim().slice(0, 160)}`] : []));
 }
 
 test('no file but objects’ own builds a typed client of the Api: every consumer makes it with `apiClient`', () => {
   const read = files().filter((f) => TYPESCRIPT.test(f) && ours(f));
-  for (const consumer of ['apps/cli/src/objects.ts', 'packages/agent-orchestrator/src/command/forward.verb.ts', 'apps/web/src/lib/api/objects.ts'])
+  for (const consumer of [
+    'apps/cli/src/objects.ts',
+    'packages/agent-orchestrator/src/command/forward.verb.ts',
+    'apps/web/src/lib/api/objects.ts',
+  ])
     assert.ok(read.includes(consumer), `${consumer} is read: it is a consumer of the api`);
   assert.ok(clientsMade(textOf(MAKER) ?? '').length > 0, `${MAKER} makes the client: the rule reads the call it refuses elsewhere`);
-  const found = read
-    .filter((f) => f !== MAKER)
-    .flatMap((f) => clientsMade(textOf(f) ?? '').map((line) => `${f}:${line}`));
+  const found = read.filter((f) => f !== MAKER).flatMap((f) => clientsMade(textOf(f) ?? '').map((line) => `${f}:${line}`));
   assert.deepEqual(
     found,
     [],
@@ -51,10 +55,12 @@ test('no file but objects’ own builds a typed client of the Api: every consume
   );
 });
 
+/** A word of a planted line: joined at run time, so this file, which the rule reads too, holds no call it refuses. */
+const joined = (...words: readonly string[]): string => words.join('');
+
 test('REFUSED: a typed client built by HttpApiClient under a name it is imported as', () => {
-  // The planted file's lines are joined from their words, so this file, which the rule reads too, holds no call it refuses.
-  const renamed = ['HttpApiClient', 'as', 'Made'].join(' ');
-  const made = `const client = ${['Made', 'make'].join('.')}(Api, { baseUrl: base });`;
+  const renamed = joined('HttpApiClient', ' as ', 'Made');
+  const made = `const client = ${joined('Made', '.', 'make')}(Api, { baseUrl: base });`;
   const file = [`import { ${renamed} } from 'effect/http-api';`, "import { Api } from 'objects';", made].join('\n');
   assert.deepEqual(clientsMade(file), [`3: ${made}`]);
 });

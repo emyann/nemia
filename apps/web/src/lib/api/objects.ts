@@ -1,21 +1,21 @@
 /**
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
- * by `objects`' one constructor of its typed client (`apiClient`) from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
- * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction, command lines and cost lines
- * (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes;
- * and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`); and the proposals that
- * change them and the delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack Query's functions
- * take one.
+ * by `objects`' one constructor of its typed client (`apiClient`) from the one definition the api serves, over `FetchHttpClient` — the Run
+ * and its sub-resources (`runs`), the inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction,
+ * command lines and cost lines (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its
+ * schedules, hires and volumes; and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`);
+ * and the proposals that change them and the delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack
+ * Query's functions take one.
  *
- * A list the board shows whole is read page by page (`everyPage`): the api answers a page of `LIST_PAGE.byDefault` to a list asked with
- * no `limit`, and `continue` on every page but the last, so each list read here asks pages of `LIST_PAGE.most` and reads on until a page
+ * A list the board shows whole is read page by page (`everyPage`): the api answers a page of `LIST_PAGE.byDefault` to a list asked with no
+ * `limit`, and `continue` on every page but the last, so each list read here asks pages of `LIST_PAGE.most` and reads on until a page
  * answers no `continue`. A step's tries are read with every output field of each closeout (`fields=*`) and each body read on from its
  * `bodyNext` (`steps.tries`), as the board shows a closeout whole.
  *
- * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
- * and its status — a `ReadRefusal` for a read, so a run gone is still `readGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
- * where an answer does not decode, naming the first key that is wrong. So each call runs on a `fetch` of its own that keeps the status and
- * the body of what it was answered, which the client's own errors do not carry whole.
+ * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`) and
+ * its status — a `ReadRefusal` for a read, so a run gone is still `readGone`, a `WriteRefusal` for a write — and an `UnreadAnswer` where an
+ * answer does not decode, naming the first key that is wrong. So each call runs on a `fetch` of its own that keeps the status and the body
+ * of what it was answered, which the client's own errors do not carry whole.
  *
  * Imports no sibling but the shared reads (`test/api-files.test.ts`).
  */

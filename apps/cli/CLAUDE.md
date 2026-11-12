@@ -64,7 +64,8 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   `resourceNamed`), and `explain` reads the fields off `OpenApi.fromApi(Api)`, the document the api serves, computed here. YAML is read
   and written with `yaml`.
 - **Every request carries the session's token** where `WF_SESSION_TOKEN` is set and not empty, as `Authorization: Bearer <token>`
-  (`sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is the person.
+  (`callerToken` and `sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is
+  the person.
   A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is.
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a
   usage refusal; the bin prints the words and exits with the code. A test asserts the code and that a command is named, never the

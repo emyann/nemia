@@ -19,7 +19,10 @@ export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<R
   return token === undefined ? {} : { authorization: `Bearer ${token}` };
 };
 
-/** The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one, else the person's. */
+/**
+ * The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one, else the
+ * person's.
+ */
 export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
   const session = env.WF_SESSION_TOKEN;
   return session !== undefined && session !== '' ? session : chosenToken(env);

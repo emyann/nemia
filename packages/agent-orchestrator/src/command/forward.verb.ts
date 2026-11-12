@@ -1,11 +1,11 @@
 /**
  * The command line forwarded to another machine's api: where `NEMIA_SERVER` names a daemon (set by the client, `apps/cli`, under a context
  * naming a remote one), the CLI still parses, checks and prints as it does on the store here, and at the one point where it would call an
- * entry's handler it calls the endpoint the entry links (`served`) instead, through `objects`' one typed client of its `Api`
- * (`apiClient`), presenting `NEMIA_SERVER_TOKEN` as its bearer, within the bound every call of it has (`READ_BOUND_MS`), a write as a read. The answer is the endpoint's success, decoded by its Schema, made into
- * what the entry prints by the link's `answer` where it has one; a refusal is the package's of the same kind, in the api's words, so a
- * forwarded command exits as one run here does. Nothing of `apps/api` is imported: this is a client of another machine's api, through
- * `objects` alone.
+ * entry's handler it calls the endpoint the entry links (`served`) instead, through `objects`' one typed client of its `Api` (`apiClient`),
+ * presenting `NEMIA_SERVER_TOKEN` as its bearer, within the bound every call of it has (`READ_BOUND_MS`), a write as a read. The answer is
+ * the endpoint's success, decoded by its Schema, made into what the entry prints by the link's `answer` where it has one; a refusal is the
+ * package's of the same kind, in the api's words, so a forwarded command exits as one run here does. Nothing of `apps/api` is imported:
+ * this is a client of another machine's api, through `objects` alone.
  */
 import { Cause, Effect, Exit, Option, type Schema } from 'effect';
 import { FetchHttpClient, HttpClientError } from 'effect/http';

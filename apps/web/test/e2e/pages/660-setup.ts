@@ -138,6 +138,29 @@ async function readsPieces(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `setup-pieces-${await themeOf(page)}.png`), { fullPage: true });
 }
 
+/**
+ * The banner over every other page, read off the same read: raised only while a run waits on a missing piece (one whose `cost` is `run`,
+ * NEED among them), and saying "first run" only where the read says no run was ever started; then back to Setup.
+ */
+async function raisesBanner(page: Page): Promise<void> {
+  const setup = page.url();
+  await page.goto(new URL('/', setup).href);
+  await idle(page);
+  const read = await answered<{ ran?: boolean; pieces: Array<Piece & { cost?: string }> }>(page, '/api/readiness');
+  const waits = read.pieces.some((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run');
+  if (!waits) throw new Refused(`a run waits on the planted need ${NEED}, which the read answers missing — it answers none a run waits on`);
+  const banner = page.locator('[data-setup-banner]');
+  await expectVisible(banner, 'a run waits on a missing piece: the banner is raised');
+  const said = (await banner.textContent()) ?? '';
+  if (/first run/.test(said) !== (read.ran === false))
+    throw new Refused(`the banner says "first run" only where no run was ever started (ran: ${read.ran}); it says: ${said}`);
+  if (/not ready/.test(said)) throw new Refused(`the banner says what the missing pieces cost, never "not ready"; it says: ${said}`);
+  await settled(page);
+  await photograph(page, path.join(OUT, `setup-banner-${await themeOf(page)}.png`));
+  await page.goto(setup);
+  await idle(page);
+}
+
 /** NEED's fix started: its output drawn as it comes, its link a link that opens a new tab, its code large over it, and its end. */
 async function runsFix(page: Page): Promise<void> {
   const unroute = await holdFix(page);
@@ -240,11 +263,11 @@ async function signsInByLink(page: Page): Promise<void> {
 export default {
   /**
    * Settings' Setup: the readiness read grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
-   * in place with each of its fixes — with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in);
-   * that fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks
-   * the store); a pairing a client asks for, listed by its name and approved by the code typed; and, on a second seat marked exposed, a
-   * first-visit link that signs a browser in and leaves the address, refused once used. The README, the tokens, the pairings and the
-   * links are taken back.
+   * in place with each of its fixes — and the banner over another page, raised by a missing piece a run waits on, with a need the page
+   * plants in the checkout's `dev` (never in place, its fix a device sign-in); that fix started, its output drawn with its link a link
+   * and the code its need declares shown large (held by `holdFix`: nothing ticks the store); a pairing a client asks for, listed by its
+   * name and approved by the code typed; and, on a second seat marked exposed, a first-visit link that signs a browser in and leaves the
+   * address, refused once used. The README, the tokens, the pairings and the links are taken back.
    */
   name: 'setup',
   route: '/setup',
@@ -257,6 +280,7 @@ export default {
       await page.reload();
       await idle(page);
       await readsPieces(page);
+      await raisesBanner(page);
       await runsFix(page);
       await approvesPairing(page);
       await signsInByLink(page);

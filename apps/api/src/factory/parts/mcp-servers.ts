@@ -5,8 +5,10 @@
  * (`serverSignIn`, `serverSignInState`, `serverSignOut`), each writing the harness's own store; and Nemia's builtin servers
  * (`builtinServerList`), a spec each and no namespace.
  */
+import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
+  mcpServerTable,
   builtinServerList,
   FACTORY_SERVER_ADD,
   FACTORY_SERVER_RM,
@@ -22,6 +24,7 @@ import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
+import { wantsTable } from '../../objects/table.ts';
 
 /** The route of the server `name` of `namespace`, as a refusal says it. */
 const routeOf = (method: string, namespace: string, name: string, sub = ''): string =>
@@ -40,10 +43,13 @@ const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcp
 export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answered((s) => {
-        factoryNamed(`GET /api/namespaces/${namespace}/mcpservers`, namespace);
-        return s.inRequest(mcpServerList(s.home, defaultRepo(s), namespace, queryOf(query)));
-      }),
+      Effect.flatMap(wantsTable, (table) =>
+        answered(async (s) => {
+          factoryNamed(`GET /api/namespaces/${namespace}/mcpservers`, namespace);
+          const list = await s.inRequest(mcpServerList(s.home, defaultRepo(s), namespace, queryOf(query)));
+          return table ? mcpServerTable(list) : list;
+        }),
+      ),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered(async (s) => {

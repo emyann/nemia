@@ -29,6 +29,9 @@
  *
  * In each factory's namespace, groups `proposals` and `delegations` (`proposal-api.ts`): a change of the factory's definitions proposed,
  * approved, declined and listed, and what the person lets an agent approve unasked.
+ *
+ * The runs, the cards, the factories, a factory's MCP servers, the agents and the skills are each listed as their `<Kind>List`, or as
+ * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
@@ -122,6 +125,9 @@ const HireObject = Hire.annotate({ identifier: 'Hire' });
 const HireListObject = HireList.annotate({ identifier: 'HireList' });
 const VolumeObject = Volume.annotate({ identifier: 'Volume' });
 const VolumeListObject = VolumeList.annotate({ identifier: 'VolumeList' });
+/** The factories and a factory's MCP servers, each a page or the same page as a `Table` where the request asks for one, as the cards. */
+const FactoryListOrTable = [FactoryListObject, Table] as const;
+const McpServerListOrTable = [McpServerListObject, Table] as const;
 
 /** The definitions and a page of each, named so that the document holds each as a component. */
 const WorkflowObject = Workflow.annotate({ identifier: 'Workflow' });
@@ -130,6 +136,9 @@ const AgentObject = Agent.annotate({ identifier: 'Agent' });
 const AgentListObject = AgentList.annotate({ identifier: 'AgentList' });
 const SkillObject = Skill.annotate({ identifier: 'Skill' });
 const SkillListObject = SkillList.annotate({ identifier: 'SkillList' });
+/** A namespace's agents and skills, each a page or the same page as a `Table` where the request asks for one, as the cards. */
+const AgentListOrTable = [AgentListObject, Table] as const;
+const SkillListOrTable = [SkillListObject, Table] as const;
 
 /** The cluster's templates, subscriptions and the feed's events, and a page of each, named so that the document holds each. */
 const TemplateObject = Template.annotate({ identifier: 'Template' });
@@ -222,7 +231,7 @@ const definitionErrors = [...cardErrors, Failed];
 
 /** The factories, which no namespace holds, and each one's rules, instruction, command lines and cost lines. */
 export class FactoriesGroup extends HttpApiGroup.make('factories').add(
-  HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListObject, error: objectErrors }),
+  HttpApiEndpoint.get('listAll', '/api/factories', { query: listQuery, success: FactoryListOrTable, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/factories/:name', { params: factoryParams, success: FactoryObject, error: objectErrors }),
   HttpApiEndpoint.get('rules', '/api/factories/:name/rules', { params: factoryParams, success: FactoryRules, error: objectErrors }),
   HttpApiEndpoint.put('putRules', '/api/factories/:name/rules', {
@@ -323,7 +332,7 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/mcpservers', {
     params: namespaceParams,
     query: listQuery,
-    success: McpServerListObject,
+    success: McpServerListOrTable,
     error: objectErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/mcpservers/:name', {
@@ -491,7 +500,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
-    success: AgentListObject,
+    success: AgentListOrTable,
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/agents/:name', {
@@ -564,7 +573,7 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/skills', {
     params: namespaceParams,
     query: { ...listQuery, ...originQuery },
-    success: SkillListObject,
+    success: SkillListOrTable,
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/skills/:name', {

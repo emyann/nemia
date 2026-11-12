@@ -9,8 +9,10 @@
  * again where the store runs (`nemia factory trust`), answered with what was asked of each; and the factory removed (`nemia factory rm`),
  * answered with what was removed.
  */
+import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
+  factoryTable,
   factoryCommandsOf,
   factoryList,
   factoryObject,
@@ -31,6 +33,7 @@ import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
+import { wantsTable } from '../objects/table.ts';
 
 /** The rules of the factory `name`, read, written (`words`) or cleared, as `nemia factory rules` does it. */
 const rules = (method: string, name: string, args: { words?: string; clear?: boolean }) =>
@@ -81,7 +84,14 @@ const writtenThen = (route: string, name: string, write: (s: Served) => Promise<
 
 export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handlers) =>
   handlers
-    .handle('listAll', ({ query }) => answered((s) => s.inRequest(factoryList(s.home, defaultRepo(s), queryOf(query)))))
+    .handle('listAll', ({ query }) =>
+      Effect.flatMap(wantsTable, (table) =>
+        answered(async (s) => {
+          const list = await s.inRequest(factoryList(s.home, defaultRepo(s), queryOf(query)));
+          return table ? factoryTable(list) : list;
+        }),
+      ),
+    )
     .handle('get', ({ params: { name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/factories/${name}`, name);

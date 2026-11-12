@@ -24,10 +24,9 @@ import {
   ProposalSpec,
   ScheduleSpec,
   SkillSpec,
-  type Table,
   WorkflowSpec,
 } from 'objects';
-import type { ObjectsClient } from '../objects.ts';
+import { pageOf, type ObjectsClient } from '../objects.ts';
 
 /** What every kind's metadata carries: a Run served before it had one carries no `resourceVersion`. */
 export type ServedMeta = Pick<ObjectMeta, 'name' | 'namespace' | 'labels' | 'creationTimestamp'> & {
@@ -93,17 +92,6 @@ export type KindCalls = {
 
 /** A list's query: the selectors, sent as `labelSelector` where any was given. */
 const query = (labelSelector: readonly string[]) => (labelSelector.length ? { labelSelector } : {});
-
-/**
- * A list's page, of a list that answers a `Table` only where asked for one (`TABLE_ACCEPT`), which `get` never asks: a `Table` all the
- * same is an api this client does not read, said as such.
- */
-const pageOf = <L extends Page, E>(listed: Effect.Effect<L | Table, E>): Effect.Effect<L, E | Error> =>
-  Effect.flatMap(listed, (list) =>
-    'items' in list
-      ? Effect.succeed(list)
-      : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
-  );
 
 /** `spec` read by `decode`, or why it is not one: the decoder's own words. */
 function decoded<S>(decode: (spec: unknown) => S, spec: unknown): { spec: S } | string {
@@ -186,11 +174,11 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     ),
   },
   Factory: {
-    list: { all: (s) => (c) => c.factories.listAll({ query: query(s) }) },
+    list: { all: (s) => (c) => pageOf(c.factories.listAll({ query: query(s) })) },
     get: { all: (name) => (c) => c.factories.get({ params: { name } }) },
   },
   McpServer: {
-    list: { in: (namespace, s) => (c) => c.mcpservers.list({ params: { namespace }, query: query(s) }) },
+    list: { in: (namespace, s) => (c) => pageOf(c.mcpservers.list({ params: { namespace }, query: query(s) })) },
     get: { in: (namespace, name) => (c) => c.mcpservers.get({ params: { namespace, name } }) },
     writes: writable(Schema.decodeUnknownSync(McpServerSpec), { create: false, update: true, upsert: true, labels: false }, (spec) => ({
       update: (a) => (c) => c.mcpservers.put({ ...params(a), payload: spec }),
@@ -223,7 +211,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     })),
   },
   Agent: {
-    list: { in: (namespace, s) => (c) => c.agents.list({ params: { namespace }, query: query(s) }) },
+    list: { in: (namespace, s) => (c) => pageOf(c.agents.list({ params: { namespace }, query: query(s) })) },
     get: { in: (namespace, name) => (c) => c.agents.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(AgentSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
       create: (a) => (c) => c.agents.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),
@@ -231,7 +219,7 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
     })),
   },
   Skill: {
-    list: { in: (namespace, s) => (c) => c.skills.list({ params: { namespace }, query: query(s) }) },
+    list: { in: (namespace, s) => (c) => pageOf(c.skills.list({ params: { namespace }, query: query(s) })) },
     get: { in: (namespace, name) => (c) => c.skills.get({ params: { namespace, name }, query: {} }) },
     writes: writable(Schema.decodeUnknownSync(SkillSpec), { create: true, update: true, upsert: false, labels: false }, (spec) => ({
       create: (a) => (c) => c.skills.create({ params: { namespace: a.namespace }, payload: { metadata: { name: a.name }, spec } }),

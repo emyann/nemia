@@ -401,6 +401,16 @@ export { runLines, type RunLines, type StepCommands } from './object/lines.verb.
 export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { RUN_COLUMNS, runCells, runTable } from './run-list/index.ts';
+export {
+  AGENT_COLUMNS,
+  FACTORY_COLUMNS,
+  MCP_SERVER_COLUMNS,
+  SKILL_COLUMNS,
+  agentTable,
+  factoryTable,
+  mcpServerTable,
+  skillTable,
+} from './kind-table/kind-table.ts';
 export { continueToken, continuedAfter, listPage, pageOf, type PageAsked, type Paged } from './object/page.ts';
 export { watchChanges, type Versioned } from './list-watch/list-watch.ts';
 export { runWatchVersion } from './runlist/runlist.ts';

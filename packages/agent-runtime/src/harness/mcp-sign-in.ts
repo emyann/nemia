@@ -12,6 +12,8 @@
  *   of one never added exits 1 and leaves the token, so a sign-out adds the server first, with no secret.
  * - `query().mcpAuthenticate(name, redirectUri)` answers an authorize URL, and the Claude Code child itself listens on the callback
  *   port until the browser's redirect arrives or the session ends; `mcpServerStatus()` then reads `connected`.
+ * - `query().mcpSubmitOAuthCallbackUrl(name, callbackUrl)` hands the child the address the browser was sent back to, for a browser
+ *   that runs on another machine than the child, whose redirect never reaches that port (`sdk.mjs` 0.3.322).
  *
  * The secret rides the child's environment alone: never its argv, never a task's config (which is journalled), and a refusal quoting
  * the child's output has it taken out first.
@@ -141,11 +143,16 @@ export const clearSignIn = async (cli: McpCli, name: string, server: RemoteMcpSe
  */
 export type SignInSettled = { readonly connected: true } | { readonly connected: false; readonly why: string };
 
-/** A sign-in's session, held: the address the person opens, what it settles on, and its end, safe to call twice. */
+/**
+ * A sign-in's session, held: the address the person opens, what it settles on, its end, safe to call twice, and `submit`, which hands
+ * the harness the address the person's browser was sent back to where that browser runs elsewhere; the session still settles as the
+ * server reads.
+ */
 export type McpSignInSession = {
   readonly authUrl: string;
   readonly settled: Promise<SignInSettled>;
   readonly end: () => void;
+  readonly submit: (callbackUrl: string) => Promise<void>;
 };
 
 /**
@@ -159,12 +166,14 @@ export type McpSignInAsk = (
 ) => Promise<McpSignInSession>;
 
 /**
- * The SDK's authenticate method, which `sdk.mjs` 0.3.322 defines on `query()`'s object (`mcpAuthenticate(e,t,n)`, a control request of
- * the subtype mcp_authenticate; the third argument, `{ redirectUriOnly }`, new after 0.3.316, is optional and not given here) and
- * `sdk.d.ts` does not declare: called through this one type, so an SDK that renames it fails here, by name.
+ * The SDK's authenticate and callback methods, which `sdk.mjs` 0.3.322 defines on `query()`'s object and `sdk.d.ts` does not declare:
+ * `mcpAuthenticate(e,t,n)`, a control request of the subtype mcp_authenticate (the third argument, `{ redirectUriOnly }`, new after
+ * 0.3.316, is optional and not given here), and `mcpSubmitOAuthCallbackUrl(e,t)`, one of the subtype mcp_oauth_callback_url carrying
+ * the server's name and the callback address. Called through this one type, so an SDK that renames either fails here, by name.
  */
 type Authenticating = {
   mcpAuthenticate?: (name: string, redirectUri: string) => Promise<{ authUrl?: string }>;
+  mcpSubmitOAuthCallbackUrl?: (name: string, callbackUrl: string) => Promise<unknown>;
 };
 
 /**
@@ -199,7 +208,8 @@ export const claudeMcpSignIn: McpSignInAsk = async (name, server, { cwd, executa
     abort.abort();
   };
   const q = query({ prompt: held, options });
-  const authenticate = (q as unknown as Authenticating).mcpAuthenticate;
+  const sdk = q as unknown as Authenticating;
+  const authenticate = sdk.mcpAuthenticate;
   if (typeof authenticate !== 'function') {
     end();
     throw new Error(
@@ -228,5 +238,14 @@ export const claudeMcpSignIn: McpSignInAsk = async (name, server, { cwd, executa
     }
     return { connected: false, why: 'the sign-in was ended before the server read connected' };
   })();
-  return { authUrl, settled, end };
+  const submit = async (callbackUrl: string): Promise<void> => {
+    const handOn = sdk.mcpSubmitOAuthCallbackUrl;
+    if (typeof handOn !== 'function') {
+      throw new Error(
+        'this Agent SDK has no `mcpSubmitOAuthCallbackUrl` on its query object, which 0.3.322 had. Read its sdk.mjs and change harness/mcp-sign-in.ts.',
+      );
+    }
+    await handOn.call(q, name, callbackUrl);
+  };
+  return { authUrl, settled, end, submit };
 };

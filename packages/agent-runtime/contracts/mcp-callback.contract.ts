@@ -8,24 +8,7 @@
  * send the browser to (`http://localhost:<callbackPort>/callback`). The words of each refusal are the caller's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** A pasted address as the runtime reads it: its origin and path, and the OAuth parameters of its query, null where absent. */
-export type PastedCallback = {
-  readonly origin: string;
-  readonly pathname: string;
-  readonly code: string | null;
-  readonly state: string | null;
-  readonly error: string | null;
-};
-
-/** The redirect a sign-in asked for: its origin and path. */
-export type Redirect = { readonly origin: string; readonly pathname: string };
-
-/**
- * Why a pasted address is refused: it is no address (`unreadable`); it is not the redirect the sign-in asked for (`elsewhere`); the
- * provider said no (`denied`, its `error`); it carries no code (`no-code`), or no state (`no-state`).
- */
-export type CallbackRefusal = 'unreadable' | 'elsewhere' | 'denied' | 'no-code' | 'no-state';
+import type { CallbackRefusal, PastedCallback, Redirect } from '../src/harness/mcp-callback.ts';
 
 /** Whether an OAuth parameter was given, and given something. */
 const given = (value: string | null): boolean => value !== null && value !== '';
@@ -42,7 +25,8 @@ const callbackSpec = spec<(pasted: PastedCallback | undefined, redirect: Redirec
     },
     anotherAddressIsElsewhere: {
       description: 'An address that is not the redirect the sign-in asked for is refused, whatever its query carries',
-      condition: ({ input: [pasted, redirect], output }) => pasted === undefined || atTheRedirect(pasted, redirect) || output === 'elsewhere',
+      condition: ({ input: [pasted, redirect], output }) =>
+        pasted === undefined || atTheRedirect(pasted, redirect) || output === 'elsewhere',
     },
     aRefusalOfTheProviderIsDenied: {
       description: 'The redirect carrying the provider’s error says the person or the provider said no',

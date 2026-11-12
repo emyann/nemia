@@ -47,8 +47,9 @@ Enterprise organization, an administrator turns channels on first, with the chan
 - **Where it starts.** Without `--cursor-file`, the channel starts from now each time Claude Code starts it. With
   `nemia channel --cursor-file <path>`, it keeps the position of the last line it sent in that file, and a channel started again sends
   what was written while it was stopped, each line once. It sends at most 50 of those lines (`RESUME_MOST`): past that, it sends one
-  notice in their place, saying how many it skipped and the `resource_version` they start after, which
-  `nemia watch --once <resource_version>` reads from in a terminal. Then it goes on with the lines written from then.
+  notice in their place, saying how many it skipped, the `resource_version` they start after, and the command that prints them:
+  `nemia watch --once <resource_version>` with the channel's selectors (and, for a namespace, its factory), which a person types in a
+  terminal and the session's agent runs through its shell. Then it goes on with the lines written from then.
 - **What it says of itself.** A tag with a `notice` attribute is the channel's own: `skipped` (the lines past the cap), `missed` (the
   saved position could not be read on, the feed having been replaced, so it started over from now), `down` and `up` (the api stopped
   answering, and answers again: it tries again every second, and loses no line), and `refused` (the api refused what it asked, a

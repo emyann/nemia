@@ -20,6 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect, Layer, Logger } from 'effect';
 import { emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
+import { skippedRead } from '../src/watch/channel.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
 const NEMIA = path.join(CLI, 'bin', 'nemia.ts');
@@ -286,7 +287,7 @@ test('resumed past the cap, one notice with the count in place of the lines, the
   });
   assert.equal(notice?.meta.skipped, String(skipped), 'the count of the lines skipped');
   assert.equal(notice?.meta.after, String(saved), 'the cursor they start after');
-  assert.match(notice?.content ?? '', new RegExp(`nemia watch --once ${saved}`), 'how a person reads them');
+  assert.ok((notice?.content ?? '').includes(skippedRead({ selectors: [] }, String(saved))), 'the command that prints them');
   assert.equal(events(c.notices).length, 0, 'none of the skipped lines');
   await store.pass({ 'r-1': stepAt('succeeded'), 'r-2': stepAt('running'), 'r-3': stepAt('running') });
   await c.got((all) => events(all).some((n) => Number(n.meta.resource_version) === store.size()) || undefined);
@@ -355,4 +356,13 @@ test('a selector the api refuses is refused, exit 2, naming the key, on stderr a
   const refusals = c.notices.filter((n) => n.meta.notice === 'refused');
   assert.equal(refusals.length, 1, `one notice: ${JSON.stringify(c.notices)}`);
   assert.match(refusals[0]?.content ?? '', /no\/pe/);
+});
+
+test("the skipped lines' read takes the channel's selectors and, for a namespace, its factory joined to each", () => {
+  assert.equal(skippedRead({ selectors: ['waits=person', 'team=core'] }, '42'), 'nemia watch --once 42 -l waits=person -l team=core');
+  assert.equal(skippedRead({ selectors: [], namespace: 'mill' }, '42'), 'nemia watch --once 42 -l factory=mill');
+  assert.equal(
+    skippedRead({ selectors: ['waits=person', 'team=core'], namespace: 'mill' }, '42'),
+    'nemia watch --once 42 -l waits=person,factory=mill -l team=core,factory=mill',
+  );
 });

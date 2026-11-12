@@ -250,6 +250,23 @@ function framesOf(text: string): { data: string[]; rest: string } {
 const decodeWatched = Schema.decodeUnknownSync(watchEventOf(Event));
 
 /**
+ * The command that prints the lines a resumed channel skipped, the events after `from` its selectors take: `nemia watch --once`, which
+ * reads the feed from that byte to its end, with each selector; a channel of one namespace has `factory=<namespace>` joined to each (a
+ * selector of its own besides), as `nemia watch` takes no namespace, but `default`'s, which also holds runs of no factory label, so its
+ * read keeps every namespace's lines.
+ */
+export function skippedRead(asked: ChannelAsked, from: string): string {
+  const namespace = asked.namespace === undefined || asked.namespace === 'default' ? undefined : `factory=${asked.namespace}`;
+  const each =
+    namespace === undefined
+      ? asked.selectors
+      : asked.selectors.length === 0
+        ? [namespace]
+        : asked.selectors.map((s) => `${s},${namespace}`);
+  return [`nemia watch --once ${from}`, ...each.map((s) => `-l ${s}`)].join(' ');
+}
+
+/**
  * Sends the backlog `held` a watch opened at `from` sent before its first BOOKMARK: each Event where they are the cap or fewer, else one
  * notice of how many were skipped, from where, and how to read them.
  */
@@ -259,12 +276,10 @@ function released(f: Following, held: readonly Event[], from: string): void {
     for (const event of held) sent(f, channelNotice(event), event.metadata.resourceVersion);
     return;
   }
-  const selectors = f.asked.selectors.map((s) => ` -l ${s}`).join('');
   const content =
     `${held.length} events were written while this channel was stopped, past the ${most} it sends on a resume: none of them was sent. ` +
-    `They are the events after resourceVersion ${from}. A person reads them with \`nemia watch --once ${from}${selectors}\`, or the ` +
-    "Event list with `nemia get events -A`; an agent with Nemia's MCP port reads the Event list as the resource nemia:///api/events. " +
-    'The channel goes on from here.';
+    `They are the events after resourceVersion ${from}, and \`${skippedRead(f.asked, from)}\` prints them, a person in a terminal ` +
+    'or an agent through its shell alike. The channel goes on from here.';
   sent(f, noticeOf('skipped', content, { skipped: String(held.length), after: from }));
 }
 

@@ -25,8 +25,7 @@ export const Route = createFileRoute('/inbox_/$name')({
 /**
  * One inbox card, to read: its body rendered, then each key a card may set with its value and what it means — or, with Source, its file as
  * written. A started card says the runs it was started as, beside its run's phase (`StartedAs`), whether that run is in flight or ended.
- * It starts and drops nothing: the Inbox page does. It ends on room as tall as Nemia's dock at the bottom right (her face and its
- * cues), so the dock covers none of its last key row once it is scrolled to its end.
+ * It starts and drops nothing: the Inbox page does.
  */
 function CardPage() {
   const { name } = Route.useParams();
@@ -34,7 +33,7 @@ function CardPage() {
   const queryClient = useQueryClient();
 
   return (
-    <article className="space-y-6 pb-24">
+    <article className="space-y-6">
       <BackToInbox />
 
       <header className="space-y-1">

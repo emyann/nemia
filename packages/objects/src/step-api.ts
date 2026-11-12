@@ -34,15 +34,17 @@ export const TranscriptEvent = Schema.Struct({
 export type TranscriptEvent = typeof TranscriptEvent.Type;
 
 /**
- * A read of a step's conversation: the engine's events from the cursor asked with, the cursor to pass as `after` on the next read (null
- * for a step with no task to read), whether something of its task runs or is to (`live`), and whether it may yet say more (`open`): a
- * task that has not settled, one held open on a person's word among them.
+ * A read of a step's conversation: a page of the engine's events from the cursor asked with (`TRANSCRIPT_PAGE`), the cursor to pass as
+ * `after` on the next read (null for a step with no task to read), whether something of its task runs or is to (`live`), whether it may
+ * yet say more (`open`): a task that has not settled, one held open on a person's word among them — and whether events said already are
+ * left after this page (`more`), to read on from `cursor` at once; absent from an answer that holds every event after its cursor.
  */
 export const StepTranscript = Schema.Struct({
   events: List(TranscriptEvent),
   cursor: Schema.NullOr(Schema.String),
   live: Schema.Boolean,
   open: Schema.Boolean,
+  more: Schema.optionalKey(Schema.Boolean),
 }).annotate({ identifier: 'StepTranscript' });
 export type StepTranscript = typeof StepTranscript.Type;
 
@@ -139,11 +141,29 @@ const tryParams = { ...stepParams, try: Schema.String };
 const fileParams = { ...stepParams, file: Schema.String };
 
 /**
- * The query of a read of a try or its closeout: `fields`, the fields of the closeout's `output` to answer, comma-separated, as JSON:API's
- * sparse fieldsets spell them; given (an empty one naming none), the closeout is read narrowly (`closeoutNarrowed`): whole but its
- * `output` and `schema`, which keep the fields named, the rest named in `outputLeftOut`, and its `raw`, left out. None reads it whole.
+ * The query of a read of a step's tries, a try or its closeout, each closeout read narrowly (`closeoutNarrowed`): `fields`, the fields of
+ * the closeout's `output` to answer, comma-separated, as JSON:API's sparse fieldsets spell them, `*` for every one, an empty one naming
+ * none; not given, the fields whose JSON is short (`SHORT_FIELD`), the rest named in `outputLeftOut`. And the page of its `body`:
+ * `bodyFrom`, the character it starts at (0 where not given), and `bodyLimit`, how many it holds (`BODY_PAGE`), the answer's `bodyNext`
+ * where more is left.
  */
-const closeoutQuery = { fields: Schema.optionalKey(Schema.String) };
+const closeoutQuery = {
+  fields: Schema.optionalKey(Schema.String),
+  bodyFrom: Schema.optionalKey(Schema.String),
+  bodyLimit: Schema.optionalKey(Schema.String),
+};
+
+/**
+ * The query of a read of a step's conversation: `after`, the cursor it reads on from; `limit`, the first events after it, or `last`, the
+ * last ones (`TRANSCRIPT_PAGE`), never both; and `kinds`, the kinds of event to answer, comma-separated, every one where not given — the
+ * cursor answered still counts every event, so a read without `kinds` from it misses none.
+ */
+const transcriptQuery = {
+  after: Schema.optionalKey(Schema.String),
+  limit: Schema.optionalKey(Schema.String),
+  last: Schema.optionalKey(Schema.String),
+  kinds: Schema.optionalKey(Schema.String),
+};
 
 /** What a sub-resource of the run object refuses with: none by that name, a try the package refuses, a run not judged. */
 const subResourceErrors = [Missing, Invalid, Unjudged];
@@ -160,6 +180,7 @@ const engineReadErrors = [BadRequest, Missing, ReadFailed];
 export class StepsGroup extends HttpApiGroup.make('steps').add(
   HttpApiEndpoint.get('tries', '/api/runs/:runId/steps/:step/tries', {
     params: stepParams,
+    query: closeoutQuery,
     success: StepTries,
     error: subResourceErrors,
   }),
@@ -182,6 +203,8 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('log', '/api/runs/:runId/steps/:step/log', {
     params: stepParams,
+    /** `tail`, how many of its last lines to answer (`LOG_TAIL`). */
+    query: { tail: Schema.optionalKey(Schema.String) },
     success: StepLog,
     error: [Missing, ReadFailed],
   }),
@@ -203,7 +226,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('transcript', '/api/runs/:runId/steps/:step/transcript', {
     params: stepParams,
-    query: { after: Schema.optionalKey(Schema.String) },
+    query: transcriptQuery,
     success: StepTranscript,
     error: engineReadErrors,
   }),

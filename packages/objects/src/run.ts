@@ -10,6 +10,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, listOf } from './meta.ts';
+import { BODY_PAGE, SHORT_FIELD } from './reads.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
 import { ChatSpeaker } from './nemia.ts';
@@ -614,12 +615,14 @@ export const StepCloseout = Schema.Struct({
    * name; absent from a whole read.
    */
   outputLeftOut: Schema.optionalKey(Strings),
+  /** The character of `body` to read on from (`?bodyFrom=`), where a read answered one page of it and more is left; absent otherwise. */
+  bodyNext: Schema.optionalKey(Schema.Finite),
 }).annotate({ identifier: 'StepCloseout' });
 export type StepCloseout = typeof StepCloseout.Type;
 
 /**
  * The names a narrowing query lists — `?fields=` of a closeout's `output`, `?diffs=` of a decision's paths — as JSON:API spells a sparse
- * fieldset: comma-separated, each name trimmed, an empty one naming none. Pure.
+ * fieldset: comma-separated, each name trimmed, an empty one naming none, `*` naming every one. Pure.
  */
 export const fieldsNamed = (fields: string): string[] =>
   fields
@@ -627,20 +630,39 @@ export const fieldsNamed = (fields: string): string[] =>
     .map((name) => name.trim())
     .filter((name) => name !== '');
 
+/** The page of a closeout's `body` a read asks for: the character it starts at, and how many it holds at most. */
+export type BodyPage = { readonly from: number; readonly limit: number };
+
 /**
- * `closeout` read narrowly, as `?fields=` asks it: what a person decides on — its outcome, summary, body, needs, files and values, its
- * questions, replies, what it left out and was refused — whole, and of its `output` (and the `schema` it was read by) the fields
- * `fields` names alone, those it left out named in `outputLeftOut`; the closeout as it came (`raw`) left out, as null. Pure.
+ * `closeout` read narrowly, as every read of it is: what a person decides on — its outcome, summary, needs, files and values, its
+ * questions, replies, what it left out and was refused — whole; its `body` cut to the page `body` asks (`BODY_PAGE` by default, never
+ * past its most), `bodyNext` the character to read on from where more is left; of its `output` (and the `schema` it was read by) the
+ * fields `fields` names — every one where it names `*`, and where it is not given those whose JSON is at most `SHORT_FIELD` characters —
+ * those it left out named in `outputLeftOut`; the closeout as it came (`raw`) left out, as null. Pure.
  */
-export const closeoutNarrowed = (closeout: StepCloseout, fields: readonly string[]): StepCloseout => {
+export const closeoutNarrowed = (
+  closeout: StepCloseout,
+  fields: readonly string[] | undefined,
+  body: BodyPage = { from: 0, limit: BODY_PAGE.byDefault },
+): StepCloseout => {
+  const keeps = (name: string): boolean =>
+    fields === undefined
+      ? (JSON.stringify(closeout.output[name]) ?? '').length <= SHORT_FIELD
+      : fields.includes('*') || fields.includes(name);
   const kept = <V>(record: Readonly<Record<string, V>>): Record<string, V> =>
-    Object.fromEntries(Object.entries(record).filter(([name]) => fields.includes(name)));
+    Object.fromEntries(Object.entries(record).filter(([name]) => keeps(name)));
+  const from = Math.max(0, body.from);
+  const to = from + Math.min(Math.max(1, body.limit), BODY_PAGE.most);
+  const whole = closeout.body;
+  const { bodyNext: _bodyNext, ...rest } = closeout;
   return {
-    ...closeout,
+    ...rest,
+    body: whole === null ? null : whole.slice(from, to),
+    ...(whole !== null && to < whole.length ? { bodyNext: to } : {}),
     output: kept(closeout.output),
     schema: kept(closeout.schema),
     raw: null,
-    outputLeftOut: Object.keys(closeout.output).filter((name) => !fields.includes(name)),
+    outputLeftOut: Object.keys(closeout.output).filter((name) => !keeps(name)),
   };
 };
 

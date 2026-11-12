@@ -120,8 +120,6 @@ test('the Run is listed across namespaces and in one, read in one and across all
     ['GET', '/api/runs/:name/lines'],
     ['GET', '/api/runs/:name/concluded'],
     ['GET', '/api/runs/:name/record'],
-    ['GET', '/api/listing'],
-    ['GET', '/api/listing/:name'],
     ['POST', '/api/namespaces/:namespace/runs'],
     ['DELETE', '/api/namespaces/:namespace/runs/:name'],
     ['POST', '/api/namespaces/:namespace/runs/:name/refresh'],

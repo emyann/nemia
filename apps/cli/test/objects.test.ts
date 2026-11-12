@@ -31,7 +31,7 @@ after(() => {
   silent.close();
 });
 
-test('REFUSED: a moved read the api never answers gives up at its bound, exit 2, naming the status and the read in process', async () => {
+test('REFUSED: a moved read the api never answers gives up at its bound, exit 2, naming the status and the restart', async () => {
   const root = path.join(scratch('nemia-bound-'), 'store');
   fs.mkdirSync(root, { recursive: true });
   const { port } = silent.address() as AddressInfo;
@@ -48,7 +48,8 @@ test('REFUSED: a moved read the api never answers gives up at its bound, exit 2,
   assert.ok(refused instanceof Refused, `a Refused, not ${String(refused)}`);
   assert.equal(refused.code, 2);
   assert.match(refused.message, /nemia service status/, 'it names the status');
-  assert.match(refused.message, /--local/, 'and the read in process');
+  assert.match(refused.message, /nemia service restart/, 'and the restart');
+  assert.doesNotMatch(refused.message, /--local/, 'never --local, which is refused');
   assert.ok(waited >= SHORT_MS - TIMER_SLACK_MS, `it waited out its bound before it gave up: ${waited} ms`);
 });
 

@@ -11,7 +11,7 @@
  */
 import { type APIResource, DEFAULT_NAMESPACE } from 'objects';
 import { stringify } from 'yaml';
-import { asked, discovered, noLocal, resourceFor } from '../objects.ts';
+import { asked, discovered, resourceFor } from '../objects.ts';
 import { Refused } from '../refused.ts';
 import { KIND_CALLS, type Served } from './kinds.ts';
 
@@ -176,7 +176,6 @@ export async function get(args: readonly string[]): Promise<number> {
     process.stdout.write(GET_HELP);
     return 0;
   }
-  if (args.includes('--local')) throw noLocal('get');
   const typed = parsed(args);
   const resource = resourceFor('get', await discovered('get'), typed.word);
   return typed.name === undefined ? getList(resource, typed) : getOne(resource, typed, typed.name);

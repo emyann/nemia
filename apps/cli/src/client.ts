@@ -32,14 +32,14 @@ export const urlOf = (base: string, path: string, query: Query = {}): URL => {
   return url;
 };
 
-/** A daemon that answered its readiness and then took no request: refused, naming the read in process and the restart. */
+/** A daemon that answered its readiness and then took no request: refused, naming its status and the restart. */
 export const unanswered = (verb: string, base: string, err: unknown): Refused =>
   new Refused(
-    `the daemon at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). Read in process: \`nemia ${verb} --local …\`, or restart it: \`nemia service restart\``,
+    `the daemon at ${base} does not answer (${err instanceof Error ? err.message : String(err)}). See whether it is up, \`nemia service status\`, or restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );
 
 /** A daemon that serves no `path` at all, a 404 with no `error`: older than this client, refused naming the restart. */
 export const olderThanThis = (verb: string, base: string, path: string): Refused =>
   new Refused(
-    `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon at ${base} does not serve ${path}: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );

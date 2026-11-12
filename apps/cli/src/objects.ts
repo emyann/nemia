@@ -3,11 +3,11 @@
  * store, found by its lease (`where.ts`) and, where none listens there, started once and waited for until it is ready (`daemon.ts`). A
  * read asks it once through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
  *
- * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`,
- * `Forbidden`, `Unauthorized`) is the api's own words, exit 2. Every request carries the session's token where `WF_SESSION_TOKEN` holds
+ * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`, `Forbidden`, `Unauthorized`) is the api's own words, exit 2,
+ * but a `Conflict`, a stale version, exit 1. Every request carries the session's token where `WF_SESSION_TOKEN` holds
  * one (`sessionHeaders`). A 404 whose body is no refusal is a daemon older than this client, refused naming the restart; an answer that
  * does not decode as the `Api` says is one too, the daemon and this client being of two builds. A read the api takes and does not answer
- * within `READ_BOUND_MS` gives up, refused naming the service's status and the read in process: it starts no daemon, since one holds
+ * within `READ_BOUND_MS` gives up, refused naming the service's status and its restart: it starts no daemon, since one holds
  * the port and took the request.
  */
 import { Cause, Duration, Effect, Exit, Option } from 'effect';
@@ -29,11 +29,6 @@ import {
 import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
 import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
-import { CLIENT_VERBS } from './route.ts';
-
-/** The way to read in process, for a verb that has one: the client's own verbs have none (`noLocal`). */
-const localWay = (verb: string): string =>
-  (CLIENT_VERBS as readonly string[]).includes(verb.split(' ')[0] ?? verb) ? '' : `, or read in process: \`nemia ${verb} … --local\``;
 
 /**
  * How long a moved read waits on the api before it gives up: the whole call, from the request to the decoded answer. Thirty seconds, some
@@ -101,10 +96,10 @@ const attempt = <A, E>(
     ),
   );
 
-/** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and the read in process. */
+/** A daemon that took the read and did not answer it within `boundMs`: refused, naming its status and its restart. */
 const notInTime = (verb: string, base: string, boundMs: number): Refused =>
   new Refused(
-    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`${localWay(verb)}`,
+    `the daemon at ${base} did not answer \`nemia ${verb}\` within ${boundMs / 1000} s. See whether it is up, \`nemia service status\`, or restart it, \`nemia service restart\``,
   );
 
 /**
@@ -116,24 +111,24 @@ function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, bound
   const failed = failureOf(exit);
   if (failed === undefined) throw Cause.squash(exit.cause);
   if (Cause.isTimeoutError(failed)) throw notInTime(verb, base, boundMs);
-  if (isRefusal(failed)) return thrown(failed.error);
+  if (isRefusal(failed)) return thrown(failed.error, failed instanceof Conflict ? 1 : 2);
   if (HttpClientError.isHttpClientError(failed)) {
     const { reason } = failed;
     const status = 'response' in reason ? reason.response.status : undefined;
     if (status === 404) throw olderThanThis(verb, base, pathOf(failed));
     if (reason._tag === 'TransportError') throw unanswered(verb, base, failed);
     throw new Refused(
-      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`${localWay(verb)}`,
+      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\``,
     );
   }
   throw new Refused(
-    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`${localWay(verb)}`,
+    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\``,
   );
 }
 
-/** A refusal in the api's own words. */
-const thrown = (said: string): never => {
-  throw new Refused(said);
+/** A refusal in the api's own words, exited with `code`: 1 for a `Conflict` (a stale version), as the old path exits; else 2. */
+const thrown = (said: string, code: number): never => {
+  throw new Refused(said, code);
 };
 
 /**
@@ -236,9 +231,3 @@ export function resourceFor(verb: string, resources: readonly APIResource[], wor
     `nemia ${verb}: the api serves no resource named "${word}". It serves ${servedNames(resources)}: see one with \`nemia explain <resource>\``,
   );
 }
-
-/** `--local` typed to a verb of the client's own, which no process answers: refused, naming how to see the daemon that serves it. */
-export const noLocal = (verb: string): Refused =>
-  new Refused(
-    `nemia ${verb} asks the api alone, and has no --local: type it again without --local, and see the daemon that serves this store with \`nemia service status\``,
-  );

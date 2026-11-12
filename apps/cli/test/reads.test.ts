@@ -1,13 +1,14 @@
 /**
  * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port. `nemia show`, `show --raw`,
- * `closeout` and `closeout --try` print the same stdout and exit with the same code as the same command typed with `--local`, which runs
- * the orchestrator's own CLI in process (the parity guard: the printers live twice until the in-process reads retire). `nemia ls` and
+ * `closeout` and `closeout --try` print the same stdout and exit with the same code as the same command run on the old path, the
+ * orchestrator's own CLI entry spawned directly as `src/local.ts` resolves it (`entryOf`), which reads the store in process (the parity
+ * guard: the printers live twice until the in-process reads retire). `nemia ls` and
  * `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked with `TABLE_ACCEPT`, with `-l`, `--show-labels` and
  * `-L` on a labelled run and card; `nemia ls <run>`, which no server table prints yet, is the old path's. Each read is seen asking the api,
  * by the request line the api says. `nemia ls` over a runs list the api answers in pages, each but the last with a `continue`, prints a
  * line per run of every page (`everyPage`), the api's table cut into pages of two rows by a stand-in in front of it. A bare 404 — an api
  * older than this client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none
- * started (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
+ * started (`NEMIA_DAEMON_START=off`), exits 2 naming `nemia up` and never `--local`.
  *
  * The store is a scratch folder (`test-kit/scratch`, which reaps what runs in it), never this machine's; the api writes no lease with
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
@@ -21,6 +22,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { LIST_PAGE } from 'objects';
 import { ambient } from './ambient.ts';
+import { entryOf } from '../src/local.ts';
 import { scratch } from 'test-kit/scratch';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -207,9 +209,9 @@ write(
 /** How a child ended, and what it said on each stream. */
 type Said = { code: number | null; out: string; err: string };
 
-/** `nemia <argv>` on the store, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<Said> {
-  const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+/** `nemia <argv>` on the store, waited on for its end: this client's bin, or the old path's entry where `bin` names it. */
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV, bin: string = CLI): Promise<Said> {
+  const child = spawn(process.execPath, [bin, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
   child.stdout.on('data', (chunk) => (out += chunk));
@@ -416,10 +418,10 @@ test('`nemia inbox -l … -L <key>`: the cards either selector takes, each with 
 });
 
 for (const [argv, route] of READS)
-  test(`\`nemia ${argv.join(' ')}\` over HTTP prints what \`--local\` prints, and exits the same`, async () => {
+  test(`\`nemia ${argv.join(' ')}\` over HTTP prints what the old path prints, and exits the same`, async () => {
     const before = api.said().length;
     const served = await nemia(argv);
-    const local = await nemia([...argv, '--local']);
+    const local = await nemia(argv, ENV, entryOf('nemia'));
     assert.equal(local.code, 0, `the old path reads the seed: ${local.err}`);
     assert.equal(served.code, local.code, `the same exit code: ${served.err}`);
     assert.equal(served.out, local.out, 'the same stdout');
@@ -470,13 +472,14 @@ test('REFUSED: a bare 404 — an api older than this nemia, that serves none of 
   assert.equal(listed.out, '');
 });
 
-test('REFUSED: with no api serving the store and none started, each read exits 2 naming its `--local`', async (t) => {
+test('REFUSED: with no api serving the store and none started, each read exits 2 naming `nemia up`, never `--local`', async (t) => {
   lease(undefined);
   t.after(() => lease(api.url));
   for (const argv of [['show', RUN], ['closeout', RUN, 'build'], ['ls'], ['inbox']]) {
     const read = await nemia(argv);
     assert.equal(read.code, 2, `${argv.join(' ')}: ${read.err}`);
-    assert.match(read.err, /--local/, argv.join(' '));
+    assert.match(read.err, /`nemia up`/, argv.join(' '));
+    assert.doesNotMatch(read.err, /--local/, argv.join(' '));
     assert.equal(read.out, '', argv.join(' '));
   }
 });

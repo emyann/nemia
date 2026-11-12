@@ -141,13 +141,17 @@ Bring it:
   - then, for each conflict, a choice: `nemia factory resolve <factory> '<conflict>' --ours` to keep their tree's side, `--theirs` to take the
     template's, or `--file <path>` with the text you would write for it, shown to them first.
 
-A conflict in a text file directly in a workflow's folder is not settled by its choice alone: once every conflict of that workflow
-has one, the resolve proposes the workflow's folder as the choices compose it, a proposal of that Workflow, and prints the line that
-approves it (`nemia proposals approve <proposal> -n <factory>`). Bring that proposal to the person as any other: they approve it, or
-decline it (`nemia proposals decline <proposal> -n <factory>`) and choose again. Every other conflict — the factory's file, its
-instruction and rules, an agent's, a skill's, a carried file — is settled by its choice.
+A conflict in a file an object of the tree holds is not settled by its choice alone: a text file directly in a workflow's folder
+(that Workflow), an agent's file or its result schema (that Agent), a text file of a skill's folder (that Skill), a step's hire in
+the factory's file (the Hire `<workflow>.<step>`), and the rules and instruction (`RULES.md`, `NEMIA.md`: the Factory). Once every
+conflict of that object has a choice, the resolve proposes the object as the choices compose it and prints the line that approves it
+(`nemia proposals approve <proposal> -n <factory>`). Bring that proposal to the person as any other: they approve it, or decline it
+(`nemia proposals decline <proposal> -n <factory>`) and choose again. A choice that would remove a skill, the rules or the instruction
+is refused, since no proposal removes them: recommend `--ours` or a file there. Every other conflict — a carried file, which every
+workflow shares and a check runs, the factory file's other keys, a file nested deeper in a workflow's folder, a file that is not
+text — is settled by its choice.
 
-The daemon merges once every conflict has a choice and each workflow's proposal has applied; until then the factory's tree and base
+The daemon merges once every conflict has a choice and each such proposal has applied; until then the factory's tree and base
 stay as they are, and its runs in flight keep their own folders. After each resolve, say what it answered: the conflicts still
 waiting, the proposal to approve, or that the merge is next.
 

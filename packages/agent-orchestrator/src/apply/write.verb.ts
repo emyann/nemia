@@ -99,7 +99,7 @@ const workflowWritten = (place: ProposalPlace, factory: string, object: Proposed
     return yield* counted('workflow', object, saved.version);
   });
 
-/** An Agent of the factory's tree written or removed. */
+/** An Agent of the factory's tree written or removed, the result schema its spec's `output` carries written beside it. */
 const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
     const dir = yield* tried(() => treeDir(place.home, factory, 'agents'));
@@ -109,21 +109,26 @@ const agentWritten = (place: ProposalPlace, factory: string, object: ProposedObj
       yield* door.remove(name, object.metadata.resourceVersion, { dir, anywhere: true });
       return uncounted(object);
     }
-    const written = yield* door.write(name, agentDraftOf(name, object.spec as AgentSpec), object.metadata.resourceVersion, {
+    const spec = object.spec as AgentSpec;
+    const written = yield* door.write(name, agentDraftOf(name, spec), object.metadata.resourceVersion, {
       dir,
       anywhere: true,
+      ...(spec.output !== undefined && { schema: spec.output }),
     });
     return yield* counted('agent', object, written.version);
   });
 
-/** A Skill of the factory's tree written. */
+/**
+ * A Skill of the factory's tree written. A spec that gives `files` gives the whole set of the folder's other text files, so one it leaves
+ * out is removed; one that gives none leaves them as they are; a file that is not text is never touched.
+ */
 const skillWritten = (place: ProposalPlace, factory: string, object: ProposedObject) =>
   Effect.gen(function* () {
     const at = yield* tried(() => treeDir(place.home, factory, 'skills'));
-    const spec = object.spec as SkillSpec;
+    const { files, ...spec } = object.spec as SkillSpec;
     const written = yield* (yield* SkillDoor).skills.write(
       SkillName.read(object.metadata.name),
-      { name: object.metadata.name, ...spec },
+      { name: object.metadata.name, ...spec, ...(files !== undefined && { files }) },
       object.metadata.resourceVersion,
       at,
       { anywhere: true },

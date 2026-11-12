@@ -1,15 +1,16 @@
 /**
- * The Skill door's memory stand-in: a fresh layer of `SkillDoor` per call, its skills held in a map by folder, each its SKILL.md's text,
- * built by `skillDoorOver` as the files layer is, so the writes are checked the one way on both. A test gives it its program —
- * `Effect.provide(program, skillDoorMemory())` — where it needs a skill to exist and nothing of the disk; the walks of
+ * The Skill door's memory stand-in: a fresh layer of `SkillDoor` per call, its skills held in a map by folder, each its SKILL.md's text
+ * and its other text files, built by `skillDoorOver` as the files layer is, so the writes are checked the one way on both. A test gives
+ * it its program — `Effect.provide(program, skillDoorMemory())` — where it needs a skill to exist and nothing of the disk; the walks of
  * `test/skill-walks.ts` hold it to what the files answer. Its folders are under `MEMORY_ROOT`, named as the files name them under the
  * store's root: your library is `<MEMORY_ROOT>/workflows/skills`.
  *
  * A skill is found as a start finds one: the roots' precedence decided by `lookedUp`, the one decider the files read too, and the
  * package's own skills last, the place's (`PLACE_SKILLS`) then the builtin ones (`BUILTIN_SKILLS`), as `skillsFor` reads them — the
  * stand-in holds none of its own. A skill held is
- * its SKILL.md alone, written through the renders the files write through (`renderSkill`, `withPreload`); a link, a file beside SKILL.md
- * and a skill named with its repository's folder (`folder:name`) are the files' to read.
+ * its SKILL.md, written through the renders the files write through (`renderSkill`, `withPreload`), and the text files a whole write gave
+ * beside it, replaced whole by the next that gives them; a link, a file that is not text and a skill named with its repository's folder
+ * (`folder:name`) are the files' to read.
  */
 import { versionDigest } from '../digest/digest.ts';
 import path from 'node:path';
@@ -18,7 +19,7 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { skillTurnCost, type SkillsFound } from '../agents/agents.ts';
 import { lookedUp } from './skills.ts';
-import { renderSkill, skillEntryOf, withPreload } from './skills.ts';
+import { renderSkill, skillEntryOf, withPreload, type SkillOther } from './skills.ts';
 import { BUILTIN_SKILLS, lookupOf, lookupRoots, packageSkillFolders, PLACE_SKILLS, type Places } from './read.store.ts';
 import { SkillDoor, skillDoorOver, type SkillLayer, type SkillPage, type SkillWhere } from './skill-door.store.ts';
 
@@ -28,8 +29,15 @@ export const MEMORY_ROOT = '/memory';
 /** Yours, under the stand-in's root: the folder your folder of skills is in, as `<home>/workflows` is on disk. */
 const MEMORY_WORKFLOWS = path.posix.join(MEMORY_ROOT, 'workflows');
 
-/** The version of a SKILL.md held: a digest of its text, as `skillVersion` digests a skill's folder. */
-const versionOf = versionDigest;
+/**
+ * The version of a skill held: a digest of its SKILL.md's text, and of its other files where it has any, as `skillVersion` digests a
+ * skill's folder.
+ */
+const versionOf = (text: string, others: readonly SkillOther[] = []): string =>
+  others.length === 0 ? versionDigest(text) : versionDigest(JSON.stringify([text, others]));
+
+/** `files` by their path, sorted, as the files layer reads them back. */
+const sorted = (files: readonly SkillOther[]): SkillOther[] => [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
 /** Why a write or a copy may not go to the folder of skills `at`, as the files refuse it, or nothing. */
 function placeRefusal(at: string, where: SkillWhere | undefined): Invalid | undefined {
@@ -79,8 +87,11 @@ function foundIn(namesIn: (holder: string) => string[], dir: string, places: Pla
   };
 }
 
-/** The skill `name` of the folder of skills `at` read for its page from the text held, `undefined` where none is. */
-function pageOf(name: string, at: string, text: string | undefined): SkillPage {
+/**
+ * The skill `name` of the folder of skills `at` read for its page from the text held, `undefined` where none is, and its other files
+ * held.
+ */
+function pageOf(name: string, at: string, text: string | undefined, others: readonly SkillOther[]): SkillPage {
   const file = path.posix.join(at, name, 'SKILL.md');
   if (text === undefined)
     return {
@@ -92,7 +103,7 @@ function pageOf(name: string, at: string, text: string | undefined): SkillPage {
       version: null,
     };
   const cost = skillTurnCost(name, text);
-  const page = { preload: cost.preload, cost, text, version: versionOf(text) };
+  const page = { preload: cost.preload, cost, text, version: versionOf(text, others) };
   try {
     return { entry: skillEntryOf(file, name, text), error: null, ...page };
   } catch (err) {
@@ -103,6 +114,8 @@ function pageOf(name: string, at: string, text: string | undefined): SkillPage {
 /** A fresh Skill door over a map: no skill held. */
 export function skillDoorMemory(): Layer.Layer<never> {
   const held = new Map<string, string>();
+  const othersHeld = new Map<string, readonly SkillOther[]>();
+  const othersAt = (dir: string): readonly SkillOther[] => othersHeld.get(dir) ?? [];
   const namesIn = (holder: string): string[] =>
     [...held.keys()]
       .filter((dir) => path.posix.dirname(dir) === holder)
@@ -112,10 +125,15 @@ export function skillDoorMemory(): Layer.Layer<never> {
     skills: {
       found: ({ dir, places }) => foundIn(namesIn, dir, places),
       list: (holder) => namesIn(holder),
-      read: (name, at) => pageOf(name, at, held.get(path.posix.join(at, name))),
+      read: (name, at) => {
+        const dir = path.posix.join(at, name);
+        return pageOf(name, at, held.get(dir), othersAt(dir));
+      },
+      others: (name, at) => othersAt(path.posix.join(at, name)),
       there: (name, at) => {
-        const text = held.get(path.posix.join(at, name));
-        return text === undefined ? { kind: 'none' } : { kind: 'held', version: versionOf(text) };
+        const dir = path.posix.join(at, name);
+        const text = held.get(dir);
+        return text === undefined ? { kind: 'none' } : { kind: 'held', version: versionOf(text, othersAt(dir)) };
       },
       write: (name, change, version, at, where) => {
         const placed = placeRefusal(at, where);
@@ -129,7 +147,10 @@ export function skillDoorMemory(): Layer.Layer<never> {
           });
         const text = asRefusal(() => ('body' in change ? renderSkill(change, was) : withPreload(file, was ?? '', change.preload)));
         held.set(dir, text);
-        return { dir, name, version: versionOf(text), written: ['SKILL.md'] };
+        const files = 'body' in change ? change.files : undefined;
+        if (files !== undefined) othersHeld.set(dir, sorted(files));
+        const others = files === undefined ? [] : othersAt(dir).map((file) => file.path);
+        return { dir, name, version: versionOf(text, othersAt(dir)), written: ['SKILL.md', ...others] };
       },
       copy: (name, from, to, where) => {
         const placed = placeRefusal(to, where);
@@ -141,8 +162,10 @@ export function skillDoorMemory(): Layer.Layer<never> {
         const dir = path.posix.join(to, name);
         if (held.has(dir))
           throw new Conflict({ message: `${SKILLS_FOLDER}/${name} is there already, in ${to}: give it as it is, or remove it first.` });
+        const others = othersAt(path.posix.join(from, name));
         held.set(dir, source);
-        return { dir, name, written: ['SKILL.md'] };
+        othersHeld.set(dir, others);
+        return { dir, name, written: ['SKILL.md', ...others.map((file) => file.path)] };
       },
     },
   };

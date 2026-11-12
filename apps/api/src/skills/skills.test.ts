@@ -514,6 +514,53 @@ test('a skill written on the board is made in your library, read back as its pag
   assert.ok(rowOf(await listed(), 'yours', 'tidy-notes'));
 });
 
+test("a Skill's other text files: served in its spec where its folder holds any, and a write that gives them replaces them whole, a picture left", async () => {
+  const D = '/api/namespaces/default/skills';
+  const files = [
+    { path: 'notes/deep/how.md', text: 'One fact a line.\n' },
+    { path: 'run.sh', text: 'echo ok\n' },
+  ];
+  const spec = { description: 'Keeps files beside it.', body: 'Read the notes.' };
+  const made = await app.request(D, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ metadata: { name: 'filed' }, spec: { ...spec, files } }),
+  });
+  const object = (await made.json()) as SkillObject;
+  assert.equal(made.status, 201, JSON.stringify(object));
+  assert.deepEqual(object.spec.files, files);
+  assert.equal(fs.readFileSync(path.join(LIBRARY, 'filed', 'notes', 'deep', 'how.md'), 'utf8'), files[0].text);
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+  fs.writeFileSync(path.join(LIBRARY, 'filed', 'logo.png'), picture);
+  const read = (await (await app.request(`${D}/filed?origin=yours`)).json()) as SkillObject;
+  assert.deepEqual(read.spec.files, files, 'the picture is not among them');
+  const replaced = await app.request(`${D}/filed`, {
+    method: 'PUT',
+    headers: json,
+    body: JSON.stringify({
+      metadata: { resourceVersion: read.metadata.resourceVersion },
+      spec: { ...spec, files: [{ path: 'run.sh', text: 'echo two\n' }] },
+    }),
+  });
+  const now = (await replaced.json()) as SkillObject;
+  assert.equal(replaced.status, 200, JSON.stringify(now));
+  assert.deepEqual(now.spec.files, [{ path: 'run.sh', text: 'echo two\n' }]);
+  assert.equal(fs.existsSync(path.join(LIBRARY, 'filed', 'notes', 'deep', 'how.md')), false);
+  assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(LIBRARY, 'filed', 'logo.png'))), picture);
+  const none = (await (await app.request(`${D}/mine?origin=yours`)).json()) as SkillObject;
+  assert.equal('files' in none.spec, false, 'a skill whose folder holds no other text file serves no files');
+  const out = await app.request(`${D}/filed`, {
+    method: 'PUT',
+    headers: json,
+    body: JSON.stringify({
+      metadata: { resourceVersion: now.metadata.resourceVersion },
+      spec: { ...spec, files: [{ path: '../escape.md', text: 'x' }] },
+    }),
+  });
+  assert.equal(out.status, 422, 'refused Invalid, as the package refuses it');
+  fs.rmSync(path.join(LIBRARY, 'filed'), { recursive: true });
+});
+
 test('a change of a skill moves the version of every agent that gives it, and the preload switch alone does too', async () => {
   const before = { scribe: await agentVersionOf('scribe'), clerk: await agentVersionOf('clerk') };
   const { version } = await detail('yours', 'mine');

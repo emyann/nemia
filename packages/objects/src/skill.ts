@@ -2,7 +2,8 @@
  * The Skill: a skill folder a factory's starts can find, served as an object in the factory's namespace. Its `spec` is what its SKILL.md
  * says: its title, description, tags and examples, whether it is loaded whole every turn (`preload`), and its instructions. Its `status`
  * is what Nemia reads of it: where it was found, its card entry or why it has none, what it costs a turn, the agents that give it, where
- * a builtin one is already found, the command that copies it, and its revision. Its other files are served by path alone (`SkillFiles`).
+ * a builtin one is already found, the command that copies it, and its revision. Its other text files, at any depth in its folder, are in
+ * its spec (`files`, where it has any); every file of its folder is served by path alone (`SkillFiles`).
  *
  * Beside it, the body a write is sent (`SkillWrite`). Plain Schemas of JSON.
  */
@@ -13,7 +14,17 @@ import { CardSkill, SkillCost, WriteMeta, definitionStatus } from './definition.
 const Text = Schema.NullOr(Schema.String);
 const Words = Schema.NullOr(Schema.Array(Schema.String));
 
-/** A skill as its SKILL.md says it; a key unset is null or left out. */
+/**
+ * A text file of a skill's folder beside its SKILL.md: its path in the folder, with `/`, at any depth, and its text. A file that is not
+ * text — a picture — is never one.
+ */
+export const SkillFile = Schema.Struct({ path: Schema.String, text: Schema.String });
+export type SkillFile = typeof SkillFile.Type;
+
+/**
+ * A skill as its SKILL.md says it; a key unset is null or left out. Its `files` are the folder's other text files, served where it holds
+ * any; a write that gives them gives the whole set, so one left out is removed, and a file that is not text is never touched.
+ */
 export const SkillSpec = Schema.Struct({
   title: Schema.optionalKey(Text),
   description: Schema.optionalKey(Text),
@@ -21,6 +32,7 @@ export const SkillSpec = Schema.Struct({
   examples: Schema.optionalKey(Words),
   preload: Schema.optionalKey(Schema.Boolean),
   body: Schema.String,
+  files: Schema.optionalKey(Schema.Array(SkillFile)),
 });
 export type SkillSpec = typeof SkillSpec.Type;
 

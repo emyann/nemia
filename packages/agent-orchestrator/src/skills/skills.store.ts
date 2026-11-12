@@ -1,8 +1,8 @@
 /**
  * What the board's skill picker and skill page read and write: one skill folder read (`skillRead`), the skills an agent gives, each read
  * where a start finds it (`givenSkills`), the skill folders of a folder of skills (`skillFolders`), the first of several that has a skill
- * (`skillDirIn`), a SKILL.md's text (`skillText`); a skill copied whole from another folder of skills (`copySkill`), and a skill made or
- * changed (`writeSkill`), each write refused as `Missing`, `Conflict` or `Invalid`.
+ * (`skillDirIn`), a SKILL.md's text (`skillText`), the other text files of its folder (`skillOthers`); a skill copied whole from another
+ * folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), each write refused as `Missing`, `Conflict` or `Invalid`.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run
  * is changed by none of it: it froze its folder, and its agents' skills, at `nemia start`.
@@ -10,10 +10,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
-import { linkRefusal } from '../folder/folder.ts';
+import { linkRefusal, textIn } from '../folder/folder.ts';
 import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
-import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
-import { skillLinkRefusal, skillVersion } from './read.store.ts';
+import { skillEntryOf, skillFilesRefusal, renderSkill, withPreload, type AgentSkill, type SkillDraft, type SkillOther } from './skills.ts';
+import { skillFiles, skillLinkRefusal, skillVersion } from './read.store.ts';
 import type { VersionRefused } from '../folder/folder.ts';
 import { isWorkflowsHolderAt } from '../folder/write.store.ts';
 import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
@@ -106,6 +106,100 @@ export function skillText(dir: string): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * The other text files of the skill folder `dir`: each file of it but its SKILL.md, at any depth, by its path in it with `/`, sorted, read
+ * as `skillFiles` reads a skill; a file that is not text (`textIn`) — a picture — or does not read is never one. None where a link in the
+ * skill is refused (`skillLinkRefusal`, which `skillRead` says) or no folder is there.
+ */
+export function skillOthers(dir: string): SkillOther[] {
+  if (skillLinkRefusal(dir)) return [];
+  let files: ReturnType<typeof skillFiles>;
+  try {
+    files = skillFiles(dir);
+  } catch {
+    return [];
+  }
+  return files.flatMap((file) => {
+    if ('refused' in file || file.path === 'SKILL.md') return [];
+    let bytes: Uint8Array;
+    try {
+      bytes = fs.readFileSync(file.real);
+    } catch {
+      return [];
+    }
+    const text = textIn(bytes);
+    return text === null ? [] : [{ path: file.path.split(path.sep).join('/'), text }];
+  });
+}
+
+/**
+ * The text files of the skill folder `dir` but its SKILL.md, each a regular file of its own at any depth, by its path in it with `/`: what
+ * a write that gives a skill's files replaces. A link, and a file that is not text or does not read, is never one.
+ */
+function ownTextFiles(dir: string, under = ''): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(path.join(dir, under), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.flatMap((entry) => {
+    const file = under === '' ? entry.name : `${under}/${entry.name}`;
+    if (entry.isDirectory()) return ownTextFiles(dir, file);
+    if (!entry.isFile() || file === 'SKILL.md') return [];
+    try {
+      return textIn(fs.readFileSync(path.join(dir, file))) === null ? [] : [file];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * Why the files `files` cannot be written into the skill folder `dir`, or undefined where they can: a folder on the way to one, or the
+ * file itself, that is a link, which a write would follow out of the skill, or a file where a folder is needed.
+ */
+function filesPlaceRefusal(dir: string, files: readonly SkillOther[] = []): string | undefined {
+  for (const { path: file } of files) {
+    const parts = file.split('/');
+    for (const [i] of parts.entries()) {
+      const at = path.join(dir, ...parts.slice(0, i + 1));
+      const there = fs.lstatSync(at, { throwIfNoEntry: false });
+      if (there?.isSymbolicLink())
+        return linkRefusal(
+          at,
+          "a skill's files are its own, and a write would follow the link. Remove it by hand, or give the file elsewhere.",
+        );
+      if (there !== undefined && i < parts.length - 1 && !there.isDirectory())
+        return `${at} is a file, and ${file} is written in it as a folder: give the file elsewhere, or remove ${at} in the same write.`;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The files `files` written into the skill folder `dir` as its whole set of other text files: each given written (its folders made), but
+ * one that already holds its text, and each text file of the folder's own not given removed (`ownTextFiles`), with a folder it leaves
+ * empty. A file that is not text, and a link, are left. The paths given, sorted; none, and nothing touched, where no files are given.
+ */
+function filesWritten(dir: string, files: readonly SkillOther[] | undefined): string[] {
+  if (files === undefined) return [];
+  const given = new Set(files.map((file) => file.path));
+  const dropped = ownTextFiles(dir).filter((file) => !given.has(file));
+  for (const { path: file, text } of files) {
+    const at = path.join(dir, ...file.split('/'));
+    if (fs.existsSync(at) && fs.readFileSync(at, 'utf8') === text) continue;
+    fs.mkdirSync(path.dirname(at), { recursive: true });
+    writeWhole(at, text);
+  }
+  for (const file of dropped) {
+    fs.rmSync(path.join(dir, ...file.split('/')));
+    for (let up = path.dirname(path.join(dir, ...file.split('/'))); up !== dir && fs.readdirSync(up).length === 0; up = path.dirname(up))
+      fs.rmdirSync(up);
+  }
+  return [...given].sort();
 }
 
 /** What `copySkill` did: the skill's folder where it now is, and its files by their path in it. */
@@ -204,8 +298,11 @@ function judgeSkillPlace(home: string, at: string, name: string, anywhere: boole
     if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink()) refuseSkill(linkRefusal(place, linkWhy));
 }
 
-/** A change `writeSkill` makes: a whole skill, as the board's form writes it, or its `preload:` line alone, as the board's switch does. */
-export type SkillChange = SkillDraft | { name: string; preload: boolean };
+/**
+ * A change `writeSkill` makes: a whole skill, as the board's form writes it — with its other text files (`files`), the whole set of them,
+ * where they are given — or its `preload:` line alone, as the board's switch does.
+ */
+export type SkillChange = (SkillDraft & { readonly files?: readonly SkillOther[] }) | { name: string; preload: boolean };
 
 /** What `writeSkill` did: the skill's folder, its version now (`skillVersion`), and the files it wrote there. */
 export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
@@ -243,8 +340,10 @@ const refuseVersion = (refused: VersionRefused | null): void => {
  * and a change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`Missing`) and one whose files
  * moved since the version was read (a `Conflict`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words,
  * an `Invalid` as the rest are. A skill whose SKILL.md does not read may be written — that is how it is mended — so only what is written
- * must read. A skill made is written in a hidden folder beside where it goes and renamed into place, and a change through a hidden file
- * beside SKILL.md, so a write that fails leaves no half a skill.
+ * must read. A whole change that gives its other text files (`files`) gives the whole set of them (`filesWritten`): each path one inside
+ * the folder (`skillFilesRefusal`), no link on the way to it (`filesPlaceRefusal`), and a file that is not text never touched. A skill
+ * made is written in a hidden folder beside where it goes and renamed into place, and a change through a hidden file beside each file
+ * it writes, so a write that fails leaves no half a file.
  */
 export function writeSkill(
   home: string,
@@ -266,6 +365,9 @@ export function writeSkill(
   const file = path.join(target, 'SKILL.md');
   const named = `${SKILLS_FOLDER}/${name}`;
   const whole = 'body' in change;
+  const files = whole ? change.files : undefined;
+  refuseSkill(skillFilesRefusal(files));
+  let others: string[];
   for (const place of [target, file]) {
     if (fs.lstatSync(place, { throwIfNoEntry: false })?.isSymbolicLink())
       refuseSkill(linkRefusal(place, "a skill's files are its own, and a write would follow the link. Remove it by hand."));
@@ -290,6 +392,7 @@ export function writeSkill(
     try {
       fs.mkdirSync(staging);
       fs.writeFileSync(path.join(staging, 'SKILL.md'), text);
+      others = filesWritten(staging, files);
       fs.renameSync(staging, target);
     } catch (err) {
       fs.rmSync(staging, { recursive: true, force: true });
@@ -297,8 +400,10 @@ export function writeSkill(
     }
   } else {
     refuseVersion(definitionVersionRefusal('skill', name, 'write', skillThere(target), version));
+    refuseSkill(filesPlaceRefusal(target, files));
     const text = rendered(fs.readFileSync(file, 'utf8'));
     writeWhole(file, text);
+    others = filesWritten(target, files);
   }
-  return { dir: target, name, version: versionWritten(target, `${named} is not in ${at}`), written: ['SKILL.md'] };
+  return { dir: target, name, version: versionWritten(target, `${named} is not in ${at}`), written: ['SKILL.md', ...others] };
 }

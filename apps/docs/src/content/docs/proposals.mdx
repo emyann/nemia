@@ -27,8 +27,10 @@ Kubernetes says it: an object with a `resourceVersion` is an update at that vers
 
 A Workflow's spec carries its steps, its README and the folder's other text files (`spec.files`): a proposal can change a script beside
 the steps. Given, `spec.files` is the whole set, so a text file it leaves out is removed; a file that is not text is never touched.
-Its `resourceVersion` covers every file in the folder, so a script edited after the proposal read it makes the proposal stale. The
-resolution of a factory upgrade's conflict in a workflow is such a proposal (see [Factories](/factories/)).
+Its `resourceVersion` covers every file in the folder, so a script edited after the proposal read it makes the proposal stale. A Skill's
+spec carries its folder's other text files the same way (`spec.files`, at any depth), and an Agent's the result schema its `output:`
+names (`spec.output`, its file and text), written beside it. The resolution of a factory upgrade's conflict is such a proposal, of the
+object that holds the conflicted file (see [Factories](/factories/)).
 
 For each object, Nemia works out whether the change widens access: whether the agent it changes would let through a rule it did not
 before, stop refusing one it refused, or run in a permission mode that reaches further. A proposal that widens access says so when
@@ -62,8 +64,10 @@ A proposal starts `waiting`. Once approved, it applies when it is due: at once b
 approved, waiting; a run you call off drops it.
 
 As it applies, it is checked again. If any of its objects moved since the proposal read it, the proposal goes `stale` and writes
-nothing: read the object again and propose anew. A Factory's version covers its rules and its instruction as well as its spec and
-status, so a Factory proposal goes stale when either is edited, or its status moves, after it was read. If an agent approved it and that approval no longer holds (its delegation taken back,
+nothing: read the object again and propose anew. A Factory's version covers its rules and its instruction as well as its spec,
+so a Factory proposal goes stale when either is edited after it was read. It does not cover its status, as Kubernetes'
+`metadata.generation` counts changes to what an object should be and never a status write: a controller's pass leaves a Factory
+proposal fresh. If an agent approved it and that approval no longer holds (its delegation taken back,
 its rule dropped, the factory no longer at `auto`), it goes back to `waiting`, for you. Otherwise every object is written, and the
 proposal is `applied`; a write refused midway leaves it `failed`, naming what was written. The tick acts on every approved proposal on
 each of its passes, so a proposal waiting on its run applies on the pass after the run succeeds.

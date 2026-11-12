@@ -1,10 +1,10 @@
 /**
  * A factory made from a template. `nemia factory apply`, an entry of the command table, the command line's alone, files
- * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`).
- * The factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template,
- * its base (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version
- * its file wants merged three ways once the person has chosen for each conflict, and a workflow's resolution, proposed by
- * `nemia factory resolve`, has applied (`upgradePass`), and its status written — the version and
+ * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`). The
+ * factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template, its base
+ * (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version its file
+ * wants merged three ways once the person has chosen for each conflict, and an owner's resolution — a Workflow's, an Agent's, a Skill's, a
+ * Hire's or the Factory's — proposed by `nemia factory resolve`, has applied (`upgradePass`), and its status written — the version and
  * digest of its base and its conditions, `Applied` and `ConflictsPending` (`reconcileFactory`). Nothing is carried between passes: what a
  * pass does, it reads off the disk. A tree once seeded is the person's, written here again only by an upgrade's merge, and never over a
  * write of theirs made since the merge read it.
@@ -58,13 +58,14 @@ import {
   sameVersionChange,
   switchTrees,
   takenFromTree,
-  workflowResolution,
+  resolutionOf,
+  ownerOfKey,
   type Choice,
   type Conflict,
   type Switched,
   type TreeFile,
   type TreeMerge,
-  type WorkflowResolution,
+  type UpgradeResolution,
 } from '../upgrade/index.ts';
 import type { ProposalPhase } from 'objects';
 import { ProposalDoor } from '../../proposal/proposal.store.ts';
@@ -221,29 +222,31 @@ const upgraded = (factory: Factory & { template: FactoryTemplate }, version: str
 /** The phase of each proposal `resolutions.json` names, by its name, as read now: `gone` where the store holds it no more. */
 export type ProposalPhases = Readonly<Record<string, ProposalPhase | 'gone'>>;
 
-/** A workflow's resolution as a pass reads it: the proposal named for it, by name and phase now, where one is, and what it is to it. */
-export type WorkflowResolved = {
+/** An owner's resolution as a pass reads it: the proposal named for it, by name and phase now, where one is, and what it is to it. */
+export type OwnerResolved = {
   readonly proposal?: { readonly name: string; readonly phase: ProposalPhase | 'gone' };
-  readonly resolution: WorkflowResolution;
+  readonly resolution: UpgradeResolution;
 };
 
 /**
- * An upgrade's merge as the pass and `nemia factory resolve` read it: the merge, the workflow whose proposal resolves each of its
- * conflicts by address (`conflictOwners`), and each such workflow's resolution, by the proposal `proposals` names for it and its phase in
- * `phases` (`workflowResolution`).
+ * An upgrade's merge as the pass and `nemia factory resolve` read it: the merge, the key of the owner whose proposal resolves each of its
+ * conflicts by address (`conflictOwners`, `ownerKey`), and each such owner's resolution, by the proposal `proposals` names for it and its
+ * phase in `phases` (`resolutionOf`).
  */
 export type UpgradeMerge = {
   readonly merge: TreeMerge;
   readonly owners: ReadonlyMap<string, string>;
-  readonly resolved: ReadonlyMap<string, WorkflowResolved>;
+  readonly resolved: ReadonlyMap<string, OwnerResolved>;
 };
 
 /**
- * The tree `ours` merged with `base` and the render `theirs` three ways, or, for a switch, with `theirs` alone: where a workflow with
- * conflicts has a resolution that applied (`taken`), merged again with that workflow's text files taken from the tree for the render's
- * (`takenFromTree`), so its conflicts are settled by what the proposal wrote. Pure.
+ * The tree `ours` of the factory `factory` merged with `base` and the render `theirs` three ways, or, for a switch, with `theirs` alone:
+ * where an owner with conflicts has a resolution that applied (`taken`), merged again with that owner's files taken from the tree for
+ * the render's (`takenFromTree`), so its conflicts are settled by what the proposal wrote. Each owner's files are its own, so the order
+ * its proposals applied in changes nothing. Pure.
  */
 export function upgradeMerge(
+  factory: string,
   base: readonly TreeFile[],
   ours: readonly TreeFile[],
   theirs: readonly TreeFile[],
@@ -254,36 +257,42 @@ export function upgradeMerge(
   const mergeOf = (render: readonly TreeFile[]) => (switched ? switchTrees(ours, render) : mergeTrees(base, ours, render));
   const sides = [switched ? [] : base, ours, theirs];
   const first = mergeOf(theirs);
-  const firstOwners = conflictOwners(first.conflicts, ...sides);
-  const resolved = new Map<string, WorkflowResolved>();
-  for (const workflow of new Set(firstOwners.values())) {
-    const name = proposals[workflow];
+  const firstOwners = conflictOwners(first.conflicts, factory, ...sides);
+  const resolved = new Map<string, OwnerResolved>();
+  for (const owner of new Set(firstOwners.values())) {
+    const name = proposals[owner];
     const proposal = name === undefined ? undefined : { name, phase: phases[name] ?? ('gone' as const) };
-    const resolution = workflowResolution(proposal === undefined ? undefined : { phase: proposal.phase });
-    resolved.set(workflow, proposal === undefined ? { resolution } : { proposal, resolution });
+    const resolution = resolutionOf(proposal === undefined ? undefined : { phase: proposal.phase });
+    resolved.set(owner, proposal === undefined ? { resolution } : { proposal, resolution });
   }
-  const taken = [...resolved].filter(([, r]) => r.resolution === 'taken').map(([workflow]) => workflow);
+  const taken = [...resolved].filter(([, r]) => r.resolution === 'taken').map(([owner]) => owner);
   if (!taken.length) return { merge: first, owners: firstOwners, resolved };
-  const merge = mergeOf(takenFromTree(theirs, ours, taken));
-  return { merge, owners: conflictOwners(merge.conflicts, ...sides), resolved };
+  const merge = mergeOf(takenFromTree(theirs, ours, taken, factory));
+  return { merge, owners: conflictOwners(merge.conflicts, factory, ...sides), resolved };
 }
 
-/** `choices` without those for a conflict a workflow's proposal resolves (`owners`): the draft it was composed from, never the merge. */
+/** `choices` without those for a conflict an owner's proposal resolves (`owners`): the draft it was composed from, never the merge. */
 export const choicesUnowned = (
   choices: Readonly<Record<string, Choice>>,
   owners: ReadonlyMap<string, string>,
 ): Readonly<Record<string, Choice>> => Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at)));
 
+/** The owner a key names as a person reads it: `the Agent reviewer`. */
+export const ownerSaid = (key: string): string => {
+  const owner = ownerOfKey(key);
+  return `the ${owner.kind} ${owner.name}`;
+};
+
 /**
- * The line that settles the conflict `conflict` of the factory `name`: where a workflow's proposal resolves it, the approve line while
- * the proposal waits, or the resolve line again, saying why, once it ended unapplied; else the resolve line.
+ * The line that settles the conflict `conflict` of the factory `name`: where an owner's proposal resolves it, the approve line while the
+ * proposal waits, or the resolve line again, saying why, once it ended unapplied; else the resolve line.
  */
 function settleLine(name: string, conflict: Conflict, read: UpgradeMerge): string {
-  const workflow = read.owners.get(conflict.at);
-  const resolved = workflow === undefined ? undefined : read.resolved.get(workflow);
+  const owner = read.owners.get(conflict.at);
+  const resolved = owner === undefined ? undefined : read.resolved.get(owner);
   const proposal = resolved?.proposal;
-  if (proposal !== undefined && resolved?.resolution === 'proposed')
-    return `the workflow ${workflow ?? ''} waits on its resolution's proposal ${proposal.name}: ${approveLine(name, proposal.name)}`;
+  if (owner !== undefined && proposal !== undefined && resolved?.resolution === 'proposed')
+    return `${ownerSaid(owner)} waits on its resolution's proposal ${proposal.name}: ${approveLine(name, proposal.name)}`;
   if (proposal !== undefined && resolved?.resolution === 'refused')
     return `${resolveLine(name, conflict.at)} again, since its proposal ${proposal.name} ${proposal.phase === 'gone' ? 'is gone' : `was ${proposal.phase}`}`;
   return resolveLine(name, conflict.at);
@@ -291,8 +300,8 @@ function settleLine(name: string, conflict: Conflict, read: UpgradeMerge): strin
 
 /** A pending conflict as the status keeps it: its sides cut (`conflictCut`), and the proposal its resolution waits on, where one is. */
 function conflictKept(conflict: Conflict, read: UpgradeMerge) {
-  const workflow = read.owners.get(conflict.at);
-  const proposal = workflow === undefined ? undefined : read.resolved.get(workflow)?.proposal;
+  const owner = read.owners.get(conflict.at);
+  const proposal = owner === undefined ? undefined : read.resolved.get(owner)?.proposal;
   return proposal === undefined
     ? conflictCut(conflict)
     : { ...conflictCut(conflict), proposal: { name: proposal.name, phase: proposal.phase === 'gone' ? null : proposal.phase } };
@@ -355,9 +364,9 @@ const upgradeDue = (
 
 /**
  * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
- * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), a workflow
+ * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), an owner
  * whose resolution's proposal applied taken from the tree (`upgradeMerge`, read with the proposals' `phases`), and the person's choices
- * for the version and the template composed into it, but those for a workflow's conflicts, which its proposal resolves. While a conflict
+ * for the version and the template composed into it, but those for an owner's conflicts, which its proposal resolves. While a conflict
  * has none, only the status is written, naming each and the proposal it waits on; once every one has, the tree is swapped for the merge
  * where no one wrote it since it was read, then the base for the render, then the status. A pass that stops between them composes the
  * same tree on the next.
@@ -377,7 +386,7 @@ function upgradePass(
     last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
   const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
   const resolutions = readResolutions(home, name);
-  const read = upgradeMerge(base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
+  const read = upgradeMerge(name, base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
   const composed = compose(read.merge, choicesUnowned(choicesFor(resolutions, merging), read.owners));
   if ('pending' in composed) {
     const status: Status = {
@@ -443,7 +452,7 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  * One templated factory brought to its template: its base rendered where absent, then its tree seeded from its base where absent, an
  * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
  * wherever the base is its render, else the one last written, else unknown, said by its own condition. The proposals the upgrade's
- * resolutions name are read as they are now (`phasesNamed`), so a workflow's conflicts are taken once its proposal applied. The status it
+ * resolutions name are read as they are now (`phasesNamed`), so an owner's conflicts are taken once its proposal applied. The status it
  * observed.
  */
 export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {

@@ -239,16 +239,16 @@ function readinessOfJson(out: string): Readiness | string {
 
 /**
  * The installed release's own readiness read, run once the daemon was restarted onto it: `releases/current`'s `nemia doctor --json` on
- * the store at `root`, which asks that daemon, so the pieces it reads are the new release's — this process's code is the older one's
- * and cannot know them. Where a run waits on a missing piece (`runsWait`), one line saying the store is not ready (`readinessSaid`), then
- * each missing piece a run waits on with the fixes that put it there; nothing where it reads ready. The client's own pieces (area
+ * the store at `root`, under the context `local` whatever context the person uses (`NEMIA_CONTEXT`), so it asks this machine's daemon,
+ * and the pieces it reads are the new release's — this process's code is the older one's and cannot know them. Where a run waits on a
+ * missing piece (`runsWait`), one line saying the store is not ready (`readinessSaid`), then each missing piece a run waits on with the fixes that put it there; nothing where it reads ready. The client's own pieces (area
  * `client`: the server reached, the token taken, `nemia` on PATH) hold no run of the store's and are never among them: one of them
  * missing that a run waits on means the server's read did not reach this command, which says so, with the piece's fix. A read that does
  * not answer is one line naming the command to type. Never a refusal: the upgrade itself succeeded.
  */
 function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv): string[] {
   const ran = spawnSync(installedNemia(root, archive), ['doctor', '--json'], {
-    env: { ...env, WF_ROOT: root },
+    env: { ...env, WF_ROOT: root, NEMIA_CONTEXT: 'local' },
     encoding: 'utf8',
     timeout: READINESS_READ_MS,
     stdio: ['ignore', 'pipe', 'pipe'],

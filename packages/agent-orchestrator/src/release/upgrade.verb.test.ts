@@ -107,7 +107,7 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
   fs.writeFileSync(path.join(REPO, 'marker.txt'), `${marker}\n`);
   fs.writeFileSync(
     path.join(REPO, 'nemia.sh'),
-    `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nif [ "$1 $2" = "doctor --json" ]; then cat '${READ}'; exit 1; fi\nexit ${carry}\n`,
+    `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nif [ "$1 $2" = "doctor --json" ]; then echo "context $NEMIA_CONTEXT" >> '${CARRIED}'; cat '${READ}'; exit 1; fi\nexit ${carry}\n`,
   );
   const commit = stand().world.commit(REPO, marker);
   stand().world.tag(REPO, tag, commit);
@@ -581,6 +581,21 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
         assert.ok(!after.some((l) => l.includes('linger')), 'a piece no run waits on is left to nemia doctor');
       } finally {
         readAs({ ready: true, pieces: [] });
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
+  await s.test(
+    "a person whose context is a remote server still has this machine's store read: the read runs under the context local",
+    async () => {
+      fs.rmSync(CARRIED, { force: true });
+      try {
+        await run({ tag: 'v13', repo: REPO }, onPointer(), { ...ENV, NEMIA_CONTEXT: 'far-away' });
+        const said = fs.readFileSync(CARRIED, 'utf8').trim().split('\n');
+        assert.ok(said.includes(`doctor --json ${ROOT}`), said.join('\n'));
+        assert.ok(said.includes('context local'), said.join('\n'));
+      } finally {
         fs.rmSync(UNIT, { force: true });
       }
     },

@@ -73,11 +73,27 @@ export function partsOf(
   };
 }
 
-/** The typed client of the `Api` at `forwarded`'s server, each request presenting its token as its bearer where it has one. */
+/**
+ * `request`, where it is a write the typed client gives no body (an endpoint with no payload), with `{}` as its body, sent as
+ * `content-type: application/json`: the api's write guard refuses a write without that header, as a body any page could send; a read, and
+ * a write with a body of its own, as it is.
+ */
+export const jsonBodied = (request: HttpClientRequest.HttpClientRequest): HttpClientRequest.HttpClientRequest =>
+  request.method === 'GET' || request.method === 'HEAD' || request.body._tag !== 'Empty'
+    ? request
+    : HttpClientRequest.bodyJsonUnsafe(request, {});
+
+/**
+ * The typed client of the `Api` at `forwarded`'s server: each bodiless write sent as JSON (`jsonBodied`), each request presenting its token
+ * as its bearer where it has one.
+ */
 const clientOf = (forwarded: Forwarded) =>
   HttpApiClient.make(Api, {
     baseUrl: forwarded.server,
-    transformClient: forwarded.token === undefined ? undefined : HttpClient.mapRequest(HttpClientRequest.bearerToken(forwarded.token)),
+    transformClient: (client) => {
+      const bodied = HttpClient.mapRequest(client, jsonBodied);
+      return forwarded.token === undefined ? bodied : HttpClient.mapRequest(bodied, HttpClientRequest.bearerToken(forwarded.token));
+    },
   });
 
 /** The typed client, as a forwarded call reads it: each group's endpoints by name, a call taking its parts. */

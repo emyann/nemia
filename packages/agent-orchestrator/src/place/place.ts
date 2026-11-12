@@ -6,11 +6,13 @@
  * A verb is a question asked of the place the program was given, and has one of three outcomes (`PlaceOutcome`): its answer, a refusal the
  * place words itself, or unread, when it gave neither in time.
  */
+import type { Need } from 'objects';
 
 /** The verbs a place may answer, in the order a run meets them: `root` first, asked of a folder before any run. */
 export const PLACE_VERBS = [
   'root',
   'open',
+  'follow',
   'make',
   'handoff',
   'report',
@@ -35,6 +37,7 @@ export type PlaceVerb = (typeof PLACE_VERBS)[number];
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   root: 120_000,
   open: 120_000,
+  follow: 120_000,
   make: 600_000,
   handoff: 120_000,
   report: 120_000,
@@ -61,6 +64,22 @@ export type Rooted = { readonly root: string | null };
  * with a `stat` and no process (`stagedHere`).
  */
 export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly inProgressFile?: string };
+
+/**
+ * What `follow` answers of a checkout, once it has read its remote: the branch it is on follows `upstream` (the remote's branch, as git
+ * names it), and the checkout is
+ * - `no-upstream`: on a branch that follows none, or on no branch in a repository with no remote — nothing to follow, nothing changed;
+ * - `up-to-date`: at its upstream's commit, or `ahead`: past it with nothing of it missing — nothing changed;
+ * - `fast-forwarded`: was clean and only behind, and is now at its upstream's commit, moved `from` one commit `to` the other;
+ * - `left`: behind but not to be moved without a person — commits of its own, a merge in progress, changes not committed, no branch —
+ *   left as it is, `message` saying why and what to do;
+ * - `unfetched`: its remote could not be read, `message` saying git's words and what to do; nothing changed.
+ */
+export type Followed =
+  | { readonly state: 'no-upstream' }
+  | { readonly state: 'up-to-date' | 'ahead'; readonly upstream: string }
+  | { readonly state: 'fast-forwarded'; readonly upstream: string; readonly from: string; readonly to: string }
+  | { readonly state: 'left' | 'unfetched'; readonly upstream?: string; readonly message: string };
 
 /**
  * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for the run's
@@ -209,6 +228,7 @@ export type Cloned = { readonly repo: string; readonly made: boolean };
 export type PlaceAnswers = {
   readonly root: Rooted;
   readonly open: Opened;
+  readonly follow: Followed;
   readonly make: Made;
   readonly handoff: HandedOff;
   readonly report: Changes;
@@ -230,6 +250,7 @@ export type PlaceAnswers = {
 export type PlaceRequests = {
   readonly root: { readonly dir: string };
   readonly open: { readonly root: string; readonly isolate: boolean };
+  readonly follow: { readonly repo: string };
   readonly make: {
     readonly repo: string;
     readonly at: string;
@@ -333,10 +354,15 @@ export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly st
   readonly [K in Exclude<SayKey, (typeof SAY_LISTS)[number]>]: string;
 };
 
-/** What a place declares of itself: the tools a landing session is denied, and the sentences the code prints for it (`PlaceSay`). */
+/**
+ * What a place declares of itself: the tools a landing session is denied, the sentences the code prints for it (`PlaceSay`), and the
+ * machine needs a run in it has (`needs`, src/needs/): each a check and the fixes that put it in place, which a run of a repository waits
+ * on before its first session and the readiness read lists. A builtin place declares them, so its fixes are started for any caller.
+ */
 export type PlaceDeclared = {
   readonly denyWhileLanding: readonly string[];
   readonly say: PlaceSay;
+  readonly needs?: readonly Need[];
 };
 
 /**
@@ -372,3 +398,9 @@ export const sayFilled = (template: string, holes: Readonly<Record<string, strin
 /** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
 export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
   'refused' in outcome ? outcome.refused : outcome.unread.said;
+
+/**
+ * The names of the needs the builtin places declare (`PlaceDeclared.needs`), which a template's workflow need may fill (`fills`): read
+ * by the template's check, which reaches no place's code, and held equal to the git place's declaration by `src/place/place.store.test.ts`.
+ */
+export const SHIPPED_PLACE_NEEDS: readonly string[] = ['git-identity'];

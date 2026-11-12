@@ -62,7 +62,9 @@ import {
   currentRelease,
   runningRelease,
   claudeTokenFile,
+  claudeTokenStatus,
   loadClaudeToken,
+  tokenWarningLine,
   trialRefusal,
   checkoutPromiseLine,
   ensureDaemon,
@@ -276,7 +278,8 @@ function upStats(home: string): void {
  * said through the process's telemetry (`telemetryLayer`) and its feed's lines published to its live readers (`feedHubLayer`). A queued
  * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`. Before anything it loads the person's sign-in
  * token file into the environment the sessions inherit, where `CLAUDE_CODE_OAUTH_TOKEN` is unset (`loadClaudeToken`), refused (exit 2)
- * where the file is readable by others.
+ * where the file is readable by others, and says once, as it takes the store, the warning of a kept token near or past its year
+ * (`tokenWarningLine`).
  */
 function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
   const store = wfRoot(env);
@@ -297,6 +300,8 @@ function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<v
       const promise = checkoutPromiseLine(runningRelease());
       if (promise) console.log(`   ${promise}`);
       if (signedIn === 'loaded') console.log(`   sessions sign in with the token in ${claudeTokenFile(store)}`);
+      const aged = signedIn === 'loaded' ? tokenWarningLine(claudeTokenStatus(store)) : undefined;
+      if (aged) console.log(`   warning: ${aged}`);
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'up', onTaken });
   return runMain(

@@ -6,10 +6,12 @@
  * not moved keep their path exactly. `--local` is refused, exit 2, naming the command typed without it. Under a remote context a verb about
  * the store only that path has is forwarded: that CLI spawned with the context's server and token (`forwardedEnv`), calling the daemon's
  * endpoints; a verb about this machine (`MACHINE_VERBS`) still runs here, and `nemia config` reads and writes the contexts themselves,
- * whatever context is in use.
+ * and `nemia pair <url>` writes one a pairing minted the token of (`pair.ts`), whatever context is in use.
  */
 import { CONFIG_VERB, chosenOf, config, factoryNotHere, unheld } from './context.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
+import { PAIR_VERB, pair } from './pair.ts';
+import { readiness } from './readiness.ts';
 import { type ClientVerb, MACHINE_VERBS, MOVED_COMMANDS, type MovedName, nameOf, type ReadVerb, routeOf } from './route.ts';
 import { Refused } from './refused.ts';
 import { commanded } from './commands/commanded.ts';
@@ -29,7 +31,14 @@ import { watch } from './watch/watch.ts';
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
 
 /** Each moved read's runner, on the words after its name: it prints, and answers its exit code. */
-const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<number>>> = { show, closeout, ls, inbox, watch };
+const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<number>>> = {
+  show,
+  closeout,
+  ls,
+  inbox,
+  watch,
+  readiness,
+};
 
 /** Each of the client's own verbs' runner, on the words after its name. */
 const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]) => Promise<number>>> => ({
@@ -75,6 +84,7 @@ const exportsAFactory = (words: readonly string[]): boolean =>
 export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const name = nameOf(argv);
   if (name === CONFIG_VERB) return config(argv.slice(1));
+  if (name === PAIR_VERB) return pair(argv.slice(1));
   const chosen = chosenOf();
   const help = argv.includes('--help') || name === '';
   const route = routeOf({ name, local: unlocal(argv), help, remote: chosen.kind === 'remote' });

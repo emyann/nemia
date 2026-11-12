@@ -9,8 +9,9 @@
  *
  * Writes are yours, in `default` alone (`writeGoes`): made with its steps (the builder's `write`, builder.ts), written whole at the
  * `metadata.resourceVersion` it was read at, its `spec.files` — served as the folder's other text files, left out where it has none —
- * the whole set of them where given, so one it leaves out is removed; — a stale one is a 409 — and removed at the `?resourceVersion=` it
- * was read at
+ * the whole set of them where given, so one it leaves out is removed; its `spec.needs` — served apart from the README, read off its
+ * frontmatter — written back into that frontmatter where given, and kept as the README has them where left out (`readmeOf`); — a stale
+ * one is a 409 — and removed at the `?resourceVersion=` it was read at
  * (`workflows rm`). The builder's refusal of a step is an `Invalid` naming the steps (`steps`).
  *
  * A step of one is read for its page (`step`, step/step.ts) in the namespace's factory, its folder the one the namespace serves of that
@@ -26,6 +27,8 @@ import {
   WORKFLOWS_REMOVE,
   workflowDraftOfFiles,
   workflowStale,
+  workflowNeeds,
+  workflowReadmeWith,
   workflowVersion,
   type FolderLoaded,
   type WorkflowFilesRead,
@@ -36,6 +39,7 @@ import {
   Conflict,
   Invalid,
   Missing,
+  type Need,
   type DefinitionFiles,
   type Workflow,
   type WorkflowCreate,
@@ -177,6 +181,20 @@ const stepBodyOf = (step: WorkflowStep): StepBody => ({
 });
 
 /**
+ * The README a write of `spec` hands the builder for the folder `dir`: its `readme` under a frontmatter of its `needs`, the folder's own
+ * README and needs where either is left out (`workflowReadmeWith`), so a Workflow read then written keeps the needs the read served
+ * apart; none where neither is given, the README left as it is.
+ */
+const readmeOf = (dir: string, spec: { readonly readme?: string | null; readonly needs?: readonly Need[] }): string | undefined =>
+  workflowReadmeWith(dir, spec.readme ?? undefined, spec.needs);
+
+/** The machine needs the README of the folder `dir` declares in its frontmatter (`workflowNeeds`) as a spec's `needs`, none where none. */
+const needsOf = (dir: string): { needs?: readonly Need[] } => {
+  const needs = workflowNeeds(dir);
+  return needs.length > 0 ? { needs } : {};
+};
+
+/**
  * The object of one folder served: its listing, the loading its graph is drawn from, and its revision; with no namespace and no revision
  * for one no namespace holds (a template's).
  */
@@ -199,6 +217,7 @@ const workflowObject = (
   spec: {
     description: listing.description,
     readme: listing.readme,
+    ...needsOf(listing.dir),
     steps: listing.steps.map(writtenStep),
     ...(listing.files.length > 0 && { files: listing.files }),
   },
@@ -301,7 +320,8 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         if (payload.spec.steps.length === 0)
           throw new Invalid({ error: `${route}: a workflow is made with its first step. Send ${SHAPE}, with one step at least.` });
         const steps = draftsOf(payload.spec.steps, route);
-        builderRefused(await write(writing(s, name, false), steps, payload.spec.readme ?? undefined, [], payload.spec.files));
+        const at = writing(s, name, false);
+        builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), [], payload.spec.files));
         return workflowAt(s, namespace, name, 'yours');
       }),
     )
@@ -321,7 +341,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         const at = writing(s, name, true);
         const now = await s.inRequest(workflowVersion(at.dir, placesOf(s.repo, s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
-        builderRefused(await write(at, steps, payload.spec.readme ?? undefined, schemas, files));
+        builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
         return workflowAt(s, namespace, name, 'yours');
       }),
     )

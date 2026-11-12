@@ -70,10 +70,10 @@ const kept = (file: string | undefined, cursor: number): void => {
 };
 
 /** One event of the stream: its name, its data and its id, as an EventSource reads a block. */
-type Sent = { event: string; data: string; id?: string };
+export type Sent = { event: string; data: string; id?: string };
 
-/** The whole blocks of `text`, and what is left after them. A comment line is nothing. */
-function blocksOf(text: string): { sent: Sent[]; rest: string } {
+/** The whole blocks of `text`, and what is left after them. A comment line is nothing. A fix's output stream is read with it too. */
+export function blocksOf(text: string): { sent: Sent[]; rest: string } {
   const parts = text.split('\n\n');
   const rest = parts.pop() ?? '';
   const sent = parts.flatMap((block): Sent[] => {

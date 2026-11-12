@@ -112,6 +112,7 @@ function refusalsOf(
   files: (others: string[]) => string[] = (others) => others,
   packageSkills: readonly string[] = ['git'],
   texts: Readonly<Record<string, string>> = {},
+  placeNeeds: readonly string[] = [],
 ): Refusal[] {
   const docs = documents();
   edit(docs);
@@ -120,6 +121,7 @@ function refusalsOf(
     packageSkills,
     (file) => texts[file] ?? '',
     (file) => sharedLinesOf(texts[file] ?? ''),
+    placeNeeds,
   );
 }
 
@@ -180,6 +182,18 @@ test('the check of a template folder: the whole folder passes, and each rule bro
       );
     },
   );
+
+  await t.test("a workflow's needs: each declared once, and a need that fills one fills a need a shipped place declares", () => {
+    const workflow = 'workflows/dev/workflow.yaml';
+    const tool = { name: 'tool', message: 'the tool', check: 'command -v tool' };
+    const filling = { name: 'from-host', message: 'from the host', check: 'true', fills: 'git-identity' };
+    const withNeeds = (needs: unknown[]) => (docs: Record<string, any>) => (docs[workflow].spec.needs = needs);
+    assert.deepEqual(refusalsOf(withNeeds([tool, filling]), undefined, undefined, undefined, ['git-identity']), []);
+    const twice = refusalsOf(withNeeds([tool, tool]), undefined, undefined, undefined, ['git-identity']);
+    assertRefused(twice, workflow, ['spec', 'needs', 1, 'name'], 'twice');
+    assertRefused(refusalsOf(withNeeds([filling])), workflow, ['spec', 'needs', 0, 'fills'], 'git-identity');
+    assert.ok(refusalsOf(withNeeds([{ name: 'tool' }])).some((r) => r.file === workflow && r.at[1] === 'needs'));
+  });
 
   await t.test("a workflow's README and its files that are no .md or .yaml are carried, and a .md that names no step is refused", () => {
     assert.deepEqual(

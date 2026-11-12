@@ -24,6 +24,7 @@ const NO_COMMIT = 'f'.repeat(40);
 const LIES: { readonly [V in PlaceVerb]: (answer: PlaceAnswers[V]) => PlaceAnswers[V] } = {
   root: (answer) => ({ root: answer.root === null ? '/elsewhere' : null }),
   open: (answer) => ({ ...answer, inProgressFile: `${answer.inProgressFile}.elsewhere` }),
+  follow: (answer) => (answer.state === 'no-upstream' ? { state: 'up-to-date', upstream: 'origin/main' } : { state: 'no-upstream' }),
   make: (answer) => ({ ...answer, conflicts: [] }),
   handoff: () => ({ commit: null }),
   report: (answer) => ({ ...answer, files: Object.fromEntries(Object.keys(answer.files).map((branch) => [branch, []])) }),

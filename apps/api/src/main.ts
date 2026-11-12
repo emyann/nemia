@@ -1,31 +1,46 @@
 /**
  * The api's process: its arguments read (`argsOf`: none, a pass interval `[ms]`, or `--no-tick`), `PORT` read (`portOf`), the person's
- * sign-in token file loaded into the environment its sessions inherit where `CLAUDE_CODE_OAUTH_TOKEN` is unset (`loadClaudeToken`), the
- * app's runtime built from its live layer (`runtime.context()`), and where it listens read off `NEMIA_BIND` and the store's settings
- * (`hostOf`, port.ts: the loopback where unset, another address only on a store marked exposed, `WF_EXPOSED=1`) — each refusal printed and
- * exited with its code. Without `--no-tick` it is the store's daemon, ticking at the interval given or `DEFAULT_EVERY_MS`: it takes the
- * store's lease first (`up`, as the api), so an api refused by another daemon binds no port, then serves the app on that address, writes
- * where it listens into the lease (`holdUrl`, the loopback for a server on every interface: `leaseHostOf`) and ticks on the engine its
- * layer built, under `runMain`: a signal closes the server and lets the lease go, and a lease taken over or a pass that fails ends the
- * process. Its passes are said as `nemia up` says them, through the telemetry the app's layer holds (`telemetryLayer` in `liveOf`, app.ts):
- * the pass is given the app runtime's context whole (`Effect.provideContext`), so its lines go through the same logger every request's
- * does, its spans and its series are exported to the collector `OTEL_EXPORTER_OTLP_ENDPOINT` names, its own series a collector reads by
- * their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`), each harness's quota asked through the asker the boards
- * read (`daemonQuota`, `QuotaAsker`), so a board open beside it adds no ask, and the hub its layer built (`FeedHub`), which the app's
- * streams of the feed read, and the place its programs ask (`PlaceService`) come with it. The runtime is disposed as the pass ends, however
- * it ends, so the exporters post what they hold once more before the process goes. With `--no-tick` it serves alone, holding nothing. It
- * prints the port the server got: the one asked for, or a free one for `PORT=0`. It keeps an idle connection past the longest its clients
- * pool one (`SERVER_TIMEOUTS`, port.ts), so a client's first call after a pause is answered rather than reset. Refused first
- * (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and
- * an install's repository is the one it was built from (`repoOf`).
+ * sign-in token file loaded into the environment its sessions inherit where `CLAUDE_CODE_OAUTH_TOKEN` is unset (`loadClaudeToken`) and
+ * warned of once where it is near or past its year (`tokenWarningLine`), the app's runtime built from its live layer
+ * (`runtime.context()`), and where it listens read off `NEMIA_BIND` and the store's settings (`hostOf`, port.ts: the loopback where
+ * unset, another address only on a store marked exposed, `WF_EXPOSED=1`; and a wildcard or public one only acknowledged,
+ * `NEMIA_BIND_PUBLIC=1`, `acknowledgedHost`) — each refusal printed and exited with its code. Without `--no-tick` it is the store's
+ * daemon, ticking at the interval given or `DEFAULT_EVERY_MS`: it takes the store's lease first (`up`, as the api), so an api refused
+ * by another daemon binds no port, then serves the app on that address, writes where it listens into the lease (`holdUrl`, the loopback
+ * for a server on every interface: `leaseHostOf`) and ticks on the engine its layer built, under `runMain`: a signal closes the server
+ * and lets the lease go, and a lease taken over or a pass that fails ends the process. Its passes are said as `nemia up` says them,
+ * through the telemetry the app's layer holds (`telemetryLayer` in `liveOf`, app.ts): the pass is given the app runtime's context whole
+ * (`Effect.provideContext`), so its lines go through the same logger every request's does, its spans and its series are exported to the
+ * collector `OTEL_EXPORTER_OTLP_ENDPOINT` names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with
+ * the daemon's (`up`'s `series`), each harness's quota asked through the asker the boards read (`daemonQuota`, `QuotaAsker`), so a
+ * board open beside it adds no ask, and the hub its layer built (`FeedHub`), which the app's streams of the feed read, and the place
+ * its programs ask (`PlaceService`) come with it. The runtime is disposed as the pass ends, however it ends, so the exporters post what
+ * they hold once more before the process goes. With `--no-tick` it serves alone, holding nothing. It prints the port the server got:
+ * the one asked for, or a free one for `PORT=0`. It keeps an idle connection past the longest its clients pool one (`SERVER_TIMEOUTS`,
+ * port.ts), so a client's first call after a pause is answered rather than reset. Refused first (`Conflict`), binding nothing: a
+ * checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the
+ * one it was built from (`repoOf`).
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import { Conflict, currentRelease, holdUrl, loadClaudeToken, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
+import {
+  BIND_PUBLIC_VARIABLE,
+  Conflict,
+  currentRelease,
+  holdUrl,
+  claudeTokenStatus,
+  loadClaudeToken,
+  runMain,
+  runningRelease,
+  tokenWarningLine,
+  trialRefusal,
+  up,
+  wfRoot,
+} from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
-import { argsOf, hostOf, leaseHostOf, portOf, SERVER_TIMEOUTS } from './port.ts';
+import { acknowledgedHost, argsOf, hostOf, leaseHostOf, portOf, SERVER_TIMEOUTS } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
 import { daemonQuota, QuotaAsker } from './gauges/quota.ts';
 import { Engine, engineRead, StoreConfig, StoreRoot } from './store.ts';
@@ -48,9 +63,15 @@ try {
   if (trial !== null) throw new Conflict({ message: trial });
   args = argsOf(process.argv.slice(2));
   port = portOf(process.env.PORT, args.ticks);
-  loadClaudeToken(process.env);
+  if (loadClaudeToken(process.env) === 'loaded') {
+    const aged = tokenWarningLine(claudeTokenStatus(wfRoot(process.env)));
+    if (aged) console.warn(`nemia: warning: ${aged}`);
+  }
   services = await runtime.context();
-  host = hostOf(process.env.NEMIA_BIND, Context.get(services, StoreConfig).exposed);
+  host = acknowledgedHost(
+    hostOf(process.env.NEMIA_BIND, Context.get(services, StoreConfig).exposed),
+    process.env[BIND_PUBLIC_VARIABLE] === '1',
+  );
   e = Context.get(services, Engine);
   asker = Context.get(services, QuotaAsker);
 } catch (err) {

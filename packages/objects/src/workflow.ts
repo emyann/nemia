@@ -194,13 +194,44 @@ export type WorkflowStep = typeof WorkflowStep.Type;
 export const WorkflowFile = Schema.Struct({ path: Schema.String, text: Schema.String });
 export type WorkflowFile = typeof WorkflowFile.Type;
 
+/** An answer a fix asks the person for before it runs, given to its command as `NEMIA_ANSWER_<NAME>` (its name in capitals). */
+export const NeedAsk = Schema.Struct({ name: Schema.String, message: Schema.String });
+export type NeedAsk = typeof NeedAsk.Type;
+
 /**
- * A workflow as its files say it: its description, its README (null for none), its steps, in its order, and the folder's other text
- * files (`files`, sorted by name). Given on a write, `files` is their whole set, as a Kubernetes replace is: a text file of the folder
- * that is no markdown and is not named is removed, a file that is not text is never touched; left out, the folder's other files stay.
+ * A fix of a need: the shell command that puts it in place, what it does in words, the answers it asks first, and the pattern of a code
+ * its output shows a person (a device code), which the board and the client show large.
+ */
+export const NeedFix = Schema.Struct({
+  command: Schema.String,
+  message: Schema.String,
+  asks: Schema.optionalKey(Schema.Array(NeedAsk)),
+  code: Schema.optionalKey(Schema.String),
+});
+export type NeedFix = typeof NeedFix.Type;
+
+/**
+ * A machine need a workflow or a place declares: its name, what it is in words, the shell command whose exit 0 says it is in place, the
+ * fixes that put it there, and `fills`, the name of a place's need whose fixes this one's come before (sdlc fills the git identity).
+ */
+export const Need = Schema.Struct({
+  name: Schema.String,
+  message: Schema.String,
+  check: Schema.String,
+  fixes: Schema.optionalKey(Schema.Array(NeedFix)),
+  fills: Schema.optionalKey(Schema.String),
+});
+export type Need = typeof Need.Type;
+
+/**
+ * A workflow as its files say it: its description, the machine needs its README's frontmatter declares (`needs`), its README (null
+ * for none), its steps, in its order, and the folder's other text files (`files`, sorted by name). Given on a write, `files` is their
+ * whole set, as a Kubernetes replace is: a text file of the folder that is no markdown and is not named is removed, a file that is not
+ * text is never touched; left out, the folder's other files stay.
  */
 export const WorkflowSpec = Schema.Struct({
   description: Schema.optionalKey(Text),
+  needs: Schema.optionalKey(Schema.Array(Need)),
   readme: Schema.optionalKey(Text),
   steps: Schema.Array(WorkflowStep),
   files: Schema.optionalKey(Schema.Array(WorkflowFile)),

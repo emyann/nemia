@@ -1,8 +1,8 @@
 /**
  * How a client of the `Api` sends a write: as JSON. The api's write guard refuses a write (any method but GET and HEAD) that does not say
  * `content-type: application/json`, a body any page could send without asking; a typed client gives an endpoint with no payload no body
- * at all, so every client of another machine's api maps its requests through `jsonBodied` — the orchestrator's CLI forwarded and the
- * client, `apps/cli`, alike.
+ * at all, so the one typed client of the `Api` (`apiClient`, `api-client.ts`), which every consumer of the api makes, maps its
+ * requests through `jsonBodied`.
  */
 import { HttpClientRequest } from 'effect/http';
 

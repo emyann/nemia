@@ -179,12 +179,31 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
                                CLI only: it writes or reads the person's login services, on the machine the command runs on
+  nemia service addresses [--json]
+                               this machine's addresses, loopback first, one a line: the address, its
+                               interface and its kind (loopback, private, shared, link-local,
+                               unique-local, public), so --bind takes a private one; --json prints
+                               {"addresses":[{"address","interface","family","kind"}]}
+                               CLI only: it reads the network interfaces of the machine the command runs on
+  nemia readiness [--json]
+                               every piece this server needs before a run: the harness sign-in, the
+                               service and its linger, the bind, the machine, the git identity, each
+                               factory's workflows' needs, a factory, a newer release — each in place
+                               or missing, with the command or fix that puts it there. --json: the
+                               whole read
+                               on the port: readiness
   nemia token ls
                                your tokens, by name, with when each was minted: never a token itself
                                CLI only: a token is minted where the store is and printed once to the person there; a caller of the port holding one token mints and revokes no other
+  nemia pairings ls
+                               the pairings the store keeps, newest first: the client that asked, and
+                               whether it waits for your approval, is approved, was claimed or lapsed.
+                               Never a code: approve the one the client shows with nemia pairings approve
+                               on the port: pairings_ls
   nemia claude-token status
-                               whether your subscription token is kept, its file and its mode: never
-                               the token
+                               whether your subscription token is kept, its file and its mode, when it
+                               was set and the days left of its year, warned of a month before it ends:
+                               never the token
                                CLI only: the token is the person's own, kept on the machine the store is on and read there from the terminal; no caller of the port reads or writes it
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;
@@ -577,7 +596,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia chat disallow <name>
                                take a name back: words under it are refused. Asked of you every time
                                on the port: chat_disallow
-  nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]
+  nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr> [--public]] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this
                                node, WF_ROOT and PATH, and each --env, written once; it restarts on
@@ -589,9 +608,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT; no limit on
                                macOS), each but one --env gives. --bind <addr>: the address the
                                daemon listens on (NEMIA_BIND), and the store marked exposed
-                               (WF_EXPOSED=1), so every caller presents a token: nemia token add
-                               mints the first. --name: the service
-                               name (nemia; required for a store that is not the default)
+                               (WF_EXPOSED=1), so every caller presents a token: nemia pairings
+                               approve and nemia board link hand out the first. A public or
+                               wildcard address is refused unless --public acknowledges it
+                               (NEMIA_BIND_PUBLIC=1); nemia service addresses lists this machine's.
+                               --name: the service name (nemia; required for a store that is not
+                               the default)
                                CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service uninstall [--name <name>]
                                stop the login service, disable it and remove its file; a daemon

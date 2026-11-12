@@ -283,42 +283,44 @@ test("her plugin's agent is the file the keeper reads, and the only agent it shi
 
 /**
  * Where a plugin's `.mcp.json` text breaks what her port's entry is: one server, `nemia`, of `type: "http"`, its url `${NEMIA_URL}` (a
- * default allowed) then `/mcp`, and its `Authorization` header `Bearer ${NEMIA_TOKEN}`, nothing of the store's written in: a line each.
+ * default allowed) then `/mcp`, its headers given by `headersHelper: "nemia config headers"` and none written in, nothing of the store's
+ * written in: a line each.
  *
- * Why the two variables reach the entry: https://code.claude.com/docs/en/mcp , "Environment variable expansion in
- * `.mcp.json`" — `${VAR}` and `${VAR:-default}` expand in an http server's `url` and `headers`, and a plugin's servers read the same
- * environment as one configured by hand. The same page reads a set of credential names (the host's own, a cloud provider's, a proxy's
- * or npm's, not listed in full) as empty in a remote server's `url` and `headers`; a name outside it "expands as written", which
- * `NEMIA_TOKEN` is. Not yet tried against a host: if the port answers 401 that the Authorization header is not
- * `Bearer <token>` while `nemia token ls` lists the token, the header reached it as `Bearer ` with the variable read empty, and the fix
- * is to rename the variable, or to take the token as a sensitive option of the plugin's user config.
+ * Why: https://code.claude.com/docs/en/mcp — an http server's `headersHelper` is a command Claude Code runs in a shell at each
+ * connection, at each reconnect and again after a 401 or 403, merging the JSON object of string headers it prints into those it sends.
+ * `nemia config headers` prints the Authorization header of `NEMIA_TOKEN` where it is set, else of the context in use (a token `nemia
+ * pair` wrote), so a token paired again is taken without restarting Claude Code, and none is held in the person's environment. The url
+ * stays substituted from `${NEMIA_URL}` as the plugin is loaded: a context changed later is not followed by it.
  */
 const serverBreaks = (text: string): string[] => {
   const servers = (JSON.parse(text) as { mcpServers?: Record<string, Record<string, unknown>> }).mcpServers ?? {};
   const names = Object.keys(servers);
   if (names.length !== 1 || names[0] !== 'nemia') return [`servers: ${names.join(', ') || 'none'}`];
-  const { type, url, headers } = servers.nemia;
+  const { type, url, headers, headersHelper } = servers.nemia;
   const breaks: string[] = [];
   if (type !== 'http') breaks.push(`type: ${String(type)}`);
   if (typeof url !== 'string' || !/^\$\{NEMIA_URL(?::-[^}]+)?\}\/mcp$/.test(url)) breaks.push(`url: ${String(url)}`);
-  if (JSON.stringify(headers) !== JSON.stringify({ Authorization: 'Bearer ${NEMIA_TOKEN}' }))
-    breaks.push(`headers: ${JSON.stringify(headers)}`);
+  if (headers !== undefined) breaks.push(`headers: ${JSON.stringify(headers)}`);
+  if (headersHelper !== 'nemia config headers') breaks.push(`headersHelper: ${String(headersHelper)}`);
   return breaks;
 };
 
-test("her plugin's one server is the store's MCP port, its address and token read from the person's environment", () => {
+test("her plugin's one server is the store's MCP port, its address read from the person's environment and its header from nemia", () => {
   const text = shipped().get('.mcp.json');
   assert.ok(text !== undefined, 'the plugin ships .mcp.json at its root');
   assert.deepEqual(serverBreaks(text), []);
 });
 
-test('REFUSED: a server entry with a written address, a written token or a second server is named for each', () => {
+test('REFUSED: a server entry with a written address, a written header or a second server is named for each', () => {
   const entry = (nemia: Record<string, unknown>, more = {}) => JSON.stringify({ mcpServers: { nemia, ...more } });
   assert.deepEqual(serverBreaks(entry({ type: 'sse', url: 'http://127.0.0.1:8787/mcp', headers: { Authorization: 'Bearer nm_1234' } })), [
     'type: sse',
     'url: http://127.0.0.1:8787/mcp',
     'headers: {"Authorization":"Bearer nm_1234"}',
+    'headersHelper: undefined',
   ]);
-  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headers: {} }, { other: {} })), ['servers: nemia, other']);
-  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headers: { Authorization: 'Bearer ${NEMIA_TOKEN}' } })), []);
+  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headersHelper: 'nemia config headers' }, { other: {} })), [
+    'servers: nemia, other',
+  ]);
+  assert.deepEqual(serverBreaks(entry({ type: 'http', url: '${NEMIA_URL}/mcp', headersHelper: 'nemia config headers' })), []);
 });

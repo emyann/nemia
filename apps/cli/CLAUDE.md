@@ -15,7 +15,7 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   api's or the objects' and the client holds no copy of it. A value the client needs is asked of the api over HTTP. Held by
   `apps/cli/test/structure.test.ts` and the cli's block of `.oxlintrc.json` (proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). A bin imports `../src/` and nothing else.
-- **Every read is asked through `src/objects.ts`**, `objects`' `Api` made a typed client (`HttpApiClient.make`) over the daemon's lease
+- **Every read is asked through `src/objects.ts`**, `objects`' one typed client of its `Api` (`apiClient`) over the daemon's lease
   url, decoded by the Schemas the api encodes with: `nemia show`'s Run and its record, `nemia closeout`'s tries, `nemia decide`'s
   RunDecision, the pause `nemia watch` says, and the runs and cards lists `nemia ls` and `nemia inbox` ask for their `Table`. **One ask**:
   `served` (`src/daemon.ts`) takes the lease's url where something listens there, else starts the daemon once and waits until `GET
@@ -79,6 +79,9 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   (`sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is the person.
   A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is; a `Conflict` (a stale
   version) exits 1.
+  (`callerToken` and `sessionHeaders`, `src/client.ts`), on the typed client, the readiness probe and the feed's stream alike; none is
+  the person.
+  A 403 `Forbidden` or a 401 `Unauthorized` of the api is its refusal in its words, exit 2, as `Invalid` is.
 - **A refusal is a `Refused` (`src/refused.ts`)**: its words name the command to type next and its `code` is the exit code, 2 for a
   usage refusal; the bin prints the words and exits with the code. A test asserts the code and that a command is named, never the
   sentence.

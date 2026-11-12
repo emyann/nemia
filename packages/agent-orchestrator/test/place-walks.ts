@@ -191,6 +191,90 @@ const OPEN: readonly Walk[] = [
   },
 ];
 
+/** A clone of `root` at `<area>/<name>`, made by the place. */
+function cloneOf({ place }: Side, area: string, root: string, name = 'clone'): string {
+  const into = path.join(area, name);
+  answerOf(place.askNow('clone', { url: `file://${root}`, into }));
+  return into;
+}
+
+/** `follow` of `repo`, its message read as whether there is one: the two places word it their own way. */
+function followed({ place }: Side, repo: string): unknown {
+  const outcome = place.askNow('follow', { repo });
+  if (!('answer' in outcome) || !('message' in outcome.answer)) return outcome;
+  const { message, ...rest } = outcome.answer;
+  return { answer: { ...rest, said: message.length > 0 } };
+}
+
+const FOLLOW: readonly Walk[] = [
+  {
+    name: "a clone is up to date with its origin's branch, fast-forwarded to it once it moves, files and all, and up to date again",
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area);
+      const clone = cloneOf(side, area, root);
+      const first = followed(side, clone);
+      const moved = side.world.branch(root, 'main', { 'a.txt': 'two\n', 'b.txt': 'new\n' });
+      const forward = followed(side, clone);
+      return { base, moved, first, forward, files: filesIn(clone), head: side.world.head(clone), again: followed(side, clone) };
+    },
+    says: {
+      again: { answer: { state: 'up-to-date', upstream: 'origin/main' } },
+      base: 'commit-1',
+      files: { 'a.txt': 'two\n', 'b.txt': 'new\n' },
+      first: { answer: { state: 'up-to-date', upstream: 'origin/main' } },
+      forward: { answer: { from: 'commit-1', state: 'fast-forwarded', to: 'commit-2', upstream: 'origin/main' } },
+      head: 'commit-2',
+      moved: 'commit-2',
+    },
+  },
+  {
+    name: 'a clone with commits of its own is ahead, and left as it is once its origin moves too; one with a change not committed, to a file its origin did not change, is left, the change kept',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area, { 'a.txt': 'one\n', 'b.txt': 'one\n' });
+      const own = cloneOf(side, area, root, 'own');
+      const dirty = cloneOf(side, area, root, 'dirty');
+      fs.writeFileSync(path.join(own, 'c.txt'), 'mine\n');
+      const mine = side.world.commit(own, 'mine');
+      const ahead = followed(side, own);
+      fs.writeFileSync(path.join(dirty, 'b.txt'), 'edited\n');
+      const moved = side.world.branch(root, 'main', { 'a.txt': 'two\n' });
+      return {
+        mine,
+        moved,
+        ahead,
+        diverged: followed(side, own),
+        ownHead: side.world.head(own),
+        uncommitted: followed(side, dirty),
+        dirtyHead: side.world.head(dirty),
+        dirtyFiles: filesIn(dirty),
+      };
+    },
+    says: {
+      ahead: { answer: { state: 'ahead', upstream: 'origin/main' } },
+      dirtyFiles: { 'a.txt': 'one\n', 'b.txt': 'edited\n' },
+      dirtyHead: 'commit-1',
+      diverged: { answer: { said: true, state: 'left', upstream: 'origin/main' } },
+      mine: 'commit-2',
+      moved: 'commit-3',
+      ownHead: 'commit-2',
+      uncommitted: { answer: { said: true, state: 'left', upstream: 'origin/main' } },
+    },
+  },
+  {
+    name: 'a repository no clone made follows nothing, and is left as it is',
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area);
+      return { base, followed: followed(side, root), head: side.world.head(root) };
+    },
+    says: { base: 'commit-1', followed: { answer: { state: 'no-upstream' } }, head: 'commit-1' },
+  },
+  {
+    name: 'REFUSED: a path that is no directory, and a directory that is no repository',
+    walk: (side, area) => [followed(side, path.join(area, 'none')), followed(side, area)],
+    says: [{ refused: true }, { refused: true }],
+  },
+];
+
 const MAKE: readonly Walk[] = [
   {
     name: "a branch's tip is the commit it is at: a cut's is the commit it was cut from, and a branch the repository lacks has none",
@@ -1311,6 +1395,7 @@ const CLONE: readonly Walk[] = [
 export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
   root: ROOT,
   open: OPEN,
+  follow: FOLLOW,
   make: MAKE,
   handoff: HANDOFF,
   report: REPORT,

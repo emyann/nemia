@@ -15,10 +15,17 @@ import { Refused } from './refused.ts';
  * of this client carries it.
  */
 export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
-  const session = env.WF_SESSION_TOKEN;
-  if (session !== undefined && session !== '') return { authorization: `Bearer ${session}` };
-  const token = chosenToken(env);
+  const token = callerToken(env);
   return token === undefined ? {} : { authorization: `Bearer ${token}` };
+};
+
+/**
+ * The token this client calls with, as `sessionHeaders` presents it: the session's where `WF_SESSION_TOKEN` holds one, else the
+ * person's.
+ */
+export const callerToken = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
+  const session = env.WF_SESSION_TOKEN;
+  return session !== undefined && session !== '' ? session : chosenToken(env);
 };
 
 /** A query's words: each key once, or several times for a list (`selector`). */

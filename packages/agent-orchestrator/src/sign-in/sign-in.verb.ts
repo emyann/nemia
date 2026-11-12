@@ -1,8 +1,8 @@
 /**
  * `nemia <TOKEN_NAME> set`, `status` and `rm`, entries of the command table: the person's sign-in token file (`sign-in.store.ts`).
  * `set` reads the token off stdin — at a terminal without showing it as it is typed, else whatever is piped in — and never prints it;
- * `status` says whether one is kept and its file's mode, never the token. Served on the CLI alone, where the store's machine is, and out
- * of an agent's reach (class `none`) but for the status, which reads no token.
+ * `status` says whether one is kept, its file's mode and its age, warning of one near or past its year, never the token. Served on
+ * the CLI alone, where the store's machine is, and out of an agent's reach (class `none`) but for the status, which reads no token.
  */
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
@@ -15,6 +15,8 @@ import {
   TOKEN_MAKER,
   TOKEN_NAME,
   TOKEN_VARIABLE,
+  tokenAgeWords,
+  tokenWarningLine,
   writeClaudeToken,
   type ClaudeTokenStatus,
 } from './sign-in.store.ts';
@@ -96,11 +98,18 @@ export const CLAUDE_TOKEN_SET: Command<ClaudeTokenSet> = {
   print: ({ file }) => [`kept your token in ${file} (0600): the daemon loads it at its next start (nemia service restart)`],
 };
 
-/** `nemia <TOKEN_NAME> status`: whether a token is kept, its file and mode; never the token. */
+/**
+ * `nemia <TOKEN_NAME> status`: whether a token is kept, its file and mode, when it was set and the days left of its year, and the warning
+ * of one near or past it (`tokenWarningLine`); never the token.
+ */
 export const CLAUDE_TOKEN_STATUS: Command<ClaudeTokenStatus> = {
   name: `${TOKEN_NAME} status`,
   usage: '',
-  help: ['whether your subscription token is kept, its file and its mode: never', 'the token'],
+  help: [
+    'whether your subscription token is kept, its file and its mode, when it',
+    'was set and the days left of its year, warned of a month before it ends:',
+    'never the token',
+  ],
   spec: {
     positionals: [],
     flags: [],
@@ -114,7 +123,9 @@ export const CLAUDE_TOKEN_STATUS: Command<ClaudeTokenStatus> = {
     status.state === 'set'
       ? [
           `token: set, in ${status.file} (mode ${status.mode ?? 'unread'})`,
+          ...(tokenAgeWords(status) === undefined ? [] : [`${tokenAgeWords(status)} (the file's write time)`]),
           ...(status.mode === '0600' ? [] : [`it is readable by more than you, and the daemon refuses it: chmod 600 ${status.file}`]),
+          ...(tokenWarningLine(status) === undefined ? [] : [`warning: ${tokenWarningLine(status)}`]),
         ]
       : [`token: not set (${status.file}); nemia ${TOKEN_NAME} set keeps the one ${TOKEN_MAKER} prints`],
 };

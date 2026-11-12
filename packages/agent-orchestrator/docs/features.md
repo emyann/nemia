@@ -2249,6 +2249,30 @@ fake machine), `test/cli-trial.boundary.test.ts`, `src/daemon/daemon.store.test.
 `apps/web/test/footer.test.ts`. Still to come: a git-free export, a walk of the tag's tree for the six helpers that read `.git`, so a
 release holds no repository at all.
 
+## Shipped: archive installs, the store's floor and the Claude token file (distribution)
+
+A person installs a published per-platform archive with one command, and the daemon runs there with no checkout. What was built, in
+`src/release/`, `src/service/` and `src/sign-in/`:
+
+- **`nemia upgrade [<tag>]` on an archive install** (a `release.json` with `from: 'archive'`) downloads `nemia-<tag>-<platform>.tar.gz`
+  and its `SHA256SUMS` from the download base the running release carries (`source`; a `file:` base is read from the disk), checks the
+  one against the other, unpacks it into the build folder, runs its `bin/nemia version` on the trial store, writes `release.json` last
+  and switches the pointer, as a build does; with no tag it reads the newest (`latest/download/latest.json`). A damaged archive or a
+  failing `nemia version` changes nothing (`Invalid`); a tag nothing is published under is `Missing`. The build path is as it was.
+- **The store's floor** (`store.json`, `readableFrom`): the daemon raises it to `STORE_READABLE_FROM` as it takes the store and never
+  lowers it (`floorAfter`); `nemia upgrade <tag>` below it is refused before anything is fetched or built (`Conflict`, naming the floor),
+  on either path. Both judgements are proved by `contracts/store-floor.contract.ts`.
+- **The release check**: on an archive install the daemon asks for the newest release once its first pass has answered and every six
+  hours, sending nothing but `nemia` as its client name, and keeps it in `releases/latest.json`; `nemia version` says a newer one, and
+  `latestRelease` answers it to the api. `NEMIA_RELEASE_CHECK=off` turns it off.
+- **`nemia service install --size auto`** writes `WF_MAX_CONCURRENT` and `WF_MEMORY_LIMIT=<n>Mi` read off the machine (`sizedFor`, proved
+  by `contracts/sizing.contract.ts`: 16 GiB and 8 CPUs run 6 sessions under 8192 MiB each), each but one `--env` gives; on launchd it
+  writes no memory limit and says so. **`--bind <addr>`** writes `NEMIA_BIND` and `WF_EXPOSED=1`. An archive install's unit runs its own
+  Node under `releases/current` (`pointedEntry`).
+- **`nemia claude-token set|status|rm`**: the person's Claude token in `$WF_ROOT/claude-token`, 0600, typed hidden or piped, never
+  printed; the daemon loads it into `CLAUDE_CODE_OAUTH_TOKEN` where that is unset (`loadClaudeToken`, in `nemia up` and the api's
+  daemon), and refuses a file others can read, naming `chmod 600`.
+
 ## Shipped: an old release is removed once unused (harness-updates C2)
 
 Nothing removed `releases/<tag>`, and each release is a full `npm ci` plus build, about 850 MB. Removing one under a session that runs on

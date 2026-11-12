@@ -380,6 +380,8 @@ export {
   SubscriptionWrite,
   Unsubscribed,
   VersionAnswer,
+  LatestRelease,
+  SessionAnswer,
   YourStore,
 } from './server-api.ts';
 export {
@@ -403,6 +405,9 @@ export {
   type StatsBy,
   FEED_STREAM_EVENTS,
   type FeedStreamEventName,
+  TOKEN_COOKIE,
+  SESSION_COOKIE_STATES,
+  type SessionCookieState,
 } from './words.ts';
 export {
   LevelRaise,

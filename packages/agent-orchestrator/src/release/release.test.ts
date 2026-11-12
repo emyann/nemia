@@ -7,8 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DaemonStanding } from '../daemon/daemon.ts';
 import {
+  archiveInstall,
   checkoutPromiseLine,
   leaseRelease,
+  platformOf,
   pointedEntry,
   ranOnWords,
   restartPlan,
@@ -109,6 +111,40 @@ test("an install's service runs the entry under releases/current, unresolved; a 
   });
   const checkout = { checkout: CHECKOUT.root, entry: `${CHECKOUT.root}/apps/api/src/main.ts`, cwd: `${CHECKOUT.root}/apps/api` };
   assert.deepEqual(pointedEntry(checkout, CHECKOUT), checkout);
+});
+
+test("an archive install's service runs its own node under releases/current too; a node outside the install, unchanged", () => {
+  const archive: Running = { ...INSTALL, from: 'archive', platform: 'linux-x64', source: 'https://example.org/nemia/releases' };
+  const entry = {
+    checkout: INSTALL.root,
+    entry: `${INSTALL.root}/apps/api/src/main.ts`,
+    cwd: `${INSTALL.root}/apps/api`,
+    node: `${INSTALL.root}/node/bin/node`,
+  };
+  assert.equal(pointedEntry(entry, archive).node, `${STORE}/releases/current/node/bin/node`);
+  assert.equal(
+    pointedEntry({ ...entry, node: '/usr/bin/node' }, INSTALL).node,
+    '/usr/bin/node',
+    "a build's install runs the system's node",
+  );
+  assert.equal(archiveInstall(archive), true);
+  assert.equal(archiveInstall(INSTALL), false, 'a release.json with no from is a build');
+  assert.equal(archiveInstall(CHECKOUT), false);
+});
+
+test('an archive is published for linux on x64 and arm64 and for macOS on arm64, and for no other machine', () => {
+  assert.equal(platformOf('linux', 'x64'), 'linux-x64');
+  assert.equal(platformOf('linux', 'arm64'), 'linux-arm64');
+  assert.equal(platformOf('darwin', 'arm64'), 'darwin-arm64');
+  assert.equal(platformOf('darwin', 'x64'), null);
+  assert.equal(platformOf('win32', 'x64'), null);
+});
+
+test('nemia version says a newer release where the check read one, and nothing where it is not newer or none was read', () => {
+  const lines = (latest?: { version: string; newer: boolean }) => versionLines('1.0.0', INSTALL, null, lease('stopped'), [], latest);
+  assert.match(lines({ version: '1.3.0', newer: true }).at(-1) ?? '', /1\.3\.0.*nemia upgrade/);
+  assert.equal(lines({ version: '1.2.0', newer: false }).at(-1), 'sessions: none at work');
+  assert.equal(lines().at(-1), 'sessions: none at work');
 });
 
 test("the lease records an install's kind, folder, tag and commit, never its source; a checkout's kind and folder", () => {

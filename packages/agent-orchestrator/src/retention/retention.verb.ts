@@ -14,7 +14,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import type { LeaseRelease } from '../daemon/daemon.ts';
 import { alive } from '../process/alive.store.ts';
 import { asked, EngineService } from '../runtime-client.ts';
-import { sessionRelease, type Running } from '../release/release.ts';
+import { sessionRelease, type Running } from '../release/index.ts';
 import {
   asideLeftover,
   buildLogPath,

@@ -121,6 +121,22 @@ test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this ma
   );
 });
 
+test('REFUSED exit 2: NEMIA_BIND beyond the loopback on a store not marked exposed, naming WF_EXPOSED=1, nothing listening, no lease', async () => {
+  const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '' });
+  assert.equal(await api.ended, 2);
+  assert.match(api.output(), /WF_EXPOSED=1/);
+  assert.doesNotMatch(api.output(), /listening/);
+  assert.equal(fs.existsSync(path.join(api.root, 'daemon.json')), false, 'no lease taken');
+});
+
+test('NEMIA_BIND=0.0.0.0 on a store marked exposed listens on every interface, and the lease names the loopback', async (t) => {
+  const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '1' });
+  t.after(() => api.child.kill());
+  const [, got] = await api.said(/api listening on http:\/\/0\.0\.0\.0:(\d+)/);
+  await leaseSays(api.root, (l) => l.url === `http://127.0.0.1:${got}`);
+  assert.equal((await fetch(`http://127.0.0.1:${got}/api/health`)).status, 401, 'an exposed store asks every caller for a token');
+});
+
 test('the api refuses a PORT that is not a port: exit 2, the fix on stderr, nothing listening', async () => {
   const api = startApi('80a');
   assert.equal(

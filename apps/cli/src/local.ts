@@ -6,6 +6,7 @@
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { chosenOf, notHere } from './context.ts';
 
 /** Which entry to spawn: `nemia`'s, or the `wf` alias's, which prints its hint first. */
 export type Entry = 'nemia' | 'wf';
@@ -44,6 +45,17 @@ function run(argv: readonly string[], entry: Entry, env: NodeJS.ProcessEnv, out:
 /** Runs the orchestrator's CLI on `argv` with this process's stdio and environment, and answers its exit code (`run`). */
 export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> =>
   run(argv, entry, env, 'inherit').then(({ code }) => code);
+
+/**
+ * The words a moved read does not read itself (`inbox add`, `ls <run>`), handed to the old path as `spawned` runs them; refused under a
+ * remote context, as the route refuses a verb about the store only that path has (`notHere`): run here, they would act on this
+ * machine's store, not the daemon's the context names.
+ */
+export const handedOn = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<number> => {
+  const chosen = chosenOf(env);
+  if (chosen.kind === 'remote') throw notHere(argv.slice(0, 2).join(' '), chosen.name);
+  return spawned(argv, 'nemia', env);
+};
 
 /**
  * Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read

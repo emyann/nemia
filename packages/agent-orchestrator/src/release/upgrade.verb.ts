@@ -1,8 +1,10 @@
 /**
- * `nemia upgrade <tag>`: the tag built from a clean export into `releases/<tag>` and checked there, `releases/current` switched to it, and
- * the daemon restarted onto it where the login service runs the pointer. A tag built already at the same commit is switched to without a
- * rebuild, so a rollback is the same command with an older tag. The command the CLI serves alone: it builds for minutes and restarts the
- * daemon that serves the api.
+ * `nemia upgrade [<tag>]`: the tag built from a clean export into `releases/<tag>` and checked there, `releases/current` switched to it,
+ * and the daemon restarted onto it where the login service runs the pointer. A tag built already at the same commit is switched to
+ * without a rebuild, so a rollback is the same command with an older tag. On an archive install the tag's published archive is
+ * downloaded, checked against its checksum and smoke-run instead (`archived`), the newest where no tag is named. Either way a tag older
+ * than the oldest release that can read the store (`store.json`, `goingBackRefused`) is refused before anything is built or fetched.
+ * The command the CLI serves alone: it builds for minutes and restarts the daemon that serves the api.
  */
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
@@ -12,12 +14,24 @@ import type { Command } from '../command/entry.verb.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
 import type { PlaceOutcome, PlaceVerb } from '../place/place.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { tried } from '../runtime-client.ts';
-import { holderOfLease, takeOverLine, DEFAULT_NAME } from '../service/service.ts';
+import { awaited, tried } from '../runtime-client.ts';
+import { holderOfLease, takeOverLine, DEFAULT_NAME } from '../service/index.ts';
 import { timeoutFlag } from '../pause/pause.ts';
 import { timedHost, liveHost, NAME_FLAG, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
 import { takeOver } from '../service/takeover.verb.ts';
-import { CURRENT, RELEASE_CHECK, restartPlan, tagRefusal, type ReleaseFile, type Running } from './release.ts';
+import {
+  archiveInstall,
+  CURRENT,
+  platformOf,
+  RELEASE_CHECK,
+  restartPlan,
+  tagRefusal,
+  type ReleaseFile,
+  type ReleasePlatform,
+  type Running,
+} from './release.ts';
+import { fetchLatest, readStoreFloor, unpackedArchive } from './archive.store.ts';
+import { goingBackRefused, parseVersion, versionTag } from './floor.ts';
 import {
   buildingOf,
   placeRelease,
@@ -121,14 +135,79 @@ function prepared(place: Place, tag: string, repo: string, root: string, env: No
   }
 }
 
-/** The installed `nemia`, as a person runs it once the store has a pointer. */
-const installedNemia = (root: string): string => path.join(releasesDir(root), CURRENT, 'node_modules', '.bin', 'nemia');
+/**
+ * The release of `tag` from its published archive at the install's download base: the one placed already where `releases/<tag>` holds a
+ * release, else downloaded for this machine's platform, checked against its checksum and unpacked (`unpackedArchive`), its `bin/nemia
+ * version` run on a trial store, `release.json` written last — the archive's commit, the download base, `from: 'archive'` and the
+ * platform — and the tree renamed into `releases/<tag>`; then the pointer switched to it. The build's folder is taken away however it
+ * ends. Refused: a machine no archive is published for, or a tag that is no version (`Invalid`, before anything is fetched); an archive
+ * with no `release.json` of its tag, or whose `nemia version` fails (`Invalid`, naming the log); and as `unpackedArchive` refuses.
+ */
+async function archived(install: Extract<Running, { kind: 'install' }>, tag: string, root: string, env: NodeJS.ProcessEnv) {
+  const platform = platformOf(process.platform, process.arch);
+  if (platform === null)
+    throw new Invalid({
+      message: `${BY} ${tag}: no archive is published for ${process.platform}-${process.arch}: build the release from its repository, nemia upgrade ${tag} --repo <checkout>.`,
+    });
+  if (parseVersion(tag) === null)
+    throw new Invalid({ message: `${BY} ${tag}: a published release's tag is its version, like nemia upgrade v1.3.0.` });
+  const building = buildingOf(tag, new Date().toISOString().replace(/[:.]/g, '-'), root);
+  try {
+    const had = releaseFileOf(releaseDir(tag, root));
+    if (had !== undefined) {
+      switchCurrent(tag, root);
+      return { release: had, built: false };
+    }
+    await unpackedArchive(install.source, tag, platform, building, BY);
+    return { release: placedArchive(install.source, tag, platform, building, root, env), built: true };
+  } finally {
+    removeBuilding(building);
+  }
+}
+
+/** The unpacked archive of `tag` smoke-run, its `release.json` written, placed into `releases/<tag>` and pointed at (`archived`). */
+function placedArchive(source: string, tag: string, platform: ReleasePlatform, building: Building, root: string, env: NodeJS.ProcessEnv) {
+  const packed = releaseFileOf(building.tree);
+  if (packed?.tag !== tag)
+    throw new Invalid({
+      message: `${BY} ${tag}: the archive holds no release.json of ${tag} at its root, so it is no release of it: nothing changed; check the download base in release.json (source).`,
+    });
+  const exit = ranInto([path.join(building.tree, 'bin', 'nemia'), 'version'], building.tree, trialEnv(env, building.trial), building.log);
+  if (exit !== 0)
+    throw new Invalid({
+      message: `${BY} ${tag}: its bin/nemia version exited ${exit}, so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}.`,
+    });
+  const release: ReleaseFile = { tag, commit: packed.commit, source, builtAt: new Date().toISOString(), from: 'archive', platform };
+  writeReleaseFile(building.tree, release);
+  if (!placeRelease(building.tree, tag, root))
+    throw new Conflict({ message: `${BY} ${tag}: releases/${tag} was placed by another upgrade meanwhile: run it again to switch to it.` });
+  switchCurrent(tag, root);
+  return release;
+}
+
+/**
+ * Refused (`Conflict`) where `tag` names a version older than the oldest release that can read the store at `root` (`store.json`,
+ * `goingBackRefused`), naming that release; a tag that is no version, or a store that records no floor, passes.
+ */
+function floorRefusal(tag: string, root: string): void {
+  const target = parseVersion(tag);
+  const floor = readStoreFloor(root);
+  if (target === null || floor === null || !goingBackRefused(target, floor)) return;
+  const oldest = versionTag(floor);
+  throw new Conflict({
+    message: `${BY} ${tag}: the store ${root} has been run by a release that ${tag} cannot read; the oldest release that can is ${oldest} (store.json). Upgrade to ${oldest} or newer, like nemia upgrade ${oldest}.`,
+  });
+}
+
+/** The installed `nemia`, as a person runs it once the store has a pointer: an archive's `bin/nemia`, a build's npm bin. */
+const installedNemia = (root: string, archive: boolean): string =>
+  archive ? path.join(releasesDir(root), CURRENT, 'bin', 'nemia') : path.join(releasesDir(root), CURRENT, 'node_modules', '.bin', 'nemia');
 
 /**
  * The daemon after the switch: restarted through the take-over where the service holds the lease and its file runs `releases/current`;
  * else named and left running, with the line that moves it; else nothing to restart.
  */
-const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHost, tag: string) {
+const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHost, tag: string, archive: boolean) {
   const root = host.roots().root;
   const lease = host.lease();
   const service = serviceForUpgrade(args, host);
@@ -148,8 +227,8 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
   const name = typeof args.name === 'string' ? args.name : DEFAULT_NAME;
   const moves =
     holder === 'service'
-      ? `${installedNemia(root)} service install${name === DEFAULT_NAME ? '' : ` --name ${name}`} rewrites the service onto releases/${CURRENT} and restarts it`
-      : `${installedNemia(root).replace(/nemia$/, '')}${takeOverLine(plan.pid, name)} hands the store to the service on releases/${CURRENT}`;
+      ? `${installedNemia(root, archive)} service install${name === DEFAULT_NAME ? '' : ` --name ${name}`} rewrites the service onto releases/${CURRENT} and restarts it`
+      : `${installedNemia(root, archive).replace(/nemia$/, '')}${takeOverLine(plan.pid, name)} hands the store to the service on releases/${CURRENT}`;
   return {
     restart: plan.kind,
     pid: plan.pid,
@@ -165,10 +244,10 @@ const restarted = Effect.fn('restarted')(function* (args: Args, host: ServiceHos
  * daemon runs; a sweep that fails is a line, never a failed upgrade, since the pointer has moved already. Lines only where it removed
  * a release or a crashed upgrade's leftover, or held.
  */
-const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: ServiceHost) {
+const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: ServiceHost, running: Running) {
   const lease = host.lease();
   const daemon = lease.kind === 'ticking' && lease.file.release !== undefined ? [lease.file.release] : [];
-  return yield* retainOnce(root, [runningRelease(), ...daemon]).pipe(
+  return yield* retainOnce(root, [running, ...daemon]).pipe(
     Effect.map((done) => {
       const said = done.removed.length > 0 || done.swept.entries.length > 0 || done.swept.logs.length > 0 || done.held !== null;
       return { removed: done.removed, lines: said ? done.lines : [] };
@@ -185,25 +264,54 @@ const removedAfter = Effect.fn('removedAfter')(function* (root: string, host: Se
 });
 
 /**
- * Upgrades the store to `tag` (`prepared`, which switches the pointer), restarts the daemon (`restarted`), then removes what no one needs
- * (`removedAfter`); refused before the switch.
+ * The tag an upgrade goes to: the one named; on an archive install with none named, the newest published (`fetchLatest`); refused
+ * (`Invalid`) where none is named on a build, which has no list of releases to read.
  */
-export const upgrade = Effect.fn('upgrade')(function* (args: Args, given?: ServiceHost, env: NodeJS.ProcessEnv = process.env) {
+const tagOf = (args: Args, running: Running) => {
+  if (typeof args.tag === 'string') return Effect.succeed(args.tag);
+  if (archiveInstall(running))
+    return Effect.map(
+      awaited(() => fetchLatest(running.source, BY)),
+      (latest) => latest.tag,
+    );
+  return Effect.fail(
+    new Invalid({ message: `${BY} takes the tag to build on a release built from its repository, like nemia upgrade v1.2.0: ${SHAPE}.` }),
+  );
+};
+
+/**
+ * Upgrades the store to `tag` (`archived` on an archive install, else `prepared`, each of which switches the pointer), restarts the daemon
+ * (`restarted`), then removes what no one needs (`removedAfter`); refused before the switch, and before anything is fetched or built where
+ * the tag is no release's name or goes back past the store's floor (`floorRefusal`). `running` is the code this command runs, which says
+ * whether the store is an archive install.
+ */
+export const upgrade = Effect.fn('upgrade')(function* (
+  args: Args,
+  given?: ServiceHost,
+  env: NodeJS.ProcessEnv = process.env,
+  running: Running = runningRelease(),
+) {
   const host = given ?? liveHost(yield* StoreRoot);
-  const tag = typeof args.tag === 'string' ? args.tag : '';
   const root = host.roots().root;
   const place = yield* PlaceService;
-  const { release, built } = yield* tried(() => {
+  const tag = yield* tagOf(args, running);
+  yield* tried(() => {
     const wrong = tagRefusal(tag);
     if (wrong !== null) throw new Invalid({ message: wrong });
-    return prepared(place, tag, repoOf(args, runningRelease()), root, env);
+    floorRefusal(tag, root);
   });
+  const archive = archiveInstall(running) ? running : null;
+  const { release, built } = archive
+    ? yield* awaited(() => archived(archive, tag, root, env))
+    : yield* tried(() => prepared(place, tag, repoOf(args, running), root, env));
   const dir = releaseDir(tag, root);
-  const said = built
-    ? `built ${tag} (${release.commit.slice(0, 7)}) into ${dir}: npm ci, npm run build and npm run ${RELEASE_CHECK} passed`
-    : `${tag} is built already at ${release.commit.slice(0, 7)} (${dir}): switched to it without a rebuild`;
-  const daemon = yield* restarted(args, host, tag);
-  const retained = yield* removedAfter(root, host);
+  const said = !built
+    ? `${tag} is built already at ${release.commit.slice(0, 7)} (${dir}): switched to it without a rebuild`
+    : archive
+      ? `downloaded ${tag} (${release.commit.slice(0, 7)}) for ${release.platform ?? 'this machine'} into ${dir}: its checksum matched and its nemia version ran`
+      : `built ${tag} (${release.commit.slice(0, 7)}) into ${dir}: npm ci, npm run build and npm run ${RELEASE_CHECK} passed`;
+  const daemon = yield* restarted(args, host, tag, archive !== null);
+  const retained = yield* removedAfter(root, host, running);
   return {
     release,
     dir,
@@ -215,14 +323,17 @@ export const upgrade = Effect.fn('upgrade')(function* (args: Args, given?: Servi
 });
 
 /** How `nemia upgrade` is typed, as its refusals end on it. */
-const SHAPE = 'nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]';
+const SHAPE = 'nemia upgrade [<tag>] [--repo <path>] [--name <name>] [--timeout <d>]';
 
 /** `nemia upgrade`. */
 const UPGRADE: Command<Upgraded> = {
   name: 'upgrade',
-  usage: '<tag> [--repo <path>] [--name <name>] [--timeout <d>]',
+  usage: '[<tag>] [--repo <path>] [--name <name>] [--timeout <d>]',
   help: [
-    "build the tag from a clean export into the store's releases/<tag>:",
+    "on an archive install, download the tag's archive (the newest where",
+    'none is named), check it against its SHA256SUMS and run its nemia',
+    "version, into the store's releases/<tag>; on a release built from a",
+    'repository, build the tag from a clean export into releases/<tag>:',
     'npm ci, npm run build and npm run release:check there, on a trial',
     'store; then point releases/current at it and restart the daemon onto',
     'it where the login service runs the pointer: jobs run on, and the',
@@ -235,11 +346,11 @@ const UPGRADE: Command<Upgraded> = {
     'not current, not among the two newest, and that no session or',
     'running nemia runs on, the folder of each build whose upgrade died,',
     'and each build log older than 30 days, as the daemon does every five',
-    'minutes',
+    'minutes. A tag older than the oldest release that can read the store',
+    '(store.json) is refused before anything is fetched or built',
   ],
   spec: {
-    positionals: [{ key: 'tag', takes: 'required', kind: 'name' }],
-    missing: `nemia upgrade takes the tag to build, like nemia upgrade v1.2.0: ${SHAPE}.`,
+    positionals: [{ key: 'tag', takes: 'optional', kind: 'name' }],
     flags: [
       { flag: '--repo', kind: 'text', key: 'repo', takes: `--repo takes the repository the tag is in: ${SHAPE}.` },
       NAME_FLAG,

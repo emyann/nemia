@@ -127,6 +127,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     dirs: () => ({ home: HOME, configHome: path.join(HOME, '.config') }),
     roots: () => ({ root: ROOT, defaultRoot: ROOT }),
     daemon: () => ({ checkout: '/srv/nemia', entry: '/srv/nemia/apps/api/src/main.ts', cwd: '/srv/nemia/apps/api' }),
+    size: () => ({ memoryMiB: 16384, cpus: 8 }),
     node: '/usr/bin/node',
     path: '/usr/bin:/bin',
     user: () => ({ name: 'ann', uid: 1000 }),

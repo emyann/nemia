@@ -6,7 +6,7 @@
  * cursor every `RECONNECT_EVERY`, `daemon up` when it opens again; it runs until a signal, which exits 128 and its number. It reads no
  * file of the store.
  *
- * What it does not read itself goes to the old path (`spawned`), which refuses it in its own words, exactly as before: a flag or form it
+ * What it does not read itself goes to the old path (`handedOn`), which refuses it in its own words, exactly as before: a flag or form it
  * does not know, a cursor beside a cursor file, a cursor file in no directory or holding no number, a selector the grammar refuses.
  */
 import fs from 'node:fs';
@@ -16,7 +16,7 @@ import { Cause, Effect, Exit, Fiber, Schedule } from 'effect';
 import { sessionHeaders, urlOf } from '../client.ts';
 import { served } from '../daemon.ts';
 import { asked as objectsAsked } from '../objects.ts';
-import { spawned } from '../local.ts';
+import { handedOn } from '../local.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
 import { bookmarkLine, livenessOf, livenessWords, pausedWords, watchedLine, type Watched } from './lines.ts';
@@ -235,7 +235,7 @@ async function once(asked: Asked, args: readonly string[]): Promise<number> {
   const at: At = { cursor: 0, hinted: false };
   const base = await served('watch');
   const got = await firstOpen(asked, at, base);
-  if (got === 'old') return spawned(['watch', ...args]);
+  if (got === 'old') return handedOn(['watch', ...args]);
   if (got.kind !== 'open') throw noneAnswers(base, got.kind === 'none' ? got.why : got.said);
   if (asked.how.json !== true) {
     const paused = pausedWords(await objectsAsked('watch', (client) => client.server.paused()));
@@ -322,7 +322,7 @@ async function followed(asked: Asked, args: readonly string[]): Promise<number> 
   const at: At = { cursor: 0, hinted: false };
   const base = await served('watch');
   const got = await firstOpen(asked, at, base);
-  if (got === 'old') return spawned(['watch', ...args]);
+  if (got === 'old') return handedOn(['watch', ...args]);
   (asked.how.json === true ? console.error : console.log)(`watching from ${at.cursor}, ^C to stop`);
   const live: { state: 'up' | 'down'; base: string } = { state: 'up', base };
   const first =
@@ -357,6 +357,6 @@ async function followed(asked: Asked, args: readonly string[]): Promise<number> 
 /** `nemia watch <args>`: over the api where it reads the words, else on the old path; answers its exit code. */
 export const watch = (args: readonly string[]): Promise<number> => {
   const asked = askedOf(args);
-  if (asked === undefined) return spawned(['watch', ...args]);
+  if (asked === undefined) return handedOn(['watch', ...args]);
   return asked.once ? once(asked, args) : followed(asked, args);
 };

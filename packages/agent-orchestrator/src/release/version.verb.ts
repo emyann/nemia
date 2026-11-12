@@ -1,6 +1,7 @@
 /**
  * `nemia version`: which release this `nemia` runs, which one the store's pointer names, which one the daemon runs, read off its lease,
- * and which releases and harness versions the sessions at work run on, read off the engine's records of their attempts.
+ * which releases and harness versions the sessions at work run on, read off the engine's records of their attempts, and the newest
+ * release the store's release check read, where it is newer (`latestRelease`, which the api's `GET /api/version` answers too).
  * The command the CLI serves alone, since the api answers its own release at `GET /api/version`. Also where the running code is found
  * (`runningRelease`), for the trial guard, the lease and the api.
  */
@@ -14,8 +15,10 @@ import { DEFAULT_HARNESS, remoteNameOf } from '../harness/harness.ts';
 import { asked, EngineService, tried, type TaskView } from '../runtime-client.ts';
 import { daemonEntry } from '../service/service.store.ts';
 import { VERSION as PACKAGE_VERSION } from '../version/version.store.ts';
-import { sessionCounts, sessionRanOn, versionLines, type Current, type Running, type SessionCount } from './release.ts';
+import { sessionCounts, sessionRanOn, versionLines, type Current, type Latest, type Running, type SessionCount } from './release.ts';
 import { currentRelease, realReleasesDir, runningAt } from './release.store.ts';
+import { readLatest } from './archive.store.ts';
+import { olderThan, parseVersion } from './floor.ts';
 
 /** The package's own folder, whose root is the checkout's or the install's. */
 const PACKAGE = path.join(import.meta.dirname, '..', '..');
@@ -33,8 +36,21 @@ export function runningRelease(): Running {
 }
 
 /**
+ * The newest release the release check of the store at `home` last read (`releases/latest.json`), and whether it is newer than the
+ * install `running` runs; undefined for a checkout, which no check reads for, and where none was read.
+ */
+export function latestRelease(home: string, running: Running): Latest | undefined {
+  if (running.kind !== 'install') return undefined;
+  const latest = readLatest(home);
+  if (latest === undefined) return undefined;
+  const newest = parseVersion(latest.tag);
+  const own = parseVersion(running.tag);
+  return { version: latest.version, newer: newest !== null && own !== null && olderThan(own, newest) };
+}
+
+/**
  * What `nemia version` reads: the package's version, this nemia's release, the store's pointer, the daemon's, the sessions at work by
- * release and harness version, and its lines.
+ * release and harness version, the newest release the check read (`latest`), and its lines.
  */
 export type Versions = {
   readonly version: string;
@@ -42,6 +58,7 @@ export type Versions = {
   readonly current: Current | null;
   readonly daemon: { readonly pid: number; readonly release: LeaseRelease | null } | null;
   readonly sessions: readonly SessionCount[];
+  readonly latest?: Latest;
   readonly lines: readonly string[];
 };
 
@@ -82,8 +99,9 @@ export const versions = Effect.fn('versions')(function* (home: string) {
     const current = currentRelease(home);
     const lease = daemonStanding(home);
     const daemon = lease.kind === 'ticking' ? { pid: lease.file.pid, release: lease.file.release ?? null } : null;
-    const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions);
-    return { version: PACKAGE_VERSION, running, current, daemon, sessions, lines };
+    const latest = latestRelease(home, running);
+    const lines = versionLines(PACKAGE_VERSION, running, current, lease, sessions, latest);
+    return { version: PACKAGE_VERSION, running, current, daemon, sessions, ...(latest ? { latest } : {}), lines };
   });
 });
 
@@ -96,7 +114,8 @@ const VERSION: Command<Versions> = {
     "the release the store's releases/current names; and the release the",
     'daemon runs, from its lease, and whether it promises to keep a running',
     'session on its files; and the sessions at work by release and harness',
-    'version, off their records. --json: the whole answer',
+    "version, off their records; and a newer release, where the daemon's",
+    'release check read one. --json: the whole answer',
   ],
   spec: {
     positionals: [],

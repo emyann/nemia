@@ -6,6 +6,7 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FrameHeader } from '@/components/frame/FrameHeader';
 import { FrameRail } from '@/components/frame/FrameRail';
 import { FrameTabs } from '@/components/frame/FrameTabs';
+import { NewerRelease } from '@/components/frame/NewerRelease';
 import { NemiaDock } from '@/components/nemia/NemiaDock';
 import { OpenBar } from '@/components/factory/OpenBar';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
@@ -22,9 +23,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 /**
  * The frame of every page: the rail at the left, the whole height of the window (`FrameRail`), open or closed as this browser's
  * `sidebar_state` cookie last left it (`sidebarOpenOf`), a modal drawer on a narrow screen; beside it the top bar (`FrameHeader`), as tall
- * as `--frame-top`, naming the page, then the page, under the strip of Settings' tabs on one of them (`FrameTabs`), in a centred column
- * unless a matched route's `staticData` asks for `fullBleed`. Over the page, under the top bar, the floating bar (`OpenBar`) shows what the
- * address's `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow
+ * as `--frame-top`, naming the page, then the line saying a newer release is out where one is (`NewerRelease`), then the page, under
+ * the strip of Settings' tabs on one of them (`FrameTabs`), in a centred column unless a matched route's `staticData` asks for
+ * `fullBleed`. Over the page, under the top bar, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every
+ * page, and a link to another page, which carries no `bar`, closes it. It follows the workflow
  * feed once for the whole page: what moves on it is read again at once, the polls slow while it is open, and the gauges say which. Her
  * chat is held over the whole frame too (`NemiaChatProvider`), one stream of hers for the visit, which her docked face and the chat page
  * both read, so a navigation neither closes it nor opens another; her docked face is drawn on every page but one whose route's
@@ -49,6 +51,7 @@ function Root() {
           <div className="flex min-w-0 flex-1 flex-col">
             <FrameHeader path={path} search={search} feed={feed} />
             <main data-frame-page className="relative flex min-w-0 flex-1 flex-col bg-background">
+              <NewerRelease />
               <FrameTabs path={path}>
                 {fullBleed ? (
                   <Outlet />

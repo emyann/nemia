@@ -31,10 +31,11 @@
  */
 export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord, type CheckResult, type CheckVerdict } from './check/index.ts';
 export { VERSION } from './version/version.store.ts';
-export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/release.ts';
-export type { SessionHarness, SessionRelease } from './release/release.ts';
+export { leaseRelease, trialRefusal, checkoutPromiseLine, type Running } from './release/index.ts';
+export type { SessionHarness, SessionRelease } from './release/index.ts';
 export { currentRelease } from './release/release.store.ts';
-export { runningRelease } from './release/version.verb.ts';
+export { latestRelease, runningRelease } from './release/version.verb.ts';
+export { claudeTokenFile, loadClaudeToken, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export {
   type Env,

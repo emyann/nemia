@@ -2,7 +2,8 @@
  * The `WF_` environment the package reads: where the store lives (`WF_ROOT`), the daemon's two ceilings (`WF_MAX_CONCURRENT`,
  * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its worktrees
  * (`WF_KEEP_WORKTREES`), how long the series are kept (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`), and the memory limit each
- * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`). Each is an Effect `Config`
+ * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), and whether the daemon of an
+ * archive install checks for a newer release (`NEMIA_RELEASE_CHECK`). Each is an Effect `Config`
  * with its default, and each has a plain reader that takes the environment it is given — never `process.env` by default — and answers the
  * value or throws `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never
  * read as its default. Reads no disk.
@@ -94,6 +95,12 @@ const SLICE = /^[\w:@.-]*[\w:@-]\.slice$/;
 const slice = Config.schema(Schema.String.check(Schema.isPattern(SLICE)), 'WF_CGROUP_PARENT').pipe(
   Config.map((value): string | undefined => value),
   Config.withDefault(undefined),
+);
+
+/** `NEMIA_RELEASE_CHECK`: `off` turns the release check off, `on` on; on when unset or empty. */
+const releaseCheckOn = Config.schema(Schema.Literals(['on', 'off']), 'NEMIA_RELEASE_CHECK').pipe(
+  Config.map((value) => value === 'on'),
+  Config.withDefault(true),
 );
 
 /**
@@ -216,6 +223,20 @@ export const cgroupParent = (env: Env): string | undefined =>
   );
 
 /**
+ * `NEMIA_RELEASE_CHECK`, whether the daemon of an archive install asks its download base for the newest release every six hours
+ * (`releaseCheck`, `src/release/check.verb.ts`): `off` never; `on`, unset or empty, it does. Refused when it is anything else: read as
+ * either, a mistyped value would do what it was not set to.
+ */
+export const releaseCheck = (env: Env): boolean =>
+  read(
+    releaseCheckOn,
+    'NEMIA_RELEASE_CHECK',
+    env,
+    (value) =>
+      `NEMIA_RELEASE_CHECK=${value} is neither on nor off. It is whether the daemon of an install from a published archive asks for the newest release every six hours: NEMIA_RELEASE_CHECK=off — or unset, for on.`,
+  );
+
+/**
  * `WF_DEFAULT_FACTORY_STARTS`, whether a start may go to the default factory when it names none and no factory holds its folder, or when
  * it starts a card that names none: only with `1`, which the package's and the api's tests set for the starts they make in scratch
  * folders. Unset, by default, every such start is refused.
@@ -254,6 +275,7 @@ export type Settings = {
   readonly defaultFactoryStarts: boolean;
   readonly sessionToken: string | undefined;
   readonly exposed: boolean;
+  readonly releaseCheck: boolean;
 };
 
 /**
@@ -293,6 +315,9 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get exposed() {
     return exposedStore(env);
+  },
+  get releaseCheck() {
+    return releaseCheck(env);
   },
 });
 

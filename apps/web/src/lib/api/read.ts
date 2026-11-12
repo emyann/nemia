@@ -4,6 +4,7 @@
  * client (`objects.ts`), which reads a refusal's words once.
  */
 import { Result, Schema, SchemaIssue } from 'effect';
+import type { TokenRefusal } from 'objects';
 
 /** A read the api answered with an error: its words, and its status, which is how a run gone from the store is told apart (`readGone`). */
 export class ReadRefusal extends Error {
@@ -88,3 +89,54 @@ export function decoded<T>(route: string, schema: Schema.Decoder<T>, value: unkn
   if (Result.isSuccess(result)) return result.success;
   throw new UnreadAnswer(route, unreadWords(route, value, result.failure.issue, may));
 }
+
+/**
+ * Why the api asks this browser for a token: it sent none to a store marked exposed (`token-required`), or the one its cookie carries is
+ * no token the store keeps (`unknown-token`, one removed since). The two of `objects`' `TOKEN_REFUSALS` a person answers by pasting a
+ * token: the other two are a session's and the MCP port's, which a browser never is.
+ */
+export type TokenAsk = Extract<TokenRefusal, 'token-required' | 'unknown-token'>;
+
+/** The api's ask for a token: its reason, and its words, which say where a token is minted. */
+export type TokenAsked = { readonly reason: TokenAsk; readonly message: string };
+
+/** The refusals the token page answers, by their words. */
+const TOKEN_ASKS: ReadonlySet<string> = new Set<TokenAsk>(['token-required', 'unknown-token']);
+
+/** The string `answer` carries at `key`, where it is an object that carries one. */
+const stringAt = (answer: unknown, key: string): string | undefined => {
+  const value = typeof answer === 'object' && answer !== null ? Reflect.get(answer, key) : undefined;
+  return typeof value === 'string' ? value : undefined;
+};
+
+/** The token the api asks for where it answered `status` with `answer`: a 401 whose reason is a `TokenAsk`, with its words; else none. */
+export function tokenAskOf(status: number, answer: unknown): TokenAsked | null {
+  const reason = stringAt(answer, 'reason');
+  if (status !== 401 || reason === undefined || !TOKEN_ASKS.has(reason)) return null;
+  return { reason: reason as TokenAsk, message: stringAt(answer, 'error') ?? '' };
+}
+
+/** The token the api last asked this page for, until the page loads again: none, until a read or a write is answered with one. */
+let asked: TokenAsked | null = null;
+
+/** Who is told when the api asks for a token. */
+const askedListeners = new Set<() => void>();
+
+/**
+ * Notes that the api asked for a token, as `ask` says, and tells every listener where its reason is new: the objects' client calls it on
+ * each answer that asks, and the first words of a reason are kept.
+ */
+export function askToken(ask: TokenAsked): void {
+  if (asked?.reason === ask.reason) return;
+  asked = ask;
+  for (const listener of askedListeners) listener();
+}
+
+/** `listener` told each time the api asks for a token; the answer stops telling it. Shaped for React's `useSyncExternalStore`. */
+export function onTokenAsked(listener: () => void): () => void {
+  askedListeners.add(listener);
+  return () => void askedListeners.delete(listener);
+}
+
+/** The token the api last asked for, or null while it has asked for none. */
+export const tokenAsked = (): TokenAsked | null => asked;

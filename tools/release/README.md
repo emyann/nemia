@@ -3,7 +3,8 @@
 The repository's own tool, never shipped. `release.ts` imports nothing installed; it reaches git and GitHub through `git` and `gh`,
 each call bounded at two minutes, in the repository at its working directory. Two workflows drive it: `.github/workflows/release.yml`
 (push to main, and `gh workflow run release.yml`) and `.github/workflows/release-label.yml` (the `release-label` check). Its code and
-`tools/guards/test/release*.test.ts` hold it.
+`tools/guards/test/release*.test.ts` hold it. Beside it, `archive.ts` builds a release's archive for one platform and `install.sh`
+installs one on a machine (*The assets*), held by `tools/guards/test/install.test.ts`.
 
 ```sh
 node tools/release/release.ts check    # the release-label check
@@ -66,7 +67,52 @@ in the pull request's body. The next version (`nextVersion`) is the last bumped,
   closes the open release pull request. GitHub refuses the workflow's token a pull request until the repository turns on **"Allow GitHub Actions to create and approve pull requests"**; `pr` then exits 1 naming it.
 - **`tag`** runs where the root `package.json` on main names a version `V` with no tag `vV` on the origin: it finds the first-parent
   commit of main that set `V` (the release pull request's merge commit), and makes the GitHub release `vV` there with the notes
-  generated since the previous release. Nothing is published to npm and no artifact is attached.
+  generated since the previous release. Nothing is published to npm; the assets are attached by the jobs after it (*The assets*).
+
+## The assets
+
+Each release carries what a machine installs from (`install.sh`) and what `nemia upgrade` fetches:
+
+| asset                            | what it is                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| `nemia-<tag>-linux-x64.tar.gz`   | the release folder for that platform, its entries at the archive's root                     |
+| `nemia-<tag>-linux-arm64.tar.gz` | the same, for Linux on arm64                                                                |
+| `nemia-<tag>-darwin-arm64.tar.gz`| the same, for macOS on Apple silicon                                                        |
+| `SHA256SUMS`                     | one line per archive, `<sha256>  <asset>`, as `sha256sum` writes it                         |
+| `install.sh`                     | the installer (`install.sh` beside this file), a POSIX sh script                            |
+| `latest.json`                    | `{ "tag": "v<x.y.z>", "version": "<x.y.z>" }`, attached last: its presence says the release is whole |
+
+GitHub serves the newest release's assets at `https://github.com/<owner>/<repo>/releases/latest/download/<asset>`, and any release's
+at `.../releases/download/<tag>/<asset>`; that `releases` URL is the download base an archive's `release.json` names as its `source`.
+
+**How one is built.** The `tag` job's step `due` reads the release of the version main names and says `due=true` where it has no
+`latest.json`. Then the `archive` job runs on a runner of each platform (`ubuntu-24.04` x64, `ubuntu-24.04-arm`, `macos-15` arm64,
+GitHub's standard runners) at the tag:
+
+```sh
+node tools/release/archive.ts --platform linux-x64 --tag v1.3.0 --source https://github.com/<owner>/<repo>/releases --out assets
+```
+
+It runs `npm ci` and the board's build in the checkout, copies the tracked tree (`git archive`) with the built `apps/web/dist`, installs
+production dependencies alone in the copy (`npm ci --omit=dev`, which takes that platform's Claude binary), fetches the Node pinned in
+`node.json` and refuses it unless its sha256 is the one pinned there (copied from Node's own `SHASUMS256.txt` for that version), and
+packs: `node/`, `bin/nemia` (sh: it follows its own symlinks to the release folder and runs `node/bin/node apps/cli/bin/nemia.ts`),
+`release.json` (`tag`, `commit`, `source`, `builtAt`, `from: "archive"`, `platform`), the tar.gz and its `SHA256SUMS` line. A machine
+of another platform is refused: `npm ci` takes the binaries of the machine it runs on. Given `--tree <dir> --node <dir>`, it packs that
+tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. The `upload` job merges the
+three `SHA256SUMS`, writes `latest.json`, and attaches every asset with `gh release upload --clobber`, `latest.json` in a call of its
+own after the rest; a run cut off before it leaves the release without `latest.json`, so the next run builds and attaches them again.
+To move Node, set `version` in `node.json` and the three sums from `https://nodejs.org/dist/v<version>/SHASUMS256.txt`.
+
+**What `install.sh` does.** It reads the platform from `uname`, refuses where `git`, `tar`, `curl` or `wget`, or `sha256sum` or `shasum`
+is missing, and on Linux warns where `systemd --user` or cgroup v2 is (each a service's need, not the install's). It downloads the archive
+and `SHA256SUMS` (the tag from `latest.json` unless `--version`), refuses an archive whose sum differs, unpacks it into
+`$WF_ROOT/releases/<tag>` through a hidden folder renamed into place, points `releases/current` at it by a relative link renamed over
+the old one, and links `~/.local/bin/nemia`. Then it asks, or with `--yes` reads its flags: the Claude token (`--claude-token-file`,
+given to `nemia claude-token set` on its stdin), starting at login (`nemia service install --size auto`, `--no-service` to skip,
+`loginctl enable-linger` on Linux), and the address to bind (`--bind`, after which `nemia token add` prints the first person token).
+`--client --server <url> [--context <name>] [--token-file <file>]` makes a client-only install (`nemia config set-context`, then
+`use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token.
 
 ## The settings it needs
 

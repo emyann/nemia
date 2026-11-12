@@ -4,7 +4,8 @@
  * route serves (`noRoute`) and other than a 500 with no words — a stream it opens (`text/event-stream`) is served, and let go unread — so
  * an endpoint the `Api` gains with no handler, or one a Hono route before the mount shadows, is refused here with nothing to list. The
  * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
- * `/openapi/v3` out of its own) and the MCP port (`/mcp`, a protocol host whose tools call the `Api`'s own endpoints).
+ * `/openapi/v3` out of its own), the MCP port (`/mcp`, a protocol host whose tools call the `Api`'s own endpoints) and the board's
+ * pages (`GET /*`, src/board/board.ts: host content, no object kind).
  */
 import './harness.ts';
 import { test } from 'node:test';
@@ -12,13 +13,15 @@ import assert from 'node:assert/strict';
 import { Hono } from 'hono';
 import { Api } from 'objects';
 import { app } from '../src/app.ts';
+import { BOARD_ROUTE } from '../src/board/board.ts';
 import { MOUNT } from '../src/objects/index.ts';
 
 /**
- * The OpenAPI document, its page and the page's script, and the MCP port, which takes every method and answers a POST alone (`mcpPort`,
- * src/mcp/port.ts): served by Hono beside the mount, outside the `Api` they describe or call.
+ * The OpenAPI document, its page and the page's script, the MCP port, which takes every method and answers a POST alone (`mcpPort`,
+ * src/mcp/port.ts), and the board's built pages (`BOARD_ROUTE`): served by Hono beside the mount, outside the `Api` they describe, call
+ * or are served beside.
  */
-const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js', 'ALL /mcp'] as const;
+const META = ['GET /openapi/v3/nemia/v1', 'GET /openapi', 'GET /openapi/scalar.js', 'ALL /mcp', `GET ${BOARD_ROUTE}`] as const;
 
 /** Each route Hono serves as `METHOD path`, once, but the middleware (`ALL /*`) and the mount, which serve none of their own. */
 const routesOf = (routes: readonly { method: string; path: string }[]): string[] => [
@@ -76,7 +79,7 @@ test('every endpoint of the Api is served by the mount: neither the 404 for no r
   assert.deepEqual(unserved, []);
 });
 
-test('the routes Hono serves outside the Api are the three of the OpenAPI document and the MCP port, and no other', () => {
+test('the routes Hono serves outside the Api are the three of the OpenAPI document, the MCP port and the board, and no other', () => {
   assert.deepEqual(outsideBreaks(app.routes), []);
 });
 
@@ -95,6 +98,10 @@ test('REFUSED: a route Hono serves that no list names, and a listed route Hono d
 });
 
 test("a path no route serves is the api's own 404, the Machines page's retired routes among them, whichever side missed it", async () => {
-  for (const url of ['/api/machines', '/api/machines/lifecycle', '/api/namespaces/default/nothing', '/nothing'])
+  for (const url of ['/api/machines', '/api/machines/lifecycle', '/api/namespaces/default/nothing', '/openapi/nothing'])
     assert.ok(saysNoRoute(await (await app.request(url)).json()), url);
+  assert.ok(
+    saysNoRoute(await (await app.request('/nothing', { method: 'POST' })).json()),
+    'a write outside the api: the board answers GET alone',
+  );
 });

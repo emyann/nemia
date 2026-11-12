@@ -207,8 +207,17 @@ test("a read the api refused still rejects in the api's words and status, not as
   assert.equal(err.message, 'no run x');
 });
 
-test("read.ts hands out the decode the objects' client reads every answer with, and its three refusals, and nothing else", async () => {
-  assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), ['ReadRefusal', 'UnreadAnswer', 'WriteRefusal', 'decoded']);
+test("read.ts hands out the decode the objects' client reads every answer with, its three refusals, the api's ask for a token, and nothing else", async () => {
+  assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), [
+    'ReadRefusal',
+    'UnreadAnswer',
+    'WriteRefusal',
+    'askToken',
+    'decoded',
+    'onTokenAsked',
+    'tokenAskOf',
+    'tokenAsked',
+  ]);
 });
 
 test('decodes takes a schema that decodes its type, and the compiler refuses one that does not', () => {

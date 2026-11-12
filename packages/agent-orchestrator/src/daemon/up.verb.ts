@@ -27,9 +27,11 @@ import { reconcile } from '../factory/applied/applied.verb.ts';
 import { free } from '../forget/prune/free.verb.ts';
 import { disk } from '../disk/disk.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
-import { leaseRelease } from '../release/release.ts';
+import { leaseRelease } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
+import { raiseStoreFloor } from '../release/archive.store.ts';
+import { releaseCheck } from '../release/check.verb.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
@@ -292,7 +294,9 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest reading as it does the quota: no pass walks the
  * store, and a sweep that failed leaves the passes none. On an eighth, once the first pass has answered and every `RETAIN_EVERY` after,
  * it removes the installed releases no one needs (`retain`), pinning the one this process runs: by then each session it adopted has
- * recorded what it runs on.
+ * recorded what it runs on. On a ninth, once the first pass has answered, an archive install asks for the newest release every six hours
+ * (`releaseCheck`), unless `NEMIA_RELEASE_CHECK=off`. As it takes the store it raises the store's floor to the oldest release that reads
+ * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it.
  */
 export const up = (
   e: Engine,
@@ -310,6 +314,7 @@ export const up = (
       }),
       ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
+    yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
     const served = yield* e.hold();
     if (served) yield* Effect.sync(() => heldServes(home, served.cards));
     yield* seriesBorn([...DAEMON_SERIES, ...series]);
@@ -342,6 +347,7 @@ export const up = (
       ),
     );
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(retain([leaseRelease(runningRelease())])), over(e)));
+    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(releaseCheck(runningRelease()))));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;

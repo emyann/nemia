@@ -78,14 +78,14 @@ test('`contextOf`: none named is this machine, `local` too, the variable wins ov
 test("`forwardedEnv`: the context's server and token in the forwarded variables, the rest kept, `WF_ROOT` dropped", () => {
   assert.deepEqual(FORWARD_VARIABLES, ORCHESTRATOR_FORWARD_VARIABLES, "the orchestrator's names, spelled once in the client");
   const chosen = { kind: 'remote', name: 'vps', server: 'http://vps:7777', token: 't1' } as const;
-  const env = { HOME: '/home/a', WF_ROOT: '/home/a/.agent-workflows', NEMIA_SERVER: 'http://stale:1', PATH: '/bin' };
+  const env = { HOME: '/somewhere/a', WF_ROOT: '/somewhere/a/.agent-workflows', NEMIA_SERVER: 'http://stale:1', PATH: '/bin' };
   assert.deepEqual(forwardedEnv(chosen, env), {
-    HOME: '/home/a',
+    HOME: '/somewhere/a',
     PATH: '/bin',
     NEMIA_SERVER: 'http://vps:7777',
     NEMIA_SERVER_TOKEN: 't1',
   });
-  assert.equal(env.WF_ROOT, '/home/a/.agent-workflows', 'the environment handed in is not changed');
+  assert.equal(env.WF_ROOT, '/somewhere/a/.agent-workflows', 'the environment handed in is not changed');
 });
 
 test('`chosenOf`: the file read, and NEMIA_CONTEXT trimmed over it, blank being none', () => {

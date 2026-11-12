@@ -29,8 +29,11 @@ import {
   type CardRead,
 } from './roster.ts';
 
-/** Where agents are read: the repository `repo`, and the store `home` that holds yours. */
-export type Readings = { repo: string; home: string };
+/**
+ * Where agents are read: the repository `repo`, none where there is none (an install with no factory named), and the store `home` that
+ * holds yours.
+ */
+export type Readings = { repo: string | undefined; home: string };
 
 /** An agent read through the Agent door, or the door's refusal of it in its own words: a file that does not read, a name that is none. */
 type Read = Agent | Refusal;
@@ -55,19 +58,21 @@ const versionOf = (name: string, dir: string, skills: SkillsFound): Effect.Effec
 /**
  * Where the skills of the agents in `dir` (`<workflows>/agents`) are found, as a start finds them for a workflow beside it, through the
  * Skill door: that root first, then the repository's skills, then the store's. What a card (`cardSkills`) and an agent's version are read
- * with outside a start, so the card names the skills a run would be given and its version moves with them.
+ * with outside a start, so the card names the skills a run would be given and its version moves with them. With no repository, the root
+ * and then the store's.
  */
-export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: string, repo: string, home: string) {
+export const agentSkillsFound = Effect.fn('agentSkillsFound')(function* (dir: string, repo: string | undefined, home: string) {
   const door = yield* SkillDoor;
-  return yield* door.skills.found({ dir: path.join(path.dirname(path.resolve(dir)), '_'), places: { repo: path.resolve(repo), home } });
+  const places = repo === undefined ? { home } : { repo: path.resolve(repo), home };
+  return yield* door.skills.found({ dir: path.join(path.dirname(path.resolve(dir)), '_'), places });
 });
 
 /**
  * Where an agent may be, in order: the repository's `workflows/agents`, then the store `home`'s, yours. The board's two places
- * (`sourcesOf`, apps/api).
+ * (`sourcesOf`, apps/api); yours alone where there is no repository.
  */
-export const agentPlaces = (repo: string, home: string): Array<{ from: AgentPlace; dir: string }> => [
-  { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
+export const agentPlaces = (repo: string | undefined, home: string): Array<{ from: AgentPlace; dir: string }> => [
+  ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) }]),
   { from: 'yours', dir: path.join(home, 'workflows', AGENTS_FOLDER) },
 ];
 
@@ -75,7 +80,7 @@ export const agentPlaces = (repo: string, home: string): Array<{ from: AgentPlac
  * Every agent of both places, in the order the places come, each read now through the Agent door. An agent that does not read carries
  * the door's refusal.
  */
-export const listAgents = Effect.fn('listAgents')(function* (repo: string, home: string) {
+export const listAgents = Effect.fn('listAgents')(function* (repo: string | undefined, home: string) {
   const out: Array<{ from: AgentPlace; dir: string; name: string; agent: Read }> = [];
   for (const { from, dir } of agentPlaces(repo, home))
     for (const name of [...(yield* namesIn(dir))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -88,7 +93,7 @@ export const listAgents = Effect.fn('listAgents')(function* (repo: string, home:
  * fix, when no place has it, when both do and nothing says which, or when the file is there and does not read — that last in the door's
  * own words.
  */
-export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: string, home: string, from?: AgentPlace) {
+export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: string | undefined, home: string, from?: AgentPlace) {
   const all = agentPlaces(repo, home);
   const found: Array<{ from: AgentPlace; dir: string; agent: Read }> = [];
   const held: string[] = [];

@@ -16,7 +16,6 @@ import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, ski
 import { frontmatterKey, SKILLS_FOLDER, skillDraftOf, skillNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
 import {
   librarySkills,
   listSkills,
@@ -35,17 +34,7 @@ import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
-import {
-  listed,
-  originAsked,
-  servedNamed,
-  servedOf,
-  thereOf,
-  writeGoes,
-  writtenAt,
-  type Held,
-  type Origin,
-} from '../definitions/served.ts';
+import { listed, originIn, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** What a write sends, said by its refusals. */
@@ -69,21 +58,20 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
 
 /**
  * Every skill the namespace holds, at each origin: the factory's tree's (`treeSkillsHeld`); yours, the repository's and the builtin as the
- * picker lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why).
+ * picker lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why). On
+ * no repository (an install, no factory named), the repository's are none.
  */
 async function heldIn(s: Served): Promise<Held<Row>[]> {
   const own = await treeSkillsHeld(s, 'factory');
-  const places = await listSkills(
-    (dirs) => readsOf(s, dirs),
-    repoNeeded(s),
-    s.home,
-    await s.inRequest(yourSkillsRead(repoNeeded(s), s.home)),
-  );
-  const theirs = repoSkillsDir(repoNeeded(s));
+  const places = await listSkills((dirs) => readsOf(s, dirs), s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
+  const theirs = s.repo === undefined ? undefined : repoSkillsDir(s.repo);
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
-  const folded = skillFoldersIn(theirs)
-    .filter((name) => !listedRepo.has(name))
-    .map((name) => path.join(theirs, name));
+  const folded =
+    theirs === undefined
+      ? []
+      : skillFoldersIn(theirs)
+          .filter((name) => !listedRepo.has(name))
+          .map((name) => path.join(theirs, name));
   const foldedReads = folded.length ? await readsOf(s, folded) : {};
   return [
     ...own,
@@ -119,10 +107,12 @@ export async function skillObjectsOf(s: Served, served: ReturnType<typeof served
         const { spec: read, unread } = specOf(row, name);
         const spec: SkillSpec = files.length > 0 ? { ...read, files } : read;
         const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
-        const usedBy = yield* skillUsers(dir, name, repoNeeded(s), s.home, s.factory?.tree);
+        const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
         const copyHint =
           origin === 'yours'
-            ? skillCopyCommand(dir, repoSkillsDir(repoNeeded(s)))
+            ? s.repo === undefined
+              ? null
+              : skillCopyCommand(dir, repoSkillsDir(s.repo))
             : origin === 'repo'
               ? skillCopyCommand(dir, librarySkills(s.home))
               : null;
@@ -217,13 +207,13 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
       Effect.flatMap(wantsTable, (table) =>
         answeredWriteIn(namespace, async (s) => {
           const { origin, ...page } = query;
-          const list = listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
+          const list = listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originIn(s, origin)), namespace), queryOf(page));
           return table ? skillTable(list) : list;
         }),
       ),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
-      answeredWriteIn(namespace, (s) => skillAt(s, namespace, name, originAsked(query.origin))),
+      answeredWriteIn(namespace, (s) => skillAt(s, namespace, name, originIn(s, query.origin))),
     )
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, async (s) => {
@@ -264,7 +254,7 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
     .handle('read', ({ payload }) => answered(async () => skillReadOf(payload)))
     .handle('files', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, async (s) => ({
-        paths: filesUnder(servedNamed(await heldIn(s), name, originAsked(query.origin), listPath(namespace)).item.dir),
+        paths: filesUnder(servedNamed(await heldIn(s), name, originIn(s, query.origin), listPath(namespace)).item.dir),
       })),
     ),
 );

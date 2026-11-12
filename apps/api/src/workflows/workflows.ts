@@ -184,12 +184,18 @@ const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], nam
   found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
 /**
- * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires and rules (`foldersLoaded`, what the
- * table's `workflows` runs), by folder. The factory is handed whole, so one the store does not hold — a template's render — loads as a
- * factory applied from it would.
+ * Each folder `dirs` names, loaded as a start on `repo` would load it — with none, as one in yours alone — in `factory` with its hires and
+ * rules (`foldersLoaded`, what the table's `workflows` runs), by folder. The factory is handed whole, so one the store does not hold — a
+ * template's render — loads as a factory applied from it would.
  */
-export const loadedOf = async (e: Engine['Service'], on: RunsOn, dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
-  (await runPlaced({ ...on, home }, e, foldersLoaded(dirs, { repo, home }, factory))) as Record<string, FolderLoaded>;
+export const loadedOf = async (
+  e: Engine['Service'],
+  on: RunsOn,
+  dirs: readonly string[],
+  repo: string | undefined,
+  home: string,
+  factory?: Factory,
+) => (await runPlaced({ ...on, home }, e, foldersLoaded(dirs, placesOf(repo, home), factory))) as Record<string, FolderLoaded>;
 
 /** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
 export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
@@ -242,9 +248,9 @@ export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promi
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
  * repository's `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so
- * the board shows a folder as a start would read it.
+ * the board shows a folder as a start would read it. With no repository (an install, no factory named), yours alone.
  */
-export const placesOf = (repo: string, home: string): Places => ({ repo, home });
+export const placesOf = (repo: string | undefined, home: string): Places => (repo === undefined ? { home } : { repo, home });
 
 /**
  * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing

@@ -83,7 +83,7 @@ export function harnessNeedsOf(declarations: Readonly<Record<string, HarnessDecl
     if (needs === undefined) return [];
     const install: Need = {
       name,
-      message: `${needs.title} (${needs.program}) is installed: this release was tested with ${needs.pin}`,
+      message: `${needs.title} (${needs.program}), at ${needs.pin}, the version this release was tested with`,
       check: needs.check,
       fixes: [
         { command: needs.install, message: `install ${needs.title} ${needs.pin} into the tools folder` },

@@ -128,6 +128,7 @@ type Piece = {
   state: 'met' | 'missing' | 'unknown';
   message: string;
   fixes: PieceFix[];
+  factory?: string;
   harness?: { name: string; part: 'install' | 'sign-in' };
 };
 
@@ -153,7 +154,8 @@ async function readsPieces(page: Page): Promise<void> {
   const { pieces } = await answered<{ pieces: Piece[] }>(page, '/api/readiness');
   if (!pieces.some((piece) => piece.name === NEED)) throw new Refused(`the api lists the planted need ${NEED} — it lists none`);
   for (const piece of pieces) {
-    const drawn = page.locator(`li[data-piece="${piece.name}"]`).first();
+    const of = piece.factory === undefined ? '' : `[data-piece-factory="${piece.factory}"]`;
+    const drawn = page.locator(`li[data-piece="${piece.name}"]${of}`).first();
     await expectVisible(drawn, `the piece ${piece.name} is drawn`);
     const state = await drawn.getAttribute('data-piece-state');
     if (state !== piece.state) throw new Refused(`${piece.name} is drawn ${state}, as the api answered it ${piece.state}`);

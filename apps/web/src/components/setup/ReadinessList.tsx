@@ -128,7 +128,7 @@ function Piece({ piece, starts }: { piece: ReadinessPiece; starts: Starts }) {
   const Icon = state.icon;
   const whose = [piece.factory, piece.workflow].filter((part) => part !== undefined).join(' · ');
   return (
-    <li data-piece={piece.name} data-piece-state={piece.state} className="flex flex-col gap-2 py-3">
+    <li data-piece={piece.name} data-piece-factory={piece.factory} data-piece-state={piece.state} className="flex flex-col gap-2 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span
           data-piece-word

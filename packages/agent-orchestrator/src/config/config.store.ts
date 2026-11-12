@@ -268,6 +268,13 @@ export const SESSION_VARIABLES = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGR
  */
 export const FORWARD_VARIABLES = ['NEMIA_SERVER', 'NEMIA_SERVER_TOKEN'] as const;
 
+/**
+ * The daemon's serving variables: where its api listens (`NEMIA_BIND`) and whether its store is marked exposed (`WF_EXPOSED`), which a
+ * service bound beyond its machine sets in its unit and so every session and check it runs inherits. A test seat drops them, so an api a
+ * test starts listens on the loopback and the store it made reads as not exposed, as on CI; a test that means one sets it itself.
+ */
+export const SERVING_VARIABLES = ['NEMIA_BIND', 'WF_EXPOSED'] as const;
+
 /** Every `WF_` setting a program reads besides the root, each as its reader answers it. */
 export type Settings = {
   readonly maxConcurrent: number;

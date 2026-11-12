@@ -999,6 +999,10 @@
       "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`, which a test's seat drops."
     },
     {
+      "term": "Serving variables",
+      "meaning": "the daemon's serving variables, declared once (`SERVING_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `NEMIA_BIND`, the address its api listens on, and `WF_EXPOSED`, the store marked exposed, which a server's unit sets and a test's seat drops."
+    },
+    {
       "term": "Forwarded",
       "meaning": "the command line run as a client of another machine's api: given `NEMIA_SERVER` and `NEMIA_SERVER_TOKEN` (`FORWARD_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`), which the client sets under a context naming a remote daemon, it parses, checks and prints as ever and calls each command's linked endpoint in place of its handler (`forwardedCall`, `packages/agent-orchestrator/src/command/forward.verb.ts`); a command no endpoint serves is refused."
     },

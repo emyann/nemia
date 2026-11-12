@@ -127,7 +127,10 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStart
   },
   writes: false,
   class: 'read',
-  served: [{ endpoint: 'cards.listAll' }],
+  served: [
+    { endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' } },
+    { endpoint: 'cards.getAll', as: 'inbox_card' },
+  ],
   only: {
     side: 'cli',
     why: "the command line's listing: the api's list of the Card (`GET /api/cards`, `objects`' Api) is the package's `cardList`, never this handler, and prints its rows as a Table (`cardTable`)",

@@ -192,10 +192,16 @@ export type Spec = {
 };
 
 /**
- * An endpoint of `objects`' `Api` that serves a verb (`<group>.<endpoint>`, typed so a name no endpoint has does not compile), and the
- * tool it is on the MCP port: the verb's name, its spaces as `_`, for the first link of an entry; `as` for every other.
+ * An endpoint of `objects`' `Api` that serves a verb (`<group>.<endpoint>`, typed so a name no endpoint has does not compile) — its
+ * handler, or the read the client's verb prints — and the tool it is on the MCP port: the verb's name, its spaces as `_`, for the first
+ * link of an entry; `as` for every other. `query`, the values of the endpoint's query keys its tool sends where a call gives none (a call
+ * that gives one, an empty one included, sends its own).
  */
-export type EndpointLink = { readonly endpoint: ApiEndpointName; readonly as?: string };
+export type EndpointLink = {
+  readonly endpoint: ApiEndpointName;
+  readonly as?: string;
+  readonly query?: Readonly<Record<string, string>>;
+};
 
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
@@ -575,8 +581,13 @@ function sideBreaks(c: Entry): string[] {
   return breaks;
 }
 
-/** A tool of the MCP port: the endpoint it calls, its name, and the entry whose link it is. */
-export type LinkedTool = { readonly endpoint: EndpointLink['endpoint']; readonly tool: string; readonly entry: string };
+/** A tool of the MCP port: the endpoint it calls, its name, the entry whose link it is, and the query its link sends by default. */
+export type LinkedTool = {
+  readonly endpoint: EndpointLink['endpoint'];
+  readonly tool: string;
+  readonly entry: string;
+  readonly query: Readonly<Record<string, string>>;
+};
 
 /**
  * The tools of `entry`'s links (`served`), in order: the first named by the verb, each space `_` (`factory ls` is the tool
@@ -585,7 +596,7 @@ export type LinkedTool = { readonly endpoint: EndpointLink['endpoint']; readonly
 export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool[] =>
   (entry.served ?? []).flatMap((link, i) => {
     const tool = i === 0 ? entry.name.replaceAll(' ', '_') : link.as;
-    return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name }];
+    return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {} }];
   });
 
 /**

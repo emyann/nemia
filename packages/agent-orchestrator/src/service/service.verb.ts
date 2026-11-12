@@ -60,6 +60,7 @@ import {
 } from './service.store.ts';
 import { takeOver, takeOverConfirmed, type Started, type TakeoverHost } from './takeover.verb.ts';
 import { sizedFor, sizeRefusal, type MachineSize } from './sizing.ts';
+import { BIND_PUBLIC_VARIABLE, bindExposure, kindOfBind, machineAddresses, type MachineAddress } from './address.ts';
 
 /**
  * What the service's verbs reach of the machine: what it is, where files go, which store and its default, the daemon the checkout runs
@@ -238,8 +239,11 @@ function pidOf(text: unknown): number | undefined {
   });
 }
 
-/** The variables `--bind` writes: the address the daemon listens on, and the store marked exposed, so every caller presents a token. */
-const BIND_KEYS = ['NEMIA_BIND', 'WF_EXPOSED'] as const;
+/**
+ * The variables `--bind` writes: the address the daemon listens on, and the store marked exposed, so every caller presents a token; and
+ * the acknowledgement `--public` writes beside them (`BIND_PUBLIC_VARIABLE`).
+ */
+const BIND_KEYS = ['NEMIA_BIND', 'WF_EXPOSED', BIND_PUBLIC_VARIABLE] as const;
 
 /**
  * Whether `--bind` names an address the daemon listens on as its api reads `NEMIA_BIND` (`bindOf`, apps/api/src/port.ts): an IPv4
@@ -281,22 +285,32 @@ function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlySet<
 }
 
 /**
- * The variables `--bind <addr>` writes (`BIND_KEYS`); none without it. Refused (`Invalid`): an address that is none, or a variable
- * `--env` gives too.
+ * The variables `--bind <addr>` writes (`BIND_KEYS`), with `--public`'s acknowledgement; none without it. Refused (`Invalid`): an address
+ * that is none, a public or wildcard one without `--public` (`bindExposure`, as the api's start refuses it), `--public` without
+ * `--bind`, or a variable `--env` gives too.
  */
 function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
-  if (args.bind === undefined) return [];
+  const acknowledged = args.public === true;
+  if (args.bind === undefined) {
+    if (acknowledged)
+      throw new Invalid({
+        message: `nemia service install: --public acknowledges a public or wildcard --bind, and none was given: --bind <addr> --public, or leave --public out.`,
+      });
+    return [];
+  }
   if (typeof args.bind !== 'string' || !bindable(args.bind))
     throw new Invalid({
-      message: `nemia service install: --bind takes an IP address of this machine for the daemon to listen on, never a host name: --bind 0.0.0.0 for every interface, --bind 100.64.0.7 for a private network's, or --bind :: for every IPv6 one (no brackets). Find this machine's with \`ip -brief address\`.`,
+      message: `nemia service install: --bind takes an IP address of this machine for the daemon to listen on, never a host name: --bind 100.64.0.7 for a private network's, --bind 0.0.0.0 --public for every interface, or --bind :: --public for every IPv6 one (no brackets). nemia service addresses lists this machine's.`,
+    });
+  const kind = kindOfBind(args.bind);
+  if (bindExposure(kind, acknowledged) === 'unacknowledged')
+    throw new Invalid({
+      message: `nemia service install: --bind ${args.bind} is a ${kind} address, which anyone who reaches this machine's network can reach: add --public to acknowledge it (${BIND_PUBLIC_VARIABLE}=1 is written), or bind a private one, which nemia service addresses lists.`,
     });
   const twice = BIND_KEYS.find((k) => given.has(k));
   if (twice !== undefined)
     throw new Invalid({ message: `nemia service install: --bind writes ${twice}, and --env gives it too: give one of them.` });
-  return [
-    ['NEMIA_BIND', args.bind],
-    ['WF_EXPOSED', '1'],
-  ];
+  return [['NEMIA_BIND', args.bind], ['WF_EXPOSED', '1'], ...(acknowledged ? [[BIND_PUBLIC_VARIABLE, '1'] as [string, string]] : [])];
 }
 
 /**
@@ -506,15 +520,16 @@ export const NAME_FLAG: Flag = {
 
 /** How each service command is typed, as its refusals end on it. */
 const SHAPES = {
-  install: 'nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]',
+  install: 'nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr> [--public]] [--name <name>] [--take-over <pid>]',
   uninstall: 'nemia service uninstall [--name <name>]',
   status: 'nemia service status [--name <name>]',
+  addresses: 'nemia service addresses [--json]',
 } as const;
 
 /** `nemia service install`. */
 const INSTALL: Command<Installed> = {
   name: 'service install',
-  usage: '[--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]',
+  usage: '[--env KEY=VALUE ...] [--size auto] [--bind <addr> [--public]] [--name <name>] [--take-over <pid>]',
   help: [
     'install the daemon as a login service: a systemd user unit on Linux,',
     'a launchd agent on macOS. It runs the api of this checkout with this',
@@ -527,9 +542,12 @@ const INSTALL: Command<Installed> = {
     'off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT; no limit on',
     'macOS), each but one --env gives. --bind <addr>: the address the',
     'daemon listens on (NEMIA_BIND), and the store marked exposed',
-    '(WF_EXPOSED=1), so every caller presents a token: nemia token add',
-    'mints the first. --name: the service',
-    'name (nemia; required for a store that is not the default)',
+    '(WF_EXPOSED=1), so every caller presents a token: nemia pairings',
+    'approve and nemia board link hand out the first. A public or',
+    'wildcard address is refused unless --public acknowledges it',
+    "(NEMIA_BIND_PUBLIC=1); nemia service addresses lists this machine's.",
+    '--name: the service name (nemia; required for a store that is not',
+    'the default)',
   ],
   spec: {
     positionals: [],
@@ -540,8 +558,9 @@ const INSTALL: Command<Installed> = {
         flag: '--bind',
         kind: 'text',
         key: 'bind',
-        takes: `--bind takes the address to listen on, like --bind 0.0.0.0: ${SHAPES.install}.`,
+        takes: `--bind takes the address to listen on, like --bind 100.64.0.7: ${SHAPES.install}.`,
       },
+      { flag: '--public', kind: 'switch', key: 'public' },
       NAME_FLAG,
       { flag: '--take-over', kind: 'name', key: 'takeOver', takes: `--take-over takes the holder's pid: ${SHAPES.install}.` },
     ],
@@ -583,6 +602,34 @@ const STATUS: Command<ServiceStatus> = {
   only: CLI_ONLY,
   handler: (args) => serviceStatus(args),
   print: (data) => data.lines,
+};
+
+/** What `nemia service addresses` reads: this machine's addresses, each with its interface, family and kind, loopback first. */
+export type Addresses = { readonly addresses: readonly MachineAddress[] };
+
+/** `nemia service addresses [--json]`: this machine's addresses, one a line, `<address> <interface> <kind>`, or as JSON. */
+export const ADDRESSES: Command<Addresses> = {
+  name: 'service addresses',
+  usage: '[--json]',
+  help: [
+    "this machine's addresses, loopback first, one a line: the address, its",
+    'interface and its kind (loopback, private, shared, link-local,',
+    'unique-local, public), so --bind takes a private one; --json prints',
+    '{"addresses":[{"address","interface","family","kind"}]}',
+  ],
+  spec: {
+    positionals: [],
+    flags: [{ flag: '--json', kind: 'switch', key: 'json' }],
+    unknown: (arg) => `nemia service addresses does not take ${arg}: ${SHAPES.addresses}.`,
+  },
+  writes: false,
+  class: 'read',
+  only: { side: 'cli', why: 'it reads the network interfaces of the machine the command runs on' },
+  handler: () => Effect.sync(() => ({ addresses: machineAddresses() })),
+  print: (data, args) =>
+    args.json === true
+      ? [JSON.stringify({ addresses: data.addresses })]
+      : data.addresses.map((a) => `${a.address} ${a.interface} ${a.kind}`),
 };
 
 /** The service's commands, in the order `nemia`'s help lists them. */

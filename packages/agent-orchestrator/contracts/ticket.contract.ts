@@ -7,6 +7,7 @@
  * approval. Claimed is for good, whatever the clock says; an unclaimed ticket past its time is expired, approved or not.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import type { TicketState } from 'objects';
 
 /**
  * A ticket as the store keeps it: when it was made and for how long, whether it needs an approval, and when it was approved and
@@ -20,14 +21,27 @@ export type Ticket = {
   readonly claimedAtMs?: number;
 };
 
-/** Where a ticket stands. Implement moves it into objects' words, the pairing's `status.phase`. */
-export type TicketState = 'waiting' | 'claimable' | 'claimed' | 'expired';
+/** The latest moment a ticket is made at, in ms since the epoch: 2^50, the year 37648, far within a double's whole numbers. */
+const WHOLE_MS = 2 ** 50;
+
+/** The longest a ticket lasts: a year. */
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 const lapsed = (t: Ticket, nowMs: number): boolean => nowMs >= t.createdAtMs + t.ttlMs;
 
 const ticketStateSpec = spec<(ticket: Ticket, nowMs: number) => TicketState>({
-  /** A ticket lasts a positive time from a finite moment. */
-  requires: ({ input: [t, nowMs] }) => Number.isFinite(t.createdAtMs) && Number.isFinite(nowMs) && t.ttlMs > 0,
+  /**
+   * A ticket lasts a positive time, a year at most, from a moment between the epoch and 2^50 ms, each a whole number of milliseconds as
+   * the clock gives them (`Date.now()`): so the moment it lapses is a sum with no rounding.
+   */
+  requires: ({ input: [t, nowMs] }) =>
+    Number.isInteger(t.createdAtMs) &&
+    Number.isInteger(nowMs) &&
+    Number.isInteger(t.ttlMs) &&
+    t.createdAtMs >= 0 &&
+    t.createdAtMs <= WHOLE_MS &&
+    t.ttlMs > 0 &&
+    t.ttlMs <= YEAR_MS,
   ensures: {
     claimedIsForGood: {
       description: 'A ticket claimed stays claimed, whatever the clock says: it is never claimed twice',
@@ -40,19 +54,12 @@ const ticketStateSpec = spec<(ticket: Ticket, nowMs: number) => TicketState>({
     aPairingWaitsForTheApproval: {
       description: 'An unclaimed pairing within its time that nobody approved waits',
       condition: ({ input: [t, nowMs], output }) =>
-        t.claimedAtMs !== undefined ||
-        lapsed(t, nowMs) ||
-        !t.needsApproval ||
-        t.approvedAtMs !== undefined ||
-        output === 'waiting',
+        t.claimedAtMs !== undefined || lapsed(t, nowMs) || !t.needsApproval || t.approvedAtMs !== undefined || output === 'waiting',
     },
     anApprovedOrOpenTicketIsClaimable: {
       description: 'An unclaimed ticket within its time is claimable where it needs no approval, or was approved',
       condition: ({ input: [t, nowMs], output }) =>
-        t.claimedAtMs !== undefined ||
-        lapsed(t, nowMs) ||
-        (t.needsApproval && t.approvedAtMs === undefined) ||
-        output === 'claimable',
+        t.claimedAtMs !== undefined || lapsed(t, nowMs) || (t.needsApproval && t.approvedAtMs === undefined) || output === 'claimable',
     },
   },
 });

@@ -7,8 +7,6 @@
  */
 import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import type { Card } from 'objects';
-import { StoreRoot } from '../config/root.store.ts';
-import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -106,7 +104,7 @@ const leftOutLines = (name: string, leftOut: readonly LeftOut[]): string[] =>
  * that the inbox is empty. A started card's state is its run's phase, judged through the informer the caller keeps (`kept.runs`). `ended`
  * counts the cards the selector takes that are left out for their run having ended: none with `--all`.
  */
-export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStarts: boolean; dir: string }> = {
+export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStarts: boolean }> = {
   name: 'inbox',
   usage: '',
   help: [
@@ -149,16 +147,16 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStart
       const selected = cards.filter((card) => selectsLabels(selectors, cardLabels(card)));
       const shown = args.all === true ? selected : selected.filter(cardInPlay);
       const defaultStarts = yield* setting('defaultFactoryStarts');
-      return { cards: shown, ended: selected.length - shown.length, defaultStarts, dir: path.join(yield* StoreRoot, 'inbox') };
+      return { cards: shown, ended: selected.length - shown.length, defaultStarts };
     }),
-  print: ({ cards, ended, defaultStarts, dir }, args) =>
+  print: ({ cards, ended, defaultStarts }, args) =>
     cards.length
       ? [
           ...inboxLines(cards, defaultStarts, {
             showLabels: args.showLabels === true,
             columns: listOf(args, 'labelColumns'),
           }),
-          `\nstart one: nemia start ${path.join(dir, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
+          `\nstart one: nemia start <name> [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
         ]
       : ended
         ? [`no card in play${inboxSelected(args)}, and ${ended} whose run ended — list them with nemia inbox --all`]
@@ -275,7 +273,7 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?:
   print: ({ card, file, labelsLeftOut }) => [
     `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}${card.labels ? `  labels: ${labelsText(card.labels)}` : ''}`,
     ...leftOutLines(card.name, labelsLeftOut ?? []),
-    `filed: ${file} — start it with nemia start ${file}${card.workflow ? '' : ' --workflows <w>'}`,
+    `filed: ${file} — start it with nemia start ${card.name}${card.workflow ? '' : ' --workflows <w>'}`,
   ],
 };
 
@@ -393,9 +391,9 @@ export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
         factoryRepo: done.factoryRepo,
       };
     }),
-  print({ name, file, was, place, of, card, factoryRepo }) {
+  print({ name, was, place, of, card, factoryRepo }) {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
-    if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${file}`];
+    if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${name}`];
     return [
       `${name}  queued at ${card.queued}, ${of === null ? `${place} in the queue` : `${place} of ${of}`}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
       `the tick starts it on its own once its turn comes and a run slot is free${card.repo ? '' : factoryRepo ? `, on ${factoryRepo}, its factory's one repository` : ', on the repository nemia up runs in'} — take it back with nemia inbox queue ${name} --off`,

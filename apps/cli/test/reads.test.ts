@@ -394,7 +394,11 @@ test("`nemia inbox` prints the server's table of the cards in play, then how to 
   assert.match(listed.out, /^hold-the-reads .*waiting on you +r-parity$/m, "a started card's state beside its run");
   assert.match(listed.out, /^notes\.txt /m, 'an entry that is no card is listed too, never hidden');
   assert.doesNotMatch(listed.out, /^called-off /m, 'its run was called off: out of the cards in play');
-  assert.match(listed.out, /start one: nemia start /);
+  assert.match(
+    listed.out,
+    /start one: nemia start <name> /,
+    'a card named as a start takes it on this machine and on another alike, never by a path of this store',
+  );
   assert.match(api.said().slice(before), /\/api\/cards\b/, 'it asked the cards list');
   const all = await nemia(['inbox', '--all']);
   assert.match(all.out, /^called-off .*cancelled +r-cancelled$/m, 'listed with --all, in its phase');

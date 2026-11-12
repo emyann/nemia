@@ -155,23 +155,33 @@ async function startThere(env: Env, args: Args, e: Engine, place: Place): Promis
 
 /**
  * What a forwarded `nemia start` of `arg` sends (`startThere`): the file's text as the brief where `arg` is a file here (`isFile`), a
- * plan's card's body and its `workflow:` among them; a card of that machine's inbox where `arg` is one word naming no file here; else the
- * words. Refused (`Invalid`) for a workflow not named, or given as a path.
+ * plan's card's body and its `workflow:` among them; a card of that machine's inbox where `arg` is one word naming no file here, by its
+ * name with or without its `.md`, its workflow and its factory that machine's card's own where `--workflows` names none; else the words.
+ * Refused (`Invalid`) for a workflow given as a path, and for a brief whose workflow is not named.
  */
 function startedThereOf(arg: string, isFile: boolean, args: Args): Args {
   const after = Array.isArray(args.after) ? args.after : [];
   const text = isFile ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, after);
-  const named = text === undefined && !/\s/.test(arg) && !pathLike(arg) && arg !== '' ? arg : undefined;
+  const named = text === undefined && !/\s/.test(arg) && !pathLike(arg) && arg !== '' ? cardNamed(arg) : undefined;
   const workflow = textOf(args, 'workflows') ?? card?.workflow;
-  if (workflow === undefined || /[\\/]/.test(workflow))
+  if (workflow !== undefined && /[\\/]/.test(workflow))
     usage(
-      `nemia start forwarded to another machine's daemon starts a workflow of that machine, named: nemia start ${named ?? '"<brief>"'} --workflows <name>, ${RUN_THERE}.`,
+      `nemia start forwarded to another machine's daemon starts a workflow of that machine, by its name: nemia start ${named ?? '"<brief>"'} --workflows <name>, ${RUN_THERE}.`,
     );
-  return named !== undefined
-    ? { ...args, brief: undefined, card: named, workflows: workflow }
-    : { ...args, brief: card ? card.body : (text?.trim() ?? arg), workflows: workflow };
+  if (named !== undefined) {
+    const { workflows: _typed, ...rest } = args;
+    return { ...rest, brief: undefined, card: named, ...(workflow === undefined ? {} : { workflows: workflow }) };
+  }
+  if (workflow === undefined)
+    usage(
+      `nemia start forwarded to another machine's daemon starts a brief on a workflow of that machine, named: nemia start "<brief>" --workflows <name>, ${RUN_THERE}.`,
+    );
+  return { ...args, brief: card ? card.body : (text?.trim() ?? arg), workflows: workflow };
 }
+
+/** A card's name as that machine's inbox names it: `given` without its `.md`, as `nemia inbox add` prints the file. */
+const cardNamed = (given: string): string => (given.endsWith('.md') && given.length > '.md'.length ? given.slice(0, -'.md'.length) : given);
 
 /**
  * `nemia start <folder>`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here

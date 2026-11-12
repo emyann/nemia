@@ -299,10 +299,15 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
 
 /**
  * The name of the card `given` is a path to in the store `home`'s inbox (`cardNameAt`) — any path under the inbox, links resolved — or
- * `given` itself where it is a card's name the inbox has and no file of that name stands where it is typed; else null, for a path outside
- * it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not there at its path is still a card's path,
- * refused by name at start; a name no card has is text.
+ * the card's name `given` says, with or without its `.md`, where the inbox has that card and no file of that name stands where it is
+ * typed; else null, for a path outside it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not
+ * there at its path is still a card's path, refused by name at start; a name no card has is text.
  */
-export const inboxNameAt = (home: string, given: string): string | null =>
-  cardNameAt(home, given) ??
-  (inboxNameRefusal(given) === undefined && !fs.existsSync(given) && fs.existsSync(path.join(inboxAt(home), `${given}.md`)) ? given : null);
+export const inboxNameAt = (home: string, given: string): string | null => {
+  const at = cardNameAt(home, given);
+  if (at !== null) return at;
+  if (inboxNameRefusal(given) !== undefined || fs.existsSync(given)) return null;
+  const bare = given.endsWith('.md') ? given.slice(0, -'.md'.length) : undefined;
+  const named = [given, ...(bare ? [bare] : [])];
+  return named.find((name) => fs.existsSync(path.join(inboxAt(home), `${name}.md`))) ?? null;
+};

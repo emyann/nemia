@@ -12,7 +12,16 @@ import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { CARD_IN_PLAY, cardInPlay, cardLabels, INBOX_COLUMNS, inboxCells, type InboxListing, parseInboxCard } from '../inbox/index.ts';
+import {
+  CARD_IN_PLAY,
+  cardInPlay,
+  cardLabels,
+  cardPlaySelector,
+  INBOX_COLUMNS,
+  inboxCells,
+  type InboxListing,
+  parseInboxCard,
+} from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
 
@@ -22,7 +31,6 @@ export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { cardPlaySelector } from './card-field.ts';
 import { listOf, pageListed } from './listed.verb.ts';
 import { setting } from '../config/config.store.ts';
 

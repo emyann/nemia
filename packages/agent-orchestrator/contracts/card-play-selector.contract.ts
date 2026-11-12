@@ -1,5 +1,5 @@
 /**
- * A CardList's `?fieldSelector=` (agent-orchestrator, src/object/card-field.ts, `cardPlaySelector`), as Kubernetes spells a field
+ * A CardList's `?fieldSelector=` (agent-orchestrator, src/inbox/card-field.ts, `cardPlaySelector`), as Kubernetes spells a field
  * selector: one field, `status.inPlay`, whether the card is still in play (`cardInPlay`: not started, or its run not ended), with one of
  * Kubernetes' three operators — `=` and `==`, which mean the same, and `!=` — then `true` or `false`. `status.inPlay!=false` asks what
  * `status.inPlay=true` asks. Anything else is no selector of it (null), which the list refuses `Invalid`, naming the forms it takes; an
@@ -32,5 +32,5 @@ const cardPlaySelectorSpec = spec<(text: string) => CardPlaySelector | null>({
   },
 });
 
-/** `cardPlaySelector`'s type, which `src/object/card-field.ts` takes: the selector `text` spells, or null where it spells none. */
+/** `cardPlaySelector`'s type, which `src/inbox/card-field.ts` takes: the selector `text` spells, or null where it spells none. */
 export type CardPlaySelectorOf = Implementation<typeof cardPlaySelectorSpec>;

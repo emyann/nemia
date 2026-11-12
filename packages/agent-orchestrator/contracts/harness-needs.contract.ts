@@ -23,30 +23,33 @@ const harnessOfStep = (step: StepHarness, defaultHarness: string): string => ste
 /** Whether `list` holds no name twice. */
 const noneTwice = (list: readonly string[]): boolean => list.every((name, i) => list.indexOf(name) === i);
 
-const harnessesOfRunSpec = spec<(steps: readonly StepHarness[], defaultHarness: string, withNeeds: readonly string[]) => readonly string[]>({
-  ensures: {
-    aSessionStepsHarnessIsNeeded: {
-      description: 'Each step that runs a session needs the harness it runs on, where that harness declares needs',
-      condition: ({ input: [steps, defaultHarness, withNeeds], output }) =>
-        steps.every(
-          (s) => !s.runsSession || !withNeeds.includes(harnessOfStep(s, defaultHarness)) || output.includes(harnessOfStep(s, defaultHarness)),
-        ),
-    },
-    onlyAHarnessASessionRunsOn: {
-      description: 'A harness is needed only where a step of the run runs a session on it: a script or a gate needs none',
-      condition: ({ input: [steps, defaultHarness], output }) =>
-        output.every((h) => steps.some((s) => s.runsSession && harnessOfStep(s, defaultHarness) === h)),
-    },
-    onlyAHarnessThatDeclaresNeeds: {
-      description: 'A harness whose adapter declares no needs (a command, a remote agent) is never one',
-      condition: ({ input: [, , withNeeds], output }) => output.every((h) => withNeeds.includes(h)),
-    },
-    eachOnce: {
-      description: 'A harness two steps run on is needed once',
-      condition: ({ output }) => noneTwice(output),
+const harnessesOfRunSpec = spec<(steps: readonly StepHarness[], defaultHarness: string, withNeeds: readonly string[]) => readonly string[]>(
+  {
+    ensures: {
+      aSessionStepsHarnessIsNeeded: {
+        description: 'Each step that runs a session needs the harness it runs on, where that harness declares needs',
+        condition: ({ input: [steps, defaultHarness, withNeeds], output }) =>
+          steps.every(
+            (s) =>
+              !s.runsSession || !withNeeds.includes(harnessOfStep(s, defaultHarness)) || output.includes(harnessOfStep(s, defaultHarness)),
+          ),
+      },
+      onlyAHarnessASessionRunsOn: {
+        description: 'A harness is needed only where a step of the run runs a session on it: a script or a gate needs none',
+        condition: ({ input: [steps, defaultHarness], output }) =>
+          output.every((h) => steps.some((s) => s.runsSession && harnessOfStep(s, defaultHarness) === h)),
+      },
+      onlyAHarnessThatDeclaresNeeds: {
+        description: 'A harness whose adapter declares no needs (a command, a remote agent) is never one',
+        condition: ({ input: [, , withNeeds], output }) => output.every((h) => withNeeds.includes(h)),
+      },
+      eachOnce: {
+        description: 'A harness two steps run on is needed once',
+        condition: ({ output }) => noneTwice(output),
+      },
     },
   },
-});
+);
 
 /** `harnessesOfRun`'s type, which src/needs/harness.ts takes. */
 export type HarnessesOfRun = Implementation<typeof harnessesOfRunSpec>;
@@ -62,7 +65,8 @@ const runsHoldingRemovalSpec = spec<(need: string, unfinished: readonly RunNeedi
     },
     onlyARunThatNeedsItHolds: {
       description: 'A run that does not need it holds nothing: each run named needs it',
-      condition: ({ input: [need, unfinished], output }) => output.every((id) => unfinished.some((r) => r.run === id && r.needs.includes(need))),
+      condition: ({ input: [need, unfinished], output }) =>
+        output.every((id) => unfinished.some((r) => r.run === id && r.needs.includes(need))),
     },
     eachOnce: {
       description: 'A run is named once',
@@ -125,5 +129,5 @@ const upgradeCarriesSpec = spec<(held: HarnessesHeld, pinned: readonly string[])
   },
 });
 
-/** `upgradeCarries`' type, which src/release/upgrade.verb.ts takes. */
+/** `upgradeCarries`' type, which src/release/carry.ts takes. */
 export type UpgradeCarries = Implementation<typeof upgradeCarriesSpec>;

@@ -96,10 +96,26 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
 }
 
 /**
+ * The new tree's own `nemia doctor carry --local` run on the store at `root` (`ranInto`, its output into the build's log): it installs,
+ * at the new release's pins, each harness the store holds activated or a release carries (`carryHarnesses`), so nothing that ran stops
+ * after the switch. Refused (`Invalid`, naming the log) where it exits non-zero: nothing is switched. `archive` says where the tree's
+ * `nemia` is: an archive's `bin/nemia`, a build's npm bin.
+ */
+function carried(tag: string, building: Building, archive: boolean, root: string, env: NodeJS.ProcessEnv): void {
+  const nemia = archive ? path.join(building.tree, 'bin', 'nemia') : path.join(building.tree, 'node_modules', '.bin', 'nemia');
+  const exit = ranInto([nemia, 'doctor', 'carry', '--local'], building.tree, { ...env, WF_ROOT: root }, building.log);
+  if (exit !== 0)
+    throw new Invalid({
+      message: `${BY} ${tag}: its nemia doctor carry, which installs this store's harnesses at ${tag}'s pins, exited ${exit}, so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}, then run the upgrade again.`,
+    });
+}
+
+/**
  * The release of `tag`: the one built already where it names the commit the tag names now, else built — exported, its commands run on a
  * trial store, the export's repository sealed away, `release.json` written last and the tree renamed into `releases/<tag>`. The build's
- * folder is taken away however it ends. Refused: a tag the repository lacks (`Missing`); one built at another commit, the tag moved, or a
- * release of it placed meanwhile (`Conflict`); a tag with no `release:check` script, or a command that fails (`Invalid`). The pointer is
+ * folder is taken away however it ends. Before it is placed, the new tree's carry runs on the store (`carried`). Refused: a tag the
+ * repository lacks (`Missing`); one built at another commit, the tag moved, or a release of it placed meanwhile (`Conflict`); a tag with
+ * no `release:check` script, a command that fails, or a carry that fails (`Invalid`). The pointer is
  * switched to it last, while the build's folder still stands, so the retention, which removes nothing while a build is under way, never
  * removes a release between the read that finds it built and the pointer naming it.
  */
@@ -122,6 +138,7 @@ function prepared(place: Place, tag: string, repo: string, root: string, env: No
       });
     checked(tag, building, env);
     answered(tag, place.askNow('seal', { tree: building.tree }));
+    carried(tag, building, false, root, env);
     const release: ReleaseFile = { tag, commit, source: repo, builtAt: new Date().toISOString() };
     writeReleaseFile(building.tree, release);
     if (!placeRelease(building.tree, tag, root))
@@ -138,10 +155,12 @@ function prepared(place: Place, tag: string, repo: string, root: string, env: No
 /**
  * The release of `tag` from its published archive at the install's download base: the one placed already where `releases/<tag>` holds a
  * release, else downloaded for this machine's platform, checked against its checksum and unpacked (`unpackedArchive`), its `bin/nemia
- * version` run on a trial store, `release.json` written last — the archive's commit, the download base, `from: 'archive'` and the
- * platform — and the tree renamed into `releases/<tag>`; then the pointer switched to it. The build's folder is taken away however it
- * ends. Refused: a machine no archive is published for, or a tag that is no version (`Invalid`, before anything is fetched); an archive
- * with no `release.json` of its tag, or whose `nemia version` fails (`Invalid`, naming the log); and as `unpackedArchive` refuses.
+ * version` run on a trial store, its carry run on the store (`carried`), `release.json` written last — the archive's commit, the download
+ * base, `from: 'archive'` and the platform — and the tree renamed into `releases/<tag>`; then the pointer switched to it. The build's
+ * folder is taken away however it ends. Refused: a machine no archive is published for, or a tag that is no version (`Invalid`, before
+ * anything is fetched); an archive with no `release.json` of its tag, or whose `nemia version` or `nemia doctor carry` fails (`Invalid`,
+ * naming the log); and as `unpackedArchive` refuses. A release placed already is switched to with no carry: the daemon's start files what
+ * it carries.
  */
 async function archived(install: Extract<Running, { kind: 'install' }>, tag: string, root: string, env: NodeJS.ProcessEnv) {
   const platform = platformOf(process.platform, process.arch);
@@ -177,6 +196,7 @@ function placedArchive(source: string, tag: string, platform: ReleasePlatform, b
     throw new Invalid({
       message: `${BY} ${tag}: its bin/nemia version exited ${exit}, so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}.`,
     });
+  carried(tag, building, true, root, env);
   const release: ReleaseFile = { tag, commit: packed.commit, source, builtAt: new Date().toISOString(), from: 'archive', platform };
   writeReleaseFile(building.tree, release);
   if (!placeRelease(building.tree, tag, root))

@@ -149,6 +149,10 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'nemia.reach': ONE,
   'nemia.chat': { shape: 'cursor', narrow: ['before', 'limit'] },
   'nemia.chatStream': { shape: 'stream', why: 'sent one message at a time, never built as one answer' },
+  'readiness.read': { shape: 'one', why: 'one piece per area and per need the machine and its factories declare' },
+  'readiness.fixOf': { shape: 'one', why: 'its output is the tail the orchestrator keeps of it (FIX_TAIL_BYTES), never the whole' },
+  'readiness.fixOutput': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },
+  'pairings.list': { shape: 'one', why: 'the tickets a person asked for, each short-lived: a handful at once' },
   'nemia.speakers': ONE,
   'nemia.instructions': ONE,
 };

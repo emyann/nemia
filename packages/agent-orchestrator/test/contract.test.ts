@@ -367,7 +367,9 @@ const READERS = [
   'loadWorkflows',
   'skillsFor',
   'workflowDescription',
+  'workflowNeeds',
   'workflowReadme',
+  'workflowReadmeWith',
   'workflowFolder',
   'workflowsIn',
 ];

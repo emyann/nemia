@@ -6,7 +6,8 @@ layout gives a place sits inside a template's folder: the workspace's own files 
 `released.json`, `test/`) sit beside it, since a render would carry anything inside.
 
 - `sdlc/` — the team that builds Nemia, with this repository's words taken out: six agents and four workflows, the role skills they
-  name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, with
+  name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, `needs.ts` — what build's and quick's needs check and
+  fix — with
   `ci-log.ts` and `exec.ts`, which `landing.ts` and `pull-request.ts` import), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
   `change.ts` in `quick/` and `cards.ts` in `janitor/`, read as `$WF_WORKFLOW_FILES/<script>.ts`. quick's land step is told build's
   `land.md` (`instruction: { path }`). What the repository a factory is applied to decides is a parameter of `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried

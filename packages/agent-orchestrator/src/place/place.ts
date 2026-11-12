@@ -6,6 +6,7 @@
  * A verb is a question asked of the place the program was given, and has one of three outcomes (`PlaceOutcome`): its answer, a refusal the
  * place words itself, or unread, when it gave neither in time.
  */
+import type { Need } from 'objects';
 
 /** The verbs a place may answer, in the order a run meets them: `root` first, asked of a folder before any run. */
 export const PLACE_VERBS = [
@@ -333,10 +334,15 @@ export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly st
   readonly [K in Exclude<SayKey, (typeof SAY_LISTS)[number]>]: string;
 };
 
-/** What a place declares of itself: the tools a landing session is denied, and the sentences the code prints for it (`PlaceSay`). */
+/**
+ * What a place declares of itself: the tools a landing session is denied, the sentences the code prints for it (`PlaceSay`), and the
+ * machine needs a run in it has (`needs`, src/needs/): each a check and the fixes that put it in place, which a run of a repository waits
+ * on before its first session and the readiness read lists. A builtin place declares them, so its fixes are started for any caller.
+ */
 export type PlaceDeclared = {
   readonly denyWhileLanding: readonly string[];
   readonly say: PlaceSay;
+  readonly needs?: readonly Need[];
 };
 
 /**
@@ -372,3 +378,9 @@ export const sayFilled = (template: string, holes: Readonly<Record<string, strin
 /** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
 export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
   'refused' in outcome ? outcome.refused : outcome.unread.said;
+
+/**
+ * The names of the needs the builtin places declare (`PlaceDeclared.needs`), which a template's workflow need may fill (`fills`): read
+ * by the template's check, which reaches no place's code, and held equal to the git place's declaration by `src/place/place.store.test.ts`.
+ */
+export const SHIPPED_PLACE_NEEDS: readonly string[] = ['git-identity'];

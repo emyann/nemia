@@ -12,9 +12,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
+import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
+import { Need } from 'objects';
+import { firstPiece } from '../piece/piece.ts';
 import {
   AGENTS_FOLDER,
   CARRIED_FOLDER,
+  FRONTMATTER,
   isReadme,
   SKILLS_FOLDER,
   STEP_KEYS,
@@ -271,12 +275,19 @@ export function workflowDescription(dir: string): string | null {
 
 /**
  * A workflow's README in full, the workflow level's instruction: the text of the first README of its folder by name, any case, without a
- * leading byte order mark.
+ * leading byte order mark and without its frontmatter, which declares the workflow's machine needs (`workflowNeeds`) and is no
+ * instruction.
  *
  * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`'
  * (`workflows/workflows.store.ts`) to judge.
  */
 export function workflowReadme(dir: string): string | null {
+  const text = readmeText(dir);
+  return text === null ? null : text.replace(/\r\n/g, '\n').replace(FRONTMATTER, '');
+}
+
+/** The text of the first README of the folder `dir` by name, any case, frontmatter and all, without a leading byte order mark; or null. */
+function readmeText(dir: string): string | null {
   try {
     const readme = fs.readdirSync(dir).filter(isReadme).sort()[0];
     if (!readme) return null;
@@ -284,6 +295,67 @@ export function workflowReadme(dir: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** The needs a README's frontmatter declares, as a Schema reads them. */
+const NeedsDeclared = Schema.Struct({ needs: Schema.optionalKey(Schema.Array(Need)) });
+
+/**
+ * The machine needs the workflow of the folder `dir` declares, read off its README's frontmatter (`needs:`, each a `Need`: its name, what
+ * it is, the shell command whose exit 0 says it is in place, its fixes and the place need it `fills`), and why they could not be read
+ * (`error`, naming the file and what to mend), none then. None for a folder with no README, one with no frontmatter, and one whose
+ * frontmatter names no needs. Never throws: a run whose needs cannot be read waits on none of them, and the readiness read says why.
+ */
+export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[]; readonly error?: string } {
+  const text = readmeText(dir);
+  if (text === null) return { needs: [] };
+  const block = FRONTMATTER.exec(text.replace(/\r\n/g, '\n'))?.[1];
+  if (block === undefined) return { needs: [] };
+  try {
+    const declared = Schema.decodeUnknownSync(NeedsDeclared)(frontmatterValues(block) ?? {});
+    return { needs: declared.needs ?? [] };
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    return {
+      needs: [],
+      error: `${path.join(dir, 'README.md')}'s frontmatter declares no needs that read (${firstPiece(why, '\n')}): mend its \`needs:\` list — each a name, a message and a check.`,
+    };
+  }
+}
+
+/** The machine needs the workflow of the folder `dir` declares in its README's frontmatter (`workflowNeedsRead`), none where none read. */
+export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead(dir).needs;
+
+/** The keys of a frontmatter `block` other than its needs, none where it does not read as a map. */
+function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
+  let read: unknown;
+  try {
+    read = block === undefined ? undefined : frontmatterValues(block);
+  } catch {
+    read = undefined;
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return {};
+  const { needs: _needs, ...rest } = read as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`), so that what a read gave
+ * — the instruction (`workflowReadme`) and the needs (`workflowNeeds`), apart — is written back whole: `body`, the instruction (the
+ * README's own where none is given), under a frontmatter whose `needs:` is `needs` (the README's own where none are given) beside the
+ * frontmatter's other keys. A `body` that carries a frontmatter of its own is read as the whole README, its frontmatter in place of the
+ * folder's. No frontmatter where it would hold nothing, and undefined where neither is given: the README is then left as it is.
+ */
+export function workflowReadmeWith(dir: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
+  if (body === undefined && needs === undefined) return undefined;
+  const given = body?.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const own = given === undefined ? undefined : FRONTMATTER.exec(given);
+  const onDisk = (readmeText(dir) ?? '').replace(/\r\n/g, '\n');
+  const block = own ?? FRONTMATTER.exec(onDisk);
+  const instruction = given === undefined ? onDisk.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
+  if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
+  const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
+  return Object.keys(keys).length === 0 ? instruction : `---\n${frontmatterOfValues(keys)}---\n${instruction}`;
 }
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;

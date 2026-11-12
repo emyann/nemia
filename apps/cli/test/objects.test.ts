@@ -120,3 +120,34 @@ test('REFUSED: a page answering back the `continue` it was asked with is refused
   const again = { kind: 'RunList', metadata: { continue: 'page-1' }, items: [] };
   await assert.rejects(followed([again, again]));
 });
+
+test("REFUSED: a refusal the daemon answers in the api's own error shape is said in its words, not as a release mismatch", async () => {
+  const said = 'file: `harness: command` is not a harness this engine has. Its harnesses are: claude, codex, check.';
+  const failing = http.createServer((request, response) => {
+    if (request.url === '/api/health') {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true }));
+      return;
+    }
+    response.writeHead(500, { 'content-type': 'application/json' }).end(JSON.stringify({ error: said }));
+  });
+  await new Promise<void>((resolve) => failing.listen(0, '127.0.0.1', resolve));
+  after(() => {
+    failing.closeAllConnections();
+    failing.close();
+  });
+  const root = path.join(scratch('nemia-failed-'), 'store');
+  fs.mkdirSync(root, { recursive: true });
+  const { port } = failing.address() as AddressInfo;
+  fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url: `http://127.0.0.1:${port}` }));
+  const env: NodeJS.ProcessEnv = { WF_ROOT: root, NEMIA_DAEMON_START: 'off' };
+
+  const refused = await asked('doctor fix', (client) => client.readiness.fix({ payload: { need: 'mise' } }), env).then(
+    () => assert.fail('the fix answered, though the api refused it'),
+    (err: unknown) => err,
+  );
+
+  assert.ok(refused instanceof Refused, `a Refused, not ${String(refused)}`);
+  assert.equal(refused.code, 2);
+  assert.ok(refused.message.includes('harness: command'), `the api's own words: ${refused.message}`);
+  assert.doesNotMatch(refused.message, /nemia version|nemia upgrade/, 'no release mismatch is named');
+});

@@ -401,6 +401,16 @@ daemon runs as, after which the step is tried again; an answer past `CODEX_SIGN_
 refuses nothing. Measured at codex-cli 0.154.0 (2026-11-11): signed in, it prints `Logged in using ChatGPT` on stderr and exits 0;
 under a `CODEX_HOME` with no sign-in, `Not logged in` on stderr, exit 1.
 
+**A Claude Code job's spawn is refused while `claude auth status` says signed out** (`prepare`, `claudeSignedOutRefusal` in
+`harness/claude/sign-in.ts`, judged by `claudeSignInOf`, proved by `contracts/claude-sign-in.contract.ts`): the attempt ends
+`unstartable` before anything runs, in words naming `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN`, which the engine reads when it
+starts, or `claude auth login`, typed as the user the engine runs as, after which the task is tried again. The Claude Code asked is the
+one the session would run (the engine's `claudeExecutable`, else `AE_CLAUDE_EXECUTABLE`, else the SDK's bundled one), in the session's
+working root and environment, the task's `config.env` included. An answer past `CLAUDE_SIGN_IN_MS` (15s) refuses too, saying the check
+did not answer; a Claude Code that does not start, or answers neither way, refuses nothing. It sees a credential's presence, never its
+validity: measured at 2.1.322 (`docs/harness.md`, *`claude auth status`*), a placeholder token reads signed in, so an expired, revoked
+or mistyped one still fails at the session's first request. Only a job is asked; a long-lived session held attached is not.
+
 **One mechanism for every local harness.** A Claude Code job, `codex exec` and a command each run in the foreground and exit, and
 none keeps a registry another process can ask. So we detach a worker per session and keep the registry ourselves
 (`bin/ae-worker.ts` writes it, `src/harness/detached/detached.ts` reads it). Until 2026-10-24 Claude Code's `--bg` sessions were
@@ -2138,6 +2148,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached-follow.ts` | an attached session followed live (`pushesOf`): the fan-out its message loop feeds, what each follower is said — its state, its text as it is written, its transcript's events with their cursor — and when a follow ends |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/session-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
+| `src/harness/claude/sign-in.ts` | whether this machine's Claude Code is signed in, asked before a job's spawn: `claude auth status` run bounded by `CLAUDE_SIGN_IN_MS` (`claudeSignedOutRefusal`), its answer judged by `claudeSignInOf` |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/stream.ts` | the lines of a Claude Code job's stream the runtime reads (`PRINTED`), decoded, and why an output is refused |

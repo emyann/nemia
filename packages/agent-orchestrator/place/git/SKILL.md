@@ -81,6 +81,14 @@ and no process between, and you need not ask any of them. What each takes and an
 - `open` — the repository a run starts in: `{ "root", "isolate" }` answers `{ "repo", "baseRef", "branch", "staged" }`, `staged` the
   file that is there while a merge is staged in that checkout, which the run reads with no process. With `isolate`, it refuses a
   `.worktreeinclude` that is no file or has a line outside the repository, the repository itself or `.git`.
+- `follow` — the checkout brought up to its remote before a step of a run that cuts worktrees works from it: `{ "repo" }` answers
+  `{ "state" }`. The truth is the upstream git names for the branch checked out (`git branch --set-upstream-to <remote>/<branch>`, as
+  `git clone` sets it), fetched alone with the machine's own credentials and no prompt for one; a branch with no upstream, or a
+  repository with no remote, follows nothing (`no-upstream`). A checkout clean and only behind is fast-forwarded (`fast-forwarded`,
+  with `upstream`, `from` and `to`), never merged or reset; one with commits of its own, a merge in progress, changes not committed
+  or no branch is left as it is (`left`), and a remote that cannot be read changes nothing (`unfetched`), each with a `message` that
+  says what to do, which the run's log carries. So the base your step merges (`main-worktree/HEAD`) is the remote's, whoever landed
+  on it.
 - `make` — a step's worktree: `{ "repo", "at", "name", "from", "also" }` cuts one at `at` on a new branch `name` from `from`, or takes up
   the one already there on `name`, merges each branch of `also`, and copies in what `.worktreeinclude` lists and git ignores; it answers
   `{ "workspace", "branch", "conflicts", "notes" }`, `conflicts` the paths a merge left unmerged.

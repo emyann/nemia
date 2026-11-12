@@ -1,9 +1,8 @@
 /**
  * The requests a link makes of an entry's input, where its endpoint names a key otherwise (`EndpointLink.request`): the input's keys
  * renamed to the endpoint's, the command line's own keys left out, and a key the endpoint cannot be sent refused in words that say where
- * the command runs instead. Pure, but for the Effect each answers in.
+ * the command runs instead. Pure, each answering a promise, rejected with the refusal where it cannot be sent.
  */
-import { Effect } from 'effect';
 import { Invalid } from '../refusal/refusal.ts';
 import type { EndpointLink } from './command.ts';
 
@@ -20,7 +19,7 @@ type Input = Readonly<Record<string, unknown>>;
 export const renamed =
   (names: Readonly<Record<string, string>>, dropped: readonly string[] = []): Request =>
   (input: Input) =>
-    Effect.succeed(
+    Promise.resolve(
       Object.fromEntries(
         Object.entries(input)
           .filter(([k]) => !dropped.includes(k))
@@ -37,7 +36,7 @@ export const refusing =
   (input: Input) => {
     const given = keys.filter((k) => input[k] !== undefined && input[k] !== false);
     if (given.length === 0) return request(input);
-    return Effect.fail(
+    return Promise.reject(
       new Invalid({
         message: `nemia ${verb} forwarded to another machine's api cannot send ${given.map((k) => `\`${k}\``).join(', ')}, which its endpoint does not take: run it on the daemon's machine, or on this machine's store with NEMIA_CONTEXT=local.`,
       }),
@@ -65,7 +64,7 @@ export const requiring =
   (input: Input) =>
     gives(key)(input)
       ? request(input)
-      : Effect.fail(
+      : Promise.reject(
           new Invalid({
             message: `forwarded to another machine's api, the command names its ${key}: ${form}; or run it on this machine's store with NEMIA_CONTEXT=local.`,
           }),
@@ -78,7 +77,7 @@ export const requiring =
 export const fromPlace =
   (names: Readonly<Record<string, string>> = {}, dropped: readonly string[] = []): Request =>
   (input: Input) =>
-    Effect.map(renamed(names, ['from', ...dropped])(input), (request) => {
+    renamed(names, ['from', ...dropped])(input).then((request) => {
       const from = input.from;
       const factory = typeof input.factory === 'string' && input.factory !== '' ? input.factory : undefined;
       const namespace = typeof from === 'string' && from !== 'yours' && from !== 'repo' ? from : (factory ?? 'default');
@@ -100,7 +99,7 @@ export const selectorQuery = (input: Input): Readonly<Record<string, string>> =>
 export const notSent =
   (verb: string): Request =>
   () =>
-    Effect.fail(
+    Promise.reject(
       new Invalid({
         message: `nemia ${verb} is not yet sent to another machine's api from here: write it on the daemon's machine or through its board, or on this machine's store with NEMIA_CONTEXT=local.`,
       }),

@@ -410,14 +410,14 @@ export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
 const fromWritten = (input: Readonly<Record<string, unknown>>) => {
   const current = input.current as Card | undefined;
   if (current === undefined)
-    return Effect.fail(
+    return Promise.reject(
       new Invalid({
         message: 'nemia inbox from forwarded reads the card first: run it through its runner, nemia inbox from <name> <run>...',
       }),
     );
   const { from: _was, ...spec } = current.spec;
   const runs = input.off === true ? [] : runsOf(input as Args);
-  return Effect.succeed({
+  return Promise.resolve({
     name: current.metadata.name,
     metadata: current.metadata.resourceVersion === undefined ? {} : { resourceVersion: current.metadata.resourceVersion },
     spec: runs.length ? { ...spec, from: runs } : spec,

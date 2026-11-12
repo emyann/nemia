@@ -99,7 +99,7 @@ export const WAIT: Command<WaitAnswer, WaitInput> = {
   served: [
     {
       endpoint: 'server.wait',
-      request: (input) => Effect.map(renamed({}, ['selector'])(input), (rest) => ({ ...rest, ...selectorQuery(input) })),
+      request: (input) => renamed({}, ['selector'])(input).then((rest) => ({ ...rest, ...selectorQuery(input) })),
     },
   ],
   input: WaitInput,

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import type { TemplateGiven } from 'objects';
-import { tried } from '../runtime-client.ts';
+import { fromThrow as tried } from '../door/door.store.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { ARCHIVE_LIMIT, packArchive, unpackArchive } from '../archive/archive.ts';
@@ -91,7 +91,9 @@ export const withTemplateTaken = <A, E, R>(
  * A forwarded call's input with its `--template` word made the request's (`templateGiven`), as a link's `request` takes it: the other
  * keys as they are, and an input that names no template as it is, for the verb there to refuse in its own words.
  */
-export const templatePacked = (input: Readonly<Record<string, unknown>>): Effect.Effect<Readonly<Record<string, unknown>>, Refusal> => {
+export const templatePacked = (input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>> => {
   const given = input['template'];
-  return typeof given === 'string' ? Effect.map(templateGiven(given), (template) => ({ ...input, template })) : Effect.succeed(input);
+  return typeof given === 'string'
+    ? Effect.runPromise(Effect.map(templateGiven(given), (template) => ({ ...input, template })))
+    : Promise.resolve(input);
 };

@@ -6,6 +6,7 @@
  * `/api/namespaces/:namespace/hires/<workflow>.<step>`; and its instruction's two verbs (instruction.verb.ts), which the api serves.
  * Their handlers answer data, and the CLI prints it.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { setting } from '../config/config.store.ts';
 import { Effect, Schema } from 'effect';
 import { HireWrite, type FactoryList } from 'objects';
@@ -387,7 +388,7 @@ export type WorkflowWireInput = typeof WorkflowWireInput.Type;
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, WorkflowWireInput> = {
   name: 'factory attach',
-  served: [{ endpoint: 'factories.attach' }],
+  served: [{ endpoint: 'factories.attach', request: renamed({ factory: 'name' }) }],
   usage: '<factory> <workflow>',
   help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
   spec: workflowSpec('attach'),
@@ -405,7 +406,7 @@ export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, Workflo
 /** `nemia factory detach`: one workflow taken from one factory. */
 export const FACTORY_DETACH: Command<{ file: string }, WorkflowWireInput> = {
   name: 'factory detach',
-  served: [{ endpoint: 'factories.detach' }],
+  served: [{ endpoint: 'factories.detach', request: renamed({ factory: 'name' }) }],
   usage: '<factory> <workflow>',
   help: ['take a workflow back, once no hire fills its steps'],
   spec: workflowSpec('detach'),
@@ -462,7 +463,7 @@ export type FireInput = typeof FireInput.Type;
 /** `nemia factory hire`: one agent hired into one step, and the agent it replaced, if any. */
 export const FACTORY_HIRE: Command<{ file: string; replaced: string | null }, HireInput> = {
   name: 'factory hire',
-  served: [{ endpoint: 'hires.put' }],
+  served: [{ endpoint: 'hires.put', request: renamed({ factory: 'namespace', step: 'name' }) }],
   usage: '<factory> <agent> --step <workflow>/<step>',
   help: ["hire an agent into a workflow's step: one a step, a second replaces it"],
   spec: HIRE_SPEC,
@@ -493,7 +494,7 @@ const FIRE_SPEC = stepSpec(
 /** `nemia factory fire`: one step's hire taken back. */
 export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> = {
   name: 'factory fire',
-  served: [{ endpoint: 'hires.delete' }],
+  served: [{ endpoint: 'hires.delete', request: renamed({ factory: 'namespace', step: 'name' }) }],
   usage: '<factory> --step <workflow>/<step>',
   help: ["take a step's hire back"],
   spec: FIRE_SPEC,
@@ -522,7 +523,7 @@ export type FactoryRmInput = typeof FactoryRmInput.Type;
  */
 export const FACTORY_RM: Command<{ file: string; instruction: string | null }, FactoryRmInput> = {
   name: 'factory rm',
-  served: [{ endpoint: 'factories.delete' }],
+  served: [{ endpoint: 'factories.delete', request: renamed({ factory: 'name' }) }],
   usage: '<name>',
   help: ["remove a factory's file, and the instruction and the rules the store", 'keeps for it'],
   spec: {
@@ -581,7 +582,7 @@ export type RevisionsInput = typeof RevisionsInput.Type;
  */
 export const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }, RevisionsInput> = {
   name: 'factory revisions',
-  served: [{ endpoint: 'factories.setRevisions' }],
+  served: [{ endpoint: 'factories.setRevisions', request: renamed({ factory: 'name' }) }],
   usage: '<name> follow|pinned',
   help: [
     "whether a factory's runs follow merged revisions at each filing (follow)",

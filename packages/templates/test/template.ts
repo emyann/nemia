@@ -25,7 +25,8 @@ export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
- * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor the forwarding ones (`FORWARD_VARIABLES`).
+ * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor the
+ * forwarding ones (`FORWARD_VARIABLES`).
  */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {

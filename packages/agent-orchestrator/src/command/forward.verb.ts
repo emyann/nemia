@@ -191,7 +191,10 @@ export const forwardedCall = Effect.fn('forwardedCall')(function* (
 ) {
   if (entry.served === undefined) return yield* Effect.fail(unlinked(entry.name));
   const link = linkOf(entry.served, input);
-  const request = link.request === undefined ? input : yield* link.request(input);
+  const request =
+    link.request === undefined
+      ? input
+      : yield* Effect.tryPromise({ try: () => link.request?.(input) ?? Promise.resolve(input), catch: (refused) => refused as Refusal });
   const keys = endpointKeysOf(Api, link.endpoint);
   const [group = '', endpoint = ''] = link.endpoint.split('.');
   const answer = yield* clientOf(forwarded).pipe(

@@ -132,7 +132,7 @@ export async function workflowsWriteRun(env: Env, args: Args, e: Engine, place: 
   const home = wfRoot(env);
   const command = WORKFLOWS_WRITE;
   if (forwardedOf(env) !== undefined) {
-    await forwardedAnswer(notSent(command.name)({}));
+    await forwardedAnswer(Effect.tryPromise({ try: () => notSent(command.name)({}), catch: (refused) => refused }));
     return;
   }
   const folder = pathOf(args, 'folder', command, 'the draft folder whose steps and README to write');

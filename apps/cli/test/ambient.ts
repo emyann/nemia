@@ -8,12 +8,19 @@
  * `Authorization: Bearer` and a test's api, which never minted it, answers 401; and `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the daemon
  * unit's, which an api that files through the real engine would inherit. And the person's own context (`NEMIA_CONTEXT`, and
  * `XDG_CONFIG_HOME`, where the client's config file is): a test's `nemia` asks the store it seats, never the daemon the person's
- * config names, nor the remote daemon a forwarded CLI would call (`FORWARD_VARIABLES`). A test that means one sets it in the environment it builds on this.
+ * config names, nor the remote daemon a forwarded CLI would call (`FORWARD_VARIABLES`). A test that means one sets it in the
+ * environment it builds on this.
  */
 import { FORWARD_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
 
 /** What the daemon sets that no child of a cli test inherits. */
-export const DROPPED = [...SESSION_VARIABLES, ...FORWARD_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT', 'NEMIA_CONTEXT', 'XDG_CONFIG_HOME'] as const;
+export const DROPPED = [
+  ...SESSION_VARIABLES,
+  ...FORWARD_VARIABLES,
+  'OTEL_EXPORTER_OTLP_ENDPOINT',
+  'NEMIA_CONTEXT',
+  'XDG_CONFIG_HOME',
+] as const;
 
 /** This process's environment without `DROPPED`, and without each of `also`. */
 export function ambient(...also: readonly string[]): NodeJS.ProcessEnv {

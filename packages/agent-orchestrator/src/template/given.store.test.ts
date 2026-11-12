@@ -60,8 +60,8 @@ test("a --template word is made the request's: a name as it is, a folder packed 
   assert.deepEqual(await Effect.runPromise(templateGiven(archive)), packed, 'an archive is sent as its bytes');
   const nowhere = await Effect.runPromiseExit(templateGiven(path.join(at, 'nowhere')));
   assert.equal(refusedAs(nowhere), 'Missing');
-  assert.deepEqual(await Effect.runPromise(templatePacked({ factory: 'mill', to: '1.0.0' })), { factory: 'mill', to: '1.0.0' });
-  assert.deepEqual(await Effect.runPromise(templatePacked({ factory: 'mill', template: 'sdlc' })), {
+  assert.deepEqual(await templatePacked({ factory: 'mill', to: '1.0.0' }), { factory: 'mill', to: '1.0.0' });
+  assert.deepEqual(await templatePacked({ factory: 'mill', template: 'sdlc' }), {
     factory: 'mill',
     template: { name: 'sdlc' },
   });
@@ -92,17 +92,24 @@ test("a forwarded resolve sends a --file's text, never its path; REFUSED: a file
   assert.ok(request);
   const file = path.join(scratch('wf-template-given-choice-'), 'choice.md');
   fs.writeFileSync(file, 'Draft it together.\n');
-  assert.deepEqual(await Effect.runPromise(request({ factory: 'mill', conflict: 'RULES.md', file })), {
+  assert.deepEqual(await request({ factory: 'mill', conflict: 'RULES.md', file }), {
     factory: 'mill',
     conflict: 'RULES.md',
     text: 'Draft it together.\n',
   });
-  assert.deepEqual(await Effect.runPromise(request({ factory: 'mill', conflict: 'RULES.md', ours: true })), {
+  assert.deepEqual(await request({ factory: 'mill', conflict: 'RULES.md', ours: true }), {
     factory: 'mill',
     conflict: 'RULES.md',
     ours: true,
   });
-  assert.equal(refusedAs(await Effect.runPromiseExit(request({ factory: 'mill', conflict: 'x', file: `${file}.gone` }))), 'Invalid');
+  assert.equal(
+    refusedAs(
+      await Effect.runPromiseExit(
+        Effect.tryPromise({ try: () => request({ factory: 'mill', conflict: 'x', file: `${file}.gone` }), catch: (refused) => refused }),
+      ),
+    ),
+    'Invalid',
+  );
 });
 
 test('a forwarded factory listing reads the Factories as its print takes them: the default left out, a file that does not read by its error', () => {

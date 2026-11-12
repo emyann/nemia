@@ -75,7 +75,7 @@ export const DAEMON: Command<DaemonAnswer> = {
   class: 'act',
   ticks: true,
   only: { side: 'cli', why: 'the api is the daemon: it answers where it stands at GET /api/daemon, the endpoint it links' },
-  served: [{ endpoint: 'server.daemon', request: () => Effect.succeed({}), answer: standingThere }],
+  served: [{ endpoint: 'server.daemon', request: () => Promise.resolve({}), answer: standingThere }],
   handler: () => daemonRead(),
   print: (data, args) => {
     if (args.json !== true) return [data.line];

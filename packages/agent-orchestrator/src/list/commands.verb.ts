@@ -27,7 +27,7 @@ export const LS: Command<RunsListed, typeof LsInput.Type> = {
     {
       endpoint: 'runs.listAll',
       takes: givesNone('runId'),
-      request: (input) => Effect.succeed(selectorQuery(input)),
+      request: (input) => Promise.resolve(selectorQuery(input)),
     },
     { endpoint: 'runs.show', as: 'ls_run', request: renamed({ runId: 'name' }, ['selector', 'showLabels', 'labelColumns']) },
   ],

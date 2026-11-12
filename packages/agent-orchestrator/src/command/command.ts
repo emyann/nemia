@@ -5,8 +5,7 @@
  * helps from a spec here, and the api calls an entry by its exported name, its body the endpoint's own Schema in objects' `Api`.
  */
 import { dollarsOf } from '../keys/index.ts';
-import { Invalid, type Refusal } from '../refusal/refusal.ts';
-import type { Effect } from 'effect';
+import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
 import { FORMER_MODES } from '../retry/index.ts';
 import { oneLine } from '../record/record.ts';
@@ -202,14 +201,15 @@ export type Spec = {
  * whether this link is the one a given input calls, on an entry of more than one link (the first whose `takes` holds, the last
  * where none says one); `request`, the call's input as the endpoint takes it — its path, query and payload keys in one object — where
  * the entry's input is not that already, reading on this machine what the command names here (a template folder packed, a file's
- * text); and `answer`, the data the entry's `print` takes, made of the endpoint's decoded answer, where that is not it already.
+ * text), a promise rejected with the package's refusal where it cannot be sent; and `answer`, the data the entry's `print` takes,
+ * made of the endpoint's decoded answer, where that is not it already.
  */
 export type EndpointLink = {
   readonly endpoint: ApiEndpointName;
   readonly as?: string;
   readonly query?: Readonly<Record<string, string>>;
   readonly takes?: (input: Readonly<Record<string, unknown>>) => boolean;
-  readonly request?: (input: Readonly<Record<string, unknown>>) => Effect.Effect<Readonly<Record<string, unknown>>, Refusal>;
+  readonly request?: (input: Readonly<Record<string, unknown>>) => Promise<Readonly<Record<string, unknown>>>;
   readonly answer?: (answer: unknown, input: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>;
 };
 

@@ -742,7 +742,7 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
  */
 export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',
-  served: [{ endpoint: 'factories.resolve', request: (input) => tried(() => choiceSent(input)) }],
+  served: [{ endpoint: 'factories.resolve', request: (input) => Effect.runPromise(tried(() => choiceSent(input))) }],
   usage: '<name> <conflict> --ours|--theirs|--file <path>',
   help: [
     "choose for one conflict of a templated factory's upgrade or switch: your",

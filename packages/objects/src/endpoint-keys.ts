@@ -40,7 +40,10 @@ export const UNTAKEN_QUERY: readonly string[] = ['watch'];
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null;
 
 /** `schema`, a JSON Schema, with a root `$ref` into `definitions` taken to what it refers to. */
-function resolved(schema: Readonly<Record<string, unknown>>, definitions: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+function resolved(
+  schema: Readonly<Record<string, unknown>>,
+  definitions: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
   const ref = schema.$ref;
   if (typeof ref !== 'string' || !ref.startsWith('#/$defs/')) return schema;
   const target = definitions[ref.slice('#/$defs/'.length)];

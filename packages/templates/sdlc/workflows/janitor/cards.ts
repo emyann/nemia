@@ -2,13 +2,13 @@
  * `node cards.ts <closeout.json>` — the janitor's cards filed in the inbox, each through `nemia inbox add`, never one already there.
  *
  * Takes the path of Argus's closeout, flat (`WF_CLOSEOUT`): its `period` and `against`, each a `from` and a `to` day, and its `cards`,
- * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, and the `factory`, `workflow` and `repo` it is started
- * with. It checks the whole closeout first, then reads the first line of every card in `${WF_ROOT:-~/.agent-workflows}/inbox`, and files
+ * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, and the `factory` and `workflow` it is started with
+ * (the repository is the factory's, wired to the workflow). It checks the whole closeout first, then reads the first line of every card in `${WF_ROOT:-~/.agent-workflows}/inbox`, and files
  * each card whose title none has, compared without case or spacing, with `nemia inbox add` run in `WF_WORKSPACE`. It starts,
  * queues and drops nothing, and never writes in the inbox itself.
  *
  * Prints a line per card, filed or already there, and exits 0. Exits 1, naming the fix on stderr and filing nothing, when no closeout
- * reached it, a card is not text where text is due, names no factory, workflow or repository or a relative one, two cards share a
+ * reached it, a card is not text where text is due, names no factory or workflow, two cards share a
  * title, or `against` is not as long as `period` or does not end the day before it starts; and, having filed the cards before it, when
  * `nemia inbox add` fails.
  */
@@ -26,7 +26,7 @@ type Period = { from: string; to: string };
 /** A reason the closeout is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
-const FIELDS = ['title', 'kind', 'correction', 'evidence', 'agent', 'factory', 'workflow', 'repo'] as const;
+const FIELDS = ['title', 'kind', 'correction', 'evidence', 'agent', 'factory', 'workflow'] as const;
 
 const KINDS = ['fence', 'body', 'skill', 'on-purpose'];
 
@@ -86,7 +86,7 @@ function checkPeriods(closeout: Record<string, unknown>): { period: Period; agai
 
 /**
  * Card `i` of the list, checked field by field; refuses a field that is not text, a title of more than one line, a kind not known, no
- * factory, workflow or repository, and a repository that is not an absolute path.
+ * factory or workflow.
  */
 function cardOf(value: unknown, i: number): Card {
   const c = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
@@ -97,16 +97,11 @@ function cardOf(value: unknown, i: number): Card {
     throw new Refusal(`card #${i + 1}: its title is one line, what to correct, and this one is empty or more than one`);
   if (!KINDS.includes(card.kind))
     throw new Refusal(`card #${i + 1}: its kind is ${JSON.stringify(card.kind)}, not one of ${KINDS.join(', ')}`);
-  for (const key of ['factory', 'workflow', 'repo'] as const)
+  for (const key of ['factory', 'workflow'] as const)
     if (!card[key].trim())
       throw new Refusal(
         `card #${i + 1}, "${card.title.trim()}" names no ${key}, so it is not ready to start: give the ${key} it starts with`,
       );
-  if (!path.isAbsolute(card.repo.trim()))
-    throw new Refusal(
-      `card #${i + 1}, "${card.title.trim()}": its repo ${JSON.stringify(card.repo)} is not an absolute path; ` +
-        'name the repository from the root',
-    );
   return card;
 }
 
@@ -159,7 +154,7 @@ const textOf = (card: Card, { period, against }: { period: Period; against: Peri
 function file(card: Card, text: string, dir: string, i: number): void {
   const at = path.join(dir, `card-${i + 1}.md`);
   fs.writeFileSync(at, text);
-  const args = ['inbox', 'add', at, '--workflow', card.workflow.trim(), '--repo', card.repo.trim()];
+  const args = ['inbox', 'add', at, '--workflow', card.workflow.trim()];
   const ran = spawnSync('nemia', [...args, '--factory', card.factory.trim()], {
     cwd: process.env.WF_WORKSPACE || process.cwd(),
     encoding: 'utf8',

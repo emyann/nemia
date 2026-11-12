@@ -253,7 +253,7 @@ const FENCE_WORDS: Baseline = {
 const HARNESS_WORDS: Baseline = {
   'apps/api/src/capabilities/capabilities.ts': { count: 15, ...MOVES.reach },
   'apps/api/src/capabilities/reach.ts': { count: 31, ...MOVES.reach },
-  'apps/api/src/gauges/quota.ts': { count: 36, ...MOVES.quota },
+  'apps/api/src/gauges/quota.ts': { count: 33, ...MOVES.quota },
   'apps/api/src/skills/skills.ts': { count: 3, ...MOVES.checkout },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/workflows/builder.ts': { count: 1, ...MOVES.defaults },

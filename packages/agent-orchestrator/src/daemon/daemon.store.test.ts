@@ -1279,7 +1279,7 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   const answers: Record<string, import('effect').Effect.Effect<unknown, unknown>> = {
     a: Effect.succeed({ kind: 'windows', limits: [{ key: 'five', usedPercentage: 30, resetsAt: null }], subscription: null }),
     b: Effect.fail(new Error('no answer')),
-    c: Effect.succeed({ kind: 'no-plan' }),
+    c: Effect.succeed({ kind: 'no-plan', program: null }),
     d: Effect.die(new Error('the harness broke')),
   };
   const asking = { quota: (name: string) => answers[name] } as unknown as Engine;

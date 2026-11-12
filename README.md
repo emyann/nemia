@@ -55,25 +55,29 @@ or TanStack Start server.
 
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
 reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks the runtime's `claude` harness for its
-`quota`, which asks Claude Code itself its usage question through the Agent SDK, and serves the answer. It asks the `claude` on the api's PATH, at
-most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
+`quota`, which asks Claude Code itself its usage question through the Agent SDK, and serves the answer. It asks the Claude Code the
+sessions run — the one `AE_CLAUDE_EXECUTABLE` names in the api's environment, else the Agent SDK's own, installed with Nemia — never a
+`claude` on PATH, at most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). A read is never answered by an ask that began more than the keep before it (with `0`, only by one that began after
 it), and a reading's age counts from when its ask began. A read waits 2 s for its ask before it says it is asking (`HKB_QUOTA_WAIT_MS`):
 with a keep shorter than an ask lasts, set a wait longer than one, or every read starts an ask it does not wait out.
 An ask is one short query of the Agent SDK that makes no model turn and spends nothing:
 
 ```ts
-query({ prompt, options: { pathToClaudeCodeExecutable: 'claude', cwd: os.tmpdir(), persistSession: false, settingSources: [] } })
+query({ prompt, options: { cwd: os.tmpdir(), persistSession: false, settingSources: [] } }) // pathToClaudeCodeExecutable only where one is named
   .usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })
 ```
 
-The SDK starts that `claude` with arguments of its own choosing and sends it the `get_usage` control request; which
+The SDK starts that Claude Code with arguments of its own choosing and sends it the `get_usage` control request; which
 Claude Code it starts is the one thing the runtime names, so the quota is read by the Claude Code the sessions run
 on. It writes no transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
 the variables a Claude Code session hands its children taken out, should the api run inside one; how it signs in
 (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, a provider's switch) is kept, as the engine's workers keep it. That claude must be
-signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (`claude`, then `/login`): an API key, Bedrock
-or Vertex has no plan limits to show.
+signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (that Claude Code, then `/login`; the header names it by its
+path, which on an install with no Claude Code of its own is the release's): an API key, Bedrock
+or Vertex has no plan limits to show, and nor has a token of `claude setup-token` (`CLAUDE_CODE_OAUTH_TOKEN`, which `nemia claude-token
+set` keeps), which can make model requests but not read the plan's usage: Claude Code answers it no plan limits without asking, and
+the header says so in its own words, with what would make it answer — a `/login` and the token taken away (`nemia claude-token rm`).
 
 To check it:
 
@@ -82,8 +86,8 @@ curl -s localhost:8787/api/quota   # state "fresh", with its windows; the Factor
 ```
 
 Every other state is a sentence on the header saying what to do, and never a number read as the quota:
-`asking` (the first ask, still out), `no-plan` (not signed in to a subscription), `unanswered` (see below),
-`no-claude` (none on the api's PATH), `timeout` (no answer in 15 s), `failed` (claude stopped first; its last line
+`asking` (the first ask, still out), `no-plan` (not signed in to a subscription, or signed in by a token), `unanswered` (see below),
+`no-claude` (the Claude Code the sessions run is not there), `timeout` (no answer in 15 s), `failed` (claude stopped first; its last line
 of stderr is quoted) and `unknown` (an answer this board does not read — `get_usage` is experimental in Claude
 Code, and a new version may change it). Under the sentence, the last good reading stays in sight, dimmed and
 dated (`as of 11:20, 25 min ago`), for up to six hours; past that it goes.

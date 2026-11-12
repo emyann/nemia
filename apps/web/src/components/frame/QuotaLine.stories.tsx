@@ -32,7 +32,10 @@ const ASKED: Quota = {
   ageMs: 120_000,
   againAt: later(0.1),
   subscription: 'max',
-  windows: [win({ key: 'five_hour', label: '5-hour', usedPercentage: 38.4, resetsAt: later(2) }), win({ usedPercentage: 86, marked: true })],
+  windows: [
+    win({ key: 'five_hour', label: '5-hour', usedPercentage: 38.4, resetsAt: later(2) }),
+    win({ usedPercentage: 86, marked: true }),
+  ],
   last: null,
   keepMs: 600_000,
   markAt: 80,

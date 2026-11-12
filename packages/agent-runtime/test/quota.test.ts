@@ -250,7 +250,7 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
 
 /**
  * The `rate_limit_info` of a `rate_limit_event`, as a session signed in by a token received it with a model turn, measured on a server
- * on 2026-11-12 (`docs/harness.md`, *The plan's utilization a session hears*): `unifiedWindows` is in no SDK type.
+ * (`docs/harness.md`, *The plan's utilization a session hears*): `unifiedWindows` is in no SDK type.
  */
 const HEARD_INFO = {
   status: 'allowed',
@@ -274,27 +274,38 @@ test("what a session heard of the plan: the newest rate_limit_event, decoded, ke
     assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 'high', status: 'allowed' } } }, HEARD_AT), null);
     assert.equal(heardOf({ ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.4, status: 'blocked' } } }, HEARD_AT), null);
   });
-  await t.test('the store keeps the newest event of any session, one file for all; an older one received later in turn order is not kept', () => {
-    const file = claudeHeardFile(scratch('ae-heard-'));
-    assert.equal(readHeard(file), null, 'none heard yet');
-    keepHeard(file, HEARD_INFO, HEARD_AT);
-    const newer = { ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.41, resetsAt: 1794999600, status: 'allowed' } } };
-    keepHeard(file, newer, HEARD_AT + 60_000);
-    keepHeard(file, HEARD_INFO, HEARD_AT + 30_000);
-    assert.deepEqual(readHeard(file)?.limits.map((l) => l.usedPercentage), [41]);
-    assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString());
-    keepHeard(file, { status: 'allowed' }, HEARD_AT + 90_000);
-    assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString(), 'an event with no window leaves the reading as it was');
-    fs.writeFileSync(file, JSON.stringify({ at: 'soon', limits: [] }));
-    assert.equal(readHeard(file), null, 'REFUSED: a file that does not decode is unread');
-  });
+  await t.test(
+    'the store keeps the newest event of any session, one file for all; an older one received later in turn order is not kept',
+    () => {
+      const file = claudeHeardFile(scratch('ae-heard-'));
+      assert.equal(readHeard(file), null, 'none heard yet');
+      keepHeard(file, HEARD_INFO, HEARD_AT);
+      const newer = { ...HEARD_INFO, unifiedWindows: { seven_day: { utilization: 0.41, resetsAt: 1794999600, status: 'allowed' } } };
+      keepHeard(file, newer, HEARD_AT + 60_000);
+      keepHeard(file, HEARD_INFO, HEARD_AT + 30_000);
+      assert.deepEqual(
+        readHeard(file)?.limits.map((l) => l.usedPercentage),
+        [41],
+      );
+      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString());
+      keepHeard(file, { status: 'allowed' }, HEARD_AT + 90_000);
+      assert.equal(readHeard(file)?.at, new Date(HEARD_AT + 60_000).toISOString(), 'an event with no window leaves the reading as it was');
+      fs.writeFileSync(file, JSON.stringify({ at: 'soon', limits: [] }));
+      assert.equal(readHeard(file), null, 'REFUSED: a file that does not decode is unread');
+    },
+  );
   await t.test("a token's ask carries what the store's sessions heard, and null while none has", async () => {
     const file = claudeHeardFile(scratch('ae-heard-'));
     const env = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
-    const ask = () => Effect.runPromise(claudeQuota({ command: '/opt/claude', env, heardFile: file, ask: standIn(async () => usageOf('no-plan')).ask }));
+    const ask = () =>
+      Effect.runPromise(claudeQuota({ command: '/opt/claude', env, heardFile: file, ask: standIn(async () => usageOf('no-plan')).ask }));
     assert.deepEqual(await ask(), { kind: 'token', program: '/opt/claude', heard: null });
     keepHeard(file, HEARD_INFO, HEARD_AT);
-    assert.deepEqual(await ask(), { kind: 'token', program: '/opt/claude', heard: { at: '2026-11-12T09:00:00.000Z', limits: [SEVEN_DAY] } });
+    assert.deepEqual(await ask(), {
+      kind: 'token',
+      program: '/opt/claude',
+      heard: { at: '2026-11-12T09:00:00.000Z', limits: [SEVEN_DAY] },
+    });
     const plan = await Effect.runPromise(claudeQuota({ env, heardFile: file, ask: standIn(async () => usageOf('plan')).ask }));
     assert.deepEqual(plan, PLAN, 'where get_usage answers with limits, they stay the source');
   });

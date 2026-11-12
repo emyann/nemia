@@ -55,14 +55,12 @@ export function heardOf(info: unknown, at: number): HeardQuota | null {
   const decoded = Option.getOrNull(decodeInfo(info));
   const windows = Object.entries(decoded?.unifiedWindows ?? {});
   if (!windows.length) return null;
-  const limits = windows.map(
-    ([key, w]): HeardLimit => ({
-      key,
-      usedPercentage: Math.round(w.utilization * 1000) / 10,
-      resetsAt: w.resetsAt === undefined ? null : new Date(w.resetsAt * 1000).toISOString(),
-      status: w.status,
-    }),
-  );
+  const limits = windows.map(([key, w]): HeardLimit => ({
+    key,
+    usedPercentage: Math.round(w.utilization * 1000) / 10,
+    resetsAt: w.resetsAt === undefined ? null : new Date(w.resetsAt * 1000).toISOString(),
+    status: w.status,
+  }));
   return { at: new Date(at).toISOString(), limits };
 }
 
@@ -74,17 +72,18 @@ export const readHeard = (file: string): HeardQuota | null => {
 
 /**
  * Keeps the event `info` a session received at `at` on `file`, written whole, where it names a window (`heardOf`) and no reading received
- * later is kept there already: sessions run side by side, and the newest is the one the plan is at. Never throws: what a session hears
- * of the plan is not worth its turn, so a write that fails leaves the reading before it.
+ * later is kept there already: sessions run side by side, and the newest is the one the plan is at. Answers whether it was kept. Never
+ * throws: what a session hears of the plan is not worth its turn, so a write that fails answers `false` and leaves the reading before it.
  */
-export const keepHeard = (file: string, info: unknown, at: number): void => {
+export const keepHeard = (file: string, info: unknown, at: number): boolean => {
   const heard = heardOf(info, at);
-  if (heard === null) return;
+  if (heard === null) return false;
   const held = readHeard(file);
-  if (held !== null && Date.parse(held.at) > at) return;
+  if (held !== null && Date.parse(held.at) > at) return false;
   try {
     writeWhole(file, heard);
+    return true;
   } catch {
-    // The reading before it stands: see above.
+    return false;
   }
 };

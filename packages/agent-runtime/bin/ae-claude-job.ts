@@ -127,8 +127,9 @@ const msOr = (value: unknown, otherwise: number): number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : otherwise;
 
 /**
- * The spawn request the runner wrote at `at`, whole, the bridge file and the heard file it named, where it named them, and the hold, where it named both
- * a hold file and the sessions' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the shipped ones otherwise.
+ * The spawn request the runner wrote at `at`, whole, the bridge file and the heard file it named, where it named them, and the hold,
+ * where it named both a hold file and the sessions' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the
+ * shipped ones otherwise.
  */
 const requestAt = (at: string | undefined): Requested => {
   if (!at)
@@ -184,6 +185,13 @@ const flushed = (to: NodeJS.WriteStream, text: string): Promise<void> =>
     to.write(text, () => done());
   });
 
+/** What keeps a `rate_limit_event` of the session on the heard file the runner named (`keepHeard`); nothing where it named none. */
+const heardBy =
+  (file: string | undefined) =>
+  (m: SDKMessage): void => {
+    if (file !== undefined && m.type === 'rate_limit_event') keepHeard(file, m.rate_limit_info, Date.now());
+  };
+
 /** The session run to its end; answers whether its last result was an error. Throws `Refused` in words for anything else. */
 const ran = async ({ request, io }: Requested): Promise<boolean> => {
   const abort = new AbortController();
@@ -216,12 +224,13 @@ const ran = async ({ request, io }: Requested): Promise<boolean> => {
   const polls = hold && io.hold ? setInterval(hold.look, io.hold.holdPollMs) : undefined;
   hold?.look();
   const bridged = bridgeOf(request, io.bridgeFile);
+  const heard = heardBy(io.heardFile);
   let failed: boolean | undefined;
   try {
     for await (const m of session as AsyncIterable<SDKMessage>) {
       await flushed(process.stdout, `${JSON.stringify(m)}\n`);
       await bridged(session, m);
-      if (m.type === 'rate_limit_event' && io.heardFile) keepHeard(io.heardFile, m.rate_limit_info, Date.now());
+      heard(m);
       if (m.type === 'result') failed = m.is_error === true;
     }
   } catch (e) {

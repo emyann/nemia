@@ -217,12 +217,14 @@ export function readOf(asked: Asked, now: number): Read {
         said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run ${typed(asked.program)}, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.`,
       };
     case 'token':
-      return heardRead(asked.heard, now) ?? {
-        ...none,
-        state: 'no-plan',
-        heard: null,
-        said: `No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
-      };
+      return (
+        heardRead(asked.heard, now) ?? {
+          ...none,
+          state: 'no-plan',
+          heard: null,
+          said: `No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
+        }
+      );
     case 'unanswered':
       return {
         ...none,
@@ -338,8 +340,8 @@ type Kept = Held & { began: number };
 /**
  * A quota asker with nothing held, as a fresh api has, one for each harness a read names (`ReadQuota`'s `harness`): what it holds is the
  * last ask's outcome, the last with windows of its own (not those a token's sessions heard), how many `unanswered` outcomes in a row
- * since it, the ask in flight and the one queued behind it, in its own memory and nobody's file. Every age it judges is on the monotonic clock (`mono`): a wall clock stepped back makes no held
- * answer younger, nor an ask begun before a read one begun after it.
+ * since it, the ask in flight and the one queued behind it, in its own memory and nobody's file. Every age it judges is on the monotonic
+ * clock (`mono`): a wall clock stepped back makes no held answer younger, nor an ask begun before a read one begun after it.
  *
  * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
  * outcome's wait — counted from when its ask began; otherwise from an ask begun within the keep of the read (with a keep of 0, only one

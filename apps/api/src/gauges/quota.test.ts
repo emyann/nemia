@@ -63,9 +63,7 @@ const HEARD_AT = '2026-09-19T09:55:00.000Z';
  * "status":"allowed"}}` in its `unifiedWindows`): the week at 40%, resetting at its `resetsAt`.
  */
 const tokenHeard = (
-  limits: HeardQuota['limits'] = [
-    { key: 'seven_day', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', status: 'allowed' },
-  ],
+  limits: HeardQuota['limits'] = [{ key: 'seven_day', usedPercentage: 40, resetsAt: '2026-11-18T11:00:00.000Z', status: 'allowed' }],
 ): HarnessQuota => ({ kind: 'token', program: null, heard: { at: HEARD_AT, limits } });
 
 /** What the fake ask answers next, and how many times it has been asked. */

@@ -148,9 +148,9 @@ export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
 /**
  * What the SDK's usage answer says, asked in `env`: the plan's limits and its subscription, no plan, a token that cannot read the plan
  * (`token`: no plan limits where `env` signs in by `TOKEN_VARIABLE`, with what its sessions last `heard` of them), a plan the usage
- * service gave nothing for, or why it cannot be read. Pure. The SDK resolves the control response's `response` — the usage itself — so this reads that and not the control
- * response around it, which only the SDK sees. A plan whose `rate_limits` are null is `unanswered`, as the SDK's type for this answer
- * says: "or null when unavailable".
+ * service gave nothing for, or why it cannot be read. Pure. The SDK resolves the control response's `response` — the usage itself — so
+ * this reads that and not the control response around it, which only the SDK sees. A plan whose `rate_limits` are null is
+ * `unanswered`, as the SDK's type for this answer says: "or null when unavailable".
  */
 export function quotaOfUsage(
   usage: unknown,

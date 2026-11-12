@@ -81,6 +81,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   going run's `wallMs` and `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`
   endpoints.
+- **No read answers past the app's bound** (`AnswerBound`, `ANSWER_MOST`): every group is built with `readsBounded`
+  (`src/objects/answer-bound.ts`), never `HttpApiBuilder.group`, which gives each GET handler through `readHandled`: its success measured
+  (`jsonLengthPast`) before HttpApi encodes it, inside the endpoint's effect where no middleware reaches, and past the bound a 422 naming
+  the read's narrowing keys (`objects`' `READS`). `test/bounded.test.ts` reads every GET of the `Api` at a bound of 1 and names one that
+  answers; `test/paged.test.ts` holds every `page` read to `LIST_PAGE`.
 - **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`decodeRefused` in
   `src/objects/serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
 - **A server-side `Table`** (Kubernetes' `Accept: application/json;as=Table;g=meta.k8s.io;v=v1`, `TABLE_ACCEPT`) is answered where an

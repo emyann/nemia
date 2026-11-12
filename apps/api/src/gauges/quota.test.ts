@@ -156,7 +156,7 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
     );
   });
   await t.test('REFUSED: no plan — Claude Code signed in with no subscription — shows no number', () => {
-    const q = quotaOf(heard({ kind: 'no-plan' }), heard(plan(), NOW - 600e3), NOW + 60e3);
+    const q = quotaOf(heard({ kind: 'no-plan', program: null }), heard(plan(), NOW - 600e3), NOW + 60e3);
     assert.equal(q.state, 'no-plan');
     assert.deepEqual(q.windows, []);
     assert.equal(
@@ -222,7 +222,7 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
   await t.test(
     'REFUSED: a failure after a good answer shows no number as now: the answer is kept as `last`, for the hover, with its time',
     () => {
-      const q = quotaOf({ asked: { kind: 'timeout', ms: 15_000 }, at: NOW }, heard(plan(), NOW - 400e3), NOW);
+      const q = quotaOf({ asked: { kind: 'timeout', ms: 15_000, program: null }, at: NOW }, heard(plan(), NOW - 400e3), NOW);
       assert.equal(q.state, 'timeout');
       assert.deepEqual(q.windows, []);
       assert.equal(q.last?.askedAt, new Date(NOW - 400e3).toISOString());
@@ -238,17 +238,45 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
   );
   await t.test('each way an ask fails, said with what to do, and when it is asked again', () => {
     const at = (asked: Held['asked'], keep = QUOTA_KEEP_MS) => quotaOf({ asked, at: NOW }, null, NOW, keep).said;
-    assert.equal(
-      at({ kind: 'missing' }),
-      "The quota cannot be asked for: there is no claude on the api's PATH. Install Claude Code, or start the api from a shell where claude runs. Asked again in 10 min.",
-    );
     assert.equal(quotaOf({ asked: { kind: 'missing' }, at: NOW }, null, NOW).state, 'no-claude');
+    assert.doesNotMatch(at({ kind: 'missing' })!, /PATH/, 'no Claude Code to ask is the one the sessions run, never a claude on PATH');
+    assert.match(
+      at({ kind: 'missing' })!,
+      /AE_CLAUDE_EXECUTABLE[^.]*\. Asked again in 10 min\.$/,
+      'and names the variable that names another',
+    );
+    const token = quotaOf({ asked: { kind: 'token', program: null }, at: NOW }, null, NOW);
+    assert.equal(token.state, 'no-plan', 'a token of claude setup-token has no plan limits to show');
+    assert.notEqual(
+      token.said,
+      quotaOf({ asked: { kind: 'no-plan', program: null }, at: NOW }, null, NOW).said,
+      'and says so in its own words, not as no subscription',
+    );
+    assert.match(
+      token.said!,
+      /nemia claude-token rm/,
+      'naming what would make it answer: the token taken away for a sign-in that reads the plan',
+    );
+    const release = '/srv/nemia/releases/current/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude';
+    for (const asked of [
+      { kind: 'token', program: release },
+      { kind: 'no-plan', program: release },
+      { kind: 'timeout', ms: 15_000, program: release },
+      { kind: 'failed', code: 3, signal: null, said: '', program: release },
+    ] as const)
+      assert.ok(
+        at(asked)!.includes(release) && !/(^|\s)claude -p\b|\b[Rr]un claude\b/.test(at(asked)!),
+        `${asked.kind}: the step to type names the Claude Code the engine asked — on an install, the release's — never a claude on PATH the machine may not have`,
+      );
     assert.equal(
-      at({ kind: 'failed', code: 3, signal: null, said: 'claude: not logged in' }),
+      at({ kind: 'failed', code: 3, signal: null, said: 'claude: not logged in', program: null }),
       'Claude Code stopped before it answered the usage request (exit 3: claude: not logged in). Run claude -p in a shell where the api runs to see why. Asked again in 10 min.',
     );
-    assert.match(at({ kind: 'failed', code: null, signal: 'SIGKILL', said: '' })!, /\(killed by SIGKILL\)\./);
-    assert.match(at({ kind: 'failed', code: null, signal: null, said: 'spawn EACCES' })!, /\(it did not start: spawn EACCES\)\./);
+    assert.match(at({ kind: 'failed', code: null, signal: 'SIGKILL', said: '', program: null })!, /\(killed by SIGKILL\)\./);
+    assert.match(
+      at({ kind: 'failed', code: null, signal: null, said: 'spawn EACCES', program: null })!,
+      /\(it did not start: spawn EACCES\)\./,
+    );
     assert.match(at({ kind: 'missing' }, 0)!, /Asked again on the next read\.$/);
     const asking = quotaOf(null, heard(plan()), NOW);
     assert.deepEqual(
@@ -266,7 +294,11 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
       ],
       subscription: 'max',
     });
-    for (const q of [quotaOf(null, null, NOW), quotaOf(heard(UNANSWERED), null, NOW), quotaOf(heard({ kind: 'no-plan' }), null, NOW)])
+    for (const q of [
+      quotaOf(null, null, NOW),
+      quotaOf(heard(UNANSWERED), null, NOW),
+      quotaOf(heard({ kind: 'no-plan', program: null }), null, NOW),
+    ])
       assert.notEqual(harnessQuotaOf(q).kind, 'windows', `REFUSED: ${q.state} gives no windows`);
     assert.ok(QUOTA_DAEMON_WAIT_MS > 15_000, "the daemon waits past the runtime's own 15 s limit on get_usage");
   });
@@ -409,7 +441,7 @@ test('The board polls the quota: one ask through the harness, kept, asked again 
     assert.equal(kept.state, 'fresh');
     assert.equal(kept.ageMs, QUOTA_KEEP_MS - 1);
     assert.equal(fake.asked, before + 1, 'held for the keep');
-    fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
+    fake.next = { kind: 'failed', code: 3, signal: null, said: '', program: null };
     clock += 1;
     assert.equal((await read({ now, mono })).state, 'failed');
     clock += 60_000;
@@ -483,7 +515,7 @@ test('The board polls the quota: one ask through the harness, kept, asked again 
       clock += 40 * 60e3;
       assert.match((await read({ now, mono })).said!, /Asked again in 1 h 20 min\.$/);
       assert.equal(fake.asked, before + 3);
-      fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
+      fake.next = { kind: 'failed', code: 3, signal: null, said: '', program: null };
       clock += 80 * 60e3;
       assert.equal((await read({ now, mono })).state, 'failed');
       fake.next = UNANSWERED;
@@ -577,7 +609,7 @@ test('REFUSED: never two asks at once — reads that come while an ask is in fli
       clock += 1;
       const b = readQuota({ ask, env, now, waitMs: 60_000 });
       const c = readQuota({ ask, env, now, waitMs: 60_000 });
-      answers[0]({ kind: 'no-plan' });
+      answers[0]({ kind: 'no-plan', program: null });
       assert.equal((await a).state, 'no-plan', 'the first read is answered by the ask it began');
       await begun(2);
       assert.equal(counts.most, 1, 'the second ask began only once the first came back');
@@ -606,7 +638,7 @@ test('REFUSED: never two asks at once — reads that come while an ask is in fli
       for (let turn = 0; turn < 10; turn += 1) await new Promise((r) => setImmediate(r));
       assert.equal(counts.began, 2, 'one ask for the first read, and one queued for the three after it');
       assert.equal(counts.most, 1, 'never two asks at once');
-      answers[1]({ kind: 'no-plan' });
+      answers[1]({ kind: 'no-plan', program: null });
       assert.deepEqual(
         (await Promise.all(later)).map((q) => q.state),
         ['no-plan', 'no-plan', 'no-plan'],
@@ -669,7 +701,7 @@ test('REFUSED: never two asks at once — reads that come while an ask is in fli
       clock += 1;
       const c = readQuota({ ask, env, now, waitMs: 60_000 });
       await begun(3);
-      answers[2]({ kind: 'no-plan' });
+      answers[2]({ kind: 'no-plan', program: null });
       assert.equal((await c).state, 'no-plan', 'and a read after both is answered');
       assert.equal(waits(), before, 'no read leaves its wait behind, the failed one included');
     },
@@ -683,7 +715,7 @@ test('REFUSED: a read that waits past its wait says asking, then what the ask ca
     new Promise<HarnessQuota>((r) =>
       setTimeout(() => {
         answered = true;
-        r({ kind: 'timeout', ms: 15_000 });
+        r({ kind: 'timeout', ms: 15_000, program: null });
       }, 300),
     );
   const q = await readQuota({ ask, waitMs: 50 });

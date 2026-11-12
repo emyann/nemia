@@ -783,3 +783,9 @@ export const TICKET_STATES = ['waiting', 'claimable', 'claimed', 'expired'] as c
 
 /** One of `TICKET_STATES`. */
 export type TicketState = (typeof TICKET_STATES)[number];
+
+/**
+ * The shape of a read the api serves (`ReadBound`, reads.ts): a list's page, a read from a cursor, a whole read by part, one object, a
+ * stream, a file's bytes.
+ */
+export const READ_SHAPES = ['page', 'cursor', 'part', 'one', 'stream', 'bytes'] as const;

@@ -26,6 +26,7 @@ export const PAGES = [
   'glossary',
   'getting-started',
   'install',
+  'self-hosting',
 ];
 
 /** The SVGs of a built page. */

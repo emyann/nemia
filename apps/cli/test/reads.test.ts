@@ -2,10 +2,12 @@
  * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port. `nemia show`, `show --raw`,
  * `closeout` and `closeout --try` print the same stdout and exit with the same code as the same command typed with `--local`, which runs
  * the orchestrator's own CLI in process (the parity guard: the printers live twice until the in-process reads retire). `nemia ls` and
- * `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked with `TABLE_ACCEPT`, with `-l`, `--show-labels`
- * and `-L` on a labelled run and card; `nemia ls <run>`, which no server table prints yet, is the old path's. Each read is seen asking
- * the api, by the request line the api says. A bare 404 — an api older than this client — exits 2 naming the restart; an unknown run
- * exits 2 with the api's refusal; no api serving the store, and none started (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
+ * `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked with `TABLE_ACCEPT`, with `-l`, `--show-labels` and
+ * `-L` on a labelled run and card; `nemia ls <run>`, which no server table prints yet, is the old path's. Each read is seen asking the api,
+ * by the request line the api says. `nemia ls` over a runs list the api answers in pages, each but the last with a `continue`, prints a
+ * line per run of every page (`everyPage`), the api's table cut into pages of two rows by a stand-in in front of it. A bare 404 — an api
+ * older than this client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none
+ * started (`NEMIA_DAEMON_START=off`), exits 2 naming `--local`.
  *
  * The store is a scratch folder (`test-kit/scratch`, which reaps what runs in it), never this machine's; the api writes no lease with
  * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
@@ -17,6 +19,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import { LIST_PAGE } from 'objects';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
 
@@ -272,6 +275,63 @@ test("`nemia ls` prints the server's table of the runs: its columns of priority 
   assert.match(api.said().slice(before), /\/api\/runs\b/, 'it asked the runs list');
 });
 
+test('`nemia ls` over a runs list answered in pages prints a line per run of every page, asking the most a page holds', async (t) => {
+  const asks: Array<{ limit: string | null; continue: string | null }> = [];
+  const ROWS = 2;
+  const paging = http.createServer((req, res) => {
+    const url = new URL(req.url ?? '/', api.url);
+    const headers = Object.fromEntries(
+      Object.entries(req.headers).flatMap(([key, value]) =>
+        typeof value === 'string' && (key === 'accept' || key === 'authorization') ? [[key, value]] : [],
+      ),
+    );
+    const runs = url.pathname === '/api/runs';
+    const at = runs ? Number(url.searchParams.get('continue')?.slice('at-'.length) ?? 0) : 0;
+    if (runs) {
+      asks.push({ limit: url.searchParams.get('limit'), continue: url.searchParams.get('continue') });
+      url.searchParams.delete('limit');
+      url.searchParams.delete('continue');
+    }
+    void fetch(url, { headers }).then(async (answered) => {
+      const text = await answered.text();
+      const table: unknown = runs && answered.ok ? JSON.parse(text) : undefined;
+      if (table === undefined || typeof table !== 'object' || table === null || !('rows' in table) || !Array.isArray(table.rows)) {
+        res.writeHead(answered.status, { 'content-type': answered.headers.get('content-type') ?? 'application/json' });
+        res.end(text);
+        return;
+      }
+      const next = at + ROWS < table.rows.length ? { continue: `at-${at + ROWS}` } : {};
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ...table, metadata: { ...next }, rows: table.rows.slice(at, at + ROWS) }));
+    });
+  });
+  await new Promise<void>((resolve) => paging.listen(0, '127.0.0.1', resolve));
+  const address = paging.address();
+  assert.ok(address !== null && typeof address === 'object');
+  lease(`http://127.0.0.1:${address.port}`);
+  t.after(async () => {
+    lease(api.url);
+    paging.closeAllConnections();
+    await new Promise((resolve) => paging.close(resolve));
+  });
+  const listed = await nemia(['ls']);
+  assert.equal(listed.code, 0, listed.err);
+  for (const run of ['r-parity', 'r-after', 'r-held', 'r-parked', 'r-cancelled', 'r-working', 'r-landed', 'r-unread', 'r-asking'])
+    assert.match(listed.out, new RegExp(`^${run} `, 'm'), `${run}'s line, whichever page it was on`);
+  assert.equal(listed.out.match(/^NAME +STATUS/gm)?.length, 1, 'one table, its columns named once');
+  assert.ok(asks.length > 2, `it read on past the first page: ${JSON.stringify(asks)}`);
+  assert.deepEqual(
+    asks.map((ask) => ask.limit),
+    asks.map(() => String(LIST_PAGE.most)),
+    'each page asked for the most a page holds',
+  );
+  assert.deepEqual(
+    asks.map((ask) => ask.continue),
+    [null, ...asks.slice(1).map((_, i) => `at-${(i + 1) * ROWS}`)],
+    'each page after the first asked with the continue the page before answered',
+  );
+});
+
 test('`nemia ls` says what waits on you: a step blocked in its word, with `nemia decide <run>`; a hold with what lifts it', async () => {
   const listed = await nemia(['ls']);
   assert.equal(listed.code, 0, listed.err);
@@ -387,7 +447,7 @@ test("REFUSED: an unknown run is the api's refusal, exit 2, naming the command t
   assert.equal(shown.out, '');
 });
 
-test('REFUSED: a bare 404 — an api older than this nemia, with no /api/listing — exits 2 naming `nemia service restart`', async (t) => {
+test('REFUSED: a bare 404 — an api older than this nemia, that serves none of its reads — exits 2 naming `nemia service restart`', async (t) => {
   const old = http.createServer((_req, res) => {
     res.writeHead(404, { 'content-type': 'text/plain' });
     res.end('404 Not Found');

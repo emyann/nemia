@@ -5,13 +5,14 @@
  * an endpoint the `Api` gains with no handler, or one a Hono route before the mount shadows, is refused here with nothing to list. The
  * routes Hono serves itself are exactly the three of the OpenAPI document (`META`, kept outside the `Api` as Kubernetes keeps
  * `/openapi/v3` out of its own), the MCP port (`/mcp`, a protocol host whose tools call the `Api`'s own endpoints) and the board's
- * pages (`GET /*`, src/board/board.ts: host content, no object kind).
+ * pages (`GET /*`, src/board/board.ts: host content, no object kind). Every read the `Api` serves is bounded (`objects`' `readsUnbounded`),
+ * and a retired read (`/api/listing`) is no route.
  */
 import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
-import { Api } from 'objects';
+import { Api, readsUnbounded } from 'objects';
 import { app } from '../src/app.ts';
 import { BOARD_ROUTE } from '../src/board/board.ts';
 import { MOUNT } from '../src/objects/index.ts';
@@ -104,4 +105,16 @@ test("a path no route serves is the api's own 404, the Machines page's retired r
     saysNoRoute(await (await app.request('/nothing', { method: 'POST' })).json()),
     'a write outside the api: the board answers GET alone',
   );
+});
+
+test('every read the Api serves is bounded: a page, a cursor, a part, or one object, each in READS with the keys that narrow it', () => {
+  assert.deepEqual(readsUnbounded(Api), []);
+});
+
+test("/api/listing, retired with nemia ls's whole answer, is the api's 404 for no route, whole or by name", async () => {
+  for (const url of ['/api/listing', '/api/listing/r-1']) {
+    const res = await app.request(url);
+    assert.equal(res.status, 404, url);
+    assert.ok(saysNoRoute(await res.json()), `${url}: the 404 for no route`);
+  }
 });

@@ -29,7 +29,7 @@ import type { RunFile } from './run-file.ts';
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  * Exported only for the tests that import it.
  */
-export const SAID_VERSION = 11;
+export const SAID_VERSION = 12;
 
 /**
  * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
@@ -46,7 +46,7 @@ export const SAID_EXTENDED: readonly number[] = [];
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  * Exported only for the tests that import it.
  */
-export const SAID_DIGEST = '2fedd886db3b3c8488f3349021c1eabe373bdc7749c13eb719b64966eda38066';
+export const SAID_DIGEST = 'e34c350872524d5bfa7343e25bd9bc55f4e86bc30614598e5c562bec43d80596';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };

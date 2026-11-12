@@ -30,6 +30,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
     };
+    const typed = path.join(store!, 'bin', 'claude').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const said = async (state: string, text: RegExp, why: string) => {
       await reloadForQuota(page, state);
       await expectVisible(page.locator(`[data-quota="${state}"]`, { hasText: text }), why);
@@ -84,8 +85,11 @@ export default {
       fs.writeFileSync(file, recordedUsage('no-plan'));
       await said(
         'no-plan',
-        /^Quota on this machine: No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription/,
-        'Claude Code with no subscription says how to sign in',
+        new RegExp(
+          '^Quota on this machine: No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription .*' +
+            `Run ${typed}, then /login`,
+        ),
+        'Claude Code with no subscription says how to sign in, naming by its path the Claude Code the sessions run, not a claude on PATH',
       );
 
       fs.writeFileSync(file, recordedUsage('unsupported'));
@@ -98,8 +102,11 @@ export default {
       fs.rmSync(file);
       await said(
         'failed',
-        /^Quota on this machine: Claude Code stopped before it answered the usage request \(exit 1: claude: not signed in, the e2e took its answer away\)\. Run claude -p/,
-        'a claude that ends before it answers says how it ended',
+        new RegExp(
+          '^Quota on this machine: Claude Code stopped before it answered the usage request \\(exit 1: claude: not signed in, the e2e took its answer away\\)\\. ' +
+            `Run ${typed} -p`,
+        ),
+        'a claude that ends before it answers says how it ended, and names by its path the Claude Code to run to see why: the one the sessions run, not a claude on PATH',
       );
     } finally {
       fs.writeFileSync(file, written);

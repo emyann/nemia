@@ -1,72 +1,230 @@
 ---
 title: Self-hosting
-description: Run Nemia on a server of your own — a small VPS — from a fresh machine to a factory's first run, reached privately from your laptop.
+description: From a fresh Linux server to a factory's first run, started from your laptop, GitHub included.
 ---
 
-Nemia runs on a machine you own and reach: a small VPS is the first place it is made for. This page walks from a fresh server to a
-factory's first run. What Nemia cannot do for you — the machine, the user, the network, the firewall — is said here; the rest is four
-answers, each given on the server.
+This guide takes a fresh Linux server and gets your factories running on it, in order. You prepare the machine, put it on a private
+network, install Nemia, open the board, connect the server to GitHub, point your laptop's `nemia` at it, apply a factory and start its
+first run. [Install](/install/) explains what the installer does. This page links to it rather than repeating it.
 
-## The machine
+It was first done on a VPS running Ubuntu 24.04 with 8 vCPU and 16 GB of memory. The commands below are the ones that worked there.
+Where a command needs a value of yours, it is written in angle brackets: `<server>` is how your laptop reaches the server over SSH, and
+`<address>` is the server's Tailscale address.
 
-A VPS running Ubuntu 24.04 with 2 vCPU and 4 GB of memory runs a few sessions at once; more memory runs more (`nemia service install
---size auto` sizes the daemon by it). It needs git, tar and curl, systemd's user manager and cgroup v2, which Ubuntu has.
+## 1. A machine and a user
 
-Make a user of your own for Nemia rather than running it as root: Nemia needs no root, and its sessions run as the user that runs it.
-
-```bash
-sudo adduser nemia
-sudo loginctl enable-linger nemia
-```
-
-`enable-linger` lets the user's services run while nobody is logged in; it is the one command that needs an administrator, and the
-installer tries it and says so where it cannot.
-
-## The network
-
-Keep the board and the api off the public internet. Join the server and your laptop to a private network — Tailscale is the simplest:
-both get an address in 100.64.0.0/10 that only your own machines reach, and the traffic between them is encrypted — and bind Nemia to
-the server's address on it. The installer offers the server's private addresses by number; a public address, or every interface
-(`0.0.0.0`), is refused unless you pass `--public`, and the daemon refuses to start on one without `NEMIA_BIND_PUBLIC=1`.
-
-Then close everything else at the firewall but SSH:
+Take a VPS that you reach with an SSH key and no password. As root, or as the provider's admin user with sudo, upgrade the packages
+and install git and curl:
 
 ```bash
-sudo ufw default deny incoming
-sudo ufw allow OpenSSH
-sudo ufw enable
+apt-get update && apt-get upgrade -y
+apt-get install -y git curl
 ```
 
-Tailscale's own traffic passes; the board's port is reached over Tailscale alone. Nemia speaks plain HTTP: where you put it behind a
-reverse proxy instead, that proxy holds the TLS.
-
-## The four answers
-
-As the Nemia user, on the server:
+Nemia runs as a user of its own, not root. Add one that accepts the same SSH key, and let its services run while nobody is logged in:
 
 ```bash
-curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
+adduser --disabled-password --gecos '' nemia
+mkdir -p ~nemia/.ssh
+cp ~/.ssh/authorized_keys ~nemia/.ssh/
+chown -R nemia:nemia ~nemia/.ssh && chmod 700 ~nemia/.ssh && chmod 600 ~nemia/.ssh/authorized_keys
+loginctl enable-linger nemia
 ```
 
-1. **Your Claude token.** Make it with `claude setup-token` on any machine with a browser, and paste it when the installer asks: it
-   is read without echo and kept by the server alone (_Install_, _Your Claude token_).
-2. **The address.** Pick the Tailscale address from the list. The installer mints the server's own token into its local context and
-   prints a first-visit link: open it in your laptop's browser within ten minutes, and the board signs you in.
-3. **A sign-in a workflow needs.** The installer ends on `nemia readiness`, and the board's Setup page shows the same read. A factory of
-   the `sdlc` template that lands on GitHub needs the GitHub CLI signed in: `nemia readiness fix gh` installs it without root, and
-   `nemia readiness fix gh-sign-in` shows a device code, large, with the link to type it at, from your phone or your laptop. The git
-   identity is filled from that account.
-4. **The repository.** `nemia factory add <name> --template sdlc --repo <url>` clones it on the server with the server's own
-   credentials, and files the factory.
-
-## Your laptop
+Check that the machine has cgroup v2, which the per-session memory limits need:
 
 ```bash
-curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.100.1.2:8787
+stat -fc %T /sys/fs/cgroup     # cgroup2fs
 ```
 
-It shows a short code; approve it on the server with `nemia pairings approve <code>`, or on the board's Setup page. A token named for
-your laptop lands in its context, never shown, and `nemia token rm <name>` on the server revokes it. Put the `NEMIA_URL` line it
-prints in your shell profile, and Claude Code's nemia plugin asks the server with the same token.
+## 2. A private network
 
-`nemia readiness` on the laptop reads the server's pieces and its own: whether its context reaches the server and its token is taken.
+The board and the api are for you and your machines alone. Tailscale puts the server on a private network with your laptop.
+Install it from Tailscale's own apt repository (the lines for Ubuntu 24.04), as root:
+
+```bash
+curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.tailscale-keyring.list | tee /etc/apt/sources.list.d/tailscale.list
+apt-get update && apt-get install -y tailscale
+tailscale up --hostname=<name>
+```
+
+`tailscale up` prints a link. Open it in a browser signed in to your tailnet to add the server, then read its address with
+`tailscale ip -4`. Your laptop joins the same tailnet with Tailscale's own app.
+
+Then close the server to the internet with your provider's cloud firewall. Allow only these inbound:
+
+- UDP 41641, Tailscale's direct path between your machines;
+- ICMP.
+
+Before you remove public SSH, check that `ssh nemia@<address>` works over Tailscale. From then on you reach the server only over
+Tailscale. Port 8787, where the board and the api listen, is never opened publicly.
+
+## 3. The install
+
+Install as the Nemia user, over `ssh -t`, because the installer asks its questions on the terminal:
+
+```bash
+ssh -t nemia@<address> 'curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind <address>'
+```
+
+It asks three things ([Install](/install/#install) explains each one):
+
+- **The Claude token.** Make the token with `claude setup-token` on a machine that has a browser and a signed-in Claude Code, then
+  paste it at the prompt, which asks it outright. It is not shown as you paste. [Your Claude token](/install/#your-claude-token)
+  explains whose token a server may run on.
+- **Start at login.** Answer yes. The installer sizes the service to the machine. The 8 vCPU, 16 GB server read as about 15.2 GiB and
+  was sized to 6 sessions at once, each limited to 7.6 GiB: the limit is half the machine, a ceiling on one session and not its share.
+- **The address to bind.** `--bind` already gave it the Tailscale address, so it does not ask
+  ([Bind it to a private network](/install/#bind-it-to-a-private-network)). Without `--bind`, it lists the machine's private
+  addresses by number; a public one, or every interface, is refused unless you pass `--public`.
+
+Because the store is bound beyond the machine, every caller needs a person token. The installer prints none: it mints the server's own
+straight into its local context, and prints a first-visit link for the board (step 4). It ends on `nemia readiness`, which lists what
+is in place and the command that fixes each piece that is not; the board's Setup page shows the same read.
+
+You can still mint a token straight into a file on your laptop, without it ever being shown:
+
+```bash
+ssh <server> '~/.local/bin/nemia token add laptop' | sed -n 's/^Authorization: Bearer //p' > ~/.nemia-token
+chmod 600 ~/.nemia-token
+```
+
+The installer links the command at `~/.local/bin/nemia`. A command passed to `ssh <server> '…'` runs in a shell that has not read your
+profile, so `~/.local/bin` is not on its PATH. This page types the full path there. In a login shell on the server, add the
+directory to your PATH once and type `nemia` alone:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+```
+
+## 4. The board
+
+Open the first-visit link the installer printed, `http://<address>:8787/?link=…`, on your laptop within ten minutes: it signs that
+browser in once, and the board keeps the token in a cookie no script reads. `nemia board link` on the server makes another (`--base
+<url>` prints it under the name your browser uses, since a browser keeps one cookie per host name). Or press _Pair this browser_ on the
+board's sign-in, and approve the code it shows with `nemia pairings approve <code>` on the server.
+
+The browser marks the page as "Not secure" because the board speaks plain HTTP. The traffic between your machines is still encrypted,
+because Tailscale tunnels it.
+
+## 5. GitHub
+
+A factory on GitHub pushes each run's branch with git and opens its pull request with the GitHub CLI
+(`packages/templates/sdlc/carried/pull-request.ts`). The daemon clones a repository named by its URL with git too. All of it uses the
+server's own credentials. **Nemia holds none.** So the server's Nemia user signs in to GitHub once.
+
+The `sdlc` template's `build` and `quick` declare these as needs, each with its fix: a run of one waits before its first session while
+one is missing, naming it, and starts by itself once it is met. On the board's Setup page, or on the server:
+
+```bash
+nemia readiness fix gh --factory <factory> --workflow build
+nemia readiness fix gh-sign-in --factory <factory> --workflow build
+nemia readiness fix git-identity --factory <factory> --workflow build
+```
+
+The first installs the GitHub CLI into `~/.agent-workflows/tools`, without root. The second signs it in with the `workflow` scope and
+shows the one-time code set apart, with the link to enter it at. The third gives git the account's name and its noreply address. The
+sections below do the same by hand.
+
+### The GitHub CLI
+
+Install it from GitHub's apt repository. This needs root once:
+
+```bash
+mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  | tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+apt-get update && apt-get install -y gh
+```
+
+The package installs the command in /usr/bin, which is on the service's PATH.
+
+### Sign in, as the Nemia user
+
+```bash
+gh auth login --hostname github.com --git-protocol https --web --scopes workflow
+```
+
+`--web` signs in with a one-time code. The server has no browser to open and no clipboard to copy the code to, so the GitHub CLI warns
+that it failed to copy the code and failed to open a browser, then prints the code and waits. This is the normal path on a server, not an error to fix. On any machine, open
+[github.com/login/device](https://github.com/login/device), enter the code and approve. The command then finishes on the server.
+
+The `workflow` scope lets a run push a change under `.github/workflows/`. Without it, GitHub refuses such a push. It is added to the
+scopes the GitHub CLI always asks for, so `gh auth status` then lists gist, read:org, repo and workflow.
+
+Then let git push over HTTPS with the GitHub CLI's token, and give the commits a name:
+
+```bash
+gh auth setup-git
+git config --global user.name "<your name>"
+git config --global user.email "<your email>"
+```
+
+`gh auth setup-git` makes the GitHub CLI git's credential helper for github.com, by its full path (/usr/bin/gh), so the daemon's
+git finds it whatever its PATH. It fails while no host is signed in, so it comes after the sign-in. Every commit a step makes carries
+that name and email. GitHub's noreply address (Settings, Emails) is one choice of email.
+
+### A repository reached by SSH
+
+If you would rather the server reach a repository by SSH, give it a key of its own for that repository. Make the key as the Nemia user,
+and add its public half to the repository on GitHub as a deploy key with write access (the repository's Settings, Deploy keys):
+
+```bash
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+cat ~/.ssh/id_ed25519.pub
+```
+
+Then name the repository by its SSH URL, `git@github.com:<owner>/<repo>.git`, when you add the factory. The clone's remote then is
+that URL, and git pushes over SSH. The pull request is still opened by the GitHub CLI, so its sign-in above stays.
+
+[A repository by its URL](/install/#a-repository-by-its-url) explains how the daemon clones and keeps a repository named by its URL.
+
+## 6. The laptop
+
+Install Nemia on your laptop as a client of the server. The laptop must be on the same tailnet:
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://<address>:8787
+nemia ls
+```
+
+The installer pairs: it shows a short code, which you approve on the server with `nemia pairings approve <code>` or on the board's
+Setup page, and a token named for your laptop lands in a context it makes the current one, never shown (`--token-file` still takes a
+token file instead). Put the `NEMIA_URL` line it prints in your shell profile for Claude Code's nemia plugin. From then on, the
+laptop's `nemia` drives the server: the reads, the runs, the inbox, the decisions and every other verb about the store. [A client of another machine](/install/#a-client-of-another-machine)
+explains contexts, and which verbs always act on the machine you type them on.
+
+## 7. A factory and its first run
+
+Apply a factory from a template, on the repository's URL, from the laptop. The laptop's `nemia` sends it to the server, whose daemon
+clones the repository with the credentials of step 5. Here it is the builtin template, [sdlc](/sdlc/), set to judge and land its work
+on GitHub:
+
+```bash
+nemia factory apply mill --template sdlc --set github=true --repo https://github.com/<owner>/<repo>.git
+```
+
+A clone that fails is refused with git's own words and the setup to do, and nothing is filed. A `--repo` that is a folder rather than a
+URL names a folder of the server, so the server refuses it from the laptop: type that one on the server.
+
+On v1.4.0 and earlier, which file a factory by URL on the server alone, type the same command there, as
+`ssh <server> '~/.local/bin/nemia factory apply mill --template sdlc --set github=true --repo <url>'`.
+
+With `github=true`, the factory waits on the repository's CI context, named ci unless you set another
+([its parameters](/sdlc/#its-parameters)). [Before you apply it on GitHub](/sdlc/#before-you-apply-it-on-github) says what the
+repository needs first: the GitHub CLI signed in on the server, which step 5 did, and a base branch protected to require that CI check,
+so a pull request merges only once it passes.
+
+Then start its first run from the laptop:
+
+```bash
+nemia start "add a --quiet flag to the export command" --workflows quick --factory mill
+nemia ls
+```
+
+The run works in a worktree of the server's clone. Its implement step pushes its branch and opens its pull request with the server's
+GitHub sign-in, and the board shows the run step by step. [How a run lives](/how-a-run-lives/) follows it to its landing.

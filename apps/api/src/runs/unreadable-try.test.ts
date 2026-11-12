@@ -1,7 +1,6 @@
 /**
  * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the RunList leaves its run unjudged,
- * naming that task, and `nemia ls` (`GET /api/listing/:runId`) marks the step whose check or try it is `unreadable`, not the word its
- * session's view would give; and the decision `nemia decide` shows (`GET
+ * naming that task; and the decision `nemia decide` shows (`GET
  * /api/runs/:runId/decision`) is refused as the run's object is, a 502 in the list's words — for a run waiting on such a run too — while a
  * run whose tasks read is answered. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
  * `standing.json`.
@@ -18,7 +17,7 @@ import path from 'node:path';
 import { app } from '../app.ts';
 import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { lsOf, runListOf } from '../../test/run-reads.ts';
+import { runListOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -136,19 +135,10 @@ test("a check's or an earlier try's journal that does not read marks its step un
     async () => {
       const runs = await listed();
       assert.ok(runs.judged.includes('r-good') && !runs.unreadable.has('r-good'), 'a run whose tasks read is judged');
-      assert.notDeepEqual(
-        (await lsOf(app, 'r-good')).listed.steps.map((s) => s.message),
-        ['unreadable'],
-      );
       for (const [id, task] of [
         ['r-check', 'r-check-implement-check'],
         ['r-try', 'r-try-implement'],
       ]) {
-        assert.deepEqual(
-          (await lsOf(app, id)).listed.steps.map((s) => [s.name, s.message]),
-          [['implement', 'unreadable']],
-          id,
-        );
         const unreadable = runs.unreadable.get(id);
         assert.ok(
           unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),

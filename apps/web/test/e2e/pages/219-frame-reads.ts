@@ -1,4 +1,5 @@
 import type { Page } from 'playwright';
+import { LIST_PAGE } from 'objects';
 import { OPEN_SELECTOR, type OpenRuns } from '../../../src/lib/api/runs.ts';
 import { barValue } from '../../../src/lib/bar.ts';
 import { openBlockOf, runsOf } from '../../../src/lib/factories.ts';
@@ -11,10 +12,10 @@ import type { PageSpec } from '../visit.ts';
 /** The factory whose bar the page opens: the one that holds a run. */
 const FACTORY = FACTORIES.hiring.name;
 /**
- * The whole list of the runs, the plain RunList, and the frame's, the RunList of the runs not finished, each by its path and query on the
- * api as a request's address says them decoded.
+ * The whole list of the runs, the plain RunList, and the frame's, the RunList of the runs not finished, each by the path and query of its
+ * first page on the api (every page asked of the most a page holds) as a request's address says them decoded.
  */
-const [WHOLE, LIGHT] = ['/api/runs', `/api/runs?fieldSelector=${OPEN_SELECTOR}`];
+const [WHOLE, LIGHT] = [`/api/runs?limit=${LIST_PAGE.most}`, `/api/runs?limit=${LIST_PAGE.most}&fieldSelector=${OPEN_SELECTOR}`];
 
 /** Goes to `to` in this tab and waits for its reads. */
 async function visit(page: Page, to: string): Promise<void> {

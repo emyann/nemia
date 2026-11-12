@@ -58,7 +58,6 @@
  * A failure that is no refusal is a 500 in its own words (`Failed`, `answeredWrite`), as on every route the api served on Hono.
  */
 import { Effect, Metric } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import type { HttpServerRequest } from 'effect/http';
 import {
   eventKept,
@@ -85,6 +84,7 @@ import { statsOf } from '../stats/stats.ts';
 import { signIn, signOut } from './session.ts';
 import { engineRead } from '../store.ts';
 import { yourStore } from '../workflows/index.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /**
  * `work` over the request's services, a refusal answered as the one map says, and any other failure a 500 in its own words (`Failed`), as
@@ -119,7 +119,7 @@ const waitSent = ({ ended, lines, cursor }: WaitAnswer): FeedWait => {
   };
 };
 
-export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
+export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
   handlers
     .handle('health', () => Effect.succeed({ ok: true } as const))
     .handle('version', () =>

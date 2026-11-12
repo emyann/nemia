@@ -14,6 +14,7 @@ export {
   StepCost,
   StepCheck,
   StepCloseout,
+  type BodyPage,
   closeoutNarrowed,
   fieldsNamed,
   StepRaise,
@@ -98,6 +99,7 @@ export {
   RUNS_IN_BY,
   type RunsInBy,
   SAID_AFTER,
+  READ_SHAPES,
   type SaidAfter,
   SETTING_ORIGINS,
   SIGN_IN_STATES,
@@ -234,6 +236,7 @@ export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
   type ApiEndpointName,
+  type ApiGetName,
   BadRequest,
   Conflict,
   Failed,
@@ -339,7 +342,7 @@ export {
 } from './words.ts';
 export { UnsupportedMediaType } from './api-errors.ts';
 export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
-export { Concluded, RunLines, RunRecord, RunsListed, StepCommands, WorkflowPageAddress } from './run-reads.ts';
+export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed } from './api-errors.ts';
 export {
   LifecycleEdge,
@@ -543,3 +546,16 @@ export {
   PairingsGroup,
   TicketClaim,
 } from './pairing.ts';
+export {
+  ANSWER_MOST,
+  BODY_PAGE,
+  LIST_PAGE,
+  LOG_TAIL,
+  type PageBounds,
+  READS,
+  type ReadBound,
+  type ReadShape,
+  readsUnbounded,
+  SHORT_FIELD,
+  TRANSCRIPT_PAGE,
+} from './reads.ts';

@@ -21,8 +21,8 @@ import { Effect, Schedule } from 'effect';
 import type { Context } from 'hono';
 import { type CallToolResult, createMcpHandler, Server, type Tool } from '@modelcontextprotocol/server';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
-import { Api, TABLE_ACCEPT, type Table, tableLines } from 'objects';
-import { ANSWER_BOUND, answerFit, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
+import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
+import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
 import { type PortTool, portTools } from './tools.ts';
 
@@ -91,13 +91,14 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
 
 /**
  * The arguments a call of `tool` with `args` is sent with: each default its link sends (`defaults`) for a key the call leaves out, and a
- * page of `PORT_PAGE` where its endpoint takes `limit` and the call gives none.
+ * page of `PORT_PAGE` where its endpoint takes `limit` and the call gives none, nor a `last` of a read from a cursor, which takes one
+ * of the two alone.
  */
 export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   const absent = (key: string) => args[key] === undefined || args[key] === null;
   const sent: Record<string, unknown> = { ...args };
   for (const [key, value] of Object.entries(tool.defaults)) if (absent(key)) sent[key] = value;
-  if (tool.queryKeys.includes('limit') && absent('limit')) sent.limit = PORT_PAGE;
+  if (tool.queryKeys.includes('limit') && absent('limit') && countKeyOf(tool, sent) === 'limit') sent.limit = PORT_PAGE;
   return sent;
 }
 
@@ -122,11 +123,28 @@ const tableText = (tool: PortTool, table: Table, args: Readonly<Record<string, u
   return [...lines, ...none, ...(next === undefined ? [] : [`more: call again with continue ${next}`])].join('\n');
 };
 
-/** The page `args` asks for, as `answerFit` judges it: its `limit` (no longer than `PAGE_MOST`), or null where it asks none. */
+/** How `tool`'s endpoint is bounded (`objects`' `READS`), where it is a read. */
+const readOf = (tool: PortTool): ReadBound | undefined =>
+  tool.method === 'GET' ? (READS as Readonly<Record<string, ReadBound>>)[tool.endpoint] : undefined;
+
+/**
+ * The key that counts the page `args` asks of `tool`: a list's `limit`; a read from a cursor's `last` where the call asks the last
+ * events, its `limit` otherwise; none for a read of neither.
+ */
+const countKeyOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): 'limit' | 'last' | null => {
+  const shape = readOf(tool)?.shape;
+  if (shape === 'cursor' && tool.queryKeys.includes('last') && args.last !== undefined && args.last !== null) return 'last';
+  return tool.queryKeys.includes('limit') && (shape === undefined || shape === 'page' || shape === 'cursor') ? 'limit' : null;
+};
+
+/**
+ * The page `args` asks for, as `answerFit` judges it: its count (`countKeyOf`, no longer than `PAGE_MOST`), or null where it asks none.
+ */
 const pageOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): number | null => {
-  if (!tool.queryKeys.includes('limit')) return null;
-  const limit = Number(args.limit);
-  return Number.isInteger(limit) && limit >= 1 ? Math.min(limit, PAGE_MOST) : null;
+  const key = countKeyOf(tool, args);
+  if (key === null) return null;
+  const count = Number(args[key]);
+  return Number.isInteger(count) && count >= 1 ? Math.min(count, PAGE_MOST) : null;
 };
 
 /** The characters a result holds, as a host counts them: its texts and the JSON of its `structuredContent`. */
@@ -163,8 +181,9 @@ async function answerOf(
 
 /**
  * A call of `tool` with `args`, answered by `app`'s own fetch of its endpoint (`answerOf`), sent with its link's defaults and the port's
- * page (`argsSent`), and held under `ANSWER_BOUND` (`answerFit`): a page past it asked again shorter, any other answer past it refused
- * with how to narrow it (`pastTheBound`), its body left out. A path name not given is refused before any request, naming it.
+ * page (`argsSent`), and held under `ANSWER_BOUND` (`answerFit`): a page past it asked again shorter — a list's `limit` halved, a read
+ * from a cursor's `last` or `limit` (`countKeyOf`) — any other answer past it refused with how to narrow it (`pastTheBound`, the read's
+ * own keys in `READS`), its body left out. A path name not given is refused before any request, naming it.
  */
 export async function called(
   tool: PortTool,
@@ -181,8 +200,10 @@ export async function called(
     const size = sizeOf(result);
     const fit = answerFit(size, ANSWER_BOUND, pageOf(tool, sent));
     if (fit.kind === 'answer') return result;
-    if (fit.kind === 'refuse') return failed(pastTheBound(tool.name, size, ANSWER_BOUND, tool.queryKeys));
-    sent = { ...sent, limit: fit.limit };
+    const key = countKeyOf(tool, sent);
+    if (fit.kind === 'refuse' || key === null)
+      return failed(pastTheBound(tool.name, size, ANSWER_BOUND, narrowingOf(readOf(tool)?.narrow, tool.queryKeys, sent)));
+    sent = { ...sent, [key]: fit.limit };
   }
 }
 

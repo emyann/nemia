@@ -45,7 +45,14 @@ the orchestrator's code holds a fact today, it is named beside it.
   `test/live-sdk.boundary.test.ts`'s third case, one job per model filed in `auto` and read off its `init` line: `haiku`
   (`claude-haiku-5-5`), `sonnet` (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) ran in `auto`, and
   `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so `CLAUDE_AUTO_DROPPED` stands as it was. The case makes this measurement
-  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`.
+  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`. Measured ten times a model the same day, after
+  two runs' checks failed on the case and a third passed: `claude-haiku-4-5` and `claude-sonnet-4-5` ran in `default` in all ten, and
+  `haiku` and `sonnet` in `auto` in all ten, so no model's answer varies. What varied is the `init` line: in one run of ten each listed
+  model's said `auto`, and a `{"type":"system","subtype":"status","permissionMode":"default"}` line after it said the mode the
+  session ran in, which Claude Code settles after printing `init` (its bundled code refuses `auto` on a model before
+  `claude-opus-4-6` in its list, a local check, no flag fetched). So `ranIn` is the last mode an `init` or a `status` line names
+  (`claudeStreamOutput`), and the case reads it so. A case that fails is a change of Claude Code's: measure the model ten times, as
+  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own.
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
@@ -233,6 +240,22 @@ with `updatedPermissions` set to the `suggestions` it was handed, as an always a
   `mkdir nemia-probe-b`, which that rule does not match, ran without a prompt, which the `setMode` suggestion to `acceptEdits`
   accounts for (not measured apart). An always allow returns every suggestion, as the SDK's comment on them asks (`sdk.d.ts:232-239`), and so can change
   more than the one rule its choice's description names first.
+
+## The quota of a token
+
+**A Claude Code signed in only by `CLAUDE_CODE_OAUTH_TOKEN` — the token `claude setup-token` makes, which `nemia claude-token set`
+keeps — answers `get_usage` with no plan limits, and asks the usage service nothing** (SDK 0.3.322, its bundled Claude Code 2.1.322,
+2026-11-11). Read off the bundled CLI: a token from that variable is given the scopes `CLAUDE_CODE_OAUTH_SCOPES` names, else
+`user:inference` alone; `get_usage` answers `rate_limits_available` as signed in to claude.ai *and* holding `user:profile`, and asks
+`/api/oauth/usage` only when it is true; its own schema says it is false for "API key, Bedrock, Vertex, or missing profile scope".
+Measured: the bundled CLI, asked through the SDK in a scratch `HOME` and `CLAUDE_CONFIG_DIR` with only a placeholder token in the
+variable, answered `{"subscription_type":null,"rate_limits_available":false,"rate_limits":null}` in under half a second — the same
+answer, field for field, as with no sign-in at all. The answer is decided from the token's scopes before any request, so a real token
+answers the same; none was at hand to confirm it against the service. So the answer cannot tell a token from no subscription: the
+quota tells them apart by the environment it hands the ask (`quotaOfUsage`, `TOKEN_VARIABLE`), and reads it as `token`. What would
+make it answer is a sign-in that holds `user:profile` — `claude` then `/login` under the same `CLAUDE_CONFIG_DIR` — with the variable
+taken away, since a set `CLAUDE_CODE_OAUTH_TOKEN` is read before the stored login. Measured by a throwaway probe kept outside the
+repository.
 
 ## The claude.ai bridge
 

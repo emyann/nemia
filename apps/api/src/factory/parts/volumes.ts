@@ -3,12 +3,12 @@
  * (`volumeObject`) — each with the runs in play that mount it, judged off the app's informer. Read alone: `nemia factory volume add` and
  * `rm` write them.
  */
-import { HttpApiBuilder } from 'effect/http-api';
 import { informerMemo, type SummaryHow, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
+import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** How a read of the volumes judges a run that mounts one: off the app's informer. */
 const howOf = (s: Served): SummaryHow => ({
@@ -17,7 +17,7 @@ const howOf = (s: Served): SummaryHow => ({
   verify: verifiesRest(s.env),
 });
 
-export const volumesHandlers = HttpApiBuilder.group(Api, 'volumes', (handlers) =>
+export const volumesHandlers = readsBounded(Api, 'volumes', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {

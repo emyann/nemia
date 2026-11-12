@@ -13,7 +13,7 @@
 import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
-import { Api, type APIResource, Conflict, Forbidden, Invalid, Missing, type Table, Unauthorized, Unjudged } from 'objects';
+import { Api, type APIResource, Conflict, Forbidden, Invalid, LIST_PAGE, Missing, type Table, Unauthorized, Unjudged } from 'objects';
 import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
 import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
@@ -162,9 +162,55 @@ export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(
       : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
   );
 
-/** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */
+/** The page of a list asked: `limit`, and past the first page the `continue` the page before answered, sent back as it is. */
+export type PageAsked = { readonly limit: string; readonly continue?: string };
+
+/** A page of a list as the api answers one: its objects (`items`) or its `Table`'s rows, and where the page stands. */
+type Paged = { readonly metadata: { readonly continue?: string } } & (
+  | { readonly items: readonly unknown[] }
+  | { readonly rows: readonly unknown[] }
+);
+
+/** The pages of one list read as one: the first page's shape, every page's objects or rows in order, the last page's metadata. */
+const joined = <P extends Paged>(first: P, pages: readonly P[]): P => {
+  const { metadata } = pages.at(-1) ?? first;
+  return 'rows' in first
+    ? Object.assign({}, first, { metadata, rows: pages.flatMap((page) => ('rows' in page ? page.rows : [])) })
+    : Object.assign({}, first, { metadata, items: pages.flatMap((page) => ('items' in page ? page.items : [])) });
+};
+
+/**
+ * Every page of a list, read as one, for a client that prints the list whole: `ask` asked for a page of `LIST_PAGE.most` and again with
+ * the `continue` each page answers, until a page answers none (the api answers a page of `LIST_PAGE.byDefault` to a list asked with no
+ * `limit`, and `continue` on every page but the last). A page that answers back the `continue` it was asked with is an api that would
+ * be asked forever, refused naming the restart.
+ */
+export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.Effect<P, E>): Effect.Effect<P, E | Error> =>
+  Effect.gen(function* () {
+    const limit = String(LIST_PAGE.most);
+    const first = yield* ask({ limit });
+    const pages = [first];
+    let sent: string | undefined;
+    let next = first.metadata.continue;
+    while (next !== undefined && next !== '') {
+      if (next === sent)
+        return yield* Effect.fail(
+          new Error('the api answered a page the same `continue` it was asked with: restart it, `nemia service restart`'),
+        );
+      sent = next;
+      const page = yield* ask({ limit, continue: next });
+      pages.push(page);
+      next = page.metadata.continue;
+    }
+    return joined(first, pages);
+  });
+
+/**
+ * The factories the api lists (`FactoryList`, `GET /api/factories`), every page, the default first on its own repository, for the read
+ * `verb`.
+ */
 export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>
-  asked(verb, (client) => pageOf(client.factories.listAll({ query: {} })), env);
+  asked(verb, (client) => pageOf(everyPage((page) => client.factories.listAll({ query: page }))), env);
 
 /** Every resource the api serves (`GET /api`), for the verb `verb` names: what `get`, `apply` and `explain` resolve a word against. */
 export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env): Promise<readonly APIResource[]> =>

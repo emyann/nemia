@@ -19,7 +19,6 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   definitionRevision,
   foldersIn,
@@ -59,6 +58,7 @@ import {
   type Held,
   type Origin,
 } from '../definitions/served.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** A folder of a workflow, where it is: the source word the api's own reads give it, and its path. */
 type Folder = { from: WorkflowSource; dir: string };
@@ -256,7 +256,7 @@ const builderRefused = (saved: Awaited<ReturnType<typeof write>>): void => {
   if ('error' in saved) throw new Invalid({ error: saved.error, steps: saved.steps });
 };
 
-export const workflowsHandlers = HttpApiBuilder.group(Api, 'workflows', (handlers) =>
+export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answeredWriteIn(namespace, async (s) => {

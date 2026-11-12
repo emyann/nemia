@@ -67,6 +67,7 @@ import {
   type PlanNext,
   type Switched,
   type TreeMerge,
+  type ResolutionOwner,
 } from './index.ts';
 import type { Status } from '../applied/applied.store.ts';
 import { adoptPreview, shellArg, type AdoptPreview } from '../../adopt/adopt.verb.ts';
@@ -602,7 +603,7 @@ type Resolved = {
   to: string;
   file: string;
   left: string[];
-  proposed?: { kind: string; name: string; proposal: string };
+  proposed?: ResolutionOwner & { readonly proposal: string };
   waits: string[];
 };
 

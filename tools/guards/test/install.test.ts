@@ -152,3 +152,94 @@ test(
     assert.doesNotMatch(ran.out, /a-token/, 'the token itself is never printed');
   },
 );
+
+/**
+ * A download base reached over http, as a stand-in `curl` first on PATH serves it: `latest.json` naming `tag`, every other URL logged
+ * and answered as missing (exit 22, as `curl -f` does on a 404). The log says what the installer asked to download.
+ */
+const mirror = (tag: string) => {
+  const dir = fs.realpathSync(scratch('install-curl-'));
+  const log = path.join(dir, 'fetched');
+  const latest = path.join(dir, 'latest.json');
+  fs.writeFileSync(latest, JSON.stringify({ tag, version: tag.slice(1) }));
+  fs.writeFileSync(
+    path.join(dir, 'curl'),
+    [
+      '#!/bin/sh',
+      'out=; url=',
+      'while [ "$#" -gt 0 ]; do case $1 in -o) out=$2; shift ;; -*) ;; *) url=$1 ;; esac; shift; done',
+      `printf '%s\\n' "$url" >>'${log}'`,
+      `case $url in */latest/download/latest.json) cp '${latest}' "$out" ;; *) exit 22 ;; esac`,
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  return { dir, log };
+};
+
+test(
+  'REFUSED: a release tag that is not v and three dotted numbers, a pre-release too, exits 1 before anything is downloaded or deleted, by --version or latest.json',
+  {
+    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
+  },
+  () => {
+    for (const tag of ['v1.0.0/../..', 'v1.0.0 ', 'v1.2.3-rc.1', 'v1.2.3.4', 'v1.2.3.']) {
+      for (const by of ['latest.json', '--version']) {
+        const { dir, log } = mirror(tag);
+        const { home, root } = machine();
+        fs.mkdirSync(path.join(root, 'releases'), { recursive: true });
+        const kept = path.join(root, 'kept');
+        fs.writeFileSync(kept, 'the store above releases/\n');
+        const args = [
+          '--yes',
+          '--no-service',
+          '--base',
+          'https://mirror.invalid/releases',
+          ...(by === '--version' ? ['--version', tag] : []),
+        ];
+        const env = { PATH: `${dir}:${process.env.PATH ?? '/usr/bin:/bin'}`, HOME: home, WF_ROOT: root };
+        const ran = spawnSync('sh', [INSTALL, ...args], { env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] });
+        const label = `${JSON.stringify(tag)} by ${by}`;
+        assert.equal(ran.status, 1, `${label}: ${ran.stdout}${ran.stderr}`);
+        const fetched = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : [];
+        assert.deepEqual(
+          fetched.filter((url) => !url.endsWith('/latest/download/latest.json')),
+          [],
+          `${label}: no archive is downloaded`,
+        );
+        assert.equal(fs.existsSync(kept), true, `${label}: nothing above releases/ is deleted`);
+        assert.deepEqual(fs.readdirSync(path.join(root, 'releases')), [], `${label}: no folder is left under releases/`);
+        assert.equal(fs.existsSync(path.join(home, '.local')), false, `${label}: no link is made`);
+      }
+    }
+  },
+);
+
+test(
+  'a release tag of v and three dotted numbers is taken, by --version and by latest.json: its archive is the next thing downloaded',
+  {
+    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
+  },
+  () => {
+    for (const by of ['latest.json', '--version']) {
+      const { dir, log } = mirror('v1.20.3');
+      const { home, root } = machine();
+      const args = [
+        '--yes',
+        '--no-service',
+        '--base',
+        'https://mirror.invalid/releases',
+        ...(by === '--version' ? ['--version', 'v1.20.3'] : []),
+      ];
+      const env = { PATH: `${dir}:${process.env.PATH ?? '/usr/bin:/bin'}`, HOME: home, WF_ROOT: root };
+      const ran = spawnSync('sh', [INSTALL, ...args], { env, encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'] });
+      assert.equal(ran.status, 1, 'the stand-in mirror has no archive, so the download fails');
+      const fetched = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+      assert.equal(
+        fetched.at(-1),
+        `https://mirror.invalid/releases/download/v1.20.3/${assetName('v1.20.3', HOST as Platform)}`,
+        `${by}: ${ran.stdout}${ran.stderr}`,
+      );
+    }
+  },
+);

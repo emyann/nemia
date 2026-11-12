@@ -213,6 +213,21 @@ test('under a remote context `nemia service status` still runs here, a verb abou
   assert.equal(code, 0, said);
 });
 
+test("a bare `nemia upgrade` under a remote context upgrades this machine, then names `nemia server upgrade`; under this machine's, and its help, no hint", async () => {
+  const { env, root } = remoteLaptop('nemia-route-upgrade-');
+  const hook = plantedEntry('nemia-route-upgrade-planted-');
+  const remote = await nemia(['upgrade', 'v9.9.9'], env, hook);
+  assert.equal(remote.code, 0, remote.said);
+  assert.deepEqual(JSON.parse(remote.out), { argv: ['upgrade', 'v9.9.9'], NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: root });
+  assert.match(remote.said.slice(remote.out.length), /`nemia server upgrade/, 'the hint names the remote form, on stderr');
+  const help = await nemia(['upgrade', '--help'], env, hook);
+  assert.doesNotMatch(help.said, /nemia server upgrade/, 'a help is the old path\'s alone');
+  const local = localLaptop('nemia-route-upgrade-local-');
+  const here = await nemia(['upgrade', 'v9.9.9'], local.env, hook);
+  assert.equal(here.code, 0, here.said);
+  assert.doesNotMatch(here.said, /nemia server upgrade/, "under this machine's context nothing names the server");
+});
+
 /** A laptop whose context in use is this machine's own, its store scratch and served by no daemon, none started on demand. */
 function localLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } {
   const folder = scratch(prefix);

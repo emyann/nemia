@@ -12,7 +12,16 @@ import { Effect } from 'effect';
 import { API_VERSION, type Card, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { CardDoor } from '../cards/cards.store.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { CARD_IN_PLAY, cardLabels, INBOX_COLUMNS, inboxCells, type InboxListing, parseInboxCard } from '../inbox/index.ts';
+import {
+  CARD_IN_PLAY,
+  cardInPlay,
+  cardLabels,
+  cardPlaySelector,
+  INBOX_COLUMNS,
+  inboxCells,
+  type InboxListing,
+  parseInboxCard,
+} from '../inbox/index.ts';
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
 
@@ -21,16 +30,20 @@ export { cardWriteRefusal } from '../card-write/index.ts';
 export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';
-import { Missing } from '../refusal/refusal.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
 import { listOf, pageListed } from './listed.verb.ts';
 import { setting } from '../config/config.store.ts';
 
-/** What a list of cards is asked: its namespace (none for every card), `?limit=`, `?continue=`, and its label selectors, OR'd. */
+/**
+ * What a list of cards is asked: its namespace (none for every card), `?limit=`, `?continue=`, its label selectors, OR'd, and its
+ * `?fieldSelector=`, the cards still in play or those whose run ended (`cardPlaySelector`), every card where it is empty or none.
+ */
 export type CardQuery = {
   readonly namespace?: string | undefined;
   readonly limit?: number | null | undefined;
   readonly continue?: string | undefined;
   readonly labelSelector?: readonly string[] | undefined;
+  readonly fieldSelector?: string | undefined;
 };
 
 /** The namespace of a listed card: its factory, or `default`. */
@@ -113,13 +126,30 @@ const objectOf = Effect.fnUntraced(function* (l: InboxListing, source = false) {
 });
 
 /**
- * A page of the cards `listing` holds (`CardList`): those of `query.namespace` (every card where none is given) that its label selectors
- * keep, sorted by name, cut by its `limit` after its `continue`. `Invalid` for a selector, a limit or a token that is not one.
+ * The entries of `listing` that `fieldSelector` keeps: every one where it is empty or none, else those whose `cardInPlay` is what it
+ * asks (`cardPlaySelector`); `Invalid` naming the forms it takes where it spells none.
+ */
+const inPlayKept = (listing: readonly InboxListing[], fieldSelector: string | undefined): readonly InboxListing[] | Invalid => {
+  if (fieldSelector === undefined || fieldSelector === '') return listing;
+  const selector = cardPlaySelector(fieldSelector);
+  if (selector === null)
+    return new Invalid({
+      message: `fieldSelector ${fieldSelector} is none a card list takes: give status.inPlay=true (or ==true, !=false) for the cards in play, status.inPlay=false (or ==false, !=true) for those whose run ended, or an empty one for every card`,
+    });
+  return listing.filter((l) => cardInPlay(l) === selector.inPlay);
+};
+
+/**
+ * A page of the cards `listing` holds (`CardList`): those of `query.namespace` (every card where none is given) that its field selector
+ * (`inPlayKept`) and its label selectors keep, sorted by name, cut by its `limit` after its `continue`. `Invalid` for a selector, a limit
+ * or a token that is not one.
  */
 export const cardListOf = Effect.fn('cardListOf')(function* (listing: readonly InboxListing[], query: CardQuery) {
   const { namespace } = query;
   const inNamespace = namespace === undefined ? listing : listing.filter((l) => namespaceOf(l) === namespace);
-  const page = yield* pageListed(inNamespace, query, 'card', { key: keyOf, labels: cardLabels });
+  const kept = inPlayKept(inNamespace, query.fieldSelector);
+  if (kept instanceof Invalid) return yield* Effect.fail(kept);
+  const page = yield* pageListed(kept, query, 'card', { key: keyOf, labels: cardLabels });
   const items = (yield* Effect.forEach(page.items, (l) => objectOf(l))).filter((c): c is Card => c !== null);
   const answered: CardList = listOf('Card', page, items);
   return answered;

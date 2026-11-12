@@ -357,7 +357,9 @@ the Card through a client made from the same `Api` (`apps/web/src/lib/api/object
 no endpoint of the `Api`: MCP's Streamable HTTP, hosted by Hono beside the OpenAPI routes. Its tools are generated, never listed: each
 entry of the command table names the endpoints that serve it (`served`, an `EndpointLink` typed by `objects`' `ApiEndpointName`, held by
 `commandBreaks`; an entry with none is the command line's alone, its `only.why` saying why), and each link is a tool, its input the
-endpoint's Schema and its call that endpoint, made in-process with the caller's own `Authorization`. Who a request is from is judged
+endpoint's Schema and its call that endpoint, made in-process with the caller's own `Authorization`. What it answers fits what a host
+reads: a list that prints a `Table` is answered as its lines (`objects`' `tableLines`, the client's printer), every list pages (a link's
+`query` gives a key's default, `limit` the port's page), and no answer passes the port's bound (`answerFit`). Who a request is from is judged
 before any router (`callerGate`) by the route's need of a token (`TokenNeed`): the port needs a person's token (`nemia token add`); every
 route the api answers (`/api`, `/openapi`) of a store marked exposed (`WF_EXPOSED=1`) needs one; else none is the person. The api
 listens on this machine's loopback unless `NEMIA_BIND` names another address, which it takes on a store marked exposed alone (`bindOf`,

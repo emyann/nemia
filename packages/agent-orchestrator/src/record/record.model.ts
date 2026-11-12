@@ -41,6 +41,9 @@ const CardName = foreignId('CardName');
 /** A check of a step's work, a task of its own (`checkTaskId`, record.ts:397). */
 const CheckTask = Schema.Struct({ taskId: TaskId.OnRead });
 
+/** Words said to a step before it was filed (`SaidBefore`, record.ts): when, and the words as said. */
+const SaidBefore = Schema.Struct({ at: Schema.String, text: Schema.String });
+
 /** Why a try was moved behind the next (`TRY_CAUSES`): a record's former `then` is read as it (`upgradeTries`) before this reads it. */
 const TryCause = Schema.Literals(TRY_CAUSES).annotate({ identifier: 'TryCause' });
 
@@ -212,7 +215,7 @@ const Pause = Schema.Struct({
  * and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`); the counters the tick keeps for the metrics
  * (`gatesTimed`, `deniedCounted`, `settlesCounted`, `runTimed`, `slotHeldAt`); the revisions it is behind (`pinned`, read loosely, the
  * revisions' own); and what `runRecord` composes on read and the store's write drops (`approvals`, `acceptances`, `pruned`, `hold`,
- * `pause`, and a person's `labels`), whose shapes a run written back is held to.
+ * `pause`, and a person's `labels` and `saidBefore`), whose shapes a run written back is held to.
  */
 /**
  * A step of the workflow a run froze, decoded loosely (`FrozenWorkflowStep`, so a record an older or newer tick wrote is not refused) and
@@ -348,6 +351,14 @@ const runFields = {
    * with the run. Absent on a run nobody labelled.
    */
   labels: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /**
+   * What was said to each step before it was filed (`nemia say` to a step with no task and no try behind it), by step, in the order said:
+   * when, and the words as said (`text`, an agent's in the frame that names it, as the engine journals words said to a session). Kept for
+   * the step's first try, whose brief carries them (`saidBeforeSection`), and for no try after. Composed onto every read of the store from
+   * a folder of its own, `runs/<id>.said/` (`runRecord` in record.store.ts), never written into the record, and removed by `nemia rm`
+   * with the run. Absent on a run nobody said anything to before a step ran.
+   */
+  saidBefore: Schema.optional(Schema.Record(Schema.String, Schema.Array(SaidBefore))),
   /**
    * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it.
    * What says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.

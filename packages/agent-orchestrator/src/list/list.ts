@@ -31,7 +31,7 @@ import {
 import { budgetWord } from '../money/money.ts';
 import { durationWord } from '../usage/usage.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote } from '../round/round.ts';
-import { saidWord } from '../say/say.ts';
+import { saidBeforeWord, saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';
 import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
@@ -263,6 +263,15 @@ const memoryNoted = ({ steps, read, memoryOf }: ListingInput, listed: Listing): 
 };
 
 /**
+ * How often a step was said to (`nemia say`): to its current try's sessions (`saidWord`), and before it was filed while it is on its first
+ * try or has none (`saidBeforeWord`, off the run's `saidBefore`).
+ */
+const notedSaid = (run: Run, name: string, saidTo: (step: string) => number): string =>
+  [saidWord(saidTo(name)), saidBeforeWord(run.steps[name]?.tries?.length ? 0 : (run.saidBefore?.[name]?.length ?? 0))]
+    .filter(Boolean)
+    .join(' · ');
+
+/**
  * What `nemia ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
  *
  * The words are `stepStatus`'s, so the list says what the run established and not only what the
@@ -296,11 +305,11 @@ const memoryNoted = ({ steps, read, memoryOf }: ListingInput, listed: Listing): 
  * (`unheld`); and an ending at its gate whose result git already has waits on nobody, its note saying
  * where the branch stands (`resultOnBase`).
  *
- * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
- * says so (`waitsOnCheckout`) — or that a person accepted its loop (`nemia approve`), never their words, which
- * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
- * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
- * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back says so (`waitsOnCheckout`) —
+ * or that a person accepted its loop (`nemia approve`), never their words, which are free text in a padded column; at its gate, the
+ * approval and the send-back; what the run did with an ending's merge (`landed`), unless it found nothing staged; how many times it was
+ * spoken to, and how many before it was filed while it is on its first try (`saidBeforeWord`); and what it was denied. Its cost goes beside
+ * its word once measured, unless the word already shows it.
  *
  * @param assessed `assess` on the run's one read: the tries, rounds and send-backs due, read here and never judged again.
  * @param stoodOf Where a step stands on this pass (`stepWords`).
@@ -372,7 +381,7 @@ function listedSteps(
         : takenByHand(step.name)
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
-    const note = [tried, gate, row.note, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    const note = [tried, gate, row.note, landingWord(run, step.name), notedSaid(run, step.name, saidTo)].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...taskRow(run.steps[step.name]?.taskId, ranOnOf, deniedOf), ...cost };
   });

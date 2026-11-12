@@ -113,13 +113,16 @@ export type RunSay = typeof RunSay.Type;
 
 /**
  * What the session's harness took and the engine journalled: when, on which attempt, the words as said (`text`, an agent's in its
- * frame), and what they came after; where an agent wrote them, which (`from`) and its words without the frame (`words`).
+ * frame), and what they came after; where an agent wrote them, which (`from`) and its words without the frame (`words`). Or, for a step
+ * not filed yet, the words kept for its first try and not delivered (`kept: true`): when they were kept, its first attempt, and nothing
+ * they came after.
  */
 export const RunSaid = Schema.Struct({
   at: Schema.String,
   attempt: Schema.Finite,
   text: Schema.String,
   after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(SAID_AFTER), id: Schema.String })),
+  kept: Schema.optionalKey(Schema.Literal(true)),
   from: Schema.optionalKey(ChatSpeaker),
   words: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunSaid' });

@@ -10,7 +10,8 @@ import { goingBackRefused, parseVersion, STORE_READABLE_FROM, versionTag } from 
 test('a tag reads as its version with or without its v, and a tag that is no version reads as none', () => {
   assert.deepEqual(parseVersion('v1.2.3'), { major: 1, minor: 2, patch: 3 });
   assert.deepEqual(parseVersion('1.20.0'), { major: 1, minor: 20, patch: 0 });
-  for (const text of ['v1', 'v1.2', 'v1.2.3-rc.1', 'latest', '', 'v-1.2.3', 'v1.2.3.4']) assert.equal(parseVersion(text), null, text);
+  for (const text of ['v1', 'v1.2', 'v1.2.3-rc.1', 'latest', '', 'v-1.2.3', 'v1.2.3.4', 'v1.0.0 ', ' v1.0.0', 'v1.0.0/../..', 'v1.2.3.'])
+    assert.equal(parseVersion(text), null, text);
   assert.equal(versionTag({ major: 1, minor: 2, patch: 3 }), 'v1.2.3');
 });
 

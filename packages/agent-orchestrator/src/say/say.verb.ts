@@ -7,8 +7,8 @@
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
-import { tryOf, type Run } from '../record/record.ts';
-import { sayRefusal, type Said } from './say.ts';
+import { tryOf, type Run, type SaidBefore } from '../record/record.ts';
+import { saidAhead, sayRefusal, type Said } from './say.ts';
 import type { Caller } from '../caller/index.ts';
 import { framedForStep, stepSpeaker, type Speaker } from '../chat/chat.ts';
 import { readSpeakers } from '../chat/chat.store.ts';
@@ -24,6 +24,13 @@ import { RunId } from '../record/record.model.ts';
  * who the words are from (`from`).
  */
 export type Told = { run: Run; taskId: string; try: number; said: Said; from: Speaker };
+
+/**
+ * What `nemia say` did with words for a step nothing of which is filed yet: kept them beside the run's record, for its first try's brief
+ * (`saidBeforeSection`), with when and the words as kept (`kept`, an agent's in its frame), and who they are from (`from`). Nothing was
+ * delivered: no session of the step runs yet.
+ */
+export type Kept = { run: Run; try: 1; kept: SaidBefore; from: Speaker };
 
 /**
  * Who says words to a step: the `caller` the request is (a session by its token, or the person with none), and who the words say they
@@ -53,9 +60,15 @@ const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidWho) {
  * of its own, and `nemia ls` and `nemia decide` read the words back off the engine's view of the task. Only the step's own task is read:
  * the engine's `say` observes its harness again, and a run's other tasks have no part in it.
  *
+ * A step nothing of which is filed yet — waiting on `--after`, a hold, the store's pause or an earlier step — has no session to hear
+ * anything, and its words are kept instead, beside the run's record (`keptFor`, answered as `Kept`): its first try's brief carries them,
+ * and no try after it. The engine is not asked. A pass that files the step while the words are being kept may compose its brief before
+ * they are there: the record is the tick's, and a person's file beside it is read on the next filing, which for that step is no first try.
+ *
  * Refused before the engine is asked, with what to do instead: words from a speaker the step's rule refuses, `Invalid` or `Conflict`
- * (`stepSpeaker`); then (`sayRefusal`) a step the run does not have, a cancelled run, a step with no task filed, and one whose task has
- * settled — each a `Conflict`. Then the engine's refusals, each a `Conflict` in the engine's words — empty words, an attempt not started, a
+ * (`stepSpeaker`); then (`sayRefusal`) a step the run does not have, a cancelled run, a pruned run's step not filed, a step whose tries are
+ * behind it with none filed now, and one whose task has settled — each a `Conflict`; and empty words for a step not filed, a `Conflict` as
+ * the engine's is. Then the engine's refusals, each a `Conflict` in the engine's words — empty words, an attempt not started, a
  * harness with no way in, a session its harness does not list running — and a failure to deliver, as the engine throws it, which journals
  * nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's (`toldBy`) or one a read threw; dies of anything
  * else, a failure to deliver included (`tried`, `asked`).
@@ -68,14 +81,30 @@ export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, 
   const taskId = run.steps[stepName]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
   const refused = sayRefusal(steps, run, stepName, () => phase);
-  if (refused || !taskId)
+  if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
+  if (saidAhead(run, stepName)) return yield* keptFor(run, stepName, text, from);
+  if (!taskId)
     return yield* Effect.fail(
-      new Conflict({
-        message: refused ?? `${stepName} has not been filed yet, so there is no session to hear anything: nemia ls ${run.id}.`,
-      }),
+      new Conflict({ message: `${stepName} has no task filed, so there is no session to hear anything: nemia ls ${run.id}.` }),
     );
   const said = yield* toldBy(e, taskId, framedForStep(from, text));
   return { run, taskId, try: tryOf(run, stepName), said, from } satisfies Told;
+});
+
+/**
+ * Words for a step nothing of which is filed yet, kept beside the run's record (`said.put`), framed as they would be said to its session
+ * (`framedForStep`), for its first try's brief. Empty words are refused `Conflict`, as the engine refuses them of a session, and nothing
+ * is kept.
+ */
+const keptFor = Effect.fnUntraced(function* (run: Run, stepName: string, text: string, from: Speaker) {
+  if (!text.trim())
+    return yield* Effect.fail(
+      new Conflict({
+        message: `\`text\` is empty: there is nothing to keep for ${stepName}. Give the words: nemia say ${run.id} ${stepName} "<words>".`,
+      }),
+    );
+  const kept = yield* (yield* RunDoor).said.put(RunId.read(run.id), stepName, framedForStep(from, text));
+  return { run, try: 1, kept, from } satisfies Kept;
 });
 
 /**

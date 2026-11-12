@@ -67,6 +67,7 @@ test('a closeout read with no fields keeps its short output fields and names the
   const every = closeoutNarrowed(closeoutOf(10), ['*']);
   assert.deepEqual(Object.keys(every.output), ['short', 'long']);
   assert.deepEqual(every.outputLeftOut, []);
+  assert.deepEqual(every.raw, { whole: true });
   assert.deepEqual(Object.keys(closeoutNarrowed(closeoutOf(10), ['long']).output), ['long']);
 });
 

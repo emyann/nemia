@@ -36,6 +36,9 @@ const LIST: PolicyList = {
 };
 
 /** Every call answering `body` as JSON, with `status`, for the length of the test; the calls made, by method and path. */
+/** A body as the client sent it, as text: a string as it is, bytes decoded. */
+const textOf = (body: BodyInit | null): string => (typeof body === 'string' ? body : new TextDecoder().decode(body as Uint8Array));
+
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200): { method: string; path: string; body: unknown }[] {
   const before = globalThis.fetch;
   const calls: { method: string; path: string; body: unknown }[] = [];
@@ -43,7 +46,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
     calls.push({
       method: init?.method ?? 'GET',
       path: String(input),
-      body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
+      body: init?.body === undefined ? undefined : JSON.parse(textOf(init.body)),
     });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
@@ -63,14 +66,14 @@ test('policyQuery, confirmRule, dropRule: her rules read back as the api answers
     assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
   });
   await t.test(
-    'a confirm is a PUT sending the words read and a drop a DELETE sending no body (its endpoint declares none), each reading the rules back',
+    'a confirm is a PUT sending the words read and a drop a DELETE sending `{}` (its endpoint declares no body), each reading the rules back',
     async (t) => {
       const calls = answering(t, LIST);
       assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
       assert.deepEqual(await dropRule('nemia', 'default'), LIST);
       assert.deepEqual(calls, [
         { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
-        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: undefined },
+        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
       ]);
     },
   );

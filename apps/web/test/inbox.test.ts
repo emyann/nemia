@@ -375,7 +375,12 @@ const cardAnswer = (name: string, namespace = 'default') => ({
 });
 /** Each request sent: its path, method, content type and body. */
 const asSent = (sent: Array<{ url: string; init: RequestInit | undefined }>) =>
-  sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body ?? undefined]);
+  sent.map(({ url, init }) => [
+    url,
+    init?.method,
+    new Headers(init?.headers).get('content-type'),
+    init?.body == null ? undefined : typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body as Uint8Array),
+  ]);
 
 test('fileCard, dropCard, startCard, queueCard: what the board sends the api for a card, through the Card verbs', async (t) => {
   await t.test(
@@ -418,15 +423,15 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
     },
   );
   await t.test(
-    "a card is dropped by its namespace and name in the path, sent as JSON with no body; a refusal rejects with the api's words",
+    "a card is dropped by its namespace and name in the path, sent as `{}` in JSON; a refusal rejects with the api's words",
     async (t) => {
       let answer = (): Response => answered(200, cardAnswer('a b'));
       const sent = sending(t, () => answer());
       await dropCard({ name: 'a b', factory: null });
       await dropCard({ name: 'c', factory: 'pair' });
       assert.deepEqual(asSent(sent), [
-        ['/api/namespaces/default/cards/a%20b', 'DELETE', 'application/json', undefined],
-        ['/api/namespaces/pair/cards/c', 'DELETE', 'application/json', undefined],
+        ['/api/namespaces/default/cards/a%20b', 'DELETE', 'application/json', '{}'],
+        ['/api/namespaces/pair/cards/c', 'DELETE', 'application/json', '{}'],
       ]);
 
       answer = () => answered(404, { error: 'no card gone-k2q9' });
@@ -461,15 +466,15 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
     },
   );
   await t.test(
-    "a card is queued and taken off the queue by its own verbs, POST, each sent as JSON with no body; a refusal rejects with the api's words",
+    "a card is queued and taken off the queue by its own verbs, POST, each sent as `{}` in JSON; a refusal rejects with the api's words",
     async (t) => {
       let answer = (): Response => answered(200, cardAnswer('a b'));
       const sent = sending(t, () => answer());
       assert.equal((await queueCard({ name: 'a b', factory: 'pair' })).metadata.name, 'a b');
       await queueCard({ name: 'a b', factory: 'pair' }, { off: true });
       assert.deepEqual(asSent(sent), [
-        ['/api/namespaces/pair/cards/a%20b/queue', 'POST', 'application/json', undefined],
-        ['/api/namespaces/pair/cards/a%20b/unqueue', 'POST', 'application/json', undefined],
+        ['/api/namespaces/pair/cards/a%20b/queue', 'POST', 'application/json', '{}'],
+        ['/api/namespaces/pair/cards/a%20b/unqueue', 'POST', 'application/json', '{}'],
       ]);
 
       answer = () => answered(422, { error: 'bare.md: no workflow' });

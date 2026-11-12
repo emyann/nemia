@@ -11,21 +11,25 @@ import { cardKeysOf, setCardFrom } from '../src/lib/api/inbox.ts';
 import { cardObject } from './factory-fixtures.ts';
 
 test("cardKeysOf: a Card's keys as the card page's rows, in order, each with its meaning", async (t) => {
-  await t.test('every key set: queued its time, from comma-joined, labels as a=b,c=d in key order, factory its namespace', () => {
-    const card = cardObject({
-      metadata: { namespace: 'mill', labels: { team: 'web', area: 'board' } },
-      spec: { gate: 'design', from: ['r-1', 'r-2'], queued: '2026-09-30T05:01:00.000Z' },
-    });
-    assert.deepEqual(cardKeysOf(card), [
-      { key: 'workflow', value: 'build', meaning: CARD_KEY_MEANINGS.workflow },
-      { key: 'repo', value: '/work/repo', meaning: CARD_KEY_MEANINGS.repo },
-      { key: 'queued', value: '2026-09-30T05:01:00.000Z', meaning: CARD_KEY_MEANINGS.queued },
-      { key: 'gate', value: 'design', meaning: CARD_KEY_MEANINGS.gate },
-      { key: 'factory', value: 'mill', meaning: CARD_KEY_MEANINGS.factory },
-      { key: 'from', value: 'r-1, r-2', meaning: CARD_KEY_MEANINGS.from },
-      { key: 'labels', value: 'area=board,team=web', meaning: CARD_KEY_MEANINGS.labels },
-    ]);
-  });
+  await t.test(
+    'every key set: queued its time, models and from comma-joined, labels as a=b,c=d in key order, factory its namespace',
+    () => {
+      const card = cardObject({
+        metadata: { namespace: 'mill', labels: { team: 'web', area: 'board' } },
+        spec: { gate: 'design', model: { implement: 'fable', review: 'opus' }, from: ['r-1', 'r-2'], queued: '2026-09-30T05:01:00.000Z' },
+      });
+      assert.deepEqual(cardKeysOf(card), [
+        { key: 'workflow', value: 'build', meaning: CARD_KEY_MEANINGS.workflow },
+        { key: 'repo', value: '/work/repo', meaning: CARD_KEY_MEANINGS.repo },
+        { key: 'queued', value: '2026-09-30T05:01:00.000Z', meaning: CARD_KEY_MEANINGS.queued },
+        { key: 'gate', value: 'design', meaning: CARD_KEY_MEANINGS.gate },
+        { key: 'model', value: 'implement=fable, review=opus', meaning: CARD_KEY_MEANINGS.model },
+        { key: 'factory', value: 'mill', meaning: CARD_KEY_MEANINGS.factory },
+        { key: 'from', value: 'r-1, r-2', meaning: CARD_KEY_MEANINGS.from },
+        { key: 'labels', value: 'area=board,team=web', meaning: CARD_KEY_MEANINGS.labels },
+      ]);
+    },
+  );
   await t.test('a key the card does not set is null; the default namespace is no factory', () => {
     const card = cardObject({ metadata: { namespace: 'default' } });
     const { workflow: _, repo: __, queued: ___, ...bare } = card.spec;
@@ -36,7 +40,7 @@ test("cardKeysOf: a Card's keys as the card page's rows, in order, each with its
     );
     assert.deepEqual(
       rows?.map((row) => row.value),
-      [null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
     );
   });
   await t.test('an entry that does not read as a card has no keys', () => {

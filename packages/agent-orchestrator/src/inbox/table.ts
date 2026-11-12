@@ -1,10 +1,12 @@
 /**
  * The inbox as a table (`objects`' `Table`, Kubernetes' server-side printing): the columns `nemia inbox` prints of each entry and a row's
  * cells, in their order, from the same judgement as its lines (`inboxLines`): the name, the first line of the card or why the entry does
- * not read as one, its workflow, repository, gate and factory, its place in the queue, the tick's last missed start of it, its state as a
+ * not read as one, its workflow, repository, gate, models and factory, its place in the queue, the tick's last missed start of it, its
+ * state as a
  * person reads it beside its run, the runs it was started as, and its labels. A client prints the cells and keeps no printer of its own.
  * Pure.
  */
+import { modelsText } from '../start/index.ts';
 import type { TableColumnDefinition } from 'objects';
 import { labelsText } from '../labels/labels.ts';
 import { cardLabels, phaseSaid, triedClause, type InboxListing } from './inbox.ts';
@@ -30,6 +32,7 @@ export const INBOX_COLUMNS: readonly TableColumnDefinition[] = [
   column('Workflow', 'the workflow the card names, empty where it names none'),
   column('Repo', 'the repository the card is about, empty where it names none'),
   column('Gate', 'the step whose closeout waits for a person in the run the card starts, empty where it names none', 1),
+  column('Model', "each step's model in the run the card starts, as <step>=<model>, empty where it names none", 1),
   column('Factory', 'the factory the card is started in, empty for the default one'),
   column('Queued', 'the place of a queued card among every card queued, from 1; null where it is not queued', 0, 'integer'),
   column('Last start', "the tick's last start of the queued card that did not happen, and what to do, empty where none", 1),
@@ -48,6 +51,7 @@ export const inboxCells = (l: InboxListing, unfactoredStarts: boolean): readonly
   l.workflow ?? '',
   l.repo ?? '',
   l.gate ?? '',
+  l.model ? modelsText(l.model) : '',
   l.factory ?? '',
   l.queued?.place ?? null,
   triedClause(l, unfactoredStarts).replace(/^ — /, ''),

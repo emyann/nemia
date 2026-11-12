@@ -105,6 +105,6 @@ test("each of a card's keys has one meaning, and the Card's spec fields carry th
   const schemas = OpenApi.fromApi(Api).components.schemas as Record<string, any>;
   const resolve = (s: any): any => (s?.$ref ? resolve(schemas[s.$ref.split('/').pop()]) : s);
   const spec = resolve(resolve(schemas['Card']).properties.spec);
-  for (const key of ['workflow', 'repo', 'gate', 'from', 'queued'] as const)
+  for (const key of ['workflow', 'repo', 'gate', 'model', 'from', 'queued'] as const)
     assert.equal(spec.properties[key].description, CARD_KEY_MEANINGS[key], key);
 });

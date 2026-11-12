@@ -3,10 +3,10 @@
  * `run-store.test.ts` and on the memory stand-in by `src/runs/memory.store.test.ts`. A run made is read back with a person's files composed
  * onto it and written back with none; a record gone is not made again; whether a run is there, taken and called off; the stamps a pass
  * compares; an ask of each kind written once at its name, read, consumed and answered from; a hold, a refresh ask and a prune marker put
- * and taken back; a run's labels put whole and taken away by an empty map; a cancellation kept as first written; a run forgotten; the
- * markers of what `nemia rm` forgets. And the write check: a new run or one written back that breaks an invariant of the model's `Run` is
- * refused `Invalid` and nothing is written, and a new run at an id already made is refused `Conflict`, the first left as it was, as is a
- * second run from one card while the first stands.
+ * and taken back; a run's labels put whole and taken away by an empty map; words said before a step was filed kept each, in order; a
+ * cancellation kept as first written; a run forgotten; the markers of what `nemia rm` forgets. And the write check: a new run or one
+ * written back that breaks an invariant of the model's `Run` is refused `Invalid` and nothing is written, and a new run at an id already
+ * made is refused `Conflict`, the first left as it was, as is a second run from one card while the first stands.
  *
  * Each row's ids are its own: the files side is one store for the whole file.
  */
@@ -319,13 +319,14 @@ const RUNS: Record<string, Walk[]> = {
           act(door.refresh.put(idOf(id)));
           act(door.labels.put(idOf(id), { team: 'core' }));
           act(door.asks.write(idOf(id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } }));
+          act(door.said.put(idOf(id), 'implement', 'Widen the scope.'));
         }
         const removed = act(door.runs.forget(idOf('w-forget')));
         const kept = act(door.runs.read(idOf('w-forget-other'))) as Run;
         return {
           removed,
           taken: act(door.runs.taken(idOf('w-forget'))),
-          kept: Boolean(kept.cancelledAt && kept.pruned && kept.hold && kept.labels && kept.approvals),
+          kept: Boolean(kept.cancelledAt && kept.pruned && kept.hold && kept.labels && kept.approvals && kept.saidBefore),
           again: act(door.runs.forget(idOf('w-forget'))),
         };
       },
@@ -338,6 +339,7 @@ const RUNS: Record<string, Walk[]> = {
           'runs/w-forget.refresh',
           'runs/w-forget.labels',
           'runs/w-forget.asks/',
+          'runs/w-forget.said/',
         ],
         taken: false,
         kept: true,
@@ -614,6 +616,52 @@ const LABELS: Record<string, Walk[]> = {
   ],
 };
 
+const SAID: Record<string, Walk[]> = {
+  'said.put': [
+    {
+      name: 'words said before a step was filed are kept each, read back composed onto the run by step in the order said, with when',
+      walk: ({ door }) => {
+        made(door, 'w-said');
+        const plain = (act(door.runs.read(idOf('w-said'))) as Run).saidBefore;
+        const first = act(door.said.put(idOf('w-said'), 'review', 'Look at the parser first.')) as { at: string; text: string };
+        act(door.said.put(idOf('w-said'), 'implement', 'Widen the scope.'));
+        act(door.said.put(idOf('w-said'), 'review', 'And the lexer.'));
+        const read = (act(door.runs.read(idOf('w-said'))) as Run).saidBefore;
+        const found = (act(door.runs.find(idOf('w-said'))) as Run | undefined)?.saidBefore;
+        const texts = (said: Run['saidBefore']) =>
+          Object.fromEntries(Object.entries(said ?? {}).map(([step, words]) => [step, words.map((w) => w.text)]));
+        return {
+          plain,
+          first: [first.text, read?.review?.[0]?.at === first.at],
+          read: texts(read),
+          found: texts(found),
+        };
+      },
+      says: {
+        plain: undefined,
+        first: ['Look at the parser first.', true],
+        read: { review: ['Look at the parser first.', 'And the lexer.'], implement: ['Widen the scope.'] },
+        found: { review: ['Look at the parser first.', 'And the lexer.'], implement: ['Widen the scope.'] },
+      },
+    },
+    {
+      name: "a word kept moves its run's stamp, and another run's stands",
+      walk: ({ door }) => {
+        made(door, 'w-said-stamp');
+        made(door, 'w-said-stamp-other');
+        const before = act(door.runs.stamps()) as Map<string, string>;
+        act(door.said.put(idOf('w-said-stamp'), 'implement', 'Widen the scope.'));
+        const after = act(door.runs.stamps()) as Map<string, string>;
+        return [
+          before.get('w-said-stamp') === after.get('w-said-stamp'),
+          before.get('w-said-stamp-other') === after.get('w-said-stamp-other'),
+        ];
+      },
+      says: [false, true],
+    },
+  ],
+};
+
 const FORGETTING: Record<string, Walk[]> = {
   'forgetting.write': [
     {
@@ -668,4 +716,4 @@ const FORGETTING: Record<string, Walk[]> = {
 };
 
 /** The Run door's walks, by method: every method of `RunDoorShape` has one, or `walksOn`'s first test fails. */
-export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = { ...RUNS, ...ASK_WALKS, ...HOLDS, ...LABELS, ...FORGETTING };
+export const RUN_WALKS: Readonly<Record<string, readonly Walk[]>> = { ...RUNS, ...ASK_WALKS, ...HOLDS, ...SAID, ...LABELS, ...FORGETTING };

@@ -71,6 +71,13 @@ export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) 
  */
 export type Hold = { at: string; until: readonly string[]; why?: string; by?: string };
 
+/**
+ * Words said to a step before it was filed (`nemia say` to a step with no task and no try behind it): when, and the words as said — an
+ * agent's in the frame that names it (`framedForStep`), as the engine journals words said to a session. A person's fact, kept beside the
+ * record and composed onto it as `saidBefore` (the model's), for the step's first try's brief (`saidBeforeSection`).
+ */
+export type SaidBefore = { at: string; text: string };
+
 /** The longest a hold's why is kept and shown (`nemia hold --why`): what is over it is clipped with `…` (`oneLine`). */
 export const WHY_CAP = 200;
 
@@ -472,14 +479,15 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
  * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
  * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), read by the Run door alone (`RunDoor`,
  * `src/runs/runs.store.ts`). What the tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds`,
- * `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a person's cards,
- * which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * `said`, `labels`, `refresh` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a
+ * person's cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {
     /**
-     * A run: its record, with the person's files composed onto it — the cancellation, the pruning, the hold, the labels, the approvals and
-     * the acceptances. Refused: an id with no record (`Missing`), and a record that does not read as a run (`UnreadableRecord`).
+     * A run: its record, with the person's files composed onto it — the cancellation, the pruning, the hold, the labels, what was said to
+     * a step before it was filed, the approvals and the acceptances. Refused: an id with no record (`Missing`), and a record that does
+     * not read as a run (`UnreadableRecord`).
      */
     readonly read: (id: string) => Run;
     /**
@@ -522,8 +530,8 @@ export type RunStore = {
     readonly cancel: (id: string) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
-     * the hold, the refresh ask, the labels, the asks and the run's own directory, in that order — and answer with each path removed, from
-     * `WF_ROOT`, a directory's with a trailing `/`. Writes nothing.
+     * the hold, the refresh ask, the labels, the asks, what was said before a step was filed and the run's own directory, in that
+     * order — and answer with each path removed, from `WF_ROOT`, a directory's with a trailing `/`. Writes nothing.
      */
     readonly forget: (id: string) => string[];
     /**
@@ -568,6 +576,13 @@ export type RunStore = {
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
     /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
     readonly stands: (id: string) => boolean;
+  };
+  readonly said: {
+    /**
+     * Keep words said to the step `step` before it was filed, each in a file of its own written exclusively, so two said at once are both
+     * kept and in the order taken: the words kept, with when. Never edited, and removed with the run.
+     */
+    readonly put: (id: string, step: string, text: string) => SaidBefore;
   };
   readonly labels: {
     /**

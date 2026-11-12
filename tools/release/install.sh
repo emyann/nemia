@@ -145,6 +145,27 @@ fetch() {
   esac
 }
 
+# A release tag is v and three numbers, digits and dots alone, checked before anything is downloaded or deleted: it names the folder
+# releases/<tag> that is removed and replaced, so a '/', a '..', a space or a pre-release suffix never reaches the disk. It is the shape
+# nemia upgrade reads a published tag in (parseVersion, packages/agent-orchestrator/src/release/floor.ts).
+check_tag() {
+  case $tag in
+    v[0-9]*.[0-9]*.[0-9]*) ;;
+    *) bad_tag "$1" ;;
+  esac
+  case ${tag#v} in
+    *[!0-9.]* | *..* | *.*.*.* | *.) bad_tag "$1" ;;
+  esac
+}
+# bad_tag <where it was read>: the refusal, naming the fix for where the tag came from.
+bad_tag() {
+  case $1 in
+    --version) fail "--version '$tag' is no release tag: a tag is v and three numbers, digits and dots alone; pass one, like --version v1.2.3" ;;
+    *) fail "$1 names the tag '$tag', no release tag (v and three numbers, digits and dots alone): nothing was downloaded; fix that base or pass --base <another>, or name the release with --version v<x.y.z>" ;;
+  esac
+}
+[ -z "$tag" ] || check_tag --version
+
 root=${WF_ROOT:-$HOME/.agent-workflows}
 releases=$root/releases
 mkdir -p "$releases"
@@ -155,11 +176,8 @@ if [ -z "$tag" ]; then
   fetch "$base/latest/download/latest.json" "$work/latest.json" ||
     fail "could not read $base/latest/download/latest.json: check your network, or pass --version <tag>"
   tag=$(sed -n 's/.*"tag"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$work/latest.json")
+  check_tag "$base/latest/download/latest.json"
 fi
-case $tag in
-  v[0-9]*.[0-9]*.[0-9]*) ;;
-  *) fail "no release tag read (got '$tag'): pass --version v<x.y.z>" ;;
-esac
 
 asset=nemia-$tag-$platform.tar.gz
 say "downloading $asset"

@@ -106,7 +106,9 @@ To move Node, set `version` in `node.json` and the three sums from `https://node
 
 **What `install.sh` does.** It reads the platform from `uname`, refuses where `git`, `tar`, `curl` or `wget`, or `sha256sum` or `shasum`
 is missing, and on Linux warns where `systemd --user` or cgroup v2 is (each a service's need, not the install's). It downloads the archive
-and `SHA256SUMS` (the tag from `latest.json` unless `--version`), refuses an archive whose sum differs, unpacks it into
+and `SHA256SUMS` (the tag from `latest.json` unless `--version`, refused before anything is downloaded or deleted unless it is `v` and
+three numbers, digits and dots alone, as `nemia upgrade` reads a published one, so no tag reaches above `releases/` and no pre-release
+is taken), refuses an archive whose sum differs, unpacks it into
 `$WF_ROOT/releases/<tag>` through a hidden folder renamed into place, points `releases/current` at it by a relative link renamed over
 the old one, and links `~/.local/bin/nemia`. Then it asks, or with `--yes` reads its flags: the Claude token (`--claude-token-file`,
 given to `nemia claude-token set` on its stdin), starting at login (`nemia service install --size auto`, `--no-service` to skip,

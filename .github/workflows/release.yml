@@ -1,7 +1,9 @@
 # Nemia's releases: a pull request this workflow keeps open, and the tag and GitHub release its merge makes (tools/release/README.md).
 # Each job runs one verb of tools/release/release.ts, which decides from the tags, main, the release branch, the merged pull requests
-# and the release pull request as they are, so a rerun with nothing changed does nothing. Nothing is published to npm and no artifact is
-# attached. tools/guards/test/release-workflow.test.ts holds this file.
+# and the release pull request as they are, so a rerun with nothing changed does nothing. Nothing is published to npm. A release whose
+# assets are not all attached (its latest.json, attached last, is missing) is built for each platform by tools/release/archive.ts and
+# its assets attached by the upload job, so a run cut off mid-way attaches them on the next. tools/guards/test/release-workflow.test.ts
+# holds this file.
 name: release
 
 # Every landing on main, and by hand (gh workflow run release.yml) after a pull request's label is changed. The sibling trigger that
@@ -54,6 +56,9 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.due.outputs.tag }}
+      due: ${{ steps.due.outputs.due }}
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
@@ -71,6 +76,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts tag
+      - name: Say whether the release of the version main names lacks its assets
+        # due=true where that release exists and has no latest.json, the asset attached last; false where it has, or where there is
+        # no release to attach to.
+        id: due
+        timeout-minutes: 3
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if ! assets=$(gh release view "$tag" --json assets --jq '.assets[].name'); then
+            echo "due=false" >> "$GITHUB_OUTPUT"
+          elif printf '%s\n' "$assets" | grep -qx latest.json; then
+            echo "due=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "due=true" >> "$GITHUB_OUTPUT"
+          fi
 
   pr:
     needs: [tag]
@@ -103,3 +126,87 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts pr
+
+  # One archive per platform, each built on a runner of that platform: npm ci there takes the platform's own Claude binary. The labels
+  # are GitHub's standard runners (docs.github.com, Actions, GitHub-hosted runners): ubuntu-24.04 is x64, ubuntu-24.04-arm arm64, and
+  # macos-15 arm64 (M1). No concurrency group: legs of one group would cancel each other while pending.
+  archive:
+    needs: [tag]
+    if: needs.tag.outputs.due == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+          - platform: darwin-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/setup-node@v7
+        timeout-minutes: 3
+        with:
+          node-version: '24.16.0'
+      - name: Build the archive of this platform
+        # npm ci twice (the checkout, then production dependencies in the copy) and the pinned Node's download.
+        timeout-minutes: 35
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          TAG: ${{ needs.tag.outputs.tag }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}/releases
+        run: node tools/release/archive.ts --platform "$PLATFORM" --tag "$TAG" --source "$SOURCE" --out assets
+      - uses: actions/upload-artifact@v7
+        timeout-minutes: 5
+        with:
+          name: archive-${{ matrix.platform }}
+          path: assets/
+          if-no-files-found: error
+
+  # Every asset onto the release: the three archives, their SHA256SUMS merged, install.sh, and latest.json last, which says the
+  # release is whole. --clobber makes a rerun replace what an earlier one attached.
+  upload:
+    needs: [tag, archive]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: release-upload
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+      - uses: actions/download-artifact@v8
+        timeout-minutes: 5
+        with:
+          pattern: archive-*
+          path: parts
+      - name: Gather the assets
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          mkdir assets
+          cp parts/*/nemia-*.tar.gz assets/
+          cat parts/*/SHA256SUMS | sort -k2 > assets/SHA256SUMS
+          cp tools/release/install.sh assets/
+          printf '{ "tag": "%s", "version": "%s" }\n' "$TAG" "${TAG#v}" > assets/latest.json
+      - name: Attach the assets to the release, latest.json last
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          gh release upload "$TAG" assets/nemia-*.tar.gz assets/SHA256SUMS assets/install.sh --clobber
+          gh release upload "$TAG" assets/latest.json --clobber

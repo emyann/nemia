@@ -9,7 +9,7 @@
  * api answers it to a list asked for a `Table` (`TABLE_ACCEPT`), so no client keeps a printer of the runs. Pure.
  */
 import type { Run, RunList, RunStepStatus, RunUnjudged, Table, TableColumnDefinition } from 'objects';
-import { ranOnWords } from '../release/release.ts';
+import { ranOnWords } from '../release/index.ts';
 
 /** How much of a brief's first line a row shows, as `nemia ls` cuts it. */
 const BRIEF_WIDTH = 56;

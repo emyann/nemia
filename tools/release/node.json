@@ -1,0 +1,9 @@
+{
+  "version": "24.16.0",
+  "source": "https://nodejs.org/dist",
+  "sha256": {
+    "linux-x64": "2faf6a387e9b62b888e21c54f01249fb27537ffecf1842f29f4c919d0a59a0ff",
+    "linux-arm64": "589f5b6dd4fcfee4dfda73013903c966abaa8abd93dbc9d436544e472b4f0e74",
+    "darwin-arm64": "39189dab4eeb15706c424af0ac08a3044c9e48f7db12a7d77f6b7aafc7dd5df6"
+  }
+}

@@ -49,7 +49,7 @@
     },
     {
       "term": "Caller",
-      "meaning": "who a request is from, as the api resolves it before any router is reached (`callerGate`, `apps/api/src/caller/caller.ts`): the person where it presents no `Authorization`, an agent's session by the session token it presents as `Authorization: Bearer <token>`, asked of the orchestrator (`sessionCaller`). A token refused, or a header that is no bearer, is a 401 `Unauthorized` with its reason on any route. A handler reads it as `caller` (`Served`, `apps/api/src/layer.ts`), and a proposal's and a delegation's handlers hand it to the orchestrator's programs (`apps/api/src/proposals/`), which judge it: a refusal by who calls is a 403 `Forbidden` with its reason.",
+      "meaning": "who a request is from, as the api resolves it before any router is reached (`callerGate`, `apps/api/src/caller/caller.ts`): the person where it presents no `Authorization`, an agent's session or the person by the token it presents as `Authorization: Bearer <token>`, or, on the api's own paths, by the board's HttpOnly cookie (`TOKEN_COOKIE`, set by `POST /api/session`, `apps/api/src/server/session.ts`), asked of the orchestrator (`sessionCaller`). What a path needs of a token is `needOf`'s: a page of the board none, exposed or not. A token refused, or a header that is no bearer, is a 401 `Unauthorized` with its reason on any route. A handler reads it as `caller` (`Served`, `apps/api/src/layer.ts`), and a proposal's and a delegation's handlers hand it to the orchestrator's programs (`apps/api/src/proposals/`), which judge it: a refusal by who calls is a 403 `Forbidden` with its reason.",
       "see": {
         "label": "The api",
         "href": "/map/#the-api"
@@ -145,7 +145,7 @@
     },
     {
       "term": "Port",
-      "meaning": "the MCP endpoint of the api, `POST /mcp` (`apps/api/src/mcp/port.ts`): Streamable HTTP, stateless, a Hono route beside the OpenAPI routes and the one route that is no endpoint of `objects`' `Api`. It needs a person's token, and serves the port tools by calling the `Api`'s own endpoints in-process with the caller's `Authorization`, so every refusal is the api's own."
+      "meaning": "the MCP endpoint of the api, `POST /mcp` (`apps/api/src/mcp/port.ts`): Streamable HTTP, stateless, a Hono route beside the OpenAPI routes and the board's pages (`apps/api/src/board/board.ts`), none of them an endpoint of `objects`' `Api`. It needs a person's token, and serves the port tools by calling the `Api`'s own endpoints in-process with the caller's `Authorization`, so every refusal is the api's own."
     },
     {
       "term": "Port tool",

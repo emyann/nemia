@@ -1,0 +1,141 @@
+---
+title: Install
+description: Install a released Nemia on a Linux or macOS machine with one command, as a server or as a client of one, and keep it up to date.
+---
+
+A released Nemia is one archive per platform: Linux on x64 or arm64, and macOS on Apple silicon. It carries its own Node, the code,
+the production dependencies with that platform's Claude Code, the board's built pages and the templates. Nothing else is installed
+system-wide, and no root is needed. A dedicated machine, such as a small VPS running Ubuntu 24.04, is the first place it is made for.
+
+## Install
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
+```
+
+The installer checks the machine first: it needs git, tar, curl or wget, and sha256sum or shasum. On Linux it also looks for
+systemd's user manager and cgroup v2, which the service and per-session memory limits need, and warns where one is missing rather than
+stopping. Then it downloads the archive for this machine and the release's checksums, refuses an archive whose checksum differs, and
+lays the release down:
+
+- the release folder in `~/.agent-workflows/releases/<tag>` (the store, `WF_ROOT` where you set it), unpacked beside it and renamed
+  into place, so it is there whole or not at all;
+- the release's pointer, the link `current` beside it, moved to it;
+- the command, `~/.local/bin/nemia`, a link to the release's own launcher. Put `~/.local/bin` on your PATH if the installer says it is
+  not.
+
+Then it asks three things, each of which you can also answer by a flag with `--yes`, for a machine you set up by script:
+
+- **Your Claude token** (below), which it hands to `nemia claude-token set` on its standard input. With `--yes`, pass it as a file:
+  `--claude-token-file <file>`.
+- **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
+  with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
+  `loginctl enable-linger`, so Nemia keeps running after you log out. `--no-service` skips it; `nemia up` runs the daemon by hand.
+- **The address to bind** (below). Left empty, the daemon listens on this machine alone.
+
+Other flags: `--version <tag>` installs that release instead of the latest, and `--base <url>` downloads from another place laid out
+as GitHub lays out a release.
+
+The installer never prints your Claude token. It prints one token only: the first person token, once, when you choose a bind address.
+
+## Bind it to a private network
+
+By default the daemon listens on 127.0.0.1, and the board and the api are for this machine only. To use them from your laptop, bind
+the daemon to an address of a private network you trust, such as your Tailscale address:
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind 100.64.0.1
+```
+
+or answer the installer's question with that address. A store bound beyond this machine is marked exposed: every caller then needs a
+person token, the board included, and the server's own `nemia` too. The installer runs `nemia token add` once and prints the first
+token; keep it, it is not shown again. It also keeps that token for the server's own `nemia`, so `nemia ls` and the other reads work
+there as before and the store's other verbs still run on the server itself. Where you bound the daemon by hand, do the same with a
+token of yours in a file:
+
+```bash
+nemia token add server
+nemia config set-context local --token-file ~/.nemia-token
+```
+
+The board asks for a token once and keeps it in a cookie only the board's own origin is sent.
+
+Nemia speaks plain HTTP. TLS stays outside it: a private network such as Tailscale, which encrypts the traffic between your machines,
+or a reverse proxy of your own in front of it.
+
+## A client of another machine
+
+On your laptop, Nemia can be just the command that talks to the daemon of your server:
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.64.0.1:8787 --token-file ~/.nemia-token
+```
+
+A client install starts no service. It writes a context, a name for that server and the file holding your person token, into
+`~/.config/nemia/config.yaml` (readable by you alone), and makes it the current one. A context is the same idea as kubectl's:
+
+```bash
+nemia config set-context vps --server http://100.64.0.1:8787 --token-file ~/.nemia-token
+nemia config use-context vps
+nemia config get-contexts
+nemia config current-context
+```
+
+Setting `NEMIA_CONTEXT=<name>` picks another context for one command. Under a remote context, the reads and the client verbs (runs,
+proposals, the inbox, decisions) reach the server. A verb only the server's own command has yet is refused there, naming the context
+to leave. The machine's own verbs (the service, upgrade, the daemon, the version, tokens and the Claude token) always act on the
+machine you type them on.
+
+## Your Claude token
+
+The sessions run Claude Code on your Claude subscription. On a server with no browser, make a long-lived token on any machine where
+you are signed in, and give it to the server:
+
+```bash
+claude setup-token
+nemia claude-token set
+```
+
+`claude setup-token` opens the browser sign-in and prints a token valid for a year; paste it into `nemia claude-token set`, which reads
+it from standard input. The token is kept in `~/.agent-workflows/claude-token`, readable by you alone, and the daemon loads it when it
+starts, however it was started. `nemia claude-token status` says whether one is set, never the token itself, and
+`nemia claude-token rm` takes it away. Nemia never sends, logs or serves it, and the board never asks for it.
+
+Each person uses their own token, on their own machine. A server that others use while it runs on one person's token makes that
+person's account available to them, which Anthropic's
+[Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section 2, _Account creation and access_, forbid: "You also
+may not make your Account available to anyone else."
+
+A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
+connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
+itself still work.
+
+## Upgrade, and going back
+
+```bash
+nemia upgrade
+nemia upgrade v1.3.0
+```
+
+`nemia upgrade` installs the latest release, or the one you name, beside the current one, checks it starts, and moves the pointer to
+it. Moving forward, the store is read as it is and never rewritten. Going back is refused past the oldest release that can read the
+store as it now is, and the refusal names that release.
+
+`nemia version` says the release you run and, when there is one, the newer release. The board says it too. To know that, the daemon
+of an installed release reads the release list's newest entry every six hours, sending nothing about you or your store. Set
+`NEMIA_RELEASE_CHECK=off` in its environment to turn that off; a checkout of the repository never checks.
+
+## Signing in from a remote browser
+
+Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as a factory's MCP server
+signing in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser cannot reach. Until Nemia carries
+those sign-ins itself, forward the port over SSH and open the page on your laptop:
+
+```bash
+ssh -L 8787:127.0.0.1:8787 you@your-server
+```
+
+Put the port the sign-in's address names in place of 8787 when it is another. With the tunnel open, the page's call back reaches the
+server.
+
+Signing in to Codex on a server, and a factory naming its repositories by URL to be cloned, come in a later release.

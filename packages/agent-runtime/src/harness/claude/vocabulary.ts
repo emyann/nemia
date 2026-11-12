@@ -8,6 +8,12 @@ import type { SpawnRequest } from '../seam.ts';
 import { CLAUDE_RULES } from './rules.ts';
 
 /**
+ * Claude Code's long-lived token, for a machine with no browser: the subscription token `claude setup-token` prints (`maker`), which
+ * Claude Code reads from `CLAUDE_CODE_OAUTH_TOKEN` (`variable`). The default harness's (`DEFAULT_SIGN_IN`, declaration.ts).
+ */
+export const CLAUDE_SIGN_IN = { variable: 'CLAUDE_CODE_OAUTH_TOKEN', maker: 'claude setup-token' } as const;
+
+/**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
  * speaks it and never in `domain.ts`.
  *

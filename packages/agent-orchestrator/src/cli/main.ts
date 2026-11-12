@@ -60,6 +60,8 @@ import {
   type Ran,
   currentRelease,
   runningRelease,
+  claudeTokenFile,
+  loadClaudeToken,
   trialRefusal,
   checkoutPromiseLine,
   ensureDaemon,
@@ -269,11 +271,14 @@ function upStats(home: string): void {
  * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
  * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, its passes
  * said through the process's telemetry (`telemetryLayer`) and its feed's lines published to its live readers (`feedHubLayer`). A queued
- * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
+ * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`. Before anything it loads the person's sign-in
+ * token file into the environment the sessions inherit, where `CLAUDE_CODE_OAUTH_TOKEN` is unset (`loadClaudeToken`), refused (exit 2)
+ * where the file is readable by others.
  */
 function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<void> {
   const store = wfRoot(env);
   if (args.stats === true) return upStats(store);
+  const signedIn = loadClaudeToken(env);
   const asked = everyOf(typeof args.every === 'string' ? args.every : undefined);
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings(settingsOf(env));
@@ -288,6 +293,7 @@ function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<v
       if (took) console.log(`   ${took}`);
       const promise = checkoutPromiseLine(runningRelease());
       if (promise) console.log(`   ${promise}`);
+      if (signedIn === 'loaded') console.log(`   sessions sign in with the token in ${claudeTokenFile(store)}`);
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'up', onTaken });
   return runMain(

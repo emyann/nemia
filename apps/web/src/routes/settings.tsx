@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { ForgetToken } from '@/components/frame/ForgetToken';
 import { NemiaSettings } from '@/components/nemia/NemiaSettings';
 import { policyQuery } from '@/lib/api/policy';
 import { levelQuery, nemiaMemoryQuery } from '@/lib/api/nemia';
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 });
 
-/** What a person sets for the whole store: Nemia, its own agent (`NemiaSettings`). */
+/** What a person sets for the whole store: Nemia, its own agent (`NemiaSettings`); and this browser's token (`ForgetToken`). */
 function SettingsPage() {
   return (
     <article data-settings className="mx-auto flex max-w-3xl flex-col gap-8">
@@ -27,6 +28,7 @@ function SettingsPage() {
         <p className="text-body-medium text-muted-foreground">What is set for the whole store, across every factory.</p>
       </header>
       <NemiaSettings />
+      <ForgetToken />
     </article>
   );
 }

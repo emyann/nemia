@@ -6,7 +6,7 @@
  */
 import { endWords, type AttemptEnd, type EngineOutcome } from '../views/views-words.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { sessionRanOn, type SessionHarness, type SessionRelease } from '../release/release.ts';
+import { sessionRanOn, type SessionHarness, type SessionRelease } from '../release/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import { bare, type TaskView, type Views } from '../summary/reads.verb.ts';
 import { wordOf } from '../summary/judged.verb.ts';

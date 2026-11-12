@@ -21,8 +21,41 @@ export const ON_INSTALLED = 'NEMIA_ON_INSTALLED';
 /** The script of a tag's root `package.json` that an upgrade runs as the release's checks, after `npm ci` and `npm run build`. */
 export const RELEASE_CHECK = 'release:check';
 
-/** What `release.json` says of a built release: its tag, the commit it named, the repository it was built from, and when. */
-export type ReleaseFile = { readonly tag: string; readonly commit: string; readonly source: string; readonly builtAt: string };
+/** How a release came to the store: built from a tag of its repository, or unpacked from a published archive. */
+export type ReleaseFrom = 'build' | 'archive';
+
+/** The platforms a release archive is published for: `process.platform` and `process.arch` of the machines Nemia installs on. */
+export const RELEASE_PLATFORMS = ['linux-x64', 'linux-arm64', 'darwin-arm64'] as const;
+
+/** A platform a release archive is published for (`RELEASE_PLATFORMS`). */
+export type ReleasePlatform = (typeof RELEASE_PLATFORMS)[number];
+
+/**
+ * What `release.json` says of a release: its tag, the commit it named, where it came from (a repository it was built from, or an
+ * archive's download base), when, and how it came (`from`, absent on a release built before archives: a build) and, for an archive, the
+ * platform it was published for.
+ */
+export type ReleaseFile = {
+  readonly tag: string;
+  readonly commit: string;
+  readonly source: string;
+  readonly builtAt: string;
+  readonly from?: ReleaseFrom;
+  readonly platform?: ReleasePlatform;
+};
+
+/** How a release came to the store, an absent `from` read as a build. */
+export const releaseFrom = (file: Pick<ReleaseFile, 'from'>): ReleaseFrom => file.from ?? 'build';
+
+/** The release platform of a machine whose Node says `platform` and `arch`, or null where no archive is published for it. */
+export function platformOf(platform: string, arch: string): ReleasePlatform | null {
+  const named = `${platform}-${arch}`;
+  return RELEASE_PLATFORMS.find((p) => p === named) ?? null;
+}
+
+/** Whether `running` is an install unpacked from a published archive: the one an upgrade downloads for, and a release check reads. */
+export const archiveInstall = (running: Running): running is Extract<Running, { kind: 'install' }> =>
+  running.kind === 'install' && releaseFrom(running) === 'archive';
 
 /** The code a process runs: a checkout, or an install with what its `release.json` says; `root` holds its root `package.json`. */
 export type Running =
@@ -52,7 +85,7 @@ export function trialRefusal(running: Running, current: Current | null, store: s
   if (running.kind === 'install' || current === null || env[ON_INSTALLED] === '1') return null;
   return (
     `nemia: this is the checkout ${running.root}, and the store ${store} runs the installed release ${current.tag} (releases/${CURRENT}). ` +
-    `Develop against a trial store (WF_ROOT=<a scratch folder> nemia …), run the installed nemia (${store}/releases/${CURRENT}/node_modules/.bin/nemia), ` +
+    `Develop against a trial store (WF_ROOT=<a scratch folder> nemia …), run the installed nemia (${store}/releases/${CURRENT}/${releaseFrom(current) === 'archive' ? 'bin' : 'node_modules/.bin'}/nemia), ` +
     `or set ${ON_INSTALLED}=1 to act on this store from the checkout knowingly.`
   );
 }
@@ -75,13 +108,15 @@ export function restartPlan(lease: DaemonStanding, holder: 'service' | 'other' |
 
 /**
  * The entry and working folder a login service runs, under the pointer where the code runs from an install, so a restart follows
- * `releases/current`; a checkout's, unchanged.
+ * `releases/current`; and the `node` that runs it too, where it is one the install carries (an archive's `node/bin/node`), so a restart
+ * runs the new release's own Node. A checkout's, and a node outside the install, unchanged.
  */
-export function pointedEntry<E extends { checkout: string; entry: string; cwd: string }>(entry: E, running: Running): E {
+export function pointedEntry<E extends { checkout: string; entry: string; cwd: string; node?: string }>(entry: E, running: Running): E {
   if (running.kind !== 'install' || entry.checkout !== running.root) return entry;
   const current = `${running.root.slice(0, running.root.length - running.tag.length)}${CURRENT}`;
   const under = (at: string) => `${current}${at.slice(running.root.length)}`;
-  return { ...entry, checkout: current, entry: under(entry.entry), cwd: under(entry.cwd) };
+  const node = entry.node?.startsWith(`${running.root}${path.sep}`) ? { node: under(entry.node) } : {};
+  return { ...entry, checkout: current, entry: under(entry.entry), cwd: under(entry.cwd), ...node };
 }
 
 /** A release in words: `v1.2.0 (install, abc1234) at <folder>`, or `checkout at <folder>`. */
@@ -162,10 +197,13 @@ export function checkoutPromiseLine(release: LeaseRelease | Running): string | n
   );
 }
 
+/** The newest release the store's release check last read, and whether it is newer than the one this code runs (`LatestRelease`). */
+export type Latest = { readonly version: string; readonly newer: boolean };
+
 /**
  * What `nemia version` says: the package's version, this `nemia`'s release, the store's pointer, the release the daemon runs — and, where
- * that is a checkout, that it makes no promise to keep a session on its files (`checkoutPromiseLine`) — and the sessions at work, by
- * release and harness version (`sessions`, as `sessionCounts` counts them).
+ * that is a checkout, that it makes no promise to keep a session on its files (`checkoutPromiseLine`) — the sessions at work, by
+ * release and harness version (`sessions`, as `sessionCounts` counts them), and the newer release where the check read one (`latest`).
  */
 export function versionLines(
   version: string,
@@ -173,6 +211,7 @@ export function versionLines(
   current: Current | null,
   lease: DaemonStanding,
   sessions: readonly SessionCount[],
+  latest?: Latest,
 ): string[] {
   const daemon =
     lease.kind !== 'ticking'
@@ -189,6 +228,7 @@ export function versionLines(
     `daemon: ${daemon}`,
     ...(promise ? [promise] : []),
     `sessions: ${counted.length ? counted.join('; ') : 'none at work'}`,
+    ...(latest?.newer ? [`newer release: ${latest.version} is out — nemia upgrade installs it`] : []),
   ];
 }
 

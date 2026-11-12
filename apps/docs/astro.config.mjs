@@ -51,6 +51,7 @@ export default defineConfig({
         { label: 'Nemia', link: '/nemia/' },
         { label: 'Glossary', link: '/glossary/' },
         { label: 'Getting started', link: '/getting-started/' },
+        { label: 'Install', link: '/install/' },
       ],
       plugins: [starlightLinksValidator()],
     }),

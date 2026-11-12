@@ -4,6 +4,7 @@ import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeConfigLayer, telemetryLayer } from 'agent-orchestrator';
+import { BOARD_ROUTE, type BoardFiles, boardOf } from './board/board.ts';
 import { callerGate } from './caller/caller.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
@@ -65,6 +66,16 @@ let bundle: Promise<string> | undefined;
 /** The OpenAPI page's viewer script, read from the installed package once and kept: a reread would serve the same file. */
 const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
 
+/** The board's folder read off the disk, afresh on each request: a rebuild is served at once. */
+const boardFiles: BoardFiles = {
+  isFile: (file) =>
+    fs.stat(file).then(
+      (stat) => stat.isFile(),
+      () => false,
+    ),
+  read: (file) => fs.readFile(file),
+};
+
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or
  * `runtime.context()` needs it, and put on every request before any router is reached (`served`, layer.ts). A service the layer gives
@@ -76,7 +87,8 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * each calling the package's verbs by type, and a GET answering a `…List` watched on `?watch=true` (watch/watch.ts) and a `Table` where
  * the request accepts one (objects/table.ts). Only the three OpenAPI routes stay outside it: the document, its page and the page's
  * script (openapi/); and the MCP port, `/mcp` (`mcpPort`, mcp/port.ts), a protocol host whose tools call the `Api`'s endpoints through
- * this app's own `fetch`, mounted before the `Api`. A path none serves is the api's own 404 (`noRoute`).
+ * this app's own `fetch`, mounted before the `Api`. After the mount, a GET of any other path is a page of the board, served from its
+ * built files (`boardOf`, board/board.ts, its files read here: `boardFiles`). A path none serves is the api's own 404 (`noRoute`).
  *
  * Before any of them, every request says one line and is traced as a server span (`saidRequest`, request/request.ts); who it is from is
  * resolved (`callerGate`, caller/caller.ts: the person with no `Authorization`, an agent's session by the token it presents, a token
@@ -101,6 +113,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       mcpPort(() => app),
     )
     .all(MOUNT, mount(runtime))
+    .get(BOARD_ROUTE, boardOf(boardFiles))
     .notFound(noRoute)
     .onError(answerError);
   return { app, runtime };

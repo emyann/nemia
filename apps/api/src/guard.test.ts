@@ -10,9 +10,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeRefused } from './guard.ts';
 
-/** `writeRefused` of a POST, as the board sends a write but for what each case names, presenting a bearer token where `bearer` is. */
-const refused = (host: string | undefined, site: string | undefined, type: string | undefined, bearer = false) =>
-  writeRefused({ method: 'POST', host, site, contentType: type, bearer });
+/**
+ * `writeRefused` of a POST, as the board sends a write but for what each case names, presenting a bearer token where `bearer` is and the
+ * board's cookie alone where `cookie` is.
+ */
+const refused = (host: string | undefined, site: string | undefined, type: string | undefined, bearer = false, cookie = false) =>
+  writeRefused({ method: 'POST', host, site, contentType: type, bearer, cookie });
 
 test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
   await t.test(
@@ -71,7 +74,7 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
       assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
       for (const method of ['GET', 'HEAD'])
         assert.equal(
-          writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined, bearer: false }),
+          writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined, bearer: false, cookie: false }),
           null,
           method,
         );
@@ -83,6 +86,17 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
     () => {
       assert.equal(refused('nemia.example.com', undefined, 'application/json', true), null);
       assert.equal(refused('nemia.example.com', undefined, 'application/json'), 'host');
+    },
+  );
+
+  await t.test(
+    "a write by the board's cookie alone passes the host, as a board reached at a private network's address is addressed; REFUSED 403 from another site, same-site included",
+    () => {
+      assert.equal(refused('100.64.0.1:8787', 'same-origin', 'application/json', false, true), null);
+      assert.equal(refused('100.64.0.1:8787', undefined, 'application/json', false, true), null, 'no browser');
+      assert.equal(refused('100.64.0.1:8787', 'same-site', 'application/json', false, true), 'site');
+      assert.equal(refused('100.64.0.1:8787', 'cross-site', 'application/json', false, true), 'site');
+      assert.equal(refused('100.64.0.1:8787', 'same-origin', 'text/plain', false, true), 'media');
     },
   );
 });

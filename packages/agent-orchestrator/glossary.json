@@ -991,6 +991,26 @@
     {
       "term": "Session variables",
       "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`, which a test's seat drops."
+    },
+    {
+      "term": "Store floor",
+      "meaning": "the oldest release that can read the store, recorded in `<WF_ROOT>/store.json` (`readableFrom`, `packages/agent-orchestrator/src/release/archive.store.ts`). Each release says the oldest that reads what it writes (`STORE_READABLE_FROM`, `packages/agent-orchestrator/src/release/floor.ts`); the daemon raises the record to it as it takes the store and never lowers it (`floorAfter`), and `nemia upgrade <tag>` refuses a tag below it, naming the floor (`goingBackRefused`).",
+      "type": "Version"
+    },
+    {
+      "term": "Archive install",
+      "meaning": "a store whose release was unpacked from a published per-platform archive (`nemia-<tag>-<platform>.tar.gz`), not built from a repository: its release.json says `from: 'archive'`, its platform and its download base (`source`). `nemia upgrade [<tag>]` downloads the tag's archive, the newest where none is named, checks it against `SHA256SUMS`, runs its `bin/nemia version` and switches `<WF_ROOT>/releases/current` to it; the login service runs the archive's own Node under the pointer (`pointedEntry`). A release.json with no `from` is a build.",
+      "type": "ReleaseFrom"
+    },
+    {
+      "term": "Release check",
+      "meaning": "the daemon's sweep on an archive install that asks the download base for the newest release (its latest.json) once its first pass has answered and every six hours after, sending nothing but a generic client name, and keeps it in `<WF_ROOT>/releases/latest.json`, which `nemia version` and `GET /api/version` read as `latest` (`packages/agent-orchestrator/src/release/check.verb.ts`). `NEMIA_RELEASE_CHECK=off` turns it off; a checkout and a build make none.",
+      "type": "ReleaseChecked"
+    },
+    {
+      "term": "Claude token file",
+      "meaning": "the person's own Claude subscription token, the one `claude setup-token` prints, kept in `<WF_ROOT>/claude-token` at mode 0600 by `nemia claude-token set` and never printed, logged or served (`packages/agent-orchestrator/src/sign-in/`). The daemon loads it at its start into `CLAUDE_CODE_OAUTH_TOKEN` where that is unset (`loadClaudeToken`), and refuses a file another user can read, naming `chmod 600`.",
+      "type": "ClaudeTokenState"
     }
   ]
 }

@@ -16,6 +16,7 @@ export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export {
   CAPABILITIES,
   DEFAULT_HARNESS,
+  DEFAULT_SIGN_IN,
   HARNESS_DECLARATIONS,
   declares,
   misplacedOf,

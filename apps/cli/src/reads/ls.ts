@@ -8,7 +8,7 @@
  */
 import { Effect } from 'effect';
 import { tableLines } from 'objects';
-import { spawned } from '../local.ts';
+import { handedOn } from '../local.ts';
 import { asked, type ObjectsClient, READ_BOUND_MS } from '../objects.ts';
 import { pausedLines, scheduleLines } from './standing.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
@@ -33,7 +33,7 @@ const standing = (client: ObjectsClient) =>
 
 export async function ls(args: readonly string[]): Promise<number> {
   const read = tableAsked(args);
-  if (read === null || read.rest.length) return spawned(['ls', ...args]);
+  if (read === null || read.rest.length) return handedOn(['ls', ...args]);
   const { selector } = read;
   const [listed, around] = await Promise.all([
     asked(

@@ -18,7 +18,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { AWAY, ENGINE, REAL_HOME, SENTINEL, STORE } from './ambient.ts';
-import { SESSION_VARIABLES } from '../src/config/config.store.ts';
+import { SERVING_VARIABLES, SESSION_VARIABLES } from '../src/config/config.store.ts';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -170,14 +170,16 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
   assert.equal(bare.status, 0, `without the hook the address is the shell's: ${bare.stdout}\n${bare.stderr}`);
 });
 
-/** What the daemon sets for each session it files, as a step's own run of the suite inherits it. */
-const DAEMONS: Record<(typeof SESSION_VARIABLES)[number], string> = {
+/** What the daemon sets for each session it files, and what a server's unit serves with, as a step's own run of the suite inherits it. */
+const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIABLES)[number], string> = {
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
+  NEMIA_BIND: '100.126.244.0',
+  WF_EXPOSED: '1',
 };
 
-test("REFUSED under the daemon's per-session variables: a test file sees none of them, and without the hook it would", () => {
+test("REFUSED under the daemon's per-session and serving variables: a test file sees none of them, and without the hook it would", () => {
   const dir = scratch('wf-ambient-');
   const file = path.join(dir, 'fixture.test.mjs');
   const out = path.join(dir, 'seen.json');

@@ -1,18 +1,22 @@
 /**
  * The environment the cli's tests hand their children (`ambient`) is CI's, whatever the session that runs them: with the daemon's
  * per-session variables and the telemetry in this process's environment, a child built on it sees none of them, and a test that means
- * one sets it on top.
+ * one sets it on top. Under a server's serving variables, the api a test serves listens on the loopback and its store reads as not
+ * exposed, where a test that means it exposed says so.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { ambient, DROPPED } from './ambient.ts';
+import { servedStore } from './served.ts';
 
 const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
+  NEMIA_BIND: '100.126.244.0',
+  WF_EXPOSED: '1',
   NEMIA_SERVER: 'http://the-persons-vps:7777',
   NEMIA_SERVER_TOKEN: 'a-token-of-the-persons',
   NEMIA_CONTEXT: 'the-persons-vps',
@@ -49,3 +53,27 @@ test('`ambient` drops each name it is also given, and leaves the rest of the env
   assert.equal(env.PATH, undefined);
   assert.equal(env.HOME, process.env.HOME);
 });
+
+test(
+  "under a server's serving variables, a served store's api listens on the loopback and lets a request with no token through",
+  { timeout: 120_000 },
+  async (t) => {
+    const was = { NEMIA_BIND: process.env.NEMIA_BIND, WF_EXPOSED: process.env.WF_EXPOSED };
+    t.after(() => {
+      for (const [n, v] of Object.entries(was)) {
+        if (v === undefined) delete process.env[n];
+        else process.env[n] = v;
+      }
+    });
+    Object.assign(process.env, { NEMIA_BIND: '100.126.244.0', WF_EXPOSED: '1' });
+    const served = await servedStore('nemia-ambient-serving-', () => {});
+    t.after(served.stop);
+    assert.match(served.url, /^http:\/\/127\.0\.0\.1:\d+$/);
+    const listed = await served.nemia(['ls']);
+    assert.equal(listed.code, 0, `the store reads as not exposed: ${listed.err}`);
+    const exposed = await servedStore('nemia-ambient-exposed-', () => {}, { WF_EXPOSED: '1' });
+    t.after(exposed.stop);
+    const refused = await exposed.nemia(['ls']);
+    assert.equal(refused.code, 2, `a test that means it exposed sets it, and its api refuses a request with no token: ${refused.err}`);
+  },
+);

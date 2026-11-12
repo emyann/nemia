@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
-import { FORWARD_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
+import { FORWARD_VARIABLES, SERVING_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
 
 /** This workspace: the folder each template is a folder of. */
 export const TEMPLATES = path.join(import.meta.dirname, '..');
@@ -25,8 +25,8 @@ export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
- * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor the
- * forwarding ones (`FORWARD_VARIABLES`).
+ * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor its
+ * serving ones (`SERVING_VARIABLES`), nor the forwarding ones (`FORWARD_VARIABLES`).
  */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -39,7 +39,7 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_MAX_RUNS: '2',
   };
   delete env.NODE_TEST_CONTEXT;
-  for (const name of [...SESSION_VARIABLES, ...FORWARD_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
+  for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, ...FORWARD_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
   return env;
 }

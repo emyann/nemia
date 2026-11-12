@@ -204,6 +204,26 @@ test('under a remote context `nemia factory add --repo <url>` files the factory 
   assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
 });
 
+test('`nemia factory add --template` is refused naming `nemia factory apply`, exit 2, under a remote context and on this machine alike', async (t) => {
+  const { env, root, folder } = aLaptop('nemia-context-add-template-');
+  const server = `http://127.0.0.1:${await freePort()}`;
+  const set = await nemia(['config', 'set-context', 'vps', '--server', server, '--token-file', tokenFile(folder, 'tok')], env);
+  assert.equal(set.code, 0, set.err);
+  const typed = ['factory', 'add', 'mill', '--template', 'mill', '--repo', 'https://github.com/o/r'];
+  await t.test('under the remote context, before its server is asked', async () => {
+    const said = await nemia(typed, { ...env, NEMIA_CONTEXT: 'vps' });
+    assert.equal(said.code, 2, said.err);
+    assert.match(said.err, /nemia factory apply <name> --template/);
+    assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
+  });
+  await t.test('on this machine', async () => {
+    const said = await nemia(typed, env);
+    assert.equal(said.code, 2, said.err);
+    assert.match(said.err, /nemia factory apply <name> --template/);
+    assert.equal(fs.existsSync(path.join(root, 'factories', 'mill.json')), false, 'nothing filed');
+  });
+});
+
 test('under a remote context that takes no connection, a read is refused naming the context and `nemia config get-contexts`', async () => {
   const { env, root, folder } = aLaptop('nemia-context-down-');
   const server = `http://127.0.0.1:${await freePort()}`;

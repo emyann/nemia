@@ -25,6 +25,7 @@ import {
 } from './factory.ts';
 import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, originsOf, refuseName } from './door/factories.store.ts';
 import { cloned } from './clones/clones.verb.ts';
+import { APPLY_USAGE } from './applied/applied.verb.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -327,9 +328,11 @@ const ADD_SPEC: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
   flags: [REPOS, NO_TRUST],
   unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository, and --no-trust.`
-      : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
+    arg === '--template' || arg.startsWith('--template=')
+      ? `nemia factory add files a factory by hand and does not take --template: a factory made from a template is filed by nemia factory apply ${APPLY_USAGE}.`
+      : arg.startsWith('-')
+        ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path|url>, once per repository, and --no-trust.`
+        : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path|url>, once per factory.`,
   apart: () => REPOS.takes,
   missing:
     "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]. Nothing was filed.",

@@ -13,7 +13,19 @@
 import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
-import { Api, type APIResource, Conflict, Forbidden, Invalid, LIST_PAGE, Missing, type Table, Unauthorized, Unjudged } from 'objects';
+import {
+  Api,
+  type APIResource,
+  Conflict,
+  Forbidden,
+  Invalid,
+  jsonBodied,
+  LIST_PAGE,
+  Missing,
+  type Table,
+  Unauthorized,
+  Unjudged,
+} from 'objects';
 import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
 import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
@@ -32,13 +44,24 @@ const localWay = (verb: string): string =>
 export const READ_BOUND_MS = 30_000;
 
 /**
- * The typed client of the `Api` at `base`, each request carrying the session's token where `env` holds one (`sessionHeaders`) and
- * `headers` beside it (an `Accept` that asks a list for its `Table`).
+ * The typed client of the `Api` at `base`: each write with no body sent as `{}` in JSON (`jsonBodied`), as the api's write guard takes
+ * it, and each request carrying the session's token where `env` holds one and `carried` is left on (`sessionHeaders`; a pairing turns it
+ * off, since it asks for a token of its own) and `headers` beside it (an `Accept` that
+ * asks a list for its `Table`).
  */
-const clientAt = (base: string, env: NodeJS.ProcessEnv = process.env, headers: Readonly<Record<string, string>> = {}, carried = true) =>
+export const clientAt = (
+  base: string,
+  env: NodeJS.ProcessEnv = process.env,
+  headers: Readonly<Record<string, string>> = {},
+  carried = true,
+) =>
   HttpApiClient.make(Api, {
     baseUrl: base,
-    transformClient: HttpClient.mapRequest(HttpClientRequest.setHeaders({ ...(carried ? sessionHeaders(env) : {}), ...headers })),
+    transformClient: (client) =>
+      HttpClient.mapRequest(
+        HttpClient.mapRequest(client, jsonBodied),
+        HttpClientRequest.setHeaders({ ...(carried ? sessionHeaders(env) : {}), ...headers }),
+      ),
   });
 
 /** What a read asks of: every group of the `Api`, each endpoint a method. */

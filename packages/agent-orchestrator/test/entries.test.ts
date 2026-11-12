@@ -689,6 +689,7 @@ const PINNED: Record<string, string[]> = {
     'pauseNowPreview',
     'pauseNowPreviewLines',
     'SESSION_VARIABLES',
+    'SERVING_VARIABLES',
     'StoreConfig',
     'factoriesDirAt',
     'filedAtOnce',

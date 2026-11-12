@@ -7,7 +7,7 @@ import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { NeedAsk } from './workflow.ts';
-import { ADDRESS_KINDS, FIX_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, HARNESS_PARTS, NEED_STATES, READINESS_AREAS } from './words.ts';
+import { ADDRESS_KINDS, FIX_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, HARNESS_PARTS, READINESS_AREAS, READINESS_STATES } from './words.ts';
 
 /**
  * A way to put a piece in place: what it does in words and its command — typed by the person where `startable` is false (`nemia
@@ -35,7 +35,7 @@ export type ReadinessFix = typeof ReadinessFix.Type;
 export const ReadinessPiece = Schema.Struct({
   name: Schema.String,
   area: Schema.Literals(READINESS_AREAS),
-  state: Schema.Literals(NEED_STATES),
+  state: Schema.Literals(READINESS_STATES),
   message: Schema.String,
   fixes: Schema.Array(ReadinessFix),
   factory: Schema.optionalKey(Schema.String),
@@ -45,7 +45,7 @@ export const ReadinessPiece = Schema.Struct({
 });
 export type ReadinessPiece = typeof ReadinessPiece.Type;
 
-/** `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`), and the pieces, in the read's order. */
+/** `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`; an `inactive` one is not), and the pieces, in the read's order. */
 export const Readiness = Schema.Struct({ ready: Schema.Boolean, pieces: Schema.Array(ReadinessPiece) });
 export type Readiness = typeof Readiness.Type;
 

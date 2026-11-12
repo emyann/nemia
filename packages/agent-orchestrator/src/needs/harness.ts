@@ -71,8 +71,27 @@ export const harnessOfNeed = (
 export type TokenKept = { readonly harness: string; readonly maker: string; readonly keep: string };
 
 /**
+ * The mark a harness's removal leaves in its folder of the tools folder, `<tools>/harnesses/<harness>/deactivated`, and its install takes
+ * away: a harness so marked was deactivated by a person, so neither the daemon's start adopts it from an older release's tree nor an
+ * upgrade carries it (`adoptBundled`, `harnessesHeld`).
+ */
+export const DEACTIVATED = 'deactivated';
+
+/** The mark of `harness` as a shell word, under `NEMIA_TOOLS`, which every check and fix is run with. */
+const markOf = (harness: string): string => `"$NEMIA_TOOLS/harnesses/${harness}/${DEACTIVATED}"`;
+
+/** The install of `harness` as it is run: its mark taken away (`DEACTIVATED`), then its adapter's `install`. */
+export const harnessInstallCommand = (harness: string, needs: HarnessNeeds): string =>
+  `rm -f ${markOf(harness)} && {\n${needs.install}\n}`;
+
+/** The removal of `harness` as it is run: its adapter's `remove`, then its mark left in its folder (`DEACTIVATED`). */
+export const harnessRemoveCommand = (harness: string, needs: HarnessNeeds): string =>
+  `{\n${needs.remove}\n} && mkdir -p "$NEMIA_TOOLS/harnesses/${harness}" && : > ${markOf(harness)}`;
+
+/**
  * Each harness of `declarations` that declares needs, as two needs: `<harness>`, its install — its program found, fixed by its install
- * (the first fix, a `puts`) or taken away by its removal (the second, `kind: removes`) — and `<harness>-sign-in`, its sign-in, fixed by
+ * (the first fix, a `puts`) or taken away by its removal (the second, `kind: removes`), each with its mark (`harnessInstallCommand`,
+ * `harnessRemoveCommand`) — and `<harness>-sign-in`, its sign-in, fixed by
  * the fixes its adapter declares in order, one a person types (`typed`) of kind `typed`. Where `token` names the harness, the fix that
  * makes its token is offered with the command that keeps it after it (`<maker> && <keep>`). A harness that declares none (a command, a
  * remote agent) gives none.
@@ -86,8 +105,8 @@ export function harnessNeedsOf(declarations: Readonly<Record<string, HarnessDecl
       message: `${needs.title} (${needs.program}), at ${needs.pin}, the version this release was tested with`,
       check: needs.check,
       fixes: [
-        { command: needs.install, message: `install ${needs.title} ${needs.pin} into the tools folder` },
-        { command: needs.remove, message: `remove ${needs.title} from the tools folder`, kind: 'removes' },
+        { command: harnessInstallCommand(name, needs), message: `install ${needs.title} ${needs.pin} into the tools folder` },
+        { command: harnessRemoveCommand(name, needs), message: `remove ${needs.title} from the tools folder`, kind: 'removes' },
       ],
     };
     const signIn: Need = {

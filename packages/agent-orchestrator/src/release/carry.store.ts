@@ -13,6 +13,7 @@ import { HARNESS_DECLARATIONS, type HarnessNeeds } from 'agent-runtime/vocabular
 import { pathLedByTools, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import { installedReleases, releaseDir } from './release.store.ts';
 import { upgradeCarries, type HarnessesHeld } from './carry.ts';
+import { DEACTIVATED, harnessInstallCommand } from '../needs/index.ts';
 
 /** A harness whose adapter declares needs (`HarnessNeeds`), by its name. */
 export type PinnedHarness = { readonly name: string; readonly needs: HarnessNeeds };
@@ -41,9 +42,15 @@ const namesIn = (dir: string): string[] => {
   }
 };
 
-/** The harnesses of `pinned` the tools folder of the store at `home` holds activated: a `<tools>/harnesses/<name>/` folder of each. */
+/** Whether a person deactivated the harness `name` in the store at `home`: its removal's mark in its folder (`DEACTIVATED`). */
+const deactivated = (home: string, name: string): boolean => isA(path.join(harnessesDir(home), name, DEACTIVATED), 'file');
+
+/**
+ * The harnesses of `pinned` the tools folder of the store at `home` holds activated: a `<tools>/harnesses/<name>/` folder of each, with
+ * no removal's mark in it (`deactivated`).
+ */
 export const activatedHarnesses = (home: string, pinned: readonly PinnedHarness[] = pinnedHarnesses()): string[] =>
-  pinned.filter((h) => isA(path.join(harnessesDir(home), h.name), 'directory')).map((h) => h.name);
+  pinned.filter((h) => isA(path.join(harnessesDir(home), h.name), 'directory') && !deactivated(home, h.name)).map((h) => h.name);
 
 /**
  * The program `program` that the tree at `tree` carries in a platform package of this machine — `node_modules/<scope>/<name>-<platform>-
@@ -73,14 +80,17 @@ export const bundledHarnesses = (trees: readonly string[], pinned: readonly Pinn
 /** The trees of the releases installed in the store at `home` (`installedReleases`): each `releases/<tag>/`, never the pointer. */
 export const releaseTrees = (home: string): string[] => installedReleases(home).map((r) => releaseDir(r.tag, home));
 
-/** What the store at `home` holds of the harnesses: activated in its tools folder, and carried by any of `trees`. */
+/**
+ * What the store at `home` holds of the harnesses: activated in its tools folder, and carried by any of `trees` — but one a person
+ * deactivated (`deactivated`), which an older release's tree still carrying it brings back neither way.
+ */
 export const harnessesHeld = (
   home: string,
   trees: readonly string[],
   pinned: readonly PinnedHarness[] = pinnedHarnesses(),
 ): HarnessesHeld => ({
   activated: activatedHarnesses(home, pinned),
-  bundled: bundledHarnesses(trees, pinned),
+  bundled: bundledHarnesses(trees, pinned).filter((name) => !deactivated(home, name)),
 });
 
 /**
@@ -130,7 +140,7 @@ export function carryHarnesses(
       }
       say(`installing ${h.needs.title} ${h.needs.pin} into ${harnessesDir(home)}`);
       fs.mkdirSync(toolsBinDir(home), { recursive: true });
-      const ran = spawnSync('sh', ['-c', h.needs.install], {
+      const ran = spawnSync('sh', ['-c', harnessInstallCommand(h.name, h.needs)], {
         cwd: home,
         env: { ...env, PATH: pathLedByTools(home, env.PATH), NEMIA_TOOLS: toolsDir(home) },
         stdio: ['ignore', 'inherit', 'inherit'],
@@ -178,7 +188,8 @@ export type Adopted = { readonly name: string; readonly version: string; readonl
  * Adopts, into the tools folder of the store at `home`, each harness with needs whose program the folder's `bin/` lacks and one of `trees`
  * carries (`bundledProgramIn`, the first tree that does): its program copied into `<tools>/harnesses/<name>/<version>/<program>` (the
  * version read off its bundling package, `bundledVersionOf`), by a copy beside it renamed into place so no reader meets half of it, and
- * linked as `<tools>/bin/<program>`. A harness whose program the folder holds, or no tree carries, is left. Answers what it adopted.
+ * linked as `<tools>/bin/<program>`. A harness whose program the folder holds, one a person deactivated (`deactivated`), or one no tree
+ * carries, is left. Answers what it adopted.
  */
 export function adoptBundled(
   home: string,
@@ -188,7 +199,7 @@ export function adoptBundled(
 ): Adopted[] {
   return pinnedHarnesses().flatMap((h) => {
     const link = path.join(toolsBinDir(home), h.needs.program);
-    if (fs.existsSync(link)) return [];
+    if (fs.existsSync(link) || deactivated(home, h.name)) return [];
     const from = trees.map((tree) => bundledProgramIn(tree, h.needs.program, platform, arch)).find((file) => file !== undefined);
     if (from === undefined) return [];
     const version = bundledVersionOf(from, platform, arch);

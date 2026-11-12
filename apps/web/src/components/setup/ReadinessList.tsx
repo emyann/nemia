@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CircleAlert, CircleCheck, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
-import type { FixStart, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
+import { CircleAlert, CircleCheck, CircleDashed, CircleHelp, Play, Power, type LucideIcon } from 'lucide-react';
+import type { FixStart, Readiness, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { CutField, CutFrame, CutPress } from '@/components/look';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/ds/utils';
@@ -10,12 +10,13 @@ import { CopyText } from './CopyText';
 
 /**
  * How each state of a piece is drawn: a word and a glyph, so it is read without its colour, and a hue — missing waits on the person,
- * in place is done, unknown is what the board cannot read.
+ * in place is done, unknown is what the board cannot read, and a harness nobody activated and nothing runs on is at rest.
  */
-const STATE: Record<NeedState, { word: string; icon: LucideIcon; className: string }> = {
+const STATE: Record<ReadinessState, { word: string; icon: LucideIcon; className: string }> = {
   missing: { word: 'Missing', icon: CircleAlert, className: ringed.yours },
   met: { word: 'In place', icon: CircleCheck, className: container.sage },
   unknown: { word: 'Unknown', icon: CircleHelp, className: dashed.grey },
+  inactive: { word: 'Not activated', icon: CircleDashed, className: container.grey },
 };
 
 /** What the list is told to do, and what it says of a start: the key being started, and a start refused, in the api's words. */

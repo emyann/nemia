@@ -6,7 +6,8 @@
  * default harness's kept token reaches its sign-in check, said as set and loading, never as good, and a token file others may read is
  * missing with the `chmod 600` that fixes it; a place's need is read by its check and carries the command that fixes it; a place's
  * repository need is read per factory; the service, linger, bind and machine pieces follow what their commands and the environment
- * answer; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
+ * answer; a harness nothing runs on and nobody activated is `inactive`, never counted against `ready`, until it is installed or a
+ * factory's workflow names it; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
@@ -15,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import { CLAUDE_PIN, DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
+import { CLAUDE_PIN, DEFAULT_HARNESS, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import type { Need } from 'objects';
 import { testPlace } from '../../place/memory/index.ts';
 import { declared } from '../../place/memory/place.ts';
@@ -186,4 +187,53 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   );
   assert.equal(got.pieces.filter((p) => p.name === 'toolchain' && p.area === 'place').length, 0, 'never read on the machine alone');
   assert.equal(fs.existsSync(path.join(repo, 'ran-here')), false, 'its check never ran in the repository');
+});
+
+test("a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named", async (t) => {
+  const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
+  assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
+  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+  const name = declaration.needs.program;
+  const program = path.join(toolsBinDir(ROOT), name);
+  const ambient = process.env.PATH;
+  // The checks run over this process's PATH, which test/ambient.ts leads with a stand-in of every harness: this one is taken off it.
+  process.env.PATH = (ambient ?? '')
+    .split(path.delimiter)
+    .filter((dir) => !fs.existsSync(path.join(dir, name)))
+    .join(path.delimiter);
+  t.after(() => {
+    process.env.PATH = ambient;
+  });
+  const states = (got: { pieces: readonly { harness?: { name: string }; state: string }[] }) =>
+    got.pieces.filter((p) => p.harness?.name === other).map((p) => p.state);
+
+  const idle = await read(facts({ PATH }), identity('exit 0'));
+  assert.deepEqual(states(idle), ['inactive', 'inactive']);
+  const install = idle.pieces.find((p) => p.name === other);
+  assert.deepEqual(
+    install?.fixes.map((f) => [f.kind, f.startable, f.index]),
+    [[undefined, true, 0]],
+    'it offers its install, which activates it',
+  );
+  assert.equal(
+    idle.ready,
+    idle.pieces.every((p) => p.state !== 'missing'),
+    'an inactive piece is not missing, and ready reads only missing ones',
+  );
+
+  fs.writeFileSync(program, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  try {
+    assert.deepEqual(states(await read(facts({ PATH }), identity('exit 0'))), ['met', 'met'], 'installed, a person activated it');
+  } finally {
+    fs.rmSync(program);
+  }
+
+  const repo = fs.mkdtempSync(path.join(ROOT, 'named-'));
+  const dir = path.join(repo, 'workflows', 'dev');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nharness: ${other}\n---\nimplement it\n`);
+  createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  const named = await read(facts({ PATH }), identity('exit 0'));
+  assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
+  assert.equal(named.ready, false);
 });

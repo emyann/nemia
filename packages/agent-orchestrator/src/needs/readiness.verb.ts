@@ -12,7 +12,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { DEFAULT_HARNESS, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
-import type { Need, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
+import type { Need, NeedState, Readiness, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import type { Env } from '../config/config.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
@@ -25,6 +25,7 @@ import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
 import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
+import { frontmatterKey } from '../former/former.ts';
 import { fixCommandOf, type FixAt } from './needs.ts';
 import { harnessOfNeed, harnessVersionWord, signInNeedOf, versionIn } from './harness.ts';
 import { trustCommandOf } from '../trust/trust.ts';
@@ -81,7 +82,7 @@ const typed = (message: string, command: string): ReadinessFix => ({ message, co
 const piece = (
   name: string,
   area: ReadinessPiece['area'],
-  state: NeedState,
+  state: ReadinessState,
   message: string,
   fixes: readonly ReadinessFix[] = [],
   more: Partial<Pick<ReadinessPiece, 'factory' | 'workflow' | 'addressKind' | 'harness'>> = {},
@@ -219,19 +220,71 @@ const VERSION_WORDS = {
   unread: () => 'its version could not be read',
 } as const;
 
+/** The text of `file`, none where it does not read: such a file names no harness, and its workflow's own load says why. */
+const textOf = (file: string): string | undefined => {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+/** The harnesses the agents and steps of `workflows` name (`harness:` in their files), read off their folders as they are now. */
+function harnessesNamed(workflows: readonly FactoryWorkflow[]): Set<string> {
+  const named = new Set<string>();
+  const read = (file: string) => {
+    const text = textOf(file);
+    const harness = text === undefined ? undefined : frontmatterKey(text, 'harness');
+    if (harness !== undefined) named.add(harness);
+  };
+  const mdIn = (dir: string): string[] => {
+    try {
+      return fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
+    } catch {
+      return [];
+    }
+  };
+  for (const w of workflows) {
+    for (const f of mdIn(w.dir)) read(path.join(w.dir, f));
+    const agents = path.join(path.dirname(w.dir), 'agents');
+    for (const f of mdIn(agents)) read(path.join(agents, f));
+  }
+  return named;
+}
+
+/**
+ * The harnesses the read counts: the default, each a factory's workflow or agent names (`harnessesNamed`), and each whose install is in
+ * place, which a person activated. Any other is `inactive`.
+ */
+const harnessesWanted = (memo: NeedsMemo, workflows: readonly FactoryWorkflow[]): Set<string> => {
+  const installed = memo.harnessNeeds.flatMap((need) => {
+    const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
+    return of?.part === 'install' && memo.readings.get(checkKey(harnessCheckOf(need))) === 'met' ? [of.name] : [];
+  });
+  return new Set([DEFAULT_HARNESS, ...harnessesNamed(workflows), ...installed]);
+};
+
 /**
  * Each harness the runtime declares needs for, as its two pieces off `memo` (`harnessNeeds`), area `harness`, each naming its harness and
  * which of its needs it is (`harness`): the install, its message saying the version found against the pin where it is in place
  * (`harnessVersionWord`); and the sign-in. The default harness's sign-in is missing, whatever its check says, while the token the store
  * keeps is readable by others, since such a file does not load: its fix is the `chmod 600` that lets only the person read it. A kept
  * token that loads says its age, off its file's write time, and near or past its year its warning (`tokenWarningLine`), with the commands
- * that make a new one: still met, since it loads.
+ * that make a new one: still met, since it loads. A harness not `wanted` (`harnessesWanted`) is `inactive`, both its pieces, each with
+ * the fixes a missing one offers, so it is activated from the read as any other is.
  */
-function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts): ReadinessPiece[] {
+function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wanted: ReadonlySet<string>): ReadinessPiece[] {
   return memo.harnessNeeds.flatMap((need) => {
     const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
     if (of === undefined) return [];
     const harness = { harness: { name: of.name, part: of.part } };
+    if (!wanted.has(of.name)) {
+      const said =
+        of.part === 'install'
+          ? `${of.needs.title} (${of.needs.program}) is not activated, and no factory's workflow runs on it: activate it when one does`
+          : `${of.needs.title} is not activated, so its sign-in is not asked`;
+      return [piece(need.name, 'harness', 'inactive', said, needFixes(need, 'missing'), harness)];
+    }
     const read = memo.readings.get(checkKey(harnessCheckOf(need)));
     if (of.part === 'install') {
       if (read !== 'met') return [needPiece(need, 'harness', read, undefined, undefined, harness)];
@@ -397,7 +450,7 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
   const trusted = new Set((yield* trustedOf(factories)).map((f) => f.name));
   const untrusted = new Set(factories.map((f) => f.name).filter((name) => !trusted.has(name)));
   const pieces: ReadinessPiece[] = [
-    ...harnessPieces(home, memo, facts),
+    ...harnessPieces(home, memo, facts, harnessesWanted(memo, workflows)),
     ...servicePieces(facts),
     bindPiece(facts),
     ...machinePieces(home, facts),

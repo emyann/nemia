@@ -741,6 +741,15 @@ export const NEED_STATES = ['met', 'missing', 'unknown'] as const;
 export type NeedState = (typeof NEED_STATES)[number];
 
 /**
+ * A piece of the readiness read's state: a need's (`NEED_STATES`), or `inactive`, a harness nobody activated and nothing runs on — no
+ * factory's workflow names it and it is not the default — shown with what activates it, and never counted against `ready`.
+ */
+export const READINESS_STATES = [...NEED_STATES, 'inactive'] as const;
+
+/** One of `READINESS_STATES`. */
+export type ReadinessState = (typeof READINESS_STATES)[number];
+
+/**
  * The kinds of address a bind is told as (`addressKind`, agent-orchestrator's src/service/address.ts): this machine alone, every
  * interface, a private network's (RFC 1918), a carrier-grade or Tailscale network's (100.64.0.0/10), a link's own, an IPv6 private
  * network's (fc00::/7), and any other.

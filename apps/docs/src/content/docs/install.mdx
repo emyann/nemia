@@ -115,10 +115,10 @@ nemia doctor
 nemia doctor fix <need>
 ```
 
-One read lists every piece a server needs before a factory's first run, each in place, missing or unknown, with the command or fix
-that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and `systemd --user`, the
-git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a factory, and a newer
-release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
+One read lists every piece a server needs before a factory's first run, each in place, missing, unknown or not activated, with the
+command or fix that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and
+`systemd --user`, the git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a
+factory, and a newer release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
 same read, and a banner on every page while a piece is missing.
 
 A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
@@ -150,10 +150,13 @@ into the tools folder's `bin`, which sessions find first, without root. Then sig
 each way, and a sign-in that asks you for a code pasted back (`claude auth login`) is one you type on the server yourself; Codex's
 device sign-in runs from the board and shows its code set apart. A run that has filed nothing waits on whichever harness its steps
 run on, and starts by itself once it is installed and signed in. The read says a harness at another version untested: it still runs.
+A harness you never activated and no factory's workflow runs on reads not activated, with what activates it, and keeps the server
+from being ready no more than a piece in place does.
 
 A met harness's second fix takes it away (`nemia doctor fix claude --index 1`, Deactivate on Setup). It is refused while a run that has
 not finished needs it, naming `nemia cancel <run>` for each. `nemia upgrade` installs each activated harness at the new release's
 version before it switches, and the daemon of a new release adopts the Claude Code an older release carried, so nothing that ran stops.
+A harness you deactivated stays so: neither an upgrade nor the daemon's start brings it back, until you activate it again.
 
 ## Your Claude token
 

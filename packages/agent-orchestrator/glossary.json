@@ -1038,7 +1038,7 @@
     },
     {
       "term": "Harness need",
-      "meaning": "each harness whose runtime adapter declares what it needs on a machine (`HarnessDeclaration.needs`) is two needs, read from that declaration and never named here (`harnessNeedsOf`, `packages/agent-orchestrator/src/needs/harness.ts`): `<harness>`, its program installed at the pin the release was tested with into the tools folder, and `<harness>-sign-in`, signed in as the user the daemon runs as. Swept, held, read and fixed as every need is; a run needs those of the harnesses its frozen steps run sessions on (`harnessesOfRun`)."
+      "meaning": "each harness whose runtime adapter declares what it needs on a machine (`HarnessDeclaration.needs`) is two needs, read from that declaration and never named here (`harnessNeedsOf`, `packages/agent-orchestrator/src/needs/harness.ts`): `<harness>`, its program installed at the pin the release was tested with into the tools folder, and `<harness>-sign-in`, signed in as the user the daemon runs as. Swept, held, read and fixed as every need is; a run needs those of the harnesses its frozen steps run sessions on (`harnessesOfRun`). Its removal leaves the mark `<tools>/harnesses/<harness>/deactivated` (`DEACTIVATED`), which its install takes away: a harness so marked is neither adopted from an older release's tree nor carried by an upgrade."
     },
     {
       "term": "Fix kind",
@@ -1050,7 +1050,7 @@
     },
     {
       "term": "Readiness",
-      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there: each harness's two needs, the service and its linger, the bind, the machine, the place's and each workflow's needs, each factory's repository needs, a factory, a newer release (`readinessOf`, `nemia doctor`, `GET /api/readiness`); `nemia doctor fix` starts a fix. `nemia readiness`, its former command, is refused, naming `nemia doctor`."
+      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there, or `inactive` (`ReadinessState`), a harness nobody activated and nothing runs on, shown with what activates it and never counted against `ready`: each harness's two needs, the service and its linger, the bind, the machine, the place's and each workflow's needs, each factory's repository needs, a factory, a newer release (`readinessOf`, `nemia doctor`, `GET /api/readiness`); `nemia doctor fix` starts a fix. `nemia readiness`, its former command, is refused, naming `nemia doctor`."
     },
     {
       "term": "Tools folder",

@@ -8,7 +8,7 @@ import { type Implementation, spec } from '@emyann/tsverify';
 
 /** A piece of the readiness read, as far as the question goes: its state, and the harness and part it is of, where it is a harness's. */
 export type HarnessPieceRead = {
-  readonly state: 'met' | 'missing' | 'unknown';
+  readonly state: 'met' | 'missing' | 'unknown' | 'inactive';
   readonly harness?: { readonly name: string; readonly part: 'install' | 'sign-in' };
 };
 

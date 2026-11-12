@@ -526,6 +526,8 @@ export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
 export {
   NEED_STATES,
   type NeedState,
+  READINESS_STATES,
+  type ReadinessState,
   ADDRESS_KINDS,
   type AddressKind,
   READINESS_AREAS,

@@ -19,7 +19,7 @@ import { followFix, startFix } from './fix.verb.ts';
 import { readinessOf } from './readiness.verb.ts';
 
 /** Each state's mark at the head of a piece's line. */
-const MARK = { met: '✓', missing: '✗', unknown: '?' } as const;
+const MARK = { met: '✓', missing: '✗', unknown: '?', inactive: '·' } as const;
 
 /** The lines `nemia doctor` prints: whether the server is ready, then each piece, its state, its words, and each fix's command. */
 export const readinessLines = (r: Readiness): string[] => [

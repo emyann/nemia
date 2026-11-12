@@ -5,6 +5,7 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import os from 'node:os';
+import { isIP } from 'node:net';
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { Args, Flag } from '../command/command.ts';
@@ -240,8 +241,11 @@ function pidOf(text: unknown): number | undefined {
 /** The variables `--bind` writes: the address the daemon listens on, and the store marked exposed, so every caller presents a token. */
 const BIND_KEYS = ['NEMIA_BIND', 'WF_EXPOSED'] as const;
 
-/** A bind address as `--bind` takes it: a host name or an address, IPv6 in brackets or not, with no space nor control character. */
-const BIND = /^[A-Za-z0-9.:[\]%_-]+$/;
+/**
+ * Whether `--bind` names an address the daemon listens on as its api reads `NEMIA_BIND` (`bindOf`, apps/api/src/port.ts): an IPv4
+ * address, or an IPv6 one written bare, never a host name, brackets or a zone (`%eth0`), which the api refuses at every start.
+ */
+const bindable = (value: string): boolean => isIP(value) !== 0 && !value.includes('%');
 
 /**
  * The variables `--size auto` writes, read off the machine's size (`sizedFor`), each but one `--env` gives (`given`): the sessions at once
@@ -282,9 +286,9 @@ function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlySet<
  */
 function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
   if (args.bind === undefined) return [];
-  if (typeof args.bind !== 'string' || !BIND.test(args.bind))
+  if (typeof args.bind !== 'string' || !bindable(args.bind))
     throw new Invalid({
-      message: `nemia service install: --bind takes the address the daemon listens on, like --bind 0.0.0.0 or --bind 100.64.0.7.`,
+      message: `nemia service install: --bind takes an IP address of this machine for the daemon to listen on, never a host name: --bind 0.0.0.0 for every interface, --bind 100.64.0.7 for a private network's, or --bind :: for every IPv6 one (no brackets). Find this machine's with \`ip -brief address\`.`,
     });
   const twice = BIND_KEYS.find((k) => given.has(k));
   if (twice !== undefined)

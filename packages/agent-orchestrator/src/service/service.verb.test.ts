@@ -895,7 +895,7 @@ test('--size auto keeps what --env gives, and on launchd writes no memory limit 
   });
 });
 
-test('REFUSED: a --size other than auto, a machine too small to size, and --bind beside --env NEMIA_BIND: exit 2, no unit written', async () => {
+test('REFUSED: a --size other than auto, a machine too small to size, a --bind the api would refuse at every start, and --bind beside --env NEMIA_BIND: exit 2, no unit written', async () => {
   const cases: [Args, { memoryMiB: number; cpus: number }][] = [
     [{ size: 'large' }, { memoryMiB: 16384, cpus: 8 }],
     [{ size: 'auto' }, { memoryMiB: 1024, cpus: 2 }],
@@ -904,6 +904,8 @@ test('REFUSED: a --size other than auto, a machine too small to size, and --bind
       { memoryMiB: 16384, cpus: 8 },
     ],
     [{ bind: 'a b' }, { memoryMiB: 16384, cpus: 8 }],
+    [{ bind: 'localhost' }, { memoryMiB: 16384, cpus: 8 }],
+    [{ bind: '[::1]' }, { memoryMiB: 16384, cpus: 8 }],
   ];
   for (const [args, size] of cases) {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size });

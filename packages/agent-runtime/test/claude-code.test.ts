@@ -238,7 +238,8 @@ test(
         'the job stopped by its worker',
       );
       assert.equal(stopped.sessionId, 'ae/j/2');
-      assert.equal(fresh.release, undefined, 'a job has nothing to let go of: its run file is its record');
+      await Effect.runPromise(fresh.release!(stopped, {}));
+      assert.ok(fs.existsSync(path.join(root, 'runs', 'claude', 'ae_j_2.json')), 'a job let go of keeps its run file: it is its record');
       const toJob = await Effect.runPromise(Effect.flip(fresh.say!({ name: 'ae/j/2', sessionId: 'ae/j/2' }, 'hello')));
       assert.match(toJob.message, /^claude: `ae\/j\/2` is `stopped`, not running/, "a job's words go to its worker");
     });

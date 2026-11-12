@@ -290,8 +290,10 @@ empty path.
 Once an attempt's end is on the record, the engine asks its runner to **release** the session (`release`, optional on `Runner`):
 I/O applied to the record, not a decision — `decide` is not asked — and level-triggered, asked on every pass that still sees such a
 session, so a crash between writing the end and releasing is repaired by the next pass. A remote agent's entry moves to
-`remote/done/`, where `find` and `logs` still read it. Claude Code, Codex and the command harness have none: their run files are the
-record `logs` reads, and a job's process has exited with its session. Until 2026-10-24 a `claude --bg` session was released by
+`remote/done/`, where `find` and `logs` still read it. Claude Code, Codex and the command harness keep their run files: those are the
+record `logs` reads, and a job's process has exited with its session. A detached runner's `release` removes nothing, and stops what
+an ended run left in its harness's process group (*One mechanism for every local harness*), failing while anything is left so it is
+asked again; it sends nothing while the run's worker is still at work, whose own exit writes what the session cost. Until 2026-10-24 a `claude --bg` session was released by
 `claude stop` and `claude rm`; a journal from then reads as it did.
 
 ### Why there are no leases
@@ -400,10 +402,25 @@ read from its own registry (`claude agents`) instead; no code reads it now.
 
 That costs exactly one thing: **a heartbeat**. A worker that gets killed leaves a run file saying
 `working` forever, and nothing on disk tells that apart from a session thinking hard. So the worker
-beats every 5s and `observe` calls a stale beat dead — which is a lease, in the only form a lease
-has ever taken. It is the price of not having somebody else's registry to read, and therefore the
+beats every 5s, and a stale beat is dead only once its worker's process is gone too — which is a lease, in the only form a
+lease has ever taken. It is the price of not having somebody else's registry to read, and therefore the
 price of running more than one harness. It is a handful of lines, because the engine already had a
 journal and a seam.
+
+Slow is not dead. The spawn records the worker it launched beside the run (`<name>.launched`: its pid, when that process started
+and the boot), and a look that finds a `working` run's beat past `STALE_MS` asks whether that very process is still there: alive,
+a worker whose first beat is late under load, or whose beat is, is working; gone, its run is `failed` (`leaseWord`, proved by
+`contracts/lease.contract.ts`; `workerSeen`, `src/harness/detached/launched.ts`). A run that names no such worker — spawned before
+it was recorded, or on a machine with no `/proc` — is judged by the clock alone, as before. No bound is put on a start: a worker that
+never beats while its process lives is ended by its task's deadline. On 2026-11-11 two reviews were read failed 30 s after their
+spawn while their workers, slow under a load of 65, were starting, and ran on orphaned (`docs/open-issues.md`).
+
+What is called dead is stopped. The worker writes its harness's pid and start on the run file (`harness`) as it spawns it, and
+once a run has ended — its worker wrote its end, or is gone — what is left in its harness's process group is ended by the runner's
+`stop` and `release` (`stopRunOf`, `src/harness/detached/left.ts`): SIGTERM from the first ask, kept in `.stop`, and SIGKILL once the
+run's stop grace has passed since (`leftSignal`, proved by `contracts/left.contract.ts`). A process that left the group with
+`setsid` is not reached. A worker is signalled only where its beat is fresh or its identity is proven: a stale run that names no
+worker is left `.stop` alone, so one that starts late starts nothing, and no pid nothing proves is its worker is signalled.
 
 The beat is written on two clocks: `heartbeatAt` on the wall clock, and `beat`, `{ boot, ms }`, on the monotonic clock every
 process of a boot shares. The lease is measured on `beat` when it was written in this boot, so a wall clock stepped forward
@@ -2134,7 +2151,7 @@ of pure code sits beside it.
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where it has one (`startWorker`) |
-| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
+| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them and `release`, `stopRunOf` the stop both take, and `output`, a stream kept whole |
 | `src/harness/detached/detached-options.ts` | how a detached runner's workers run, beside its spec (`DetachedOptions`): their stop grace and heartbeat, each defaulted to the shipped bound, and a beat the lease would read as dead refused (`workerBoundsOf`) |
 | `src/harness/detached/worker-bounds.ts` | the detached worker's two shipped bounds, named once (`WORKER_STOP_GRACE_MS`, `WORKER_BEAT_MS`), importing nothing, as the worker it is read by imports nothing else |
 | `src/harness/detached/looked.ts` | what a detached look at the names it was told found: each sighting, the names left unread and why each was (`unreadWhy`), and every warning to log |
@@ -2143,7 +2160,9 @@ of pure code sits beside it.
 | `src/harness/detached/output.ts` | what a detached session's output says: a Claude Code job's result and stream, decoded by `stream.ts` or refused, read for closeout, usage (every model's, `modelUsage`, else the main thread's), cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/harness-io.ts` | what a detached harness's command is told of the files its runner named for it (`HarnessIO`): the closeout's schema and answer, the MCP config, the spawn request, a Claude Code job's bridge file, and its hold file, the sessions' drain and the hold's bounds |
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
-| `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
+| `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`, `leaseWord`, proved by `contracts/lease.contract.ts`) included |
+| `src/harness/detached/launched.ts` | who a detached run's worker is: the process the spawn launched, by its pid, start and boot (`writeLaunched`, `.launched`), and whether a look finds it running, gone or cannot tell (`workerSeen`) |
+| `src/harness/detached/left.ts` | what an ended detached run left in its harness's process group (`groupLeft`), the first time a stop was asked of it (`firstAsked`, `.stop`), and the signal it is sent (`leftSignal`, proved by `contracts/left.contract.ts`) |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
 | `src/harness/detached/sighted.ts` | the facts a detached sighting takes from what its output said — a limit, denials, skills, files, the model, the mode and the harness version — each only when said, an empty list kept (`sightedOf`) |
 | `src/harness/detached/compact.ts` | the captures already on disk rewritten once to what their readers read (`compactRuns`), a detached runner's `compact`: a run whose worker ended, one capture at a time, each left whole and named where it is at work, has no run file, or does not read the same |
@@ -2209,6 +2228,7 @@ of pure code sits beside it.
 | `test/memory-limit.boundary.test.ts` | a memory limit on a real cgroup: a runaway child of a 256Mi task killed in its scope, the attempt carrying the limit, the kill and the peak, and a neighbour untouched; skipped with the probe's words off systemd |
 | `test/attached-memory.test.ts` | a held long-lived session under a memory limit: refused its start where the host makes no scope (its unlimited neighbour started), ended `failed` rather than taken up again when a holder that makes none finds it parked, and run in a scope of its own whose memory its run file and sighting say where the host makes one |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
+| `test/detached-left.boundary.test.ts` | a slow worker read working and a gone one failed, and what an ended run left in its harness group stopped by `stop`, `release` and the engine's pass — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
 | `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |

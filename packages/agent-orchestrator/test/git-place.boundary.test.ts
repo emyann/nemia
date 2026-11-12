@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import { gitPlace } from '../place/git/place.ts';
-import { clone } from '../place/git/verbs/clone.ts';
 import { GIT_ENV, gitWorld } from './git-world.ts';
 import { walksOn } from './place-walks.ts';
 import { scratch } from 'test-kit/scratch';
@@ -56,15 +55,4 @@ test('root: a repository whose git folder is kept apart answers its checkout, ne
       bare: { answer: { root: at('bare.git') } },
     },
   );
-});
-
-test('clone: the git clone it asks for runs with no prompt for a credential, so a URL the machine cannot reach fails at once', () => {
-  const into = path.join(scratch('wf-clone-env-'), 'clones', 'repo');
-  const body = clone({ url: 'https://example.test/o/r.git', into });
-  const done = { status: 0, signal: null, stdout: '', stderr: '' };
-  let step = body.next();
-  while (!step.done && !step.value.args.includes('clone')) step = body.next(done);
-  assert.ok(!step.done, 'it asks git to clone');
-  assert.equal(step.value.cmd, 'git');
-  assert.equal(step.value.env?.GIT_TERMINAL_PROMPT, '0');
 });

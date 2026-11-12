@@ -126,7 +126,7 @@ const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
     .filter(Boolean)
     .at(-1);
   const answer = said === undefined ? `exited ${ran.status}` : `said "${quote(said, WORDS_QUOTE)}"`;
-  return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`codex login --device-auth\`, as the user the engine runs as, then try the step again.`;
+  return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`codex login --device-auth\`, as the user the engine runs as, then try again.`;
 };
 
 /**

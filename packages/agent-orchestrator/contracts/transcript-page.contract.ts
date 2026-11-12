@@ -34,9 +34,7 @@ const boundsTaken = (bounds: TranscriptBounds): boolean =>
 /** The smaller of two counts. */
 const least = (a: number, b: number): number => (a < b ? a : b);
 
-const transcriptCutSpec = spec<
-  (count: number, limit: number | null, last: number | null, bounds: TranscriptBounds) => TranscriptPageCut
->({
+const transcriptCutSpec = spec<(count: number, limit: number | null, last: number | null, bounds: TranscriptBounds) => TranscriptPageCut>({
   requires: ({ input: [n, , , bounds] }) => count(n) && boundsTaken(bounds),
   ensures: {
     refusedBothExactlyWhenBothAsked: {
@@ -76,7 +74,8 @@ const transcriptCutSpec = spec<
         output.to - output.from === least(limit === null ? bounds.byDefault : limit, bounds.most),
     },
     lastEventsReachTheEnd: {
-      description: 'A read of the last events ends at the last event said, and holds as many as it asked, up to the most and to what there is',
+      description:
+        'A read of the last events ends at the last event said, and holds as many as it asked, up to the most and to what there is',
       condition: ({ input: [n, , last, bounds], output }) =>
         'refused' in output || last === null || (output.to === n && output.to - output.from === least(least(last, bounds.most), n)),
     },

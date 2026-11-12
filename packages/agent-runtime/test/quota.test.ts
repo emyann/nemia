@@ -233,8 +233,7 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
     });
 });
 
-test('REFUSED: an ask whose query cannot be opened answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {
-  /** The SDK's `query()`, throwing as it opens, as it does when its platform's package is not installed: in words, with no `errorClass`. */
+test('REFUSED: an ask whose query cannot be opened — the SDK throwing in words, with no errorClass, as it does when its platform package is not installed — answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {
   const throwing: OpenUsage = () => {
     throw new Error('Native CLI binary for linux-x64 not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional.');
   };

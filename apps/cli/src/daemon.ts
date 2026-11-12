@@ -151,25 +151,40 @@ const remoteDown = (verb: string, name: string, server: string): Refused =>
     `nemia ${verb}: the daemon of the context ${name}, at ${server}, takes no connection. See that it runs there (\`nemia service status\` on its machine), check its address with \`nemia config get-contexts\`, or read this machine's store after \`nemia config use-context local\``,
   );
 
+/** A daemon made ready for a read: its base url, and the release its health says (`Health.release`), null where it says none. */
+export type Served = { readonly base: string; readonly release: string | null };
+
 /**
- * The base url of the daemon a read asks, ready: under a remote context its server, where something listens there, never a daemon
- * started here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the
- * read's own bound then says — else one started now and waited for (`daemonStarted`). Refused where the daemon says a release other
- * than `client`, this client's own (`releaseHeld`).
+ * The daemon a read asks, ready (`Served`): under a remote context its server, where something listens there, never a daemon started
+ * here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the read's own
+ * bound then says — else one started now and waited for (`daemonStarted`). Refused where the daemon says a release other than `client`,
+ * this client's own (`releaseHeld`).
  */
-export async function served(verb: string, env: NodeJS.ProcessEnv = process.env, client: string | null = clientRelease()): Promise<string> {
+export async function servedWith(
+  verb: string,
+  env: NodeJS.ProcessEnv = process.env,
+  client: string | null = clientRelease(),
+): Promise<Served> {
+  const held = (base: string, release: string | null): Served => ({ base: releaseHeld(verb, base, release, client), release });
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   if (chosen.kind === 'remote') {
     const { probe, release } = await probed(chosen.server, env);
-    if (probe !== 'refused') return releaseHeld(verb, chosen.server, release, client);
+    if (probe !== 'refused') return held(chosen.server, release);
     throw remoteDown(verb, chosen.name, chosen.server);
   }
   const at = servedAt(env);
   if (at !== undefined) {
     const { probe, release } = await probed(at, env);
-    if (probe !== 'refused') return releaseHeld(verb, at, release, client);
+    if (probe !== 'refused') return held(at, release);
   }
   const started = await daemonStarted(verb, env);
-  return releaseHeld(verb, started, (await probed(started, env)).release, client);
+  return held(started, (await probed(started, env)).release);
 }
+
+/** The base url of the daemon a read asks, ready, as `servedWith` finds it. */
+export const served = async (
+  verb: string,
+  env: NodeJS.ProcessEnv = process.env,
+  client: string | null = clientRelease(),
+): Promise<string> => (await servedWith(verb, env, client)).base;

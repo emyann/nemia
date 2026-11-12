@@ -21,6 +21,7 @@
  * given none (`test/root-given.test.ts`).
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { brokenBy, doorOf, fromThrow, rootedDoor, type DoorOf } from '../door/door.store.ts';
@@ -28,9 +29,16 @@ import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts'
 import { WorkflowError, type StepSpec as Step } from '../step/step.ts';
 import type { StepDraft } from '../workflow/index.ts';
 import type { Places } from '../skills/read.store.ts';
-import { workflowVersionRefusal, type Fills, type Found, type WorkflowThere } from '../folder/folder.ts';
+import { isMarkdown, textIn, workflowVersionRefusal, type Fills, type Found, type WorkflowThere } from '../folder/folder.ts';
 import { StepName, Workflow, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
-import { formerKeyLines, loadWorkflowsWith, workflowDirAt, workflowsIn } from '../folder/folder.store.ts';
+import {
+  formerKeyLines,
+  loadWorkflowsWith,
+  workflowDescription,
+  workflowDirAt,
+  workflowReadme,
+  workflowsIn,
+} from '../folder/folder.store.ts';
 import { versionDigest, versionGathered, versionNamed, type VersionGathered } from '../folder/version.store.ts';
 import { placesAroundAt, removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from '../folder/write.store.ts';
 import { AgentDoor, agentDoorOver, agentFiles, type AgentDoorShape } from '../agents/agent-door.store.ts';
@@ -346,4 +354,75 @@ export const writeWorkflow = writeWorkflowOnDisk;
 export const draftSteps = Effect.fn('draftSteps')(function* (folder: string, places: Places, fills?: Fills) {
   const dir = yield* fromThrow(() => workflowDirAt(path.resolve(folder)));
   return yield* (yield* WorkflowDoor).workflows.read(dir, places, fills);
+});
+
+/**
+ * What a workflow's folder, given as its files, says: its steps loaded as a start loads them, its README in full and its description, and
+ * its other text files (`files`, no markdown, sorted by name), each null or none where the folder has none. What the api answers a read of
+ * the files a person keeps (`POST /api/workflows/read`), so its steps are the loader's and never another reader's.
+ */
+export type WorkflowFilesRead = {
+  readonly steps: Step[];
+  readonly readme: string | null;
+  readonly description: string | null;
+  readonly files: readonly CarriedFile[];
+};
+
+/**
+ * Why a folder given as files may not hold the file named `name`, or undefined where it may: a name directly in the folder, never a path
+ * nor one climbing out of it, and given once (`seen`, the names before it). Pure.
+ */
+const givenNameRefusal = (name: string, seen: readonly string[]): string | undefined => {
+  if (name === '' || name === '.' || name === '..' || name.includes('/') || name.includes('\\') || name.includes('\0'))
+    return `${JSON.stringify(name)} is not a file's name in the workflow's folder: send the files directly in it, each by its name.`;
+  if (seen.includes(name)) return `${name} is sent twice: send each file of the folder once.`;
+  return undefined;
+};
+
+/**
+ * The workflow `name` as its folder, given as its files (`files`, each a file directly in it by its name and its text), says it
+ * (`WorkflowFilesRead`): read exactly as the Workflow door the program is given reads a folder on disk, its agents and skills found in
+ * `places`, by writing the files into a scratch folder of the machine's temporary folder, named `name`, which is removed whatever the read
+ * answers. The memory door holds a draft's steps rendered, never the files a person wrote, so it cannot read them as the disk does.
+ * Refused `Invalid` for a name that is not a workflow's, a file's name that is not one directly in the folder, and a folder that does not
+ * load, in the loader's words, which name the step.
+ */
+export const workflowDraftOfFiles = Effect.fn('workflowDraftOfFiles')(function* (
+  name: string,
+  files: readonly CarriedFile[],
+  places: Places = {},
+) {
+  yield* nameChecked(name);
+  for (const [i, file] of files.entries()) {
+    const why = givenNameRefusal(
+      file.path,
+      files.slice(0, i).map((f) => f.path),
+    );
+    if (why !== undefined) return yield* Effect.fail(new Invalid({ message: why }));
+  }
+  const door = yield* WorkflowDoor;
+  return yield* Effect.acquireUseRelease(
+    Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-workflow-read-'))),
+    (scratch) =>
+      Effect.gen(function* () {
+        const folder = path.join(scratch, name);
+        yield* Effect.sync(() => {
+          fs.mkdirSync(folder);
+          for (const file of files) fs.writeFileSync(path.join(folder, file.path), file.text);
+        });
+        const dir = yield* fromThrow(() => workflowDirAt(folder));
+        const steps = yield* door.workflows.read(dir, places);
+        const carried = files
+          .filter((f) => !isMarkdown(f.path) && textIn(new TextEncoder().encode(f.text)) !== null)
+          .map((f) => ({ path: f.path, text: f.text }))
+          .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+        return {
+          steps,
+          readme: workflowReadme(folder),
+          description: workflowDescription(folder),
+          files: carried,
+        } satisfies WorkflowFilesRead;
+      }),
+    (scratch) => Effect.sync(() => fs.rmSync(scratch, { recursive: true, force: true })),
+  );
 });

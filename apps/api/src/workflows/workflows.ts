@@ -302,7 +302,7 @@ export function listed(
  * A step as the listing has it, in a factory whose hires into its workflow are `hires`, by step: resolved, what its file sets itself where
  * an agent gives it the rest, and the agent hired into it.
  */
-const listedStep =
+export const listedStep =
   (hires: ReadonlyMap<string, string>) =>
   (step: StepSpec): ListedStep => ({
     name: step.name,

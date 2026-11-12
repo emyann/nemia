@@ -90,17 +90,3 @@ export const selectorQuery = (input: Input): Readonly<Record<string, string>> =>
   const texts = Array.isArray(selector) ? selector.map(String) : typeof selector === 'string' ? [selector] : [];
   return texts.length ? { labelSelector: texts.join(',') } : {};
 };
-
-/**
- * The request of a writer whose input is a draft the command line reads here into the package's own form (an agent's file, a skill's
- * folder, a workflow's draft), which its endpoint takes as an object of `objects`' instead: not sent yet, and refused (`Invalid`) saying
- * where it runs — on the daemon's machine, on this machine's store, or through the board.
- */
-export const notSent =
-  (verb: string): Request =>
-  () =>
-    Promise.reject(
-      new Invalid({
-        message: `nemia ${verb} is not yet sent to another machine's api from here: write it on the daemon's machine or through its board, or on this machine's store with NEMIA_CONTEXT=local.`,
-      }),
-    );

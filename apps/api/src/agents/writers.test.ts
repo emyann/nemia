@@ -3,14 +3,13 @@
  * `agents rm`, `agents run`, `skills write`, `workflows write` and `workflows rm`, sent as the board sends it, hands its entry's
  * handler only the keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is
  * answered as it would be. The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken
- * is refused in the one sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the
- * command line. A factory's tree, the writers' place `factory`, is the command line's alone: each writer's route refuses it before its
- * handler.
+ * is refused in `workflowTaken`'s one sentence by the Workflow's `create`, the one route the board and `nemia workflows write` (the
+ * client's, `apps/cli`) both write through. A factory's tree, the writers' place `factory`, is the command line's alone: each writer's
+ * route refuses it before its handler.
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -137,28 +136,18 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   );
 });
 
-test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia, typed once for the handler both share", async () => {
+test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the Workflow's create, which the board and nemia both send", async () => {
   fs.cpSync(path.join(TEAM, 'dev'), path.join(STORE, 'taken'), { recursive: true });
   fs.writeFileSync(path.join(STORE, 'TAKEN.txt'), 'not a workflow\n');
-  const draft = path.join(scratch('nemia-api-taken-'), 'taken');
-  fs.cpSync(path.join(TEAM, 'dev'), draft, { recursive: true });
   const taken = (await (await app.request(`${D}/workflows/taken?origin=yours`)).json()) as Workflow;
-  const nemia = path.join(import.meta.dirname, '../../../../packages/agent-orchestrator/bin/nemia.ts');
-  for (const [name, version, typedToo] of [
-    ['taken', taken.metadata.resourceVersion, true],
-    ['TAKEN.txt', null, false],
+  for (const [name, version] of [
+    ['taken', taken.metadata.resourceVersion],
+    ['TAKEN.txt', null],
   ] as const) {
     const res = await sent('POST', `${D}/workflows`, { metadata: { name }, spec: { steps: [taken.spec.steps[0]] } });
     const board = ((await res.json()) as { error: string }).error;
     assert.equal(res.status, 409, board);
     assert.equal(board, workflowTaken(path.join(STORE, name), version), name);
-    if (!typedToo) continue;
-    const typed = spawnSync(process.execPath, [nemia, 'workflows', 'write', 'yours', name, '--folder', draft], {
-      encoding: 'utf8',
-      timeout: 60_000,
-    });
-    assert.equal(typed.status, 2, typed.stderr);
-    assert.equal(typed.stderr.trim(), board, name);
   }
 });
 

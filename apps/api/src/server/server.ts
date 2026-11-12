@@ -73,10 +73,11 @@ import {
   SERIES,
   VERSION,
   WAIT,
+  type Running,
   type WaitAnswer,
 } from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
-import { Api, type Event, type FeedWait } from 'objects';
+import { Api, type Event, type FeedWait, type Health } from 'objects';
 import { capabilitiesWithSteps } from '../capabilities/index.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
@@ -95,6 +96,13 @@ const answered = answeredWrite;
 /** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
 const RUNNING = runningRelease();
 const RELEASE = leaseRelease(RUNNING);
+
+/**
+ * What `GET /api/health` answers: that the api is up, and the release it runs (`release`), the tag of an install's `release.json`, which
+ * the client holds its own against; none for a checkout, or where the app was given no release.
+ */
+export const healthOf = (running: Running | undefined): Health =>
+  running?.kind === 'install' ? { ok: true, release: running.tag } : { ok: true };
 
 /**
  * Each `?selector=` of `request`, in order: the label queries of `GET /api/stats` and `GET /api/feed/stream`, read off the request since
@@ -121,7 +129,12 @@ const waitSent = ({ ended, lines, cursor }: WaitAnswer): FeedWait => {
 
 export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
   handlers
-    .handle('health', () => Effect.succeed({ ok: true } as const))
+    .handle('health', () =>
+      Effect.gen(function* () {
+        const { running } = yield* ServedNow;
+        return healthOf(running);
+      }),
+    )
     .handle('version', () =>
       answered(async ({ home }) => {
         const latest = latestRelease(home, RUNNING);

@@ -308,6 +308,36 @@ test('a person works in a factory with hires: the listing names what is unfilled
   );
 
   await s.test(
+    'POST /api/namespaces/<factory>/runs on a factory of two repositories: unwired, a 422 naming the attach; wired, the run works on the wired one, whatever `?repo=` says',
+    async (t) => {
+      addFactory({ name: 'twin', repos: [repoR, repoS] });
+      const implementer = path.join(repoR, 'workflows', 'agents', 'implementer.md');
+      write(implementer, '---\nharness: claude\n---\nYou implement what you are asked.\n');
+      t.after(() => {
+        removeFactory('twin');
+        fs.rmSync(implementer, { force: true });
+      });
+      attachWorkflow({ factory: 'twin', workflow: 'alpha' });
+      hireAgent({ factory: 'twin', agent: 'implementer', step: 'alpha/implement' });
+      const before = runFiles();
+      const unwired = await post(`/api/namespaces/twin/runs?repo=${encodeURIComponent(repoS)}`, {
+        workflow: 'alpha',
+        brief: 'Add a cache',
+      });
+      assert.equal(unwired.status, 422);
+      saysAll(said(await unwired.json()), ['nemia factory attach twin alpha --repo', path.basename(repoR), path.basename(repoS)]);
+      assert.deepEqual(runFiles(), before, 'nothing written');
+
+      attachWorkflow({ factory: 'twin', workflow: 'alpha', repo: path.basename(repoR) });
+      const res = await post(`/api/namespaces/twin/runs?repo=${encodeURIComponent(repoS)}`, { workflow: 'alpha', brief: 'Add a cache' });
+      assert.equal(res.status, 201, await res.clone().text());
+      const { id } = (await res.json()) as { id: string };
+      const run = runsAtOnce(root).runs.read(id);
+      assert.deepEqual([run.factory, run.repo], ['twin', repoR], '`?repo=` found the factory; its wiring placed the run');
+    },
+  );
+
+  await s.test(
     'a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started',
     async () => {
       const { card } = onStore(addToInbox({ text: 'Cache the views' }));
@@ -422,14 +452,19 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
   );
 
   await t.test(
-    'REFUSED: a card that names no factory is a 422 naming ?factory=, though one factory alone holds its repository; it stays',
+    'REFUSED: a card that names no factory is a 422 naming ?factory=, never placed in the factory a repository is in; with ?repo= a 422 naming the attach; it stays',
     async (t) => {
       const repoT = asShipped(t);
       const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
       const before = runFiles();
-      const res = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta' });
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start`, { workflow: 'delta' });
       assert.equal(res.status, 422);
       assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
+      const placed = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, {
+        workflow: 'delta',
+      });
+      assert.equal(placed.status, 422, "a card's run is placed by its factory's wiring, never by ?repo=");
+      saysAll(said(await placed.json()), [card.name, '--repo', 'nemia factory attach']);
       assert.ok(
         onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',

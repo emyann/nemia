@@ -55,6 +55,7 @@ const factory = (name: string, extra: Partial<Factory> = {}): Factory => ({
   untrusted: [],
   volumes: [],
   costLines: {},
+  workflowRepos: {},
   template: null,
   ...extra,
 });
@@ -193,14 +194,42 @@ test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a f
   });
 });
 
-test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a card or a floor starts a run, and why it cannot', async (t) => {
+test('startRepo, floorPlace, whyNotStarted, untrustedFor: where a workflow or a floor starts a run, and why it cannot', async (t) => {
   await t.test(
-    "a card starts on its repo:, else on the factory's one repository; with several and no repo:, on none until a person picks",
+    "a workflow starts on the repository the factory's wiring names for it, else its only one; never on a card's: the orchestrator's workflowRepo",
     () => {
-      assert.equal(startRepo(factory('solo', { repos: ['/r/a', '/r/b'] }), '/r/b'), '/r/b');
-      assert.equal(startRepo(factory('solo'), null), '/code/nemia');
-      assert.equal(startRepo(factory('pair', { repos: ['/r/a', '/r/b'] }), null), null);
-      assert.equal(startRepo(factory('none', { repos: [] }), null), null);
+      const pair = { repos: ['/r/app', '/r/docs'] };
+      const rows: Array<[string, Partial<Factory>, string, string | null, 'unwired' | 'unknown' | 'shared' | null]> = [
+        ['wired', { ...pair, workflowRepos: { build: 'docs' } }, 'build', '/r/docs', null],
+        [
+          'wired with a trailing separator',
+          { repos: ['/r/app/', '/r/docs/'], workflowRepos: { build: 'docs' } },
+          'build',
+          '/r/docs/',
+          null,
+        ],
+        ['only one, none named', { repos: ['/r/app'] }, 'build', '/r/app', null],
+        ['only one, another workflow wired', { repos: ['/r/app'], workflowRepos: { quick: 'app' } }, 'build', '/r/app', null],
+        ['several, none named', pair, 'build', null, 'unwired'],
+        ['several, another workflow wired', { ...pair, workflowRepos: { quick: 'app' } }, 'build', null, 'unwired'],
+        ["a prototype's name is no wiring", { ...pair, workflowRepos: {} }, 'constructor', null, 'unwired'],
+        ['none at all', { repos: [] }, 'build', null, 'unwired'],
+        ['a name none has', { ...pair, workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
+        ['a name none has, on its only one', { repos: ['/r/app'], workflowRepos: { build: 'site' } }, 'build', null, 'unknown'],
+        ['a name two share', { repos: ['/a/app', '/b/app'], workflowRepos: { build: 'app' } }, 'build', null, 'shared'],
+      ];
+      for (const [row, extra, workflow, repo, refused] of rows) {
+        const on = startRepo(factory('pair', extra), workflow);
+        if (repo !== null) assert.deepEqual(on, { repo }, row);
+        else {
+          assert.ok('refused' in on, row);
+          assert.equal(on.refused, refused, row);
+          assert.match(on.why, new RegExp(`nemia factory attach pair ${workflow} --repo`), `${row}: names the attach that fixes it`);
+          for (const name of new Set((extra.repos ?? []).map((r) => r.split('/').filter(Boolean).at(-1)))) {
+            assert.ok(on.why.includes(name!), `${row}: offers ${name}`);
+          }
+        }
+      }
     },
   );
   await t.test(

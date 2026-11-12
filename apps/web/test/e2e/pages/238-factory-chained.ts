@@ -3,7 +3,7 @@ import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
 import { cardOf, photographCard } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { CHAINED, DIAMOND, QUEUE, QUEUED_IN, refusedWhy, seedChained } from '../seed.ts';
+import { CHAINED, DIAMOND, FACTORIES, onSeveralRepos, QUEUE, QUEUED_IN, refusedWhy, seedChained } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -12,7 +12,8 @@ export default {
    * A run of a factory started `--after` a run of the default factory that may still land is on its factory's floor as a ghost, dimmed and
    * dashed: its line says what it waits on in `wf ls`'s words, the run it waits on a link to that run's page. The run it waits on, in
    * another factory, brings no card onto this floor, and no edge comes into the ghost. The run is taken back. Before it, the floor's lane:
-   * the factory's two queued cards, in the queue's order, the try marked on the one its factory refused.
+   * the factory's two queued cards, in the queue's order, the try marked on the one its factory refused, each saying the repository its
+   * factory gives its workflow — its only one; on two, `not wired`, the attach that wires it on hover, the factory's file then put back.
    */
   name: 'factory-chained',
   route: `/factories/${CHAINED.factory}`,
@@ -33,6 +34,31 @@ export default {
       `one try is marked, on ${QUEUE.refused.name}: nobody has its workflow, in the package's words`,
     );
     await expectCount(lane.locator(`a[data-ghost="${QUEUE.refused.name}"] [data-ghost-tried="refused"]`), 1, 'and it is on that card');
+    await expectTexts(
+      lane.locator('[data-ghost-repo]'),
+      queued.map(() => 'checkout'),
+      "each ghost says the repository its factory gives its workflow, its only one, by its folder's name",
+    );
+    const { back } = onSeveralRepos(store!);
+    try {
+      await page.goto(page.url(), { waitUntil: 'load' });
+      await idle(page);
+      const unwired = lane.locator('[data-ghost-repo="not wired"]');
+      await expectTexts(
+        unwired,
+        queued.map(() => 'not wired'),
+        `on two repositories, wired to neither, each ghost says it is not wired`,
+      );
+      const title = (await unwired.first().getAttribute('title')) ?? '';
+      if (!title.includes(`${CHAINED.factory} ${QUEUE.first.workflow} --repo`) || !title.includes(FACTORIES.bare))
+        throw new Refused(`with the attach that wires it, and the folder names, on hover — its title is ${JSON.stringify(title)}`);
+      await settled(page);
+      await photograph(lane, path.join(OUT, `factory-chained-lane-unwired-${theme}.png`));
+    } finally {
+      back();
+    }
+    await page.goto(page.url(), { waitUntil: 'load' });
+    await idle(page);
     const file = seedChained(store!, path.join(store!, 'checkout'));
     try {
       const said = (

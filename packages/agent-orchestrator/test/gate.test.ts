@@ -80,6 +80,13 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   return dir;
 };
 
+/** `planned()`'s workflow under `repo`'s `workflows/`, by the name a card started in `repo` finds it: a card names its workflow so. */
+const plannedIn = (repo: string): string => {
+  const dir = planned();
+  fs.cpSync(dir, path.join(repo, 'workflows', path.basename(dir)), { recursive: true });
+  return path.basename(dir);
+};
+
 const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
 
 const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
@@ -649,7 +656,7 @@ test("an inbox card's `gate:` is frozen on the run it starts", async (t) => {
   const repo = aRepo();
   const card = (name: string, gate: string) => {
     fs.mkdirSync(inboxDir(ROOT), { recursive: true });
-    fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
+    fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${plannedIn(repo)}\ngate: ${gate}\n---\nPlan the flag.\n`);
   };
   await s.test("beside a start's --gate, a step both name once", async () => {
     card('plan-the-flag-a1b2', 'plan');
@@ -673,7 +680,7 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
     stage.main(['start', 'plan the flag', '--workflows', planned(), '--repo', repo, '--no-worktree', ...flags]);
   const card = (name: string, gate: string) => {
     fs.mkdirSync(inboxDir(ROOT), { recursive: true });
-    fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
+    fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${plannedIn(repo)}\ngate: ${gate}\n---\nPlan the flag.\n`);
     return name;
   };
   const fromCard = (name: string, gates?: string[]) =>

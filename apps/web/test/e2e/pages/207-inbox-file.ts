@@ -60,8 +60,8 @@ function expectFile(file: string, text: string, assertion: string): void {
 
 /**
  * Start the card `name`, which names no factory, on a page of its own: its Start draws a Factory list and no start form; with the
- * factory picked, then its workflow, Start sends the factory and its repository in the query of the card's start, the record names
- * the factory, the repository and the card, and the card stays in the inbox, started. The run is taken back.
+ * factory picked, its workflow preset or picked, Start sends the factory alone in the query of the card's start, the record names the
+ * factory, the repository its wiring gives the workflow and the card, and the card stays in the inbox, started. The run is taken back.
  */
 async function startUnassigned(page: Page, name: string, theme: string): Promise<void> {
   const factory = FACTORIES.hiring.name;
@@ -105,11 +105,14 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
   }
 }
 
-/** Refuses unless `started`, a start's answer, is a 201 whose query names `factory` and `repo`, and whose record names them and `card`. */
+/**
+ * Refuses unless `started`, a start's answer, is a 201 whose query names `factory` and no repository, and whose record names it, `repo`
+ * (the one its wiring gives the workflow) and `card`.
+ */
 async function expectStartedIn(started: Response, { factory, repo, card }: { factory: string; repo: string; card: string }): Promise<void> {
   const sent = new URL(started.url()).searchParams;
-  if (sent.get('factory') !== factory || sent.get('repo') !== repo)
-    throw new Refused(`a card of no factory starts through its start, ?factory=${factory}&repo=${repo} — it was sent to ${started.url()}`);
+  if (sent.get('factory') !== factory || sent.has('repo'))
+    throw new Refused(`a card of no factory starts through its start, ?factory=${factory} and no repo — it was sent to ${started.url()}`);
   if (started.status() !== 201)
     throw new Refused(`the api starts the card in ${factory} — it answered ${started.status()}: ${await started.text()}`);
   const { id } = (await started.json()) as { id: string };
@@ -120,12 +123,13 @@ async function expectStartedIn(started: Response, { factory, repo, card }: { fac
   };
   const got = { factory: record.factory, repo: record.repo, from: record.from?.inbox };
   if (JSON.stringify(got) !== JSON.stringify({ factory, repo, from: card }))
-    throw new Refused(`the record names the factory picked, its repository and the card — it holds ${JSON.stringify(got)}`);
+    throw new Refused(`the record names the factory picked, the repository it wires and the card — it holds ${JSON.stringify(got)}`);
 }
 
 /**
- * The seed's factory as it is found, its one workflow unread in it: the box, with the factory picked, offers no workflow and says which
- * was left out and why; and so does the start of a seeded card of no factory, with the factory picked there. Nothing is written.
+ * The seed's factory as it is found, its one workflow unread in it: the box, with the factory picked, offers the workflow by its name,
+ * as the factory's file attaches it; the start of a seeded card of no factory, with the factory picked there, says it is left out and
+ * why, and draws no start form. Nothing is written.
  */
 async function unreadSaid(page: Page, theme: string): Promise<void> {
   const factory = FACTORIES.hiring.name;
@@ -134,25 +138,20 @@ async function unreadSaid(page: Page, theme: string): Promise<void> {
   await box.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
   await expectTexts(
     box.getByRole('combobox', { name: 'Workflow' }).locator('option'),
-    ['None: chosen at start'],
-    `${factory}, as seeded, offers no workflow in the box: ${workflow} does not read in it`,
+    ['None: chosen at start', workflow],
+    `${factory} offers ${workflow} in the box by its name, as its file attaches it: a card names a workflow, the factory finds it`,
   );
-  const unread = box.locator(`[data-workflows-unread] [data-unread="${workflow}"]`);
-  await expectVisible(unread, `and the box says ${workflow} is left out of the list`);
-  const why = ((await unread.textContent()) ?? '').trim();
-  if (!why.startsWith(`${workflow}: implement: \`agent: implementer\` fills this step in every factory`))
-    throw new Refused(`with why it does not read, in the api's words — it said ${JSON.stringify(why)}`);
-  await settled(page);
-  await photograph(box, path.join(OUT, `inbox-file-unread-${theme}.png`));
+  await expectCount(box.locator('[data-workflows-unread]'), 0, 'the box reads no workflow, so says none is left out');
   await box.getByRole('combobox', { name: 'Factory' }).selectOption('');
 
   const card = cardIn(page, CARDS.rich.name);
   await card.getByRole('button', { name: 'Start' }).click();
   await card.getByRole('combobox', { name: 'Factory' }).selectOption(factory);
-  await expectVisible(
-    card.locator(`[data-workflows-unread] [data-unread="${workflow}"]`),
-    `the start of a card of no factory, in ${factory}, says ${workflow} is left out too`,
-  );
+  const unread = card.locator(`[data-workflows-unread] [data-unread="${workflow}"]`);
+  await expectVisible(unread, `the start of a card of no factory, in ${factory}, says ${workflow} is left out`);
+  const why = ((await unread.textContent()) ?? '').trim();
+  if (!why.startsWith(`${workflow}: implement: \`agent: implementer\` fills this step in every factory`))
+    throw new Refused(`with why it does not read, in the api's words — it said ${JSON.stringify(why)}`);
   await expectCount(card.locator(`form[aria-label="Start ${CARDS.rich.name}"]`), 0, 'and draws no start form: nothing to run it on');
   await settled(page);
   await photograph(card, path.join(OUT, `inbox-start-unread-${theme}.png`));
@@ -164,7 +163,7 @@ export default {
    * The box that files a card. Its Factory list holds "No factory" and each factory whose file reads, never `default` nor `broken`,
    * with "No factory" chosen: the box then has no Workflow list and no Repository field, sends the idea alone, and the card's line says
    * it has no factory yet, with no tag. Reached with a factory in the address, the list is preset to it, its repository is said as
-   * text, and a filing sends the factory and the workflow picked and no repository: the card's file names the factory, and its line
+   * text, and a filing sends the factory and the workflow picked and never a repository: the card's file names the factory, and its line
    * wears the factory's tag, linked. A card filed with no factory there is hidden by the page's filter, and the box says so. The card
    * of no factory is then started through its Start's Factory list (`startUnassigned`). The factory is made able to start its
    * workflow for the page (`hiringStarts`), since the seed leaves that workflow unread in it — which the box and a card's start say first
@@ -220,8 +219,8 @@ export default {
       written.push(tagged.file);
       expectSent(
         tagged.sent,
-        { body: ASSIGNED, factory, workflow: WORKFLOWS.good.name, from: 'repo' },
-        'in a factory the box sends the factory and the workflow picked, and no repository nobody chose',
+        { body: ASSIGNED, factory, workflow: WORKFLOWS.good.name },
+        'in a factory the box sends the factory and the workflow picked by its name, and never a repository nor an origin',
       );
       expectFile(
         tagged.file,

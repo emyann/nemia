@@ -18,8 +18,8 @@ import {
 import { selectorKey } from './selector.ts';
 import { cards } from './objects.ts';
 import { factoryIn, namespaceOf } from './namespace.ts';
-import { sourceOf, type KeyRow } from './library.ts';
-import type { Place, Started, WorkflowListing } from './workflows.ts';
+import { type KeyRow } from './library.ts';
+import type { Started } from './workflows.ts';
 
 /**
  * A card's life, as the orchestrator computes it once and the api sends it (`CARD_STATES` of `objects`): its own until it starts —
@@ -66,8 +66,8 @@ export type InboxEntry = {
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
   /**
-   * The repository the card's factory picks for it: its factory's one repository, for a card that names none — null for a card that names
-   * its own, one whose factory has several or does not read, and an entry that does not read as a card.
+   * The repository the card's factory places its run on, by its wiring for the card's workflow (`cardRepo`): null where it gives none,
+   * for a card of no factory, one whose factory does not read, and an entry that does not read as a card.
    */
   factoryRepo: string | null;
   /** The card's own labels (its frontmatter's `labels:`), `{}` for none. */
@@ -210,23 +210,21 @@ export const cardQuery = (name: string) =>
 type CardRef = Pick<InboxEntry, 'name' | 'factory'>;
 
 /**
- * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path> --factory <name>` does: in `factory`'s
- * namespace when it names one, in `default` when it is left out (the Card's `create`). Resolves with the card's name; rejects with the
- * api's refusal in full — the package's words for an idea with nothing in it, a repository that is not an absolute path to a directory or
- * a factory the store does not have, or the api's own about the request or a workflow it has none of.
+ * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --factory <name>` does: in `factory`'s namespace when it names
+ * one, in `default` when it is left out (the Card's `create`). Never a repository nor an origin: the factory places the card's run and
+ * finds its workflow by name. Resolves with the card's name; rejects with the api's refusal in full — the package's words for an idea with
+ * nothing in it or a factory the store does not have, or the api's own about the request or a workflow it has none of.
  */
 export const fileCard = async ({
   factory,
-  from,
-  ...card
+  body,
+  workflow,
 }: {
   body: string;
   workflow?: string;
-  from?: WorkflowListing['from'];
-  repo?: string;
   factory?: string;
 }): Promise<{ name: string }> => {
-  const filed = await cards.create(namespaceOf(factory), { ...card, ...(from ? { from: sourceOf(from) } : {}) });
+  const filed = await cards.create(namespaceOf(factory), { body, ...(workflow === undefined ? {} : { workflow }) });
   return { name: filed.metadata.name };
 };
 
@@ -248,22 +246,28 @@ export const queueCard = (card: CardRef, { off = false }: { off?: boolean } = {}
   off ? cards.unqueue(namespaceOf(card.factory), card.name) : cards.queue(namespaceOf(card.factory), card.name);
 
 /**
- * Start a card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does (the Card's `start`): its run on `workflow`, waiting on
- * `after` and reading `context` when given, the card kept in the inbox and listed as started. `place` starts it in a factory on one of
- * its repositories, as a factory's start does (`placeQuery`): none for the default factory. Resolves with the new run; rejects with the
- * api's refusal in full — a card not there, one started already, a workflow its factory does not offer.
+ * Start a card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does (the Card's `start`): its run on `workflow`, by its name,
+ * waiting on `after` and reading `context` when given, the card kept in the inbox and listed as started. `factory` starts it in that
+ * factory, for a card that names none: none for the default factory. Never a repository nor an origin: the factory places the run by its
+ * wiring for the workflow and finds the workflow by its name. Resolves with the new run; rejects with the api's refusal in full — a card
+ * not there, one started already, a workflow its factory does not offer, one its factory wires to no repository.
  */
 export const startCard = (
   card: CardRef,
-  start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[]; context?: readonly string[] },
-  place?: Place | null,
+  start: { workflow: string; brief: string; after?: readonly string[]; context?: readonly string[] },
+  factory?: string | null,
 ): Promise<Started> =>
   cards
     .start(
       namespaceOf(card.factory),
       card.name,
-      { ...start, from: sourceOf(start.from) },
-      place && place.factory !== DEFAULT_NAMESPACE ? place : undefined,
+      {
+        workflow: start.workflow,
+        brief: start.brief,
+        ...(start.after === undefined ? {} : { after: start.after }),
+        ...(start.context === undefined ? {} : { context: start.context }),
+      },
+      factory && factory !== DEFAULT_NAMESPACE ? factory : undefined,
     )
     .then(({ id, card: started }) => ({ id, card: started }));
 

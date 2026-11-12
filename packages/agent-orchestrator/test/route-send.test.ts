@@ -88,11 +88,7 @@ const planned = async (surface: string, given: { title?: string; labels?: Record
 /** The routed card of a run's `ship` node, read as the inbox reads a card. */
 const routedCard = (id: string) => {
   const file = `${id}-ship-routed.md`;
-  return parseInboxCard(
-    file,
-    fs.readFileSync(path.join(inboxAt(ROOT), file), 'utf8'),
-    (at) => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() ?? false,
-  );
+  return parseInboxCard(file, fs.readFileSync(path.join(inboxAt(ROOT), file), 'utf8'));
 };
 
 /** What `nemia ls <id>` words each step. */

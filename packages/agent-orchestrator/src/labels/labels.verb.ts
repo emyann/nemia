@@ -65,10 +65,10 @@ export const labelCard = Effect.fn('labelCard')(function* (name: string, edits: 
     return yield* Effect.fail(
       new Missing({ message: `${command}: ${noCardLine(name, yield* inboxCards())} Label one nemia inbox lists, by its name.` }),
     );
-  const card = yield* tried(() => parseInboxCard(`${name}.md`, text, () => true));
+  const card = yield* tried(() => parseInboxCard(`${name}.md`, text));
   const was = card.labels ?? {};
   const labels = yield* edited(command, was, edits, overwrite);
-  yield* door.cards.rewrite(card$, yield* tried(() => labelledText(card, labels, () => true)));
+  yield* door.cards.rewrite(card$, yield* tried(() => labelledText(card, labels)));
   const out: Labelled = { kind: 'Card', name, labels, was };
   return out;
 });

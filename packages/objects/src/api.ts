@@ -68,6 +68,7 @@ import {
   FactoryRevisionsWrite,
   FactoryRules,
   FactoryRulesWrite,
+  FactoryAttachWrite,
   FactorySettingWrite,
   FactoryTrusted,
 } from './factory.ts';
@@ -335,6 +336,7 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }),
   HttpApiEndpoint.put('attach', '/api/factories/:name/workflows/:workflow', {
     params: factoryWorkflowParams,
+    payload: FactoryAttachWrite,
     success: FactoryObject,
     error: objectErrors,
   }),

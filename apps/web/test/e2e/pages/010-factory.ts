@@ -142,8 +142,11 @@ export default {
       if (!ago.startsWith('queued ')) throw new Refused(`${card.name}'s ghost says how long it has been queued — it says ${ago}`);
       await expectInstant(queued, 'Queued at ', `when ${card.name}'s ghost was queued`, () => ago);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
-      const repo = "the daemon's repository";
-      await expectTexts(ghost.locator('[data-ghost-repo]'), [repo], `and its repository (${repo})`);
+      await expectCount(
+        ghost.locator('[data-ghost-repo]'),
+        0,
+        "and no repository: a card of no factory is placed where the daemon runs, which the lane says nothing of, nor of the card's",
+      );
       const href = await ghost.getAttribute('href');
       if (href !== `/inbox/${card.name}`)
         throw new Refused(`${card.name}'s ghost opens the card's page (/inbox/${card.name}) — it links to ${href}`);

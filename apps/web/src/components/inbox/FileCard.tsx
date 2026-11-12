@@ -1,31 +1,29 @@
 /**
- * The box that files a card, on the Inbox page: the idea, and the factory it is filed in, picked from a list. With a factory, the
- * repository is the factory's own and the workflows are those it offers there; with none, the idea is filed alone.
+ * The box that files a card, on the Inbox page: the idea, and the factory it is filed in, picked from a list. With a factory, the workflows
+ * are those it offers, by name, and the repository is the one its wiring gives the workflow picked, said and never picked; with none, the
+ * idea is filed alone.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
-import { factoryWorkflowsQuery, type Place } from '../../lib/api/workflows.ts';
 import { fileCard } from '../../lib/api/inbox.ts';
 import { storeQuery } from '../../lib/api/store.ts';
-import { keptBy } from '../../lib/factories';
-import { cardFiling, factoriesOffered, factoryPreset, workflowKey } from '../../lib/inbox';
-import { FIELD, WorkflowOptions, WorkflowsUnread } from '../workflow/WorkflowOptions';
+import { keptBy, startRepo } from '../../lib/factories';
+import { cardFiling, factoriesOffered, factoryPreset } from '../../lib/inbox';
+import { FIELD } from '../workflow/WorkflowOptions';
 import { BUTTON } from '../../lib/classes';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
-/** What the box's lists hold: the factory's name, `''` for none; the repository picked among several; and the workflow's key. */
-type Picks = { factory: string; repo: string; workflow: string };
-
 /**
- * The box: the idea, the Factory list (`FactoryField`) and, under a factory, where the card runs and on what (`InFactory`); File; then
- * the api's refusal in full, with the idea kept to send again, or a note for a card filed where the page's filter hides it (`Hidden`).
+ * The box: the idea, the Factory list (`FactoryField`) and, under a factory, the workflow it runs and the repository the factory gives it
+ * (`InFactory`); File; then the api's refusal in full, with the idea kept to send again, or a note for a card filed where the page's
+ * filter hides it (`Hidden`).
  *
  * `shown` is the factory the address names, which the list starts on when it is offered (`factoryPreset`), until a person picks. Picking
- * a factory forgets the repository and the workflow picked under the last one, and what is sent is what the lists offer now
- * (`cardFiling`): no repository a person did not choose.
+ * a factory forgets the workflow picked under the last one, and what is sent is what the lists offer now (`cardFiling`): the factory and
+ * the workflow's name, never a repository nor an origin — the factory places the card's run.
  */
 export function FileCard({ shown }: { shown: string | undefined }) {
   const queryClient = useQueryClient();
@@ -33,17 +31,12 @@ export function FileCard({ shown }: { shown: string | undefined }) {
   const offered = factoriesOffered(factories.data ?? []);
   const [idea, setIdea] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
-  const [repo, setRepo] = useState('');
   const [workflow, setWorkflow] = useState('');
   const [filed, setFiled] = useState<{ name: string; factory: string | null } | null>(null);
-  const picks: Picks = { factory: chosen ?? factoryPreset(shown, offered), repo, workflow };
-  const factory = offered.find((f) => f.name === picks.factory) ?? null;
-  const place = placeOf(factory, repo);
-  const workflows = useQuery({ ...factoryWorkflowsQuery(place ?? { factory: '', repo: '' }), enabled: place !== null });
-  const listed = place === null ? [] : (workflows.data ?? []);
-  const picked = listed.find((w) => w.error === null && workflowKey(w) === workflow) ?? null;
+  const factory = offered.find((f) => f.name === (chosen ?? factoryPreset(shown, offered))) ?? null;
+  const picked = factory?.workflows?.includes(workflow) ? workflow : null;
   const file = useMutation({
-    mutationFn: () => fileCard(cardFiling({ idea, factory, repo, workflow: picked })),
+    mutationFn: () => fileCard(cardFiling({ idea, factory, workflow: picked })),
     onMutate: () => setFiled(null),
     onSuccess: ({ name }) => {
       setIdea('');
@@ -66,34 +59,14 @@ export function FileCard({ shown }: { shown: string | undefined }) {
       <FactoryField
         offered={offered}
         read={factories.data !== undefined}
-        picked={picks.factory}
+        picked={factory?.name ?? ''}
         error={factories.error}
         onPick={(name) => {
           setChosen(name);
-          setRepo('');
           setWorkflow('');
         }}
       />
-      {factory && (
-        <InFactory
-          factory={factory}
-          picks={picks}
-          onRepo={setRepo}
-          onWorkflow={setWorkflow}
-          unread={<WorkflowsUnread workflows={listed} />}
-        >
-          {workflows.error ? (
-            <p className="text-body-small text-failure">Could not list the workflows: {workflows.error.message}</p>
-          ) : (
-            place !== null && workflows.data && <WorkflowOptions workflows={workflows.data} />
-          )}
-        </InFactory>
-      )}
-      {picked?.folderTeam && (
-        <p data-in-folders className="text-body-small text-muted-foreground">
-          {picked.name} works in folders the run makes for it, and looks at no repository: the card names none.
-        </p>
-      )}
+      {factory && <InFactory factory={factory} picked={picked} onWorkflow={setWorkflow} />}
       <div className="flex flex-wrap items-center gap-3">
         <button type="submit" disabled={!idea.trim() || file.isPending} className={BUTTON}>
           {file.isPending ? 'Filing…' : 'File'}
@@ -134,16 +107,6 @@ function NotFiled({ message }: { message: string }) {
       <p className="font-mono text-body-small whitespace-pre-wrap break-words text-on-failure-container">{message}</p>
     </div>
   );
-}
-
-/**
- * Where the factory's workflows are read for the box: on its only repository, or on the one picked among several; null with no
- * factory, and while a factory on several, or on none, has none to read them on.
- */
-function placeOf(factory: Pick<Factory, 'name' | 'repos'> | null, repo: string): Place | null {
-  if (factory === null) return null;
-  const on = factory.repos.length === 1 ? factory.repos[0] : factory.repos.includes(repo) ? repo : null;
-  return on === null ? null : { factory: factory.name, repo: on };
 }
 
 /**
@@ -199,81 +162,57 @@ function FactoryField({
 }
 
 /**
- * Under a factory: its repository, said as text when it has one and picked from a list when it has several, "None: chosen at start"
- * first and nothing preset; and its Workflow list, whose options are `children`, once the repository they are read on is known, with
- * the workflows left out of it said under it (`unread`).
+ * Under a factory: its Workflow list, the workflows it offers by name, "None: chosen at start" first and nothing preset; and its
+ * repository, said as text and never picked: the one its wiring gives the workflow picked (`startRepo`), or why it gives none, naming
+ * the attach; with no workflow picked, its only one, or that the workflow picked at start decides.
  */
-function InFactory({
-  factory,
-  picks,
-  onRepo,
-  onWorkflow,
-  unread,
-  children,
-}: {
-  factory: Pick<Factory, 'name' | 'repos'>;
-  picks: Picks;
-  onRepo: (repo: string) => void;
-  onWorkflow: (key: string) => void;
-  unread: ReactNode;
-  children: ReactNode;
-}) {
-  const ids = { repo: useId(), workflow: useId() };
-  const several = factory.repos.length > 1;
-  const known = placeOf(factory, picks.repo) !== null;
+function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: string | null; onWorkflow: (name: string) => void }) {
+  const field = useId();
+  const offered = factory.workflows ?? [];
+  const on = picked === null ? null : startRepo(factory, picked);
+  const [only, ...more] = factory.repos;
   return (
     <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <div className="space-y-1.5">
-        <label htmlFor={ids.workflow} className="block text-body-medium font-medium">
+        <label htmlFor={field} className="block text-body-medium font-medium">
           Workflow
         </label>
         <select
-          id={ids.workflow}
-          value={known ? picks.workflow : ''}
-          disabled={!known}
+          id={field}
+          value={picked ?? ''}
+          disabled={offered.length === 0}
           onChange={(event) => onWorkflow(event.target.value)}
           className={`${FIELD} disabled:cursor-not-allowed`}
         >
           <option value="">None: chosen at start</option>
-          {children}
+          {offered.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
         </select>
-        {unread}
-        {!known && several && (
-          <p data-needs-repo className="text-body-small text-muted-foreground">
-            Pick a repository to choose among the workflows {code(factory.name)} offers on it.
+        {offered.length === 0 && (
+          <p data-no-workflow className="text-body-small text-muted-foreground">
+            {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
         )}
       </div>
       <div className="space-y-1.5">
-        {several ? (
-          <>
-            <label htmlFor={ids.repo} className="block text-body-medium font-medium">
-              Repository
-            </label>
-            <select
-              id={ids.repo}
-              value={factory.repos.includes(picks.repo) ? picks.repo : ''}
-              onChange={(event) => {
-                onRepo(event.target.value);
-                onWorkflow('');
-              }}
-              className={`${FIELD} font-mono text-body-small`}
-            >
-              <option value="">None: chosen at start</option>
-              {factory.repos.map((repo) => (
-                <option key={repo} value={repo}>
-                  {repo}
-                </option>
-              ))}
-            </select>
-          </>
+        <p className="text-body-medium font-medium">Repository</p>
+        {on !== null && 'why' in on ? (
+          <p data-unwired={on.refused} className="text-body-small break-words text-yours">
+            {on.why}
+          </p>
         ) : (
-          <>
-            <p className="text-body-medium font-medium">Repository</p>
-            <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-muted-foreground">
-              {factory.repos[0] ?? `${factory.name} names no repository.`}
-            </p>
-          </>
+          <p data-factory-repo className="py-1.5 font-mono text-body-small break-all text-muted-foreground">
+            {on !== null
+              ? on.repo
+              : only !== undefined && !more.length
+                ? only
+                : only === undefined
+                  ? `${factory.name} names no repository.`
+                  : `The factory's, for the workflow its start runs.`}
+          </p>
         )}
       </div>
     </div>

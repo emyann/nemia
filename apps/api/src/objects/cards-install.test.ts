@@ -1,10 +1,10 @@
 /**
  * The Card's create, label and queue (`POST /api/namespaces/:namespace/cards…`, objects/cards.ts) on an api that runs a release, with no
  * repository of its own (`Running` of `kind: 'install'`, `HKB_REPO` unset): a card is placed by what it says, never refused for the api's
- * missing repository. One in a factory of one repository is filed there and listed, labelled and queued; one that names no factory and no
- * repository is filed with none, as `nemia inbox add` in process files it. A card naming a workflow has it looked for on the `repo:` it
- * names where that is one the api serves, and only one naming a workflow and no place to find it on asks for the repository the api does
- * not have.
+ * missing repository. A card names its factory and its workflow, never a repository: one in a factory of one repository is filed there
+ * and listed, labelled and queued; one that names no factory is filed with none, as `nemia inbox add` in process files it, its workflow
+ * by name with no repository looked at. A `repo` sent is refused, and so is a `?repo=` on a card's start: the factory places the run, by
+ * the repository its wiring names (`PUT …/workflows/<workflow>` with `{ repo }`), which an attach sent with no body leaves as it was.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -15,8 +15,8 @@ import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import type { Running } from 'agent-orchestrator';
-import { addFactory } from 'agent-orchestrator/testing';
-import type { Card, CardList } from 'objects';
+import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
+import type { Card, CardList, Factory } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
 
@@ -37,6 +37,7 @@ const millRepo = scratch('nemia-api-cards-install-repo-');
 fs.mkdirSync(path.join(millRepo, 'workflows', 'dev'), { recursive: true });
 fs.writeFileSync(path.join(millRepo, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 addFactory({ name: 'mill', repos: [millRepo] });
+attachWorkflow({ factory: 'mill', workflow: 'dev' });
 
 const JSON_TYPE = { 'content-type': 'application/json' };
 const send = (url: string, method: string, body: unknown) => app.request(url, { method, headers: JSON_TYPE, body: JSON.stringify(body) });
@@ -78,18 +79,33 @@ test('on an install, a card is placed by its factory, or filed with no repositor
     assert.equal(card.spec.repo, undefined, 'no repository is written that nobody chose');
   });
 
-  await s.test("a card in no factory whose repo: is one of a factory's has its workflow found there, by name", async () => {
-    const res = await send('/api/namespaces/default/cards', 'POST', { body: 'On the mill.', repo: millRepo, workflow: 'dev' });
+  await s.test('a card in no factory naming a workflow is filed with it by name, no repository looked at', async () => {
+    const res = await send('/api/namespaces/default/cards', 'POST', { body: 'Somewhere.', workflow: 'dev' });
     const card = (await res.json()) as Card;
     assert.equal(res.status, 201, JSON.stringify(card));
-    assert.equal(card.spec.repo, millRepo);
     assert.equal(card.spec.workflow, 'dev');
   });
 
-  await s.test('REFUSED: a card naming a workflow and no place to find it on is 422, nothing filed', async () => {
+  await s.test('REFUSED: a card sent with a repo is 422, the repo being retired, nothing filed', async () => {
     const before = fs.readdirSync(path.join(root, 'inbox')).length;
-    const res = await send('/api/namespaces/default/cards', 'POST', { body: 'Somewhere.', workflow: 'dev' });
-    assert.equal(res.status, 422);
+    const res = await send('/api/namespaces/default/cards', 'POST', { body: 'On the mill.', repo: millRepo, workflow: 'dev' });
+    assert.equal(res.status, 422, await res.clone().text());
     assert.equal(fs.readdirSync(path.join(root, 'inbox')).length, before);
+  });
+
+  await s.test("REFUSED: a card's start that names ?repo= is 422, naming the attach, no run started", async () => {
+    const res = await send(`/api/namespaces/mill/cards/${name}/start?repo=${encodeURIComponent(millRepo)}`, 'POST', {});
+    const answer = await res.text();
+    assert.equal(res.status, 422, answer);
+    assert.ok(answer.includes('nemia factory attach'), answer);
+  });
+
+  await s.test("an attach names the repository a workflow works on by its folder's name, and one sent with no repo keeps it", async () => {
+    const wired = await send('/api/factories/mill/workflows/dev', 'PUT', { repo: path.basename(millRepo) });
+    assert.equal(wired.status, 200, await wired.clone().text());
+    const kept = (await (await send('/api/factories/mill/workflows/dev', 'PUT', {})).json()) as Factory;
+    assert.deepEqual(kept.spec.workflowRepos, { dev: path.basename(millRepo) });
+    const unknown = await send('/api/factories/mill/workflows/dev', 'PUT', { repo: 'nope' });
+    assert.equal(unknown.status, 422, await unknown.clone().text());
   });
 });

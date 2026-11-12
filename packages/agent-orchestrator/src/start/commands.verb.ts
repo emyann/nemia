@@ -4,6 +4,7 @@
  * command line's alone: its runner starts a run per card (`nemia start <folder>`), and `folderRefusal` says what such a start does not
  * take.
  */
+import path from 'node:path';
 import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
@@ -160,10 +161,10 @@ const START_SPEC: Spec = {
 
 /**
  * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
- * start did not take; the store's
- * pause as it stood once the run was written (`pausedRead`), while one stands; `landed`, the runs it is handed as context that had
- * landed when it started; and `hints`, a line for each file of its folder that still writes a former spelling, read through the Workflow
- * door (`hints`), where any does.
+ * start did not take; for a brief, the `--repo` that only found the factory, where its wiring placed the run on another
+ * (`repoFoundFactory`, as typed); the store's pause as it stood once the run was written (`pausedRead`), while one stands; `landed`, the
+ * runs it is handed as context that had landed when it started; and `hints`, a line for each file of its folder that still writes a former
+ * spelling, read through the Workflow door (`hints`), where any does.
  */
 type Started = {
   id: string;
@@ -175,6 +176,7 @@ type Started = {
   card?: string;
   queueLeft?: string;
   ignoredRepo?: string;
+  repoFoundFactory?: string;
   paused?: Paused;
   landed?: readonly string[];
   hints?: readonly string[];
@@ -307,7 +309,15 @@ const startedThereLines = ({ id }: Started): string[] => [
 ];
 
 /**
- * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, where
+ * That `--repo` (`given`, as typed) only found the factory the run is started in: the run works on the repository its wiring names for its
+ * workflow, the folder `run.workflowDir` names.
+ */
+const foundFactoryLine = (given: string, run: StartedRun): string =>
+  `--repo ${given} only found the factory ${run.factory ?? ''}: ${path.basename(run.workflowDir)} works on ${run.repo}`;
+
+/**
+ * What `nemia start` prints of a run it started: its steps, where it came from, its factory and a `--repo` that only found it, the folders
+ * it mounts, where it works, where
  * it copied its inputs and its workflow's files, and what it waits on, what it reads as context, landed or in flight, and ends at; while
  * the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:` not taken.
  */
@@ -318,6 +328,7 @@ function startedLines(started: Started): string[] {
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),
     ...(run.factory ? [`factory: ${run.factory}${isRepositoryRun(run) ? `, on ${run.repo}` : ''}`] : []),
+    ...(started.repoFoundFactory !== undefined ? [foundFactoryLine(started.repoFoundFactory, run)] : []),
     ...mountLines(started),
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(home, run)}`] : []),
@@ -347,14 +358,23 @@ const hintsOf = Effect.fnUntraced(function* (run: Run) {
   return yield* hints.pipe(Effect.orElseSucceed((): readonly string[] => []));
 });
 
-/** An inbox card's start, off what the handler was handed (`START`). */
+/**
+ * Why a card's start takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run.
+ */
+export const cardRepoRefusal = (card: string): string =>
+  `nemia start ${card} does not take --repo: a card's run works on the repository its factory names for its workflow, never one its start names. Start it without --repo, and name the repository on the factory: nemia factory attach <factory> <workflow> --repo <name>. Nothing was started.`;
+
+/**
+ * An inbox card's start, off what the handler was handed (`START`): `at` is the folder a card of the default factory is started on, and
+ * read for no other; refused `Invalid` a `repo` given (`cardRepoRefusal`).
+ */
 const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) {
-  const { instead: brief, workflows: workflow, repo, factory } = given;
+  const { instead: brief, workflows: workflow, factory } = given;
+  if (given.repo !== undefined) return yield* Effect.fail(new Invalid({ message: cardRepoRefusal(card) }));
   const started = yield* startFromInbox({
     name: card,
     ...(brief !== undefined ? { brief } : {}),
     ...(workflow !== undefined ? { workflow } : {}),
-    ...(repo !== undefined ? { repo } : {}),
     callerRepo: given.at ?? '.',
     isolate: given.noWorktree !== true,
     after: [...(given.after ?? [])],
@@ -415,17 +435,20 @@ const START_LINES: readonly string[] = [
   'refused before anything is written',
   '--factory <name>: the workflow must be attached to the factory, whose',
   'hires fill its steps, and a step left with no agent is refused (nemia',
-  'factory --help). A factory with one repository gives the run its',
-  "--repo, and a repository not one of the factory's is refused, naming",
-  'them. Without it, the run is started in the factory whose repository',
-  'holds --repo, else where nemia start is typed, on that repository, when',
-  'one factory alone does; none, or two, is refused, naming the fix.',
+  'factory --help). Without it, the run is started in the factory whose',
+  'repository holds --repo, else where nemia start is typed, when one',
+  'factory alone does; none, or two, is refused, naming the fix. In a',
+  'factory the run works on the repository it names for the workflow',
+  '(nemia factory attach <factory> <workflow> --repo <name>), else its',
+  'only one: --repo only finds the factory, and the start says so where',
+  'it differs',
   'The default factory is history only: --factory default is refused',
   'a card of the inbox (nemia inbox --help), by its path or its name,',
   'starts its body, or --brief "<brief>" in its place, and stays in the',
-  'inbox, listed as started: --workflows is its workflow:',
-  'unless given, --repo its repo:, --factory its factory:, and a card',
-  'that names no factory either way is refused',
+  'inbox, listed as started: --workflows, a name, is its workflow:',
+  'unless given, --factory its factory:, and a card that names no',
+  'factory either way is refused; --repo is refused: its factory places',
+  'the run',
 ];
 
 /** What `nemia start --help` prints: the start of one brief, then the start of a folder of cards (`FOLDER_HELP`). */
@@ -461,15 +484,17 @@ export const StartInput = Schema.Struct({
   instead: Text,
   at: Text,
   fix: Text,
+  repoFoundFactory: Text,
 });
 export type StartInput = typeof StartInput.Type;
 
 /**
  * `nemia start`: a run of a brief, or of an inbox card. Its handler is handed what its caller found: under `card`, an inbox card's name,
- * with `instead` the brief in place of its body, `at` the repository when neither the card nor its factory names one, and `fix` how the
- * caller names a factory; else `brief`, the brief's text, `workflows`, the folder, and `repo`, the repository, with `repoNamed` true where
- * a person named it. The CLI's runner reads a brief's file and finds the folder from where it is typed; the api's route finds both from its
- * body, so no path a body sends reaches the handler.
+ * with `instead` the brief in place of its body, `at` the repository a card of the default factory is started on, and `fix` how the caller
+ * names a factory; else `brief`, the brief's text, `workflows`, the folder, and `repo`, the repository, with `repoNamed` true where a
+ * person named it and `repoFoundFactory` the `--repo` typed where it only found the factory, whose wiring placed the run on `repo`. The
+ * CLI's runner reads a brief's file and finds the folder from where it is typed; the api's route finds both from its body, so no path a
+ * body sends reaches the handler.
  */
 export const START: Command<Started, StartInput> = {
   name: 'start',
@@ -477,7 +502,11 @@ export const START: Command<Started, StartInput> = {
     {
       endpoint: 'runs.create',
       takes: givesNone('card'),
-      request: refusing('start', PATHS_HERE, renamed({ workflows: 'workflow' }, ['repoNamed', 'instead', 'at', 'fix', 'card'])),
+      request: refusing(
+        'start',
+        PATHS_HERE,
+        renamed({ workflows: 'workflow' }, ['repoNamed', 'instead', 'at', 'fix', 'card', 'repoFoundFactory']),
+      ),
       answer: startedThere,
     },
     {
@@ -486,7 +515,16 @@ export const START: Command<Started, StartInput> = {
       request: refusing(
         'start',
         PATHS_HERE,
-        renamed({ workflows: 'workflow', card: 'name', instead: 'brief' }, ['brief', 'repo', 'repoNamed', 'at', 'fix', 'factory', 'cards']),
+        renamed({ workflows: 'workflow', card: 'name', instead: 'brief' }, [
+          'brief',
+          'repo',
+          'repoNamed',
+          'at',
+          'fix',
+          'factory',
+          'cards',
+          'repoFoundFactory',
+        ]),
       ),
       answer: startedThere,
     },
@@ -596,7 +634,8 @@ const startOf = Effect.fnUntraced(function* (given: StartInput) {
     labels: { edits: [...(given.label ?? [])] },
     ...(factory !== undefined ? { factory } : {}),
   });
-  return { id: run.id, run, home: yield* StoreRoot } satisfies Started;
+  const found = given.repoFoundFactory !== undefined ? { repoFoundFactory: given.repoFoundFactory } : {};
+  return { id: run.id, run, home: yield* StoreRoot, ...found } satisfies Started;
 });
 
 /** The flags of `nemia start` that `nemia start <folder>` refuses, each with why the folder says it instead. */

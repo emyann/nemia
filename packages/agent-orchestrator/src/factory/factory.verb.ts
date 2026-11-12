@@ -53,7 +53,7 @@ nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
 nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
 nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
-nemia factory attach <factory> <workflow>
+nemia factory attach <factory> <workflow> [--repo <name>]
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
@@ -118,6 +118,10 @@ factory, naming the repositories its work is on, the workflows it offers and the
   nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.
+                 --repo <name> names the repository its runs work on, by its folder's name: required where
+                 the factory has several repositories, its only one otherwise. A card and a brief started
+                 in the factory run on it, never on the folder they are typed in; attach an attached
+                 workflow again with --repo to change it.
   nemia factory detach takes a workflow back, once the factory hires no one into its steps, schedules it no more
                  and sets it no cost line.
   nemia factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
@@ -376,39 +380,66 @@ export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file
   print: ({ name, repos, file, trusts }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`, ...trustedLines(name, trusts)],
 };
 
-/** `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
+/** `nemia factory attach`'s `--repo <name>`: the folder name of the factory's repository the workflow's runs work on. */
+const WORKS_ON = {
+  flag: '--repo',
+  kind: 'text',
+  key: 'repo',
+  takes:
+    "--repo takes the folder name of one of the factory's repositories, the one the workflow's runs work on: nemia factory attach <factory> <workflow> --repo <name>",
+  twice: 'nemia factory attach takes --repo once: a workflow works on one repository.',
+} satisfies Flag;
+
+/**
+ * `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow; an attach takes `--repo <name>` besides, a detach no
+ * flag, an unknown one refused wherever it stands.
+ */
 const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   positionals: [
     { key: 'factory', takes: 'required', kind: 'name' },
     { key: 'workflow', takes: 'required', kind: 'name' },
   ],
-  flags: [],
+  flags: verb === 'attach' ? [WORKS_ON] : [],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>.`
+      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>${verb === 'attach' ? ' [--repo <name>]' : ''}.`
       : `nemia factory ${verb} takes one workflow, and ${arg} is a second: nemia factory ${verb} <factory> <workflow>, once per workflow.`,
   missing: `nemia factory ${verb} takes the factory, then the workflow, by its folder's name: nemia factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
   flagFirst: true,
 });
 
-/** What `nemia factory attach` and `detach` take: the factory, and the workflow by its folder's name. */
-export const WorkflowWireInput = Schema.Struct({ factory: Schema.String, workflow: Schema.String });
+/**
+ * What `nemia factory attach` and `detach` take: the factory, the workflow by its folder's name, and for an attach the folder name of the
+ * repository its runs work on (`repo`), where one is named.
+ */
+export const WorkflowWireInput = Schema.Struct({
+  factory: Schema.String,
+  workflow: Schema.String,
+  repo: Schema.optional(Schema.String),
+});
 export type WorkflowWireInput = typeof WorkflowWireInput.Type;
 
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, WorkflowWireInput> = {
   name: 'factory attach',
   served: [{ endpoint: 'factories.attach', request: renamed({ factory: 'name' }) }],
-  usage: '<factory> <workflow>',
-  help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
+  usage: '<factory> <workflow> [--repo <name>]',
+  help: [
+    "offer a workflow in a factory, by its folder's name: a factory offers",
+    'only the workflows attached to it; --repo names the repository its runs',
+    'work on, by folder name, required where the factory has several',
+  ],
   spec: workflowSpec('attach'),
   writes: true,
   class: 'ask',
   input: WorkflowWireInput,
-  handler: ({ factory, workflow }) =>
-    Effect.map(wire(factory, { verb: 'attach', workflow }), ({ was, now, file }) => ({ file, already: now === was })),
-  print: ({ file, already }, { factory, workflow }) => [
-    `${factory}  ${already ? 'already attached' : 'attached'} ${workflow}`,
+  handler: ({ factory, workflow, repo }) =>
+    Effect.map(wire(factory, { verb: 'attach', workflow, ...(repo === undefined ? {} : { repo }) }), ({ was, now, file }) => ({
+      file,
+      already: now === was,
+    })),
+  print: ({ file, already }, { factory, workflow, repo }) => [
+    `${factory}  ${already ? 'already attached' : 'attached'} ${workflow}${repo === undefined ? '' : `, works on ${repo}`}`,
     `${already ? 'unchanged' : 'attached'}: ${file}`,
   ],
 };

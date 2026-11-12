@@ -41,10 +41,9 @@
           "evidence": { "type": "string", "description": "The numbers behind it, as `nemia stats` gave them for the period and the one before." },
           "agent": { "type": "string", "description": "The agent the correction is about, by name; empty when it is about no one agent." },
           "factory": { "type": "string", "description": "The factory the card is started in." },
-          "workflow": { "type": "string", "description": "The workflow the card is started on, by name." },
-          "repo": { "type": "string", "description": "The repository the card is about, as an absolute path." }
+          "workflow": { "type": "string", "description": "The workflow the card is started on, by name." }
         },
-        "required": ["title", "kind", "correction", "evidence", "agent", "factory", "workflow", "repo"],
+        "required": ["title", "kind", "correction", "evidence", "agent", "factory", "workflow"],
         "additionalProperties": false
       }
     }

@@ -92,7 +92,7 @@ const nameChecked = checked(CardName.OnCreate, (name: string) => `a card under $
  * model's `Card` says its invariants are held — a queued card names its workflow, `from:` names each run once — so no decode through
  * `Card` after it could refuse a text it let through.
  */
-const textChecked = (name: string, text: string) => fromThrow(() => void parseInboxCard(`${name}.md`, text, () => true));
+const textChecked = (name: string, text: string) => fromThrow(() => void parseInboxCard(`${name}.md`, text));
 
 /** A try written: what the model's `MissedStart` refuses of it. */
 const tryChecked = (name: string) => checked(MissedStartModel, () => `the try of the card ${name}`);

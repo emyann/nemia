@@ -195,16 +195,7 @@ export { AgentDoor, type AgentDoorShape } from './agents/agent-door.store.ts';
 export { SkillDoor, type SkillDoorShape } from './skills/skill-door.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom/custom.store.ts';
 export { cardToStart, planLines, planStopped, type Card, type Planned } from './plan/plan.ts';
-export {
-  INBOX_KEY_MEANINGS,
-  INBOX_KEYS,
-  inboxLines,
-  inboxNameRefusal,
-  noCardLine,
-  queueLine,
-  queueOrder,
-  workflowAt,
-} from './inbox/index.ts';
+export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, queueLine, queueOrder } from './inbox/index.ts';
 export type { CardRun, CardState, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   factoryLines,
@@ -370,7 +361,7 @@ export {
 } from './views/views.verb.ts';
 export { endWords, phaseOfView, type AttemptEnd, type EngineOutcome } from './views/views-words.ts';
 export type { Bridge, CheckReport } from './views/views.verb.ts';
-export { repoFor, startRun } from './start/start.verb.ts';
+export { repoFor, startRun, wiredRepoFor } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export { advanceRun, type Advanced } from './tick/advance.verb.ts';
@@ -451,7 +442,7 @@ export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
-export { CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
+export { cardRepoRefusal, CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';

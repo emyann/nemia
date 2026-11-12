@@ -291,9 +291,9 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
         return s.inRequest(FACTORY_TRUST.handler({ factory: name }));
       }),
     )
-    .handle('attach', ({ params: { name, workflow } }) =>
+    .handle('attach', ({ params: { name, workflow }, payload }) =>
       writtenThen(`PUT /api/factories/${name}/workflows/${workflow}`, name, (s) =>
-        s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow })),
+        s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow, ...(payload.repo === undefined ? {} : { repo: payload.repo }) })),
       ),
     )
     .handle('detach', ({ params: { name, workflow } }) =>

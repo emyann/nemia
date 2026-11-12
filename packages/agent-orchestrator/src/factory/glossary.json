@@ -11,7 +11,7 @@
   "terms": [
     {
       "term": "Factory",
-      "meaning": "a named grouping in the store: the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps.",
+      "meaning": "a named grouping in the store: the repositories a body of work is on, the workflows it offers and the repository each works on, and the agents it hires into their steps.",
       "type": "Factory",
       "see": {
         "label": "Factories",
@@ -36,6 +36,11 @@
       "term": "Volume name",
       "meaning": "the name a factory's volume is served and linked under, stored on its entry at `nemia factory volume add`: its folder's name as a slug (`volumeBase`), with a suffix, `<base>-2`, where another volume of the factory holds it (`volumeNameAmong`, proved by `packages/agent-orchestrator/contracts/volume-name.contract.ts`). An entry an older file stores none of is named on read, after the stored names, in path order (`volumesNamed`, `packages/agent-orchestrator/src/factory/volume/volume.ts`); a name once stored is kept.",
       "type": "NamedVolume"
+    },
+    {
+      "term": "Workflow's repository",
+      "meaning": "the one repository of its factory a workflow's runs work on, named by the repository's folder name in the factory's wiring (`workflowRepos`, `nemia factory attach <factory> <workflow> --repo <name>`), else the factory's only repository; a factory of several that names none for a workflow, or names one none or two of its repositories have, refuses the start (`workflowRepo`, proved by `packages/agent-orchestrator/contracts/workflow-repo.contract.ts`, in `packages/agent-orchestrator/src/factory/factory.ts`). A card's and a brief's run are placed by it alone, never by the card, the folder a start is typed in nor the daemon's. Kept in the factory's own file, or in its tree's wiring where it is made from a template, as an attach writes it. No verb adds a repository to a factory today: one that does names a repository for each workflow it leaves unwired.",
+      "type": "WorkflowRepoOf"
     },
     {
       "term": "Harness settings",

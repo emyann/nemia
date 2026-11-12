@@ -33,14 +33,17 @@ export const statusFile = (home: string, name: string): string => path.join(fold
 export type Entry = { path: string; bytes: Buffer; mode?: number };
 
 /**
- * The wiring a templated factory's tree holds in `factory.json`: its workflows, its hires, and whether its runs follow merged revisions
- * when it says; a key a later `nemia` writes is kept.
+ * The wiring a templated factory's tree holds in `factory.json`: its workflows, its hires, whether its runs follow merged revisions
+ * when it says, and the repository each workflow works on by folder name, where a person named one (`nemia factory attach … --repo`):
+ * written into the tree, as an attach is, so an upgrade of the template merges it as it merges the rest; a key a later `nemia` writes is
+ * kept.
  */
 const TreeWiringSchema = Schema.StructWithRest(
   Schema.Struct({
     workflows: Schema.Array(Schema.String),
     hires: Schema.Record(Schema.String, Schema.String),
     revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
+    workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );

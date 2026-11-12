@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   cardToStart,
+  cardRepoRefusal,
   folderRefusal,
   inboxDir,
   inboxNameAt,
@@ -21,8 +22,8 @@ import {
   startPlan,
   runWith,
   type Place,
-  workflowAt,
   workflowFolder,
+  wiredRepoFor,
   type Args,
   type StartInput,
   wfRoot,
@@ -38,13 +39,18 @@ const textOf = (args: Args, key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
+/** Where a start typed here is made (`placeOfStart`): its factory, its repository, its tree, and a `--repo` that only found the factory. */
+type StartPlace = { factory?: string; repo: string; tree?: string; repoFoundFactory?: string };
+
 /**
  * Where a start of a workflow typed here is made (`startFactoryAtOnce`): the factory `--factory` names, else the one whose repository holds
- * `--repo`, else the directory it is typed in; and its repository — the one that holds the folder, when the factory was found from it,
- * else `--repo`, else the factory's one repository, else here (`repoFor`); and its tree, where it is made from a template. Refused as
- * `startFactoryAtOnce` and `repoFor` refuse.
+ * `--repo`, else the directory it is typed in; and its repository — in a factory, the one its wiring names for the workflow `workflow`
+ * (its name, or a path's last folder), else its only one (`wiredRepoFor`), whatever `--repo` names, which then only found the factory and
+ * is said as `repoFoundFactory` where it names another; in the default factory, or with no workflow to place (a plan's folder, whose
+ * cards name their own), the one that holds the folder, else `--repo`, else the factory's one repository, else here (`repoFor`); and its
+ * tree, where it is made from a template. Refused as `startFactoryAtOnce`, `wiredRepoFor` and `repoFor` refuse.
  */
-function placeOfStart(env: Env, args: Args): { factory?: string; repo: string; tree?: string } {
+function placeOfStart(env: Env, args: Args, workflow?: string): StartPlace {
   const given = textOf(args, 'repo');
   const named = given === undefined ? undefined : path.resolve(given);
   const found = startFactoryAtOnce(
@@ -56,23 +62,30 @@ function placeOfStart(env: Env, args: Args): { factory?: string; repo: string; t
   );
   const factory = found.factory?.name;
   const tree = found.factory?.tree;
+  const wired =
+    factory === undefined || workflow === undefined ? undefined : wiredRepoFor(wfRoot(env), factory, path.basename(path.resolve(workflow)));
+  const typed = found.repo ?? named;
+  const elsewhere = wired !== undefined && given !== undefined && typed !== undefined && path.resolve(typed) !== wired;
   return {
     ...(factory !== undefined ? { factory } : {}),
-    repo: found.repo ?? repoFor(wfRoot(env), factory, named, path.resolve('.')),
+    repo: wired ?? found.repo ?? repoFor(wfRoot(env), factory, named, path.resolve('.')),
     ...(tree !== undefined ? { tree } : {}),
+    ...(elsewhere ? { repoFoundFactory: given } : {}),
   };
 }
 
-/** `nemia start` of the inbox's card `card`: its body, or `--brief` in its place — a file's text, or the words. */
+/**
+ * `nemia start` of the inbox's card `card`: its body, or `--brief` in its place — a file's text, or the words. Refused a `--repo`
+ * (`cardRepoRefusal`): a card's factory places its run.
+ */
 function cardArgs(card: string, args: Args): Args {
+  if (textOf(args, 'repo') !== undefined) usage(cardRepoRefusal(card));
   const instead = textOf(args, 'instead');
-  const repo = textOf(args, 'repo');
   return {
     ...args,
     card,
     instead:
       instead !== undefined && fs.statSync(instead, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(instead, 'utf8') : instead,
-    repo: repo === undefined ? undefined : path.resolve(repo),
     at: path.resolve('.'),
     fix: '--factory <name>',
   };
@@ -80,7 +93,8 @@ function cardArgs(card: string, args: Args): Args {
 
 /**
  * A brief's arguments: a file that opens with a frontmatter block of keys is a plan's card, or refused by the key a plan's card lacks
- * (`cardToStart`); any other file is the whole brief; and a card's own `workflow:` is found from its plan folder.
+ * (`cardToStart`); any other file is the whole brief; and a card's own `workflow:` is found from its plan folder. Placed by its workflow
+ * (`placeOfStart`): `--workflows`, else the plan card's own, else `./workflows`.
  */
 function briefArgs(env: Env, arg: string, args: Args): Args {
   if (args.instead !== undefined)
@@ -91,12 +105,13 @@ function briefArgs(env: Env, arg: string, args: Args): Args {
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, after);
   const workflows = textOf(args, 'workflows');
-  const { factory, repo, tree } = placeOfStart(env, args);
+  const { factory, repo, tree, repoFoundFactory } = placeOfStart(env, args, workflows ?? card?.workflow ?? './workflows');
   return {
     ...args,
     brief: card ? card.body : (text?.trim() ?? arg),
     repo,
-    repoNamed: args.repo !== undefined,
+    repoNamed: args.repo !== undefined && repoFoundFactory === undefined,
+    ...(repoFoundFactory !== undefined ? { repoFoundFactory } : {}),
     workflows:
       workflows === undefined && card?.workflow !== undefined
         ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo, tree)
@@ -170,6 +185,7 @@ function startedThereOf(arg: string, isFile: boolean, args: Args): Args {
       `nemia start forwarded to another machine's daemon starts a workflow of that machine, by its name: nemia start ${named ?? '"<brief>"'} --workflows <name>, ${RUN_THERE}.`,
     );
   if (named !== undefined) {
+    if (textOf(args, 'repo') !== undefined) usage(cardRepoRefusal(named));
     const { workflows: _typed, ...rest } = args;
     return { ...rest, brief: undefined, card: named, ...(workflow === undefined ? {} : { workflows: workflow }) };
   }
@@ -206,9 +222,8 @@ async function folderRun(env: Env, folder: string, args: Args, e: Engine, place:
 }
 
 /**
- * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is
- * typed (`workflowAt`); a directory is refused. Forwarded to another machine's api, the file's text is what is sent, and `--workflow` and
- * `--repo` are that machine's, sent as typed.
+ * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), its `--workflow` a name, sent as typed; a
+ * directory is refused. Forwarded to another machine's api, the file's text is what is sent.
  */
 export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const idea = textOf(args, 'idea') ?? '';
@@ -218,14 +233,12 @@ export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place)
       `${idea} is a directory, and nemia inbox add takes the idea as text or as one file: nemia inbox add "<idea>", or nemia inbox add ./idea.md.`,
     );
   const workflow = textOf(args, 'workflow');
-  const repo = textOf(args, 'repo');
   const factory = textOf(args, 'factory');
   const there = forwardedOf(env) !== undefined;
   const asked = {
     idea: at ? fs.readFileSync(idea, 'utf8') : idea,
-    ...(there ? {} : at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
-    ...(workflow === undefined ? {} : { workflow: there ? workflow : workflowAt(workflow, process.cwd()) }),
-    ...(repo === undefined ? {} : { repo: there ? repo : path.resolve(repo) }),
+    ...(!there && at ? { from: idea } : {}),
+    ...(workflow === undefined ? {} : { workflow }),
     ...(factory === undefined ? {} : { factory }),
     label: Array.isArray(args.label) ? args.label.map(String) : [],
   };
@@ -233,14 +246,12 @@ export async function inboxAddRun(env: Env, args: Args, e: Engine, place: Place)
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
-/**
- * `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`).
- */
+/** `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), its `--workflow` a name, sent as typed. */
 export async function inboxQueueRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked = {
     name: textOf(args, 'name') ?? '',
-    ...(workflow === undefined ? {} : { workflow: forwardedOf(env) !== undefined ? workflow : workflowAt(workflow, process.cwd()) }),
+    ...(workflow === undefined ? {} : { workflow }),
     ...(args.off === true ? { off: true } : {}),
   };
   const data = await answered(env, e, place, INBOX_QUEUE, asked);

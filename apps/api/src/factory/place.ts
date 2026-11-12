@@ -14,7 +14,13 @@ import { repoOf } from '../capabilities/capabilities.ts';
  * What a request is answered in: its repository, none where it has none; its factory, none for the default factory; and whether the
  * request named either (`?factory=`, `?repo=`), which a page read per factory tells from a request that leaves both to the api.
  */
-export type Place = { repo: string | undefined; factory: Factory | undefined; named: boolean };
+export type Place = {
+  repo: string | undefined;
+  factory: Factory | undefined;
+  named: boolean;
+  /** Whether the request named `?repo=`: a card's start refuses one, its factory placing the run (`cardStart`). */
+  repoNamed: boolean;
+};
 
 /** What of the request `placeFor` reads: its query's `factory` and `repo`, each undefined where it is not given. */
 export type PlaceQuery = { factory: string | undefined; repo: string | undefined };
@@ -23,7 +29,7 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: the api's own (`repoOf`),
  * where it has one, then those of each factory in the store whose file reads, in the order the Factory door lists them (`listedAtOnce`).
  */
-export function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): string[] {
+function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): string[] {
   const named = listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo))));
   const own = repoOf(env, running);
   return [...new Set([...(own === undefined ? [] : [own]), ...named])];
@@ -59,6 +65,11 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  * there is none. Throws each refusal as the package's kind, so `app.onError` answers it by that kind.
  */
 export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string, running?: Running): Place {
+  return { ...placeOf(query, env, home, running), repoNamed: query.repo !== undefined };
+}
+
+/** `placeFor`'s place, but whether it named `?repo=`. */
+function placeOf(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string, running?: Running): Omit<Place, 'repoNamed'> {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
   if (query.factory === undefined || query.factory === DEFAULT_NAMESPACE) {
     if (named === undefined) return { repo: repoOf(env, running), factory: undefined, named: query.factory !== undefined };

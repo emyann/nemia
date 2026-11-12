@@ -3,6 +3,7 @@
  * Event list added to it and not offered fails; which URIs name a view, and why the others name none; and a read past the bound left
  * a whole `EventList`, its oldest events out.
  */
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema, SchemaAST } from 'effect';

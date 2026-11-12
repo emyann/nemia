@@ -17,6 +17,7 @@ import {
   retriedInRound,
   retrySection,
   roundSection,
+  saidBeforeSection,
   type RetryBriefing,
   type RoundBriefing,
 } from './brief-sections.ts';
@@ -99,6 +100,20 @@ const contractsOf = (
 const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(Boolean).join('\n\n');
 
 /**
+ * What was said to the step before it was filed, for its first try alone (`saidBeforeSection`): none for a try or a round past it, nor for
+ * a filing with a try behind it on the record.
+ */
+const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: RoundBriefing): string[] =>
+  !retry && !round && !run.steps[step.name]?.tries?.length ? saidBeforeSection(run.saidBefore?.[step.name]) : [];
+
+/**
+ * The head of a brief for a step that continues another's session (`resume`), on its first filing: what it is handed (`handed`, what was
+ * said before it ran and a person's decisions), and the tree the run installed, never the spec again.
+ */
+const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]): string =>
+  opened(step) + handed.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '');
+
+/**
  * What a step is told. THE decision about what one step knows of another.
  *
  * It gets: its own prose, the original request, and where to look. It does NOT get the previous
@@ -119,6 +134,9 @@ const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(
  * One level up, a run that waited on runs is handed what they concluded, summaries included, on its roots
  * (`## From run <id>`): by then a person has read those summaries and landed the work — see `fromRunSection`. A run handed others as
  * context (`--from`) is handed theirs the same way, after, each labelled landed or not landed, not judged — see `contextSection`.
+ *
+ * A step's first try is handed what was said to it before it was filed (`## Said before you started`), beside what was asked for, and
+ * no later try is — see `saidBeforeSection`.
  *
  * And a step after a gate is handed the approval that let it be filed, and the words given with it (`## Approved`): a person's decision
  * on the record, which the step after the gate and every step after that one read — see `approvedSection`. So is a step after one a
@@ -201,11 +219,9 @@ export function composeBrief(
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
+  const saidBefore = saidBeforeOf(step, run, retry, round);
 
-  if (step.resume && !retry && !round)
-    return (
-      opened(step) + handed.decided.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
-    );
+  if (step.resume && !retry && !round) return resumedBrief(step, [saidBefore.join('\n'), ...handed.decided], tree) + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -214,7 +230,7 @@ export function composeBrief(
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
   const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
-  const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
+  const parts = [...opening, '## What was asked for', '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
 
   if (step.after.length > 1 && !endsOnBase(step) && !inFolder) {
     return [

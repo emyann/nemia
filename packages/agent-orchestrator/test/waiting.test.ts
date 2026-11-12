@@ -22,7 +22,20 @@ import type { BranchReader } from '../src/branches/branches.store.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
 import { names, namesFor } from './assessed.ts';
-import { advanceRun, cancelRun, decideRun, list, parentRead, standingLiveOf, startPlan, startRun, runWith } from '../src/runner.ts';
+import {
+  advanceRun,
+  cancelRun,
+  decideRun,
+  list,
+  parentRead,
+  PERSON,
+  retryRun,
+  sayRun,
+  standingLiveOf,
+  startPlan,
+  startRun,
+  runWith,
+} from '../src/runner.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { UnloadedFolder } from '../src/steps/steps.ts';
 import { isRepositoryRun } from '../src/run.ts';
@@ -684,6 +697,73 @@ test('context without a wait: a run handed another with `--from` files at once, 
       assert.match(brief.slice(readAt), /as context \(`--from`\).*\n.*\nNot landed, not judged/);
     },
   );
+});
+
+test('words said to a step of a run waiting on another are kept, and its first try alone is handed them, with who said them and when', async (t) => {
+  const s = story(t);
+  const repo = aRepo();
+  const parent = await aParent(repo, { work: 'parent.txt' });
+  const child = await started({ brief: 'Page the reads', repo, workflowDir: twoSteps(), after: [parent.run.id] });
+  const person = 'We should use cursor pagination as much as we can.';
+  const agent = 'Keep the old offset reads for a release.';
+  const kept: string[] = [];
+  const implement = `${child.id}-implement`;
+  await s.test('the run waits on its parent: nothing of it is filed', async () => {
+    const r = await tick(child.id);
+    assert.deepEqual([r.filed, r.waiting], [[], [{ run: parent.run.id }]]);
+  });
+  await s.test(
+    "`nemia say` to its step keeps the words, a person's and an agent's under its name, and says they were kept, not delivered",
+    async (sub) => {
+      const told = await stage.runWith(board().e, sayRun(child.id, 'implement', person, { caller: PERSON }));
+      assert.ok('kept' in told, 'kept, not said to a session');
+      assert.deepEqual([told.try, told.kept.text, told.from], [1, person, { kind: 'person' }]);
+      kept.push(told.kept.at);
+      const printed = await printedBy(sub, () => stage.main(['say', child.id, 'implement', 'Mind the cursor format.']));
+      assert.match(printed[0], new RegExp(`^${child.id}  kept for implement's first try, at `), printed.join('\n'));
+      const byAgent = await stage.runWith(
+        board().e,
+        sayRun(child.id, 'implement', agent, { caller: { kind: 'agent', agent: 'operator', factory: null } }),
+      );
+      assert.ok('kept' in byAgent);
+      assert.deepEqual(byAgent.from, { kind: 'agent', name: 'operator' });
+      kept.push(byAgent.kept.at);
+      assert.deepEqual(board().said, [], 'no session was told anything');
+      assert.deepEqual(Object.keys(runRecord(ROOT, child.id).saidBefore ?? {}), ['implement'], 'composed onto the run read');
+    },
+  );
+  await s.test('`nemia ls` notes the step said to before it ran', async () => {
+    const listed = await stage.runWith(board().e, list(board().e, runRecord(ROOT, child.id)));
+    assert.match(listed.steps[0].note ?? '', /said to 3× before it ran/);
+  });
+  await s.test(
+    "once the parent lands the step is filed, and its first try's brief holds the words beside what was asked for, each with its time and who said it",
+    async () => {
+      mergedByHand(repo, parent.branch);
+      const r = await tick(child.id);
+      assert.deepEqual(r.filed, ['implement']);
+      const brief = briefOf(implement);
+      const asked = brief.indexOf('## What was asked for\n\nPage the reads');
+      const at = brief.indexOf('\n## Said before you started\n');
+      const from = brief.indexOf(`\n## From run ${parent.run.id}\n`);
+      assert.ok(asked > 0 && at > asked && from > at, brief);
+      const section = brief.slice(at, from);
+      assert.ok(section.includes(`At ${kept[0]}:\n\n\`\`\`text\n${person}\n\`\`\``), section);
+      assert.ok(section.includes('Mind the cursor format.'), section);
+      assert.ok(section.includes(`At ${kept[1]}:\n\n\`\`\`text\nThe agent operator writes, not the person: ${agent}\n\`\`\``), section);
+      assert.match(section, /words in no frame are a person's/);
+    },
+  );
+  await s.test('a later try that starts a new session is not handed them again', async () => {
+    board().settle(implement, 'succeeded', { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which?' });
+    await tick(child.id);
+    await stage.runWith(board().e, retryRun(child.id, 'implement', { mode: 'fresh' }));
+    assert.deepEqual((await tick(child.id)).tried, ['implement']);
+    const again = briefOf(`${implement}-try2`);
+    assert.doesNotMatch(again, /Said before you started|cursor pagination|cursor format|offset reads/);
+    const listed = await stage.runWith(board().e, list(board().e, runRecord(ROOT, child.id)));
+    assert.doesNotMatch(listed.steps[0].note ?? '', /before it ran/);
+  });
 });
 
 test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing on a folder it cannot start whole, nor with a flag the folder says instead', async (t) => {

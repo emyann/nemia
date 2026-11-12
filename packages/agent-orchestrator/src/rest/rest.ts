@@ -132,6 +132,7 @@ export const RUN_INPUTS = {
   pruned: 'stamp',
   hold: 'stamp',
   labels: 'stamp',
+  said: 'stamp',
   refresh: 'stamp',
   asks: 'stamp',
   journals: 'feed',
@@ -157,6 +158,7 @@ export const STAMPED_FILES: Readonly<Record<InputsWatchedBy<'stamp'>, string>> =
   pruned: 'pruned',
   hold: 'hold',
   labels: 'labels',
+  said: 'said',
   refresh: 'refresh',
   asks: 'asks',
 };

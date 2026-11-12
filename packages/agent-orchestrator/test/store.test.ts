@@ -22,7 +22,7 @@ import { EngineService } from '../src/runtime-client.ts';
 import type { Accepted, RoundAsked } from '../src/round/round.verb.ts';
 import type { Asked } from '../src/retry/retry.verb.ts';
 import type { Approved } from '../src/gate/gate.verb.ts';
-import type { Told } from '../src/say/say.verb.ts';
+import type { Kept, Told } from '../src/say/say.verb.ts';
 import type { Cancelled } from '../src/cancel/cancel.verb.ts';
 import type { CheckReport } from '../src/views/views.verb.ts';
 import type { CheckRefusal } from '../src/check/check.ts';
@@ -1079,7 +1079,7 @@ async function _verbProgramTypes() {
     v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService | StoreRoot>,
     v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService | PlaceService | StoreRoot>,
     v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService | PlaceService | StoreRoot>,
-    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told, Refusal, EngineService | StoreRoot>,
+    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told | Kept, Refusal, EngineService | StoreRoot>,
     v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
   ] satisfies Array<EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>>);
   void [
@@ -1092,7 +1092,7 @@ async function _verbProgramTypes() {
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.approveRun('x', 'y') satisfies EffectOf<Approved, never, EngineService>,
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
-    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told, never, EngineService>,
+    v.sayRun('x', 'y', 'z', { caller: PERSON }) satisfies EffectOf<Told | Kept, never, EngineService>,
     // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
     v.cancelRun('x') satisfies EffectOf<Cancelled, never, EngineService>,
   ];

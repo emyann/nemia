@@ -1,8 +1,8 @@
-/** `nemia say`, an entry of the command table: words to a step's session, journalled on its task (`sayRun`). */
+/** `nemia say`, an entry of the command table: words to a step's session, journalled on its task, or kept for its first try (`sayRun`). */
 import { Effect, Schema } from 'effect';
 import { RunSay, type SaidAfter } from 'objects';
 import type { Speaker } from '../chat/chat.ts';
-import { saidLines } from './say.ts';
+import { saidLines, type Said } from './say.ts';
 import { sayRun } from './say.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 
@@ -26,8 +26,12 @@ const SayCaller = Schema.Union([
 export const SayInput = Schema.Struct({ runId: Schema.String, step: Schema.String, caller: SayCaller, ...RunSay.fields });
 export type SayInput = typeof SayInput.Type;
 
+/** The engine's `said` entry as the answer says it: when, on which attempt, the words, and what they came after (null where none). */
+const pickSaid = ({ at, attempt, text, after }: Said) => ({ at, attempt, text, after: after ?? null });
+
 /**
- * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the
+ * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them; or, to a step not filed yet,
+ * kept for its first try (`kept: true`, on no task, `taskId: null`, the attempt its first). It takes every word after the
  * step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
 export const SAY: Command<
@@ -37,7 +41,8 @@ export const SAY: Command<
     text: string;
     after: { kind: SaidAfter; id: string } | null;
     try: number;
-    taskId: string;
+    taskId: string | null;
+    kept?: true;
     from?: Speaker;
     words?: string;
   },
@@ -51,6 +56,9 @@ export const SAY: Command<
     "engine journals the words on the step's task, nemia ls notes the step",
     'said to, and nemia decide prints them under it. A try that continues',
     'the session is handed them again, as ## Said to your session.',
+    'Words to a step not filed yet (waiting on --after, a hold or an',
+    'earlier step) are kept, not delivered: its first try is handed them,',
+    'as ## Said before you started, and no try after it.',
     "Words from a session its run filed are its agent's, by its token",
     '(WF_SESSION_TOKEN); an agent with none says --as <name> before its',
     "words, a name the person allowed with nemia chat allow. An agent's",
@@ -75,13 +83,17 @@ export const SAY: Command<
   input: SayInput,
   handler: Effect.fnUntraced(function* ({ runId, step, text: given, caller, from }: SayInput) {
     const told = yield* sayRun(runId, step, given, from === undefined ? { caller } : { caller, from });
-    const { at, attempt, text, after } = told.said;
-    const answer = { at, attempt, text, after: after ?? null, try: told.try, taskId: told.taskId };
+    const answer =
+      'kept' in told
+        ? { ...told.kept, attempt: 1, after: null, try: told.try, taskId: null, kept: true as const }
+        : { ...pickSaid(told.said), try: told.try, taskId: told.taskId };
     return told.from.kind === 'agent' ? { ...answer, from: told.from, words: given } : answer;
   }),
-  print({ at, attempt, text, try: tryNo, taskId }, { runId, step }) {
+  print({ at, attempt, text, try: tryNo, taskId, kept }, { runId, step }) {
     return [
-      `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: nemia decide ${runId} prints it under the step`,
+      kept
+        ? `${runId}  kept for ${step}'s first try, at ${at} — not delivered: no session of ${step} runs yet, and its first try's brief carries the words`
+        : `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: nemia decide ${runId} prints it under the step`,
       ...saidLines([{ at, attempt, text, try: tryNo }])
         .slice(1)
         .flatMap((l) => l.split('\n'))

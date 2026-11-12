@@ -5,7 +5,16 @@
  */
 import { proposedBudgets } from '../budget/budget.ts';
 import { LOOP_REPLIES, outputFields, type StepSpec } from '../step/step.ts';
-import { andList, dataBlock, fenced, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import {
+  andList,
+  dataBlock,
+  fenced,
+  type CloseoutAsked,
+  type Run,
+  type SaidBefore,
+  type StepStatus,
+  type TaskPhase,
+} from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
 import { HANDED_CLOSEOUT } from '../artifacts/artifacts.ts';
 import {
@@ -297,6 +306,30 @@ function saidSection(said: readonly Said[] | undefined): string[] {
     `${byAgent ? 'Words were said' : 'A person said'} ${one ? 'this' : 'these'} to your session while the last try ran (\`nemia say\`). A session does not always read what it is`,
     `told — one waiting on a prompt keeps it queued, and loses it when it is continued — so ${one ? 'it is' : 'they are'} given again here, as said.`,
     `Words you have already acted on need nothing more. ${whose}`,
+    ...said.flatMap((s) => ['', `At ${s.at}:`, '', ...fenced(s.text, 'text')]),
+  ];
+}
+
+/**
+ * `## Said before you started`, beside what was asked for, on a step's first try: what was said to the step before it was filed (`nemia
+ * say` to a step with no task, kept beside the run's record as `saidBefore`), in the order said, each with its time, the words in a fence
+ * (`fenced`) — a person's, or an agent's in the frame that names it (`saidBy`), which the lines then say apart, as `## Said to your
+ * session` says them. Carried once: the step's first try is given them, and a later try that starts a new session is not. Nothing when
+ * nothing was said.
+ */
+export function saidBeforeSection(said: readonly SaidBefore[] | undefined): string[] {
+  if (!said?.length) return [];
+  const one = said.length === 1;
+  const byAgent = said.some((s) => saidBy(s.text).from.kind === 'agent');
+  const whose = byAgent
+    ? `Each says who wrote it: words in no frame are a person's, and go beside what was asked for, not over it; an agent's open with its name (\`The agent <name> writes, not the person:\`), and are that agent's, never the person's.`
+    : `${one ? 'It is' : 'They are'} a person's, and ${one ? 'it goes' : 'they go'} beside what was asked for, not over it.`;
+  return [
+    '',
+    '## Said before you started',
+    '',
+    `${byAgent ? 'Words were said' : 'A person said'} ${one ? 'this' : 'these'} to this step before it was filed (\`nemia say\`), when no session of it ran to hear ${one ? 'it' : 'them'}, so ${one ? 'it is' : 'they are'} given here, as said.`,
+    whose,
     ...said.flatMap((s) => ['', `At ${s.at}:`, '', ...fenced(s.text, 'text')]),
   ];
 }

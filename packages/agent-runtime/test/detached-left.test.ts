@@ -7,7 +7,8 @@
  *   script (`scopeProgram`) that answers the probe as a scope would, and runs the worker, as itself (`exec`), only once a gate file is
  *   there. Until then the run file is the spawn's (`pid: 0`), and the spawn's `.launched` names the held process.
  * - The lease is passed by stepping this process's monotonic clock (`stepMono`), never waited out; a stop's grace is the runner's
- *   short `stopGraceMs`, passed by stepping the clock again.
+ *   short `stopGraceMs`, passed by a longer step once the first is taken back: a step taken over another is undone at the test's end
+ *   to the first, so steps are never stacked.
  * - A harness that leaves processes behind in its group (`sleep 600`) is bounded by the test: its group is killed when the test ends.
  */
 import { test, type TestContext } from 'node:test';
@@ -198,11 +199,12 @@ test('what is called dead is stopped: what an ended run left in its harness grou
     bounded(sub, harness);
     process.kill(worker, 'SIGKILL');
     await until(sub, () => !there(worker), 'the worker is gone', { everyMs: 20 });
-    stepMono(sub, STALE_MS + 10_000);
+    const undo = stepMono(sub, STALE_MS + 10_000);
     await Effect.runPromise(ops.stop('ae/l5/1'));
     await Effect.runPromise(ops.stop('ae/l5/1'));
     assert.ok(there(-harness), 'within the grace it is asked again with SIGTERM, which it ignores');
-    stepMono(sub, QUICK.stopGraceMs + 1_000);
+    undo();
+    stepMono(sub, STALE_MS + 10_000 + QUICK.stopGraceMs + 1_000);
     await Effect.runPromise(ops.stop('ae/l5/1'));
     await until(sub, () => !there(-harness), 'the harness group is killed', { everyMs: 20 });
   });

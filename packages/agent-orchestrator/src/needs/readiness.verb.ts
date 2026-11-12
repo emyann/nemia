@@ -1,9 +1,11 @@
 /**
- * The readiness read (`readinessOf`): every piece a person's server needs before a factory's first run, each in place, missing or not
- * known, with the command or the fix that puts it there — the harness's sign-in, the service and its linger, the bind, the machine (cgroup
- * v2, the user's service manager, the tools folder), the places' needs, every factory's workflows' needs, a factory at all, and a newer
- * release. Composed from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test hands its own.
- * A controller: it reads the store, this process's needs' readings (`NeedsMemory`), or the checks run now where it keeps none.
+ * The readiness read (`readinessOf`): every piece a person's server needs to run its factories, each in place, missing or not known,
+ * with the command or the fix that puts it there and what it costs while missing (`cost`: a run waits on it, or it keeps the server up
+ * or open) — the harness's sign-in, the service and its linger, the bind, the machine (cgroup v2, the user's service manager, the tools
+ * folder), the places' needs, every factory's workflows' needs, a factory at all, and a newer release — and whether a run was ever
+ * started here (`ran`). Composed from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test
+ * hands its own. A controller: it reads the store, this process's needs' readings (`NeedsMemory`), or the checks run now where it keeps
+ * none.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,7 +22,7 @@ import {
   type CodexSignIn,
 } from '../runtime-client.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
-import type { Need, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
+import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece } from 'objects';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
 import type { Env } from '../config/config.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
@@ -30,6 +32,7 @@ import { frontmatterKey } from '../former/former.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { PlaceService } from '../place/place.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { tried } from '../runtime-client.ts';
 import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
@@ -100,15 +103,20 @@ const capital = (word: string): string => `${word.charAt(0).toUpperCase()}${word
 /** A fix a person types: its words and its command. */
 const typed = (message: string, command: string): ReadinessFix => ({ message, command, startable: false });
 
+/**
+ * What a piece is, which each piece declares: its name, its area, and what it costs while it is missing (`ReadinessCost`), which
+ * `missingSaid` tells a person apart.
+ */
+type Of = { readonly name: string; readonly area: ReadinessPiece['area']; readonly cost: ReadinessCost };
+
 /** A piece of the read. */
 const piece = (
-  name: string,
-  area: ReadinessPiece['area'],
+  { name, area, cost }: Of,
   state: NeedState,
   message: string,
   fixes: readonly ReadinessFix[] = [],
   more: Partial<Pick<ReadinessPiece, 'factory' | 'workflow' | 'addressKind'>> = {},
-): ReadinessPiece => ({ name, area, state, message, fixes, ...more });
+): ReadinessPiece => ({ name, area, state, message, fixes, ...more, cost });
 
 /**
  * The default harness's sign-in: its token kept in the store (`claudeTokenStatus`), given in the environment, or, with neither, its own
@@ -118,33 +126,26 @@ const piece = (
  * make a new one: still met, since it loads.
  */
 function harnessPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
-  const name = TOKEN_NAME;
+  const of: Of = { name: TOKEN_NAME, area: 'harness', cost: 'run' };
   const set = `nemia ${TOKEN_NAME} set`;
   const make = typed(`make a token with ${TOKEN_MAKER}, then keep it with ${set} < token.txt`, `${TOKEN_MAKER} && ${set}`);
   const own = `${capital(DEFAULT_HARNESS)} token`;
   const status = claudeTokenStatus(home);
   const later = 'whether it is still good shows only when a session or the quota is refused';
   if (status.state === 'set' && status.mode !== '0600')
-    return piece(name, 'harness', 'missing', `the ${own} file ${status.file} is readable by others (${status.mode}), so it does not load`, [
+    return piece(of, 'missing', `the ${own} file ${status.file} is readable by others (${status.mode}), so it does not load`, [
       typed('let only you read it', `chmod 600 ${status.file}`),
     ]);
   if (status.state === 'set') {
     const warning = tokenWarningLine(status);
     if (warning !== undefined)
-      return piece(name, 'harness', 'met', warning, [
-        typed(`make a new one: ${TOKEN_RENEWAL}`, `${TOKEN_MAKER} && ${set} && nemia service restart`),
-      ]);
-    return piece(
-      name,
-      'harness',
-      'met',
-      `a ${own} is set and loads (${status.file}, ${tokenAgeWords(status) ?? 'its age unread'}): ${later}`,
-    );
+      return piece(of, 'met', warning, [typed(`make a new one: ${TOKEN_RENEWAL}`, `${TOKEN_MAKER} && ${set} && nemia service restart`)]);
+    return piece(of, 'met', `a ${own} is set and loads (${status.file}, ${tokenAgeWords(status) ?? 'its age unread'}): ${later}`);
   }
-  if (facts.env[TOKEN_VARIABLE]) return piece(name, 'harness', 'met', `a ${own} is set and loads (${TOKEN_VARIABLE}): ${later}`);
+  if (facts.env[TOKEN_VARIABLE]) return piece(of, 'met', `a ${own} is set and loads (${TOKEN_VARIABLE}): ${later}`);
   if (facts.ownSignIn(facts.env) === 'signed-in')
-    return piece(name, 'harness', 'met', `no ${own} is kept, and ${capital(DEFAULT_HARNESS)} Code is signed in by its own login: ${later}`);
-  return piece(name, 'harness', 'missing', `no ${own} is kept: a session signs in with it`, [make]);
+    return piece(of, 'met', `no ${own} is kept, and ${capital(DEFAULT_HARNESS)} Code is signed in by its own login: ${later}`);
+  return piece(of, 'missing', `no ${own} is kept: a session signs in with it`, [make]);
 }
 
 /** The text of `file`, none where it does not read: such a file names no harness, and its workflow's own load says why. */
@@ -182,17 +183,33 @@ function harnessesNamed(workflows: readonly FactoryWorkflow[]): Set<string> {
 /** The second harness's sign-in, where a factory's workflow runs on it: none otherwise. */
 function secondHarnessPieces(workflows: readonly FactoryWorkflow[], facts: ReadinessFacts): ReadinessPiece[] {
   if (!harnessesNamed(workflows).has(SECOND_HARNESS)) return [];
-  const name = `${SECOND_HARNESS}-sign-in`;
+  const of: Of = { name: `${SECOND_HARNESS}-sign-in`, area: 'harness', cost: 'run' };
   const read = facts.signIn(facts.env);
-  if (read.state === 'signed-in') return [piece(name, 'harness', 'met', `${capital(SECOND_HARNESS)} is signed in on this machine`)];
+  if (read.state === 'signed-in') return [piece(of, 'met', `${capital(SECOND_HARNESS)} is signed in on this machine`)];
   if (read.state === 'unknown')
-    return [piece(name, 'harness', 'unknown', `whether ${capital(SECOND_HARNESS)} is signed in could not be read: is it installed?`)];
+    return [piece(of, 'unknown', `whether ${capital(SECOND_HARNESS)} is signed in could not be read: is it installed?`)];
   return [
-    piece(name, 'harness', 'missing', `${capital(SECOND_HARNESS)} is not signed in on this machine${read.said ? `: "${read.said}"` : ''}`, [
+    piece(of, 'missing', `${capital(SECOND_HARNESS)} is not signed in on this machine${read.said ? `: "${read.said}"` : ''}`, [
       typed('sign in with a device code, as the user the daemon runs as', CODEX_SIGN_IN_COMMAND),
     ]),
   ];
 }
+
+/** The service and its linger keep the server up: a run waits on neither while the daemon runs. */
+const SERVICE: Of = { name: 'service', area: 'service', cost: 'server' };
+const LINGER: Of = { name: 'linger', area: 'service', cost: 'server' };
+
+/** The bind keeps the server open, to this machine or a network: no run waits on it. */
+const BIND: Of = { name: 'bind', area: 'bind', cost: 'server' };
+
+/** The tools folder holds what a fix installs, which a step's session finds there: a run waits on it. */
+const TOOLS: Of = { name: 'tools', area: 'machine', cost: 'run' };
+
+/** A factory: a run starts in one. */
+const FACTORY: Of = { name: 'factory', area: 'factory', cost: 'run' };
+
+/** A newer release keeps the server current: no run waits on it. */
+const RELEASE: Of = { name: 'release', area: 'release', cost: 'server' };
 
 /** The service: its unit running under the user's service manager, and the user's linger, which keeps it running once they log out. */
 function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
@@ -200,20 +217,20 @@ function servicePieces(facts: ReadinessFacts): ReadinessPiece[] {
   const active = facts.run('systemctl', ['--user', 'is-active', unit]);
   const service =
     active === undefined
-      ? piece('service', 'service', 'unknown', `whether ${unit} runs could not be read: systemctl is not here`)
+      ? piece(SERVICE, 'unknown', `whether ${unit} runs could not be read: systemctl is not here`)
       : active.out.trim() === 'active'
-        ? piece('service', 'service', 'met', `${unit} runs`)
-        : piece('service', 'service', 'missing', `${unit} does not run (${active.out.trim() || `exit ${active.code}`})`, [
+        ? piece(SERVICE, 'met', `${unit} runs`)
+        : piece(SERVICE, 'missing', `${unit} does not run (${active.out.trim() || `exit ${active.code}`})`, [
             typed('install the service and start it', 'nemia service install'),
           ]);
   const shown = facts.run('loginctl', ['show-user', facts.user, '-p', 'Linger']);
   const said = shown?.out.trim();
   const linger =
     shown === undefined || shown.code !== 0 || !said?.startsWith('Linger=')
-      ? piece('linger', 'service', 'unknown', `whether ${facts.user}'s services outlive their sessions could not be read`)
+      ? piece(LINGER, 'unknown', `whether ${facts.user}'s services outlive their sessions could not be read`)
       : said === 'Linger=yes'
-        ? piece('linger', 'service', 'met', `${facts.user}'s services run while nobody is logged in`)
-        : piece('linger', 'service', 'missing', `${facts.user}'s services stop when they log out`, [
+        ? piece(LINGER, 'met', `${facts.user}'s services run while nobody is logged in`)
+        : piece(LINGER, 'missing', `${facts.user}'s services stop when they log out`, [
             typed('keep them running, once, as an administrator', `sudo loginctl enable-linger ${facts.user}`),
           ]);
   return [service, linger];
@@ -226,8 +243,7 @@ function bindPiece(facts: ReadinessFacts): ReadinessPiece {
   const acknowledged = facts.env[BIND_PUBLIC_VARIABLE] === '1';
   if (bindExposure(kind, acknowledged) === 'unacknowledged')
     return piece(
-      'bind',
-      'bind',
+      BIND,
       'missing',
       `the api listens on ${bind}, a ${kind} address, which no one acknowledged`,
       [
@@ -237,40 +253,42 @@ function bindPiece(facts: ReadinessFacts): ReadinessPiece {
       { addressKind: kind },
     );
   const reach = kind === 'loopback' ? 'this machine alone reaches it' : `it is reached on its ${kind} network`;
-  return piece('bind', 'bind', 'met', `the api listens on ${bind}: ${reach}`, [], { addressKind: kind });
+  return piece(BIND, 'met', `the api listens on ${bind}: ${reach}`, [], { addressKind: kind });
 }
 
-/** The machine: cgroup v2, the user's service manager reached, and the tools folder made and first on the daemon's PATH. */
+/**
+ * The machine: cgroup v2, the user's service manager reached, and the tools folder made and first on the daemon's PATH. A run waits on
+ * the first two only where the daemon files its sessions under a memory limit (`WF_MEMORY_LIMIT`), which needs both; else they keep the
+ * service alone.
+ */
 function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
+  const limited = (facts.env.WF_MEMORY_LIMIT ?? '') !== '';
+  const kernel: Of = { name: 'cgroup-v2', area: 'machine', cost: limited ? 'run' : 'server' };
+  const manager: Of = { name: 'systemd-user', area: 'machine', cost: limited ? 'run' : 'server' };
   const cgroup = facts.exists('/sys/fs/cgroup/cgroup.controllers')
-    ? piece('cgroup-v2', 'machine', 'met', 'the kernel holds cgroup v2: a session runs under its memory limit')
+    ? piece(kernel, 'met', 'the kernel holds cgroup v2: a session runs under its memory limit')
     : piece(
-        'cgroup-v2',
-        'machine',
+        kernel,
         'missing',
         'the kernel holds no cgroup v2, so no session can be held to a memory limit: boot with systemd.unified_cgroup_hierarchy=1, or leave WF_MEMORY_LIMIT unset',
       );
-  const manager = facts.run('systemctl', ['--user', 'show-environment']);
+  const answered = facts.run('systemctl', ['--user', 'show-environment']);
   const user =
-    manager === undefined
-      ? piece('systemd-user', 'machine', 'unknown', "whether the user's service manager runs could not be read: systemctl is not here")
-      : manager.code === 0
-        ? piece('systemd-user', 'machine', 'met', "the user's service manager (systemd --user) answers")
-        : piece('systemd-user', 'machine', 'missing', "the user's service manager (systemd --user) does not answer", [
+    answered === undefined
+      ? piece(manager, 'unknown', "whether the user's service manager runs could not be read: systemctl is not here")
+      : answered.code === 0
+        ? piece(manager, 'met', "the user's service manager (systemd --user) answers")
+        : piece(manager, 'missing', "the user's service manager (systemd --user) does not answer", [
             typed('log in as the user once, so their manager starts, and keep it with linger', `sudo loginctl enable-linger ${facts.user}`),
           ]);
   const bin = toolsBinDir(home);
   const onPath = (facts.env.PATH ?? '').split(path.delimiter).includes(bin);
   const tools =
     facts.exists(bin) && onPath
-      ? piece('tools', 'machine', 'met', `the tools folder ${bin} is first on the daemon's PATH`)
-      : piece(
-          'tools',
-          'machine',
-          'missing',
-          `the tools folder ${bin} is ${facts.exists(bin) ? 'not on this process’s PATH' : 'not made yet'}`,
-          [typed('start the daemon again, which makes it and puts it first', 'nemia service restart')],
-        );
+      ? piece(TOOLS, 'met', `the tools folder ${bin} is first on the daemon's PATH`)
+      : piece(TOOLS, 'missing', `the tools folder ${bin} is ${facts.exists(bin) ? 'not on this process’s PATH' : 'not made yet'}`, [
+          typed('start the daemon again, which makes it and puts it first', 'nemia service restart'),
+        ]);
   return [cgroup, user, tools];
 }
 
@@ -292,7 +310,8 @@ const needPiece = (
   state: NeedState | undefined,
   workflow?: { factory: string; workflow: string },
   fixes?: Need['fixes'],
-): ReadinessPiece => piece(need.name, area, state ?? 'unknown', need.message, needFixes(need, workflow, fixes), workflow ?? {});
+): ReadinessPiece =>
+  piece({ name: need.name, area, cost: 'run' }, state ?? 'unknown', need.message, needFixes(need, workflow, fixes), workflow ?? {});
 
 /**
  * The places' needs, then each factory's workflows' own: a need that fills a place's is said under its workflow as the place's need, its
@@ -305,7 +324,8 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
   for (const w of workflows) {
     const read = workflowNeedsRead(w.dir);
     const at = { factory: w.factory, workflow: w.workflow };
-    if (read.error !== undefined) out.push(piece(`${w.workflow}-needs`, 'workflow', 'unknown', read.error, [], at));
+    if (read.error !== undefined)
+      out.push(piece({ name: `${w.workflow}-needs`, area: 'workflow', cost: 'run' }, 'unknown', read.error, [], at));
     for (const need of read.needs) {
       const filled = place.find((p) => p.name === need.fills);
       if (filled !== undefined) {
@@ -316,8 +336,7 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
       if (untrusted.has(w.factory)) {
         out.push(
           piece(
-            need.name,
-            'workflow',
+            { name: need.name, area: 'workflow', cost: 'run' },
             'unknown',
             `${need.message}: not checked, since the factory ${w.factory}'s places are not trusted`,
             [typed('trust its places, then its check runs', trustCommandOf(w.factory))],
@@ -336,12 +355,11 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untr
 /** A factory filed at all: none yet names the command that files one. */
 function factoryPiece(factories: readonly FactoryListing[]): ReadinessPiece {
   if (!factories.length)
-    return piece('factory', 'factory', 'missing', 'no factory is filed: a run starts in one', [
+    return piece(FACTORY, 'missing', 'no factory is filed: a run starts in one', [
       typed('file one from a template, on a repository', 'nemia factory add <name> --template <template> --repo <url>'),
     ]);
   return piece(
-    'factory',
-    'factory',
+    FACTORY,
     'met',
     `${factories.length} factor${factories.length === 1 ? 'y is' : 'ies are'} filed: ${factories.map((f) => f.name).join(', ')}`,
   );
@@ -352,20 +370,20 @@ function releasePiece(home: string, facts: ReadinessFacts): ReadinessPiece {
   const latest = latestRelease(home, facts.running);
   if (latest === undefined)
     return piece(
-      'release',
-      'release',
+      RELEASE,
       'unknown',
       facts.running.kind === 'checkout'
         ? 'a checkout runs here: no release is checked for'
         : 'no release check has read the newest release yet',
     );
   return latest.newer
-    ? piece('release', 'release', 'met', `${latest.version} is out, newer than this release`, [typed('take it', 'nemia upgrade')])
-    : piece('release', 'release', 'met', `this is the newest release (${latest.version})`);
+    ? piece(RELEASE, 'met', `${latest.version} is out, newer than this release`, [typed('take it', 'nemia upgrade')])
+    : piece(RELEASE, 'met', `this is the newest release (${latest.version})`);
 }
 
 /**
- * Every piece of the store's server, in the read's order (`Readiness`), `ready` where none is missing. The needs are read off this
+ * Every piece of the store's server, in the read's order (`Readiness`), `ready` where none is missing, and whether a run was ever
+ * started here (`ran`). The needs are read off this
  * process's memory (`NeedsMemory`) where it keeps one that has swept, else every check is run now on a memory of the read's own, the
  * place's needs among them; a check with no reading is `unknown`.
  */
@@ -390,5 +408,6 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
     factoryPiece(factories),
     releasePiece(home, facts),
   ];
-  return { ready: pieces.every((p) => p.state !== 'missing'), pieces } satisfies Readiness;
+  const ran = (yield* (yield* RunDoor).runs.ids()).length > 0;
+  return { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran } satisfies Readiness;
 });

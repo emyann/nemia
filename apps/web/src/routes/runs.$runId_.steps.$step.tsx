@@ -114,7 +114,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
   }, [following.events, said]);
   const say = sayable(run, step);
   return (
-    <div className="flex h-[calc(100svh-var(--frame-top))] min-h-96 flex-col">
+    <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96 flex-col">
       <header aria-label="The step" className="shrink-0 space-y-1 border-b px-4 py-3">
         <BackToRun run={run} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

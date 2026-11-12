@@ -320,11 +320,12 @@ export async function agentsCardRun(env: Env, args: Args, e: Engine, place: Plac
 }
 
 /**
- * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
- * store, and what the entry says of them printed.
+ * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), on `--repo`, else the folder it is typed in, handed to
+ * its entry's handler (`AGENTS_CUSTOM`) in its store, and what the entry says of them printed.
  */
 export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
+  const typed = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
+  const asked = { ...typed, repo: typed.repo ?? '.' };
   const data = await answered(env, e, place, AGENTS_CUSTOM, asked);
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }

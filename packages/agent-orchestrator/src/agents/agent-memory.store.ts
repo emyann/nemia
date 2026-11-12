@@ -79,13 +79,13 @@ function foundIn(held: Holding, dir: string, places: Places): Map<string, Agent 
 }
 
 /** Refuse, as `Missing`, custom instructions for an agent `name` a run on `repo` could not name, but the store's own (`isStoreAgent`). */
-function refuseNoAgent(held: Holding, name: string, repo: string): void {
+function refuseNoAgent(held: Holding, name: string, repo: string | undefined): void {
   if (isStoreAgent(name)) return;
-  const at = path.posix.resolve(repo);
-  if (foundIn(held, path.posix.join(at, 'workflows', '_'), { repo: at, home: MEMORY_ROOT }).has(name)) return;
-  throw new Missing({
-    message: `no agent named ${name} where a run on ${at} looks for one, nor in yours (${MEMORY_AGENTS}). Name one that is there.`,
-  });
+  const at = repo === undefined ? undefined : path.posix.resolve(repo);
+  const places = at === undefined ? { home: MEMORY_ROOT } : { repo: at, home: MEMORY_ROOT };
+  if (foundIn(held, path.posix.join(at ?? MEMORY_ROOT, 'workflows', '_'), places).has(name)) return;
+  const where = at === undefined ? 'in yours' : `where a run on ${at} looks for one, nor in yours`;
+  throw new Missing({ message: `no agent named ${name} ${where} (${MEMORY_AGENTS}). Name one that is there.` });
 }
 
 /** A fresh Agent door over maps: no agent held, no custom instructions. */

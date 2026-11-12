@@ -58,8 +58,9 @@ const KEPT = 'a run already started keeps the words it was started with';
 const TOLD = "her open session is told at the keeper's next beat";
 
 /**
- * What `nemia agents custom`'s handler takes: the agent's `name`; the repository whose agents it is looked for in (`repo`, `.` where none
- * is named); `clear`, to remove the words; and the `words` to write, which the command line reads off `--file` and the api is sent.
+ * What `nemia agents custom`'s handler takes: the agent's `name`; the repository whose agents it is looked for in (`repo`; yours and the
+ * builtins where none is named, the command line naming the folder it is typed in); `clear`, to remove the words; and the `words` to
+ * write, which the command line reads off `--file` and the api is sent.
  */
 export const CustomInput = Schema.Struct({
   name: Schema.String,
@@ -132,7 +133,7 @@ export const AGENTS_CUSTOM: Command<Read | Cleared, CustomInput> = {
     why: "the api serves it as the Agent's `instructions`, `putInstructions` and `deleteInstructions` verbs of `objects`' Api (`/api/namespaces/:namespace/agents/:name/instructions`) and Nemia's at `/api/nemia/instructions`, each calling this entry's handler: no route of its own",
   },
   input: CustomInput,
-  handler: ({ name, repo = '.', clear, words }) =>
+  handler: ({ name, repo, clear, words }) =>
     Effect.gen(function* () {
       const root = yield* StoreRoot;
       const file = customInstructionsFile(root, name);

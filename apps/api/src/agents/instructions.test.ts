@@ -170,6 +170,19 @@ test('what the instructions refuse — a name no place has, blank words, a front
     },
   );
 
+  await t.test(
+    'REFUSED: in `default` with no `?repo=`, an agent of a repository is a name no place has (404), never looked for in the api’s folder; yours is written',
+    async () => {
+      const bare = (name: string) => `/api/namespaces/default/agents/${name}/instructions`;
+      const missed = await refused(() => send('PUT', bare('scribe'), { words: 'Write it.' }), 404);
+      assert.ok(missed.includes('The agents there: archivist.'), missed);
+      assert.ok(!missed.includes(process.cwd()), 'the api’s own folder is not where an agent is looked for');
+      const put = await send('PUT', bare('archivist'), { words: 'File it.' });
+      assert.equal(put.status, 200);
+      assert.equal((await send('DELETE', bare('archivist'), {})).status, 200);
+    },
+  );
+
   await t.test('REFUSED: words that are not a string, or none (400 naming `payload.words`), and a name that climbs (400)', async () => {
     for (const body of [{ words: 7 }, {}]) {
       const before = held();

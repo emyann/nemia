@@ -252,6 +252,54 @@ export async function startServers(seat: Served, dist?: string): Promise<Require
 }
 
 /**
+ * A second seat on the worker's store, marked exposed (`WF_EXPOSED=1`), as an install bound beyond its machine serves it: an api of its
+ * own that ticks nothing, and a `vite preview` of the built app proxying `/api` to it, each on a free port. Answers the app's address,
+ * and `stop`, which ends both and waits for them, leaving the worker's own servers running: a page that starts one stops it before it
+ * ends.
+ */
+export async function serveExposed(): Promise<{ base: string; stop: () => Promise<void> }> {
+  const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
+  const from = servers.length;
+  const stop = async () => {
+    const own = servers.splice(from, 2);
+    await Promise.all(
+      own.map(
+        ({ child }) =>
+          new Promise<void>((resolve) => {
+            if (child.exitCode !== null || child.signalCode !== null) return resolve();
+            const kill = setTimeout(() => child.kill('SIGKILL'), STOP_MS);
+            child.once('exit', () => {
+              clearTimeout(kill);
+              resolve();
+            });
+            child.kill('SIGTERM');
+          }),
+      ),
+    );
+  };
+  try {
+    const apiPort = await startServer(
+      'the exposed api',
+      [path.join(API, 'src', 'main.ts'), '--no-tick'],
+      API,
+      { ...apiEnv, WF_EXPOSED: '1' },
+      /api listening on http:\/\/127\.0\.0\.1:(\d+)/,
+    );
+    const base = await startServer(
+      'the exposed vite preview',
+      [vite, 'preview', '--port', '0', '--host', '127.0.0.1'],
+      WEB,
+      { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
+      /Local:\s+(http:\/\/[^\s/]+)/,
+    );
+    return { base, stop };
+  } catch (err) {
+    await stop();
+    throw err;
+  }
+}
+
+/**
  * Seeds `root`, an empty directory, and serves it (`startServers`). draft's say file (SAYING) is read, standing in for its holder,
  * before the api can be asked to say anything into it, and each arrival is written into draft's transcript, as a working session does
  * when it reads the words between calls. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the

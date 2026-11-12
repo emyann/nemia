@@ -9,7 +9,16 @@ import path from 'node:path';
 import type { QuotaWindow } from '../src/lib/api/quota.ts';
 import type { RunView } from '../src/lib/api/judged.ts';
 import { listed, listedStep, summary, waitingRun, type Word } from './run-fixtures.ts';
-import { atWork, atWorkWords, daemonDot, feedWords, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
+import {
+  atWork,
+  atWorkWords,
+  daemonDot,
+  feedWords,
+  newerReleaseWords,
+  quotaShort,
+  staleFrameHeights,
+  versionWords,
+} from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
 const NOW = new Date('2026-09-30T05:10:00.000Z');
@@ -205,4 +214,14 @@ test("feedWords and versionWords: the feed's word and the version serving the bo
       });
     },
   );
+});
+
+test('newerReleaseWords: the frame says a newer release, only where the api read one newer', () => {
+  const checkout = { kind: 'checkout', root: '/home/me/nemia' } as const;
+  assert.match(
+    newerReleaseWords({ version: '1.2.0', release: checkout, latest: { version: '1.3.0', newer: true } }) ?? '',
+    /^nemia 1\.3\.0 is out: /,
+  );
+  assert.equal(newerReleaseWords({ version: '1.3.0', release: checkout, latest: { version: '1.3.0', newer: false } }), null);
+  assert.equal(newerReleaseWords({ version: '1.2.0', release: checkout }), null);
 });

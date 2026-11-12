@@ -965,3 +965,57 @@ test("a card's labels: filed with them, listed with them, selected by them with 
     names(((await refused.json()) as { error: string }).error, '`payload.label`');
   });
 });
+
+/**
+ * The factory `tree`, made from a template, on a repository of its own with a commit: its tree's one workflow `quick`, attached, whose
+ * step names an agent of the tree's — a workflow neither its repository nor yours has. Filed for one test and taken off after it, so the
+ * other tests read the store's factories as they file them.
+ */
+const treeFactory = (): { quick: string; repo: string; gone: () => void } => {
+  const repo = scratch('nemia-api-inbox-tree-');
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
+  const tree = path.join(root, 'factories', 'tree', 'tree');
+  const quick = path.join(tree, 'workflows', 'quick');
+  write(
+    path.join(root, 'factories', 'tree.json'),
+    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+  );
+  write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['quick'], hires: {} }));
+  write(path.join(quick, 'README.md'), '# quick\n\nImplement it.\n');
+  write(path.join(quick, 'implement.md'), '---\nplace: git\nagent: maker\n---\nImplement it.\n');
+  write(path.join(tree, 'workflows', 'agents', 'maker.md'), '---\ndescription: Makes the change a card asks for.\n---\nMake it.\n');
+  const gone = (): void => {
+    fs.rmSync(path.join(root, 'factories', 'tree.json'), { force: true });
+    fs.rmSync(path.join(root, 'factories', 'tree'), { recursive: true, force: true });
+  };
+  return { quick, repo, gone };
+};
+
+test("a card started through its factory's namespace runs in that factory, on the factory's workflow: the card's own when the start names none, or the one it names", async (t) => {
+  clear();
+  const { quick, repo: treeRepo, gone } = treeFactory();
+  t.after(gone);
+  write(path.join(inbox, 'by-its-own.md'), "---\nworkflow: quick\nfactory: tree\n---\nRun on the card's own workflow\n");
+  write(path.join(inbox, 'by-the-start.md'), '---\nfactory: tree\n---\nRun on the workflow the start names\n');
+  const start = (name: string, body: Record<string, unknown>) =>
+    app.request(`/api/namespaces/tree/cards/${name}/start`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
+
+  const own = await start('by-its-own', {});
+  assert.equal(own.status, 201, await own.clone().text());
+  const ownRun = runsAtOnce(root).runs.read(((await own.json()) as CardStarted).id);
+  assert.deepEqual(
+    [ownRun.workflowDir, ownRun.factory, ownRun.repo],
+    [quick, 'tree', treeRepo],
+    "no `workflow` sent: the card's `workflow:`, found in its factory's tree, as `nemia start <card> --factory tree` finds it",
+  );
+
+  const named = await start('by-the-start', { workflow: 'quick' });
+  assert.equal(named.status, 201, await named.clone().text());
+  const namedRun = runsAtOnce(root).runs.read(((await named.json()) as CardStarted).id);
+  assert.deepEqual(
+    [namedRun.workflowDir, namedRun.factory, namedRun.repo],
+    [quick, 'tree', treeRepo],
+    "a `workflow` only the factory has: looked up in the factory's tree, the request placed in the namespace's factory",
+  );
+});

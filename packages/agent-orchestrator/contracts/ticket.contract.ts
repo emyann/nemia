@@ -8,7 +8,10 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** A ticket as the store keeps it: when it was made and for how long, whether it needs an approval, and when it was approved and claimed. */
+/**
+ * A ticket as the store keeps it: when it was made and for how long, whether it needs an approval, and when it was approved and
+ * claimed.
+ */
 export type Ticket = {
   readonly createdAtMs: number;
   readonly ttlMs: number;

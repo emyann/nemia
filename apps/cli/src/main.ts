@@ -1,15 +1,17 @@
 /**
  * `nemia`, a client of the api: a moved read asks the api serving the store the context in use names (`context.ts`) over HTTP; the
- * client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`) ask it whatever else is
- * typed, each saying its own help (`channel` serves the feed to a Claude Code session over stdio, `watch/channel.ts`); a command whose
+ * client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, `server`) ask it whatever
+ * else is typed, each saying its own help (`channel` serves the feed to a Claude Code session over stdio, `watch/channel.ts`; `server
+ * upgrade` upgrades the server a context names through its api, `server/upgrade.ts`); a command whose
  * words the client holds (`MOVED_COMMANDS`) is parsed, helped and run here (`commands/commanded.ts`); every other verb and a help of
  * one run on the orchestrator's own CLI, spawned with the same words (`local.ts`), so the writes it has not moved keep their path
  * exactly. `--local` is refused, exit 2, naming the command typed without it. Under a remote context a verb about
  * the store only that path has is forwarded: that CLI spawned with the context's server and token (`forwardedEnv`), calling the daemon's
- * endpoints; a verb about this machine (`MACHINE_VERBS`) still runs here, and `nemia config` reads and writes the contexts themselves,
+ * endpoints; a verb about this machine (`MACHINE_VERBS`) still runs here, a bare `nemia upgrade` then naming `nemia server upgrade` on
+ * stderr (`serverHint`), and `nemia config` reads and writes the contexts themselves,
  * and `nemia pair <url>` writes one a pairing minted the token of (`pair.ts`), whatever context is in use.
  */
-import { CONFIG_VERB, chosenOf, config, factoryNotHere, unheld } from './context.ts';
+import { CONFIG_VERB, type Chosen, chosenOf, config, factoryNotHere, unheld } from './context.ts';
 import { doctor, RETIRED_VERB, retiredVerb } from './doctor.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
 import { PAIR_VERB, pair } from './pair.ts';
@@ -27,6 +29,7 @@ import { inbox } from './reads/inbox.ts';
 import { ls } from './reads/ls.ts';
 import { show } from './reads/show.ts';
 import { channel } from './watch/channel.ts';
+import { server, serverHint } from './server/upgrade.ts';
 import { watch } from './watch/watch.ts';
 
 /** What the `wf` alias says first, on stderr, the same words the orchestrator's alias says. */
@@ -51,6 +54,7 @@ const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]
   proposals,
   decide: (args) => decide(args, (argv) => main(argv, entry)),
   channel,
+  server,
 });
 
 /** Whether `name` is one of `MOVED_COMMANDS`, whose words the client holds. */
@@ -97,6 +101,17 @@ const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number
 };
 
 /**
+ * `argv` run on the old path, here, and its exit code; a bare `nemia upgrade` typed under a remote context then names on stderr the form
+ * that upgrades that context's server (`serverHint`): the words keep upgrading this machine, whatever the context.
+ */
+async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean, chosen: Chosen): Promise<number> {
+  const code = await spawned(argv, entry);
+  if (argv[0] === 'upgrade' && !help && !argv.includes('-h') && chosen.kind === 'remote')
+    process.stderr.write(serverHint(chosen.name, chosen.server));
+  return code;
+}
+
+/**
  * Runs `argv` and answers the exit code: on the api for a moved read, a verb of the client's own and a command whose words it holds,
  * else on the old path under `entry`, forwarded to the daemon a remote context names for a verb about the store only that path has;
  * refused, exit 2, where `--local` is typed (`localRefused`) but on `doctor carry` (`carryUnlocal`), under a context the config does
@@ -115,7 +130,7 @@ export async function main(typed: readonly string[], entry: Entry = 'nemia'): Pr
   if (chosen.kind === 'refused' && !ofTheMachine(name)) throw unheld(chosen.name);
   if (chosen.kind === 'remote' && !help && exportsAFactory(argv)) throw factoryNotHere(chosen.name);
   if (route === 'forwarded' && chosen.kind === 'remote') return spawned(argv, entry, forwardedEnv(chosen));
-  if (route === 'process') return spawned(argv, entry);
+  if (route === 'process') return spawnedHere(argv, entry, help, chosen);
   if (entry === 'wf') process.stderr.write(`${WF_HINT}\n`);
   if (isMoved(name)) return commanded(name, argv.slice(name.split(' ').length));
   const verb = Object.entries(own(entry)).find(([word]) => word === name)?.[1];

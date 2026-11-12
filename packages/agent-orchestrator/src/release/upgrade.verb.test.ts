@@ -663,3 +663,9 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
     }
   });
 });
+
+test("`nemia upgrade --help` says it upgrades this machine's install, and names `nemia server upgrade` for the server a context names", () => {
+  const help = (RELEASES.find((c) => c.name === 'upgrade')?.help ?? []).join(' ');
+  assert.match(help, /nemia server upgrade/);
+  assert.match(help, /nemia service/, "kept apart from this machine's login unit");
+});

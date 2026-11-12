@@ -32,6 +32,7 @@ import { routeOf } from './request/request.ts';
 import { type Place, type PlaceQuery, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
+import type { UpgradeStarts } from './upgrades/index.ts';
 import { Engine, type RequestTrace, StoreConfig, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
@@ -103,10 +104,20 @@ export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: 
 export const AnswerBound = Context.Reference<number>('api/AnswerBound', { defaultValue: () => ANSWER_MOST });
 
 /**
- * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
- * the package's programs ask (`PlaceService`).
+ * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), the one
+ * permit an upgrade's start is filed under (`UpgradeStarts`), and the place the package's programs ask (`PlaceService`).
  */
-export type Services = ApiConfig | Engine | StoreRoot | StoreConfig | McpAsker | QuotaAsker | ReadMemo | Followings | PlaceService;
+export type Services =
+  | ApiConfig
+  | Engine
+  | StoreRoot
+  | StoreConfig
+  | McpAsker
+  | QuotaAsker
+  | ReadMemo
+  | UpgradeStarts
+  | Followings
+  | PlaceService;
 
 /** The runtime an app runs its handlers on, built once from its layer. */
 export type ApiRuntime = ManagedRuntime.ManagedRuntime<Services, never>;

@@ -166,10 +166,10 @@ export const staleFrameHeights = (source: string): string[] =>
 
 /**
  * The line that says a newer release is out, where the api read one newer than the release it runs (`latest.newer`): the release, and
- * where to upgrade. None where the api read none, or the one it runs is the newest. The command that upgrades is the api's to answer,
- * as every command the board shows (`test/structure.test.ts`), and `latest` carries none yet.
+ * where to upgrade it — Settings, whose Server release section upgrades the server. None where the api read none, or the one it runs is
+ * the newest.
  */
 export function newerReleaseWords(version: Version): string | null {
   const latest = version.latest;
-  return latest?.newer ? `nemia ${latest.version} is out: upgrade at the machine that serves this board` : null;
+  return latest?.newer ? `nemia ${latest.version} is out: upgrade it in Settings` : null;
 }

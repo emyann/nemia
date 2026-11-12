@@ -4,7 +4,8 @@
  * without a rebuild, so a rollback is the same command with an older tag. On an archive install the tag's published archive is
  * downloaded, checked against its checksum and smoke-run instead (`archived`), the newest where no tag is named. Either way a tag older
  * than the oldest release that can read the store (`store.json`, `goingBackRefused`) is refused before anything is built or fetched.
- * The command the CLI serves alone: it builds for minutes and restarts the daemon that serves the api.
+ * The command the CLI serves alone: it builds for minutes and restarts the daemon that serves the api. Its link to `POST /api/upgrades`
+ * (`served`) is the same upgrade filed by the server as a job of the engine (`upgrade-job.verb.ts`), which the MCP port offers as a tool.
  */
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
@@ -428,7 +429,10 @@ const UPGRADE: Command<Upgraded> = {
     'running nemia runs on, the folder of each build whose upgrade died,',
     'and each build log older than 30 days, as the daemon does every five',
     'minutes. A tag older than the oldest release that can read the store',
-    '(store.json) is refused before anything is fetched or built',
+    '(store.json) is refused before anything is fetched or built. It',
+    "upgrades this machine's install, whatever the context: the server a",
+    'context names is upgraded from here with nemia server upgrade [<tag>],',
+    "through its api (not nemia service, this machine's login unit)",
   ],
   spec: {
     positionals: [{ key: 'tag', takes: 'optional', kind: 'name' }],
@@ -442,6 +446,7 @@ const UPGRADE: Command<Upgraded> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
+  served: [{ endpoint: 'upgrades.start', request: (input) => Promise.resolve({ tag: input.tag }) }],
   handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host))),
   print: (data) => data.lines,
 };

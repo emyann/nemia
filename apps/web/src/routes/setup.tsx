@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import type { Fix, FixPhase, FixStart } from 'objects';
-import { FixRun } from '@/components/setup/FixRun';
+import { FollowedFix } from '@/components/setup/FollowedFix';
 import { HarnessChoice, HarnessSkipped } from '@/components/setup/HarnessChoice';
 import { PairingApprovals } from '@/components/setup/PairingApprovals';
 import { ReadinessList } from '@/components/setup/ReadinessList';
@@ -10,7 +10,6 @@ import { approvePairing, pairingsQuery } from '@/lib/api/pairing';
 import { readinessQuery, startFix } from '@/lib/api/readiness';
 import { forgetHarnessSkip, keepHarnessSkip, readHarnessSkipped } from '@/lib/harnessSkip';
 import { harnessAsked, harnessChoices } from '@/lib/setup';
-import { useFixFollow } from '@/lib/useFixFollow';
 
 /** Settings' Setup, at /setup: what the server needs to run its factories. Its loader reads the readiness read. */
 export const Route = createFileRoute('/setup')({
@@ -24,21 +23,6 @@ export const Route = createFileRoute('/setup')({
     </p>
   ),
 });
-
-/** A started fix followed live (`useFixFollow`) and drawn as it runs (`FixRun`); its end reads the readiness again (`onEnded`). */
-function FollowedFix({ fix, onEnded }: { fix: Fix; onEnded: (ended: Fix) => void }) {
-  const followed = useFixFollow(fix, onEnded);
-  return (
-    <FixRun
-      need={fix.need}
-      phase={followed.phase}
-      output={followed.output}
-      {...(fix.code === undefined ? {} : { code: fix.code })}
-      {...(followed.ended?.exitCode === undefined ? {} : { exitCode: followed.ended.exitCode })}
-      {...(followed.unread === undefined ? {} : { unread: followed.unread })}
-    />
-  );
-}
 
 /**
  * The fixes started on this visit, newest first, each followed as it runs; over the read, while no harness is activated and the person has

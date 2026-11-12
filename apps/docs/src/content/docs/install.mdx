@@ -103,7 +103,8 @@ run it on.
 The machine's own verbs always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`, `nemia tick`), the
 version, tokens and the Claude token, and the verbs that read and write files and no store (`nemia template`, `nemia frontmatter`,
 `nemia admit`). `nemia template export --factory` reads a factory of this machine's store, so under a remote context it is refused:
-run it on the server.
+run it on the server. `nemia upgrade` upgrades your laptop's install under a remote context too; the server is upgraded from your laptop
+by another verb (see [From another machine](#from-another-machine)).
 
 Claude Code's nemia plugin asks the server through the current context's token (`nemia config headers`, its `headersHelper`), at the
 address `NEMIA_URL` names: `nemia pair` prints the line to put in your shell profile.
@@ -233,6 +234,36 @@ store as it now is, and the refusal names that release.
 `nemia version` says the release you run and, when there is one, the newer release. The board says it too. To know that, the daemon
 of an installed release reads the release list's newest entry every six hours, sending nothing about you or your store. Set
 `NEMIA_RELEASE_CHECK=off` in its environment to turn that off; a checkout of the repository never checks.
+
+### From the board
+
+The board's _Settings_ opens on the server's release: the one it runs and, when the daemon has read a newer one, that release with a
+link to its notes and an _Upgrade_ button. Pressing it asks once, then runs `nemia upgrade <tag>` on the server, exactly as you would
+type it there. Its output shows as it runs. The daemon restarts onto the new release partway through, and the page says so and reads the
+output again once it is back. It then shows the release the server now runs, or the upgrade's refusal and its log, with the server
+still on the release it ran. Any piece the new release needs before runs can start shows beside it, with its fix.
+
+_Back_ goes to the newest installed release older than the one the server runs, under the same rule as `nemia upgrade`: where the
+store's oldest readable release is newer, Back is shown refused and names it. Only a person may press either button. A session's token
+is refused, as for a fix on _Setup_. The MCP port offers the same upgrade as its `upgrade` tool, behind the person's token.
+
+### From another machine
+
+```bash
+nemia server upgrade
+nemia server upgrade v1.3.0
+nemia server upgrade --back
+```
+
+Under a context that names a remote server, `nemia server upgrade` asks that server's api for the same upgrade the board's _Upgrade_
+button starts: to the release you name, or to the newer one the server has read. `--back` goes where the board's _Back_ goes, under the
+same rule. Its output prints as it runs; when the daemon restarts onto the new release it waits for it to answer again, then prints the
+rest. It ends saying the release the server now runs, or the upgrade's refusal, its log named in the output, with the server still on
+the release it ran. Any piece the new release needs before runs can start is in that output, with its fix.
+
+Your laptop and the server must then be of one release for the other verbs to talk to it, so when they differ the command ends naming
+the `nemia upgrade <tag>` that brings your laptop level. `server` is the daemon a context names; `nemia service` is your own machine's
+login unit. A bare `nemia upgrade` typed under a remote context still upgrades your laptop, and then names `nemia server upgrade`.
 
 ## Signing in from a remote browser
 

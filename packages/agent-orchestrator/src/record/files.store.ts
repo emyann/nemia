@@ -46,6 +46,8 @@ import {
   roundAskIn,
   runFile,
   runsDir,
+  saidDir,
+  keepSaid,
   writeAsk,
   writeHold,
   writeRun,
@@ -183,6 +185,7 @@ function removeRunFiles(home: string, id: string): string[] {
     refreshFile(home, id),
     labelsFile(home, id),
     asksDir(home, id),
+    saidDir(home, id),
     path.join(runsDir(home), id),
   ];
   for (const at of files) {
@@ -531,6 +534,7 @@ export const filesStoreAt = (home: string): RunStore => ({
     put: (id, until, said) => writeHold(home, id, until, said),
     stands: (id) => fs.existsSync(holdFile(home, id)),
   },
+  said: { put: (id, step, text) => keepSaid(home, id, step, text) },
   labels: { put: (id, labels) => writeLabels(home, id, labels) },
   refresh: {
     lift: (id) => removeRefresh(home, id),

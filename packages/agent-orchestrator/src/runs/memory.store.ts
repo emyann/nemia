@@ -14,7 +14,7 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run } from '../record/record.ts';
+import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
@@ -32,7 +32,7 @@ const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
 const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause'] as const;
+const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause'] as const;
 const recordOf = (run: Run): Run => {
   const kept: Record<string, unknown> = { ...run };
   for (const key of COMPOSED) delete kept[key];
@@ -49,6 +49,7 @@ type State = {
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
   labels: Map<string, Labels>;
+  said: Map<string, Array<SaidBefore & { step: string }>>;
   refresh: Map<string, { at: string }>;
   asks: Map<string, Map<string, Held>>;
   forgetting: Map<string, string[]>;
@@ -61,6 +62,7 @@ const stateOf = (): State => ({
   pruned: new Map(),
   holds: new Map(),
   labels: new Map(),
+  said: new Map(),
   refresh: new Map(),
   asks: new Map(),
   forgetting: new Map(),
@@ -85,6 +87,7 @@ function readOf(st: State, id: string): Run {
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
+    ...saidBeforeOf(st, id),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   } as Run;
@@ -105,6 +108,7 @@ function forgetOf(st: State, id: string): string[] {
     [st.refresh, `${id}.refresh`],
     [st.labels, `${id}.labels`],
     [st.asks, `${id}.asks/`],
+    [st.said, `${id}.said/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
   if (card !== undefined) removed.push(`started/${card}.json`);
@@ -135,7 +139,7 @@ function runsOf(st: State): RunsLayer['runs'] {
     },
     stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
     exists: (id) => st.records.has(id),
-    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks].some((m) => m.has(id)),
+    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id) => {
       const at = st.cancelled.get(id);
@@ -251,6 +255,24 @@ function holdsOf(st: State): RunsLayer['holds'] {
   };
 }
 
+/** What was said to the run's steps before each was filed, by step, in the order kept, as `saidBefore` composes it: none where nothing was. */
+function saidBeforeOf(st: State, id: string): Pick<Run, 'saidBefore'> {
+  const byStep: Record<string, SaidBefore[]> = {};
+  for (const { step, at, text } of st.said.get(id) ?? []) (byStep[step] ??= []).push({ at, text });
+  return Object.keys(byStep).length ? { saidBefore: byStep } : {};
+}
+
+function saidOf(st: State): RunsLayer['said'] {
+  return {
+    put: (id, step, text) => {
+      const kept = { at: new Date().toISOString(), text };
+      st.said.set(id, [...(st.said.get(id) ?? []), { step, ...kept }]);
+      touch(st, id);
+      return { ...kept };
+    },
+  };
+}
+
 function labelsOf(st: State): RunsLayer['labels'] {
   return {
     put: (id, labels) => {
@@ -299,6 +321,7 @@ function memoryRuns(): RunsLayer {
     runs: runsOf(st),
     asks: asksGroup(st),
     holds: holdsOf(st),
+    said: saidOf(st),
     labels: labelsOf(st),
     refresh: refreshOf(st),
     forgetting: forgettingOf(st),

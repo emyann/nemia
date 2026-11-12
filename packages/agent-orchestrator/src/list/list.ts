@@ -31,7 +31,7 @@ import {
 import { budgetWord } from '../money/money.ts';
 import { durationWord } from '../usage/usage.ts';
 import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote } from '../round/round.ts';
-import { saidWord } from '../say/say.ts';
+import { saidBeforeWord, saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';
 import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
@@ -299,8 +299,8 @@ const memoryNoted = ({ steps, read, memoryOf }: ListingInput, listed: Listing): 
  * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
  * says so (`waitsOnCheckout`) — or that a person accepted its loop (`nemia approve`), never their words, which
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
- * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
- * was denied. Its cost goes beside its word once measured, unless the word already shows it.
+ * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to, and how many
+ * before it was filed while it is on its first try (`saidBeforeWord`); and what it was denied. Its cost goes beside its word once measured, unless the word already shows it.
  *
  * @param assessed `assess` on the run's one read: the tries, rounds and send-backs due, read here and never judged again.
  * @param stoodOf Where a step stands on this pass (`stepWords`).
@@ -328,6 +328,7 @@ function listedSteps(
 ): Listing {
   const { run, verdictOf, spendOf, standings, checkout, sessionBlocked } = read;
   const waiting = gated(run) ? [...waits] : [];
+  const saidBeforeOf = (name: string): number => (run.steps[name]?.tries?.length ? 0 : (run.saidBefore?.[name]?.length ?? 0));
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   const due = assessed.due.retry;
   const rounds = assessed.due.round;
@@ -372,7 +373,7 @@ function listedSteps(
         : takenByHand(step.name)
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
-    const note = [tried, gate, row.note, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    const note = [tried, gate, row.note, landingWord(run, step.name), saidWord(saidTo(step.name)), saidBeforeWord(saidBeforeOf(step.name))].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...taskRow(run.steps[step.name]?.taskId, ranOnOf, deniedOf), ...cost };
   });

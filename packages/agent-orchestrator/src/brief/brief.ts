@@ -17,6 +17,7 @@ import {
   retriedInRound,
   retrySection,
   roundSection,
+  saidBeforeSection,
   type RetryBriefing,
   type RoundBriefing,
 } from './brief-sections.ts';
@@ -120,6 +121,9 @@ const opened = (step: StepSpec): string => [PRECEDENCE, briefBody(step)].filter(
  * (`## From run <id>`): by then a person has read those summaries and landed the work — see `fromRunSection`. A run handed others as
  * context (`--from`) is handed theirs the same way, after, each labelled landed or not landed, not judged — see `contextSection`.
  *
+ * A step's first try is handed what was said to it before it was filed (`## Said before you started`), beside what was asked for, and
+ * no later try is — see `saidBeforeSection`.
+ *
  * And a step after a gate is handed the approval that let it be filed, and the words given with it (`## Approved`): a person's decision
  * on the record, which the step after the gate and every step after that one read — see `approvedSection`. So is a step after one a
  * person sent back with an answer (`## Answered`), which every step after the answered one reads — see `answeredSection`.
@@ -201,10 +205,17 @@ export function composeBrief(
   const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
+  const firstTry = !retry && !round && !run.steps[step.name]?.tries?.length;
+  const saidBefore = firstTry ? saidBeforeSection(run.saidBefore?.[step.name]) : [];
 
   if (step.resume && !retry && !round)
     return (
-      opened(step) + handed.decided.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
+      opened(step) +
+      saidBefore.join('\n') +
+      handed.decided.join('') +
+      (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') +
+      given +
+      contracts
     );
 
   const earlier = step.after.length
@@ -214,7 +225,7 @@ export function composeBrief(
   const inputs = inputsLine(inputsDir, run.inputs, inFolder, folders, run.cards);
   const request = [run.brief, ...mountsLine(step, run, folders), ...(inputs ? ['', INPUTS_HEADING, '', inputs] : [])];
   const opening = [opened(step), ''];
-  const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
+  const parts = [...opening, '## What was asked for', '', ...request, ...saidBefore, ...handed.parents, ...handed.decided];
 
   if (step.after.length > 1 && !endsOnBase(step) && !inFolder) {
     return [

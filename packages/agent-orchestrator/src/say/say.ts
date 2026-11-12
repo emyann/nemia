@@ -1,6 +1,7 @@
 /**
  * Words a person says to a step's session while it runs (`nemia say`): what the engine journalled (`Said`, `SaidTo`), what the package
- * refuses before the engine is asked (`sayRefusal`), and how `nemia ls` and `nemia decide` show them (`saidWord`, `saidLines`). Pure.
+ * refuses before the engine is asked (`sayRefusal`), when the words are kept for a step's first try instead (`saidAhead`), and how
+ * `nemia ls` and `nemia decide` show them (`saidWord`, `saidBeforeWord`, `saidLines`). Pure.
  */
 import type { StepSpec } from '../step/step.ts';
 import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/record.ts';
@@ -28,12 +29,25 @@ export type SaidAfterKind = SaidAfter;
 export type SaidTo = Said & { try: number };
 
 /**
- * Why `nemia say` will not hand a step's session words, in words that say what to do instead — or null, when the engine may be asked. Pure.
+ * Whether words said to the step `name` now are kept for its first try rather than said to a session: nothing of it is filed — no task,
+ * and no try behind it. Pure. `sayRefusal` still judges a cancelled or pruned run, and a step the run does not have.
+ */
+export const saidAhead = (run: Run, name: string): boolean => {
+  const step = run.steps[name];
+  return step !== undefined && !step.taskId && !step.tries?.length;
+};
+
+/**
+ * Why `nemia say` will not hand a step's session words, in words that say what to do instead — or null, when the engine may be asked, or
+ * the words kept for a step nothing of which is filed (`saidAhead`). Pure.
  *
  * The package's own refusals, before the engine is asked: a step the run does not have; a cancelled run, whose sessions are being stopped;
- * a step with no task filed; and a step whose current try's task has settled, where no session is running to hear anything — words for such
- * a step go into its next try's brief, with `nemia retry --message`. Everything else about the session — words that are empty, an attempt
- * not started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
+ * a step with no task filed whose tries are behind it (sent back, or a round to be filed again), where no session is there to hear and no
+ * first try is left to carry them; and a step whose current try's task has settled, where no session is running to hear anything — words for
+ * such a step go into its next try's brief, with `nemia retry --message`. A step nothing of which is filed yet is no refusal, nor is it the
+ * engine's: its words are kept for its first try (`saidAhead`), unless the run was pruned, which files nothing more. Everything else
+ * about the session — words that are empty, an attempt not started, a harness with no way in, a session its harness does not list — is
+ * the engine's to refuse, in its own words (`Engine.say`).
  * A settled step of a pruned or a held run is told that the try that would carry the words is refused (`prunedRefusal`, `heldRefusal`).
  */
 export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
@@ -43,7 +57,12 @@ export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, p
     return `${run.id} was cancelled at ${run.cancelledAt}: its sessions are being stopped, not steered, and a cancelled run files nothing more. Start a new run for the work with nemia start.`;
   }
   const taskId = run.steps[name].taskId;
-  if (!taskId) return `${name} has not been filed yet, so there is no session to hear anything. Say it once it runs: nemia ls ${run.id}.`;
+  if (!taskId && run.pruned)
+    return `${name} has not been filed, and it never will be: ${run.id} was ${prunedWords(run.pruned)}, so nothing would carry the words.`;
+  if (!taskId) {
+    if (saidAhead(run, name)) return null;
+    return `${name} has no session to hear anything: try ${tryOf(run, name) - 1} is behind it and its next try is not filed yet, which is handed no words said before. Say them once that try runs: nemia ls ${run.id}.`;
+  }
   const phase = phaseOf(taskId);
   if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
     const settled = `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything.`;
@@ -57,6 +76,12 @@ export function sayRefusal(steps: readonly StepSpec[], run: Run, name: string, p
 
 /** How `nemia ls` notes a step whose current try a person said something to (`nemia say`): `said to 2×`. Empty when nobody did. */
 export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
+
+/**
+ * How `nemia ls` notes a step said to before it was filed (`nemia say`, kept for its first try): `said to 2× before it ran`, while it is
+ * on its first try or has none yet. Empty when nobody did.
+ */
+export const saidBeforeWord = (times: number): string => (times > 0 ? `said to ${times}× before it ran` : '');
 
 /**
  * What `nemia decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`nemia say`), in

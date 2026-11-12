@@ -18,7 +18,7 @@ import { asNamed } from '../workflow.ts';
 import { keptDeclared } from '../pinned/pinned.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
-import type { AsksRead, MergeAskHeld } from './record.ts';
+import type { AsksRead, MergeAskHeld, SaidBefore } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
@@ -62,7 +62,7 @@ const StepRecordSchema = Kept({
 
 /**
  * A run's record as any version of the tick writes it: `Run`, with the person's files composed on read
- * (`approvals`, `acceptances`, `pruned`, `hold`, `labels`) left to their own readers. Every key it does not name is kept, so a key a
+ * (`approvals`, `acceptances`, `pruned`, `hold`, `labels`, `saidBefore`) left to their own readers. Every key it does not name is kept, so a key a
  * newer or an older `nemia` wrote survives `rewriteRun`.
  */
 const runBase = {
@@ -279,9 +279,10 @@ export const removeHold = (home: string, id: string, at: string): boolean => {
 
 /**
  * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its
- * hold (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
+ * hold (`holdFile`), what was said to its steps before each was filed (`saidDir`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`), off one
  * listing of its asks directory. None of them is ever written into the record (`rewriteRun`), and whatever the record carries under their
- * keys is dropped, the store's pause's and the run's labels (`pause`, `labels`, which the Run door composes) with them. Counted as one
+ * keys is dropped, the store's pause's, the run's labels and what was said before a step was filed (`pause`, `labels`, `saidBefore`,
+ * which the Run door composes) with them. Counted as one
  * record read (`countRecord`) under `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
@@ -304,13 +305,14 @@ const readRecord = (home: string, id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(home, id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'pause', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
-  const [at, pruned, hold] = [
+  const [at, pruned, hold, saidBefore] = [
     fs.existsSync(cancelFile(home, id)) ? readText(cancelFile(home, id)).trim() : '',
     readPruned(home, id),
     readHold(home, id),
+    readSaidBefore(home, id),
   ];
   const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(home, id));
@@ -325,10 +327,81 @@ const readRecord = (home: string, id: string): Run => {
     ...(at ? { cancelledAt: at } : {}),
     ...(pruned ? { pruned } : {}),
     ...(hold ? { hold } : {}),
+    ...(saidBefore ? { saidBefore } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   };
 };
+
+/**
+ * What was said to the run's steps before each was filed (`nemia say` to a step with no task and no try): a folder of its own, a person's
+ * fact beside the record for the reason `cancelFile` is, each word a file `<n>.json` of `{ step, at, text }`, numbered from 1 in the
+ * order kept. Written by `keepSaid` alone, exclusively; never edited; removed by `nemia rm` with the run. Composed onto the run as
+ * `saidBefore` by every read of a record (`runRecord`), and never written into the record.
+ */
+export const saidDir = (home: string, id: string): string => path.join(runsDir(home), `${id}.said`);
+
+const isKeptSaid = Schema.is(Schema.Struct({ step: Schema.String, at: Schema.String, text: Schema.String }));
+
+/** The number of each word kept in `dir`, in the order kept: none where the folder is not there. */
+function keptNumbers(dir: string): number[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw err;
+  }
+  return names
+    .map((name) => /^(\d+)\.json$/.exec(name)?.[1])
+    .filter((n): n is string => n !== undefined)
+    .map(Number)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * Keep words said to `step` before it was filed: the next number's file, written `wx`, so two people saying at once each keep their own
+ * word, the later taking the number after; the word kept, with when.
+ */
+export function keepSaid(home: string, id: string, step: string, text: string): SaidBefore {
+  const dir = saidDir(home, id);
+  fs.mkdirSync(dir, { recursive: true });
+  const kept = { at: new Date().toISOString(), text };
+  for (;;) {
+    const n = (keptNumbers(dir).at(-1) ?? 0) + 1;
+    try {
+      fs.writeFileSync(path.join(dir, `${n}.json`), JSON.stringify({ step, ...kept }, null, 2), { flag: 'wx' });
+      return kept;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+  }
+}
+
+/**
+ * What was said to each of the run's steps before it was filed, by step, in the order kept: undefined where nothing was. A file that does
+ * not read as a word kept is left out, and said once on stderr, naming it.
+ */
+function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> | undefined {
+  const dir = saidDir(home, id);
+  const byStep: Record<string, SaidBefore[]> = {};
+  for (const n of keptNumbers(dir)) {
+    const file = path.join(dir, `${n}.json`);
+    let json: unknown;
+    try {
+      json = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') continue;
+    }
+    if (!isKeptSaid(json)) {
+      sayOnce(`run ${id}: ${file} is no word kept for a step ({ step, at, text }), and is left out: remove the file, or say the words again with nemia say`);
+      continue;
+    }
+    const { step, at, text } = json;
+    (byStep[step] ??= []).push({ at, text });
+  }
+  return Object.keys(byStep).length ? byStep : undefined;
+}
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.
@@ -741,14 +814,15 @@ export const restStamps = (home: string): Map<string, string> =>
   });
 
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause'>): string => JSON.stringify(run, null, 2);
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause' | 'saidBefore'>): string => JSON.stringify(run, null, 2);
 
 /**
- * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause and the run's labels, each a person's file
+ * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, the run's labels and what was said before a
+ * step was filed, each a person's file
  * (`runs.labels.put` writes the labels, `writeLabels` in files.store.ts). Exclusive (`wx`): a record already at the id is left as it is,
  * and the write throws `EEXIST`, which the Run door answers as `Conflict`.
  */
-export const writeRun = (home: string, { pause: _, labels: __, ...run }: Run) => {
+export const writeRun = (home: string, { pause: _, labels: __, saidBefore: ___, ...run }: Run) => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   fs.writeFileSync(runFile(home, run.id), recordText(run), { flag: 'wx' });
 };
@@ -761,14 +835,14 @@ export const writeRun = (home: string, { pause: _, labels: __, ...run }: Run) =>
  * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
  * removed after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause and
- * labels the run store did: they are a person's files, and a copy in the record would outlive the file it was read from.
+ * Without the approvals, acceptances, pruning, hold and a person's routes `runRecord` composed onto it (`unrouted`), nor the pause,
+ * labels and words said before a step was filed the run store did: they are a person's files, and a copy in the record would outlive the file it was read from.
  */
 export const rewriteRun = (home: string, run: Run): boolean => within('act', () => rewriteNow(home, run));
 
 const rewriteNow = (
   home: string,
-  { approvals: _, acceptances: __, pruned: ___, hold: ____, labels: ______, pause: _____, ...run }: Run,
+  { approvals: _, acceptances: __, pruned: ___, hold: ____, labels: ______, pause: _____, saidBefore: _______, ...run }: Run,
 ): boolean => {
   let fd: number;
   try {

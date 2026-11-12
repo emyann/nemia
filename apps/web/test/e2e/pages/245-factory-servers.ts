@@ -247,7 +247,6 @@ async function pastesBack(page: Page): Promise<void> {
   try {
     const { problems } = watch(other);
     let taken = false;
-    /** A sign-in that waits past the page's visit: a fixed instant far ahead, so the page holds no deadline of its own. */
     const until = '2099-01-01T00:00:00.000Z';
     const answer = (route: Route, json: unknown) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) });

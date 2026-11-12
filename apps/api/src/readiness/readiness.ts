@@ -8,7 +8,7 @@
  *   checks are run now.
  * - `POST /api/readiness/fixes` — a need's fix filed on the engine as a command task (`startFix`), answered as it is filed (`pending`).
  *   Refused 404 (`Missing`) for no such need, factory or workflow, and 422 (`Invalid`) for a factory named without its workflow, an index
- *   or an answer amiss, and a workflow's fix of a factory not trusted, naming `nemia factory trust <factory>`.
+ *   or an answer amiss, 403 (`Forbidden`) for a session's token, since a fix acts on the machine outside a step's fence, and a workflow's fix of a factory not trusted, naming `nemia factory trust <factory>`.
  * - `GET /api/readiness/fixes/:id` — the fix as it stands (`fixOf`): its phase, the tail of what it printed, its exit code once settled.
  *   404 for an id no fix was started under.
  * - `GET /api/readiness/fixes/:id/output` — what the fix prints, followed, as server-sent events (`followFix`): an `output` event a chunk
@@ -20,6 +20,7 @@ import { readsBounded } from '../objects/answer-bound.ts';
 import { followFix, fixOf, liveFacts, readinessOf, startFix, type FixFollowed, type ReadinessFacts } from 'agent-orchestrator';
 import { Api, type FixStreamEvent } from 'objects';
 import { answered, answeredWrite } from '../objects/refused.ts';
+import { personOnly } from '../caller/person-only.ts';
 
 /**
  * The machine's facts the readiness read asks, over the environment `env` the api listens under: the process's own (`liveFacts`) by
@@ -36,7 +37,12 @@ const eventOf = (followed: FixFollowed): FixStreamEvent =>
 export const readinessHandlers = readsBounded(Api, 'readiness', (handlers) =>
   handlers
     .handle('read', () => answeredWrite((s) => s.inRequest(Effect.flatMap(Facts, (facts) => readinessOf(facts(s.env))))))
-    .handle('fix', ({ payload }) => answeredWrite((s) => s.inRequest(startFix(payload))))
+    .handle('fix', ({ payload }) =>
+      answeredWrite((s) => {
+        personOnly(s, 'POST /api/readiness/fixes', `\`nemia readiness fix ${payload.need}\``);
+        return s.inRequest(startFix(payload));
+      }),
+    )
     .handle('fixOf', ({ params }) => answeredWrite((s) => s.inRequest(fixOf(params.id))))
     .handle('fixOutput', ({ params }) =>
       answered(async (s) => {

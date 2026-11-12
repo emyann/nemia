@@ -9,12 +9,13 @@
 import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { PlaceService, runningRelease } from 'agent-orchestrator';
+import { PlaceService, runningRelease, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import type { Fix, Need, Readiness } from 'objects';
-import { appOver, eachTest } from '../../test/placed.ts';
+import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import { root } from '../../test/harness.ts';
 import { Facts } from './readiness.ts';
 
 /** The need the test place declares here: an identity, asked of the person, whose fix prints it. */
@@ -53,10 +54,14 @@ const app = eachTest(() =>
 );
 
 /** A request of `method` to `url`, as a client sends one: JSON, from the board's own page. */
-const send = (method: 'GET' | 'POST', url: string, body?: unknown) =>
+const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: string) =>
   app().request(url, {
     method,
-    headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
+    headers: {
+      'content-type': 'application/json',
+      'sec-fetch-site': 'same-origin',
+      ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+    },
     ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
   });
 
@@ -98,4 +103,19 @@ test('REFUSED: a fix of no such need is a 404, an answer left out a 422, and an 
   assert.equal((await send('POST', '/api/readiness/fixes', { need: 'identity', answers: { name: 'Lin' } })).status, 422);
   assert.equal((await send('GET', '/api/readiness/fixes/no-such-fix')).status, 404);
   assert.equal((await send('GET', '/api/readiness/fixes/no-such-fix/output')).status, 404);
+});
+
+test("a session's token starts no fix: 403, and nothing is filed", async () => {
+  const task = 't-readiness-session';
+  const token = Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).tokens.mint({ agent: 'nemia', factory: null, run: null, step: null, attempt: 1, task });
+    }).pipe(Effect.provide(tokenDoorFiles(root))),
+  );
+  Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
+  engine().settle(task, 'working');
+  const before = Effect.runSync(engineFor(engine()).list()).length;
+  const res = await send('POST', '/api/readiness/fixes', { need: 'identity', answers: { name: 'x', email: 'y@example.com' } }, token);
+  assert.equal(res.status, 403);
+  assert.equal(Effect.runSync(engineFor(engine()).list()).length, before, 'no fix filed');
 });

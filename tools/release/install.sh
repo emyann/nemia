@@ -370,10 +370,19 @@ if [ "$service" = 1 ]; then
     "$nemia" config set-context local --token-file "$work/local-token"
     rm -f "$work/local-token"
     say "open this link in a browser within ten minutes: it signs that browser in to the board, once"
+    # The link is made under the bind's own address, never the daemon's lease, which may not be written yet: an IPv6 one bracketed. A
+    # wildcard bind names no address a browser opens, so it asks for --board-base.
+    if [ -z "$board_base" ]; then
+      case $bind in
+        0.0.0.0 | :: | '[::]') ;;
+        *:*) board_base="http://[${bind#[}" && board_base="${board_base%]}]:8787" ;;
+        *) board_base="http://$bind:8787" ;;
+      esac
+    fi
     if [ -n "$board_base" ]; then
       "$nemia" board link --base "$board_base" || warn "no first-visit link was made: run nemia board link --base $board_base once Nemia is up"
     else
-      "$nemia" board link || warn "no first-visit link was made: run nemia board link once Nemia is up"
+      warn "$bind is every interface, which names no address to open: run nemia board link --base http://<the address your browser uses>:8787"
     fi
     say "on another machine: install with --client --server http://<this machine's address>:8787, then approve its code here with nemia pairings approve <code>"
   fi

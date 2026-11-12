@@ -35,22 +35,15 @@ import {
   pairingClaimed,
   pairingsListed,
 } from 'agent-orchestrator';
-import { Api, Forbidden } from 'objects';
+import { Api } from 'objects';
 import type { Served } from '../layer.ts';
+import { personOnly } from '../caller/person-only.ts';
 import { answeredWrite } from '../objects/refused.ts';
 import { cookieSent, overHttps } from '../server/session.ts';
 
 /** `work` over the request's services at the time the clock reads now, read once for the request; a refusal answered by the one map. */
 const ticketed = <A>(work: (s: Served, nowMs: number) => A) =>
   Effect.flatMap(Clock.currentTimeMillis, (nowMs) => answeredWrite(async (s) => work(s, nowMs)));
-
-/** The caller of `route` refused unless it is the person: a session's token approves no pairing and makes no link. */
-const personOnly = (s: Served, route: string): void => {
-  if (s.caller.kind === 'person') return;
-  throw new Forbidden({
-    error: `${route} is the person's alone, and this request carries a session's token: run \`nemia pairings approve <code>\` or \`nemia board link\` at the store's machine, or send a token of yours (\`nemia token add <name>\` mints one).`,
-  });
-};
 
 /** The url the api ticking the store `home` serves at, as its lease says; none where no api ticks it. */
 const leasedUrl = (home: string): string | undefined => {
@@ -76,13 +69,13 @@ export const pairingsHandlers = readsBounded(Api, 'pairings', (handlers) =>
     .handle('list', () => ticketed((s, nowMs) => pairingsListed(s.home, nowMs)))
     .handle('approve', ({ params }) =>
       ticketed((s, nowMs) => {
-        personOnly(s, `POST /api/pairings/${params.code}/approve`);
+        personOnly(s, `POST /api/pairings/${params.code}/approve`, `\`nemia pairings approve ${params.code}\``);
         return pairingApproved(s.home, params.code, nowMs);
       }),
     )
     .handle('link', ({ payload }) =>
       ticketed((s, nowMs) => {
-        personOnly(s, 'POST /api/links');
+        personOnly(s, 'POST /api/links', '`nemia board link`');
         return linkMinted(s.home, payload.base ?? boardBase(leasedUrl(s.home), s.env), nowMs);
       }),
     ),

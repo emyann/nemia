@@ -44,7 +44,7 @@ const STUB = [
   '  "token add") printf "minted person-secret-1 for %s\\nAuthorization: Bearer person-secret-1\\n" "$3" ;;',
   '  "claude-token set") cat >"$STUB_LOG.claude" ;;',
   '  "config set-context") if [ "$3" = local ]; then cat "$5" >"$STUB_LOG.local"; ls -l "$5" | cut -c1-10 >"$STUB_LOG.mode"; fi ;;',
-  '  "board link") printf "%s/link/first-visit\\n" "${4:-http://192.168.1.20:8787}" ;;',
+  '  "board link") printf "%s/link/first-visit\\n" "${4:-http://127.0.0.1:8787}" ;;',
   '  "readiness ") printf "harness missing: nemia claude-token set\\n"; exit 1 ;;',
   'esac',
   '',
@@ -216,7 +216,7 @@ test(
     assert.equal(ran.kept('mode'), '-rw-------\n', 'a file only its owner reads');
     assert.equal(fs.existsSync(set.slice('config set-context local --token-file '.length)), false, 'and the file is gone after');
 
-    assert.ok(ran.asked.includes('board link'), ran.asked.join('\n'));
+    assert.ok(ran.asked.includes('board link --base http://192.168.1.20:8787'), ran.asked.join('\n'));
     assert.match(ran.out, /http:\/\/192\.168\.1\.20:8787\/link\/first-visit/, 'the first-visit link is printed');
     assert.equal(ran.asked.at(-1), 'readiness', 'the install ends on the readiness read, its exit 1 no failure of the install');
   },
@@ -227,6 +227,9 @@ test('a typed address is taken, and the 1 of the offer binds this machine alone,
   const typed = run([], ['claude-oat-secret', '', '10.0.0.7']);
   assert.equal(typed.status, 0, typed.out);
   assert.ok(typed.asked.includes('service install --size auto --bind 10.0.0.7'), typed.asked.join('\n'));
+  assert.ok(typed.asked.includes('board link --base http://10.0.0.7:8787'), 'the link is made under the bind, not the lease');
+  const v6 = run([], ['claude-oat-secret', '', 'fd7a::7']);
+  assert.ok(v6.asked.includes('board link --base http://[fd7a::7]:8787'), v6.asked.join('\n'));
 
   const alone = run([], ['claude-oat-secret', '', '1']);
   assert.equal(alone.status, 0, alone.out);

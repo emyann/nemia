@@ -6,9 +6,9 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { folderTrust, tried, trustFolder } from '../runtime-client.ts';
-import type { Args, Flag } from '../command/command.ts';
+import type { Flag } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
 import { HARNESSES } from '../harness/harness.ts';
@@ -94,8 +94,9 @@ export const untrustedPlaces = Effect.fn('untrustedPlaces')(function* (factories
 /** `--no-trust`, on `nemia factory add` and `apply`: the factory filed, and no place of it trusted. */
 export const NO_TRUST: Flag = { flag: '--no-trust', kind: 'switch', key: 'noTrust' };
 
-/** The name `nemia factory trust` was given. */
-const nameOf = (args: Args): string => (typeof args.factory === 'string' ? args.factory : '');
+/** What `nemia factory trust` takes: the factory whose places are trusted, by its name. */
+export const TrustInput = Schema.Struct({ factory: Schema.String });
+export type TrustInput = typeof TrustInput.Type;
 
 /** The places of the factory `name`; refuses, as `Missing`, a name the store has no factory under, and one whose file does not read. */
 function placesOf(home: string, name: string): readonly string[] {
@@ -115,9 +116,13 @@ function placesOf(home: string, name: string): readonly string[] {
   return found.repos;
 }
 
-/** `nemia factory trust`: the trust of one factory's places asked again, and what was done. */
-export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[] }> = {
+/**
+ * `nemia factory trust`: the trust of one factory's places asked again, and what was done. Written where the store runs, in the trust
+ * files of the harnesses of that machine: the api serves it as the Factory's `trust`, calling this handler.
+ */
+export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[] }, TrustInput> = {
   name: 'factory trust',
+  served: [{ endpoint: 'factories.trust' }],
   usage: '<name>',
   help: ["trust a factory's places for the harnesses its steps run on, so each", "place's own settings apply to them"],
   spec: {
@@ -129,10 +134,9 @@ export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[
   },
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: 'the board trusts no place: it shows the line to type, and nemia factory trust does it' },
-  handler: (args) =>
+  input: TrustInput,
+  handler: ({ factory: name }) =>
     Effect.gen(function* () {
-      const name = nameOf(args);
       const home = yield* StoreRoot;
       const repos = yield* tried(() => placesOf(home, name));
       return { name, trusts: yield* trustPlaces(repos) };

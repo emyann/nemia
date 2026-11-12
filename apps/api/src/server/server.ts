@@ -30,6 +30,12 @@
  * - `GET /api/stats` — the flow numbers of every run in the store, as `nemia stats --json` prints them (`statsOf`, stats/stats.ts).
  * - `GET /api/pause` — the store's pause, what still finishes under it, each session it parked and each check it holds (`PAUSED`).
  * - `GET /api/pause/now` — what a pause at once would stop, `{ interrupts, cost }` (`PAUSE_NOW`), read off one view of the engine.
+ * - `GET /api/pause/timeout` — the store's pause timeout in force, as bare `nemia pause-timeout` says it (`PAUSE_TIMEOUT`): `{ timeout,
+ *   wrote }`, `timeout` its milliseconds, whether the store's file set it and since when; ten minutes where none is set. 422 for a file
+ *   that does not read (`Invalid`), naming how to set it again.
+ * - `PUT /api/pause/timeout` — the store's pause timeout set, as `nemia pause-timeout <d>` sets it (`PAUSE_TIMEOUT`), its body
+ *   `{ timeout }` (objects' `PauseTimeoutWrite`, as `10m`): what each later pause, restart and upgrade gives a call in flight. 422 for a
+ *   timeout out of its form (`Invalid`), nothing written.
  * - `POST /api/pause` — the store paused, as `nemia pause` pauses it (`PAUSE`), its body `{ why?, by?, timeout?, now? }` (objects'
  *   `PauseWrite`): every session parks at its tool call's end within `timeout` (the store's where left out), written on the pause as
  *   `timeoutMs`; with `now`, it pauses at once (`pauseNow`), keeping a pause that stands, and answers `{ pause, kept, interrupted,
@@ -61,6 +67,7 @@ import {
   PASSES,
   PAUSE,
   PAUSE_NOW,
+  PAUSE_TIMEOUT,
   PAUSED,
   RESUME,
   runningRelease,
@@ -141,6 +148,8 @@ export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
     .handle('stats', ({ query, request }) => answered((s) => statsOf({ ...query, selector: selectorsOf(request) }, s)))
     .handle('paused', () => answered((s) => s.inRequest(PAUSED.handler({}))))
     .handle('pauseNow', () => answered((s) => s.inRequest(PAUSE_NOW.handler({}, { records: { pause: s.memo.records.pause } }))))
+    .handle('pauseTimeout', () => answered((s) => s.inRequest(PAUSE_TIMEOUT.handler({}))))
+    .handle('setPauseTimeout', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE_TIMEOUT.handler(payload))))
     .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler(payload))))
     .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}))))
     .handle('wait', ({ query }) =>

@@ -1,6 +1,7 @@
 /**
  * Who may speak in her chat as an agent: a name allowed is listed once however often it is allowed, taken back it is gone, and a name no
- * agent speaks under is refused with nothing written. Each write is the person's own setting, asked of them every time.
+ * agent speaks under is refused with nothing written. Each write is the person's own setting, asked of them every time, and each verb is
+ * served by its endpoint of the api's nemia group.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,9 +51,16 @@ test('nemia chat allow, disallow and speakers: the names an agent may speak unde
     assert.equal(await refusedAs(CHAT_ALLOW.handler({ name: 'operator' })), 'Die');
     assert.equal(fs.readFileSync(speakersFile(path.join(home, 'nemia')), 'utf8'), before);
   });
-  await t.test('each write is the person’s own setting, asked of them every time, and the CLI’s alone', () => {
-    for (const c of [CHAT_ALLOW, CHAT_DISALLOW])
-      assert.deepEqual([c.writes, c.class, c.asksAlways, c.only?.side], [true, 'ask', true, 'cli'], c.name);
+  await t.test('each write is the person’s own setting, asked of them every time, and each is served by its endpoint of the api', () => {
+    for (const c of [CHAT_ALLOW, CHAT_DISALLOW]) assert.deepEqual([c.writes, c.class, c.asksAlways], [true, 'ask', true], c.name);
     assert.deepEqual([CHAT_SPEAKERS.writes, CHAT_SPEAKERS.class], [false, 'read']);
+    assert.deepEqual(
+      [CHAT_SPEAKERS, CHAT_ALLOW, CHAT_DISALLOW].map((c) => [c.served?.map((l) => l.endpoint), c.only]),
+      [
+        [['nemia.speakers'], undefined],
+        [['nemia.allowSpeaker'], undefined],
+        [['nemia.disallowSpeaker'], undefined],
+      ],
+    );
   });
 });

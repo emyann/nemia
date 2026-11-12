@@ -64,7 +64,7 @@ export const COMMANDS: readonly Command[] = [
   ...TEMPLATES,
   tableEntry(RETRY),
   tableEntry(APPROVE),
-  ROUTE,
+  tableEntry(ROUTE),
   tableEntry(REFRESH),
   tableEntry(SAY),
   tableEntry(LS),

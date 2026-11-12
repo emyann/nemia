@@ -81,7 +81,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     assert.deepEqual(read.suggested.map((s) => s.id).sort(), ['approve-draft', 'approve-ship']);
     for (const s of read.suggested) assert.equal(s.words, ruleWords(s), 'its words are the words a confirm checks');
     assert.ok(
-      POLICY_REACH.print(read, {}).some((l) => l.includes('approve-ship')),
+      POLICY_REACH.print(read, { name: 'nemia', factory: 'f' }).some((l) => l.includes('approve-ship')),
       'the suggestions are printed',
     );
     suggested = read.suggested;
@@ -91,7 +91,7 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     const tries = { id: 'tries', answer: 'retry' as const, steps: ['implement'], when: ['checked' as const] };
     writeProposed(ROOT, 'nemia', { at: '2026-11-05T00:00:00.000Z', rules: [tries], guidance: ['be kind'], digest: null });
     const read = await reach({ factory: 'f' });
-    await stage.runWith(stage.board().e, POLICY_PROPOSE.handler({ name: 'nemia', file: '-', words: JSON.stringify(read.proposal) }));
+    await stage.runWith(stage.board().e, POLICY_PROPOSE.handler({ name: 'nemia', words: JSON.stringify(read.proposal) }));
     const after = readProposed(ROOT, 'nemia');
     assert.deepEqual(after?.rules.map((r) => r.id).sort(), ['approve-draft', 'approve-ship', 'tries']);
     assert.deepEqual(after?.guidance, ['be kind']);

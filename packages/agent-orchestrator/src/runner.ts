@@ -388,6 +388,7 @@ export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { CANCEL } from './cancel/commands.verb.ts';
+export { ROUTE } from './gate/route.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';
@@ -431,18 +432,27 @@ export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 /**
- * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
+ * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes;
+ * and the Factory's own writes, a workflow attached and detached, its revisions policy, its removal, the trust of its places and its
+ * harness settings.
  */
-export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
+export { FACTORY_ATTACH, FACTORY_DETACH, FACTORY_FIRE, FACTORY_HIRE, FACTORY_REVISIONS, FACTORY_RM } from './factory/factory.verb.ts';
+export { FACTORY_TRUST } from './trust/trust.verb.ts';
+export { FACTORY_SETTING_RM, FACTORY_SETTING_SET } from './harness-settings/harness-settings.verb.ts';
 export { LS } from './list/commands.verb.ts';
 export { REFRESH } from './revisions/commands.verb.ts';
 export { RETRY } from './retry/commands.verb.ts';
 export { SAY } from './say/commands.verb.ts';
 export { APPROVE } from './gate/commands.verb.ts';
-/** Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, and an agent's rules for auto. */
+/**
+ * Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, an agent's rules for auto, what they
+ * reach, and the names an agent may speak under in her chat.
+ */
 export { LEVEL } from './nemia/level.verb.ts';
 export { MEMORY } from './nemia/memory.verb.ts';
 export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
+export { POLICY_REACH } from './reach/reach.verb.ts';
+export { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './chat/speakers.verb.ts';
 /**
  * The definitions' entries the api calls by type, each with its `input`: the agents listed, read as a card, written, removed,
  * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder
@@ -533,6 +543,7 @@ export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from '.
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
 export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
+export { TIMEOUT as PAUSE_TIMEOUT } from './pause/pause-timeout.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';

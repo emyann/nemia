@@ -171,10 +171,10 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                unasked, in a factory or a run: why each other rule cannot (a step approved
                                before it runs has done nothing to recommend or check; one with no check
                                never passed one), what keeps a rule from a run now, and the rules that would
-                               CLI only: an agent reads it from its session; the board draws no part for it yet
+                               on the port: policy_reach
   nemia chat speakers
                                the names an agent may speak under in her chat, each one you allowed
-                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
+                               on the port: chat_speakers
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
@@ -293,7 +293,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                condition's own answer, for the try it is on, and files the nodes
                                whose when: names it. Refused once a node after it is filed or sent:
                                nemia cancel <runId>, and start again.
-                               CLI only: the board offers no route control yet: nemia route writes the file
+                               on the port: route
   nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
@@ -384,7 +384,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                the agent's proposal: rules from your custom instruction, as JSON,
                                with the words the machinery cannot hold kept as guidance; none is in
                                force until you confirm it (nemia policy confirm)
-                               CLI only: the agent proposes from its own session; the board shows the proposal and confirms its rules
+                               on the port: policy_propose
   nemia daemon [--json]
                                the store's daemon, started where none ticks it (as any command that
                                ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and
@@ -403,7 +403,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
                                file a factory: a lowercase slug naming one or more directories,
                                each trusted for its steps unless --no-trust
-                               CLI only: the board files, attaches to and removes no factory: nemia factory does
+                               CLI only: the api files no factory: its places are directories of this machine, which nemia factory add names and checks
   nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
@@ -429,10 +429,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it
-                               CLI only: the board files, attaches to and removes no factory: nemia factory does
+                               on the port: factory_attach
   nemia factory detach <factory> <workflow>
                                take a workflow back, once no hire fills its steps
-                               CLI only: the board files, attaches to and removes no factory: nemia factory does
+                               on the port: factory_detach
   nemia factory hire <factory> <agent> --step <workflow>/<step>
                                hire an agent into a workflow's step: one a step, a second replaces it
                                on the port: factory_hire
@@ -456,17 +456,17 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory volume add <factory> <path>:ro|:rw
                                mount a folder of this machine for every local step of a factory's runs,
                                read-only (:ro) or writable (:rw); a writable one is not a run's workspace
-                               CLI only: the board lists volumes and writes none: nemia factory volume writes them
+                               CLI only: a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none
   nemia factory volume rm <factory> <path>
                                take a volume off a factory, by its path
-                               CLI only: the board lists volumes and writes none: nemia factory volume writes them
+                               CLI only: a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none
   nemia factory setting set <factory> <harness>.<key> <json>
                                give every session of a factory's runs on a harness one of its settings,
                                claude.attribution among them; its value is JSON
-                               CLI only: the board shows no harness setting yet: nemia factory setting writes them
+                               on the port: factory_setting_set
   nemia factory setting rm <factory> <harness>.<key>
                                take a harness setting off a factory, by its key
-                               CLI only: the board shows no harness setting yet: nemia factory setting writes them
+                               on the port: factory_setting_rm
   nemia factory cost-line set <factory> <workflow> <usd>
                                set what a run of a workflow may cost before its gate says so, in dollars:
                                a gate whose caps pass it is said, and never approved unasked at auto
@@ -481,15 +481,15 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory revisions <name> follow|pinned
                                whether a factory's runs follow merged revisions at each filing (follow)
                                or keep them until nemia refresh (pinned, the default)
-                               CLI only: the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it
+                               on the port: factory_revisions
   nemia factory trust <name>
                                trust a factory's places for the harnesses its steps run on, so each
                                place's own settings apply to them
-                               CLI only: the board trusts no place: it shows the line to type, and nemia factory trust does it
+                               on the port: factory_trust
   nemia factory rm <name>
                                remove a factory's file, and the instruction and the rules the store
                                keeps for it
-                               CLI only: the board files, attaches to and removes no factory: nemia factory does
+                               on the port: factory_rm
   nemia template export <folder> --from <repo> [--factory <name>]
                                write a template from a repository and a factory, and say where each
                                part came from
@@ -553,7 +553,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                the timeout in force (10m by default); given one, sets it: digits and s, m
                                or h, from 1s to 23h, as 90s, 10m or 2h. nemia pause --timeout <d> gives one
                                pause a timeout of its own
-                               CLI only: the board pauses with the store's timeout and sets none: nemia pause-timeout <d> sets it
+                               on the port: pause-timeout, pause_timeout_set
   nemia policy confirm <agent> <id> --words '<words>'
                                put in force a rule the agent proposed, or the default again, as its
                                words read: from then on, at auto, the answer it names is given unasked
@@ -568,10 +568,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                let an agent speak in her chat under a name, and to a step's session
                                (nemia say --as <name>): its words reach her, the step and the board as
                                its own, never as yours. Asked of you every time
-                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
+                               on the port: chat_allow
   nemia chat disallow <name>
                                take a name back: words under it are refused. Asked of you every time
-                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
+                               on the port: chat_disallow
   nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this

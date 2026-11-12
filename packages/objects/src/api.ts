@@ -11,10 +11,12 @@
  * started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
  *
- * Group `factories`: the factories, which no namespace holds, listed and read, and each one's sub-resources — its rules and its
- * instruction, read, written and cleared, and the lines a person types for it (`commands`). The factory's parts are each in the
- * factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`, the servers
- * Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read alone.
+ * Group `factories`: the factories, which no namespace holds, listed, read and removed, and each one's sub-resources — its rules and its
+ * instruction, read, written and cleared, the lines a person types for it (`commands`), its cost line per workflow, its revisions
+ * policy, its places trusted again, a workflow attached and detached, and a harness setting set and taken off. The factory's parts are
+ * each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`,
+ * the servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read
+ * alone.
  *
  * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
  * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
@@ -40,8 +42,12 @@ import {
   FactoryInstructionWords,
   FactoryInstructionWrite,
   FactoryList,
+  FactoryRemoved,
+  FactoryRevisionsWrite,
   FactoryRules,
   FactoryRulesWrite,
+  FactorySettingWrite,
+  FactoryTrusted,
 } from './factory.ts';
 import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
@@ -106,6 +112,8 @@ const CardListOrTable = [CardListObject, Table] as const;
 const FactoryObject = Factory.annotate({ identifier: 'Factory' });
 const FactoryListObject = FactoryList.annotate({ identifier: 'FactoryList' });
 const FactoryCommandsObject = FactoryCommands.annotate({ identifier: 'FactoryCommands' });
+const FactoryTrustedObject = FactoryTrusted.annotate({ identifier: 'FactoryTrusted' });
+const FactoryRemovedObject = FactoryRemoved.annotate({ identifier: 'FactoryRemoved' });
 const McpServerObject = McpServer.annotate({ identifier: 'McpServer' });
 const McpServerListObject = McpServerList.annotate({ identifier: 'McpServerList' });
 const ScheduleObject = Schedule.annotate({ identifier: 'Schedule' });
@@ -140,6 +148,7 @@ const namespaceParams = { namespace: Schema.String };
 /** A factory, by its name. */
 const factoryParams = { name: Schema.String };
 const factoryWorkflowParams = { name: Schema.String, workflow: Schema.String };
+const factorySettingParams = { name: Schema.String, setting: Schema.String };
 
 /** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
 const cardErrors = [BadRequest, Missing, Conflict, Invalid];
@@ -260,6 +269,43 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }),
   HttpApiEndpoint.delete('deleteCostLine', '/api/factories/:name/costlines/:workflow', {
     params: factoryWorkflowParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('delete', '/api/factories/:name', {
+    params: factoryParams,
+    success: FactoryRemovedObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('setRevisions', '/api/factories/:name/revisions', {
+    params: factoryParams,
+    payload: FactoryRevisionsWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('trust', '/api/factories/:name/trust', {
+    params: factoryParams,
+    success: FactoryTrustedObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('attach', '/api/factories/:name/workflows/:workflow', {
+    params: factoryWorkflowParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('detach', '/api/factories/:name/workflows/:workflow', {
+    params: factoryWorkflowParams,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.put('putSetting', '/api/factories/:name/settings/:setting', {
+    params: factorySettingParams,
+    payload: FactorySettingWrite,
+    success: FactoryObject,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.delete('deleteSetting', '/api/factories/:name/settings/:setting', {
+    params: factorySettingParams,
     success: FactoryObject,
     error: objectErrors,
   }),

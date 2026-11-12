@@ -106,6 +106,11 @@ export default {
 
       await other.goto(new URL('/settings', seat.base).href, { waitUntil: 'load' });
       await idle(other);
+      const section = other.locator('[data-forget-token]');
+      await expectVisible(section, "Settings says this browser's token, with a press that forgets it");
+      await section.scrollIntoViewIfNeeded();
+      await settled(other);
+      await photograph(other, path.join(OUT, `token-forget-${await themeOf(other)}.png`));
       const forgot = nextLoad(other);
       await other.locator('[data-forget-token-press]').click();
       await forgot;

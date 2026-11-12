@@ -6,9 +6,9 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
-import { Cause, Effect } from 'effect';
+import { Cause, Effect, Schema } from 'effect';
 import type { Args } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { checked, type Command } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { filedFactory } from '../factory/door/factories.store.ts';
 import { factoryRepo } from '../factory/factory.ts';
@@ -67,6 +67,24 @@ const agentIn = (args: Args): string => String(args.name ?? '');
 /** The usage the refusals of `nemia policy reach` end on. */
 const REACH_FORM = 'nemia policy reach <agent> (--factory <name> | --run <runId>)';
 
+/**
+ * What `nemia policy reach` takes: the agent, and the factory (`factory`) or the run (`runId`) whose steps are read, exactly one of them;
+ * the api reads the run from its query's `run`.
+ */
+export const ReachInput = Schema.Struct({
+  name: Schema.String,
+  factory: Schema.optionalKey(Schema.String),
+  runId: Schema.optionalKey(Schema.String),
+});
+export type ReachInput = typeof ReachInput.Type;
+
+/** Why `nemia policy reach` refuses what it was given, before anything is read: a name that is no agent's, neither or both of the two. */
+const reachRefusal = (input: Args): string | null =>
+  agentNameRefusal(agentIn(input)) ??
+  ((typeof input.factory === 'string') === (typeof input.runId === 'string')
+    ? `nemia policy reach reads one factory or one run: give --factory <name> or --run <runId>, one of them: ${REACH_FORM}.`
+    : null);
+
 /** Why a read failed, in its own words. */
 const messageOf = (cause: Cause.Cause<unknown>): string => {
   const err = Cause.squash(cause);
@@ -110,16 +128,14 @@ const runSites = Effect.fnUntraced(function* (runId: string) {
   return { factory: run.factory, sites, facts };
 });
 
-/** The reach of `agent`'s rules at the store `home`, of the factory `--factory` or the run `--run` in `args`. */
-const reachOf = Effect.fnUntraced(function* (home: string, args: Args) {
-  const agent = agentIn(args);
+/** The reach of `agent`'s rules at the store `home`, of the factory `factory` or the run `runId` in `input`. */
+const reachOf = Effect.fnUntraced(function* (home: string, { name: agent, factory: named, runId }: ReachInput) {
   const inForce = listInForce(readConfirmed(home, agent)?.rules);
   const asProposed = readProposed(home, agent);
   const proposed = asProposed?.rules ?? [];
-  const runId = typeof args.runId === 'string' ? args.runId : undefined;
   const read =
     runId === undefined
-      ? { ...(yield* factorySites(home, String(args.factory))), factory: String(args.factory), facts: undefined }
+      ? { ...(yield* factorySites(home, String(named))), factory: String(named), facts: undefined }
       : { ...(yield* runSites(runId)), unloaded: [] };
   const factory = read.factory ?? 'default';
   const facts = read.facts;
@@ -177,9 +193,14 @@ function reachLines(r: PolicyReach): string[] {
   ];
 }
 
-/** `nemia policy reach <agent> (--factory <name> | --run <runId>)`: what an agent's rules can approve at a step's gate, and why not. */
-export const POLICY_REACH: Command<PolicyReach> = {
+/**
+ * `nemia policy reach <agent> (--factory <name> | --run <runId>)`: what an agent's rules can approve at a step's gate, and why not. The api
+ * serves it as the nemia group's `reach` (`GET /api/policy/:name/reach?factory|run`). Refused (`Invalid`) before anything is read: a name
+ * that is no agent's, neither or both of the factory and the run (`reachRefusal`); then as the factory or the run reads.
+ */
+export const POLICY_REACH: Command<PolicyReach, ReachInput> = {
   name: 'policy reach',
+  served: [{ endpoint: 'nemia.reach' }],
   usage: '<agent> (--factory <name> | --run <runId>)',
   help: [
     "which steps at their gate the agent's rules in force could ever approve",
@@ -195,14 +216,16 @@ export const POLICY_REACH: Command<PolicyReach> = {
     ],
     unknown: (arg) => `nemia policy reach takes an agent's name and --factory or --run, not ${arg}: ${REACH_FORM}.`,
   },
-  check: (args) =>
-    agentNameRefusal(agentIn(args)) ??
-    ((typeof args.factory === 'string') === (typeof args.runId === 'string')
-      ? `nemia policy reach reads one factory or one run: give --factory <name> or --run <runId>, one of them: ${REACH_FORM}.`
-      : null),
+  check: reachRefusal,
   writes: false,
   class: 'read',
-  only: { side: 'cli', why: 'an agent reads it from its session; the board draws no part for it yet' },
-  handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.suspend(() => reachOf(home, args))),
+  input: ReachInput,
+  handler: (input) =>
+    Effect.flatMap(StoreRoot, (home) =>
+      Effect.andThen(
+        checked(reachRefusal(input)),
+        Effect.suspend(() => reachOf(home, input)),
+      ),
+    ),
   print: reachLines,
 };

@@ -2,10 +2,10 @@
  * The run's named actions, as the api is sent them and answers them: a run started (`RunStart`, `RunStarted`), a step tried again or a
  * loop sent round (`RunRetry`, `RunAsked`), a step approved at its gate (`RunApprove`, `RunApproved`), words said to a step's session
  * (`RunSay`, `RunSaid`), the run pinned to new revisions or its loop sent to merge its base (`RunRefresh`, `RunRefreshed`), a hold put
- * and lifted (`RunHold`, `RunHeld`), a try's run removed (`RunRemoved`) and a finished run pruned (`RunPrune`, `RunPruned`). Each body is
- * what its endpoint decodes (run-api.ts), a 400 naming the key it refuses, and what the orchestrator's typed entry takes beside the
- * path's names (`RetryInput`, `ApproveInput`, …); each answer the keys the entry answers. A run's labels are edited with the card's
- * `LabelEdit`, answered `Labelled` (labels.ts).
+ * and lifted (`RunHold`, `RunHeld`), a condition routed by hand (`RunRoute`, `RunRouted`), a try's run removed (`RunRemoved`) and a
+ * finished run pruned (`RunPrune`, `RunPruned`). Each body is what its endpoint decodes (run-api.ts), a 400 naming the key it refuses,
+ * and what the orchestrator's typed entry takes beside the path's names (`RetryInput`, `ApproveInput`, …); each answer the keys the
+ * entry answers. A run's labels are edited with the card's `LabelEdit`, answered `Labelled` (labels.ts).
  *
  * Plain Schemas of JSON, as every object of this package is: a body's shape is checked here, what it asks of a run by the entry, in its
  * words.
@@ -187,6 +187,23 @@ export type RunCancelPlan = typeof RunCancelPlan.Type;
 /** What a cancel answers: the run and the plan it followed (`nemia cancel`). */
 export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan }).annotate({ identifier: 'RunCancelled' });
 export type RunCancelled = typeof RunCancelled.Type;
+
+/** A condition routed by hand, as `nemia route` routes one: the route, one of the condition's `routes:`. */
+export const RunRoute = Schema.Struct({ route: Schema.String }).annotate({ identifier: 'RunRoute' });
+export type RunRoute = typeof RunRoute.Type;
+
+/**
+ * What a route answers: the condition, the try of it the route is for, the route, when it was written and the file it is in. The next
+ * pass files the steps whose `when:` names it.
+ */
+export const RunRouted = Schema.Struct({
+  step: Schema.String,
+  try: Schema.Finite,
+  route: Schema.String,
+  at: Schema.String,
+  file: Schema.String,
+}).annotate({ identifier: 'RunRouted' });
+export type RunRouted = typeof RunRouted.Type;
 
 /** What the engine forgot of a removed run's tasks, and what waits to be forgotten until it settles (`EngineForgetting`). */
 const EngineForgetting = Schema.Struct({

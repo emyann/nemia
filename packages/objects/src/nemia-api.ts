@@ -18,6 +18,7 @@ import {
   ChatStop,
   ChatStreamEvent,
   ChatStreamHeaders,
+  ChatSpeakers,
   ChatStreamQuery,
   NemiaInstructions,
   NemiaInstructionsCleared,
@@ -26,6 +27,9 @@ import {
   NemiaLevelSet,
   NemiaMemory,
   PolicyList,
+  PolicyProposal,
+  PolicyReach,
+  PolicyReachQuery,
   PolicyRuleConfirm,
 } from './nemia.ts';
 
@@ -35,10 +39,15 @@ const policyParams = { name: Schema.String };
 /** One rule of an agent's, by the agent's name and the rule's id. */
 const ruleParams = { name: Schema.String, id: Schema.String };
 
+/** A name an agent speaks under in her chat. */
+const speakerParams = { speaker: Schema.String };
+
 /** The answers named, so that the document holds each as a component. */
 const NemiaLevelObject = NemiaLevel.annotate({ identifier: 'NemiaLevel' });
 const NemiaMemoryObject = NemiaMemory.annotate({ identifier: 'NemiaMemory' });
 const PolicyListObject = PolicyList.annotate({ identifier: 'PolicyList' });
+const PolicyReachObject = PolicyReach.annotate({ identifier: 'PolicyReach' });
+const ChatSpeakersObject = ChatSpeakers.annotate({ identifier: 'ChatSpeakers' });
 const ChatHistoryObject = ChatHistory.annotate({ identifier: 'ChatHistory' });
 const NemiaInstructionsObject = NemiaInstructions.annotate({ identifier: 'NemiaInstructions' });
 
@@ -53,7 +62,11 @@ const NemiaInstructionsObject = NemiaInstructions.annotate({ identifier: 'NemiaI
  * - `GET /api/policy/:name` — an agent's rules for auto; 422 for a name that is no agent's or a file of rules that does not read.
  *   `PUT /api/policy/:name/rules/:id` confirms a proposed rule as the person read it (`{ words }`): 404 for a rule not proposed, 409 for
  *   one that reads otherwise since or is in force already, 422 for blank words or a rule reaching past the agent's delegation. `DELETE`
- *   takes one out of force.
+ *   takes one out of force. `PUT /api/policy/:name/proposal` writes what the agent proposes, its JSON text in `{ words }`, over what it
+ *   proposed, none in force until confirmed: 422 for a name that is no agent's or words that are no proposal.
+ * - `GET /api/policy/:name/reach?factory|run` — which steps at their gate the agent's rules in force could ever approve, in one factory or
+ *   one run (`PolicyReach`): 422 for a name that is no agent's, or for neither or both of `factory` and `run`; 404 for no such factory or
+ *   run.
  * - `GET /api/nemia/chat?before&limit` — a page of her chat; 422 for a limit or a `before` that is none.
  * - `GET /api/nemia/chat/stream` — the same followed as server-sent events (`ChatStreamEvent`), from the `Last-Event-ID` an EventSource
  *   sends when it reconnects, else from `after`, else whole; 422 before the stream opens for a cursor no read gave.
@@ -61,6 +74,8 @@ const NemiaInstructionsObject = NemiaInstructions.annotate({ identifier: 'NemiaI
  *   agent, 409 for a name the person has not allowed. `POST /api/nemia/chat/answer` — an ask of hers answered: 404 for one her chat does
  *   not hold, 409 for one answered already, 422 for picks that do not answer it. `POST /api/nemia/chat/read` — the read mark moved: 404 for
  *   an event her chat does not hold. `POST /api/nemia/chat/stop` — the turn she is answering stopped: 409 where she is not answering.
+ * - `GET /api/nemia/chat/speakers` — the names an agent may speak under in her chat (`ChatSpeakers`); `PUT` and `DELETE
+ *   /api/nemia/chat/speakers/:speaker` allow one and take one back, each answering the list after: 422 for a name no agent speaks under.
  * - `GET|PUT|DELETE /api/nemia/instructions` — her custom instructions, read (a file there that does not read answered in `error`),
  *   written (`{ words }`: 422 for blank words or a frontmatter block) and cleared; her open session is told at her keeper's next beat.
  */
@@ -93,6 +108,18 @@ export class NemiaGroup extends HttpApiGroup.make('nemia').add(
     success: PolicyListObject,
     error: [Missing, Conflict, Invalid, Failed],
   }),
+  HttpApiEndpoint.put('propose', '/api/policy/:name/proposal', {
+    params: policyParams,
+    payload: PolicyProposal,
+    success: PolicyListObject,
+    error: [Missing, Invalid, Failed],
+  }),
+  HttpApiEndpoint.get('reach', '/api/policy/:name/reach', {
+    params: policyParams,
+    query: PolicyReachQuery,
+    success: PolicyReachObject,
+    error: [Missing, Conflict, Invalid],
+  }),
   HttpApiEndpoint.get('chat', '/api/nemia/chat', { query: ChatHistoryQuery, success: ChatHistoryObject, error: [Invalid] }),
   HttpApiEndpoint.get('chatStream', '/api/nemia/chat/stream', {
     query: ChatStreamQuery,
@@ -112,6 +139,17 @@ export class NemiaGroup extends HttpApiGroup.make('nemia').add(
     error: [Missing, Conflict, Invalid, Failed],
   }),
   HttpApiEndpoint.post('chatRead', '/api/nemia/chat/read', { payload: ChatReadWrite, success: ChatReadMark, error: [Missing, Failed] }),
+  HttpApiEndpoint.get('speakers', '/api/nemia/chat/speakers', { success: ChatSpeakersObject, error: [Invalid] }),
+  HttpApiEndpoint.put('allowSpeaker', '/api/nemia/chat/speakers/:speaker', {
+    params: speakerParams,
+    success: ChatSpeakersObject,
+    error: [Invalid, Failed],
+  }),
+  HttpApiEndpoint.delete('disallowSpeaker', '/api/nemia/chat/speakers/:speaker', {
+    params: speakerParams,
+    success: ChatSpeakersObject,
+    error: [Invalid, Failed],
+  }),
   HttpApiEndpoint.get('instructions', '/api/nemia/instructions', { success: NemiaInstructionsObject, error: [Missing, Invalid] }),
   HttpApiEndpoint.put('writeInstructions', '/api/nemia/instructions', {
     payload: NemiaInstructionsWrite,

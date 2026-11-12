@@ -241,6 +241,22 @@ with `updatedPermissions` set to the `suggestions` it was handed, as an always a
   accounts for (not measured apart). An always allow returns every suggestion, as the SDK's comment on them asks (`sdk.d.ts:232-239`), and so can change
   more than the one rule its choice's description names first.
 
+## The quota of a token
+
+**A Claude Code signed in only by `CLAUDE_CODE_OAUTH_TOKEN` — the token `claude setup-token` makes, which `nemia claude-token set`
+keeps — answers `get_usage` with no plan limits, and asks the usage service nothing** (SDK 0.3.322, its bundled Claude Code 2.1.322,
+2026-11-11). Read off the bundled CLI: a token from that variable is given the scopes `CLAUDE_CODE_OAUTH_SCOPES` names, else
+`user:inference` alone; `get_usage` answers `rate_limits_available` as signed in to claude.ai *and* holding `user:profile`, and asks
+`/api/oauth/usage` only when it is true; its own schema says it is false for "API key, Bedrock, Vertex, or missing profile scope".
+Measured: the bundled CLI, asked through the SDK in a scratch `HOME` and `CLAUDE_CONFIG_DIR` with only a placeholder token in the
+variable, answered `{"subscription_type":null,"rate_limits_available":false,"rate_limits":null}` in under half a second — the same
+answer, field for field, as with no sign-in at all. The answer is decided from the token's scopes before any request, so a real token
+answers the same; none was at hand to confirm it against the service. So the answer cannot tell a token from no subscription: the
+quota tells them apart by the environment it hands the ask (`quotaOfUsage`, `TOKEN_VARIABLE`), and reads it as `token`. What would
+make it answer is a sign-in that holds `user:profile` — `claude` then `/login` under the same `CLAUDE_CONFIG_DIR` — with the variable
+taken away, since a set `CLAUDE_CODE_OAUTH_TOKEN` is read before the stored login. Measured by a throwaway probe kept outside the
+repository.
+
 ## The claude.ai bridge
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,

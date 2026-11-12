@@ -2,24 +2,25 @@
  * The harness every api test runs against, and never this machine's: a fake `claude` first on PATH that notes every call, and a scratch
  * directory where Claude Code keeps its sessions and transcripts (`CLAUDE_CONFIG_DIR`). The api reads through the package's `engine()`,
  * whose `claude` harness is the engine's own — every session on the Agent SDK, a job or an attached one, and the Agent SDK's query the
- * quota is asked through — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's
- * own tests hand theirs. What it is called with as a flag it hands to `fixtures/stand-in-claude.ts`, which answers the Agent SDK as Claude
- * Code does. So the runner itself — the run files it reads, the transcripts it reads, the flags it spawns with — is what the api's tests
- * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the informer of each run's judgement gives (`Informer`) is
- * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
- * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
- * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
+ * quota is asked through — and that harness runs the Claude Code `AE_CLAUDE_EXECUTABLE` names, set here to the fake (and `claude` from
+ * PATH, the fake too, where a verb of Claude Code's own is spawned by name): the harness a test hands the api is that `claude`, as the
+ * engine's own tests hand theirs. What it is called with as a flag it hands to `fixtures/stand-in-claude.ts`, which answers the Agent SDK
+ * as Claude Code does. So the runner itself — the run files it reads, the transcripts it reads, the flags it spawns with — is what the
+ * api's tests exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the informer of each run's judgement gives
+ * (`Informer`) is judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never
+ * this machine's. It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package
+ * refuses by name: a run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
  * `WF_DEFAULT_FACTORY_STARTS=1`, so a start made in a scratch repository no factory holds, or of a card that names no factory, goes to the
  * default factory: a test of the refusal those starts meet by default deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
- * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the
- * api is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of
- * a collector it made itself. And it deletes the daemon's per-session variables (`SESSION_VARIABLES`, the package's one list):
+ * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
+ * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
+ * collector it made itself. And it deletes the daemon's per-session variables (`SESSION_VARIABLES`, the package's one list):
  * `WF_SESSION_TOKEN`, minted for each session, which a `nemia` a test spawns would send to an api that never minted it, and
- * `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the daemon unit's, which a test that files through the real engine would inherit; CI sets
- * none, and a test that means one sets it in its own scope. And neither store is the person's and neither is their home: it points
- * `WF_ROOT`, `AE_ROOT` and `HOME` each at a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a
- * throwaway one and `os.homedir()` answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something
- * of the person's own `$HOME` reads it from `realHome`.
+ * `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the daemon unit's, which a test that files through the real engine would inherit; CI sets none,
+ * and a test that means one sets it in its own scope. And neither store is the person's and neither is their home: it points `WF_ROOT`,
+ * `AE_ROOT` and `HOME` each at a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a throwaway
+ * one and `os.homedir()` answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something of the
+ * person's own `$HOME` reads it from `realHome`.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -85,6 +86,12 @@ fs.writeFileSync(
   { mode: 0o755 },
 );
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
+/**
+ * The fake, which is the Claude Code the engine's sessions run, named as the engine's environment names one (`AE_CLAUDE_EXECUTABLE`): a
+ * job inherits it, and the quota asks the Claude Code a job runs, never a `claude` on PATH, so without it the Agent SDK's own would answer.
+ */
+export const claude = path.join(bin, 'claude');
+process.env.AE_CLAUDE_EXECUTABLE = claude;
 /** Where Claude Code keeps its sessions and transcripts: `CLAUDE_CONFIG_DIR`, which the Claude runner reads as its module loads. */
 export const config = scratch('nemia-api-harness-claude-');
 process.env.CLAUDE_CONFIG_DIR = config;

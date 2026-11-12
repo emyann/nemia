@@ -96,7 +96,7 @@ const harness = (
             }),
           quota: Effect.suspend(() => {
             asked.push(['quota', undefined]);
-            return Effect.succeed({ kind: 'no-plan' as const });
+            return Effect.succeed({ kind: 'no-plan' as const, program: null });
           }),
           say: (session: { name: string; sessionId: string }, text: string) =>
             Effect.suspend(() => {
@@ -749,7 +749,7 @@ test("the card and the runtime's extension: each method offered as the driver ha
 
   await t.test("harnessQuota answers the driver's quota; REFUSED on a driver without one, which is asked nothing", async () => {
     const h = harness();
-    assert.deepEqual(await h.handler.harnessQuota({}, ctx), { kind: 'no-plan' });
+    assert.deepEqual(await h.handler.harnessQuota({}, ctx), { kind: 'no-plan', program: null });
     assert.deepEqual(h.acted(), [['quota', undefined]]);
     const bare = harness({ bare: true });
     await assert.rejects(

@@ -1,7 +1,7 @@
 /**
- * The subscription's quota as the board shows it, read off the engine's `quota` verb (`Engine.quota`), which asks Claude Code itself: the
- * `claude` on the api's PATH, sent its `get_usage` control request (packages/agent-orchestrator/docs/features.md, *the quota on the
- * board*). This file starts no process.
+ * The subscription's quota as the board shows it, read off the engine's `quota` verb (`Engine.quota`), which asks the harness itself: the
+ * one the engine's sessions run, sent its `get_usage` control request (packages/agent-orchestrator/docs/features.md, *the quota
+ * on the board*). This file starts no process.
  *
  * Nothing asks unless a board asks. A read (`makeQuota`) answers from the last ask while it is younger than `QUOTA_KEEP_MS`, counted from
  * when the ask began; otherwise from an ask begun within the keep of the read — the one in flight, or one started after it, one at a time —
@@ -63,12 +63,13 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
  *
  *   fresh      the plan's windows, from an answer younger than `keepMs`: `windows` are to show
  *   asking     no answer held, and one asked for: said so, and read again soon
- *   no-plan    Claude Code here has no plan limits: it is not signed in to a Claude subscription
+ *   no-plan    Claude Code here has no plan limits: it is not signed in to a subscription, or it is signed in by a long-lived token
+ *              that can make model requests and not read the plan's limits (`token`), each said in its own words
  *   unanswered Claude Code is signed in to a subscription, and Anthropic's usage service gave it nothing: `rate_limits_available` true and
  *              `rate_limits` null. Claude Code 2.1.278 answers so when the service's body is an error ("Usage fetch returned a fieldless or
  *              non-object body (in-band error)" in its --debug log), which may be the service limiting how often it is asked: kept by
  *              `backoffOf`, not the keep
- *   no-claude  there is no `claude` on the api's PATH
+ *   no-claude  there is nothing to ask: the program the engine names is not there, or the SDK's own is not installed
  *   timeout    Claude Code did not answer in time
  *   failed     Claude Code ended before it answered, or the engine would not ask it (`rejected`), each said in its own words
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
@@ -152,6 +153,12 @@ const unknownRead = (what: string): Read => ({
 export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
 
 /**
+ * The command a person types to run the Claude Code that was asked: the path the engine named it by (`program`), which on an install
+ * with no Claude Code on PATH is the one the release carries; `claude` where the engine found none to name.
+ */
+const typed = (program: string | null): string => program ?? 'claude';
+
+/**
  * What the engine's answer says to the board, judged at `now` for the windows' resets: the plan's windows (`fresh`), or why there are none,
  * with what to do. Pure. A plan none of whose limits is a window the board shows is `unknown`.
  */
@@ -162,20 +169,20 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-claude',
-        said: "The quota cannot be asked for: there is no claude on the api's PATH. Install Claude Code, or start the api from a shell where claude runs.",
+        said: "The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the one installed with Nemia. Reinstall Nemia, or set AE_CLAUDE_EXECUTABLE in the api's environment to one that is there.",
       };
     case 'timeout':
       return {
         ...none,
         state: 'timeout',
-        said: `Claude Code did not answer the usage request within ${ageWord(asked.ms)}: run claude -p in a shell where the api runs to see why.`,
+        said: `Claude Code did not answer the usage request within ${ageWord(asked.ms)}: run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
       };
     case 'failed': {
       const how = asked.code !== null ? `exit ${asked.code}` : asked.signal ? `killed by ${asked.signal}` : 'it did not start';
       return {
         ...none,
         state: 'failed',
-        said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run claude -p in a shell where the api runs to see why.`,
+        said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
       };
     }
     case 'rejected':
@@ -188,7 +195,13 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-plan',
-        said: "No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run claude, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.",
+        said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run ${typed(asked.program)}, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.`,
+      };
+    case 'token':
+      return {
+        ...none,
+        state: 'no-plan',
+        said: `No plan limits to show: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
       };
     case 'unanswered':
       return {

@@ -287,6 +287,11 @@
       "type": "ApprovedByOf"
     },
     {
+      "term": "Readiness cost",
+      "meaning": "what a piece of the readiness read costs while it is missing, which the piece declares (`cost`): a run waits on it (`run`), which makes the server not ready and raises the board's banner, or it is advised, raising no banner: it keeps the server up, open or current (`server`), or it is the client's own comfort (`client`); `missingSaid` says a read's missing pieces by it, \"before a factory's first run\" only where the read says no run was ever started (`ran: false`) (`READINESS_COSTS`, `packages/objects/src/words.ts`).",
+      "type": "ReadinessCost"
+    },
+    {
       "term": "Read bound",
       "meaning": "how one read the api serves is kept from growing past what the daemon can hold: its shape — a list's page (`page`), a read from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a file's bytes (`bytes`) — and the query keys that narrow it, one entry for every GET endpoint of the `Api` in `READS`, typed over every GET name so a read with none does not compile (`ReadBound`, `packages/objects/src/reads.ts`).",
       "type": "ReadBound"

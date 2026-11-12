@@ -181,16 +181,24 @@ const sources = (dir: string): string[] =>
     return entry.name.endsWith('.tsx') ? [at] : [];
   });
 
-test('staleFrameHeights: no page sized as the screen less the old header', async (t) => {
+test("staleFrameHeights: no page sized as the screen less a header alone, without the frame's lines", async (t) => {
   await t.test('the frame height: REFUSED, a page still at the screen less the header alone, a line break inside or not', () => {
     assert.deepEqual(staleFrameHeights('<div className="flex h-[calc(100svh-3rem)] min-h-96">'), ['h-[calc(100svh-3rem)]']);
     assert.deepEqual(staleFrameHeights('h-[calc(100svh-\n  3rem)]!'), ['h-[calc(100svh-\n  3rem)]']);
     assert.equal(staleFrameHeights('h-[calc(100svh-5rem)]').length, 0);
   });
-  await t.test('the frame height: no page under the top bar is the screen less the old header', () => {
+  await t.test("the frame's lines: REFUSED, a page the screen less the top bar alone, which the banner's row would overflow", () => {
+    assert.deepEqual(staleFrameHeights('flex h-[calc(100svh-var(--frame-top))] min-h-96'), ['h-[calc(100svh-var(--frame-top))]']);
+    assert.equal(staleFrameHeights('flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96').length, 0);
+  });
+  await t.test('the frame height: no page under the top bar is the screen less a header alone', () => {
     const app = path.join(import.meta.dirname, '..');
     const stale = sources(path.join(app, 'src')).filter((file) => staleFrameHeights(fs.readFileSync(file, 'utf8')).length > 0);
-    assert.equal(stale.length, 0, `less the top bar, 100svh-var(--frame-top): ${stale.map((f) => path.relative(app, f)).join(', ')}`);
+    assert.equal(
+      stale.length,
+      0,
+      `less the top bar and the frame's lines, 100svh-var(--frame-top)-var(--frame-lines): ${stale.map((f) => path.relative(app, f)).join(', ')}`,
+    );
   });
 });
 

@@ -1,7 +1,7 @@
 /** What several pages of the e2e look for or do on the board, beyond checks.ts: the menu, a next visit, a page's files and markdown. */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { BrowserContext, Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type RunList, type ScheduleList } from 'objects';
 import {
@@ -884,3 +884,32 @@ export async function expectPanelHeld(page: Page): Promise<void> {
 
 /** The composer's field in her chat. */
 export const chatFieldOf = (page: Page): Locator => page.locator('[data-chat-composer] textarea');
+
+/** The piece the e2e plants in every readiness read the board makes: missing, and a run waits on it, so the setup banner is raised. */
+export const BANNER_PIECE = {
+  name: 'e2e-banner',
+  area: 'harness',
+  state: 'missing',
+  message: 'a piece the e2e plants, which a run waits on, so the setup banner shows on every page',
+  fixes: [],
+  cost: 'run',
+} as const;
+
+/** Where the board reads the readiness read, as a route's pattern. */
+export const READINESS_ROUTE = '**/api/readiness';
+
+/**
+ * Every page of `context` judged with the setup banner shown, whatever the machine misses: the board's readiness read answered as the api
+ * answers it, with BANNER_PIECE added, so a page that measures to the window's foot is measured under the banner's row. A page that reads
+ * the api's own read on the board routes it on to the api itself (`page.route` with `route.continue()`, which a page's route takes before
+ * the context's).
+ */
+export async function bannerShown(context: BrowserContext): Promise<void> {
+  await context.route(READINESS_ROUTE, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    if (!response.ok()) return route.fulfill({ response });
+    const read = (await response.json()) as { ready: boolean; pieces: unknown[] };
+    return route.fulfill({ response, json: { ...read, ready: false, pieces: [...read.pieces, BANNER_PIECE] } });
+  });
+}

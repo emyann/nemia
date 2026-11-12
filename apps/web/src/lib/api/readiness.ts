@@ -1,5 +1,5 @@
 /**
- * The readiness read (`GET /api/readiness`, `objects`' `Readiness`): every piece the server needs before a factory's first run, in place
+ * The readiness read (`GET /api/readiness`, `objects`' `Readiness`): every piece the server needs to run its factories, in place
  * or missing, each with its fixes; a fix the server runs started (`POST /api/readiness/fixes`, a `Fix`), and its output followed as
  * server-sent events at `fixOutputPath`, each event's data decoded by `objects`' schema of it (`FIX_STREAM_SCHEMAS`).
  */

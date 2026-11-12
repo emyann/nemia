@@ -116,12 +116,15 @@ nemia readiness
 nemia readiness fix <need>
 ```
 
-One read lists every piece a server needs before a factory's first run, each in place, missing or unknown, with the command or fix
+One read lists every piece a server needs to run its factories, each in place, missing or unknown, with the command or fix
 that puts it there: the Claude token, or Claude Code's own sign-in where none is set (set and loading; a wrong or expired token shows
 only when a session is refused), the service and
 its linger, the bind, cgroup v2 and `systemd --user`, the git identity, the needs each factory's workflows declare, a factory, and a
 newer release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
-same read, and a banner on every page while a piece is missing.
+same read. Each piece says what it costs while missing: a piece a run waits on (a harness not signed in, a git identity, a factory)
+makes the server not ready, and raises a banner on every page of the board; a piece that keeps the server up or open (the service,
+its linger, the bind) is advised, listed with its fix and raising no banner, and the read's last line says `ready` with it counted.
+"Before a factory's first run" is said only where no run was ever started.
 
 A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
 the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need is missing,

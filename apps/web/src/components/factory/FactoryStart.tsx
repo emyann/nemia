@@ -4,7 +4,7 @@
  * workflows the factory offers there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as
  * the CLI's `start --factory` starts it.
  */
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import KitButton from '@/components/ui/ds/components/Button';
@@ -14,9 +14,9 @@ import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/a
 import { floorPlace, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
-import { RepoPicker } from './FactoryCardStart';
 import { FloatingBar } from '../frame/FloatingBar';
 import { StartRun } from '../run/StartRun';
+import { FIELD } from '../workflow/WorkflowOptions';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 const path = (text: string) => <code className="font-mono text-body-small break-all">{text}</code>;
@@ -267,5 +267,38 @@ function WorkflowRow({
         </span>
       </label>
     </li>
+  );
+}
+
+/** A factory's repositories to start a run on, when it has several: a person picks one; `note` says, under it, why the pick is theirs. */
+function RepoPicker({
+  repos,
+  picked,
+  onPick,
+  note,
+}: {
+  repos: readonly string[];
+  picked: string | null;
+  onPick: (repo: string) => void;
+  note: ReactNode;
+}) {
+  const field = useId();
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={field} className="block text-body-medium font-medium">
+        Repository
+      </label>
+      <select id={field} value={picked ?? ''} onChange={(event) => onPick(event.target.value)} className={`${FIELD} sm:max-w-md`}>
+        <option value="" disabled>
+          Pick where it runs
+        </option>
+        {repos.map((repo) => (
+          <option key={repo} value={repo}>
+            {repo}
+          </option>
+        ))}
+      </select>
+      <p className="text-body-small text-muted-foreground">{note}</p>
+    </div>
   );
 }

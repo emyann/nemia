@@ -3,7 +3,7 @@ import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { WorkflowListing } from './api/workflows.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
-import { shownIn, startRepo } from './factories.ts';
+import { shownIn, startRepo, type StartRepo } from './factories.ts';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
@@ -95,43 +95,11 @@ export function cardLines(entries: readonly InboxEntry[], refusals: readonly Car
 /** A workflow as a pick is keyed: its source and its name, since the repository and yours may each have one of a name. */
 export const workflowKey = (workflow: Pick<WorkflowListing, 'from' | 'name'>): string => `${workflow.from}:${workflow.name}`;
 
-const trimmed = (dir: string): string => dir.replace(/[\\/]+$/, '');
-
 /**
- * A card's `workflow:` that is a bare name — no slash, not `.` or `..` — which a start looks for under the card's repository's
- * `workflows/`.
+ * A card's `workflow:` that is a bare name — no slash, not `.` or `..` — the name of a workflow its factory offers. An older card's path is
+ * no name: its start names the workflow.
  */
 const isName = (workflow: string): boolean => !/[\\/]/.test(workflow) && workflow !== '.' && workflow !== '..';
-
-/**
- * Whether a card's workflow is a name in a repository other than `here`, the api's: the card's `repo:` names another, and a start looks for
- * the name there (`workflowFolder`). The board lists the workflows of `here` alone, so one of the same name among them is another workflow.
- */
-export const namedElsewhere = (workflow: string | null, repo: string | null, here: string): boolean =>
-  Boolean(workflow && repo && isName(workflow) && trimmed(repo) !== trimmed(here));
-
-/**
- * The workflow a card's start form is preset to, from what the card writes (`workflow:`), among the workflows here that read — or null, for
- * a card that names none, or one that is not among them.
- *
- * As a start from the command line finds it (`workflowFolder`): an absolute path is that folder, whichever source has it; a name is the
- * repository's workflow of that name (a factory's own, in a factory), never yours, since a name on a card is looked for under the
- * repository's `workflows/`. `repo` is the card's `repo:` and `here` the api's repository, whose workflows are listed: a name on a card
- * about another repository is that repository's workflow (`namedElsewhere`), which is not listed, so it presets nothing — a workflow of the
- * same name here would run another workflow than the card names. A relative path is read from the inbox, a folder the board does not list,
- * and is no workflow's name, so it presets nothing.
- */
-export function presetOf(
-  workflow: string | null,
-  repo: string | null,
-  here: string,
-  workflows: readonly WorkflowListing[],
-): WorkflowListing | null {
-  if (!workflow || namedElsewhere(workflow, repo, here)) return null;
-  const readable = workflows.filter((w) => w.error === null);
-  if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(workflow)) return readable.find((w) => trimmed(w.dir) === trimmed(workflow)) ?? null;
-  return readable.find((w) => w.from !== 'yours' && w.name === workflow) ?? null;
-}
 
 /** Whether a card names no factory: it has no `factory:` line, or writes `default`, which is no factory to start in. */
 export const unassigned = (entry: Pick<InboxEntry, 'factory'>): boolean => entry.factory === null || entry.factory === DEFAULT_NAMESPACE;
@@ -148,46 +116,39 @@ export const factoryPreset = (shown: string | undefined, offered: readonly Pick<
   shown !== undefined && offered.some((f) => f.name === shown) ? shown : '';
 
 /**
- * What the box that files a card holds when File is pressed: the idea; the factory now picked, null for none; `repo`, what its list of
- * repositories was last set to, `''` for none; and the workflow picked among those listed now, null for none.
+ * What the box that files a card holds when File is pressed: the idea; the factory now picked, null for none; and the name of the
+ * workflow picked among those it offers, null for none.
  */
-type FilingChoice = {
-  idea: string;
-  factory: Pick<Factory, 'name' | 'repos'> | null;
-  repo: string;
-  workflow: Pick<WorkflowListing, 'name' | 'from' | 'folderTeam'> | null;
-};
+type FilingChoice = { idea: string; factory: Pick<Factory, 'name'> | null; workflow: string | null };
 
-/** A card as `fileCard` sends it. */
-type CardFiling = { body: string; factory?: string; workflow?: string; from?: WorkflowListing['from']; repo?: string };
+/** A card as `fileCard` sends it: never a repository nor an origin, which the factory decides. */
+type CardFiling = { body: string; factory?: string; workflow?: string };
 
 /**
  * What the box sends for `choice`, by what is offered now and never by what a list held before. With no factory, the idea alone: its
- * workflow and repository come with the factory its start picks. In a factory, its name, and the workflow picked; and a repository only
- * where a person chose one: the factory has several, the one picked is among them, and the workflow is no folder team, which looks at
- * none. A factory's only repository is the factory's to give, and is never sent.
+ * workflow comes with the factory its start picks. In a factory, its name, and the workflow picked, by its name. Never a repository nor
+ * an origin: a card names a factory and a workflow, and the factory alone places its run (`startRepo`) and finds the workflow.
  */
-export function cardFiling({ idea, factory, repo, workflow }: FilingChoice): CardFiling {
+export function cardFiling({ idea, factory, workflow }: FilingChoice): CardFiling {
   if (factory === null) return { body: idea };
-  const chosen = factory.repos.length > 1 && factory.repos.includes(repo) && !workflow?.folderTeam;
-  return {
-    body: idea,
-    factory: factory.name,
-    ...(workflow ? { workflow: workflow.name, from: workflow.from } : {}),
-    ...(chosen ? { repo } : {}),
-  };
+  return { body: idea, factory: factory.name, ...(workflow ? { workflow } : {}) };
 }
 
 /**
- * Where a card in a factory starts: the factory, its repositories, and the one it starts on (`startRepo`) — null while a person has it to
- * pick. Null for a card that names no factory (`unassigned`), which starts once a person picks one (`startPlace`). For a factory the store
- * does not list, or whose file does not read, why the card cannot start in it.
+ * Where a card in a factory starts: the factory; the workflow it names, where the factory offers it by that name, else null for a person
+ * to pick; and the repository the factory wires for that workflow (`startRepo`), or why it gives none — null while no workflow is
+ * named. Null for a card that names no factory (`unassigned`), which starts once a person picks one (`startPlace`). For a factory the
+ * store does not list, or whose file does not read, why the card cannot start in it.
  */
-export type CardPlace = { factory: string; repos: string[]; repo: string | null } | { why: string };
+export type CardPlace = { factory: Factory; workflow: string | null; on: StartRepo | null } | { why: string };
+
+/** The card's `workflow:` where `factory` offers it by that name, else null. */
+const offeredName = (workflow: string | null, factory: Pick<Factory, 'workflows'>): string | null =>
+  workflow !== null && isName(workflow) && (factory.workflows ?? []).includes(workflow) ? workflow : null;
 
 /** `entry`'s place among `factories`, as the api lists them (`CardPlace`); `fileFactory` is the line that files a factory (`YourStore`). */
 export function cardPlace(
-  entry: Pick<InboxEntry, 'factory' | 'repo'>,
+  entry: Pick<InboxEntry, 'factory' | 'workflow'>,
   factories: readonly Factory[],
   fileFactory: string,
 ): CardPlace | null {
@@ -199,41 +160,23 @@ export function cardPlace(
     };
   }
   if (factory.error !== null) return { why: `The card names the factory ${factory.name}, whose file does not read: ${factory.error}` };
-  return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, entry.repo) };
+  const workflow = offeredName(entry.workflow, factory);
+  return { factory, workflow, on: workflow === null ? null : startRepo(factory, workflow) };
 }
 
 /**
  * Where a card that names no factory starts once a person picks `picked` among `factories`: null until one is picked (`''`); then the
- * picked factory's place, as a card naming it has (`cardPlace`) — or, for a card whose `repo:` is none of that factory's repositories,
- * why it cannot start there, naming both and the two ways out.
+ * picked factory's place, as a card naming it has (`cardPlace`). A card's `repo:` is retired, and plays no part.
  */
 export function startPlace(
-  entry: Pick<InboxEntry, 'repo'>,
+  entry: Pick<InboxEntry, 'workflow'>,
   picked: string,
   factories: readonly Factory[],
   fileFactory: string,
 ): CardPlace | null {
   if (picked === '') return null;
-  const place = cardPlace({ factory: picked, repo: entry.repo }, factories, fileFactory);
-  if (place === null || 'why' in place || entry.repo === null) return place;
-  if (place.repos.some((repo) => trimmed(repo) === trimmed(entry.repo!))) return place;
-  return {
-    why: `The card is about ${entry.repo}, and the factory ${picked} works on ${place.repos.join(', ') || 'no repository'}: pick a factory that works on it, or change the card's repo: line.`,
-  };
+  return cardPlace({ factory: picked, workflow: entry.workflow }, factories, fileFactory);
 }
-
-/**
- * What a card's `repo:` is worth on a team whose every step works in a folder: nothing. The package starts the card all the same —
- * refusing it would strand a card filed before the team worked in folders — and says the repository was not looked at: the CLI's `start`
- * prints it, a tick's line carries it, and the api answers it on the start (`ignoredRepo`).
- *
- * The board says it before the start instead, on the form where a person picks the workflow: a start the api takes opens the run's
- * page, so a sentence in its answer is shown to nobody. `repo` is the card's, and a card that names none has nothing to say.
- */
-export const ignoredRepoNote = (workflow: Pick<WorkflowListing, 'folderTeam'>, repo: string | undefined | null): string | null =>
-  workflow.folderTeam && repo
-    ? `The card's repo: ${repo} is not looked at — this workflow's steps work in folders, with no git repository.`
-    : null;
 
 /**
  * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. The CLI's `start` refuses `--after` for such
@@ -291,38 +234,45 @@ export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workfl
   workflows.filter((w): w is T & { error: string } => w.error !== null);
 
 /**
- * The repository a card's factory picks for it, as the orchestrator says it (`factoryRepoOf`): its factory's one repository, for a card
- * with no `repo:` whose factory is among `factories` that read and is not the default — null for every other, and while the factories are
- * unread. The Card does not carry it, so the page reads it off the factories it lists (`entryOf`).
+ * The repository the run of `entry` starts on in its factory, among `factories` that read and are not the default (`startRepo`, on the
+ * card's workflow by its name), or why the factory gives it none: the factory's only one for a card that names no workflow by name;
+ * null for a card of no factory or the default (which the daemon places), one whose factory is not listed or does not read, a card that
+ * names no workflow in a factory of several, and while the factories are unread. Never the card's `repo:`, which is retired.
  */
-export function factoryRepoOf(
-  entry: Pick<InboxEntry, 'repo' | 'factory'>,
-  factories: readonly Pick<Factory, 'name' | 'default' | 'repos' | 'error'>[] | undefined,
-): string | null {
-  if (entry.repo !== null || entry.factory === null) return null;
+export function cardRepo(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factories: readonly Factory[] | undefined): StartRepo | null {
+  if (unassigned(entry)) return null;
   const factory = factories?.find((f) => f.name === entry.factory && !f.default && f.error === null);
-  const [only] = factory?.repos ?? [];
-  return factory?.repos.length === 1 && only !== undefined ? only : null;
+  if (!factory) return null;
+  if (entry.workflow !== null && isName(entry.workflow)) return startRepo(factory, entry.workflow);
+  const [only, ...more] = factory.repos;
+  return only !== undefined && !more.length ? { repo: only } : null;
+}
+
+/**
+ * The repository a card's factory places its run on (`cardRepo`), as the tick's last try says it: null where it gives none. The Card does
+ * not carry it, so the page reads it off the factories it lists (`entryOf`).
+ */
+export function factoryRepoOf(entry: Pick<InboxEntry, 'factory' | 'workflow'>, factories: readonly Factory[] | undefined): string | null {
+  const on = cardRepo(entry, factories);
+  return on !== null && 'repo' in on ? on.repo : null;
 }
 
 /**
  * What the tick's last try of a queued card's start says, as the CLI's `inbox` says it beside the card: refused, it waits for a person, not
- * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none but names its
- * factory — never for a card that names no factory, refused wherever a daemon runs: the one its factory picks said as such
- * (`factoryRepo`), and running the daemon elsewhere offered only when its factory picks none, where the try was on the daemon's own. `why`
- * is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
+ * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names its factory —
+ * never for a card that names no factory, refused wherever a daemon runs — and said as the one its factory places it on where it is
+ * (`factoryRepo`). `why` is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
  */
 export function triedLine(
-  entry: Pick<InboxEntry, 'repo' | 'factory' | 'error' | 'factoryRepo'> & { tried: NonNullable<InboxEntry['tried']> },
+  entry: Pick<InboxEntry, 'factory' | 'error' | 'factoryRepo'> & { tried: NonNullable<InboxEntry['tried']> },
   at: string,
 ): string {
   const { tried } = entry;
-  const said = entry.repo === null && entry.factory !== null && entry.error === null;
-  const on = said ? ` on ${tried.repo}${tried.repo === entry.factoryRepo ? ", its factory's one repository" : ''}` : '';
-  const elsewhere = said && entry.factoryRepo === null ? ', or run the daemon in the repository it is about' : '';
+  const said = entry.factory !== null && entry.error === null;
+  const on = said ? ` on ${tried.repo}${tried.repo === entry.factoryRepo ? ", its factory's repository for its workflow" : ''}` : '';
   const why = tried.why !== entry.error ? `: ${tried.why.trim()}${/[.!?]$/.test(tried.why.trim()) ? '' : '.'}` : '.';
   return tried.refused
-    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${elsewhere}.`
+    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.`
     : `Failed at ${at}${on}${why} Not a refusal: the tick tries it again on every pass, where it keeps its place.`;
 }
 

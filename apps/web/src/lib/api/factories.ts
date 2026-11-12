@@ -73,7 +73,8 @@ export type FactoryVolume = { path: string; readOnly: boolean; commands: { rm: s
  * workflows it offers — null for the default factory, which offers every workflow found — its hires, `<workflow>/<step>` to an agent's
  * name, and its schedules. `error` says why its file does not read, null for every other. `template` is the template it is made from,
  * null for one that is not; `untrusted` each of its places a harness does not trust now; `volumes` each folder its runs reach;
- * `costLines` the line it sets per workflow, none where it sets none.
+ * `costLines` the line it sets per workflow, none where it sets none; `workflowRepos` the repository each workflow it attaches works on,
+ * by the workflow's name to the repository's folder name, `{}` where it names none (`startRepo`).
  */
 export type Factory = {
   name: string;
@@ -93,6 +94,8 @@ export type Factory = {
   volumes: FactoryVolume[];
   /** The cost line of each workflow it sets one for, in dollars: a gate whose caps' bound passes it says so. */
   costLines: Record<string, number>;
+  /** The folder name of each workflow's repository, by the workflow's name (`startRepo`). */
+  workflowRepos: Record<string, string>;
 };
 
 /** A schedule of a factory, as the view draws it: `unschedule` the line that takes it back. */
@@ -133,6 +136,7 @@ export const factoryViewOf = (factory: FactoryObject, commands: FactoryCommands,
     template: spec.template ? { ...spec.template, applied: status.applied ?? null, conditions: status.conditions } : null,
     untrusted: status.untrusted.map((u) => ({ place: u.place, harness: u.harness, withheld: u.withheld, never: u.never ?? null })),
     costLines: { ...spec.costLines },
+    workflowRepos: { ...spec.workflowRepos },
     volumes: spec.volumes.map((v) => ({
       path: v.path,
       readOnly: v.readOnly,

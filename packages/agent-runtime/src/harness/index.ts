@@ -17,6 +17,8 @@ export type {
   McpServer,
   Observation,
   QuotaLimit,
+  HeardLimit,
+  HeardQuota,
   RunnerOps,
   SessionForgotten,
   SessionKept,

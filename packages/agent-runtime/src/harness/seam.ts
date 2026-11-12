@@ -176,6 +176,15 @@ export type Followed =
  */
 export type QuotaLimit = { key: string; usedPercentage: number; resetsAt: string | null };
 
+/** A limit as a session heard it (`HeardQuota`): its use, its reset and its status then, in the harness's words. */
+export type HeardLimit = QuotaLimit & { status: 'allowed' | 'allowed_warning' | 'rejected' };
+
+/**
+ * The plan's limits as the newest of the harness's sessions to hear them was told, with a model turn: when it was received (`at`, ISO),
+ * and each window it named (Claude Code's `rate_limit_event`, `harness/claude/heard.ts`).
+ */
+export type HeardQuota = { at: string; limits: HeardLimit[] };
+
 /**
  * What a harness's quota came to, asked once (`RunnerOps.quota`):
  *
@@ -183,7 +192,7 @@ export type QuotaLimit = { key: string; usedPercentage: number; resetsAt: string
  *               harness listed limits and none had a number
  *   no-plan     the harness has no plan limits: it is not signed in to a subscription
  *   token       it is signed in by a long-lived token that can make model requests and not read the plan's limits (Claude Code's
- *               `claude setup-token`)
+ *               `claude setup-token`); `heard` is what its sessions' own turns said of them, the newest (`HeardQuota`), null while none has
  *   unanswered  it is signed in to `subscription`, and the service it asks gave it nothing
  *   unknown     it answered in a shape the runtime does not read: `what` it found
  *   missing     there is no program to ask: the one named is not there, or the harness's own is not installed
@@ -197,7 +206,7 @@ export type QuotaLimit = { key: string; usedPercentage: number; resetsAt: string
 export type HarnessQuota =
   | { kind: 'windows'; limits: QuotaLimit[]; subscription: string | null }
   | { kind: 'no-plan'; program: string | null }
-  | { kind: 'token'; program: string | null }
+  | { kind: 'token'; program: string | null; heard: HeardQuota | null }
   | { kind: 'unanswered'; subscription: string | null }
   | { kind: 'unknown'; what: string }
   | { kind: 'missing' }

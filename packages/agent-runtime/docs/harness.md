@@ -257,6 +257,25 @@ make it answer is a sign-in that holds `user:profile` — `claude` then `/login`
 taken away, since a set `CLAUDE_CODE_OAUTH_TOKEN` is read before the stored login. Measured by a throwaway probe kept outside the
 repository.
 
+## The plan's utilization a session hears
+
+**A session signed in by that same token is told the plan's utilization with its model turns, in a `rate_limit_event`, whatever the
+token's scopes** (Claude Code on SDK 0.3.322, measured on the server on v1.6.0, 2026-11-12). The SDK's type calls it "Rate limit
+information for claude.ai subscription users" (`SDKRateLimitEvent`, `sdk.d.ts:5987`). In the last 60 sessions' stdout under
+`~/.agent-workflows/engine/runs/claude/` there were 5 such events, each
+
+```
+{"status":"allowed","resetsAt":1794999600,"rateLimitType":"seven_day","overageStatus":"rejected",
+ "overageDisabledReason":"org_level_disabled","isUsingOverage":false,
+ "unifiedWindows":{"seven_day":{"utilization":0.4,"resetsAt":1794999600,"status":"allowed"}}}
+```
+
+`unifiedWindows` is in no SDK type (`SDKRateLimitInfo`, `sdk.d.ts:6000`, declares a single `utilization` beside `rateLimitType`), and its
+`utilization` is a fraction (0.4 is 40%), where `get_usage`'s is in percent. The event carries no time of its own. So the runtime keeps
+the newest event any session of its store received, with when it was received, in one file (`harness/claude/heard.ts`,
+`claudeHeardFile`): a job's own process keeps it, and so does a session held in the holder, and a token's quota carries it as `heard`.
+It costs nothing: the factory's sessions spend anyway. A machine where no session has had a turn since has none to show.
+
 ## The claude.ai bridge
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,

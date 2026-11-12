@@ -47,6 +47,11 @@ export type HarnessIO = {
    * job has no hold.
    */
   holdFile?: string;
+  /**
+   * Where a Claude Code job's own process keeps the newest `rate_limit_event` its session hears (`keepHeard`): one file of the store,
+   * every session's (`claudeHeardFile`), named by its spec's `prepare` with the hold. Absent: nothing is kept.
+   */
+  heardFile?: string;
   /** The store's sessions' drain (`sessionDrainFile`), which a job's own process reads on every poll. Absent, with `holdFile`: no hold. */
   drainFile?: string;
   /** How long a job is held under a drain before it parks, in milliseconds: a test's shortening of `JOB_HOLD_MS`. Absent: that bound. */

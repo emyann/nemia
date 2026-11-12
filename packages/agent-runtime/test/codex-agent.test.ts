@@ -38,7 +38,7 @@ import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a
 import { nameFor } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { codex } from '../src/harness/codex/codex.ts';
+import { codex, codexHarness } from '../src/harness/codex/codex.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
@@ -66,20 +66,36 @@ const SCHEMA = {
  * directory) before it prints its thread; write prose rather than JSON to `-o`; start a `sleep` of its own and write its pid;
  * stay up `sleepMs` after its last line, or until the file `exitOn` exists; or write `-o` first and print its thread only once the
  * file `threadOn` exists, which is what the worker reads when it has not yet read the thread line off the pipe. It writes each argv
- * it is run with to `argv.jsonl`, its own pid to `pid`, and `wrote-out` once `-o` is written.
+ * it is run with to `argv.jsonl`, its own pid to `pid`, and `wrote-out` once `-o` is written. Asked `login status`, as the harness
+ * asks before every spawn, it writes that argv to `login.jsonl` instead and answers as Codex does on stderr: signed in, exit 0, by
+ * default; `Not logged in`, exit 1, told `login: 'out'`; and nothing for a minute, told `login: 'hang'`.
  */
-type Fake = { gate?: string; prose?: boolean; grandchild?: boolean; sleepMs?: number; exitOn?: string; threadOn?: string };
+type Fake = {
+  gate?: string;
+  prose?: boolean;
+  grandchild?: boolean;
+  sleepMs?: number;
+  exitOn?: string;
+  threadOn?: string;
+  login?: 'out' | 'hang';
+};
 
 const FAKE = `
 const fs = require('node:fs');
 const { spawn } = require('node:child_process');
 const args = process.argv.slice(2);
 const said = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
+let o = {};
+try { o = JSON.parse(fs.readFileSync('fake.json', 'utf8')); } catch {}
+if (args[0] === 'login') {
+  fs.appendFileSync('login.jsonl', JSON.stringify(args) + '\\n');
+  if (o.login === 'hang') setTimeout(() => process.exit(0), 60000);
+  else if (o.login === 'out') { process.stderr.write('Not logged in\\n'); process.exit(1); }
+  else { process.stderr.write('Logged in using ChatGPT\\n'); process.exit(0); }
+} else {
 fs.appendFileSync('argv.jsonl', JSON.stringify(args) + '\\n');
 fs.writeFileSync('pid', String(process.pid));
 const calls = fs.readFileSync('argv.jsonl', 'utf8').split('\\n').filter(Boolean).length;
-let o = {};
-try { o = JSON.parse(fs.readFileSync('fake.json', 'utf8')); } catch {}
 const r = args.indexOf('resume');
 const thread = r === -1 ? '${THREAD}' : args[r + 1];
 const out = args.indexOf('-o');
@@ -103,6 +119,7 @@ const finish = () => {
 };
 const wait = () => (o.gate && !fs.existsSync(o.gate) ? setTimeout(wait, 20) : go());
 wait();
+}
 `;
 
 let bin: string;
@@ -133,6 +150,18 @@ const argvOf = (cwd: string): string[][] => {
   try {
     return fs
       .readFileSync(path.join(cwd, 'argv.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+  } catch {
+    return [];
+  }
+};
+/** Each `login` argv the fake codex was run with in `cwd`. */
+const loginsOf = (cwd: string): string[][] => {
+  try {
+    return fs
+      .readFileSync(path.join(cwd, 'login.jsonl'), 'utf8')
       .split('\n')
       .filter(Boolean)
       .map((l) => JSON.parse(l));
@@ -317,7 +346,15 @@ test(
         assert.equal(card.capabilities.streaming, true, 'its card says it streams: a session is followed from its stdout and its rollout');
         const extension = card.capabilities.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
         assert.deepEqual(extension.params, {
-          methods: ['sessionLogs', 'sessionOutput', 'sessionTranscript', 'observeSessions', 'forgetSession', 'sessionKept'],
+          methods: [
+            'sessionLogs',
+            'sessionOutput',
+            'releaseSession',
+            'sessionTranscript',
+            'observeSessions',
+            'forgetSession',
+            'sessionKept',
+          ],
           say: false,
         });
 
@@ -496,5 +533,55 @@ test(
     await holds(t, () => phase('input-required'), 'turn 1 signed and waiting');
     await Effect.runPromise(engine.close(id));
     await holds(t, () => phase('succeeded'), 'closed and settled');
+  },
+);
+
+test(
+  'a Codex step does not start while `codex` is signed out: its spawn is refused before anything runs, in words naming `codex login --device-auth`; signed in it runs, and a sign-in check that never answers refuses nothing',
+  WAITED,
+  async (t) => {
+    const s = story(t);
+    const shipped = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex } }));
+    const settled = async (t: Waiter, id: string, on: typeof shipped = shipped) => {
+      await holds(
+        t,
+        async () => {
+          await Effect.runPromise(on.tick());
+          return (await Effect.runPromise(on.view(id))).state.settled !== null;
+        },
+        `${id} settled`,
+      );
+      return (await Effect.runPromise(on.view(id))).state;
+    };
+
+    await s.test('signed out, the attempt ends unstartable, in words naming the sign-in, and nothing is run', async (t) => {
+      const cwd = workdir({ login: 'out' });
+      const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
+      const state = await settled(t, id);
+      assert.equal(state.settled, 'failed');
+      const [attempt] = state.attempts;
+      assert.equal(attempt?.reason, 'unstartable');
+      assert.ok(attempt?.error?.includes('codex login --device-auth'), 'the words name the command that signs in');
+      assert.ok(attempt?.error?.includes('Not logged in'), "and quote Codex's own answer");
+      assert.deepEqual(loginsOf(cwd), [['login', 'status']], 'Codex was asked whether it is signed in');
+      assert.deepEqual(argvOf(cwd), [], 'and no `exec` ran');
+    });
+
+    await s.test('signed in, the step tried again runs as before', async (t) => {
+      const cwd = workdir();
+      const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
+      assert.equal((await settled(t, id)).settled, 'succeeded');
+      assert.deepEqual(loginsOf(cwd), [['login', 'status']]);
+      assert.equal(argvOf(cwd)[0]?.[0], 'exec');
+    });
+
+    await s.test('a sign-in check that runs past its bound is no answer, and refuses nothing: the session runs', async (t) => {
+      const shortened = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex: codexHarness({ signInMs: 300 }) } }));
+      const cwd = workdir({ login: 'hang' });
+      const id = await Effect.runPromise(shortened.file({ brief: 'the brief', cwd, harness: 'codex' }));
+      assert.equal((await settled(t, id, shortened)).settled, 'succeeded');
+      assert.deepEqual(loginsOf(cwd), [['login', 'status']]);
+      assert.equal(argvOf(cwd)[0]?.[0], 'exec');
+    });
   },
 );

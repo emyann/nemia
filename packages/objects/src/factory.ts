@@ -55,7 +55,8 @@ export type HarnessSettings = typeof HarnessSettings.Type;
  * What a factory's file says: its repositories; the workflows it offers, absent on the default factory, which offers every workflow
  * found; its hires, `<workflow>/<step>` to an agent's name; its volumes; and, where its file names them, its harness settings, its
  * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
- * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none).
+ * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the
+ * git URL each of its repositories named by one is cloned from, by the repository's folder (absent where it was given none).
  */
 export const FactorySpec = Schema.Struct({
   repos: Schema.Array(Schema.String),
@@ -67,6 +68,7 @@ export const FactorySpec = Schema.Struct({
   template: Schema.optionalKey(FactoryTemplate),
   level: Schema.optionalKey(Schema.Literals(LEVELS)),
   costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
+  origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
 });
 export type FactorySpec = typeof FactorySpec.Type;
 

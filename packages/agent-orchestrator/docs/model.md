@@ -211,6 +211,7 @@ erDiagram
     string tree "optional"
     object harnessSettings "optional"
     object costLines "optional"
+    object origins "optional"
     number generation "optional"
   }
   AppliedTemplate {

@@ -14,9 +14,10 @@
  * read (`daemonQuota`, `QuotaAsker`), so a board open beside it adds no ask, and the hub its layer built (`FeedHub`), which the app's
  * streams of the feed read, and the place its programs ask (`PlaceService`) come with it. The runtime is disposed as the pass ends, however
  * it ends, so the exporters post what they hold once more before the process goes. With `--no-tick` it serves alone, holding nothing. It
- * prints the port the server got: the one asked for, or a free one for `PORT=0`. Refused first (`Conflict`), binding nothing: a checkout's
- * api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the one it was built
- * from (`repoOf`).
+ * prints the port the server got: the one asked for, or a free one for `PORT=0`. It keeps an idle connection past the longest its clients
+ * pool one (`SERVER_TIMEOUTS`, port.ts), so a client's first call after a pause is answered rather than reset. Refused first
+ * (`Conflict`), binding nothing: a checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and
+ * an install's repository is the one it was built from (`repoOf`).
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
@@ -24,7 +25,7 @@ import { Conflict, currentRelease, holdUrl, loadClaudeToken, runMain, runningRel
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
-import { argsOf, hostOf, leaseHostOf, portOf } from './port.ts';
+import { argsOf, hostOf, leaseHostOf, portOf, SERVER_TIMEOUTS } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
 import { daemonQuota, QuotaAsker } from './gauges/quota.ts';
 import { Engine, engineRead, StoreConfig, StoreRoot } from './store.ts';
@@ -69,10 +70,13 @@ const unserved = (err: Error & { code?: string }): Error =>
     { exitCode: 2 },
   );
 
-/** The app served on `port`, once it listens, at the port it got; the server closed, every connection with it, as the scope closes. */
+/**
+ * The app served on `port`, once it listens, at the port it got, keeping an idle connection as long as its clients do
+ * (`SERVER_TIMEOUTS`); the server closed, every connection with it, as the scope closes.
+ */
 const listening = Effect.acquireRelease(
   Effect.callback<{ server: ReturnType<typeof serve>; port: number }, Error>((resume) => {
-    const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
+    const server = serve({ fetch: app.fetch, port, hostname: host, serverOptions: SERVER_TIMEOUTS }, (info) => {
       console.log(`api listening on http://${host.includes(':') ? `[${host}]` : host}:${info.port}`);
       resume(Effect.succeed({ server, port: info.port }));
     });

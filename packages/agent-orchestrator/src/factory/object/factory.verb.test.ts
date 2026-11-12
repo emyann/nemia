@@ -140,3 +140,20 @@ test("a factory's commands are the lines a person types for it, with each schedu
   });
   assert.match(factoryCommands(m, []).attach, /^nemia factory attach acme/);
 });
+
+test("a factory's origins are its spec's where its file names any, and no key where it names none", () => {
+  const into = path.join(home, 'clones', 'h', 'o', 'r');
+  const mill: FactoryListing = {
+    ...acme,
+    name: 'mill',
+    file: path.join(home, 'factories', 'mill.json'),
+    repos: [into],
+    origins: { [into]: 'https://h/o/r.git' },
+  };
+  const { name: _n, file: _f, ...millFiled } = mill;
+  fs.writeFileSync(mill.file, JSON.stringify(millFiled));
+  const served = factoryObjectsOf({ factories: [mill], untrusted: [] }, repo, home).find((o) => o.metadata.name === 'mill');
+  assert.deepEqual(served?.spec.origins, { [into]: 'https://h/o/r.git' });
+  assert.ok(served && Schema.is(FactorySchema)(served));
+  assert.equal('origins' in (byName('acme')?.spec ?? {}), false, 'a factory given no URL serves none');
+});

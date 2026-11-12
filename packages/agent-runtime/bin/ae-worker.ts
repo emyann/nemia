@@ -6,7 +6,7 @@
  * starts before the engine can help it and outlives the engine that started it, so anything clever in here is a thing that
  * breaks while nobody is watching.
  *
- * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId, startRefused }`, rewritten as the
+ * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId, startRefused, harness }`, rewritten as the
  * session moves and on a timer. The heartbeat is what makes "the worker was killed" observable —
  * a stopped session and a stalled one are indistinguishable on disk without it. That is the cost
  * of owning a registry, and owning a registry is the cost of being harness-agnostic. `beat` is the heartbeat on the monotonic
@@ -37,6 +37,10 @@
  * exits only once the group is empty, since a child that ignored SIGTERM, left behind by a harness that did not, has
  * nothing to find it by after. A harness a stop ended is written with no exit code, -1, whatever it exited with: how a process
  * ends on SIGTERM is no answer of its own.
+ *
+ * The harness's pid and its start (`processStart`) go on the run file (`harness`) as soon as it is spawned, once every handler a write
+ * may reach is set: what a run leaves in its harness's process group once this worker has ended, or died, is found by it and stopped by
+ * the runner (`harness/detached/left.ts`), since nobody here is left to.
  *
  * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
  * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
@@ -71,6 +75,7 @@ import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/wo
 import { terminationMessageAt } from '../src/harness/detached/termination-message.ts';
 import { cgroupMemoryOf, type CgroupMemory } from '../src/harness/cgroup.ts';
 import { monoNow } from '../src/core/engine/now.ts';
+import { processStart } from '../src/process/alive.ts';
 
 /** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
 const runFile = ((given: string | undefined): string => {
@@ -110,6 +115,8 @@ let status = {
   memory: undefined as CgroupMemory | undefined,
   /** A harness started here has closed nothing yet, whatever the one before it did. */
   inputClosed: undefined as true | undefined,
+  /** The harness this worker started, once it has: none yet, whatever the one before it was. */
+  harness: undefined as { pid: number; start?: string } | undefined,
 };
 /**
  * How long a harness told to stop has to end on SIGTERM before what is left of its group is killed: the plan's, which the spawn
@@ -388,6 +395,11 @@ if (input) {
     stdin.end();
     return false;
   });
+}
+
+if (child.pid !== undefined) {
+  const harnessStart = processStart(child.pid);
+  write({ harness: { pid: child.pid, ...(harnessStart ? { start: harnessStart } : {}) } });
 }
 
 /**

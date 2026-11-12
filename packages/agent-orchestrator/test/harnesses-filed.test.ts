@@ -1,8 +1,8 @@
 /**
- * Every harness the orchestrator files a task on is one the daemon's engine has (`HARNESSES`, `src/runtime-client.ts`): a step's, each
- * of the step harnesses (`HARNESSES`, `src/harness/harness.ts`), and each harness a filing names as a literal (`e.file({ … harness: '<name>'
- * … })` in the package's source: a check's, a fix's, a script condition's). The stand-in engine takes any harness, so a filing on one
- * the engine lacks is refused only on the daemon, as every fix was while `command` was missing.
+ * Every harness the orchestrator files a task on is one the daemon's engine has (`HARNESSES`, `src/runtime-client.ts`): a step's,
+ * each of the step harnesses (`HARNESSES`, `src/harness/harness.ts`), and each harness a filing names as a literal (`e.file({ …
+ * harness: '<name>' … })` in the package's source: a check's, a fix's, a script condition's). The stand-in engine takes any harness,
+ * so a filing on one the engine lacks is refused only on the daemon, as every fix was while `command` was missing.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,8 +7,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { Context, Effect, Layer } from 'effect';
 import { MCP_TRANSPORTS as HARNESS_TRANSPORTS, transportOf, type McpTransport as HarnessTransport, type Running } from 'agent-orchestrator';
 import { CLAUDE_RULES, WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
@@ -412,17 +412,23 @@ const endOf = (stream: { once(event: string, listener: () => void): unknown } | 
 type Started = Pick<Declared, 'name' | 'args'> & { command: string };
 
 /**
- * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Succeeds with the tools, or with why
+ * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. The era it speaks is the SDK's to
+ * find (`versionNegotiation: 'auto'`, as a step's session asks it): `server/discover` is sent to a short-lived sibling started first,
+ * which answers 2026-07-28, refuses or says nothing within a third of `deadlineMs`, and the server is then started once more and asked in
+ * that era, `initialize` for 2025-11-25 — so each ask starts a server twice, the sibling's stderr left unread. Succeeds with the tools, or with why
  * not and what it printed, quoting the entry as `.mcp.json` writes it; never fails. What it printed is read to its end: a server that
  * failed is stopped (`client.close()`) and its stderr waited on until it ends (`endOf`, at most `STDERR_END_MS`), so a line it printed
  * after the client saw it fail is quoted too; a server that never started has no stderr to wait on. The client and its server
  * are taken in the ask's scope and closed as it closes (`client.close()`: stdin ended, then SIGTERM, then SIGKILL), whatever ends it: an
- * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The listing is given
+ * answer, `deadlineMs` passed, or an interruption; a request of the listing still in flight is rejected by that close. The transport is
+ * closed too, as the client alone does not reach it before it connects: a close during the era probe is what reaps the probe's sibling,
+ * which the listing settles once it has (waited on at most `STDERR_END_MS`). The listing is given
  * no abort signal: the client closes itself on an aborted `connect` and does not wait for the server, which a close after it then misses.
  */
 export const serverAsk = (repo: string, server: Started, launch: Launch, deadlineMs: number): Effect.Effect<Answer> =>
   Effect.gen(function* () {
     let said = '';
+    let listing: Promise<unknown> | undefined;
     const { client, transport, ended } = yield* Effect.acquireRelease(
       Effect.sync(() => {
         const transport = new StdioClientTransport({
@@ -433,11 +439,19 @@ export const serverAsk = (repo: string, server: Started, launch: Launch, deadlin
           stderr: 'pipe',
         });
         transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
-        return { transport, client: new Client({ name: 'nemia-api', version: '0.0.0' }), ended: endOf(transport.stderr) };
+        const client = new Client(
+          { name: 'nemia-api', version: '0.0.0' },
+          { versionNegotiation: { mode: 'auto', probe: { timeoutMs: Math.floor(deadlineMs / 3) } } },
+        );
+        return { transport, client, ended: endOf(transport.stderr) };
       }),
-      ({ client }) => Effect.promise(() => client.close().catch(() => {})),
+      ({ client, transport }) =>
+        Effect.promise(async () => {
+          await Promise.all([transport.close().catch(() => {}), client.close().catch(() => {})]);
+          await Promise.race([listing?.catch(() => {}), new Promise((resolve) => setTimeout(resolve, STDERR_END_MS).unref())]);
+        }),
     );
-    return yield* Effect.tryPromise({ try: () => listTools(client, transport), catch: (err) => err }).pipe(
+    return yield* Effect.tryPromise({ try: () => (listing = listTools(client, transport)), catch: (err) => err }).pipe(
       Effect.timeoutOrElse({
         duration: deadlineMs,
         orElse: () => Effect.fail(new Error(`it did not list its tools within ${deadlineMs / 1000} s`)),

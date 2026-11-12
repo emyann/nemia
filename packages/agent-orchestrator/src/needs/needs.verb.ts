@@ -281,11 +281,25 @@ export const runHarnesses = (steps: readonly StepSpec[]): readonly string[] =>
     HARNESSES_WITH_NEEDS,
   );
 
+/**
+ * Whether `run`'s needs may hold it (`runNeeds`): it has filed nothing, nobody called it off, and it froze its folder's files, the copy
+ * its needs are read from. Any other run waits on no need.
+ */
+export const heldOnNeeds = (run: Run): boolean => !hasStarted(run) && !run.cancelledAt && run.workflowFiles !== undefined;
+
+/**
+ * The harnesses `run` would be held on, from its frozen `steps` (`runHarnesses`), none where its needs hold it no more (`heldOnNeeds`):
+ * what `runNeeds` holds a run by, and what the readiness read names of each run, so the two cannot drift.
+ */
+export const harnessesHolding = (run: Run, steps: readonly StepSpec[]): readonly string[] => (heldOnNeeds(run) ? runHarnesses(steps) : []);
+
 /** The needs of `harnessNeeds` of each harness a run's frozen `steps` run sessions on (`runHarnesses`). */
-const harnessNeedsOfRun = (harnessNeeds: readonly Need[], steps: readonly StepSpec[]): Need[] => {
-  const harnesses = runHarnesses(steps);
-  return harnessNeeds.filter((need) => harnesses.some((h) => need.name === h || need.name === signInNeedOf(h)));
-};
+const harnessNeedsOfRun = (harnessNeeds: readonly Need[], steps: readonly StepSpec[]): Need[] =>
+  needsOfHarnesses(harnessNeeds, runHarnesses(steps));
+
+/** The needs of `harnessNeeds` of each of `harnesses`: its install and its sign-in. */
+const needsOfHarnesses = (harnessNeeds: readonly Need[], harnesses: readonly string[]): Need[] =>
+  harnessNeeds.filter((need) => harnesses.some((h) => need.name === h || need.name === signInNeedOf(h)));
 
 /**
  * The names of every need of `run` (`needsOfRun`), in the store `home`: its workflow's, read from its frozen copy of its folder, its
@@ -314,13 +328,13 @@ export const runNeedNames = (
  * nothing, so a process that never sweeps holds no run on a harness.
  */
 export const runNeeds = Effect.fnUntraced(function* (memo: NeedsMemo | undefined, run: Run, steps: readonly StepSpec[] = []) {
-  if (memo === undefined || hasStarted(run) || run.cancelledAt || run.workflowFiles === undefined) return [] as NeedHeld[];
+  if (memo === undefined || run.workflowFiles === undefined || !heldOnNeeds(run)) return [] as NeedHeld[];
   const workflowFiles = workflowFilesDir(memo.home, run, run.workflowFiles);
   const carriedFiles = run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(memo.home, run, run.carriedFiles) };
   const own = workflowNeedsRead(workflowFiles).needs;
   const repository = isRepositoryRun(run) ? run.repo : undefined;
   const placed = repository === undefined ? [] : memo.placeNeeds;
-  const harnessed = harnessNeedsOfRun(memo.harnessNeeds, steps);
+  const harnessed = needsOfHarnesses(memo.harnessNeeds, harnessesHolding(run, steps));
   const workflow = run.factory === undefined ? undefined : { factory: run.factory, workflow: path.basename(run.workflowDir) };
   const held: NeedHeld[] = [];
   for (const need of needsOfRun(own, placed, harnessed)) {

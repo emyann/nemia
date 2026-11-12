@@ -1,14 +1,15 @@
 /**
  * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves as the
- * Factory's list of `objects`, and `ls` — then filed, given workflows and relieved of them and removed, which the command line alone
- * does; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`; and
- * its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
+ * Factory's list of `objects`, and `ls` — then filed, which the command line alone does; given workflows and relieved of them, its
+ * revisions policy written and removed, which the api serves as the Factory's `attach`, `detach`, `setRevisions` and `delete`, each typed
+ * by its `input`; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`;
+ * and its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
 import { setting } from '../config/config.store.ts';
 import { Effect, Schema } from 'effect';
 import { HireWrite } from 'objects';
 import { tried } from '../runtime-client.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Missing } from '../refusal/refusal.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import {
@@ -183,8 +184,11 @@ refused, naming the attach.`;
  * the harness reports; `server add` records a remote one and `server rm` takes one off (`servers/servers.verb.ts`).
  */
 
-/** Why the api does not file, attach, detach or remove a factory: the board reads them, and the command line is their one writer. */
-const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and removes no factory: nemia factory does' } as const;
+/** Why the api does not file a factory: its places are directories of the machine the command line is typed on. */
+const WRITTEN_HERE = {
+  side: 'cli',
+  why: 'the api files no factory: its places are directories of this machine, which nemia factory add names and checks',
+} as const;
 
 /** The text under `key`: what the spec read there. */
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
@@ -325,38 +329,40 @@ const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   flagFirst: true,
 });
 
+/** What `nemia factory attach` and `detach` take: the factory, and the workflow by its folder's name. */
+export const WorkflowWireInput = Schema.Struct({ factory: Schema.String, workflow: Schema.String });
+export type WorkflowWireInput = typeof WorkflowWireInput.Type;
+
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
-const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
+export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, WorkflowWireInput> = {
   name: 'factory attach',
+  served: [{ endpoint: 'factories.attach' }],
   usage: '<factory> <workflow>',
   help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
   spec: workflowSpec('attach'),
   writes: true,
   class: 'ask',
-  only: WRITTEN_HERE,
-  handler: (args) =>
-    Effect.map(wire(textOf(args, 'factory'), { verb: 'attach', workflow: textOf(args, 'workflow') }), ({ was, now, file }) => ({
-      file,
-      already: now === was,
-    })),
-  print: ({ file, already }, args) => [
-    `${textOf(args, 'factory')}  ${already ? 'already attached' : 'attached'} ${textOf(args, 'workflow')}`,
+  input: WorkflowWireInput,
+  handler: ({ factory, workflow }) =>
+    Effect.map(wire(factory, { verb: 'attach', workflow }), ({ was, now, file }) => ({ file, already: now === was })),
+  print: ({ file, already }, { factory, workflow }) => [
+    `${factory}  ${already ? 'already attached' : 'attached'} ${workflow}`,
     `${already ? 'unchanged' : 'attached'}: ${file}`,
   ],
 };
 
 /** `nemia factory detach`: one workflow taken from one factory. */
-const FACTORY_DETACH: Command<{ file: string }> = {
+export const FACTORY_DETACH: Command<{ file: string }, WorkflowWireInput> = {
   name: 'factory detach',
+  served: [{ endpoint: 'factories.detach' }],
   usage: '<factory> <workflow>',
   help: ['take a workflow back, once no hire fills its steps'],
   spec: workflowSpec('detach'),
   writes: true,
   class: 'ask',
-  only: WRITTEN_HERE,
-  handler: (args) =>
-    Effect.map(wire(textOf(args, 'factory'), { verb: 'detach', workflow: textOf(args, 'workflow') }), ({ file }) => ({ file })),
-  print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
+  input: WorkflowWireInput,
+  handler: ({ factory, workflow }) => Effect.map(wire(factory, { verb: 'detach', workflow }), ({ file }) => ({ file })),
+  print: ({ file }, { factory, workflow }) => [`${factory}  detached ${workflow}`, `detached: ${file}`],
 };
 
 /** `nemia factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
@@ -455,12 +461,17 @@ export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> =
   print: ({ file, fired }, { factory, step }) => [`${factory}  ${step}  fired ${fired}`, `fired: ${file}`],
 };
 
+/** What `nemia factory rm` takes: the factory, by its name. */
+export const FactoryRmInput = Schema.Struct({ factory: Schema.String });
+export type FactoryRmInput = typeof FactoryRmInput.Type;
+
 /**
  * `nemia factory rm`: one factory's file removed, then the instruction the store keeps for it, its folder whole (`instruction`, null for
  * none). Refused as `removeFactory` refuses, before the folder is touched.
  */
-const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
+export const FACTORY_RM: Command<{ file: string; instruction: string | null }, FactoryRmInput> = {
   name: 'factory rm',
+  served: [{ endpoint: 'factories.delete' }],
   usage: '<name>',
   help: ["remove a factory's file, and the instruction and the rules the store", 'keeps for it'],
   spec: {
@@ -471,19 +482,17 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   },
   writes: true,
   class: 'ask',
-  only: WRITTEN_HERE,
-  handler: (args) => {
-    const name = textOf(args, 'factory');
-    return Effect.gen(function* () {
+  input: FactoryRmInput,
+  handler: ({ factory: name }) =>
+    Effect.gen(function* () {
       const home = yield* StoreRoot;
       yield* tried(() => refuseName(name, 'rm'));
       const door = yield* FactoryDoor;
       const file = yield* door.factories.remove(FactoryName.read(name));
       return { file, instruction: yield* tried(() => removeInstructionFolder(home, name)) };
-    });
-  },
-  print: ({ file, instruction }, args) => [
-    `${textOf(args, 'factory')}  removed — ${file}`,
+    }),
+  print: ({ file, instruction }, { factory }) => [
+    `${factory}  removed — ${file}`,
     ...(instruction === null ? [] : [`instruction removed: ${instruction}`]),
   ],
 };
@@ -511,9 +520,17 @@ const policyOf = (args: Args): RevisionsPolicy | undefined => REVISIONS_POLICIES
 const revisionsRefusal = (args: Args): string =>
   `nemia factory revisions takes follow or pinned, and was given ${String(args.revisions)}: nemia factory revisions <name> follow|pinned. Nothing was changed.`;
 
-/** `nemia factory revisions`: whether a factory's runs follow merged revisions, written, with what it said before. */
-const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> = {
+/** What `nemia factory revisions` takes: the factory, and the policy, one of `REVISIONS_POLICIES`. */
+export const RevisionsInput = Schema.Struct({ factory: Schema.String, revisions: Schema.Literals(REVISIONS_POLICIES) });
+export type RevisionsInput = typeof RevisionsInput.Type;
+
+/**
+ * `nemia factory revisions`: whether a factory's runs follow merged revisions, written, with what it said before. A policy that is
+ * neither of the two is refused by the command line's `check` and by the api's payload, each before anything is read.
+ */
+export const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }, RevisionsInput> = {
   name: 'factory revisions',
+  served: [{ endpoint: 'factories.setRevisions' }],
   usage: '<name> follow|pinned',
   help: [
     "whether a factory's runs follow merged revisions at each filing (follow)",
@@ -523,21 +540,17 @@ const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> 
   check: (args) => (args.revisions === undefined || policyOf(args) !== undefined ? leftOut(REVISIONS_SPEC, args) : revisionsRefusal(args)),
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it" },
-  handler: (args) => {
-    const name = textOf(args, 'factory');
-    return Effect.gen(function* () {
-      const revisions = policyOf(args);
-      if (revisions === undefined) return yield* Effect.fail(new Invalid({ message: revisionsRefusal(args) }));
+  input: RevisionsInput,
+  handler: ({ factory: name, revisions }) =>
+    Effect.gen(function* () {
       yield* tried(() => refuseName(name, 'revisions'));
       const door = yield* FactoryDoor;
       const factory = yield* filedFactory(name, 'revisions');
       const file = yield* door.factories.rewrite({ ...factory, revisions });
       return { file, was: factory.revisions ?? null };
-    });
-  },
-  print: ({ file, was }, args) => [
-    `${textOf(args, 'factory')}  revisions: ${textOf(args, 'revisions')}${was === null || was === textOf(args, 'revisions') ? '' : ` (was ${was})`}`,
+    }),
+  print: ({ file, was }, { factory, revisions }) => [
+    `${factory}  revisions: ${revisions}${was === null || was === revisions ? '' : ` (was ${was})`}`,
     `changed: ${file}`,
   ],
 };

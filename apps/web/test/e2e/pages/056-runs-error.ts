@@ -7,6 +7,9 @@ import { OUT } from '../world.ts';
 /** What the held read is answered with, in the api's shape for a refusal. */
 const WHY = 'the store could not be read';
 
+/** The error's class name as the bundle minifies it: an identifier, which may hold a dollar sign (such as $L). */
+const ERROR_NAME = '[\\w$]+';
+
 export default {
   /**
    * The page when a read fails: a visit of its own whose read of the finished runs is answered with a failure says, under the page's
@@ -44,7 +47,7 @@ export default {
       await contrastHolds(other, ['[role="alert"] p:first-child', '[data-error-reason]']);
       const seen = problems();
       const refused = /^request answered 500: GET .*\/api\/runs\?.*fieldSelector=status\.state(%3D|=)finished/;
-      const said = new RegExp(`^console error: \\w+: ${WHY}\\b`);
+      const said = new RegExp(`^console error: ${ERROR_NAME}: ${WHY}\\b`);
       const others = seen.filter(
         (p) =>
           !refused.test(p) &&

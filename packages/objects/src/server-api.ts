@@ -1,7 +1,8 @@
 /**
  * The group of the server and the machine (`ServerGroup`), added to the one `Api` (`api.ts`) beside the objects: whether the api answers
  * and what it runs, what the repository offers a step, your store, the floor's gauges (the run slots, the passes, the series, the
- * metrics, the daemon, the quota), the store's pause read, put and lifted, the flow numbers, and the feed followed as server-sent events.
+ * metrics, the daemon, the quota), the store's pause read, put and lifted and its timeout read and set, the flow numbers, and the feed
+ * followed as server-sent events.
  * None of them is a kind, so discovery lists none (`resourcesOf` skips a group no kind has).
  *
  * Each answer is a plain Schema of JSON here. Where an answer holds a deep part another reader owns — a pass's phases, a group of the flow
@@ -279,6 +280,25 @@ export type PauseAnswer = typeof PauseAnswer.Type;
 export const Resumed = Schema.Struct({ pause: Pause });
 export type Resumed = typeof Resumed.Type;
 
+/** The store's pause timeout in force: its milliseconds, whether the store's file set it, and since when where it says. */
+export const PauseTimeout = Schema.Struct({ ms: Schema.Number, set: Schema.Boolean, at: Schema.optionalKey(Schema.String) });
+export type PauseTimeout = typeof PauseTimeout.Type;
+
+/**
+ * What `GET` and `PUT /api/pause/timeout` answer, as `nemia pause-timeout` does: the timeout in force, and whether this call wrote it.
+ */
+export const PauseTimeoutAnswer = Schema.Struct({ timeout: PauseTimeout, wrote: Schema.Boolean }).annotate({
+  identifier: 'PauseTimeoutAnswer',
+});
+export type PauseTimeoutAnswer = typeof PauseTimeoutAnswer.Type;
+
+/**
+ * `PUT /api/pause/timeout`'s body, `nemia pause-timeout <d>`'s duration: digits and s, m or h, from 1s to 23h (`"10m"`), kept as the text
+ * it was sent as, so a wrong one is refused in the package's words, a 422.
+ */
+export const PauseTimeoutWrite = Schema.Struct({ timeout: Schema.String }).annotate({ identifier: 'PauseTimeoutWrite' });
+export type PauseTimeoutWrite = typeof PauseTimeoutWrite.Type;
+
 /** A file of the daemon's, read as it says itself: who it is, where it serves, and when it last moved. */
 export const Daemon = Schema.Struct({
   kind: Schema.Literals(DAEMON_KINDS),
@@ -483,6 +503,12 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('stats', '/api/stats', { query: StatsQuery, success: Stats, error: readErrors }),
   HttpApiEndpoint.get('paused', '/api/pause', { success: Paused, error: [Missing, ...readErrors] }),
   HttpApiEndpoint.get('pauseNow', '/api/pause/now', { success: PauseNowRead, error: [Missing, ...readErrors] }),
+  HttpApiEndpoint.get('pauseTimeout', '/api/pause/timeout', { success: PauseTimeoutAnswer, error: readErrors }),
+  HttpApiEndpoint.put('setPauseTimeout', '/api/pause/timeout', {
+    payload: PauseTimeoutWrite,
+    success: PauseTimeoutAnswer,
+    error: [BadRequest, Invalid, Failed],
+  }),
   HttpApiEndpoint.post('pause', '/api/pause', {
     payload: PauseWrite,
     success: PauseAnswer,

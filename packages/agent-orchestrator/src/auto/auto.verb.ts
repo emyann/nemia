@@ -5,7 +5,7 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
-import { PolicyRuleConfirm } from 'objects';
+import { PolicyProposal, PolicyRuleConfirm } from 'objects';
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -232,10 +232,20 @@ export function proposalOf(words: string): { rules: PolicyRule[]; guidance: stri
 }
 
 /**
- * `nemia policy propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed.
+ * What `nemia policy propose` takes: the agent, and its proposal's JSON text (`objects`' `PolicyProposal`), which the command line's runner
+ * reads from `--file` and the api is sent.
  */
-export const POLICY_PROPOSE: Command<PolicyList> = {
+export const ProposeInput = Schema.Struct({ ...PolicyProposal.fields, name: Schema.String });
+export type ProposeInput = typeof ProposeInput.Type;
+
+/**
+ * `nemia policy propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed.
+ * The api serves it as the nemia group's `propose` (`PUT /api/policy/:name/proposal`), sent the words themselves. Refused (`Invalid`),
+ * writing nothing: a name that is no agent's, and words that are no proposal (`proposalOf`).
+ */
+export const POLICY_PROPOSE: Command<PolicyList, ProposeInput> = {
   name: 'policy propose',
+  served: [{ endpoint: 'nemia.propose' }],
   usage: '<agent> --file <path>|-',
   help: [
     "the agent's proposal: rules from your custom instruction, as JSON,",
@@ -250,6 +260,7 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
         kind: 'text',
         key: 'file',
         takes: '--file takes the file of the proposal, or - to read it from stdin: nemia policy propose <agent> --file <path>',
+        only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
       },
     ],
     unknown: (arg) => `nemia policy propose takes an agent's name and --file <path> (or - for stdin), not ${arg}.`,
@@ -259,16 +270,18 @@ export const POLICY_PROPOSE: Command<PolicyList> = {
     (typeof args.file === 'string' ? null : 'nemia policy propose takes the proposal in --file <path>, or --file - for stdin.'),
   writes: true,
   class: 'act',
-  only: { side: 'cli', why: 'the agent proposes from its own session; the board shows the proposal and confirms its rules' },
-  handler: (args) =>
+  input: ProposeInput,
+  handler: ({ name, words }) =>
     Effect.flatMap(StoreRoot, (home) =>
-      Effect.gen(function* () {
-        const agent = agentIn(args);
-        const { rules, guidance } = yield* tried(() => proposalOf(String(args.words ?? '')));
-        const digest = digestOf(yield* instructionOf(agent));
-        yield* tried(() => writeProposed(home, agent, { at: new Date().toISOString(), rules, guidance, digest }));
-        return yield* listed(home, agent);
-      }),
+      Effect.andThen(
+        agentNamed(name),
+        Effect.gen(function* () {
+          const { rules, guidance } = yield* tried(() => proposalOf(words));
+          const digest = digestOf(yield* instructionOf(name));
+          yield* tried(() => writeProposed(home, name, { at: new Date().toISOString(), rules, guidance, digest }));
+          return yield* listed(home, name);
+        }),
+      ),
     ),
   print: (list) => [
     `${list.agent} proposed ${(list.proposed?.rules.length ?? 0) + (list.proposed?.proposalRules.length ?? 0)} rule(s), none in force until confirmed.`,

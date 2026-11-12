@@ -3,6 +3,7 @@
  * questions the step asks (`--answer`, `typedAnswers`), or a loop out of rounds ended as it stands, with the person's words (what `nemia
  * accept` was, decision 7: `approveForm`), and what the next tick files because of it.
  */
+import { refusing, renamed, requiring } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { RunApprove } from 'objects';
@@ -101,7 +102,12 @@ export const APPROVE: Command<
   ApproveInput
 > = {
   name: 'approve',
-  served: [{ endpoint: 'runs.approve' }],
+  served: [
+    {
+      endpoint: 'runs.approve',
+      request: refusing('approve', ['answer', 'budget'], requiring('step', 'nemia approve <runId> <step>', renamed({ runId: 'name' }))),
+    },
+  ],
   usage: '<runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]',
   help: [
     'let a step waiting at its gate hand on: what waits on it is filed on',

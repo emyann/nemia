@@ -140,12 +140,12 @@ export const unheld = (name: string): Refused =>
   );
 
 /**
- * A verb about the store only the in-process path has, typed under the remote context `name`: refused, naming the context to leave and
- * the machine to run it on.
+ * `nemia template export --factory <name>` typed under the remote context `name`: refused, since the factory it reads is this machine's
+ * store's, not the daemon's, and no endpoint serves an export; naming the machine to run it on and the context that reads this one.
  */
-export const notHere = (verb: string, name: string): Refused =>
+export const factoryNotHere = (name: string): Refused =>
   new Refused(
-    `nemia ${verb} acts on a store in process, and the context in use, ${name}, is a remote daemon this client cannot run it on: run it on that daemon's machine, or here on this machine's store after \`nemia config use-context local\``,
+    `nemia template export --factory reads the factory from a store in process, and the context in use, ${name}, is a remote daemon: run it on that daemon's machine, or export this machine's factory with \`NEMIA_CONTEXT=local nemia template export …\``,
   );
 
 /** What `nemia config` says of itself, on `--help` or no words. */

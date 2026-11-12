@@ -69,8 +69,8 @@ export const unkeptVerbs = (): Pick<
  */
 export const declaredVerbsOf = (
   harnesses: TestHarnesses,
-  kept: Pick<EngineShape, 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'>,
-): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> => {
+  kept: Pick<EngineShape, 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'>,
+): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'> => {
   const { declared } = harnesses;
   const fallback = harnesses.runsOn(undefined);
   const mcp = verbHarnessIn('mcp', undefined, declared, fallback).kind === 'taken';
@@ -89,6 +89,7 @@ export const declaredVerbsOf = (
         : kept.mcpState(servers),
     mcpSignIn: (name, server, secret) => signIn(() => kept.mcpSignIn(name, server, secret), mcpStateRefusal({ [name]: server })),
     mcpSignInState: kept.mcpSignInState,
+    mcpSignInCallback: kept.mcpSignInCallback,
     mcpSignOut: (name, server) => signIn(() => kept.mcpSignOut(name, server), mcpStateRefusal({ [name]: server })),
   };
 };

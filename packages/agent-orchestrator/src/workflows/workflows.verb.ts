@@ -6,6 +6,7 @@
  * api runs itself (`foldersLoaded`), handed its factory whole. The api resolves which folder a read names, and words the board's answer
  * around what each answers.
  */
+import { fromPlace, givesNone, refusing, notSent } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
@@ -149,7 +150,10 @@ export type WorkflowStepInput = typeof WorkflowStepInput.Type;
  */
 export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, WorkflowWriteInput> = {
   name: 'workflows write',
-  served: [{ endpoint: 'workflows.create' }, { endpoint: 'workflows.replace', as: 'workflows_replace' }],
+  served: [
+    { endpoint: 'workflows.create', takes: givesNone('version'), request: notSent('workflows write') },
+    { endpoint: 'workflows.replace', as: 'workflows_replace', request: notSent('workflows write') },
+  ],
   usage: '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   help: [
     'a workflow folder of yours, or of a templated --factory, written from',
@@ -237,7 +241,12 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
  */
 export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
   name: 'workflows rm',
-  served: [{ endpoint: 'workflows.delete' }],
+  served: [
+    {
+      endpoint: 'workflows.delete',
+      request: refusing('workflows rm', ['repo'], fromPlace({ version: 'resourceVersion' }, ['repo', 'factory'])),
+    },
+  ],
   usage: 'yours <name> --version <v>',
   help: ['a workflow folder of yours removed, at the --version it was read at'],
   spec: writerSpec(

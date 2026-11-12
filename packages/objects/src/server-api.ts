@@ -59,8 +59,8 @@ export const LatestRelease = Schema.Struct({ version: Schema.String, newer: Sche
 export type LatestRelease = typeof LatestRelease.Type;
 
 /**
- * `GET /api/version`: the orchestrator's package version, the code the api runs, and the newest release the daemon knows of (`latest`),
- * which the board and `nemia version` say when it is newer.
+ * `GET /api/version`: the release's version (the root package.json's), the code the api runs, and the newest release the daemon
+ * knows of (`latest`), which the board and `nemia version` say when it is newer.
  */
 export const VersionAnswer = Schema.Struct({ version: Schema.String, release: Release, latest: Schema.optionalKey(LatestRelease) });
 export type VersionAnswer = typeof VersionAnswer.Type;

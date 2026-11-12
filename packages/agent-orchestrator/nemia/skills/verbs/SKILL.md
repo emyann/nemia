@@ -31,7 +31,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                on the port: factory
   nemia factory ls
                                the same, by its name
-                               CLI only: the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it
+                               on the port: factory_ls
   nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; onto a template of another name, a switch
@@ -39,7 +39,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                template, and the plan nemia factory adopt takes; nothing is written.
                                To change a parameter alone: --to the version applied, and
                                --set <key>=<value> for each; it prints the line that files it
-                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
+                               on the port: factory_diff
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
                                on the port: factory_servers
@@ -279,7 +279,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
-                               CLI only: the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler
+                               on the port: inbox_from
   nemia label run <runId> <key=value|key->... [--overwrite]
                                edit a run's labels: key=value sets a key, key- removes it; changing a
                                value takes --overwrite. nemia ls -l selects by them, and the feed's
@@ -394,7 +394,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                the store's daemon, started where none ticks it (as any command that
                                ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and
                                the url the api serves at, from its lease. --json: the whole answer
-                               CLI only: the api is the daemon: it answers where it stands at GET /api/daemon
+                               on the port: daemon
 ```
 
 ## Prompts the person
@@ -408,21 +408,21 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory add <name> --repo <path|url> [--repo <path|url> ...] [--no-trust]
                                file a factory: a lowercase slug naming one or more directories or git URLs,
                                each URL cloned, each trusted for its steps unless --no-trust
-                               CLI only: the api files no factory: its places are directories of this machine, which nemia factory add names and checks
+                               on the port: factory_add
   nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
-                               CLI only: a template is a folder on the machine nemia runs on; the board applies none
+                               on the port: factory_apply
   nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
                                take a hand-made factory over by a template, in place, as nemia factory
                                diff previewed it: its name, cards, runs and stats stay
-                               CLI only: a template is a folder on the machine nemia runs on; the board takes over no factory
+                               on the port: factory_adopt
   nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]
                                upgrade a templated factory: its file wants --to, and the daemon merges
                                the template's change into its tree once each conflict is resolved;
                                with --to the version applied and --set, a change of its parameters
                                alone, filed with the --plan nemia factory diff printed for it
-                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
+                               on the port: factory_upgrade
   nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
                                choose for one conflict of a templated factory's upgrade or switch: your
                                tree, the template (none: drop the file), or the text of a file; once
@@ -430,7 +430,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                instruction has one, that object is proposed as they compose it, to
                                approve (nemia proposals approve <p> -n <name>); a carried file stays
                                a choice; the daemon merges once each has one and each proposal applied
-                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
+                               on the port: factory_resolve
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it
@@ -461,10 +461,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory volume add <factory> <path>:ro|:rw
                                mount a folder of this machine for every local step of a factory's runs,
                                read-only (:ro) or writable (:rw); a writable one is not a run's workspace
-                               CLI only: a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none
+                               on the port: factory_volume_add
   nemia factory volume rm <factory> <path>
                                take a volume off a factory, by its path
-                               CLI only: a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none
+                               on the port: factory_volume_rm
   nemia factory setting set <factory> <harness>.<key> <json>
                                give every session of a factory's runs on a harness one of its settings,
                                claude.attribution among them; its value is JSON

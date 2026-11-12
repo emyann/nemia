@@ -1,5 +1,5 @@
 /**
- * A factory made from a template. `nemia factory apply`, an entry of the command table, the command line's alone, files
+ * A factory made from a template. `nemia factory apply`, an entry of the command table, served on the api as the Factory's `apply`, files
  * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`). The
  * factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template, its base
  * (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version its file
@@ -70,6 +70,7 @@ import {
 } from '../upgrade/index.ts';
 import type { ProposalPhase } from 'objects';
 import { ProposalDoor } from '../../proposal/proposal.store.ts';
+import { templatePacked } from '../../template/given.store.ts';
 
 /**
  * A template rendered with a factory's parameters: its name (its tree's, which the lint holds equal to its manifest's), its version, the
@@ -608,8 +609,14 @@ export const reconcile = (): Effect.Effect<never, never, StoreRoot> => {
   return Effect.forever(pass.pipe(Effect.andThen(Effect.sleep(RECONCILE_EVERY))));
 };
 
-/** Why the api applies no template: a template is a folder on the machine nemia runs on. */
-const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board applies none' } as const;
+/**
+ * Why the command line takes an apply by its arguments: the api serves it as the Factory's `apply`, calling its handler with the template
+ * by a builtin's name or packed, kept under its store.
+ */
+const HERE = {
+  side: 'cli',
+  why: "the api serves it as the Factory's `apply` of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name",
+} as const;
 
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -708,6 +715,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
  */
 export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
   name: 'factory apply',
+  served: [{ endpoint: 'factories.apply', request: templatePacked }],
   usage: '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]',
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,

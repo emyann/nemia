@@ -4,14 +4,15 @@
  *
  * The rule the card rests on is the secret's: a server of the client Nemia ships is handed its secret, and the fixture that breaks it is
  * the same server under a foreign client id, which is handed none. And each refusal by its kind: a server the record does not hold is
- * `Missing`, a callback port another sign-in waits on is `Conflict`.
+ * `Missing`, a callback port another sign-in waits on is `Conflict`, as is a callback pasted where none waits, and a pasted address that
+ * is not the sign-in's redirect is `Invalid`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
 import { engineOf, runWith } from '../../runtime-client.ts';
-import { serverSignIn, serverSignInState, serverSignOut } from './sign-in.verb.ts';
+import { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './sign-in.verb.ts';
 import { writeFactoryServers } from './servers.store.ts';
 import { SHIPPED_CLIENT_SECRETS, shippedSecretOf } from './clients.ts';
 import { DEFAULT_NAMESPACE } from '../factory.ts';
@@ -86,4 +87,25 @@ test('a sign-out asks the engine to clear the server, and is refused while its s
   engine.settleSignIn('github', { state: 'connected' });
   assert.deepEqual(await runWith(engineOf(engine.layer), serverSignOut(DEFAULT_NAMESPACE, 'github', ROOT)), { signedOut: true });
   assert.deepEqual(engine.signOuts, ['github']);
+});
+
+test('a pasted callback completes a waiting sign-in; refused by kind where none waits or the address is not its redirect', async () => {
+  const engine = testEngine();
+  writeFactoryServers(ROOT, DEFAULT_NAMESPACE, { github: GITHUB });
+  const PASTED = 'http://localhost:8791/callback?code=a-code&state=a-state';
+  const none = await refusal(runWith(engineOf(engine.layer), serverSignInCallback(DEFAULT_NAMESPACE, 'github', PASTED, ROOT)));
+  assert.equal(none._tag, 'Conflict', 'no sign-in waits');
+  const missing = await refusal(runWith(engineOf(engine.layer), serverSignInCallback(DEFAULT_NAMESPACE, 'gitlab', PASTED, ROOT)));
+  assert.equal(missing._tag, 'Missing');
+  await runWith(engineOf(engine.layer), serverSignIn(DEFAULT_NAMESPACE, 'github', ROOT));
+  const elsewhere = 'http://localhost:9999/callback?code=a-code&state=a-state';
+  const wrong = await refusal(runWith(engineOf(engine.layer), serverSignInCallback(DEFAULT_NAMESPACE, 'github', elsewhere, ROOT)));
+  assert.equal(wrong._tag, 'Invalid');
+  assert.equal(wrong.message.includes('a-code'), false, 'the pasted address is in no refusal');
+  assert.deepEqual(engine.callbacks, [], 'nothing handed on');
+  const state = await runWith(engineOf(engine.layer), serverSignInCallback(DEFAULT_NAMESPACE, 'github', PASTED, ROOT));
+  assert.equal(state.state, 'waiting');
+  assert.deepEqual(engine.callbacks, [{ name: 'github', url: PASTED }]);
+  engine.settleSignIn('github', { state: 'connected' });
+  assert.deepEqual(await runWith(engineOf(engine.layer), serverSignInState(DEFAULT_NAMESPACE, 'github', ROOT)), { state: 'connected' });
 });

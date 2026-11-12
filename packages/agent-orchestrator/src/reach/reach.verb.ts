@@ -4,6 +4,7 @@
  * workflow gates as it declares them; of a run, off the steps it is gated at, a gate added at its start among them, with what keeps each
  * rule that could approve one from doing so now, read as admission reads it (`seenOf`, `factsOf`). Any agent's: the name is the one given.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Schema } from 'effect';
@@ -200,7 +201,7 @@ function reachLines(r: PolicyReach): string[] {
  */
 export const POLICY_REACH: Command<PolicyReach, ReachInput> = {
   name: 'policy reach',
-  served: [{ endpoint: 'nemia.reach' }],
+  served: [{ endpoint: 'nemia.reach', request: renamed({ runId: 'run' }) }],
   usage: '<agent> (--factory <name> | --run <runId>)',
   help: [
     "which steps at their gate the agent's rules in force could ever approve",

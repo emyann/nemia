@@ -4,6 +4,7 @@
  * back; `untrustedPlaces` reads which places are not trusted now, for a listing; and `nemia factory trust <name>`, the verb that asks
  * again (`FACTORY_TRUST`). The repository a folder is in is the place's answer (`root`), and the trust is the runtime's.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import { Effect, Schema } from 'effect';
@@ -122,7 +123,7 @@ function placesOf(home: string, name: string): readonly string[] {
  */
 export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[] }, TrustInput> = {
   name: 'factory trust',
-  served: [{ endpoint: 'factories.trust' }],
+  served: [{ endpoint: 'factories.trust', request: renamed({ factory: 'name' }) }],
   usage: '<name>',
   help: ["trust a factory's places for the harnesses its steps run on, so each", "place's own settings apply to them"],
   spec: {

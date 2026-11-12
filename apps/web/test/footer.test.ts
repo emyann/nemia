@@ -204,13 +204,14 @@ test("feedWords and versionWords: the feed's word and the version serving the bo
     "the version says the code serving the board: an install's tag, or checkout, and the folder in its hover; the version alone without",
     () => {
       const install = { kind: 'install', root: '/home/me/.nemia/v1.2.0', tag: 'v1.2.0', commit: 'abcdef1234567890' } as const;
-      assert.deepEqual(versionWords({ version: '1.0.0', release: install }), {
-        text: 'v1.0.0 · v1.2.0',
-        title: "Nemia's orchestrator, version 1.0.0, the installed release v1.2.0 (abcdef1) at /home/me/.nemia/v1.2.0",
+      assert.deepEqual(versionWords({ version: '1.2.0', release: install }), {
+        text: 'v1.2.0 · install',
+        title: 'Nemia 1.2.0, the installed release v1.2.0 (abcdef1) at /home/me/.nemia/v1.2.0',
       });
+      assert.equal(versionWords({ version: '1.3.0', release: install }).text, 'v1.3.0 · v1.2.0', 'an install of another tag names it');
       assert.deepEqual(versionWords({ version: '1.0.0', release: { kind: 'checkout', root: '/home/me/nemia' } }), {
         text: 'v1.0.0 · checkout',
-        title: "Nemia's orchestrator, version 1.0.0, run from the checkout at /home/me/nemia",
+        title: 'Nemia 1.0.0, run from the checkout at /home/me/nemia',
       });
     },
   );

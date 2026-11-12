@@ -3,8 +3,9 @@
  * whose end a test settles. The real ones spawn Claude Code and wait on a person's browser, which no node test does.
  *
  * What matters: the address is answered before the server connects; the hold is one per callback port, a second refused while the
- * first waits; a sign-in no one approves ends at its bound and reads `expired`; and an engine with no Claude Code harness spawns
- * nothing.
+ * first waits; a sign-in no one approves ends at its bound and reads `expired`; an engine with no Claude Code harness spawns
+ * nothing; and an address pasted back is handed to the waiting session only when it is that sign-in's redirect with a code and a state,
+ * never quoted in a refusal.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +28,14 @@ const GITHUB: RemoteMcpServer = {
 /** Seams that record every CLI call and session, each session settled by hand through `settle`. */
 const seams = () => {
   const cli: Array<readonly string[]> = [];
-  const sessions: Array<{ name: string; cwd: string; redirectUri: string; ended: boolean; settle: (s: SignInSettled) => void }> = [];
+  const sessions: Array<{
+    name: string;
+    cwd: string;
+    redirectUri: string;
+    ended: boolean;
+    submitted: string[];
+    settle: (s: SignInSettled) => void;
+  }> = [];
   const run: McpCli = async (args) => {
     cli.push(args);
     return { code: 0, out: '' };
@@ -35,9 +43,14 @@ const seams = () => {
   const ask: McpSignInAsk = async (name, _server, { cwd, redirectUri }) => {
     let settle: (s: SignInSettled) => void = () => {};
     const settled = new Promise<SignInSettled>((resolve) => (settle = resolve));
-    const s = { name, cwd, redirectUri, ended: false, settle };
+    const s = { name, cwd, redirectUri, ended: false, submitted: [] as string[], settle };
     sessions.push(s);
-    return { authUrl: `https://github.com/login/oauth/authorize?state=${sessions.length}`, settled, end: () => void (s.ended = true) };
+    return {
+      authUrl: `https://github.com/login/oauth/authorize?state=${sessions.length}`,
+      settled,
+      end: () => void (s.ended = true),
+      submit: async (url) => void s.submitted.push(url),
+    };
   };
   return { cli, sessions, run, ask };
 };
@@ -210,4 +223,75 @@ test('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', asyn
       assert.deepEqual([s.cli, s.sessions.length], [[], 0]);
     },
   );
+});
+
+test('a person whose browser runs elsewhere pastes back the address it landed on, and the sign-in completes', async (t) => {
+  const st = story(t);
+  const s = seams();
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+  const PASTED = 'http://localhost:8791/callback?code=a-code-of-the-sign-in&state=a-state-of-the-sign-in';
+
+  await st.test('REFUSED: a callback with no sign-in waiting for the server, nothing handed on', async () => {
+    const err = await refusalOf(v.mcpSignInCallback('github', PASTED));
+    assert.deepEqual([err._tag, err.held, err.callback], ['McpSignInRefused', false, 'none-waiting']);
+    assert.equal(err.message.includes('a-code-of-the-sign-in'), false, 'the pasted address is in no refusal');
+  });
+
+  await st.test('REFUSED: each address that is not the redirect with a code and a state, nothing handed on, none quoted', async () => {
+    await Effect.runPromise(v.mcpSignIn('github', GITHUB, 'secret'));
+    const wrong: Array<[string, string]> = [
+      ['not an address a-code-of-the-sign-in', 'unreadable'],
+      ['http://localhost:9999/callback?code=a-code-of-the-sign-in&state=s', 'elsewhere'],
+      ['http://localhost:8791/elsewhere?code=a-code-of-the-sign-in&state=s', 'elsewhere'],
+      ['http://localhost:8791/callback?error=access_denied&state=a-code-of-the-sign-in', 'denied'],
+      ['http://localhost:8791/callback?state=a-code-of-the-sign-in', 'no-code'],
+      ['http://localhost:8791/callback?code=a-code-of-the-sign-in', 'no-state'],
+    ];
+    for (const [url, why] of wrong) {
+      const err = await refusalOf(v.mcpSignInCallback('github', url));
+      assert.deepEqual([err._tag, err.held, err.callback], ['McpSignInRefused', false, why], url);
+      assert.equal(err.message.includes('a-code-of-the-sign-in'), false, `the pasted address is in no refusal: ${why}`);
+    }
+    assert.deepEqual(s.sessions[0].submitted, [], 'nothing was handed to the harness');
+    assert.equal((await Effect.runPromise(v.mcpSignInState('github'))).state, 'waiting', 'and the sign-in still waits');
+  });
+
+  await st.test(
+    "the sign-in's own redirect with a code and a state is handed to its session, and the state still reads waiting",
+    async () => {
+      const state = await Effect.runPromise(v.mcpSignInCallback('github', PASTED));
+      assert.deepEqual(s.sessions[0].submitted, [PASTED]);
+      assert.equal(state.state, 'waiting');
+    },
+  );
+
+  await st.test('the session reads connected once the harness took it, as a browser reaching the port would', async () => {
+    s.sessions[0].settle({ connected: true });
+    await until(() => s.sessions[0].ended);
+    assert.deepEqual(await Effect.runPromise(v.mcpSignInState('github')), { state: 'connected' });
+  });
+
+  await st.test('REFUSED: a second paste once it settled: none waits any more', async () => {
+    const err = await refusalOf(v.mcpSignInCallback('github', PASTED));
+    assert.equal(err.callback, 'none-waiting');
+    assert.deepEqual(s.sessions[0].submitted, [PASTED], 'handed on once');
+  });
+});
+
+test('REFUSED: a harness that does not take the pasted address answers its refusal without the address', async () => {
+  const s = seams();
+  const PASTED = 'http://localhost:8791/callback?code=a-code-of-the-sign-in&state=s';
+  const ask: McpSignInAsk = async (...args) => ({
+    ...(await s.ask(...args)),
+    submit: async (url) => {
+      throw new Error(`the harness did not match the state of ${url}`);
+    },
+  });
+  const v = mcpSignInVerbsOf(CLAUDE, scratch('ae-sign-in-'), undefined, { cli: s.run, ask });
+  await Effect.runPromise(v.mcpSignIn('github', GITHUB));
+  const err = await refusalOf(v.mcpSignInCallback('github', PASTED));
+  assert.deepEqual([err._tag, err.held], ['McpSignInRefused', false]);
+  assert.equal(err.message.includes('a-code-of-the-sign-in'), false, err.message);
+  s.sessions[0].settle({ connected: false, why: 'ended' });
+  await until(() => s.sessions[0].ended);
 });

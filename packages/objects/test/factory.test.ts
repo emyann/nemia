@@ -1,12 +1,13 @@
 /**
  * The Factory (`src/factory.ts`): a factory and a page of them as the Api's endpoints answer them, every key kept, a factory missing
  * every optional key read; its condition words closed; and its sub-resources — its rules, its instruction and its commands, the old
- * route's lines as the board read them — as the Api's endpoints answer them and take their writes.
+ * route's lines as the board read them — as the Api's endpoints answer them and take their writes; and the writes that name a template
+ * or a folder, a template given by its name or packed, never by a path.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { API_VERSION, Factory, FactoryCommands } from 'objects';
+import { API_VERSION, Factory, FactoryCommands, TemplateGiven } from 'objects';
 import { answered, taken } from './served.ts';
 
 const templated = {
@@ -139,4 +140,113 @@ test("an upgrade's conflict names the proposal its resolution waits on: its phas
     () => Schema.decodeUnknownSync(Factory)(upgradeWith({ name: 'p-1', phase: 'pending' })),
     'a phase is one of PROPOSAL_PHASES',
   );
+});
+
+test('a template travels by its name or packed in base64, never as a path; REFUSED: both, neither, or a path key', () => {
+  for (const template of [{ name: 'sdlc' }, { archive: 'H4sIAAAA' }])
+    assert.deepEqual(taken('factories', 'apply', { template, repos: ['/srv/repo'] }), { template, repos: ['/srv/repo'] });
+  assert.equal(taken('factories', 'apply', { template: { path: '/laptop/sdlc' }, repos: [] }), undefined);
+  assert.equal(taken('factories', 'apply', { template: {}, repos: [] }), undefined);
+  assert.deepEqual(taken('factories', 'apply', {}), {}, "a template or repositories left out are the verb's to refuse, in its words");
+  assert.equal(Schema.decodeUnknownExit(TemplateGiven)({ name: 1 })._tag, 'Failure');
+});
+
+test('a factory filed and a volume mounted and taken off, as the Api takes and answers them; REFUSED: a filing whose repos are no list', () => {
+  const filing = { name: 'mill', repos: ['/srv/repo'], noTrust: true };
+  assert.deepEqual(taken('factories', 'create', filing), filing);
+  assert.equal(taken('factories', 'create', { name: 'mill', repos: '/srv/repo' }), undefined);
+  const created = {
+    name: 'mill',
+    repos: ['/srv/repo'],
+    file: '/store/factories/mill.json',
+    trusts: [{ place: '/srv/repo', unasked: 'no harness keeps a trust' }],
+  };
+  assert.deepEqual(answered('factories', 'create', created), created);
+  assert.deepEqual(taken('factories', 'addVolume', { volume: '/srv/data:ro' }), { volume: '/srv/data:ro' });
+  const added = { file: '/store/factories/mill.json', volume: { path: '/srv/data', readOnly: true }, was: null };
+  assert.deepEqual(answered('factories', 'addVolume', added), added);
+  const removed = { file: '/store/factories/mill.json', removed: '/srv/data' };
+  assert.deepEqual(answered('factories', 'removeVolume', removed), removed);
+  assert.equal(answered('factories', 'addVolume', removed), undefined);
+});
+
+test('a preview answers an upgrade or a takeover, told apart by kind; REFUSED: a kind, a side or a hire change off its words', () => {
+  const upgrade = {
+    kind: 'upgrade',
+    name: 'mill',
+    from: '1.0.0',
+    to: '1.1.0',
+    merge: {
+      base: 'common',
+      merged: [{ at: 'workflows/a/x.md', from: 'template' }],
+      conflicts: [{ at: 'RULES.md', base: 'a', ours: 'b', theirs: null }],
+    },
+    next: { line: 'nemia factory upgrade mill --to 1.1.0', digest: 'sha256:ab', dropped: [] },
+  };
+  assert.deepEqual(answered('factories', 'diff', upgrade), upgrade);
+  const unnamed = { ...upgrade, from: undefined, switched: { from: 'mill', to: 'press' } };
+  assert.deepEqual(answered('factories', 'diff', unnamed), JSON.parse(JSON.stringify(unnamed)), 'a base no status names has no from');
+  const adopt = {
+    kind: 'adopt',
+    plan: {
+      factory: 'mill',
+      kept: { repos: ['/srv/repo'], schedules: [], instruction: false, volumes: [], settings: [] },
+      workflows: { added: ['press'], dropped: [], kept: [] },
+      hires: [{ step: 'press/draft', kind: 'added', now: 'drafter' }],
+      revisions: { was: 'pinned', now: 'pinned' },
+      rules: null,
+      runs: { ids: [], policy: 'pinned' },
+      stranded: { cards: [], schedules: [] },
+    },
+    digest: 'sha256:cd',
+    line: 'nemia factory adopt mill --template /store/x.tgz --plan sha256:cd',
+  };
+  assert.deepEqual(answered('factories', 'diff', adopt), adopt);
+  assert.equal(answered('factories', 'diff', { ...upgrade, kind: 'switch' }), undefined);
+  assert.equal(answered('factories', 'diff', { ...upgrade, merge: { ...upgrade.merge, base: 'some' } }), undefined);
+  assert.equal(answered('factories', 'diff', { ...adopt, plan: { ...adopt.plan, hires: [{ step: 's', kind: 'moved' }] } }), undefined);
+  assert.deepEqual(taken('factories', 'diff', { to: '1.1.0', template: { name: 'sdlc' }, sets: ['a=1'] }), {
+    to: '1.1.0',
+    template: { name: 'sdlc' },
+    sets: ['a=1'],
+  });
+});
+
+test("an apply, a takeover, an upgrade and a conflict's choice, as the Api takes and answers them; REFUSED: a choice's file as a path", () => {
+  const template = { source: '/store/templates-given/ab.tgz', version: '1.0.0', params: { budget: 7 } };
+  const applied = { name: 'mill', repos: ['/srv/repo'], file: '/f', template, place: template.source, tree: '/t', trusts: [] };
+  assert.deepEqual(answered('factories', 'apply', applied), applied);
+  assert.deepEqual(taken('factories', 'adopt', { template: { name: 'sdlc' }, plan: 'sha256:cd' }), {
+    template: { name: 'sdlc' },
+    plan: 'sha256:cd',
+  });
+  const adopted = { name: 'mill', file: '/f', template, tree: '/t' };
+  assert.deepEqual(answered('factories', 'adopt', adopted), adopted);
+  assert.deepEqual(taken('factories', 'upgrade', { to: '1.1.0', plan: 'sha256:ab', downgrade: false }), {
+    to: '1.1.0',
+    plan: 'sha256:ab',
+    downgrade: false,
+  });
+  const upgraded = { name: 'mill', from: '1.0.0', to: '1.1.0', file: '/f', dropped: ['old'], conflicts: 2 };
+  assert.deepEqual(answered('factories', 'upgrade', upgraded), upgraded);
+  assert.deepEqual(taken('factories', 'resolve', { conflict: 'RULES.md', text: 'Be brief.\n' }), {
+    conflict: 'RULES.md',
+    text: 'Be brief.\n',
+  });
+  assert.deepEqual(
+    taken('factories', 'resolve', { conflict: 'RULES.md', file: '/laptop/rules.md' }),
+    { conflict: 'RULES.md' },
+    'a path is no key of it',
+  );
+  const resolved = {
+    name: 'mill',
+    at: 'RULES.md',
+    to: '1.1.0',
+    file: '/r',
+    left: [],
+    proposed: { kind: 'Factory', name: 'mill', proposal: 'p-1' },
+    waits: ['p-1'],
+  };
+  assert.deepEqual(answered('factories', 'resolve', resolved), resolved);
+  assert.equal(answered('factories', 'resolve', { ...resolved, proposed: { ...resolved.proposed, kind: 'Card' } }), undefined);
 });

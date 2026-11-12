@@ -1,6 +1,7 @@
 /**
  * A harness's declaration as two needs (`harnessNeedsOf`), a table of declarations: an install need whose first fix puts the program in
- * place and whose second takes it away (`kind: removes`), a sign-in need whose fixes a person types carry `kind: typed`, the token's
+ * place and whose second takes it away (`kind: removes`) — the install taking away the mark a removal leaves (`DEACTIVATED`) before it
+ * runs, the removal leaving it after — a sign-in need whose fixes a person types carry `kind: typed`, the token's
  * maker offered with the command that keeps the token, and none of a harness that declares no needs. And each need named back to its
  * harness and part (`harnessOfNeed`), and the version a command printed (`versionIn`). The laws of `harnessesOfRun`,
  * `runsHoldingRemoval` and `harnessVersionWord` are proved by `contracts/harness-needs.contract.ts`.
@@ -40,7 +41,13 @@ test('a harness declaration gives two needs, each fix of its kind', async (t) =>
       declarations: { tool: declared(needsWith([{ command: 'tool login', message: 'sign in', typed: true }])) },
       needs: ['tool', 'tool-sign-in'],
       kinds: { tool: [undefined, 'removes'], 'tool-sign-in': ['typed'] },
-      commands: { tool: ['install-tool', 'remove-tool'], 'tool-sign-in': ['tool login'] },
+      commands: {
+        tool: [
+          'rm -f "$NEMIA_TOOLS/harnesses/tool/deactivated" && {\ninstall-tool\n}',
+          '{\nremove-tool\n} && mkdir -p "$NEMIA_TOOLS/harnesses/tool" && : > "$NEMIA_TOOLS/harnesses/tool/deactivated"',
+        ],
+        'tool-sign-in': ['tool login'],
+      },
     },
     {
       name: 'a sign-in the server starts is a puts, its code pattern kept',

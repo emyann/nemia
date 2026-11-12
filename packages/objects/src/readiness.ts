@@ -45,7 +45,10 @@ export const ReadinessPiece = Schema.Struct({
 });
 export type ReadinessPiece = typeof ReadinessPiece.Type;
 
-/** `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`; an `inactive` one is not), and the pieces, in the read's order. */
+/**
+ * `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`; an `inactive` one is not), and the pieces, in the
+ * read's order.
+ */
 export const Readiness = Schema.Struct({ ready: Schema.Boolean, pieces: Schema.Array(ReadinessPiece) });
 export type Readiness = typeof Readiness.Type;
 

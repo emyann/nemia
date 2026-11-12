@@ -81,8 +81,7 @@ export const DEACTIVATED = 'deactivated';
 const markOf = (harness: string): string => `"$NEMIA_TOOLS/harnesses/${harness}/${DEACTIVATED}"`;
 
 /** The install of `harness` as it is run: its mark taken away (`DEACTIVATED`), then its adapter's `install`. */
-export const harnessInstallCommand = (harness: string, needs: HarnessNeeds): string =>
-  `rm -f ${markOf(harness)} && {\n${needs.install}\n}`;
+export const harnessInstallCommand = (harness: string, needs: HarnessNeeds): string => `rm -f ${markOf(harness)} && {\n${needs.install}\n}`;
 
 /** The removal of `harness` as it is run: its adapter's `remove`, then its mark left in its folder (`DEACTIVATED`). */
 export const harnessRemoveCommand = (harness: string, needs: HarnessNeeds): string =>

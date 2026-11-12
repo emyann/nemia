@@ -7,7 +7,8 @@
  * missing with the `chmod 600` that fixes it; a place's need is read by its check and carries the command that fixes it; a place's
  * repository need is read per factory; the service, linger, bind and machine pieces follow what their commands and the environment
  * answer; a harness nothing runs on and nobody activated is `inactive`, never counted against `ready`, until it is installed or a
- * factory's workflow names it; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
+ * factory's workflow names it, its checks run over a PATH of the test's own, with no stand-in of it (`test/ambient.ts` puts one of each
+ * harness first); and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
 import { createFactoryAt } from '../factory/factory.store.ts';
 import path from 'node:path';
@@ -189,14 +190,13 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   assert.equal(fs.existsSync(path.join(repo, 'ran-here')), false, 'its check never ran in the repository');
 });
 
-test("a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named", async (t) => {
+test('a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named', async (t) => {
   const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
   assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
   const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
   const name = declaration.needs.program;
   const program = path.join(toolsBinDir(ROOT), name);
   const ambient = process.env.PATH;
-  // The checks run over this process's PATH, which test/ambient.ts leads with a stand-in of every harness: this one is taken off it.
   process.env.PATH = (ambient ?? '')
     .split(path.delimiter)
     .filter((dir) => !fs.existsSync(path.join(dir, name)))

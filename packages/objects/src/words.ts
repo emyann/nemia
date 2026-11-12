@@ -321,6 +321,18 @@ export const RULE_ORIGINS = ['default', 'proposed'] as const;
 /** One of `RULE_ORIGINS`. */
 export type RuleOrigin = (typeof RULE_ORIGINS)[number];
 
+/** How many of the steps at their gate an agent's rules in force could ever approve unasked: every one, some, or none. */
+export const POLICY_REACHES = ['all', 'some', 'none'] as const;
+
+/** One of `POLICY_REACHES`. */
+export type PolicyReachWord = (typeof POLICY_REACHES)[number];
+
+/** Why a condition can never hold at a gate: the step is approved before it runs, or it has no check to pass. */
+export const NEVER_HOLDS = ['approved-before-it-runs', 'no-check'] as const;
+
+/** One of `NEVER_HOLDS`. */
+export type NeverHolds = (typeof NEVER_HOLDS)[number];
+
 /** Who a message of a chat is from: the task's agent, the person, the keeper's quiet marker, or another agent the person allowed. */
 export const CHAT_FROM = ['agent', 'person', 'keeper', 'peer'] as const;
 

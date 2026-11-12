@@ -299,7 +299,7 @@ export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place
  * `nemia policy propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
 export async function policyProposeRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = withWords(args, POLICY_PROPOSE.name);
+  const asked = inputFor(POLICY_PROPOSE, withWords(args, POLICY_PROPOSE.name));
   const data = await runWith(e, placedIn(env, place, POLICY_PROPOSE.handler(asked)));
   for (const line of POLICY_PROPOSE.print(data, asked)) console.log(line);
 }

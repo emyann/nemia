@@ -19,8 +19,17 @@ export type Sized = { readonly maxConcurrent: number; readonly memoryLimitMiB: n
 /** The machine's memory each session is given on average, in MiB. */
 export const MIB_PER_SESSION = 2560;
 
-/** The smallest machine Nemia sizes: 2 GiB and one CPU; the installer refuses a smaller one, naming what it found. */
-const sizable = (m: Machine): boolean => Number.isInteger(m.memoryMiB) && Number.isInteger(m.cpus) && m.memoryMiB >= 2048 && m.cpus >= 1;
+/**
+ * The smallest machine Nemia sizes: 2 GiB and one CPU; the installer refuses a smaller one, naming what it found. And the largest: a
+ * pebibyte and 65,536 CPUs, past any machine's, so that no count is so large that a double's arithmetic on it rounds.
+ */
+const sizable = (m: Machine): boolean =>
+  Number.isInteger(m.memoryMiB) &&
+  Number.isInteger(m.cpus) &&
+  m.memoryMiB >= 2048 &&
+  m.cpus >= 1 &&
+  m.memoryMiB <= 2 ** 30 &&
+  m.cpus <= 2 ** 16;
 
 /** Whether one more session than `n` would fit: its share of the memory, and a CPU left over. */
 const roomForMore = (m: Machine, n: number): boolean => (n + 1) * MIB_PER_SESSION <= m.memoryMiB && n + 1 <= m.cpus - 1;

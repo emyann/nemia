@@ -17,6 +17,7 @@ import {
   memoryLimit,
   metricsHourDays,
   metricsMinuteDays,
+  releaseCheck,
   settingsOf,
   verifiesRest,
   wfRoot,
@@ -74,6 +75,7 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
       ['/sys/fs/cgroup/x', 'run.scope', 'sessions', 'a/b.slice', '.slice', 'a b.slice'],
       'WF_CGROUP_PARENT=sessions.slice',
     ],
+    'NEMIA_RELEASE_CHECK neither on nor off': [releaseCheck, 'NEMIA_RELEASE_CHECK', ['0', 'no', 'OFF', ' off'], 'NEMIA_RELEASE_CHECK=off'],
   };
   for (const [name, [read, variable, values, fix]] of Object.entries(rows))
     await t.test(name, () => {
@@ -126,6 +128,17 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       'WF_EXPOSED: 1 marks the store exposed, and anything else, unset among them, leaves it not',
       () => [{ WF_EXPOSED: '1' }, { WF_EXPOSED: '0' }, { WF_EXPOSED: '' }, { WF_EXPOSED: 'yes' }, {}].map((env) => exposedStore(env)),
       [true, false, false, false, false],
+    ],
+    [
+      'NEMIA_RELEASE_CHECK: off turns the release check off; on, empty or unset leaves it on',
+      () =>
+        [{ NEMIA_RELEASE_CHECK: 'off' }, { NEMIA_RELEASE_CHECK: 'on' }, { NEMIA_RELEASE_CHECK: '' }, {}].map((env) => releaseCheck(env)),
+      [false, true, true, true],
+    ],
+    [
+      'the settings carry the release check',
+      () => [settingsOf({ NEMIA_RELEASE_CHECK: 'off' }).releaseCheck, settingsOf({}).releaseCheck],
+      [false, true],
     ],
     ['the settings carry it as exposed', () => [settingsOf({ WF_EXPOSED: '1' }).exposed, settingsOf({}).exposed], [true, false]],
     [

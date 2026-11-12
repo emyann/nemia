@@ -23,7 +23,7 @@ import {
   type ServiceNamed,
   type Unstarted,
 } from './demand.ts';
-import { DEFAULT_NAME, plistRead, systemOf, unitName, unitPathOf, unitRead } from '../service/service.ts';
+import { DEFAULT_NAME, plistRead, systemOf, unitName, unitPathOf, unitRead } from '../service/index.ts';
 import { spawnDetached, unitsOf, type SpawnEnded } from '../service/service.store.ts';
 import { liveHost, serviceForUpgrade, type ServiceHost } from '../service/service.verb.ts';
 

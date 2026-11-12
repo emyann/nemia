@@ -158,6 +158,10 @@ const MOVES = {
     move: "a workflow's word in the runtime's prose: its callers' names (`nemia up`, the orchestrator, a step) and the same word in another sense (the SDK's client factory, Claude Code's gate)",
     to: 'the same files in packages/agent-runtime, said in its own words: a caller, a task, an attempt, a session',
   },
+  signIn: {
+    move: "the default harness's sign-in token a person keeps for the daemon: the name of its file and of its commands, and the command that prints it",
+    to: "packages/agent-runtime, which names each harness's sign-in token, the variable it is read from and the command that makes it",
+  },
   quota: {
     move: "the quota's words for Claude Code: the harness the api asks, its get_usage and its states",
     to: "packages/agent-runtime's quota answer, which names its harness and states; the api and the board show it in the orchestrator's words",
@@ -306,6 +310,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
   'packages/agent-orchestrator/src/runtime-client.ts': { count: 1, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/sign-in/sign-in.store.ts': { count: 2, ...MOVES.signIn },
   'packages/agent-orchestrator/src/skills/read.store.ts': { count: 8, ...MOVES.checkout },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
   'packages/agent-orchestrator/src/status/status.ts': { count: 2, card: 'u42s' },

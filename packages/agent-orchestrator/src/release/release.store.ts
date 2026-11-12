@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Result, Schema } from 'effect';
-import { CURRENT, RELEASE_FILE, type Current, type ReleaseFile, type Running } from './release.ts';
+import { CURRENT, RELEASE_FILE, RELEASE_PLATFORMS, type Current, type ReleaseFile, type Running } from './release.ts';
 import type { BuildLog, Installed, PidEntry } from '../retention/index.ts';
 
 /** `release.json` as an upgrade writes it (`ReleaseFile`). */
@@ -19,6 +19,8 @@ const ReleaseFileSchema = Schema.Struct({
   commit: Schema.String.check(Schema.isNonEmpty()),
   source: Schema.String,
   builtAt: Schema.String,
+  from: Schema.optionalKey(Schema.Literals(['build', 'archive'])),
+  platform: Schema.optionalKey(Schema.Literals(RELEASE_PLATFORMS)),
 });
 
 /** The store's releases folder. */

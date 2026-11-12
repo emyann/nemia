@@ -182,12 +182,17 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia token ls
                                your tokens, by name, with when each was minted: never a token itself
                                CLI only: a token is minted where the store is and printed once to the person there; a caller of the port holding one token mints and revokes no other
+  nemia claude-token status
+                               whether your subscription token is kept, its file and its mode: never
+                               the token
+                               CLI only: the token is the person's own, kept on the machine the store is on and read there from the terminal; no caller of the port reads or writes it
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
                                daemon runs, from its lease, and whether it promises to keep a running
                                session on its files; and the sessions at work by release and harness
-                               version, off their records. --json: the whole answer
+                               version, off their records; and a newer release, where the daemon's
+                               release check read one. --json: the whole answer
                                CLI only: it says which code the command runs from; the api answers its own at GET /api/version
   nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
                                the feed's lines, followed as the tick writes them, until ^C, and a
@@ -566,7 +571,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia chat disallow <name>
                                take a name back: words under it are refused. Asked of you every time
                                CLI only: the board shows no speaker list yet: nemia chat allow writes it
-  nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
+  nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this
                                node, WF_ROOT and PATH, and each --env, written once; it restarts on
@@ -574,7 +579,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                the store; --take-over <pid> pauses the store, waits for the calls
                                in flight of its sessions, stops that pid and starts the service
                                (checks and jobs run on, as nemia service restart --help says).
-                               --name: the service
+                               --size auto: the sessions at once and each one's memory limit, read
+                               off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT; no limit on
+                               macOS), each but one --env gives. --bind <addr>: the address the
+                               daemon listens on (NEMIA_BIND), and the store marked exposed
+                               (WF_EXPOSED=1), so every caller presents a token: nemia token add
+                               mints the first. --name: the service
                                name (nemia; required for a store that is not the default)
                                CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service uninstall [--name <name>]
@@ -596,8 +606,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                Starts the service where nothing ticks; a daemon started by hand is
                                named with --take-over's line
                                CLI only: it restarts the person's login service, on the machine the command runs on
-  nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]
-                               build the tag from a clean export into the store's releases/<tag>:
+  nemia upgrade [<tag>] [--repo <path>] [--name <name>] [--timeout <d>]
+                               on an archive install, download the tag's archive (the newest where
+                               none is named), check it against its SHA256SUMS and run its nemia
+                               version, into the store's releases/<tag>; on a release built from a
+                               repository, build the tag from a clean export into releases/<tag>:
                                npm ci, npm run build and npm run release:check there, on a trial
                                store; then point releases/current at it and restart the daemon onto
                                it where the login service runs the pointer: jobs run on, and the
@@ -610,7 +623,8 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                not current, not among the two newest, and that no session or
                                running nemia runs on, the folder of each build whose upgrade died,
                                and each build log older than 30 days, as the daemon does every five
-                               minutes
+                               minutes. A tag older than the oldest release that can read the store
+                               (store.json) is refused before anything is fetched or built
                                CLI only: builds for minutes and restarts the daemon that serves the api
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former

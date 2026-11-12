@@ -4,6 +4,7 @@
  * one at the command line, a fake in the tests, so no test starts a service.
  */
 import { StoreRoot } from '../config/root.store.ts';
+import os from 'node:os';
 import { Effect } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import type { Args, Flag } from '../command/command.ts';
@@ -14,7 +15,7 @@ import { Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { asked, drained, EngineService, tried, type TaskView } from '../runtime-client.ts';
 import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal, type Finishing, type Pause } from '../pause/pause.ts';
 import { timeoutAt } from '../pause/pause-timeout.store.ts';
-import { pointedEntry } from '../release/release.ts';
+import { pointedEntry } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import {
   envPairs,
@@ -57,17 +58,20 @@ import {
   writeUnit,
 } from './service.store.ts';
 import { takeOver, takeOverConfirmed, type Started, type TakeoverHost } from './takeover.verb.ts';
+import { sizedFor, sizeRefusal, type MachineSize } from './sizing.ts';
 
 /**
  * What the service's verbs reach of the machine: what it is, where files go, which store and its default, the daemon the checkout runs
- * and the node that runs it, the installer's `PATH`, the user, the system's programs (`call`) and lingering; and what a take-over is
- * handed (`TakeoverHost`).
+ * and the node that runs it (the daemon's own `node` where it carries one, an archive install's), the installer's `PATH`, the user, the
+ * system's programs (`call`) and lingering, and its size, which `--size auto` reads (`size`); and what a take-over is handed
+ * (`TakeoverHost`).
  */
 export type ServiceHost = TakeoverHost & {
   readonly machine: () => Machine;
   readonly dirs: () => { home: string; configHome: string };
   readonly roots: () => { root: string; defaultRoot: string };
-  readonly daemon: () => { checkout: string; entry: string; cwd: string };
+  readonly daemon: () => { checkout: string; entry: string; cwd: string; node?: string };
+  readonly size: () => MachineSize;
   readonly node: string;
   readonly path: string;
   readonly user: () => { name: string; uid: number };
@@ -133,7 +137,8 @@ export const liveHost = (root: string, timeoutMs: number = DEFAULT_TIMEOUT_MS): 
   machine: machineOf,
   dirs: serviceDirs,
   roots: () => storeRoots(root),
-  daemon: () => pointedEntry(daemonEntry(), runningRelease()),
+  daemon: () => pointedEntry({ ...daemonEntry(), node: process.execPath }, runningRelease()),
+  size: () => ({ memoryMiB: Math.floor(os.totalmem() / 1_048_576), cpus: os.availableParallelism() }),
   node: process.execPath,
   path: process.env.PATH ?? '',
   user: userOf,
@@ -232,22 +237,86 @@ function pidOf(text: unknown): number | undefined {
   });
 }
 
-/** The service's spec: the checkout's daemon under the installer's node, its store and `PATH`, then each `--env`, in the order given. */
-function specOf(at: Placed, args: Args, host: ServiceHost): ServiceSpec {
+/** The variables `--bind` writes: the address the daemon listens on, and the store marked exposed, so every caller presents a token. */
+const BIND_KEYS = ['NEMIA_BIND', 'WF_EXPOSED'] as const;
+
+/** A bind address as `--bind` takes it: a host name or an address, IPv6 in brackets or not, with no space nor control character. */
+const BIND = /^[A-Za-z0-9.:[\]%_-]+$/;
+
+/**
+ * The variables `--size auto` writes, read off the machine's size (`sizedFor`), each but one `--env` gives (`given`): the sessions at once
+ * and, but on launchd, which holds no per-session limit, each one's memory limit; and its line. None without `--size`. Refused
+ * (`Invalid`): a `--size` other than `auto`, or a machine outside what Nemia sizes (`sizeRefusal`).
+ */
+function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlySet<string>): { env: [string, string][]; lines: string[] } {
+  if (args.size === undefined) return { env: [], lines: [] };
+  if (args.size !== 'auto')
+    throw new Invalid({
+      message: `nemia service install: --size takes auto, which sizes the sessions to this machine: ${SHAPES.install}.`,
+    });
+  const machine = host.size();
+  const wrong = sizeRefusal(machine);
+  if (wrong !== null) throw new Invalid({ message: wrong });
+  const sized = sizedFor(machine);
+  const env: [string, string][] = [
+    ...(given.has('WF_MAX_CONCURRENT') ? [] : [['WF_MAX_CONCURRENT', String(sized.maxConcurrent)] as [string, string]]),
+    ...(given.has('WF_MEMORY_LIMIT') || at.system === 'launchd'
+      ? []
+      : [['WF_MEMORY_LIMIT', `${sized.memoryLimitMiB}Mi`] as [string, string]]),
+  ];
+  const said = env.map(([k, v]) => `${k}=${v}`).join(', ');
+  return {
+    env,
+    lines: [
+      `sized for ${machine.memoryMiB} MiB and ${machine.cpus} CPU: ${said || 'each variable as --env gives it'}`,
+      ...(at.system === 'launchd'
+        ? ['launchd holds no per-session memory limit: no WF_MEMORY_LIMIT is written, and a session on macOS runs unbounded']
+        : []),
+    ],
+  };
+}
+
+/**
+ * The variables `--bind <addr>` writes (`BIND_KEYS`); none without it. Refused (`Invalid`): an address that is none, or a variable
+ * `--env` gives too.
+ */
+function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
+  if (args.bind === undefined) return [];
+  if (typeof args.bind !== 'string' || !BIND.test(args.bind))
+    throw new Invalid({
+      message: `nemia service install: --bind takes the address the daemon listens on, like --bind 0.0.0.0 or --bind 100.64.0.7.`,
+    });
+  const twice = BIND_KEYS.find((k) => given.has(k));
+  if (twice !== undefined)
+    throw new Invalid({ message: `nemia service install: --bind writes ${twice}, and --env gives it too: give one of them.` });
+  return [
+    ['NEMIA_BIND', args.bind],
+    ['WF_EXPOSED', '1'],
+  ];
+}
+
+/**
+ * The service's spec: the checkout's daemon under the installer's node (or the one the daemon carries), its store and `PATH`, what
+ * `--size auto` and `--bind` write, then each `--env`, in the order given; and the lines the sizing says.
+ */
+function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec; lines: string[] } {
   const given = Array.isArray(args.env) ? (args.env as readonly string[]) : [];
   const wrong = envRefusal(given);
   if (wrong !== null) throw new Invalid({ message: wrong });
+  const keys = new Set(envPairs(given).map(([k]) => k));
+  const sized = sizedEnv(args, at, host, keys);
+  const bound = boundEnv(args, keys);
   const daemon = host.daemon();
   const spec: ServiceSpec = {
     name: at.name,
     node: host.node,
     ...daemon,
-    env: [['WF_ROOT', host.roots().root], ['PATH', host.path], ...envPairs(given)],
+    env: [['WF_ROOT', host.roots().root], ['PATH', host.path], ...sized.env, ...bound, ...envPairs(given)],
     logs: launchdLogs(host.dirs().home, at.name),
   };
   const bad = specRefusal(spec);
   if (bad !== null) throw new Invalid({ message: bad });
-  return spec;
+  return { spec, lines: sized.lines };
 }
 
 /** What `nemia service install` did: the service and its file, the checkout it runs, how it stands now, and its lines. */
@@ -308,10 +377,11 @@ const lingerLines = (at: Placed, host: ServiceHost): string[] => {
  */
 export const installService = Effect.fn('installService')(function* (args: Args, given?: ServiceHost) {
   const host = given ?? liveHost(yield* StoreRoot);
-  const { at, spec, pid } = yield* tried(() => {
+  const { at, spec, sizing, pid } = yield* tried(() => {
     const at = placed(args, host);
     const pid = pidOf(args.takeOver);
-    return { at, spec: specOf(at, args, host), pid };
+    const { spec, lines } = specOf(at, args, host);
+    return { at, spec, sizing: lines, pid };
   });
   if (pid !== undefined) yield* takeOverConfirmed(pid, host);
   yield* tried(() => {
@@ -327,7 +397,7 @@ export const installService = Effect.fn('installService')(function* (args: Args,
           holder: pid,
           lines: [`took the store over from pid ${pid}: ${at.unit} ticks it${taken.pid ? ` as pid ${taken.pid}` : ''}`],
         }));
-  const lines = [wrote, ...done.lines, ...lingerLines(at, host)];
+  const lines = [wrote, ...sizing, ...done.lines, ...lingerLines(at, host)];
   return { name: at.name, system: at.system, file: at.file, checkout: spec.checkout, ...done, lines } satisfies Installed;
 });
 
@@ -432,7 +502,7 @@ export const NAME_FLAG: Flag = {
 
 /** How each service command is typed, as its refusals end on it. */
 const SHAPES = {
-  install: 'nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]',
+  install: 'nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]',
   uninstall: 'nemia service uninstall [--name <name>]',
   status: 'nemia service status [--name <name>]',
 } as const;
@@ -440,7 +510,7 @@ const SHAPES = {
 /** `nemia service install`. */
 const INSTALL: Command<Installed> = {
   name: 'service install',
-  usage: '[--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]',
+  usage: '[--env KEY=VALUE ...] [--size auto] [--bind <addr>] [--name <name>] [--take-over <pid>]',
   help: [
     'install the daemon as a login service: a systemd user unit on Linux,',
     'a launchd agent on macOS. It runs the api of this checkout with this',
@@ -449,13 +519,25 @@ const INSTALL: Command<Installed> = {
     'the store; --take-over <pid> pauses the store, waits for the calls',
     'in flight of its sessions, stops that pid and starts the service',
     '(checks and jobs run on, as nemia service restart --help says).',
-    '--name: the service',
+    "--size auto: the sessions at once and each one's memory limit, read",
+    'off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT; no limit on',
+    'macOS), each but one --env gives. --bind <addr>: the address the',
+    'daemon listens on (NEMIA_BIND), and the store marked exposed',
+    '(WF_EXPOSED=1), so every caller presents a token: nemia token add',
+    'mints the first. --name: the service',
     'name (nemia; required for a store that is not the default)',
   ],
   spec: {
     positionals: [],
     flags: [
       { flag: '--env', kind: 'text', key: 'env', many: true, takes: `--env takes KEY=VALUE: ${SHAPES.install}.` },
+      { flag: '--size', kind: 'name', key: 'size', takes: `--size takes auto: ${SHAPES.install}.` },
+      {
+        flag: '--bind',
+        kind: 'text',
+        key: 'bind',
+        takes: `--bind takes the address to listen on, like --bind 0.0.0.0: ${SHAPES.install}.`,
+      },
       NAME_FLAG,
       { flag: '--take-over', kind: 'name', key: 'takeOver', takes: `--take-over takes the holder's pid: ${SHAPES.install}.` },
     ],

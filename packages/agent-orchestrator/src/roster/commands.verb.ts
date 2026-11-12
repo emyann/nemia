@@ -65,6 +65,7 @@ export const AGENTS: Command<AgentsRead, AgentsInput> = {
     why: "the api serves it as the Agent's `list` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentsInput,
+  /** None given, no repository's read: the command line's runner gives the folder it is typed in (`agentsRun`). */
   handler: ({ repo }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
   print: agentsLines,
 };

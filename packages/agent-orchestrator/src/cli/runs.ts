@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   admitted,
+  AGENTS,
   AGENTS_CUSTOM,
   POLICY_PROPOSE,
   PRUNE,
@@ -282,6 +283,18 @@ const factoryWords = (args: Args, command: string): { factory: string; words?: s
   ...(typeof args.file === 'string' ? { words: wordsFrom(args.file, command) } : {}),
   ...(args.clear === true ? { clear: true } : {}),
 });
+
+/**
+ * `nemia agents`' runner: a repository the command line names, else the folder it is typed in, as `[--repo .]` says, handed to its entry's
+ * handler (`AGENTS`), which reads no repository where none is given (the api's, on an install with no factory named); forwarded, the
+ * repository is the api's to resolve, and none is added. What the entry says of them printed.
+ */
+export async function agentsRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const named = args.repo;
+  const asked = typeof named === 'string' ? { repo: named } : forwardedOf(env) === undefined ? { repo: '.' } : {};
+  const data = await answered(env, e, place, AGENTS, asked);
+  for (const line of AGENTS.print(data, asked)) console.log(line);
+}
 
 /**
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its

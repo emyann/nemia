@@ -287,7 +287,7 @@ test('resumed past the cap, one notice with the count in place of the lines, the
   });
   assert.equal(notice?.meta.skipped, String(skipped), 'the count of the lines skipped');
   assert.equal(notice?.meta.after, String(saved), 'the cursor they start after');
-  assert.ok((notice?.content ?? '').includes(skippedRead({ selectors: [] }, String(saved))), 'the command that prints them');
+  assert.ok((notice?.content ?? '').includes(skippedRead({ selectors: [] }, String(saved), 'local')), 'the command that prints them');
   assert.equal(events(c.notices).length, 0, 'none of the skipped lines');
   await store.pass({ 'r-1': stepAt('succeeded'), 'r-2': stepAt('running'), 'r-3': stepAt('running') });
   await c.got((all) => events(all).some((n) => Number(n.meta.resource_version) === store.size()) || undefined);
@@ -358,11 +358,22 @@ test('a selector the api refuses is refused, exit 2, naming the key, on stderr a
   assert.match(refusals[0]?.content ?? '', /no\/pe/);
 });
 
-test("the skipped lines' read takes the channel's selectors and, for a namespace, its factory joined to each", () => {
-  assert.equal(skippedRead({ selectors: ['waits=person', 'team=core'] }, '42'), 'nemia watch --once 42 -l waits=person -l team=core');
-  assert.equal(skippedRead({ selectors: [], namespace: 'mill' }, '42'), 'nemia watch --once 42 -l factory=mill');
+test("the skipped lines' read names the channel's context, quotes each selector, and joins a namespace's factory to each", () => {
   assert.equal(
-    skippedRead({ selectors: ['waits=person', 'team=core'], namespace: 'mill' }, '42'),
-    'nemia watch --once 42 -l waits=person,factory=mill -l team=core,factory=mill',
+    skippedRead({ selectors: ['waits=person', 'team=core'] }, '42', 'local'),
+    "NEMIA_CONTEXT='local' nemia watch --once 42 -l 'waits=person' -l 'team=core'",
+  );
+  assert.equal(
+    skippedRead({ selectors: [], namespace: 'mill' }, '42', 'vps'),
+    "NEMIA_CONTEXT='vps' nemia watch --once 42 -l 'factory=mill'",
+  );
+  assert.equal(
+    skippedRead({ selectors: ['waits in (person,agent)', '!on'], namespace: 'mill' }, '42', 'vps'),
+    "NEMIA_CONTEXT='vps' nemia watch --once 42 -l 'waits in (person,agent),factory=mill' -l '!on,factory=mill'",
+  );
+  assert.equal(
+    skippedRead({ selectors: ["team=it's"] }, '42', 'local').endsWith(`-l 'team=it'\\''s'`),
+    true,
+    'a quote of its own closed and escaped',
   );
 });

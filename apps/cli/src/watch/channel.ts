@@ -20,6 +20,7 @@ import { Effect, Schema } from 'effect';
 import { Event, watchEventOf } from 'objects';
 import type { ChannelMeta, ChannelNotice, ChannelNoticeOf } from '../../contracts/channel-notice.contract.ts';
 import { sessionHeaders, urlOf } from '../client.ts';
+import { CONTEXT_VARIABLE, chosenOf, LOCAL_CONTEXT } from '../context.ts';
 import { served } from '../daemon.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
@@ -249,13 +250,18 @@ function framesOf(text: string): { data: string[]; rest: string } {
 
 const decodeWatched = Schema.decodeUnknownSync(watchEventOf(Event));
 
+/** `word` as a shell reads it back unchanged: in single quotes, each quote of its own closed, escaped and opened again. */
+const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
+
 /**
- * The command that prints the lines a resumed channel skipped, the events after `from` its selectors take: `nemia watch --once`, which
- * reads the feed from that byte to its end, with each selector; a channel of one namespace has `factory=<namespace>` joined to each (a
+ * The command that prints the lines a resumed channel skipped, the events after `from` its selectors take, from the store the channel
+ * read: `nemia watch --once`, which reads the feed from that byte to its end, under the context the channel resolved (`context`, named
+ * whatever the shell's own is, since a channel's entry may set `NEMIA_CONTEXT` for it alone), with each selector quoted for a shell (a
+ * set-based or negated one holds a parenthesis or a `!`); a channel of one namespace has `factory=<namespace>` joined to each (a
  * selector of its own besides), as `nemia watch` takes no namespace, but `default`'s, which also holds runs of no factory label, so its
  * read keeps every namespace's lines.
  */
-export function skippedRead(asked: ChannelAsked, from: string): string {
+export function skippedRead(asked: ChannelAsked, from: string, context: string): string {
   const namespace = asked.namespace === undefined || asked.namespace === 'default' ? undefined : `factory=${asked.namespace}`;
   const each =
     namespace === undefined
@@ -263,7 +269,7 @@ export function skippedRead(asked: ChannelAsked, from: string): string {
       : asked.selectors.length === 0
         ? [namespace]
         : asked.selectors.map((s) => `${s},${namespace}`);
-  return [`nemia watch --once ${from}`, ...each.map((s) => `-l ${s}`)].join(' ');
+  return [`${CONTEXT_VARIABLE}=${quoted(context)} nemia watch --once ${from}`, ...each.map((s) => `-l ${quoted(s)}`)].join(' ');
 }
 
 /**
@@ -278,10 +284,16 @@ function released(f: Following, held: readonly Event[], from: string): void {
   }
   const content =
     `${held.length} events were written while this channel was stopped, past the ${most} it sends on a resume: none of them was sent. ` +
-    `They are the events after resourceVersion ${from}, and \`${skippedRead(f.asked, from)}\` prints them, a person in a terminal ` +
+    `They are the events after resourceVersion ${from}, and \`${skippedRead(f.asked, from, contextName())}\` prints them, a person in a terminal ` +
     'or an agent through its shell alike. The channel goes on from here.';
   sent(f, noticeOf('skipped', content, { skipped: String(held.length), after: from }));
 }
+
+/** The name of the context the channel reads the store of: a remote one's, else `local`. */
+const contextName = (): string => {
+  const chosen = chosenOf();
+  return chosen.kind === 'local' ? LOCAL_CONTEXT : chosen.name;
+};
 
 /** Where an open watch is: the Events it held before its first BOOKMARK (none once it came), and the cursor it opened at. */
 type Opened = { held: Event[] | undefined; readonly from: string };

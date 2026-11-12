@@ -129,3 +129,25 @@ export function portOf(value: string | undefined, ticks = true): number {
     { exitCode: 2 },
   );
 }
+
+/**
+ * How long the api's server keeps a connection that has gone idle, in milliseconds: past the longest any of its clients keeps one
+ * pooled, so a client that reuses its connection after a pause is answered on it, never reset. Node's own 5 s (closed at about 6 s with
+ * its buffer) is shorter than an MCP host's pool, which wrote on a connection the server had just closed about 20 s after its last call
+ * and was reset (`ECONNRESET`, nothing applied). The longest of the three clients is the board's browser: Chromium keeps a used idle
+ * connection five minutes, so the server keeps one ten seconds more. The CLI's fetch (undici) reads the `Keep-Alive: timeout=` this
+ * sends and closes its own before it.
+ */
+export const KEEP_ALIVE_MS = 310_000;
+
+/**
+ * The server's timeouts, handed to Node's `http.createServer` (main.ts, through `serve`'s `serverOptions`): `keepAliveTimeout` at
+ * `KEEP_ALIVE_MS`, and `headersTimeout` a second above it, as Node asks of a server that keeps connections longer than the time it
+ * waits for a request's headers; `requestTimeout` matches `headersTimeout`, which Node refuses to exceed it (its 300 s default is
+ * under it).
+ */
+export const SERVER_TIMEOUTS = {
+  keepAliveTimeout: KEEP_ALIVE_MS,
+  headersTimeout: KEEP_ALIVE_MS + 1_000,
+  requestTimeout: KEEP_ALIVE_MS + 1_000,
+} as const;

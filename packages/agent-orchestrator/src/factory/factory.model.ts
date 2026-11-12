@@ -79,6 +79,12 @@ export const Factory = Schema.Struct({
   harnessSettings: Schema.optional(HarnessSettings),
   costLines: Schema.optional(Schema.Record(WorkflowName.OnRead, Schema.Finite.check(Schema.isGreaterThan(0)))),
   origins: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /**
+   * The repository each workflow works on, by its folder name (`workflowRepo`). Checked for its shape alone, on purpose: a key for a
+   * workflow it no longer offers (an upgrade of its template dropped it) names nothing anyone starts, and refusing it would leave the
+   * factory unreadable; a name no repository has is refused at the attach (`wiringRefusal`) and at a start.
+   */
+  workflowRepos: Schema.optional(Schema.Record(WorkflowName.OnRead, Schema.String)),
   generation: Schema.optional(Schema.Number),
 })
   .check(

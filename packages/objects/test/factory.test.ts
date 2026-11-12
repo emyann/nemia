@@ -87,7 +87,7 @@ test("the factory's sub-resources as the Api's endpoints answer them and take th
   assert.equal(taken('factories', 'putRules', {}), undefined);
 });
 
-test("an attach takes the repository its workflow works on, by folder name, or none; REFUSED: a name that is no string", () => {
+test('an attach takes the repository its workflow works on, by folder name, or none; REFUSED: a name that is no string', () => {
   assert.deepEqual(taken('factories', 'attach', { repo: 'web' }), { repo: 'web' });
   assert.deepEqual(taken('factories', 'attach', {}), {});
   assert.equal(taken('factories', 'attach', { repo: 3 }), undefined);

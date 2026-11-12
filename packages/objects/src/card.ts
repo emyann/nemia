@@ -43,7 +43,7 @@ export type CardKey = (typeof CARD_KEYS)[number];
  */
 export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   workflow:
-    "what runs the card when it is started: the name of a workflow its factory offers; else the start names one. A path an older card holds is not read",
+    'what runs the card when it is started: the name of a workflow its factory offers; else the start names one. A path an older card holds is not read',
   repo: "retired: an older card's repository, read and not used, since the card's factory places its run (`nemia factory attach <f> <wf> --repo <name>`); a new or changed value is refused",
   queued:
     'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
@@ -138,8 +138,9 @@ export type CardFile = typeof CardFile.Type;
 
 /**
  * A card started: the workflow its run is started on, by name — the card's own `workflow:` when it names none, as `nemia start <card>`
- * takes it, `from` being retired, read and ignored, since the factory finds the workflow and places the run — the runs it waits on (`after`) and reads as context
- * (`context`), the brief given in place of the card's body, and the labels it is started with (`key=value`, `key-`).
+ * takes it, `from` being retired, read and ignored, since the factory finds the workflow and places the run — the runs it waits on
+ * (`after`) and reads as context (`context`), the brief given in place of the card's body, and the labels it is started with
+ * (`key=value`, `key-`).
  */
 export const CardStart = Schema.Struct({
   workflow: Schema.optionalKey(Schema.String),

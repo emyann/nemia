@@ -37,6 +37,10 @@ const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, sta
       return new Invalid({
         message: `spec.queued of the card ${card.name} is not what the card has (${card.queued ?? 'unset'}): send it back as read, and queue or unqueue the card with nemia inbox queue ${card.name} [--off]`,
       });
+    case 'repo':
+      return new Invalid({
+        message: `spec.repo of the card ${card.name} is retired: a card names its factory and its workflow, and the factory places its run. Send the card's repo back as read (${card.repo ?? 'unset'}) or leave it out, and name the workflow's repository with nemia factory attach <factory> <workflow> --repo <name>`,
+      });
     case 'empty':
       return new Invalid({
         message: `spec.body of the card ${card.name} is empty: a card's body is its run's brief; write what the run is asked to do`,
@@ -80,6 +84,8 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
     ...(metadata.resourceVersion !== undefined ? { versionSent: metadata.resourceVersion } : {}),
     ...(card.queued !== undefined ? { queuedNow: card.queued } : {}),
     ...(spec.queued !== undefined ? { queuedSent: spec.queued } : {}),
+    ...(card.repo !== undefined ? { repoNow: card.repo } : {}),
+    ...(spec.repo !== undefined ? { repoSent: spec.repo } : {}),
     ...(spec.body !== undefined ? { body: spec.body } : {}),
   });
   if (refusal !== null) return yield* Effect.fail(refusalOf(refusal, card, file, started));

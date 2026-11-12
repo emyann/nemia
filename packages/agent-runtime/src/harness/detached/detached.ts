@@ -787,7 +787,8 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
    * 1. Nothing to do for a run whose worker can no longer run and whose harness's group is empty (`groupLeft`), or for no run.
    * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
    *    the grace below is measured from the instant it holds.
-   * 3. A run file that says `working` whose worker is not seen gone: SIGTERM to the worker, read again, whose pid is above 0
+   * 3. A run file that says `working` whose word is too (a fresh beat: somebody beats it, even a worker started again by hand that its
+ *    spawn's `.launched` does not name), or whose worker is not seen gone: SIGTERM to the worker, read again, whose pid is above 0
    *    (`process.kill(0, …)` signals this process's entire group). The worker ends its harness's group and writes `stopped`.
    * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
    *    sent what `leftSignal` picks, SIGTERM within the run's stop grace since the first ask and SIGKILL after.
@@ -800,7 +801,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     const worker = () => (seen ??= workerSeen(launchedFile(name)));
     const word = leased(hit.run, now, worker);
     const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
-    const workerMayRun = hit.run.state === 'working' && worker() !== 'gone';
+    const workerMayRun = hit.run.state === 'working' && (word === 'working' || worker() !== 'gone');
     if (!workerMayRun && group === undefined) return false;
     const asked = firstAsked(stopFile(name), now);
     if (workerMayRun) {

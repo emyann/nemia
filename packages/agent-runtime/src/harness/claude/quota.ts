@@ -200,12 +200,31 @@ export function quotaOfRefusal(error: unknown): HarnessQuota {
 }
 
 /**
+ * How an ask that could not be opened reads: `cause` thrown by the open itself, before any process started, over the Claude Code
+ * `named` (`quotaExecutable`). With none named, the SDK looks for its own bundled CLI as it opens the query, and throws, in words and
+ * with no `errorClass`, when the platform's package is not installed (`npm install --omit=optional`, a platform it ships none for): that
+ * is `missing`. The SDK's other throws at that point are checks of options, which an ask's (`usageOptions`) are not made to trip. With
+ * one named, the SDK throws nothing for its absence there (it fails the spawn, read by `quotaOfRefusal`), so a throw is read as any
+ * other refusal.
+ */
+const quotaOfUnopened = (cause: unknown, named: string | undefined): HarnessQuota =>
+  named === undefined ? { kind: 'missing' } : quotaOfRefusal(cause);
+
+/** An ask that threw before its query was open, told apart from one whose question was refused. */
+class Unopened {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    this.cause = cause;
+  }
+}
+
+/**
  * Ask Claude Code for the plan's usage: the Claude Code the sessions run (`quotaExecutable` of `command`, the engine's `claudeExecutable`,
  * and of `env`, this process's environment by default), read at each ask. Open a query for the question (`sdkUsageAsk`, or the `ask`
- * given), put it, and read what it answers (`quotaOfUsage`) or how it refused (`quotaOfRefusal`). The query is taken in the ask's scope and
- * closed as it closes, whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never
- * fails: every way it can go is a `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there, or the SDK bundles
- * none for this platform.
+ * given), put it, and read what it answers (`quotaOfUsage`), how it refused (`quotaOfRefusal`), or why it could not be opened
+ * (`quotaOfUnopened`). The query is taken in the ask's scope and closed as it closes, whatever ends it: an outcome, the timeout
+ * (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never fails: every way it can go is a `HarnessQuota`, and no Claude
+ * Code to ask is `missing`: the one named is not there, or the SDK bundles none for this platform.
  */
 export const claudeQuota = ({
   command,
@@ -213,17 +232,17 @@ export const claudeQuota = ({
   env = process.env,
   ask = sdkUsageAsk(env),
 }: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
-  Effect.suspend(() =>
-    Effect.acquireRelease(
-      Effect.sync(() => ask(quotaExecutable(command, env))),
-      (open) => Effect.promise(() => open.close().catch(() => undefined)),
+  Effect.suspend(() => {
+    const executable = quotaExecutable(command, env);
+    return Effect.acquireRelease(Effect.try({ try: () => ask(executable), catch: (cause) => new Unopened(cause) }), (open) =>
+      Effect.promise(() => open.close().catch(() => undefined)),
     ).pipe(
-      Effect.flatMap((open) =>
-        Effect.tryPromise({ try: () => open.usage({ skipBehaviors: true }), catch: (cause) => cause }).pipe(
-          Effect.match({ onSuccess: (usage) => quotaOfUsage(usage, env), onFailure: quotaOfRefusal }),
-        ),
-      ),
+      Effect.flatMap((open) => Effect.tryPromise({ try: () => open.usage({ skipBehaviors: true }), catch: (cause) => cause })),
+      Effect.match({
+        onSuccess: (usage) => quotaOfUsage(usage, env),
+        onFailure: (cause) => (cause instanceof Unopened ? quotaOfUnopened(cause.cause, executable) : quotaOfRefusal(cause)),
+      }),
       Effect.scoped,
       Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed<HarnessQuota>({ kind: 'timeout', ms: timeoutMs }) }),
-    ),
-  );
+    );
+  });

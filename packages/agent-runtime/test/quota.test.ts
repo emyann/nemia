@@ -233,6 +233,20 @@ test("the Claude Code an ask drives is the one the sessions run: the engine's wh
     });
 });
 
+test('REFUSED: an ask whose query cannot be opened answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {
+  /** The SDK's `query()`, throwing as it opens, as it does when its platform's package is not installed: in words, with no `errorClass`. */
+  const throwing: OpenUsage = () => {
+    throw new Error('Native CLI binary for linux-x64 not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional.');
+  };
+  await t.test("none named and none inherited: the SDK's own is not installed, so there is no Claude Code to ask", async () => {
+    assert.deepEqual(await Effect.runPromise(claudeQuota({ env: {}, ask: throwing })), { kind: 'missing' });
+  });
+  await t.test('one named: the throw is read as any refusal, with what it said', async () => {
+    const asked = await Effect.runPromise(claudeQuota({ command: '/bin/claude', env: {}, ask: throwing }));
+    assert.equal(asked.kind, 'failed');
+  });
+});
+
 test('REFUSED: an ask that threw, timed out or was interrupted closes its query all the same', async () => {
   const refused = standIn(() => Promise.reject(thrown('no claude', { errorClass: 'executable_not_found' })));
   assert.deepEqual(await Effect.runPromise(claudeQuota({ ask: refused.ask })), { kind: 'missing' });

@@ -294,7 +294,7 @@ export {
   type TableColumnType,
 } from './words.ts';
 export { UnsupportedMediaType } from './api-errors.ts';
-export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow } from './table.ts';
+export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
 export { Concluded, RunLines, RunRecord, RunsListed, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed } from './api-errors.ts';
 export {

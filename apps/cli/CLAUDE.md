@@ -18,7 +18,8 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   RunDecision, the pause `nemia watch` says, and the runs and cards lists `nemia ls` and `nemia inbox` ask for their `Table`. **One ask**:
   `served` (`src/daemon.ts`) takes the lease's url where something listens there, else starts the daemon once and waits until `GET
   /api/health` answers, bounded; the read then asks once (`asked`). No read retries after a refused connection.
-- **A list is printed as the server prints it** (`src/reads/table.ts`, fc2e): `nemia ls` and `nemia inbox` ask with `Accept:
+- **A list is printed as the server prints it** (`src/reads/table.ts`, fc2e, and `objects`' `tableLines`, the one printer of a
+  `Table`, which the api's MCP port prints with too): `nemia ls` and `nemia inbox` ask with `Accept:
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
   `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
   the runs' Table, from server reads that serve no Table: the pause first, how old where the branches stand is (`Daemon.branchesLine`), a

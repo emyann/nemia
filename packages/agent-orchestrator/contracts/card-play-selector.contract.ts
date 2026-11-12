@@ -13,22 +13,21 @@ export type CardPlaySelector = { readonly inPlay: boolean };
 /** The field a card's list is selected by. */
 const FIELD = 'status.inPlay';
 
-/** The spellings that ask for the cards whose `inPlay` is `value`. */
-const asking = (value: boolean): readonly string[] => [
-  `${FIELD}=${value}`,
-  `${FIELD}==${value}`,
-  `${FIELD}!=${!value}`,
-];
+/** Whether `text` is one of the spellings that ask for the cards whose `inPlay` is `value`: `=` or `==` it, or `!=` the other. */
+const asks = (text: string, value: boolean): boolean =>
+  value
+    ? text === FIELD + '=true' || text === FIELD + '==true' || text === FIELD + '!=false'
+    : text === FIELD + '=false' || text === FIELD + '==false' || text === FIELD + '!=true';
 
 const cardPlaySelectorSpec = spec<(text: string) => CardPlaySelector | null>({
   ensures: {
     eachSpellingTaken: {
       description: 'status.inPlay, then =, == or !=, then true or false, is a selector of the cards',
-      condition: ({ input: [text], output }) => !(asking(true).includes(text) || asking(false).includes(text)) || output !== null,
+      condition: ({ input: [text], output }) => !(asks(text, true) || asks(text, false)) || output !== null,
     },
     readAsSpelled: {
       description: 'A selector taken keeps the cards whose inPlay its text asks for: = and == the value named, != the other',
-      condition: ({ input: [text], output }) => output === null || asking(output.inPlay).includes(text),
+      condition: ({ input: [text], output }) => output === null || asks(text, output.inPlay),
     },
   },
 });

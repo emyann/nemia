@@ -7,10 +7,11 @@
  * server's own (`GET /api/daemon`). Any other words go to the old path: `nemia ls <run>` among them.
  */
 import { Effect } from 'effect';
+import { tableLines } from 'objects';
 import { spawned } from '../local.ts';
 import { asked, type ObjectsClient, READ_BOUND_MS } from '../objects.ts';
 import { pausedLines, scheduleLines } from './standing.ts';
-import { AS_TABLE, tableAsked, tableLines, tableOf } from './table.ts';
+import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What `nemia ls` says beside the runs: the pause, each factory's schedules, and the daemon. */
 const standing = (client: ObjectsClient) =>

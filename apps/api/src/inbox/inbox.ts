@@ -92,9 +92,11 @@ function filingIn(factory: Factory, body: CardFile, home: string): Filing | Refu
  * start records names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is,
  * for the package to refuse: the api has no directory it was typed from.
  *
- * A filing that names a `factory` is the factory's to place (`filingIn`), and the api's repository is not looked at.
+ * A filing that names a `factory` is the factory's to place (`filingIn`), and the api's repository is not looked at. One that names none
+ * asks for a repository (`repoOf`) only to look for its workflow: a card with no workflow is filed with the `repo:` it names, or none, as
+ * `nemia inbox add` files it in process, so an api with no repository of its own still files it.
  */
-export function filingOf(body: CardFile, repo: string, home: string): Filing | Refusal {
+export function filingOf(body: CardFile, repoOf: () => string, home: string): Filing | Refusal {
   const { body: text, workflow, from, repo: about } = body;
   if (from !== undefined && workflow === undefined) {
     return {
@@ -109,6 +111,7 @@ export function filingOf(body: CardFile, repo: string, home: string): Filing | R
     ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}),
   };
   if (workflow === undefined) return filing;
+  const repo = repoOf();
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
   const byName = path.dirname(folder.dir) === path.join(repo, 'workflows') && (filing.repo === undefined || filing.repo === repo);

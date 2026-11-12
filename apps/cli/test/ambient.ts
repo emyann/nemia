@@ -6,16 +6,19 @@
  * Dropped (`DROPPED`): `OTEL_EXPORTER_OTLP_ENDPOINT`, a collector every child would post its spans to, and the daemon's per-session
  * variables, the orchestrator's one list (`SESSION_VARIABLES`): `WF_SESSION_TOKEN`, minted for each session, which `nemia` sends as
  * `Authorization: Bearer` and a test's api, which never minted it, answers 401; and `WF_MEMORY_LIMIT` and `WF_CGROUP_PARENT`, the daemon
- * unit's, which an api that files through the real engine would inherit. And the person's own context (`NEMIA_CONTEXT`, and
+ * unit's, which an api that files through the real engine would inherit. And the daemon's serving variables (`SERVING_VARIABLES`):
+ * `NEMIA_BIND`, a server's network address, which an api a test starts would listen on where the test waits on the loopback, and
+ * `WF_EXPOSED`, which would mark the store a test serves exposed. And the person's own context (`NEMIA_CONTEXT`, and
  * `XDG_CONFIG_HOME`, where the client's config file is): a test's `nemia` asks the store it seats, never the daemon the person's
  * config names, nor the remote daemon a forwarded CLI would call (`FORWARD_VARIABLES`). A test that means one sets it in the
  * environment it builds on this.
  */
-import { FORWARD_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
+import { FORWARD_VARIABLES, SERVING_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
 
 /** What the daemon sets that no child of a cli test inherits. */
 export const DROPPED = [
   ...SESSION_VARIABLES,
+  ...SERVING_VARIABLES,
   ...FORWARD_VARIABLES,
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'NEMIA_CONTEXT',

@@ -13,7 +13,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 import { app } from '../src/app.ts';
-import { engine, SESSION_VARIABLES, tickRun, withProposalsPass } from 'agent-orchestrator';
+import { engine, SERVING_VARIABLES, SESSION_VARIABLES, tickRun, withProposalsPass } from 'agent-orchestrator';
 import { runWith } from './builtin-place.ts';
 
 /** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
@@ -161,12 +161,18 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file run un
   assert.deepEqual(seen([]), { address: named }, 'the probe reads what it is given, so the absence above is the harness');
 });
 
-test("REFUSED under the daemon's per-session variables: a test file run under the harness sees none of them, and without it sees the daemon's", () => {
+test("REFUSED under the daemon's per-session and serving variables: a test file run under the harness sees none of them, and without it sees the daemon's", () => {
   const dir = scratch('nemia-api-probe-');
   const out = path.join(dir, 'probe.json');
-  const daemons = { WF_SESSION_TOKEN: 'a-token-no-test-minted', WF_MEMORY_LIMIT: '6Gi', WF_CGROUP_PARENT: 'sessions.slice' };
+  const daemons = {
+    WF_SESSION_TOKEN: 'a-token-no-test-minted',
+    WF_MEMORY_LIMIT: '6Gi',
+    WF_CGROUP_PARENT: 'sessions.slice',
+    NEMIA_BIND: '100.126.244.0',
+    WF_EXPOSED: '1',
+  };
   const names = Object.keys(daemons);
-  assert.deepEqual(names, [...SESSION_VARIABLES]);
+  assert.deepEqual(names, [...SESSION_VARIABLES, ...SERVING_VARIABLES]);
   fs.writeFileSync(
     path.join(dir, 'probe.test.mjs'),
     [

@@ -1,6 +1,6 @@
 /**
- * The subscription's quota as the board shows it, read off the engine's `quota` verb (`Engine.quota`), which asks Claude Code itself: the
- * Claude Code the engine's sessions run, sent its `get_usage` control request (packages/agent-orchestrator/docs/features.md, *the quota
+ * The subscription's quota as the board shows it, read off the engine's `quota` verb (`Engine.quota`), which asks the harness itself: the
+ * one the engine's sessions run, sent its `get_usage` control request (packages/agent-orchestrator/docs/features.md, *the quota
  * on the board*). This file starts no process.
  *
  * Nothing asks unless a board asks. A read (`makeQuota`) answers from the last ask while it is younger than `QUOTA_KEEP_MS`, counted from
@@ -63,13 +63,13 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
  *
  *   fresh      the plan's windows, from an answer younger than `keepMs`: `windows` are to show
  *   asking     no answer held, and one asked for: said so, and read again soon
- *   no-plan    Claude Code here has no plan limits: it is not signed in to a Claude subscription, or it is signed in by a token of
- *              `claude setup-token`, which can make model requests and not read the plan's limits (`token`), each said in its own words
+ *   no-plan    Claude Code here has no plan limits: it is not signed in to a subscription, or it is signed in by a long-lived token
+ *              that can make model requests and not read the plan's limits (`token`), each said in its own words
  *   unanswered Claude Code is signed in to a subscription, and Anthropic's usage service gave it nothing: `rate_limits_available` true and
  *              `rate_limits` null. Claude Code 2.1.278 answers so when the service's body is an error ("Usage fetch returned a fieldless or
  *              non-object body (in-band error)" in its --debug log), which may be the service limiting how often it is asked: kept by
  *              `backoffOf`, not the keep
- *   no-claude  there is no Claude Code to ask: the one the engine names is not there, or the Agent SDK's own is not installed
+ *   no-claude  there is nothing to ask: the program the engine names is not there, or the SDK's own is not installed
  *   timeout    Claude Code did not answer in time
  *   failed     Claude Code ended before it answered, or the engine would not ask it (`rejected`), each said in its own words
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
@@ -163,7 +163,7 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-claude',
-        said: "The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the Agent SDK's own, installed with Nemia. Reinstall Nemia, or set AE_CLAUDE_EXECUTABLE in the api's environment to a Claude Code that is there.",
+        said: "The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the one installed with Nemia. Reinstall Nemia, or set AE_CLAUDE_EXECUTABLE in the api's environment to one that is there.",
       };
     case 'timeout':
       return {
@@ -195,7 +195,7 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-plan',
-        said: "No plan limits to show: the Claude Code the sessions run is signed in by a token of claude setup-token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, sign in with claude, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.",
+        said: "No plan limits to show: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, run claude and /login under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.",
       };
     case 'unanswered':
       return {

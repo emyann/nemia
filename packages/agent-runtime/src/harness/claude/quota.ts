@@ -137,7 +137,7 @@ const subscriptionOf = (usage: Record<string, unknown>): string | null =>
   typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
 
 /**
- * The variable a token made by `claude setup-token` signs Claude Code in by. Claude Code gives such a token the `user:inference` scope
+ * The variable by which a token made by `claude setup-token` signs in. Claude Code gives such a token the `user:inference` scope
  * alone, and answers `get_usage` with `rate_limits_available: false` without asking the usage endpoint, since it lacks `user:profile`
  * (read off 2.1.322 and measured: `docs/harness.md`, *The quota of a token*) — the same answer as no subscription at all.
  */

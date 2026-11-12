@@ -215,6 +215,7 @@ test('a harness nobody activated and no workflow runs on is inactive, its instal
     [[undefined, true, 0]],
     'it offers its install, which activates it',
   );
+  assert.equal(idle.pieces.find((p) => p.name === signInNeedOf(other))?.fixes.length, 0, 'and no sign-in before it is installed');
   assert.equal(
     idle.ready,
     idle.pieces.every((p) => p.state !== 'missing'),

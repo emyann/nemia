@@ -270,8 +270,9 @@ const harnessesWanted = (memo: NeedsMemo, workflows: readonly FactoryWorkflow[])
  * (`harnessVersionWord`); and the sign-in. The default harness's sign-in is missing, whatever its check says, while the token the store
  * keeps is readable by others, since such a file does not load: its fix is the `chmod 600` that lets only the person read it. A kept
  * token that loads says its age, off its file's write time, and near or past its year its warning (`tokenWarningLine`), with the commands
- * that make a new one: still met, since it loads. A harness not `wanted` (`harnessesWanted`) is `inactive`, both its pieces, each with
- * the fixes a missing one offers, so it is activated from the read as any other is.
+ * that make a new one: still met, since it loads. A harness not `wanted` (`harnessesWanted`) is `inactive`, both its pieces: its install
+ * with the fix a missing one offers, so it is activated from the read as any other is, and its sign-in with none, since no sign-in runs
+ * before the install; once installed it is wanted, and the read after the install offers them.
  */
 function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wanted: ReadonlySet<string>): ReadinessPiece[] {
   return memo.harnessNeeds.flatMap((need) => {
@@ -283,7 +284,7 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wan
         of.part === 'install'
           ? `${of.needs.title} (${of.needs.program}) is not activated, and no factory's workflow runs on it: activate it when one does`
           : `${of.needs.title} is not activated, so its sign-in is not asked`;
-      return [piece(need.name, 'harness', 'inactive', said, needFixes(need, 'missing'), harness)];
+      return [piece(need.name, 'harness', 'inactive', said, of.part === 'install' ? needFixes(need, 'missing') : [], harness)];
     }
     const read = memo.readings.get(checkKey(harnessCheckOf(need)));
     if (of.part === 'install') {

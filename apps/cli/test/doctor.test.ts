@@ -1,8 +1,9 @@
 /**
- * `nemia readiness` and `nemia readiness fix <need>`, against a stand-in of the api's readiness routes under a remote context: the read
+ * `nemia doctor` and `nemia doctor fix <need>`, against a stand-in of the api's readiness routes under a remote context: the read
  * prints the server's pieces and adds the laptop's own under the area `client` — the server reached, the token accepted, `~/.local/bin`
  * on PATH — and still answers, non-zero, where the server takes no connection; the fix is started with its answers and its output
- * followed to its end, the code it declares shown again, and the exit is its phase's.
+ * followed to its end, the code it declares shown again, and the exit is its phase's. A met piece shows the fix that removes it, a typed
+ * fix the command to type; the verb it replaced, `readiness`, is refused with exit 2.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,6 +32,20 @@ const READ = {
   ready: false,
   pieces: [
     { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [] },
+    {
+      name: 'tool',
+      area: 'harness',
+      state: 'met',
+      message: 'tool 1.0 is installed',
+      fixes: [{ message: 'take tool off this server', command: 'tool uninstall', startable: true, index: 1, kind: 'removes' }],
+    },
+    {
+      name: 'tool-sign-in',
+      area: 'harness',
+      state: 'missing',
+      message: 'tool is not signed in',
+      fixes: [{ message: 'sign in at a terminal', command: 'tool auth login', startable: false, index: 0, kind: 'typed' }],
+    },
     { name: 'tool-auth', area: 'workflow', state: 'missing', message: 'not signed in', factory: 'f1', workflow: 'build', fixes: [FIX] },
   ],
 };
@@ -130,44 +145,63 @@ const clientStates = (said: Said): Record<string, string> =>
       .map((p) => [p.name, p.state]),
   );
 
-test("`nemia readiness --json`: the server's pieces, and the laptop's own under `client`, every one in place", async () => {
-  const said = await nemia(['readiness', '--json'], aLaptop('nemia-ready-json-', server, GOOD));
+test("`nemia doctor --json`: the server's pieces, and the laptop's own under `client`, every one in place", async () => {
+  const said = await nemia(['doctor', '--json'], aLaptop('nemia-ready-json-', server, GOOD));
   assert.equal(said.code, 1, `a missing piece of the server's: ${said.err}`);
   const pieces = piecesOf(said);
   assert.deepEqual(
     pieces.filter((p) => p.area !== 'client').map((p) => p.name),
-    ['claude-token', 'tool-auth'],
+    ['claude-token', 'tool', 'tool-sign-in', 'tool-auth'],
   );
   assert.deepEqual(clientStates(said), { 'server-reached': 'met', 'token-accepted': 'met', 'local-bin-on-path': 'met' });
 });
 
-test('`nemia readiness`: a token the server refuses, and ~/.local/bin off PATH, are missing pieces of the client', async () => {
-  const said = await nemia(['readiness', '--json'], aLaptop('nemia-ready-token-', server, 'nm_wrong', false));
+test('`nemia doctor`: a token the server refuses, and ~/.local/bin off PATH, are missing pieces of the client', async () => {
+  const said = await nemia(['doctor', '--json'], aLaptop('nemia-ready-token-', server, 'nm_wrong', false));
   assert.equal(said.code, 1);
   assert.deepEqual(clientStates(said), { 'server-reached': 'met', 'token-accepted': 'missing', 'local-bin-on-path': 'missing' });
 });
 
-test('`nemia readiness`: a context whose server takes no connection is flagged, and the read still answers, non-zero', async () => {
+test('`nemia doctor`: a context whose server takes no connection is flagged, and the read still answers, non-zero', async () => {
   const env = aLaptop('nemia-ready-down-', `http://127.0.0.1:${await freePort()}`, GOOD);
-  const json = await nemia(['readiness', '--json'], env);
+  const json = await nemia(['doctor', '--json'], env);
   assert.equal(json.code, 1, json.err);
   assert.equal(clientStates(json)['server-reached'], 'missing');
-  const text = await nemia(['readiness'], env);
+  const text = await nemia(['doctor'], env);
   assert.equal(text.code, 1);
   assert.match(text.out, /server-reached/);
   assert.match(text.out, /nemia config get-contexts/, 'the fix names a command');
 });
 
-test('`nemia readiness` as text: each area, each piece, and the command of each fix', async () => {
-  const said = await nemia(['readiness'], aLaptop('nemia-ready-text-', server, GOOD));
+test('`nemia doctor` as text: each area, each piece, and the command of each fix', async () => {
+  const said = await nemia(['doctor'], aLaptop('nemia-ready-text-', server, GOOD));
   assert.equal(said.code, 1);
   for (const word of ['harness', 'workflow', 'client', 'claude-token', 'tool-auth', 'tool login']) assert.ok(said.out.includes(word), word);
+  assert.match(said.out, /nemia doctor fix tool --index 1/, 'a met piece names the fix that removes it');
+  assert.match(said.out, /fix: tool auth login/, 'a typed fix is the command to type');
+  assert.doesNotMatch(said.out, /nemia doctor fix tool-sign-in/, 'a typed fix is never started from here');
 });
 
-test('`nemia readiness fix <need>`: started with its answers, its output followed, its code shown again, exit 0 on success', async () => {
+test('`nemia doctor fix <need>` posts the need alone where nothing else is typed', async () => {
+  const from = started.length;
+  const said = await nemia(['doctor', 'fix', 'claude'], aLaptop('nemia-fix-need-', server, GOOD));
+  assert.equal(said.code, 1, said.err);
+  assert.deepEqual(started.slice(from), [{ need: 'claude' }]);
+});
+
+test('REFUSED: the retired verb `readiness`, with or without its words, is a usage refusal naming `nemia doctor`', async () => {
+  const env = aLaptop('nemia-retired-', server, GOOD);
+  for (const argv of [['readiness'], ['readiness', 'fix', 'tool-auth'], ['readiness', '--local']]) {
+    const said = await nemia(argv, env);
+    assert.equal(said.code, 2, argv.join(' '));
+    assert.match(said.err, /nemia doctor/, 'the refusal names the verb to type');
+  }
+});
+
+test('`nemia doctor fix <need>`: started with its answers, its output followed, its code shown again, exit 0 on success', async () => {
   const from = started.length;
   const said = await nemia(
-    ['readiness', 'fix', 'tool-auth', '--factory', 'f1', '--workflow', 'build', '--answer', 'host=example.test'],
+    ['doctor', 'fix', 'tool-auth', '--factory', 'f1', '--workflow', 'build', '--answer', 'host=example.test'],
     aLaptop('nemia-fix-ok-', server, GOOD),
   );
   assert.equal(said.code, 0, said.err);
@@ -176,15 +210,15 @@ test('`nemia readiness fix <need>`: started with its answers, its output followe
   assert.equal(said.out.split('WXYZ-1234').length - 1, 2, 'the code in its line, and again on its own');
 });
 
-test('`nemia readiness fix`: a fix that failed exits 1', async () => {
-  const said = await nemia(['readiness', 'fix', 'other-need'], aLaptop('nemia-fix-bad-', server, GOOD));
+test('`nemia doctor fix`: a fix that failed exits 1', async () => {
+  const said = await nemia(['doctor', 'fix', 'other-need'], aLaptop('nemia-fix-bad-', server, GOOD));
   assert.equal(said.code, 1, said.err);
 });
 
 test('REFUSED: an ask with no `--answer` and no terminal to ask it on is a usage refusal naming the flag', async () => {
   const from = started.length;
   const said = await nemia(
-    ['readiness', 'fix', 'tool-auth', '--factory', 'f1', '--workflow', 'build'],
+    ['doctor', 'fix', 'tool-auth', '--factory', 'f1', '--workflow', 'build'],
     aLaptop('nemia-fix-ask-', server, GOOD),
   );
   assert.equal(said.code, 2);

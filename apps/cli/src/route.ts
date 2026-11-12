@@ -9,10 +9,10 @@
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 /**
- * The reads this client asks the api for, which the orchestrator's CLI answers too: `readiness` among them, whose `fix` starts a fix on
- * the server the context names and follows it (`src/readiness.ts`).
+ * The reads this client asks the api for, which the orchestrator's CLI answers too: `doctor` among them, whose `fix` starts a fix on
+ * the server the context names and follows it (`src/doctor.ts`).
  */
-export const READ_VERBS = ['show', 'closeout', 'ls', 'inbox', 'watch', 'readiness'] as const;
+export const READ_VERBS = ['show', 'closeout', 'ls', 'inbox', 'watch', 'doctor'] as const;
 
 /** A read this client asks the api for. */
 export type ReadVerb = (typeof READ_VERBS)[number];

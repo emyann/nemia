@@ -45,7 +45,14 @@ the orchestrator's code holds a fact today, it is named beside it.
   `test/live-sdk.boundary.test.ts`'s third case, one job per model filed in `auto` and read off its `init` line: `haiku`
   (`claude-haiku-5-5`), `sonnet` (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) ran in `auto`, and
   `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so `CLAUDE_AUTO_DROPPED` stands as it was. The case makes this measurement
-  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`.
+  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`. Measured ten times a model the same day, after
+  two runs' checks failed on the case and a third passed: `claude-haiku-4-5` and `claude-sonnet-4-5` ran in `default` in all ten, and
+  `haiku` and `sonnet` in `auto` in all ten, so no model's answer varies. What varied is the `init` line: in one run of ten each listed
+  model's said `auto`, and a `{"type":"system","subtype":"status","permissionMode":"default"}` line after it said the mode the
+  session ran in, which Claude Code settles after printing `init` (its bundled code refuses `auto` on a model before
+  `claude-opus-4-6` in its list, a local check, no flag fetched). So `ranIn` is the last mode an `init` or a `status` line names
+  (`claudeStreamOutput`), and the case reads it so. A case that fails is a change of Claude Code's: measure the model ten times, as
+  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own.
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
@@ -316,6 +323,23 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
   left the sign-in in flight, and what it clears of a completed sign-in is unmeasured.
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.
+
+What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, off the installed
+files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):
+
+- **`Query.mcpSubmitOAuthCallbackUrl(name, callbackUrl)` is now relied on**, for a browser that runs on another machine than the
+  daemon, whose redirect to `http://localhost:<callbackPort>/callback` never reaches the Claude Code child listening there: the person
+  pastes the address the browser landed on, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322
+  (`mcpSubmitOAuthCallbackUrl(e,t)`, a control request of the subtype `mcp_oauth_callback_url` carrying `serverName` and
+  `callbackUrl`), and it is absent from `sdk.d.ts` and from the SDK's TypeScript reference, so it is called through the one
+  `Authenticating` type, as `mcpAuthenticate` is, and a missing method throws naming `sdk.mjs`. The table above measured it refusing a
+  URL with no code or a mismatched state on 0.3.308; the runtime refuses, before handing it on, an address that is not the sign-in's
+  redirect or carries no code or no state (`callbackRefusal`, proved by `contracts/mcp-callback.contract.ts`), and leaves the state's
+  match to the harness. A whole exchange by paste, with a real token, is unmeasured, as the token exchange above is.
+- **`mcpAuthenticate`'s third argument, `{ redirectUriOnly }`, is refused for a server with a client id**: the bundled Claude Code says
+  `MCP OAuth refused: redirectUriOnly with a configured client` where the server's config sets `oauth.clientId` (or `oauth.xaa`),
+  since such a sign-in may need a callback on the child's own computer. Every server a factory signs in to names a client id, so the
+  runtime never gives it, and the paste-back is the callback the child listens for, handed on by the SDK.
 
 What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
 2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's

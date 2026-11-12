@@ -349,6 +349,7 @@ export { treeChecked };
 export {
   factoriesDirAt,
   factoryRepos,
+  originsOf,
   refuseName,
   scheduleOf,
   scheduleRefused,

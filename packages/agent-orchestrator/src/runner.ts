@@ -42,6 +42,7 @@ export {
   maxConcurrent,
   maxRuns,
   SESSION_VARIABLES,
+  FORWARD_VARIABLES,
   setting,
   type Settings,
   settingsOf,
@@ -448,7 +449,7 @@ export { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from './factory/schedule/schedul
 export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
-export { serverSignIn, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
+export { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
@@ -569,3 +570,9 @@ export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';
 export { FACTORY_ADD } from './factory/factory.verb.ts';
+export { FACTORY_VOLUME_ADD, FACTORY_VOLUME_RM } from './factory/volume/volume.verb.ts';
+export { FACTORY_APPLY, reconcileOnce } from './factory/applied/applied.verb.ts';
+export { FACTORY_ADOPT } from './adopt/adopt.verb.ts';
+export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrade/upgrade.verb.ts';
+export { withResolutionProposerAs } from './factory/upgrade/proposed.verb.ts';
+export { sentTemplatesDir, templateGiven, withTemplateTaken } from './template/given.store.ts';

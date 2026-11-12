@@ -1,4 +1,5 @@
 /** `nemia hold`, an entry of the command table: a run held until other runs land or a person lifts it (`hold`), or lifted (`unhold`). */
+import { givesNone, renamed } from '../command/requests.verb.ts';
 import { BY_CAP, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from './wait.ts';
 import { hold, unhold } from './wait.verb.ts';
@@ -59,7 +60,10 @@ export type HoldInput = typeof HoldInput.Type;
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }, HoldInput> = {
   name: 'hold',
-  served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'unhold' }],
+  served: [
+    { endpoint: 'runs.hold', takes: givesNone('off'), request: renamed({ runId: 'name' }, ['off']) },
+    { endpoint: 'runs.unhold', as: 'unhold', request: renamed({ runId: 'name' }, ['off', 'until', 'why', 'by']) },
+  ],
   usage: '<runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
     'file nothing more of a run until other runs land, as --after would',

@@ -73,6 +73,7 @@ import type { Status } from '../applied/applied.store.ts';
 import { adoptPreview, shellArg, type AdoptPreview } from '../../adopt/adopt.verb.ts';
 import { planDigest } from '../../adopt/adopt.store.ts';
 import { adoptLines } from '../../adopt/adopt.ts';
+import { templatePacked } from '../../template/given.store.ts';
 
 /** A factory made from a template. */
 type Templated = Factory & { template: FactoryTemplate };
@@ -122,7 +123,14 @@ const switchOf = (status: Status | undefined, render: RenderedAt): Switched | un
 /** The version a base holds where no status names it, as the plan and the upgrade print it. */
 const UNKNOWN = 'a version no status names';
 
-const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board upgrades none' } as const;
+/**
+ * Why the command line takes a preview, an upgrade and a choice by their arguments: the api serves each as the Factory's `diff`, `upgrade`
+ * and `resolve`, calling its handler with a template by a builtin's name or packed, and a choice's file by its text.
+ */
+const HERE = {
+  side: 'cli',
+  why: "the api serves it as the Factory's diff, upgrade or resolve of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name, and a file by its text",
+} as const;
 
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -396,6 +404,7 @@ type Planned = {
  */
 export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
   name: 'factory diff',
+  served: [{ endpoint: 'factories.diff', request: templatePacked }],
   usage:
     '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
   help: [
@@ -471,6 +480,7 @@ type Upgraded = { name: string; from: string | undefined; to: string; file: stri
  */
 export const FACTORY_UPGRADE: Command<Upgraded> = {
   name: 'factory upgrade',
+  served: [{ endpoint: 'factories.upgrade', request: templatePacked }],
   usage: '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]',
   help: [
     'upgrade a templated factory: its file wants --to, and the daemon merges',
@@ -533,16 +543,37 @@ const RESOLVE_SPEC: Spec = {
     'nemia factory resolve takes the factory and the conflict, as nemia factory diff names it: nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>.',
 };
 
-/** The person's choice the resolve `args` give: ours, theirs, or the text of `--file`, refused where it is not there (`Invalid`). */
-function choiceOf(args: Args): Choice {
-  if (args.ours === true) return 'ours';
-  if (args.theirs === true) return 'theirs';
-  const file = path.resolve(textOf(args, 'file') ?? '');
+/** The text of the file `given` resolves a conflict with, refused where it is not there (`Invalid`). */
+function fileText(given: string): string {
+  const file = path.resolve(given);
   if (!fs.existsSync(file) || !fs.statSync(file).isFile())
     throw new Invalid({
       message: `nemia factory resolve: there is no file at ${file} to resolve the conflict with. Nothing was resolved.`,
     });
-  return { text: fs.readFileSync(file, 'utf8') };
+  return fs.readFileSync(file, 'utf8');
+}
+
+/**
+ * The person's choice the resolve `args` give: ours, theirs, the words of `text` — what the api is sent — or the text of `--file`,
+ * refused where it is not there (`Invalid`); none of them refused as the command line refuses it.
+ */
+function choiceOf(args: Args): Choice {
+  if (args.ours === true) return 'ours';
+  if (args.theirs === true) return 'theirs';
+  const text = textOf(args, 'text');
+  if (text !== undefined) return { text };
+  const file = textOf(args, 'file');
+  if (file === undefined) throw new Invalid({ message: RESOLVE_SPEC.oneWay ?? 'nemia factory resolve takes one choice.' });
+  return { text: fileText(file) };
+}
+
+/**
+ * A forwarded resolve's input as the api takes it: the factory, the conflict and the choice, a `--file` sent as its text, read here
+ * (`fileText`), never as a path of this machine.
+ */
+function choiceSent(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  const { file, ...rest } = input;
+  return typeof file === 'string' ? { ...rest, text: fileText(file) } : rest;
 }
 
 /**
@@ -711,6 +742,7 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
  */
 export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',
+  served: [{ endpoint: 'factories.resolve', request: (input) => Effect.runPromise(tried(() => choiceSent(input))) }],
   usage: '<name> <conflict> --ours|--theirs|--file <path>',
   help: [
     "choose for one conflict of a templated factory's upgrade or switch: your",

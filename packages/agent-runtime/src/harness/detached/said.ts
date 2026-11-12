@@ -22,14 +22,14 @@ import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
 import { replaceFile } from '../../core/replace.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
-import { overNow, type RunFile } from './run-file.ts';
+import type { RunFile } from './run-file.ts';
 
 /**
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  * Exported only for the tests that import it.
  */
-export const SAID_VERSION = 11;
+export const SAID_VERSION = 12;
 
 /**
  * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
@@ -46,7 +46,7 @@ export const SAID_EXTENDED: readonly number[] = [];
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  * Exported only for the tests that import it.
  */
-export const SAID_DIGEST = '2fedd886db3b3c8488f3349021c1eabe373bdc7749c13eb719b64966eda38066';
+export const SAID_DIGEST = 'e34c350872524d5bfa7343e25bd9bc55f4e86bc30614598e5c562bec43d80596';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };
@@ -191,9 +191,12 @@ export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
  */
 type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
 
-/** When `run`'s capture is read (`SaidWhen`): over as of now, its lease gone included; ended once its worker wrote its end. */
-export const saidWhen = (run: RunFile, keep?: (output: string) => string): SaidWhen => ({
-  over: overNow(run),
+/**
+ * When `run`'s capture is read (`SaidWhen`): `over`, as the runner's look reads the run now (its lease gone with its worker included);
+ * ended once its worker wrote its end.
+ */
+export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) => string): SaidWhen => ({
+  over,
   ended: run.state !== 'working',
   ...(keep ? { keep } : {}),
 });

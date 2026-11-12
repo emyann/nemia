@@ -110,6 +110,17 @@ const PRINTED = {
      */
     permissionMode: Schema.optional(Schema.NonEmptyString),
   }),
+  /**
+   * A change of the session's state, as the SDK's status message names it (`SDKStatusMessage`, `sdk.d.ts:6326`), read for its mode
+   * alone: the `init` line can name a mode Claude Code has not yet settled, and the `status` line that follows it names the one the
+   * session runs in — measured on 2.1.322: on `claude-haiku-4-5` filed in `auto`, 1 run in 10 printed `init` with `auto`
+   * and then a `status` with `default`, where the other 9 printed `default` on both. Read as written, as the `init` line's is.
+   */
+  'system status': Schema.Struct({
+    type: Schema.Literal('system'),
+    subtype: Schema.Literal('status'),
+    permissionMode: Schema.optional(Schema.NonEmptyString),
+  }),
   stream_event: Schema.Struct({
     type: Schema.Literal('stream_event'),
     event: Schema.Union([StartEvent, DeltaEvent, StopEvent, otherThan(['message_start', 'content_block_delta', 'content_block_stop'])]),
@@ -203,6 +214,12 @@ export type Printed<K extends PrintedKind> = (typeof PRINTED)[K]['Type'];
 
 /** The mode an `init` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`. */
 export const initRanIn = (line: Printed<'system init'>): string | undefined => line.permissionMode;
+
+/** The mode a `status` line names, in the runtime's word (`ranIn`): Claude Code's `permissionMode`, absent from most of them. */
+export const statusRanIn = (line: Printed<'system status'>): string | undefined => line.permissionMode;
+
+/** A `status` line as a capture keeps it: the mode it names, and nothing else a reader does not read. */
+export const statusLineText = (ranIn: string): string => JSON.stringify({ type: 'system', subtype: 'status', permissionMode: ranIn });
 
 /** An `init` line as a capture keeps it, off what a reader reads of it: the mode under Claude Code's own key. */
 export const initLineText = ({ ranIn, ...read }: InitRead): string =>

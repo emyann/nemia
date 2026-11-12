@@ -115,3 +115,13 @@ test('a factory sets a cost line for a workflow it offers, and one for a workflo
   for (const [row, factory] of Object.entries(rows))
     await t.test(`REFUSED: ${row}`, () => assert.equal(Schema.is(Factory)(factory), false));
 });
+
+test('a factory names the URL only of a repository it has, and one naming another folder is refused', async (t) => {
+  const mill = { name: 'mill', repos: ['/store/clones/h/o/r'], workflows: [], hires: {}, schedules: {} };
+  await t.test('the URL of its one clone', () =>
+    assert.equal(Schema.is(Factory)({ ...mill, origins: { '/store/clones/h/o/r': 'https://h/o/r' } }), true),
+  );
+  await t.test('REFUSED: the URL of a folder that is none of its repositories', () =>
+    assert.equal(Schema.is(Factory)({ ...mill, origins: { '/elsewhere': 'https://h/o/r' } }), false),
+  );
+});

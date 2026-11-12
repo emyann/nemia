@@ -500,6 +500,12 @@ export const mcpServers = {
   /** The state of the server `name`'s last sign-in, from the engine's memory. */
   signInState: (namespace: string, name: string): Promise<SignInState> =>
     call((c) => c.mcpservers.signInState({ params: { namespace, name } }), read(SignInState)),
+  /**
+   * The server `name`'s waiting sign-in handed `url`, the address the person's browser landed on once they approved, where that
+   * browser runs on another machine than the daemon: answers the sign-in's state.
+   */
+  signInCallback: (namespace: string, name: string, url: string): Promise<SignInState> =>
+    call((c) => c.mcpservers.signInCallback({ params: { namespace, name }, payload: { url } }), write(SignInState, SIGN_IN_ASKED)),
   /** The server `name` signed out. */
   signOut: (namespace: string, name: string): Promise<SignedOut> =>
     call((c) => c.mcpservers.signOut({ params: { namespace, name } }), write(SignedOut, SIGN_IN_ASKED)),

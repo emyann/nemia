@@ -1,18 +1,21 @@
 /**
  * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves as the
- * Factory's list of `objects`, and `ls` — then filed, which the command line alone does; given workflows and relieved of them, its
- * revisions policy written and removed, which the api serves as the Factory's `attach`, `detach`, `setRevisions` and `delete`, each typed
- * by its `input`; hired into and fired from, which the api serves as a Hire's writes, `/api/namespaces/:namespace/hires/<workflow>.<step>`;
- * and its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
+ * Factory's list of `objects`, and `ls` — then filed, which the api serves as the Factory's `create`; given workflows and relieved of
+ * them, its revisions policy written and removed, which the api serves as the Factory's `attach`, `detach`, `setRevisions` and
+ * `delete`, each typed by its `input`; hired into and fired from, which the api serves as a Hire's writes,
+ * `/api/namespaces/:namespace/hires/<workflow>.<step>`; and its instruction's two verbs (instruction.verb.ts), which the api serves.
+ * Their handlers answer data, and the CLI prints it.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { setting } from '../config/config.store.ts';
 import { Effect, Schema } from 'effect';
-import { HireWrite } from 'objects';
+import { HireWrite, type FactoryList } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import {
+  DEFAULT_NAMESPACE,
   factoryLines,
   REVISIONS_POLICIES,
   unhiredFireRefusal,
@@ -20,7 +23,8 @@ import {
   type FactoryListing,
   type RevisionsPolicy,
 } from './factory.ts';
-import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, refuseName } from './door/factories.store.ts';
+import { factoriesDirAt, FactoryDoor, factoryRepos, filedFactory, originsOf, refuseName } from './door/factories.store.ts';
+import { cloned } from './clones/clones.verb.ts';
 import { ownAgentRefusal } from './wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -41,8 +45,8 @@ import { FACTORY_SETTINGS, SETTING_FORMS } from '../harness-settings/harness-set
 import { COST_LINE_FORMS, FACTORY_COST_LINES } from './cost-line/cost-line.verb.ts';
 
 export const FACTORY_HELP = `nemia factory [ls]
-nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
-nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
+nemia factory add <name> --repo <path|url> [--repo <path|url> ...] [--no-trust]
+nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]
 nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
 nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
 nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
@@ -184,10 +188,10 @@ refused, naming the attach.`;
  * the harness reports; `server add` records a remote one and `server rm` takes one off (`servers/servers.verb.ts`).
  */
 
-/** Why the api does not file a factory: its places are directories of the machine the command line is typed on. */
+/** Why the command line takes a filing by its arguments: the api serves it as the Factory's `create`, calling its handler. */
 const WRITTEN_HERE = {
   side: 'cli',
-  why: 'the api files no factory: its places are directories of this machine, which nemia factory add names and checks',
+  why: "the api serves it as the Factory's `create` of `objects`' Api, calling this handler: its places are directories of the machine the store runs on, which it names and checks",
 } as const;
 
 /** The text under `key`: what the spec read there. */
@@ -213,6 +217,50 @@ const listedNow = Effect.fn('listedNow')(function* (memo?: ScheduleRuns) {
   return { factories, schedules, untrusted: yield* untrustedPlaces(factories), dir: factoriesDirAt(yield* StoreRoot) } satisfies Listed;
 });
 
+/**
+ * The listing `nemia factory` prints, made of the page of Factories another machine's api answered (`factories.listAll`): each factory
+ * but the default as its object says it, a file that does not read by its error, and the places not trusted its status names. What no
+ * Factory object carries is not said: its schedules and their fires, where its instruction is kept, the store's folder (`dir`, named by
+ * the daemon's address alone) and the folder a harness keeps a trust under.
+ */
+const listedOfObjects = (answer: unknown): Listed => {
+  const items = (answer as FactoryList).items.filter((o) => o.metadata.name !== DEFAULT_NAMESPACE);
+  const factories = items.map((o): FactoryListing => {
+    const name = o.metadata.name;
+    const error = o.status.error;
+    if (error !== undefined && o.spec.repos.length === 0) {
+      const cut = error.indexOf(' ');
+      return { name, file: cut < 0 ? error : error.slice(0, cut), error: cut < 0 ? '' : error.slice(cut + 1) };
+    }
+    const { spec } = o;
+    return {
+      name,
+      file: '',
+      repos: spec.repos,
+      workflows: spec.workflows ?? [],
+      hires: spec.hires,
+      schedules: {},
+      volumes: spec.volumes,
+      ...(spec.harnessSettings === undefined ? {} : { harnessSettings: spec.harnessSettings }),
+      ...(spec.costLines === undefined ? {} : { costLines: spec.costLines }),
+      ...(spec.revisions === undefined ? {} : { revisions: spec.revisions }),
+      ...(spec.template === undefined ? {} : { template: spec.template }),
+      status: { applied: o.status.applied ?? null, conditions: o.status.conditions },
+    };
+  });
+  const untrusted = items.flatMap((o) =>
+    o.status.untrusted.map((u): Untrusted => ({
+      factory: o.metadata.name,
+      place: u.place,
+      harness: u.harness,
+      folder: u.place,
+      withheld: u.withheld,
+      never: u.never ?? null,
+    })),
+  );
+  return { factories, schedules: [], untrusted, dir: "the daemon's store" };
+};
+
 /** The lines `nemia factory` prints of the store's factories, and how to file one or remove one. */
 const listed = ({ factories, schedules, untrusted, dir }: Listed): string[] => [
   ...factoryLines(factories, schedules, Date.now(), untrusted),
@@ -222,7 +270,7 @@ const listed = ({ factories, schedules, untrusted, dir }: Listed): string[] => [
 /** `nemia factory`: the default factory, then each in the store; a word it does not take is refused naming its nine forms. */
 export const FACTORY: Command<Listed> = {
   name: 'factory',
-  served: [{ endpoint: 'factories.listAll' }],
+  served: [{ endpoint: 'factories.listAll', answer: listedOfObjects }],
   usage: '',
   help: [
     "the store's factories: the default first — every run and card that",
@@ -246,6 +294,7 @@ export const FACTORY: Command<Listed> = {
 /** `nemia factory ls`: the same listing, by its name. */
 const FACTORY_LS: Command<Listed> = {
   name: 'factory ls',
+  served: [{ endpoint: 'factories.listAll', answer: listedOfObjects }],
   usage: '',
   help: ['the same, by its name'],
   spec: {
@@ -255,7 +304,10 @@ const FACTORY_LS: Command<Listed> = {
   },
   writes: false,
   class: 'read',
-  only: { side: 'cli', why: "the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it" },
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Factory's `listAll` of `objects`' Api, calling this handler: ls is the command line's second name for it",
+  },
   handler: (_args, kept) => listedNow(kept?.records?.factories),
   print: listed,
 };
@@ -266,7 +318,7 @@ const REPOS = {
   kind: 'text',
   key: 'repos',
   many: true,
-  takes: "--repo takes a repository's directory: nemia factory add <name> --repo <path> [--repo <path> ...]",
+  takes: "--repo takes a repository's directory or its git URL: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]",
 } satisfies Flag;
 
 /** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository, and `--no-trust`. */
@@ -279,7 +331,7 @@ const ADD_SPEC: Spec = {
       : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
   apart: () => REPOS.takes,
   missing:
-    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path|url> [--repo <path|url> ...]. Nothing was filed.",
 };
 
 /**
@@ -288,8 +340,12 @@ const ADD_SPEC: Spec = {
  */
 export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string; trusts: readonly PlaceTrust[] }> = {
   name: 'factory add',
-  usage: '<name> --repo <path> [--repo <path> ...] [--no-trust]',
-  help: ['file a factory: a lowercase slug naming one or more directories,', 'each trusted for its steps unless --no-trust'],
+  served: [{ endpoint: 'factories.create' }],
+  usage: '<name> --repo <path|url> [--repo <path|url> ...] [--no-trust]',
+  help: [
+    'file a factory: a lowercase slug naming one or more directories or git URLs,',
+    'each URL cloned, each trusted for its steps unless --no-trust',
+  ],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
   writes: true,
@@ -299,11 +355,13 @@ export const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file
     Effect.gen(function* () {
       const name = textOf(args, 'name');
       const given = Array.isArray(args.repos) ? args.repos : [];
-      const repos = yield* tried(() => {
+      const home = yield* StoreRoot;
+      const { repos, origins } = yield* tried(() => {
         refuseName(name, 'add');
-        return factoryRepos(name, given);
+        return factoryRepos(home, name, given);
       });
-      const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {} };
+      yield* cloned(origins);
+      const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, ...originsOf(origins) };
       const file = yield* Effect.gen(function* () {
         const door = yield* FactoryDoor;
         return yield* door.factories.create(factory);
@@ -336,7 +394,7 @@ export type WorkflowWireInput = typeof WorkflowWireInput.Type;
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, WorkflowWireInput> = {
   name: 'factory attach',
-  served: [{ endpoint: 'factories.attach' }],
+  served: [{ endpoint: 'factories.attach', request: renamed({ factory: 'name' }) }],
   usage: '<factory> <workflow>',
   help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
   spec: workflowSpec('attach'),
@@ -354,7 +412,7 @@ export const FACTORY_ATTACH: Command<{ file: string; already: boolean }, Workflo
 /** `nemia factory detach`: one workflow taken from one factory. */
 export const FACTORY_DETACH: Command<{ file: string }, WorkflowWireInput> = {
   name: 'factory detach',
-  served: [{ endpoint: 'factories.detach' }],
+  served: [{ endpoint: 'factories.detach', request: renamed({ factory: 'name' }) }],
   usage: '<factory> <workflow>',
   help: ['take a workflow back, once no hire fills its steps'],
   spec: workflowSpec('detach'),
@@ -411,7 +469,7 @@ export type FireInput = typeof FireInput.Type;
 /** `nemia factory hire`: one agent hired into one step, and the agent it replaced, if any. */
 export const FACTORY_HIRE: Command<{ file: string; replaced: string | null }, HireInput> = {
   name: 'factory hire',
-  served: [{ endpoint: 'hires.put' }],
+  served: [{ endpoint: 'hires.put', request: renamed({ factory: 'namespace', step: 'name' }) }],
   usage: '<factory> <agent> --step <workflow>/<step>',
   help: ["hire an agent into a workflow's step: one a step, a second replaces it"],
   spec: HIRE_SPEC,
@@ -442,7 +500,7 @@ const FIRE_SPEC = stepSpec(
 /** `nemia factory fire`: one step's hire taken back. */
 export const FACTORY_FIRE: Command<{ file: string; fired: string }, FireInput> = {
   name: 'factory fire',
-  served: [{ endpoint: 'hires.delete' }],
+  served: [{ endpoint: 'hires.delete', request: renamed({ factory: 'namespace', step: 'name' }) }],
   usage: '<factory> --step <workflow>/<step>',
   help: ["take a step's hire back"],
   spec: FIRE_SPEC,
@@ -471,7 +529,7 @@ export type FactoryRmInput = typeof FactoryRmInput.Type;
  */
 export const FACTORY_RM: Command<{ file: string; instruction: string | null }, FactoryRmInput> = {
   name: 'factory rm',
-  served: [{ endpoint: 'factories.delete' }],
+  served: [{ endpoint: 'factories.delete', request: renamed({ factory: 'name' }) }],
   usage: '<name>',
   help: ["remove a factory's file, and the instruction and the rules the store", 'keeps for it'],
   spec: {
@@ -530,7 +588,7 @@ export type RevisionsInput = typeof RevisionsInput.Type;
  */
 export const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }, RevisionsInput> = {
   name: 'factory revisions',
-  served: [{ endpoint: 'factories.setRevisions' }],
+  served: [{ endpoint: 'factories.setRevisions', request: renamed({ factory: 'name' }) }],
   usage: '<name> follow|pinned',
   help: [
     "whether a factory's runs follow merged revisions at each filing (follow)",

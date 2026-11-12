@@ -80,7 +80,9 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * `harnessSettings`: the settings of a harness every session of its runs' steps on it is given, when it names any (`HarnessSettings`), as
  * the file holds them: judged at a start and at the door's write, not on read. `costLines`: the cost line it sets for each workflow it
  * offers, in dollars, by the workflow's folder name (`nemia factory cost-line set`), when it sets any: frozen on a run of that workflow at
- * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `generation`: the count of
+ * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `origins`: each of its
+ * repositories it was given by git URL, its folder (`clones/<host>/<path>` in the store, `cloneTarget`) to that URL, which the daemon
+ * clones again when the folder is gone (`clonesOnce`), when it was given any. `generation`: the count of
  * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
  * its file holds one; a file written before the counter reads as 1 (`generationOf`).
  */
@@ -97,6 +99,7 @@ export type Factory = {
   volumes?: readonly Volume[];
   harnessSettings?: SettingsAsRead;
   costLines?: Readonly<Record<string, number>>;
+  origins?: Readonly<Record<string, string>>;
   generation?: number;
 };
 

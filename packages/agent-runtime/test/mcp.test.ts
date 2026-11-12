@@ -33,13 +33,14 @@ const tmp = (label: string) => scratch(`ae-mcp-${label}-`);
 
 /**
  * A fake `claude` and `codex`: each writes its argv, one line per argument, to `<bin>/<name>.argv` — written, then moved, so
- * no reader sees half.
+ * no reader sees half. The `codex` answers `login status`, which the harness asks before a spawn, signed in and writing nothing.
  */
 const fakeBin = () => {
   const bin = tmp('bin');
   for (const name of ['claude', 'codex']) {
     const out = path.join(bin, `${name}.argv`);
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
+    const signedIn = name === 'codex' ? `if [ "$1" = login ]; then exit 0; fi\n` : '';
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${signedIn}printf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
       mode: 0o755,
     });
   }

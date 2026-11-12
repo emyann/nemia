@@ -3,6 +3,7 @@
  * spells it. The api serves each, a run's as the Run's `labels` action and a card's as the Card's `labels` verb (`objects`' Api),
  * its body a `LabelEdit` — `labels`, the edits, and `overwrite` — under the keys the command line gives them, so one handler reads both.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { type Args, type Spec } from '../command/command.ts';
 import { checked, type Command } from '../command/entry.verb.ts';
@@ -61,7 +62,7 @@ export type LabelRunInput = typeof LabelRunInput.Type;
  */
 export const LABEL_RUN: Command<Labelled, LabelRunInput> = {
   name: 'label run',
-  served: [{ endpoint: 'runs.labels' }],
+  served: [{ endpoint: 'runs.labels', request: renamed({ runId: 'name' }) }],
   usage: '<runId> <key=value|key->... [--overwrite]',
   help: [
     "edit a run's labels: key=value sets a key, key- removes it; changing a",

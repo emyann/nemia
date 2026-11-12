@@ -8,16 +8,6 @@ import { TABLE } from './commands.verb.ts';
 
 /** Each entry of the command line's alone that no endpoint serves, in the table's order. */
 const LEFT_OUT = [
-  'inbox from',
-  'factory ls',
-  'factory add',
-  'factory apply',
-  'factory adopt',
-  'factory diff',
-  'factory upgrade',
-  'factory resolve',
-  'factory volume add',
-  'factory volume rm',
   'template lint',
   'template export',
   'template pack',
@@ -34,7 +24,6 @@ const LEFT_OUT = [
   'claude-token rm',
   'upgrade',
   'version',
-  'daemon',
   'frontmatter rewrite',
   'tick',
   'up',

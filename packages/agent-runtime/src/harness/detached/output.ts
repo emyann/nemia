@@ -13,6 +13,8 @@ import {
   partialMarksOf,
   printedKindOf,
   printedLinesOf,
+  statusLineText,
+  statusRanIn,
   type PrintedKind,
   type PrintedLine,
   type Printed,
@@ -188,7 +190,7 @@ const deniedCalls = (entries: readonly DeniedEntry[], inputs: ReadonlyMap<string
  * The kinds of line a stream is read for.
  * Exported only for the tests that import it.
  */
-export const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'assistant'];
+export const STREAM_KINDS: readonly PrintedKind[] = ['result', 'system permission_denied', 'system init', 'system status', 'assistant'];
 
 /** A call an assistant's line makes, as its `tool_use` block decodes. */
 type ToolUse = Extract<Exclude<Printed<'assistant'>['message']['content'], string>[number], { type: 'tool_use' }>;
@@ -214,7 +216,10 @@ type StreamFacts = {
    * last is the process that runs now.
    */
   harnessVersion?: string;
-  /** The mode its last `init` line names: one per turn, so a turn in another mode than the first is the mode it runs in now. */
+  /**
+   * The mode its last `init` or `status` line names: an `init` line per turn, so a turn in another mode than the first is the mode it
+   * runs in now, and a `status` line where Claude Code settles a mode the `init` line named before it had (`PRINTED`'s `system status`).
+   */
   ranIn?: string;
   skills: Map<string, unknown>;
   files: Map<string, [string, unknown]>;
@@ -245,7 +250,8 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
     facts.model ??= printed.line.model;
     if (printed.line.claude_code_version) facts.harnessVersion = printed.line.claude_code_version;
     facts.ranIn = initRanIn(printed.line) ?? facts.ranIn;
-  } else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
+  } else if (printed.kind === 'system status') facts.ranIn = statusRanIn(printed.line) ?? facts.ranIn;
+  else if (printed.kind === 'assistant') gatherCalls(facts, printed.line);
 };
 
 /**
@@ -263,7 +269,9 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * whose `init` line names a model, which is the alias — `opus` — already resolved to the model id the harness chose for it; what it
  * answers it `ranOn`, so no field of a recorded fact is spelt as the harness argument that asked for it. The version of Claude
  * Code it runs, `harnessVersion`, is the last `init` line's `claude_code_version`, said only by a stream with one that names it; the
- * mode it ran in, `ranIn`, the mode the last `init` line names, likewise. What it was denied is said, `[]` for nothing, by a stream
+ * mode it ran in, `ranIn`, the mode the last `init` or `status` line names, likewise: Claude Code can print its `init` line before it
+ * settles the mode, and says the settled one on a `status` line after it (`PRINTED`'s `system status`). What it was denied is said,
+ * `[]` for nothing, by a stream
  * with its `init` line or its result, which measured it; one with neither cannot say.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
@@ -342,8 +350,9 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
  * What a job's stream capture keeps once its session has ended: what the shipped readers read of it, and nothing of the conversation
  * they do not, in the order printed. Kept whole: a line that is no JSON object (stderr, the worker's own words, a line torn mid-write).
  * A line of a kind `claudeStreamOutput` reads is kept as its schema decodes it (`PRINTED`), every field no reader reads left out: its
- * `result` and its `permission_denied` lines each time, and an `init` line only where it changes what a reader reads (`initKept`) —
- * the SDK prints one per turn, each listing every tool and command. An `assistant` line is cut to its `tool_use` blocks, each its id,
+ * `result` and its `permission_denied` lines each time, an `init` line only where it changes what a reader reads (`initKept`) —
+ * the SDK prints one per turn, each listing every tool and command — and a `status` line only where it names a mode the last did not.
+ * An `assistant` line is cut to its `tool_use` blocks, each its id,
  * its tool and its input: whole for a call the stream says was denied, else only the key a reader reads (`READ_INPUT_KEYS`), a command
  * by its first word; one that makes no call is dropped. Every other JSON line is dropped: tool results, partial messages, text and
  * thinking, other `system` lines. A capture kept so keeps the same, and reads the same.
@@ -357,7 +366,7 @@ export const claudeStreamKept = (output: string): string => {
   return output
     .split('\n')
     .flatMap((text) => {
-      const init = initLineKept(text, read);
+      const init = initLineKept(text, read) ?? statusLineKept(text, read);
       if (init === undefined) return lineKept(text, facts.denied) ?? [];
       read = init.read;
       return init.kept ?? [];
@@ -394,7 +403,25 @@ export const initLineKept = (text: string, read: InitRead | undefined): { kept?:
   };
 };
 
-/** What a capture keeps of its line `text` (`claudeStreamKept`) when it is no `init` line, the calls `denied` named whole, or nothing. */
+/**
+ * What a capture keeps of the line `text` when it is a `status` line, after the lines that said `read` (none before the first `init`
+ * line): its mode alone (`statusLineText`) where it names one other than the last a reader read, else nothing; and what a reader reads
+ * once it is read, the mode it names folded into `read` once an `init` line began it. None when `text` is no `status` line. Throws, as
+ * `claudeStreamKept` does, when it does not decode.
+ */
+const statusLineKept = (text: string, read: InitRead | undefined): { kept?: string; read: InitRead | undefined } | undefined => {
+  if (printedKindOf(text) !== 'system status') return undefined;
+  const [printed] = decoded(text, ['system status']);
+  if (printed?.kind !== 'system status') return undefined;
+  const mode = statusRanIn(printed.line);
+  if (mode === undefined || (read !== undefined && mode === read.ranIn)) return { read };
+  return { kept: statusLineText(mode), read: read && { ...read, ranIn: mode } };
+};
+
+/**
+ * What a capture keeps of its line `text` (`claudeStreamKept`) when it is no `init` or `status` line, the calls `denied` named whole, or
+ * nothing.
+ */
 const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined => {
   const kind = printedKindOf(text);
   if (kind === undefined) return text;

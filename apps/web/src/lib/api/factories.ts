@@ -21,6 +21,7 @@ import {
   type Schedule,
   type SignedOut,
   type SignInStarted,
+  type SignInState,
 } from 'objects';
 import { builtin, factories, hireName, hires, mcpServers, schedules } from './objects.ts';
 
@@ -306,6 +307,16 @@ export const signInStateQuery = (name: string, server: string) =>
     queryFn: () => mcpServers.signInState(name, server),
     refetchInterval: (query) => (query.state.data?.state === 'waiting' ? 2_000 : false),
   });
+
+/**
+ * Complete the waiting sign-in to the factory `name`'s server `server` with `url`, the address the person's browser landed on once they
+ * approved — `http://localhost:<callbackPort>/callback?code=…&state=…`, which fails to load where the daemon runs on another machine:
+ * resolves with the sign-in's state, which reads `connected` once the harness took it. Rejects with a `WriteRefusal`: no such server
+ * (404), no sign-in waiting (409), an address that is not the sign-in's redirect with a code and a state (422), a body with no `url`
+ * (400).
+ */
+export const completeSignIn = (name: string, server: string, url: string): Promise<SignInState> =>
+  mcpServers.signInCallback(name, server, url);
 
 /** Sign the factory `name` out of `server`: its sign-in cleared, so its state reads needs-auth on the next read. 409 while one waits. */
 export const signOutServer = (name: string, server: string): Promise<SignedOut> => mcpServers.signOut(name, server);

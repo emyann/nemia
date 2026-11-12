@@ -1,15 +1,18 @@
 /**
  * Codex, through `codex exec`: the sandboxes and efforts it takes, the trust it is extended, and its spec.
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { McpServer, SpawnRequest } from '../seam.ts';
-import type { HarnessSpec } from '../detached/detached.ts';
+import type { HarnessIO, HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
 import { CODEX_DECLARATION, CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
+import { withoutTelemetry } from '../telemetry.ts';
+import { quote, WORDS_QUOTE } from '../../core/quote.ts';
 
 /**
  * The project paths a Codex config trusts.
@@ -99,6 +102,80 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
   return picked as Record<string, McpServer>;
 };
 
+/** How long `codex login status` is given to answer before a spawn goes on without its answer (`signedOutRefusal`). */
+export const CODEX_SIGN_IN_MS = 15_000;
+
+/**
+ * Why Codex cannot start the session `r` because it is signed out on this machine, or `undefined`. It asks `codex login status`,
+ * in the session's working root and environment — the engine's, less its telemetry, under the task's own `config.env` — as the
+ * user the engine runs as, which is the user Codex would run as. A nonzero exit is signed out: the words quote the last line Codex
+ * printed and name the command that signs in. An answer that never comes within `ms`, and a `codex` that does not start, refuse
+ * nothing: an unknown answer is not a signed-out one, and a missing binary fails the spawn in its own words, as it did before.
+ */
+const signedOutRefusal = (r: SpawnRequest, ms: number): string | undefined => {
+  const ran = spawnSync('codex', ['login', 'status'], {
+    cwd: r.cwd,
+    encoding: 'utf8',
+    timeout: ms,
+    env: { ...withoutTelemetry(process.env), ...r.config?.env },
+  });
+  if (ran.error !== undefined || ran.status === null || ran.status === 0) return undefined;
+  const said = `${ran.stdout ?? ''}\n${ran.stderr ?? ''}`
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1);
+  const answer = said === undefined ? `exited ${ran.status}` : `said "${quote(said, WORDS_QUOTE)}"`;
+  return `Codex is not signed in on this machine: \`codex login status\` ${answer}. Sign in with \`codex login --device-auth\`, as the user the engine runs as, then try again.`;
+};
+
+/**
+ * Signed out, the spawn is refused before anything else is read (`signedOutRefusal`).
+ *
+ * Trust is extended, never granted.
+ *
+ * Codex keeps `.git` read-only inside its sandbox on purpose, so a step can only commit its own
+ * work when a rule lets `git add`/`git commit` run outside it — and Codex loads a project's rules
+ * only when the project is trusted: in a worktree, when the repository and the worktree both are. A
+ * worktree is a new path, so it is never trusted on its own.
+ *
+ * So a worktree whose repository you already trust in your own Codex config is trusted for the
+ * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
+ * Codex settings it ships, and that is not a decision this engine gets to make for you.
+ *
+ * The directory trust is extended from is the task's `config.codex.trustFrom`, and it decides
+ * alone: trusted, it and the `cwd` are; not, nothing is. A task that names none is extended no trust.
+ *
+ * The same config is read for the MCP servers it names. Codex merges a task's `mcp_servers` into
+ * the operator's, so a task server with one of their names becomes a mix of the two — the task's
+ * command with the operator's args and env — or fails to load when the
+ * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
+ */
+const codexPrepare = (r: SpawnRequest, signInMs: number): Partial<HarnessIO> => {
+  const signedOut = signedOutRefusal(r, signInMs);
+  if (signedOut) throw new Error(signedOut);
+  const pickedMcp = codexPicked(r);
+  const picked = pickedMcp ? { pickedMcp } : {};
+  const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
+  let toml: string;
+  try {
+    toml = fs.readFileSync(config, 'utf8');
+  } catch {
+    return picked;
+  }
+  const operators = codexMcpServerNames(toml);
+  const taken = Object.keys({ ...pickedMcp, ...r.config?.mcp }).filter((name) => operators.has(name));
+  if (taken.length) {
+    throw new Error(
+      `${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`,
+    );
+  }
+  const named = r.config?.codex?.trustFrom;
+  if (named === undefined) return picked;
+  const from = path.resolve(named);
+  return trustedProjects(toml).has(from) ? { ...picked, trustedDirs: [...new Set([from, r.cwd])] } : picked;
+};
+
 /**
  * Codex, through `codex exec`. Its argv, in order:
  *
@@ -135,8 +212,11 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
  * the stream's `thread.started`, whose `thread_id` the worker reads as the session's id, which a resume and the rollout are found by.
  * Its worker keeps stdout apart (`streams`), so a session is followed live (`follow`): its state, then its rollout's events as Codex
  * writes them, each message whole (`codexPartials`), its stdout decoded as it comes.
+ *
+ * Its `prepare` refuses a spawn while Codex is signed out (`signedOutRefusal`), asking for no longer than `signInMs`,
+ * `CODEX_SIGN_IN_MS` unless a test shortens it.
  */
-export const codex: HarnessSpec = {
+export const codexHarness = (o: { signInMs?: number } = {}): HarnessSpec => ({
   name: 'codex',
   can: CODEX_DECLARATION.can,
   command: (r, io) => ({
@@ -192,46 +272,8 @@ export const codex: HarnessSpec = {
   noChannel:
     '`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words, its `resumeFrom` naming this session (`ae file`).',
   start: CODEX_START,
-  /**
-   * Trust is extended, never granted.
-   *
-   * Codex keeps `.git` read-only inside its sandbox on purpose, so a step can only commit its own
-   * work when a rule lets `git add`/`git commit` run outside it — and Codex loads a project's rules
-   * only when the project is trusted: in a worktree, when the repository and the worktree both are. A
-   * worktree is a new path, so it is never trusted on its own.
-   *
-   * So a worktree whose repository you already trust in your own Codex config is trusted for the
-   * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
-   * Codex settings it ships, and that is not a decision this engine gets to make for you.
-   *
-   * The directory trust is extended from is the task's `config.codex.trustFrom`, and it decides
-   * alone: trusted, it and the `cwd` are; not, nothing is. A task that names none is extended no trust.
-   *
-   * The same config is read for the MCP servers it names. Codex merges a task's `mcp_servers` into
-   * the operator's, so a task server with one of their names becomes a mix of the two — the task's
-   * command with the operator's args and env — or fails to load when the
-   * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
-   */
-  prepare: (r) => {
-    const pickedMcp = codexPicked(r);
-    const picked = pickedMcp ? { pickedMcp } : {};
-    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
-    let toml: string;
-    try {
-      toml = fs.readFileSync(config, 'utf8');
-    } catch {
-      return picked;
-    }
-    const operators = codexMcpServerNames(toml);
-    const taken = Object.keys({ ...pickedMcp, ...r.config?.mcp }).filter((name) => operators.has(name));
-    if (taken.length) {
-      throw new Error(
-        `${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`,
-      );
-    }
-    const named = r.config?.codex?.trustFrom;
-    if (named === undefined) return picked;
-    const from = path.resolve(named);
-    return trustedProjects(toml).has(from) ? { ...picked, trustedDirs: [...new Set([from, r.cwd])] } : picked;
-  },
-};
+  prepare: (r) => codexPrepare(r, o.signInMs ?? CODEX_SIGN_IN_MS),
+});
+
+/** Codex as the runtime ships it (`codexHarness`). */
+export const codex: HarnessSpec = codexHarness();

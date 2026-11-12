@@ -25,6 +25,7 @@ import { emitDaemonStarted, FEED_FOLLOW_BEATS, FEED_FOLLOW_LINES, FEED_FOLLOW_RE
 import { keep } from '../nemia/keep.verb.ts';
 import { reconcile } from '../factory/applied/applied.verb.ts';
 import { free } from '../forget/prune/free.verb.ts';
+import { clones } from '../factory/clones/clones.verb.ts';
 import { disk } from '../disk/disk.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
 import { leaseRelease } from '../release/index.ts';
@@ -331,6 +332,7 @@ export const up = (
     yield* Effect.forkScoped(over(e)(deliver()));
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());
+    yield* Effect.forkScoped(clones());
     let rested: Pass['runs'] = [];
     yield* Effect.forkScoped(over(e)(free(() => rested)));
     const answered = yield* Deferred.make<void>();

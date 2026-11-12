@@ -1,4 +1,5 @@
 /** `nemia series`, an entry of the command table: what the system's passes were, kept a minute and an hour at a time (`seriesRead`). */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { tried } from '../runtime-client.ts';
@@ -13,7 +14,7 @@ export type SeriesInput = typeof SeriesInput.Type;
 /** `nemia series`: the system's series over a range, a point a minute, an hour or a day. */
 export const SERIES: Command<SeriesRead, SeriesInput> = {
   name: 'series',
-  served: [{ endpoint: 'server.series' }],
+  served: [{ endpoint: 'server.series', request: renamed({}, ['json']) }],
   usage: '[--range 24h|7d|30d|all] [--json]',
   help: [
     "the system's series over a range: a pass's time and its phases, its",

@@ -1,4 +1,5 @@
 /** `nemia ls`, an entry of the command table: every run, or the one named, and its steps (`runsListed`). */
+import { givesNone, renamed, selectorQuery } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { runsListed } from './list.verb.ts';
 import { lsLines, type RunsListed } from './list.ts';
@@ -22,7 +23,14 @@ const LsInput = Schema.Struct({
 
 export const LS: Command<RunsListed, typeof LsInput.Type> = {
   name: 'ls',
-  served: [{ endpoint: 'runs.listAll' }, { endpoint: 'runs.show', as: 'ls_run' }],
+  served: [
+    {
+      endpoint: 'runs.listAll',
+      takes: givesNone('runId'),
+      request: (input) => Promise.resolve(selectorQuery(input)),
+    },
+    { endpoint: 'runs.show', as: 'ls_run', request: renamed({ runId: 'name' }, ['selector', 'showLabels', 'labelColumns']) },
+  ],
   usage: '[<runId>] [-l <selector>] [--show-labels] [-L <key>]',
   help: [
     'runs and their steps — a run waiting on another says waiting on <run>,',

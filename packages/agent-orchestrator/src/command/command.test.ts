@@ -356,10 +356,10 @@ test("the table's help is today's, word for word", () => {
       '                               repositories (nemia factory --help)',
       '  nemia factory ls',
       '                               the same, by its name',
-      '  nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]',
-      '                               file a factory: a lowercase slug naming one or more directories,',
-      '                               each trusted for its steps unless --no-trust',
-      '  nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
+      '  nemia factory add <name> --repo <path|url> [--repo <path|url> ...] [--no-trust]',
+      '                               file a factory: a lowercase slug naming one or more directories or git URLs,',
+      '                               each URL cloned, each trusted for its steps unless --no-trust',
+      '  nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]',
       '                               make a factory from a template that passes its check, its parameters',
       '                               given with --set; the daemon renders its tree',
       '  nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>',
@@ -912,6 +912,8 @@ const API = { side: 'api', why: 'w' } as const;
 const CLI_ALONE = { side: 'cli', why: 'w' } as const;
 /** The one endpoint of `objects`' Api that serves an entry, its tool the entry's name. */
 const LINK = [{ endpoint: 'runs.show' }] as const;
+/** Which link of two a forwarded call takes: the first where the input names no `off`. */
+const takes = (asked: Readonly<Record<string, unknown>>) => asked.off !== true;
 const SAID_NOTHING: Spec = { ...CARD, flags: [{ flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: '' } }] };
 
 /**
@@ -1032,14 +1034,24 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
   ],
   [
     'an entry with a second link that names its tool',
-    [{ name: 'a b', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'un_a_b' }] }],
+    [
+      {
+        name: 'a b',
+        input,
+        handler,
+        served: [
+          { endpoint: 'runs.hold', takes },
+          { endpoint: 'runs.unhold', as: 'un_a_b' },
+        ],
+      },
+    ],
     [],
     [],
     [],
   ],
   [
     'REFUSED: a second link that names no tool, which would take the name of the first',
-    [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold' }] }],
+    [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold', takes }, { endpoint: 'runs.unhold' }] }],
     [],
     [],
     [["a's link to runs.unhold names no tool", 'as']],
@@ -1048,11 +1060,44 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
     'REFUSED: one tool name on two links, the first of one entry and the second of another',
     [
       { name: 'a b', input, handler, served: LINK },
-      { name: 'c', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'a_b' }] },
+      {
+        name: 'c',
+        input,
+        handler,
+        served: [
+          { endpoint: 'runs.hold', takes },
+          { endpoint: 'runs.unhold', as: 'a_b' },
+        ],
+      },
     ],
     [],
     [],
     [['a_b is the tool of a b and of c', 'another as']],
+  ],
+  [
+    'REFUSED: a link before the last that says no takes, which a forwarded call could never choose',
+    [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'un_a' }] }],
+    [],
+    [],
+    [["a's link to runs.hold says no takes", 'takes']],
+  ],
+  [
+    'the last link of several, which says no takes, being the one a forwarded call takes where none before it holds',
+    [
+      {
+        name: 'a',
+        input,
+        handler,
+        served: [
+          { endpoint: 'runs.hold', takes },
+          { endpoint: 'runs.unhold', as: 'un_a', takes },
+          { endpoint: 'runs.cancel', as: 'cancel_a' },
+        ],
+      },
+    ],
+    [],
+    [],
+    [],
   ],
 ];
 
@@ -1069,7 +1114,17 @@ test("a tool of a CLI verb the api serves counts against the table's tools, and 
   const decide = { name: 'decide', served: [{ endpoint: 'runs.decision' }] } as const;
   names(
     commandBreaks(
-      [{ name: 'a', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'decide' }] }],
+      [
+        {
+          name: 'a',
+          input,
+          handler,
+          served: [
+            { endpoint: 'runs.hold', takes },
+            { endpoint: 'runs.unhold', as: 'decide' },
+          ],
+        },
+      ],
       [],
       [],
       [decide],

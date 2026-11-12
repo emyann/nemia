@@ -142,8 +142,9 @@ test("the family's pure rules: a mark under its caller's prefix, a line's trace 
     assert.match(talk, /const drawn = drawnCount\(items\);/, 'and the talk follows its latest by that number');
     assert.match(
       talk,
-      /\}, \[atEnd, drawn, writing\]\);/,
-      'and by the message being written too: a text that grows is one item however long, so the talk would stop following it halfway',
+      /\}, \[atEnd, drawn, writing, height\]\);/,
+      'and by the message being written too: a text that grows is one item however long, so the talk would stop following it halfway; ' +
+        'and by its own height, so a line the frame draws over the page once it is drawn leaves a person at the foot at the latest',
     );
     assert.doesNotMatch(
       talk,

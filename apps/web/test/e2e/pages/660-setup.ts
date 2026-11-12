@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from 'playwright';
-import { answered, photograph, themeOf, topBarOf } from '../board.ts';
+import { answered, photograph, READINESS_ROUTE, themeOf, topBarOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import { serveExposed } from '../served.ts';
@@ -169,7 +169,7 @@ async function raisesBanner(page: Page): Promise<void> {
     route.request().method() === 'GET'
       ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
       : route.fallback();
-  await page.route('**/api/readiness', answer);
+  await page.route(READINESS_ROUTE, answer);
   try {
     await page.goto(new URL('/', setup).href);
     await idle(page);
@@ -187,7 +187,7 @@ async function raisesBanner(page: Page): Promise<void> {
     await idle(page);
     await expectCount(banner, 0, 'linger alone is missing, and no run waits on it: no banner');
   } finally {
-    await page.unroute('**/api/readiness', answer);
+    await page.unroute(READINESS_ROUTE, answer);
   }
   await page.goto(setup);
   await idle(page);
@@ -294,7 +294,8 @@ async function signsInByLink(page: Page): Promise<void> {
 
 export default {
   /**
-   * Settings' Setup: the readiness read grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
+   * Settings' Setup, over the api's own read (routed on past the piece every page's context plants, `bannerShown`): the readiness read
+   * grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
    * in place with each of its fixes — and the banner over another page, over reads it plants, raised by a missing piece a run waits on
    * and by no piece advised alone; with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in); that
    * fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks the
@@ -309,6 +310,8 @@ export default {
     const found = fs.readFileSync(readme, 'utf8');
     const before = heldIn();
     fs.writeFileSync(readme, plantedReadme(found));
+    const ownRead = (route: Route) => route.continue();
+    await page.route(READINESS_ROUTE, ownRead);
     try {
       await page.reload();
       await idle(page);
@@ -324,5 +327,6 @@ export default {
     await page.reload();
     await idle(page);
     await expectCount(page.locator(`li[data-piece="${NEED}"]`), 0, 'the planted need is taken back');
+    await page.unroute(READINESS_ROUTE, ownRead);
   },
 } satisfies PageSpec;

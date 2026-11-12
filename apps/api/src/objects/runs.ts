@@ -2,7 +2,7 @@
  * The runs group's handlers (`objects`' `Api`): the runs as a `RunList` (`runList`), across namespaces and in one, or as the `Table` its
  * page prints (`runTable`) where the request asks for one; a run in its namespace (`get`) and across them (`show`), the run object off the
  * app's informer (`runObject`); what is read beside it — its lines (`runLines`), what it concludes (`CONCLUDED`), its record (`SHOW`,
- * raw), `nemia ls`'s listing (`LS`); its four sub-resources, the entries `tries`, `try`, `closeout` and `told`; a run started (`create`,
+ * raw); its four sub-resources, the entries `tries`, `try`, `closeout` and `told`; a run started (`create`,
  * `runStart`); and the run's named actions, each its body decoded by its endpoint (`objects`' `RunRetry`, `RunApprove`, …) and handed with
  * the path's names to the orchestrator's typed entry `nemia` runs (`RETRY`, `APPROVE`, `ROUTE`, `SAY`, `REFRESH`, `HOLD`, `CANCEL`,
  * `RM`, `PRUNE`, `LABEL_RUN`).
@@ -15,7 +15,6 @@
  * `onlyTry`), and the removal and the prune fail with what did nothing (`refuses`), which the command line says as a line.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   APPROVE,
   CANCEL,
@@ -25,7 +24,6 @@ import {
   Informer,
   informerMemo,
   LABEL_RUN,
-  LS,
   PRUNE,
   REFRESH,
   RETRY,
@@ -49,6 +47,7 @@ import { runStart } from '../runs/start.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
 import { decisionHandler } from '../decide/decide.ts';
+import { readsBounded } from './answer-bound.ts';
 
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
@@ -63,9 +62,6 @@ const howOf = (s: Served): SummaryHow => ({
   memo: s.informer ?? informerMemo(),
   verify: verifiesRest(s.env),
 });
-
-/** A selector given once, several times, or not at all. */
-type Listed = string | readonly string[] | undefined;
 
 /** One selector, several, or none, as a list. */
 const listOf = (given: string | readonly string[] | undefined): string[] =>
@@ -169,19 +165,10 @@ const given = <K extends string, V>(key: K, value: V | undefined): Partial<Recor
   value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 
 /**
- * `value` as JSON says it, a key the orchestrator left undefined dropped: the record and the listing are the orchestrator's own objects,
- * said by `Schema.Unknown`, which the Api's JSON encoding refuses where a key holds `undefined` (a 500), as `JSON.stringify` never did.
+ * `value` as JSON says it, a key the orchestrator left undefined dropped: the record is the orchestrator's own object, said by
+ * `Schema.Unknown`, which the Api's JSON encoding refuses where a key holds `undefined` (a 500), as `JSON.stringify` never did.
  */
 const asJson = <A>(value: A): A => JSON.parse(JSON.stringify(value)) as A;
-
-/**
- * The selectors a listing is asked for, under either spelling, under the key `nemia ls`'s entry reads them (`selector`), or none where
- * none was given.
- */
-const selected = ({ labelSelector, selector }: { readonly labelSelector?: Listed; readonly selector?: Listed }) => {
-  const selectors = [...listOf(labelSelector), ...listOf(selector)];
-  return selectors.length ? { selector: selectors } : {};
-};
 
 /** A try removed (`nemia rm`, a try alone, its refusals thrown): what the engine forgot of it. */
 const removed = (at: At) =>
@@ -248,7 +235,7 @@ const said = (at: At & { readonly step: string }, payload: RunSay) =>
     return done.from === undefined ? said : { ...said, from: done.from, words: done.words };
   });
 
-export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
+export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => page(undefined, query))
     .handle('list', ({ params: { namespace }, query }) => page(namespace, query))
@@ -288,10 +275,6 @@ export const runsHandlers = HttpApiBuilder.group(Api, 'runs', (handlers) =>
         found(s.home, name);
         return asJson(await s.inRequest(SHOW.handler({ runId: name, raw: true })));
       }),
-    )
-    .handle('listing', ({ query }) => answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler(selected(query)))))))
-    .handle('listingOne', ({ params: { name }, query }) =>
-      answered(async (s) => asJson(await s.inRequest(informed(s, LS.handler({ runId: name, ...selected(query) }))))),
     )
     .handle('decision', ({ params: { runId }, query }) => decisionHandler(runId, query.sensitive, query.diffs)),
 );

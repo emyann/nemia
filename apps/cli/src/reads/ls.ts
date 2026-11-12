@@ -1,6 +1,7 @@
 /**
  * `nemia ls [-l <selector>]... [--show-labels] [-L <key>]... [-o wide]`, read from the api: the runs, those a selector takes (sent as
- * `labelSelector`, given again for another), as the server prints them — the runs list asked for its `Table` (`TABLE_ACCEPT`), printed by
+ * `labelSelector`, given again for another), as the server prints them — the runs list asked for its `Table` (`TABLE_ACCEPT`), every
+ * page of it read on from the `continue` each answers (`everyPage`) so a run is one line however many there are, printed by
  * `tableLines`, each run's status and what waits on you among its columns — with the pause first (`GET /api/pause`, `pausedLines`), and
  * after the table how old what it shows of where the result branches stand is, where the server says so (`Daemon.branchesLine`), a
  * line per schedule of each factory (`GET /api/namespaces/<factory>/schedules`, `scheduleLines`) and the daemon's line last, the
@@ -9,23 +10,27 @@
 import { Effect } from 'effect';
 import { tableLines } from 'objects';
 import { handedOn } from '../local.ts';
-import { asked, type ObjectsClient, pageOf, READ_BOUND_MS } from '../objects.ts';
+import { asked, everyPage, type ObjectsClient, pageOf, READ_BOUND_MS } from '../objects.ts';
 import { pausedLines, scheduleLines } from './standing.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What `nemia ls` says beside the runs: the pause, each factory's schedules, and the daemon. */
 const standing = (client: ObjectsClient) =>
   Effect.all(
-    { paused: client.server.paused(), daemon: client.server.daemon(), factories: pageOf(client.factories.listAll({ query: {} })) },
+    {
+      paused: client.server.paused(),
+      daemon: client.server.daemon(),
+      factories: pageOf(everyPage((page) => client.factories.listAll({ query: page }))),
+    },
     { concurrency: 'unbounded' },
   ).pipe(
     Effect.flatMap(({ paused, daemon, factories }) =>
       Effect.forEach(
         factories.items,
         ({ metadata: { name } }) =>
-          client.schedules
-            .list({ params: { namespace: name }, query: {} })
-            .pipe(Effect.map((listed) => ({ factory: name, schedules: listed.items }))),
+          everyPage((page) => client.schedules.list({ params: { namespace: name }, query: page })).pipe(
+            Effect.map((listed) => ({ factory: name, schedules: listed.items })),
+          ),
         { concurrency: 'unbounded' },
       ).pipe(Effect.map((schedules) => ({ paused, daemon, schedules }))),
     ),
@@ -38,7 +43,7 @@ export async function ls(args: readonly string[]): Promise<number> {
   const [listed, around] = await Promise.all([
     asked(
       'ls',
-      (client) => client.runs.listAll({ query: selector.length ? { labelSelector: selector } : {} }),
+      (client) => everyPage((page) => client.runs.listAll({ query: selector.length ? { ...page, labelSelector: selector } : page })),
       process.env,
       READ_BOUND_MS,
       AS_TABLE,

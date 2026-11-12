@@ -7,13 +7,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Exit, Schema } from 'effect';
+import { Effect, Exit, Layer, Schema } from 'effect';
 import { Event, EventList } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { meteredPass } from '../meter/tally.store.ts';
-import { FeedDoor, feedDoorFiles } from '../feed/feed.store.ts';
+import { FeedDoor, feedDoorFiles, feedDoorOver, feedFiles } from '../feed/feed.store.ts';
 import { feedDoorMemory } from '../feed/memory.store.ts';
 import { upgraded, type FeedLine } from '../feed/feed.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -128,14 +128,14 @@ test("a factory's conflicts line is served as an Event about the factory, in its
   }
 });
 
-test('a page of 2 reads on by continue in feed order, counting what follows', () => {
+test('a page of 2 reads on by continue in feed order, the last counting nothing left', () => {
   const lines = ['r-c', 'r-a', 'r-d', 'r-b'].map(inMill);
   const first = value(over(lines, eventList({ limit: 2 })));
   assert.deepEqual(
     first.items.map((e) => e.involved.name),
     ['r-c', 'r-a'],
   );
-  assert.equal(first.metadata.remainingItemCount, 2);
+  assert.equal(first.metadata.remainingItemCount, undefined, 'a page that is not the last read no further than one line past it');
   const token = first.metadata.continue;
   assert.ok(token !== undefined);
   const second = value(over(lines, eventList({ limit: 2, continue: token })));
@@ -226,4 +226,45 @@ test("an Event read by its byte on a large feed reads its own line, past a line 
   const bytes = Object.values(tallies?.kinds ?? {}).reduce((sum, kind) => sum + kind.bytes, 0);
   assert.ok(bytes > Buffer.byteLength(JSON.stringify(big)), `its own line is read whole (${bytes} bytes)`);
   assert.ok(bytes < size / 4, `${bytes} bytes read of a feed of ${size}`);
+});
+
+test('a default page of a feed of 1,000 lines reads no more lines than the page and one past it, and reads on by continue', () => {
+  const root = scratch('wf-event-page-');
+  fs.writeFileSync(path.join(root, 'feed.jsonl'), Array.from({ length: 1000 }, (_, i) => `${JSON.stringify(inMill(`r-${i}`))}\n`).join(''));
+  let read = 0;
+  const files = feedFiles(root);
+  const counted = Layer.succeed(FeedDoor)(
+    feedDoorOver({
+      lines: {
+        ...files.lines,
+        read: (after, limit) => {
+          const lines = files.lines.read(after, limit);
+          read += lines.lines.length;
+          return lines;
+        },
+      },
+    }),
+  );
+  const bounds = { byDefault: 10, most: 20 };
+  const first = Effect.runSync(eventList({}, bounds).pipe(Effect.provide(counted)));
+  assert.equal(first.items.length, 10);
+  assert.ok(read <= 11, `${read} lines read for a page of 10`);
+  const token = first.metadata.continue;
+  assert.ok(token !== undefined);
+  read = 0;
+  const second = Effect.runSync(eventList({ continue: token, limit: 500 }, bounds).pipe(Effect.provide(counted)));
+  assert.deepEqual(
+    second.items.map((e) => e.involved.name),
+    Array.from({ length: 20 }, (_, i) => `r-${i + 10}`),
+    'a limit past the most answers the most',
+  );
+  assert.ok(read <= 21, `${read} lines read for a page of 20`);
+  read = 0;
+  const kept = Effect.runSync(eventList({ labelSelector: ['run=r-999'] }, bounds).pipe(Effect.provide(counted)));
+  assert.deepEqual(
+    kept.items.map((e) => e.involved.name),
+    ['r-999'],
+  );
+  assert.equal(kept.metadata.remainingItemCount, 0);
+  assert.equal(kept.metadata.continue, undefined);
 });

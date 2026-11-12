@@ -20,7 +20,8 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
 /**
  * The handler of the runs group's `decision` endpoint, the run `runId`'s decision read over the request's services, its judgement through
  * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's
- * comma-separated globs, names the files shown in full in place of the defaults.
+ * comma-separated globs, names the files shown in full in place of the defaults; `diffs`, the comma-separated paths whose diffs are
+ * answered whole (`*` every one), none where it is not given (`objects`' `decisionNarrowed`, as every read of a decision is).
  */
 export const decisionHandler = (runId: string, sensitive?: string, diffs?: string) =>
   Effect.flatMap(
@@ -28,5 +29,5 @@ export const decisionHandler = (runId: string, sensitive?: string, diffs?: strin
     (read) =>
       'unjudged' in read
         ? Effect.fail(new Unjudged({ error: read.unjudged }))
-        : Effect.succeed(diffs === undefined ? read.decision : decisionNarrowed(read.decision, fieldsNamed(diffs))),
+        : Effect.succeed(decisionNarrowed(read.decision, diffs === undefined ? undefined : fieldsNamed(diffs))),
   );

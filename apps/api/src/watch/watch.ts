@@ -3,7 +3,8 @@
  * whose data is the JSON of `watchEventOf(WatchedObject)` (`objects`), the frame HttpApi's `StreamSse({ data })` writes, so a move of
  * the stream under HttpApi changes no client (watch-sse.test.ts holds the frames equal). The stream stays Hono's (decision 27).
  *
- * The list is read by the route itself, the URL with `watch` taken out, so a watch answers what the list answers, its selectors and its
+ * The list is read by the route itself, the URL with `watch` taken out, through every page (`readAll`, each of `WatchPage` objects, its
+ * `continue` followed until none is), so a watch answers what the list answers, every object of it, its selectors and its
  * namespace's refusal with it: a first read that is no 2xx is answered as it is, before any stream. Then each object is sent ADDED, then a
  * BOOKMARK, Kubernetes' initial state. The list is read again on a feed line (`followFeed`, on the app's `Beats.feed`), at most one read
  * in flight and one per `WATCH_SETTLE`, and on a resync every `Beats.watch` (`WATCH_RESYNC`) for a change no line says (a card or a
@@ -18,9 +19,9 @@
  */
 import { type Context as RequestContext } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { Data, type Duration, Effect, Schema, Stream } from 'effect';
+import { Context, Data, type Duration, Effect, Schema, Stream } from 'effect';
 import { BOOKMARK_EVERY, feedSize, followFeed, watchChanges, type Versioned } from 'agent-orchestrator';
-import { API_VERSION, AnyObjectList, TABLE_ACCEPT, type WatchedObject, watchEventOf } from 'objects';
+import { API_VERSION, AnyObjectList, LIST_PAGE, TABLE_ACCEPT, type WatchedObject, watchEventOf } from 'objects';
 import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
@@ -65,16 +66,45 @@ const keyOf = (o: WatchedObject): string => `${o.metadata.namespace ?? ''}/${o.m
 /** The version a list's objects are compared at between two reads: its JSON as served where its route hands none. */
 export type VersionOf = (o: WatchedObject) => string;
 
-/** `answer`, a 2xx of the list, read as its objects, each keyed and versioned by `versionOf`. */
-async function readOf(answer: Response, at: number, versionOf: VersionOf): Promise<Read> {
-  const list = Schema.decodeUnknownSync(AnyObjectList)(await answer.json());
-  const objects = new Map(list.items.map((o) => [keyOf(o), o] as const));
+/**
+ * How many objects each page a watch reads its list by asks (`limit`): the most a list answers (`LIST_PAGE`), unless the app's layer gives
+ * another, as a test does to see a watch read past one page.
+ */
+export const WatchPage = Context.Reference<number>('api/WatchPage', { defaultValue: () => LIST_PAGE.most });
+
+/** The `continue` of a list's answer, where more of it is left. */
+const continueOf = (list: AnyObjectList): string | undefined => {
+  const metadata = list.metadata;
+  if (typeof metadata !== 'object' || metadata === null || !('continue' in metadata)) return undefined;
+  return typeof metadata.continue === 'string' && metadata.continue !== '' ? metadata.continue : undefined;
+};
+
+/**
+ * The list at `url`, read whole through its pages: each asked of `list` with `limit` = `page` and the `continue` the last answered, until
+ * none is, so a watch sees every object however many pages the list is; its objects each keyed and versioned by `versionOf`. The first
+ * answer that is no 2xx is answered as it is.
+ */
+async function readAll(list: Listed, c: RequestContext<ApiEnv>, url: URL, page: number, at: number, versionOf: VersionOf) {
+  const items: WatchedObject[] = [];
+  let kind = '';
+  let token: string | undefined;
+  do {
+    const asked = new URL(url);
+    asked.searchParams.set('limit', String(page));
+    if (token !== undefined) asked.searchParams.set('continue', token);
+    const answer = await list(c, new Request(asked, { headers: c.req.raw.headers }));
+    if (!answer.ok) return answer;
+    const read = Schema.decodeUnknownSync(AnyObjectList)(await answer.json());
+    kind = read.kind;
+    items.push(...read.items);
+    token = continueOf(read);
+  } while (token !== undefined);
   return {
-    kind: list.kind.replace(/List$/, ''),
-    versions: list.items.map((o) => ({ key: keyOf(o), version: versionOf(o) })),
-    objects,
+    kind: kind.replace(/List$/, ''),
+    versions: items.map((o) => ({ key: keyOf(o), version: versionOf(o) })),
+    objects: new Map(items.map((o) => [keyOf(o), o] as const)),
     at,
-  };
+  } satisfies Read;
 }
 
 /** An event as its frame: the JSON of its Schema's encoding, an unnamed message with no id, as HttpApi's `StreamSse` writes it. */
@@ -120,12 +150,10 @@ export const watchable =
     if (refused !== null) return c.json({ error: refused.error }, refused.status);
     const url = new URL(c.req.url);
     url.searchParams.delete('watch');
-    const request = () => new Request(url, { headers: c.req.raw.headers });
     const home = await c.var.runtime.runPromise(StoreRoot);
-    const at = feedSize(home);
-    const first = await list(c, request());
-    if (!first.ok) return first;
-    const initial = await readOf(first, at, versionOf);
+    const page = await c.var.runtime.runPromise(WatchPage);
+    const initial = await readAll(list, c, url, page, feedSize(home), versionOf);
+    if (initial instanceof Response) return initial;
     return streamSSE(c, async (stream: SSEStreamingApi) => {
       const gone = new AbortController();
       stream.onAbort(() => gone.abort());
@@ -135,10 +163,8 @@ export const watchable =
       for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
       await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
       const again = Effect.gen(function* () {
-        const at = feedSize(home);
-        const answer = yield* Effect.promise(async () => list(c, request()));
-        if (!answer.ok) return yield* new ListRefused({ status: answer.status });
-        const now = yield* Effect.promise(() => readOf(answer, at, versionOf));
+        const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
+        if (now instanceof Response) return yield* new ListRefused({ status: now.status });
         const frames = changedFrames(state.sent, now);
         state.sent = now;
         state.at = now.at;
@@ -147,7 +173,7 @@ export const watchable =
       });
       const watched = Effect.gen(function* () {
         const beats = yield* Beats;
-        const lines = followFeed(at, beats.feed === undefined ? {} : { beat: beats.feed }).pipe(
+        const lines = followFeed(initial.at, beats.feed === undefined ? {} : { beat: beats.feed }).pipe(
           Stream.filter((f) => f.kind === 'line'),
           Stream.map(() => 'line' as const),
         );
@@ -163,7 +189,7 @@ export const watchable =
                 Stream.mapEffect(() => again),
                 Stream.map(() => null),
               )
-            : follow(c, at, beats.feed).pipe(
+            : follow(c, initial.at, beats.feed).pipe(
                 Stream.map(({ object, at: after }) => {
                   state.at = after;
                   if (object === undefined || sentKeys.has(keyOf(object))) return null;

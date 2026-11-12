@@ -70,21 +70,22 @@ export const mcpServerObject = Effect.fn('mcpServerObject')(function* (home: str
   return found;
 });
 
-/** Nemia's builtin servers, as objects with a spec alone and no namespace: those of `dir`, the package's own by default. */
-export const builtinServerList = (dir: string = BUILTIN_SERVERS): McpServerList => {
+/**
+ * A page of Nemia's builtin servers (`McpServerList`), as objects with a spec alone and no namespace: those of `dir`, the package's own by
+ * default, sorted by name and cut by the list's query as every list is (`objectsListed`). `Invalid` for a selector, a limit or a token
+ * that is not one.
+ */
+export const builtinServerList = Effect.fn('builtinServerList')(function* (query: ObjectQuery, dir: string = BUILTIN_SERVERS) {
   const filedAt = bornAt(dir);
-  return {
-    apiVersion: API_VERSION,
-    kind: 'McpServerList',
-    metadata: { remainingItemCount: 0 },
-    items: builtinServers(dir).map(({ name, ...server }) => {
-      const spec = specOf(server, false);
-      return {
-        apiVersion: API_VERSION,
-        kind: 'McpServer',
-        metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, undefined) },
-        spec,
-      };
-    }),
-  };
-};
+  const servers: McpServer[] = builtinServers(dir).map(({ name, ...server }) => {
+    const spec = specOf(server, false);
+    return {
+      apiVersion: API_VERSION,
+      kind: 'McpServer',
+      metadata: { name, creationTimestamp: filedAt, resourceVersion: versionOf(spec, undefined) },
+      spec,
+    };
+  });
+  const listed: McpServerList = yield* objectsListed('McpServer', servers, query, 'builtin server');
+  return listed;
+});

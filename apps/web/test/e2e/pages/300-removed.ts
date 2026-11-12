@@ -67,7 +67,7 @@ export default {
 
       const refused = `request answered 404: GET ${new URL(`/api/runs/${id}`, page.url()).href}`;
       const stepsReadAgainOnRemoved = new RegExp(
-        `^request answered 404: GET ${literal(new URL(`/api/runs/${id}/steps/`, page.url()).href)}[^/]+/(tries|told)$`,
+        `^request answered 404: GET ${literal(new URL(`/api/runs/${id}/steps/`, page.url()).href)}[^/]+/(tries(\\?fields=(\\*|%2A))?|told)$`,
       );
       for (const [{ problems }, where] of [
         [run, 'the run page'],

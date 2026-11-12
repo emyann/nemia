@@ -192,17 +192,20 @@ export const RunDecision = Schema.Union([
 export type RunDecision = typeof RunDecision.Type;
 
 /**
- * `decision` read narrowly, as `?diffs=` asks it (comma-separated paths, an empty one naming none): each check-affecting file's diff
- * answered whole where `diffs` names its path, every other with its lines left out (`linesLeftOut`), its path and its counts kept.
- * Anything but a decidable run is answered as it is. Pure.
+ * `decision` read narrowly, as every read of it is: each check-affecting file's diff answered whole where `diffs` names its path (`*`
+ * naming every one; `?diffs=`, comma-separated, an empty one naming none), every other with its lines left out (`linesLeftOut`), its path
+ * and its counts kept; not given, none is whole, a decision reading as its summary. Anything but a decidable run is answered as it is.
+ * Pure.
  */
-export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[]): RunDecision =>
+export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[] | undefined): RunDecision =>
   'sensitive' in decision
     ? {
         ...decision,
         sensitive: decision.sensitive.map((branch) => ({
           ...branch,
-          files: branch.files.map((file) => (diffs.includes(file.path) ? file : { ...file, lines: [], linesLeftOut: true })),
+          files: branch.files.map((file) =>
+            diffs !== undefined && (diffs.includes('*') || diffs.includes(file.path)) ? file : { ...file, lines: [], linesLeftOut: true },
+          ),
         })),
       }
     : decision;

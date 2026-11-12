@@ -285,6 +285,15 @@
       "term": "approvedBy",
       "meaning": "who approved a proposal: the person, or an agent under the rule named, and when (`ApprovedByOf`, `packages/objects/src/proposal.ts`).",
       "type": "ApprovedByOf"
+    },
+    {
+      "term": "Read bound",
+      "meaning": "how one read the api serves is kept from growing past what the daemon can hold: its shape — a list's page (`page`), a read from a cursor (`cursor`), a whole read by part (`part`), one object (`one`), a stream (`stream`), a file's bytes (`bytes`) — and the query keys that narrow it, one entry for every GET endpoint of the `Api` in `READS`, typed over every GET name so a read with none does not compile (`ReadBound`, `packages/objects/src/reads.ts`).",
+      "type": "ReadBound"
+    },
+    {
+      "term": "Answer bound",
+      "meaning": "the most an answer's JSON is, in characters (`ANSWER_MOST`, 8 MiB, `packages/objects/src/reads.ts`): past it the api refuses the read, naming the keys that narrow it from its `READS` entry, before it builds the answer; and the default and the most of each page beside it (`LIST_PAGE`, `TRANSCRIPT_PAGE`, `BODY_PAGE`, `LOG_TAIL`)."
     }
   ]
 }

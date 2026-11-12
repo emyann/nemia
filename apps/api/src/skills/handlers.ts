@@ -12,7 +12,6 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, skillTable, type SkillChange } from 'agent-orchestrator';
 import { SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
@@ -46,6 +45,7 @@ import {
   type Held,
   type Origin,
 } from '../definitions/served.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** What a write sends, said by its refusals. */
 const SHAPE =
@@ -169,7 +169,7 @@ const draftOf = (spec: SkillSpec, name: string, route: string): SkillChange => {
   return { ...draft, ...(files !== undefined && { files }) };
 };
 
-export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
+export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>

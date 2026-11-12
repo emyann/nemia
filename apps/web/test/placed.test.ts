@@ -61,10 +61,20 @@ test('REFUSED: a page loads the list of its place — with no factory the one re
     await loadWorkflowsIn(new QueryClient(), address);
     return [...asked].sort();
   };
-  assert.deepEqual(await loaded({}), ['/api/factories', '/api/namespaces/default/workflows']);
-  assert.deepEqual(await loaded({ factory: 'default' }), ['/api/factories', '/api/namespaces/default/workflows']);
-  assert.deepEqual(await loaded({ factory: 'pipao' }), ['/api/factories', '/api/namespaces/pipao/workflows?repo=%2Fcode%2Fpipao']);
-  assert.deepEqual(await loaded({ factory: 'quay', repo: '/b' }), ['/api/factories', '/api/namespaces/quay/workflows?repo=%2Fb']);
-  assert.deepEqual(await loaded({ factory: 'quay' }), ['/api/factories'], 'several repositories and none named: no list is guessed');
-  assert.deepEqual(await loaded({ factory: 'gone' }), ['/api/factories'], 'no factory of that name: no list');
+  assert.deepEqual(await loaded({}), ['/api/factories?limit=500', '/api/namespaces/default/workflows?limit=500']);
+  assert.deepEqual(await loaded({ factory: 'default' }), ['/api/factories?limit=500', '/api/namespaces/default/workflows?limit=500']);
+  assert.deepEqual(await loaded({ factory: 'pipao' }), [
+    '/api/factories?limit=500',
+    '/api/namespaces/pipao/workflows?limit=500&repo=%2Fcode%2Fpipao',
+  ]);
+  assert.deepEqual(await loaded({ factory: 'quay', repo: '/b' }), [
+    '/api/factories?limit=500',
+    '/api/namespaces/quay/workflows?limit=500&repo=%2Fb',
+  ]);
+  assert.deepEqual(
+    await loaded({ factory: 'quay' }),
+    ['/api/factories?limit=500'],
+    'several repositories and none named: no list is guessed',
+  );
+  assert.deepEqual(await loaded({ factory: 'gone' }), ['/api/factories?limit=500'], 'no factory of that name: no list');
 });

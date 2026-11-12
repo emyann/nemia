@@ -115,7 +115,7 @@
     },
     {
       "term": "Selector",
-      "meaning": "the `?selector=` query of a read of runs or cards (`/api/listing`, `/api/stats`) and of the feed (`GET /api/feed/stream`): a selector of their labels in the orchestrator's grammar (`team=core`, `team in (core,infra)`, `!team`), given again for another, of which one must take a run or a card; handed to the entry as `selector` (`apps/api/src/labels/selector.ts`), and a malformed one a 422 naming the key. The RunList (`GET /api/runs`, `GET /api/namespaces/:namespace/runs`) takes `labelSelector` in its place, and reads `?selector=` as retired."
+      "meaning": "the `?selector=` query of a read of runs or cards (`/api/stats`) and of the feed (`GET /api/feed/stream`): a selector of their labels in the orchestrator's grammar (`team=core`, `team in (core,infra)`, `!team`), given again for another, of which one must take a run or a card; handed to the entry as `selector` (`apps/api/src/labels/selector.ts`), and a malformed one a 422 naming the key. The RunList (`GET /api/runs`, `GET /api/namespaces/:namespace/runs`) takes `labelSelector` in its place, and reads `?selector=` as retired."
     },
     {
       "term": "Try cause",

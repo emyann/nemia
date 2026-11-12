@@ -5,8 +5,8 @@
  * resource's singular, its kind in lower case, and the list's envelope. Computed once: the `Api` does not change while the api runs.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import { API_VERSION, Api, type APIResourceList, type ApiRoute, KINDS, RESOURCE_PLURALS, resourcesOf, routeOf } from 'objects';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** Every route of the `Api` discovery reads: each endpoint's method and path, those `routeOf` reads as a resource's. */
 const routes: ApiRoute[] = Object.values(Api.groups).flatMap((group) =>
@@ -30,6 +30,6 @@ export const discovered: APIResourceList = {
   }),
 };
 
-export const discoveryHandlers = HttpApiBuilder.group(Api, 'discovery', (handlers) =>
+export const discoveryHandlers = readsBounded(Api, 'discovery', (handlers) =>
   handlers.handle('resources', () => Effect.succeed(discovered)),
 );

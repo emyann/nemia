@@ -19,7 +19,7 @@ import { PlaceService } from '../place/place.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { MOMENTUM } from '../status/status.ts';
 import { trustCommandOf } from '../trust/trust.ts';
-import { untrustedPlaces } from '../trust/trust.verb.ts';
+import { untrustedPlaces } from '../trust/untrusted.verb.ts';
 import { fixRefusal } from './needs.ts';
 import { NeedsMemory, needsOnce, factoryWorkflows } from './needs.verb.ts';
 import { readFixRecord, writeFixRecord, type FixRecord } from './fix.store.ts';

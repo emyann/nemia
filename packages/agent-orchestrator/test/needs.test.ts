@@ -90,14 +90,14 @@ test('a fresh run waits on a missing need of its workflow, starts once it is met
 
   await s.test('once the sweep reads the need met, the next pass files the first step', async () => {
     fs.writeFileSync(FLAG, '');
-    await Effect.runPromise(needsOnce(memo));
+    await stage.runPlaced(needsOnce(memo));
     await tick(id);
     assert.deepEqual(b.filings, [`${id}-implement`]);
   });
 
   await s.test('a run that has filed a step is not held when the need lapses', async () => {
     fs.rmSync(FLAG, { force: true });
-    await Effect.runPromise(needsOnce(memo));
+    await stage.runPlaced(needsOnce(memo));
     const { read } = await stage.runWith(b.e, readRun(b.e, runRecord(ROOT, id)).pipe(Effect.provideService(NeedsMemory, memo)));
     assert.equal(assess(read).waitingOnNeeds, undefined);
     assert.ok(!(await listed(id)).some((w) => w.includes('waiting on tool')));

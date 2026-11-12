@@ -18,6 +18,9 @@ import { workflowNeeds, workflowNeedsRead, workflowReadme } from '../folder/fold
 import { toolsDir } from '../config/root.store.ts';
 import { createFactoryAt } from '../factory/factory.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
+import { PlaceService } from '../place/place.store.ts';
+import { trustPlaces } from '../trust/trust.verb.ts';
+import { testPlace } from '../../place/memory/place.ts';
 
 const ROOT = scratch('wf-needs-read-');
 
@@ -100,18 +103,31 @@ test("a workflow's need that fills a place's goes before the place's own fixes, 
   );
 });
 
-test("a sweep reads the places' needs and every factory's workflows', each kept by its check and folders", async () => {
-  const home = scratch('wf-needs-sweep-');
+/** A workflow `dev` of a factory's own repository, under `home`, its README declaring one need checked by `check`. */
+const devRepo = (home: string, check: string): { repo: string; dir: string } => {
   const repo = fs.mkdtempSync(path.join(home, 'repo-'));
   const dir = path.join(repo, 'workflows', 'dev');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'README.md'), '---\nneeds:\n  - name: tool\n    message: the tool\n    check: exit 1\n---\n');
+  fs.writeFileSync(path.join(dir, 'README.md'), `---\nneeds:\n  - name: tool\n    message: the tool\n    check: ${check}\n---\n`);
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  createFactoryAt(home, { name: 'acme', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  return { repo, dir };
+};
+
+test("a sweep reads the places' needs and every trusted factory's workflows', each kept by its check and folders, and runs no check of an untrusted one", async () => {
+  const home = scratch('wf-needs-sweep-');
+  const trusted = devRepo(home, 'exit 1');
+  const untrusted = devRepo(home, 'touch ran');
+  createFactoryAt(home, { name: 'acme', repos: [trusted.repo], workflows: ['dev'], hires: {}, schedules: {} });
+  createFactoryAt(home, { name: 'stray', repos: [untrusted.repo], workflows: ['dev'], hires: {}, schedules: {} });
+  const placed = PlaceService.layer(testPlace().place);
+  await Effect.runPromise(trustPlaces([trusted.repo]).pipe(Effect.provide(placed)));
   const memo = needsMemo(home, 2_000);
   memo.placeNeeds = [{ name: 'identity', message: 'identity', check: 'exit 0' }];
-  const read = await Effect.runPromise(needsOnce(memo));
+  const read = await Effect.runPromise(needsOnce(memo).pipe(Effect.provide(placed)));
   assert.equal(read.get(checkKey({ check: 'exit 0' })), 'met');
-  assert.equal(read.get(checkKey({ check: 'exit 1', workflowFiles: dir, carriedFiles: carriedDirOf(dir) })), 'missing');
+  const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir) };
+  assert.equal(read.get(checkKey({ check: 'exit 1', ...own })), 'missing');
+  assert.equal(read.size, 2, "the untrusted factory's check is not swept");
+  assert.equal(fs.existsSync(path.join(home, 'ran')), false, 'and never ran');
   assert.equal(memo.version, 2);
 });

@@ -36,7 +36,17 @@ import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
 import { claudeTokenStatus, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE } from '../sign-in/sign-in.store.ts';
 import { fixCommandOf } from './needs.ts';
-import { checkKey, factoryWorkflows, needsMemo, NeedsMemory, needsOnce, type FactoryWorkflow, type NeedsMemo } from './needs.verb.ts';
+import { trustCommandOf } from '../trust/trust.ts';
+import {
+  checkKey,
+  factoryWorkflows,
+  trustedOf,
+  needsMemo,
+  NeedsMemory,
+  needsOnce,
+  type FactoryWorkflow,
+  type NeedsMemo,
+} from './needs.verb.ts';
 
 /** What a run of a command answered: its exit code (null where a signal ended it) and what it printed; undefined where it did not start. */
 export type CommandRead = { readonly code: number | null; readonly out: string } | undefined;
@@ -264,9 +274,10 @@ const needPiece = (
 
 /**
  * The places' needs, then each factory's workflows' own: a need that fills a place's is said under its workflow as the place's need, its
- * fixes first, the place's after, as `startFix` finds them; a workflow whose needs do not read says why.
+ * fixes first, the place's after, as `startFix` finds them; a workflow whose needs do not read says why, and a need of a factory whose
+ * places are not trusted (`untrusted`) is `unknown`, its check never run, with the command that trusts them.
  */
-function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[]): ReadinessPiece[] {
+function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[], untrusted: ReadonlySet<string>): ReadinessPiece[] {
   const place = memo.placeNeeds;
   const out: ReadinessPiece[] = place.map((need) => needPiece(need, 'place', memo.readings.get(checkKey({ check: need.check }))));
   for (const w of workflows) {
@@ -278,6 +289,19 @@ function needPieces(memo: NeedsMemo, workflows: readonly FactoryWorkflow[]): Rea
       if (filled !== undefined) {
         const state = memo.readings.get(checkKey({ check: filled.check }));
         out.push(needPiece(filled, 'workflow', state, at, [...(need.fixes ?? []), ...(filled.fixes ?? [])]));
+        continue;
+      }
+      if (untrusted.has(w.factory)) {
+        out.push(
+          piece(
+            need.name,
+            'workflow',
+            'unknown',
+            `${need.message}: not checked, since the factory ${w.factory}'s places are not trusted`,
+            [typed('trust its places, then its check runs', trustCommandOf(w.factory))],
+            at,
+          ),
+        );
         continue;
       }
       const key = checkKey({ check: need.check, workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) });
@@ -332,13 +356,15 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
   if (kept === undefined || (memo.version === 0 && memo.readings.size === 0)) yield* needsOnce(memo);
   const factories = yield* tried(() => listedAtOnce(home));
   const workflows = factoryWorkflows(factories);
+  const trusted = new Set((yield* trustedOf(factories)).map((f) => f.name));
+  const untrusted = new Set(factories.map((f) => f.name).filter((name) => !trusted.has(name)));
   const pieces: ReadinessPiece[] = [
     harnessPiece(home, facts),
     ...secondHarnessPieces(workflows, facts),
     ...servicePieces(facts),
     bindPiece(facts),
     ...machinePieces(home, facts),
-    ...needPieces(memo, workflows),
+    ...needPieces(memo, workflows, untrusted),
     factoryPiece(factories),
     releasePiece(home, facts),
   ];

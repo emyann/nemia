@@ -15,6 +15,7 @@ import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
 import { carriedDirOf, carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
+import { untrustedPlaces } from '../trust/untrusted.verb.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { fixCommandOf, needsOfRun, needStateOf, type NeedHeld, type NeedRan } from './needs.ts';
@@ -143,18 +144,29 @@ export const factoryWorkflows = (factories: readonly FactoryListing[]): FactoryW
     return f.workflows.map((workflow) => ({ factory: f.name, workflow, dir: path.join(root, 'workflows', workflow) }));
   });
 
+/**
+ * The factories of `factories` whose places a harness trusts now (`untrustedPlaces`): a factory's workflow's checks run on the daemon
+ * only where they would run in its session, as its fixes do (`fixRefusal`). A factory that does not read has no place, and stays.
+ */
+export const trustedOf = Effect.fnUntraced(function* (factories: readonly FactoryListing[]) {
+  const untrusted = new Set((yield* untrustedPlaces(factories)).map((u) => u.factory));
+  return factories.filter((f) => !untrusted.has(f.name));
+});
+
 /** The checks of a factory's workflow, each with its live folders: what the readiness read lists and the sweep reads. */
 export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]): CheckAt[] =>
   needs.map((need) => ({ check: need.check, workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }));
 
 /**
- * One sweep over the needs of the store `memo` reads for: every check of the builtin places, of every factory's workflows as their
- * files are now, and of each run that asked since the last sweep (`asked`), each run once at most `AT_ONCE` at a time under the memory's
- * limit, its reading kept and each that changed counted (`version`). A key no longer asked for is forgotten. Answers the readings by key.
+ * One sweep over the needs of the store `memo` reads for: every check of the builtin places, of every trusted factory's workflows as
+ * their files are now (`trustedOf`: an untrusted factory's are never run), and of each run that asked since the last sweep (`asked`),
+ * each run once at most `AT_ONCE` at a time under the memory's limit, its reading kept and each that changed counted (`version`).
+ * A key no longer asked for is forgotten. Answers the readings by key.
  */
 export const needsOnce = Effect.fn('needsOnce')(function* (memo: NeedsMemo, options: { shell?: string } = {}) {
   const home = memo.home;
-  const workflows = factoryWorkflows(yield* Effect.sync(() => listedAtOnce(home)));
+  const listed = yield* Effect.sync(() => listedAtOnce(home));
+  const workflows = factoryWorkflows(yield* trustedOf(listed));
   const targets = new Map<string, CheckAt>();
   for (const at of placeChecks(memo)) targets.set(checkKey(at), at);
   for (const w of workflows) for (const at of workflowChecks(w, workflowNeedsRead(w.dir).needs)) targets.set(checkKey(at), at);

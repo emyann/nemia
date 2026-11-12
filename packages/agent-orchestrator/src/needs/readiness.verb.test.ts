@@ -4,6 +4,9 @@
  * read by its check and carries the command that fixes it; the service, linger, bind and machine pieces follow what their commands and
  * the environment answer; and the read is `ready` only where no piece is missing. The test's store is its own, at `ROOT`.
  */
+import { createFactoryAt } from '../factory/factory.store.ts';
+import path from 'node:path';
+import fs from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -76,4 +79,21 @@ test("with no token kept or given, Claude Code's own login meets the harness pie
   const token = got.pieces.find((p) => p.name === TOKEN_NAME);
   assert.equal(token?.state, 'met');
   assert.doesNotMatch(token?.message ?? '', /\bvalid\b|\bgood\b(?! shows)/);
+});
+
+test('a need of a factory whose places are not trusted is unknown, its check never run, with the command that trusts them', async () => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'stray-'));
+  const dir = path.join(repo, 'workflows', 'dev');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'README.md'), '---\nneeds:\n  - name: stray-tool\n    message: the tool\n    check: touch ran\n---\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  createFactoryAt(ROOT, { name: 'stray', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+  const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'));
+  const need = got.pieces.find((p) => p.name === 'stray-tool');
+  assert.equal(need?.state, 'unknown');
+  assert.deepEqual(
+    need?.fixes.map((f) => f.command),
+    ['nemia factory trust stray'],
+  );
+  assert.equal(fs.existsSync(path.join(ROOT, 'ran')), false, 'its check never ran');
 });

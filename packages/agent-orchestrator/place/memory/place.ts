@@ -13,7 +13,7 @@
 import { Effect, type Layer } from 'effect';
 import { worldOf } from './handle.ts';
 import { inventory, open, report, root, standing, status, trial, type Reply } from './reads.ts';
-import { exported, handoff, land, make, remove, seal } from './writes.ts';
+import { cloned, exported, handoff, land, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
 import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
@@ -33,6 +33,7 @@ const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]
   remove,
   export: exported,
   seal,
+  clone: cloned,
 };
 
 /** What the test place declares of itself: nothing denied, and each sentence in words that name the handle, never a command. */

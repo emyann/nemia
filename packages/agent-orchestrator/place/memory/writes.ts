@@ -1,13 +1,14 @@
 /**
- * The verbs of the test place that change a repository or a directory: `make`, `handoff`, `land`, `remove`, `export` and `seal`, each
- * over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
+ * The verbs of the test place that change a repository or a directory: `make`, `handoff`, `land`, `remove`, `export`, `seal` and
+ * `clone`, each over what the place holds (`Held`) and answering as its twin of the git place does, refusing in its own words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkoutAt, committed, dirty, mergedIn, repositoryAt, takenBack } from './acts.ts';
+import { fileURLToPath } from 'node:url';
+import { checkoutAt, committed, dirty, headOf, mergedIn, repositoryAt, takenBack } from './acts.ts';
 import { isDirectory, OWN, real, writeChanges } from './disk.ts';
 import { noRepository, refused, runBranch, type Reply } from './reads.ts';
-import { commitAt, type Held, type Repository } from './world.ts';
+import { commitAt, commitOf, type Held, type Repository } from './world.ts';
 import type { PlaceRequests } from '../../src/place/place.ts';
 
 /** A workspace cut at `at` on the new branch `name` from `from`, its files written there; why not, where it cannot be. */
@@ -139,4 +140,44 @@ export function seal(held: Held, { tree }: PlaceRequests['seal']): Reply<'seal'>
   if (!fs.existsSync(own)) return { removed: false };
   fs.rmSync(own, { recursive: true, force: true });
   return { removed: true };
+}
+
+/** The folder a URL the test place can read names: a path, or a `file://` URL of one; undefined for any other, which it cannot reach. */
+function folderOf(url: string): string | undefined {
+  if (path.isAbsolute(url)) return url;
+  try {
+    return url.startsWith('file://') ? fileURLToPath(url) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * `clone`: the repository the URL's folder holds copied into `into`, on the branch the folder is on, with every commit and tag and that
+ * branch alone, as git clones one; `made: false`, nothing copied, where `into` holds a repository already. Refused where `into` holds
+ * anything else, and where the URL names no repository the place holds, each leaving `into` as it was.
+ */
+export function cloned(held: Held, { url, into }: PlaceRequests['clone']): Reply<'clone'> {
+  if (!path.isAbsolute(into)) return refused(`${into} is not an absolute path: name the folder to clone into from the root`);
+  if (isDirectory(into) && repositoryAt(held, into)) return { repo: into, made: false };
+  if (fs.existsSync(into) && !(isDirectory(into) && fs.readdirSync(into).length === 0))
+    return refused(`${into} holds something that is no repository, so nothing is cloned over it: move it away, or clone somewhere else`);
+  const folder = folderOf(url);
+  const origin = folder === undefined ? undefined : checkoutAt(held, folder);
+  if (!origin)
+    return refused(
+      `${url} could not be cloned into ${into}: the test place reaches a repository by its folder alone, and ${noRepository(folder ?? url)}`,
+    );
+  const { repo: from, checkout } = origin;
+  const head = commitOf(from, headOf(from, checkout));
+  writeChanges(into, {}, head.tree);
+  const dir = real(into);
+  held.repositories.set(dir, {
+    root: dir,
+    commits: new Map(from.commits),
+    branches: new Map([[checkout.branch, head.id]]),
+    tags: new Map(from.tags),
+    checkouts: new Map([[dir, { dir, branch: checkout.branch }]]),
+  });
+  return { repo: into, made: true };
 }

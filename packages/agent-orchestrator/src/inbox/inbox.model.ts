@@ -25,6 +25,7 @@ export const Card = Schema.Struct({
   repo: Schema.optional(Schema.String),
   queued: Schema.optional(Schema.String),
   gate: Schema.optional(StepName.OnRead),
+  model: Schema.optional(Schema.Record(StepName.OnRead, Schema.String)),
   factory: Schema.optional(FactoryName.OnRead),
   from: Schema.optional(Schema.Array(RunId.OnRead)),
   /** A person's labels on the card (`labels:`), each pair as `labelRefusal` takes one: its reader's invariant. */

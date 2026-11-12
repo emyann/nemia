@@ -15,7 +15,7 @@ export type RunModels = Readonly<Record<string, string>>;
  * The models `pairs` name, each `<step>=<model>`, in the order written — or why they do not read, as the words after what named them:
  * a pair with no `=`, a blank step or model, one with a space in it, and a step named twice.
  */
-export function modelsOf(pairs: readonly string[]): Record<string, string> | { why: string } {
+export function modelsOf(pairs: readonly string[]): { models: Record<string, string> } | { why: string } {
   const models: Record<string, string> = {};
   for (const pair of pairs) {
     const at = pair.indexOf('=');
@@ -26,12 +26,8 @@ export function modelsOf(pairs: readonly string[]): Record<string, string> | { w
     if (models[step] !== undefined) return { why: `names ${step} twice, and a step runs on one model: name it once` };
     models[step] = model;
   }
-  return models;
+  return { models };
 }
-
-/** Whether `read` is the models `modelsOf` read, not its refusal. */
-export const modelsRead = (read: Record<string, string> | { why: string }): read is Record<string, string> =>
-  typeof read.why !== 'string';
 
 /** The models as a card's `model:` line and `nemia start` say them: `implement=fable, review=opus`. */
 export const modelsText = (models: RunModels): string =>

@@ -29,10 +29,10 @@ export const CARD_STATES = [
 export type CardState = (typeof CARD_STATES)[number];
 
 /**
- * The keys a card's frontmatter may set, in the order a card's page lists them: five are its `spec`'s, `factory` is its
+ * The keys a card's frontmatter may set, in the order a card's page lists them: six are its `spec`'s, `factory` is its
  * `metadata.namespace` and `labels` its `metadata.labels`.
  */
-export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'factory', 'from', 'labels'] as const;
+export const CARD_KEYS = ['workflow', 'repo', 'queued', 'gate', 'model', 'factory', 'from', 'labels'] as const;
 
 /** A key a card's frontmatter may set. */
 export type CardKey = (typeof CARD_KEYS)[number];
@@ -48,6 +48,8 @@ export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   queued:
     'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
   gate: 'a step of its workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, in the run it starts: none when unset',
+  model:
+    "the model a step of its workflow runs on in the run it starts, and in no other run, as `<step>=<model>`, comma-separated: `implement=fable`; its other steps run on their agents' models, and none when unset",
   factory:
     'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
   from: 'runs whose conclusions its run is handed as context, by id, comma-separated: it does not wait on them; none when unset',
@@ -63,6 +65,7 @@ export const CardSpec = Schema.Struct({
   workflow: Schema.optionalKey(described(Schema.String, 'workflow')),
   repo: Schema.optionalKey(described(Schema.String, 'repo')),
   gate: Schema.optionalKey(described(Schema.String, 'gate')),
+  model: Schema.optionalKey(described(Schema.Record(Schema.String, Schema.String), 'model')),
   from: Schema.optionalKey(described(Schema.Array(Schema.String), 'from')),
   queued: Schema.optionalKey(described(Schema.String, 'queued')),
   body: Schema.optionalKey(

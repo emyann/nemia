@@ -37,6 +37,7 @@
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
  * (inbox.store.ts and inbox.verb.ts read them).
  */
+import { modelsOf, modelsText } from '../start/models.ts';
 import path from 'node:path';
 import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
@@ -70,6 +71,11 @@ export type InboxCard = {
   queued?: string;
   /** The step its run is gated at, as written: frozen on the run's `gates` at start, beside any `--gate`. Absent on a card with no gate. */
   gate?: string;
+  /**
+   * The model each step it names runs on in its run alone (`model:`, `<step>=<model>`, comma-separated), by the step's name: frozen on the
+   * run's `models` at start, a `--model` for the same step over it. Absent on a card that names none.
+   */
+  model?: Record<string, string>;
   /** The factory its run is started in, as written: absent on a card of the default factory. */
   factory?: string;
   /** The runs its run is handed as context (`from:`), by id, in the order written: absent on a card that names none. */
@@ -121,7 +127,7 @@ function refuse(why: string): never {
 export function parseInboxCard(file: string, text: string, isDirectory: (at: string) => boolean): InboxCard {
   const { block, body } = splitFrontmatter(file, text);
   const keys = block === null ? {} : inboxKeys(file, block);
-  const { repo, workflow, queued, gate, factory, from } = keys;
+  const { repo, workflow, queued, gate, model, factory, from } = keys;
   const name = file.slice(0, -'.md'.length);
   if (repo !== undefined && !path.isAbsolute(repo)) {
     refuse(
@@ -154,8 +160,26 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
     );
   }
   if (factory !== undefined) refuseFactoryKey(file, factory);
-  const { from: _, ...rest } = keys;
-  return { name, file, ...rest, ...(from !== undefined ? { from: fromRuns(file, from) } : {}), body: bodyOf(file, body) };
+  const { from: _, model: __, ...rest } = keys;
+  return {
+    name,
+    file,
+    ...rest,
+    ...(model !== undefined ? { model: cardModels(file, model) } : {}),
+    ...(from !== undefined ? { from: fromRuns(file, from) } : {}),
+    body: bodyOf(file, body),
+  };
+}
+
+/**
+ * A card's `model:` as the model each step it names runs on (`modelsOf`), comma-separated `<step>=<model>`: refused, naming the file, where
+ * a pair does not read or a step is named twice. Whether each is a step of its workflow, and one that can run on the model, is the start's
+ * to say (`cardModels` in inbox.verb.ts, `modelsRefusal`).
+ */
+function cardModels(file: string, line: string): Record<string, string> {
+  const read = modelsOf(line.split(','));
+  if ('why' in read) refuse(`${file}: \`model: ${line}\` ${read.why}, comma-separated: \`model: implement=fable, review=opus\`. Correct the line.`);
+  return read.models;
 }
 
 /**
@@ -250,7 +274,7 @@ function flatKeys(file: string, block: string, filing: boolean): Partial<Record<
       ? filing
         ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>.md --after <runId>.`
         : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/${file} --after <runId>. Delete the line.`
-      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, the factory that processes it, the runs it is handed as context, and a person's labels on it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, and a person's labels on it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
@@ -304,6 +328,8 @@ export type InboxListing = {
   factory: string | null;
   /** On a card that names one only: the step its run is gated at (`gate:`). */
   gate?: string;
+  /** On a card that names one only: the model each step it names runs on in its run (`model:`), by the step's name. */
+  model?: Record<string, string>;
   /** The runs its run is handed as context (`from:`): none on a card that names none, and on an entry that does not read as a card. */
   from: string[];
   /** The runs whose record's `from` names this card: the runs it was started as. */
@@ -449,6 +475,7 @@ export function cardsListed(
           repo: card.repo ?? null,
           factory: card.factory ?? null,
           ...(card.gate !== undefined ? { gate: card.gate } : {}),
+          ...(card.model !== undefined ? { model: card.model } : {}),
           from: card.from ?? [],
           startedAs,
           labels: card.labels ?? {},
@@ -628,7 +655,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}${labelled}`;
-    return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
+    return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.model ? `  model: ${modelsText(l.model)}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
   });
 }
 
@@ -795,6 +822,7 @@ export function cardText(
     repo: card.repo,
     queued: card.queued,
     gate: card.gate,
+    model: card.model && modelsText(card.model),
     factory: card.factory,
     from: fromLine(card.from),
     ...(card.labels !== undefined ? { labels: card.labels } : {}),

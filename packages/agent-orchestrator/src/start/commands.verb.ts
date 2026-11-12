@@ -23,6 +23,7 @@ import type { StepSpec } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
+import { modelsOf, modelsText, type RunModels } from './models.ts';
 import { volumeMounts } from '../factory/volume/volume.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { labelsText } from '../labels/labels.ts';
@@ -122,6 +123,12 @@ const START_SPEC: Spec = {
       { many: true, cli: "the board gates a step by its workflow's own gate: true, or a card's gate:" },
     ),
     startFlag(
+      '--model',
+      'models',
+      "a step's model in this run alone, its other steps and every other run keeping their agents': nemia start <brief> --model <step>=<model> [--model <step>=<model> ...]",
+      { many: true, cli: "the board names a step's model by a card's model:" },
+    ),
+    startFlag(
       '--label',
       'label',
       'a label the run is created with, key=value to set one or key- to drop one it would inherit: nemia start <brief> --label team=core [--label <edit> ...]',
@@ -146,7 +153,7 @@ const START_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --card <name> once per inbox card to hand its steps; --gate <step> once per step to gate; --label key=value (or key-) once per label; --factory <name>; and, for an inbox card, --brief "<brief>".`
+      ? `nemia start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --from <runId> once per run to read as context; --input <file> once per file to hand its steps; --card <name> once per inbox card to hand its steps; --gate <step> once per step to gate; --model <step>=<model> once per step to run on another model; --label key=value (or key-) once per label; --factory <name>; and, for an inbox card, --brief "<brief>".`
       : `nemia start takes one brief, and ${arg} is a second. Quote a brief with spaces — nemia start "<brief>" — or give it as a file: nemia start ./brief.md.`,
   apart: (_value, flag) => START_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
@@ -250,6 +257,12 @@ function gateLines(run: Run): string[] {
   ];
 }
 
+/** The models the run names for its steps, for it alone (`models`): a line where it names any. */
+const modelLines = (run: Run): string[] =>
+  run.models !== undefined && Object.keys(run.models).length
+    ? [`models: ${modelsText(run.models)} — for this run alone; its other steps run on their agents'`]
+    : [];
+
 /**
  * The labels a run was created with, and a line per key it was not given since the runs it names disagree on it: the key, each run with
  * its value, and how to set it.
@@ -276,10 +289,11 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
       ];
 
 /**
- * The keys of a start that name files and folders of the machine it is typed on — the inputs and the cards copied into the run, the gates
- * and a start with no worktree, which name a folder's own steps — which another machine's api is not sent.
+ * The keys of a start that name files and folders of the machine it is typed on — the inputs and the cards copied into the run, the gates,
+ * the models and a start with no worktree, which name a folder's own steps — which another machine's api is not sent: a card's `model:`
+ * is, with the card.
  */
-const PATHS_HERE = ['inputs', 'cards', 'gates', 'noWorktree'] as const;
+const PATHS_HERE = ['inputs', 'cards', 'gates', 'models', 'noWorktree'] as const;
 
 /** What another machine's api answers of a start (`runs.create`, `cards.start`): the run's id, which is what is printed of it. */
 const startedThere = (answer: unknown): Started => {
@@ -315,6 +329,7 @@ function startedLines(started: Started): string[] {
       : []),
     ...contextLines(run.context ?? [], (id) => started.landed?.includes(id) === true),
     ...gateLines(run),
+    ...modelLines(run),
     ...labelLines(run),
     `run 'nemia tick' (or 'nemia up') to start it`,
     ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
@@ -347,6 +362,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     inputs: [...(given.inputs ?? [])],
     cards: [...(given.cards ?? [])],
     gates: [...(given.gates ?? [])],
+    ...modelsGiven(given),
     labels: [...(given.label ?? [])],
     ...(factory !== undefined ? { factory } : {}),
     fix: given.fix ?? '--factory <name>',
@@ -363,7 +379,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
 
 /** `nemia start`'s usage, as the help lists it. */
 const START_USAGE =
-  '<brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]';
+  '<brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]';
 
 /** `nemia start`'s help lines, under its usage. */
 const START_LINES: readonly string[] = [
@@ -379,6 +395,11 @@ const START_LINES: readonly string[] = [
   "--gate <step>: that step's closeout waits for nemia approve before",
   "anything after it is filed, as a step's own gate: true does; once",
   "per step. An inbox card's gate: <step> is one more",
+  '--model <step>=<model>: that step runs on the model in this run alone;',
+  "its other steps, and every other run, keep their agents' models. Once",
+  "per step, over an inbox card's model: for the same step. Refused, naming",
+  "the models that keep it, where the step's harness refuses the model or",
+  "its permission mode is dropped on it",
   '--workflows takes a folder, or a name under <repo>/workflows/: dev',
   'a folder of cards starts a plan, a run per card, parents first, at',
   'the command line alone (nemia start --help)',
@@ -432,6 +453,7 @@ export const StartInput = Schema.Struct({
   inputs: Texts,
   cards: Texts,
   gates: Texts,
+  models: Texts,
   label: Texts,
   noWorktree: Schema.optional(Schema.Boolean),
   factory: Text,
@@ -544,6 +566,17 @@ export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   print: ({ section }) => [section.replace(/^\n+/, '')],
 };
 
+/**
+ * The models `nemia start --model <step>=<model>` names (`modelsOf`), as the start is handed them: none where no `--model` was typed.
+ * Refused (`Invalid`) where a pair does not read, before anything is read or written.
+ */
+const modelsGiven = (given: Pick<StartInput, 'models'>): { models?: RunModels } => {
+  if (!given.models?.length) return {};
+  const read = modelsOf(given.models);
+  if ('why' in read) throw new Invalid({ message: `nemia start --model ${read.why}, once per step. Nothing was started.` });
+  return { models: read.models };
+};
+
 /** A run of a brief, or of an inbox card under `card`, started off what the handler was handed (`START`). */
 const startOf = Effect.fnUntraced(function* (given: StartInput) {
   const { card, factory } = given;
@@ -559,6 +592,7 @@ const startOf = Effect.fnUntraced(function* (given: StartInput) {
     inputs: [...(given.inputs ?? [])],
     cards: [...(given.cards ?? [])],
     gates: [...(given.gates ?? [])],
+    ...modelsGiven(given),
     labels: { edits: [...(given.label ?? [])] },
     ...(factory !== undefined ? { factory } : {}),
   });
@@ -579,6 +613,8 @@ const FOLDER_REFUSES: Readonly<Record<string, string>> = {
     "nemia start <folder> does not take --card: a plan's cards are handed no other card. Start that card by hand with the cards to hand it: nemia start <card.md> --workflows <dir> --card <name>.",
   '--gate':
     "nemia start <folder> does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: nemia start <card.md> --workflows <dir> --gate <step>.",
+  '--model':
+    "nemia start <folder> does not take --model: a plan's cards run on their agents' models. To run one card's step on another model, start that card by hand: nemia start <card.md> --workflows <dir> --model <step>=<model>.",
   '--brief':
     'nemia start <folder> does not take --brief: each card\'s body is its run\'s brief. To start one card with other words, start it by hand: nemia start <card.md> --brief "<brief>".',
   '--label':

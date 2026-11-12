@@ -137,10 +137,11 @@ export const stepsToStart = Effect.fn('stepsToStart')(function* (
   known?: SkillsFound,
   harnessSettings?: HarnessSettings,
   models: RunModels = {},
+  modelSaid: (step: string) => string = (step) => `--model ${step}=${models[step] ?? ''}`,
 ) {
   const home = yield* StoreRoot;
   const read = yield* stepsIn(workflowDir, places, factory);
-  const unmodelled = modelsRefusal(read, models, (step) => `--model ${step}=${models[step] ?? ''}`);
+  const unmodelled = modelsRefusal(read, models, modelSaid);
   if (unmodelled) return yield* Effect.fail(new Invalid({ message: unmodelled }));
   const steps = withModels(read, models);
   const found = known ?? (isFolderTeam(steps) ? yield* (yield* SkillDoor).skills.found({ dir: workflowDir, places }) : undefined);
@@ -327,6 +328,8 @@ export type StartOptions = {
    * (`withModels`), and frozen on the record as `models`. Left out, every step runs on its agent's.
    */
   models?: RunModels;
+  /** How a refusal of `models` names where a step's model was said: a card's line, by the step's name. Left out, `--model <step>=<m>`. */
+  modelSaid?: (step: string) => string;
   factory?: string;
   /**
    * The labels the run is created with, beside what its `after` and `context` runs agree on: the card's own (`card`), and the start's
@@ -732,6 +735,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     found,
     harnessSettings,
     opts.models,
+    opts.modelSaid,
   );
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(home, opts.repo) }));

@@ -43,7 +43,7 @@ export default {
       );
     }
 
-    await expectCardKeys(page, file, rich.name, { workflow: rich.workflow });
+    await expectCardKeys(page, file, rich.name, { workflow: rich.workflow, model: rich.model });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const lastRow = await file.locator('section[aria-label="Keys"] tr[data-key]').last().boundingBox();
     const dock = await dockFaceOf(page).locator('..').boundingBox();

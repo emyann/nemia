@@ -34,7 +34,8 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
   the one is `nemia apply`, which writes the objects a file holds through `objects`' typed client, beside `get` and `explain`, the
   verbs the client alone has (`CLIENT_VERBS` in `apps/cli/src/route.ts`, resource-objects' decision 5);
 - the orchestrator's CLI, forwarded (`NEMIA_SERVER`, `src/command/forward.verb.ts`), is a client of another machine's api, not a
-  layer reaching up in code: it calls that api over HTTP through `objects`' `Api` as a typed client, and imports nothing of `apps/api`;
+  layer reaching up in code: it calls that api over HTTP through `objects`' one typed client of its `Api` (`apiClient`), which the client and the board make
+  too and nothing else builds (`tools/guards/test/one-api-client.test.ts`), and imports nothing of `apps/api`;
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the

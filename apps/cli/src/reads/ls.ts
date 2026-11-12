@@ -8,9 +8,9 @@
  * server's own (`GET /api/daemon`). Any other words go to the old path: `nemia ls <run>` among them.
  */
 import { Effect } from 'effect';
-import { tableLines } from 'objects';
+import { READ_BOUND_MS, tableLines } from 'objects';
 import { handedOn } from '../local.ts';
-import { asked, everyPage, type ObjectsClient, pageOf, READ_BOUND_MS } from '../objects.ts';
+import { asked, everyPage, type ObjectsClient, pageOf } from '../objects.ts';
 import { pausedLines, scheduleLines } from './standing.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 

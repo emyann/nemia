@@ -119,7 +119,7 @@ test('the Hire writes: what a hire or a fire refuses, the factory file as it was
     assert.match(await refused(() => send('DELETE', '/api/namespaces/gone/hires/make.code', {}), 404), /gone/);
   });
   await t.test("the default factory's step is a 409 naming the verb that does not take it", async () => {
-    stepIn(own, WORKFLOW, 'code');
+    stepIn(root, WORKFLOW, 'code');
     const said = await refused(() => send('PUT', '/api/namespaces/default/hires/make.code', { agent: 'implementer' }), 409);
     assert.ok(said.startsWith('`default` is the default factory'), said);
     assert.ok(said.includes('nemia factory hire does not take it'), said);

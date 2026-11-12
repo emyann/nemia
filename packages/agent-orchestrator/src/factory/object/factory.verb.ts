@@ -1,6 +1,6 @@
 /**
- * The factories as objects (`Factory`, `FactoryList`, from `objects`), cluster-scoped: the default factory first, on the repository the
- * caller names (the api's own), offering every workflow, hiring no one and keeping no file; then each factory of the store as `nemia
+ * The factories as objects (`Factory`, `FactoryList`, from `objects`), cluster-scoped: the default factory first, on no repository,
+ * offering every workflow, hiring no one and keeping no file; then each factory of the store as `nemia
  * factory` lists it (`factoriesListed`), a file that does not read listed all the same, its `status.error` saying why, so it hides no
  * other. A factory's parts read it through `factoryFiled`: its spec and its listing, off one read of the store's factories, no status, and
  * no run. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
@@ -179,19 +179,19 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
 };
 
 /**
- * The default factory's object: on `repo`, on none where there is none (an api that runs a release whose source is no folder), offering
- * every workflow (no `workflows`), hiring no one, keeping no file.
+ * The default factory's object: on no repository (a repository is a factory's own, filed with `nemia factory add`), offering every
+ * workflow (no `workflows`), hiring no one, keeping no file.
  */
-export const defaultFactoryObject = (repo: string | undefined, home: string): FactoryObject =>
+export const defaultFactoryObject = (home: string): FactoryObject =>
   objectOf(
     { name: DEFAULT_NAMESPACE, creationTimestamp: bornAt(home) },
-    { repos: repo === undefined ? [] : [repo], hires: {}, volumes: [] },
+    { repos: [], hires: {}, volumes: [] },
     { conditions: [], untrusted: [] },
   );
 
-/** Every factory's object: the default on `repo`, then each of `listed`, read at `home`. */
-export const factoryObjectsOf = (listed: FactoryListed, repo: string | undefined, home: string): FactoryObject[] => [
-  defaultFactoryObject(repo, home),
+/** Every factory's object: the default, then each of `listed`, read at `home`. */
+export const factoryObjectsOf = (listed: FactoryListed, home: string): FactoryObject[] => [
+  defaultFactoryObject(home),
   ...listed.factories.map((l) => factoryObjectOf(l, listed, home)),
 ];
 
@@ -226,35 +226,35 @@ const unlisted = (home: string, name: string): Effect.Effect<DefaultFactory, Mis
   );
 
 /**
- * The factory `name` as its parts read it (`filedOf`), the default on `repo`, read now at the store `home`, with its listing (none for
+ * The factory `name` as its parts read it (`filedOf`), read now at the store `home`, with its listing (none for
  * the default factory, which the door answers as its record): `Missing` where none has the name. One read of the store's factories, and
  * none of git or of a run.
  */
-export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, repo: string | undefined, name: string) {
+export const factoryFiled = Effect.fn('factoryFiled')(function* (home: string, name: string) {
   const listing = (yield* factoriesListed(home)).factories.find((l) => l.name === name);
   if (listing !== undefined) {
     const filed: Filed = { factory: filedOf(listing, home), listing };
     return filed;
   }
   yield* unlisted(home, name);
-  const filed: Filed = { factory: defaultFactoryObject(repo, home), listing: undefined };
+  const filed: Filed = { factory: defaultFactoryObject(home), listing: undefined };
   return filed;
 });
 
-/** A page of the factories (`FactoryList`), the default on `repo`, read now at the store `home`. */
-export const factoryList = Effect.fn('factoryList')(function* (home: string, repo: string | undefined, query: ObjectQuery) {
-  const objects = factoryObjectsOf(yield* factoriesListed(home, () => true), repo, home);
+/** A page of the factories (`FactoryList`), the default first, read now at the store `home`. */
+export const factoryList = Effect.fn('factoryList')(function* (home: string, query: ObjectQuery) {
+  const objects = factoryObjectsOf(yield* factoriesListed(home, () => true), home);
   const listed: FactoryList = yield* objectsListed('Factory', objects, query, 'factory');
   return listed;
 });
 
-/** The factory `name` as an object, the default on `repo`, read now at the store `home`; `Missing` where none has the name. */
-export const factoryObject = Effect.fn('factoryObject')(function* (home: string, repo: string | undefined, name: string) {
+/** The factory `name` as an object, read now at the store `home`; `Missing` where none has the name. */
+export const factoryObject = Effect.fn('factoryObject')(function* (home: string, name: string) {
   const listed = yield* factoriesListed(home, (l) => l.name === name);
   const listing = listed.factories.find((l) => l.name === name);
   if (listing !== undefined) return factoryObjectOf(listing, listed, home);
   yield* unlisted(home, name);
-  return defaultFactoryObject(repo, home);
+  return defaultFactoryObject(home);
 });
 
 /** The entry of the command table named `name`. */
@@ -291,8 +291,8 @@ export const factoryCommands = (factory: FiledFactory, schedules: readonly strin
  * The lines of the factory `name` (`factoryCommands`), read now at `home`, each schedule its file holds taken back by its workflow, by
  * name: none for the default factory or a file that does not read. `Missing` where no factory has the name.
  */
-export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, repo: string | undefined, name: string) {
-  const { factory, listing } = yield* factoryFiled(home, repo, name);
+export const factoryCommandsOf = Effect.fn('factoryCommandsOf')(function* (home: string, name: string) {
+  const { factory, listing } = yield* factoryFiled(home, name);
   const scheduled = listing === undefined || 'error' in listing ? [] : Object.keys(listing.schedules).sort(byText);
   return factoryCommands(factory, scheduled);
 });

@@ -32,8 +32,8 @@ import { mcpServerObject } from '../factory/object/mcp-server.verb.ts';
 import type { StoreRoot } from '../config/root.store.ts';
 import type { StoreConfig } from '../config/config.store.ts';
 
-/** Where a proposal is read and applied: the store's root, and the repository the api serves (the default factory's). */
-export type ProposalPlace = { readonly home: string; readonly repo: string };
+/** Where a proposal is read and applied: the store's root, whose factories say their own repositories. */
+export type ProposalPlace = { readonly home: string };
 
 /**
  * What reading a proposal's objects needs: the engine and the place, which the served Hires and McpServers read through, and the store's
@@ -135,7 +135,7 @@ const servedNow = (object: { metadata: { resourceVersion: string }; spec: unknow
  * digests its rules and its instruction beside its spec and status, so an edit of any of them makes a proposal read before it stale.
  */
 const factoryNow = (place: ProposalPlace, factory: string) =>
-  orNone(factoryObject(place.home, place.repo, factory), servedNow).pipe(
+  orNone(factoryObject(place.home, factory), servedNow).pipe(
     Effect.flatMap((served) =>
       served.version === null
         ? Effect.succeed(NONE)
@@ -175,9 +175,9 @@ export const currentOf = (
     case 'Skill':
       return skillNow(place, factory, name);
     case 'Hire':
-      return orNone(hireObject(place.home, place.repo, factory, name), servedNow);
+      return orNone(hireObject(place.home, factory, name), servedNow);
     case 'McpServer':
-      return orNone(mcpServerObject(place.home, place.repo, factory, name), servedNow);
+      return orNone(mcpServerObject(place.home, factory, name), servedNow);
     case 'Factory':
       return name === factory
         ? factoryNow(place, factory)

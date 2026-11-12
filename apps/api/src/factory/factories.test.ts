@@ -502,7 +502,11 @@ test('a person reads the factories: the default first, each by name, a broken fi
           unschedule: {},
           volumeRm: {},
         });
-        assert.deepEqual(byName('default')?.spec, { repos: [own], hires: {}, volumes: [] }, 'no workflows: it offers every one');
+        assert.deepEqual(
+          byName('default')?.spec,
+          { repos: [], hires: {}, volumes: [] },
+          'no workflows: it offers every one, on no repository',
+        );
         assert.deepEqual(byName('default')?.status, { conditions: [], untrusted: [] });
         assert.deepEqual(byName('hired')?.status.untrusted, [
           {

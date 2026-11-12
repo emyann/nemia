@@ -84,7 +84,8 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
 test('`--help`, and a writer given too little, print its usage and help from `COMMAND_WORDS`, exit 0, asking nothing', async () => {
   const env = laptop('nemia-writers-help-');
   for (const words of COMMAND_WORDS) {
-    for (const argv of [[...words.name.split(' '), '--help'], words.name.split(' ')]) {
+    const short = words.spec.positionals.some((p) => p.takes === 'required') ? [words.name.split(' ')] : [];
+    for (const argv of [[...words.name.split(' '), '--help'], ...short]) {
       const said = await nemia(argv, env);
       assert.equal(said.code, 0, said.err);
       assert.ok(said.out.includes(`nemia ${words.name} ${words.usage}`), said.out);

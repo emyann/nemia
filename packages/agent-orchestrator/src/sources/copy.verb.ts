@@ -7,11 +7,11 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
-import { AgentCopy } from 'objects';
-import { writerSpec, yourSkillsDir, yoursOf } from '../yours/yours.ts';
+import { AGENTS_COPY_WORDS, AgentCopy } from 'objects';
+import { yourSkillsDir, yoursOf } from '../yours/yours.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
@@ -135,55 +135,15 @@ const writeCopy = (source: Source, skills: readonly SourceSkill[], parts: readon
     return yield* write.pipe(Effect.tapCause(() => Effect.sync(() => removeWritten(made))));
   });
 
-/** The words of a copy: what it wrote, what it reused, and how the agent is given to a step. */
-const copiedLines = ({ name, copied, reused }: AgentCopied): string[] => [
-  `${name} copied into your library${copied.length ? `: ${copied.join(', ')}` : ', which held it already'}`,
-  ...(reused.length && copied.length ? [`reused as they were: ${reused.join(', ')}`] : []),
-  `give it to a step: nemia factory hire <factory> ${name} --step <workflow>/<step>`,
-];
-
 /**
  * `nemia agents copy`: an agent file copied into your library (`copyAgent`). Its handler takes objects' `AgentCopy`, the body of
  * `POST /api/namespaces/default/agents/copy`, which the api calls it by: `file`, `as` and `keep`, as the command line's flags spell them.
  */
-export const AGENTS_COPY: Command<AgentCopied, AgentCopy> = {
-  name: 'agents copy',
-  served: [{ endpoint: 'agents.copy' }],
-  usage: '<file> [--as <name>] [--keep <part>]...',
-  help: [
-    'an agent file copied into your library, with its schema and skills;',
-    'a part your library holds otherwise stops it: --as or --keep',
-  ],
-  spec: writerSpec(
-    'agents copy',
-    '<file> [--as <name>] [--keep <part>]...',
-    [{ key: 'file', takes: 'required', kind: 'text' }],
-    [
-      {
-        flag: '--as',
-        kind: 'name',
-        key: 'as',
-        takes: '--as takes the name the agent has in your library: nemia agents copy <file> --as <name>',
-      },
-      {
-        flag: '--keep',
-        kind: 'name',
-        key: 'keep',
-        many: true,
-        takes: "--keep takes a skill or a schema of the copy whose library's version stays: nemia agents copy <file> --keep <part>",
-      },
-    ],
-  ),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Agent's `copy` verb of `objects`' Api (`/api/namespaces/:namespace/agents/copy`), which calls this entry's handler: no route of its own",
-  },
+export const AGENTS_COPY: Served<AgentCopied, AgentCopy> = {
+  ...AGENTS_COPY_WORDS,
   input: AgentCopy,
   handler: ({ file, as, keep = [] }) =>
     Effect.gen(function* () {
       return yield* copyAgent({ file, ...(as !== undefined && { as }), keep: [...keep], home: yield* StoreRoot });
     }),
-  print: copiedLines,
 };

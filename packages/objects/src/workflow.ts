@@ -288,6 +288,8 @@ export const WorkflowStatus = Schema.Struct({
   folderTeam: Schema.Boolean,
   error: Text,
   unfilled: Text,
+  /** The files a removal took (`DELETE …/workflows/<name>`), by their path in the folder, on that answer alone. */
+  removed: Schema.optionalKey(Strings),
 });
 export type WorkflowStatus = typeof WorkflowStatus.Type;
 

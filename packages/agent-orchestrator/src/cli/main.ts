@@ -84,19 +84,7 @@ import {
 import { forwardedOf, unlinked } from '../command/forward.verb.ts';
 import { printed, answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import {
-  admitRun,
-  agentsCustomRun,
-  agentsRun,
-  agentsCardRun,
-  policyProposeRun,
-  factoryInstructRun,
-  factoryRulesRun,
-  factoryServerAddRun,
-  pruneVerb,
-  rmVerb,
-  sayRun,
-} from './runs.ts';
+import { admitRun, factoryInstructRun, factoryRulesRun, factoryServerAddRun, pruneVerb, rmVerb, sayRun } from './runs.ts';
 import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
@@ -431,13 +419,9 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['inbox from', inboxFromRun],
-  ['agents', agentsRun],
-  ['agents card', agentsCardRun],
-  ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],
   ['factory server add', factoryServerAddRun],
-  ['policy propose', policyProposeRun],
   ['admit', admitRun],
   ['pause', pauseRun],
   ['say', sayRun],

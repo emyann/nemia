@@ -66,21 +66,7 @@ export const HELD_FACTORY: readonly string[] = [
 ];
 
 /** The policies and the rest of the agents' and workflows' verbs. */
-export const HELD_DEFINITION: readonly string[] = [
-  'agents',
-  'agents card',
-  'agents sources',
-  'agents custom',
-  'agents copy',
-  'agents rm',
-  'agents run',
-  'policy',
-  'policy propose',
-  'policy confirm',
-  'policy rm',
-  'policy reach',
-  'workflows rm',
-];
+export const HELD_DEFINITION: readonly string[] = [];
 
 /** The moved reads, whose words and help are still here. */
 export const HELD_READ: readonly string[] = ['inbox', 'ls', 'show', 'closeout', 'watch'];

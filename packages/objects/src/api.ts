@@ -523,6 +523,12 @@ const originQuery = { origin: Schema.optionalKey(Schema.String) };
 const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 
 /**
+ * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one the api knows, its own or a
+ * factory's; the api's own where none is named.
+ */
+const repoQuery = { repo: Schema.optionalKey(Schema.String) };
+
+/**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
  * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
  * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
@@ -554,7 +560,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
-    query: removeQuery,
+    query: { ...removeQuery, ...repoQuery },
     success: WorkflowObject,
     error: definitionErrors,
   }),
@@ -577,7 +583,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
 export class AgentsGroup extends HttpApiGroup.make('agents').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
-    query: { ...listQuery, ...originQuery },
+    query: { ...listQuery, ...originQuery, ...repoQuery },
     success: AgentListOrTable,
     error: definitionErrors,
   }),
@@ -601,7 +607,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
-    query: removeQuery,
+    query: { ...removeQuery, ...repoQuery },
     success: AgentObject,
     error: definitionErrors,
   }),
@@ -613,7 +619,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
     params: cardParams,
-    query: originQuery,
+    query: { ...originQuery, ...repoQuery },
     success: AgentCard,
     error: definitionErrors,
   }),
@@ -630,17 +636,20 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.get('instructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
+    query: repoQuery,
     success: AgentInstructions,
     error: definitionErrors,
   }),
   HttpApiEndpoint.put('putInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
+    query: repoQuery,
     payload: AgentInstructionsWrite,
     success: AgentInstructions,
     error: definitionErrors,
   }),
   HttpApiEndpoint.delete('deleteInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
+    query: repoQuery,
     success: AgentInstructionsCleared,
     error: definitionErrors,
   }),

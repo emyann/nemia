@@ -4,12 +4,12 @@
  * workflow gates as it declares them; of a run, off the steps it is gated at, a gate added at its start among them, with what keeps each
  * rule that could approve one from doing so now, read as admission reads it (`seenOf`, `factsOf`). Any agent's: the name is the one given.
  */
-import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Schema } from 'effect';
 import type { Args } from '../command/command.ts';
-import { checked, type Command } from '../command/entry.verb.ts';
+import { POLICY_REACH_WORDS } from 'objects';
+import { checked, type Served } from '../command/entry.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { filedFactory } from '../factory/door/factories.store.ts';
 import { factoryRepo } from '../factory/factory.ts';
@@ -162,64 +162,13 @@ const reachOf = Effect.fnUntraced(function* (home: string, { name: agent, factor
   } satisfies PolicyReach;
 });
 
-/** What a row says of its step: who reaches it, else why none can. */
-function rowLines(row: GateReach): string[] {
-  const head = `  ${row.step} of ${row.workflow}`;
-  const reached = row.reachedBy.length
-    ? [`${head}: approved on its own by ${row.reachedBy.join(', ')}`]
-    : [`${head}: no rule can approve it`, ...row.misses.map((m) => `    ${m.words}`)];
-  return [
-    ...reached,
-    ...(row.proposedBy.length ? [`    proposed, would: ${row.proposedBy.join(', ')}`] : []),
-    ...(row.now ?? []).map((n) => `    now, ${n.rule} waits: ${n.words}`),
-  ];
-}
-
-/** The lines `nemia policy reach` prints. */
-function reachLines(r: PolicyReach): string[] {
-  const reached = r.gates.filter((g) => g.reachedBy.length).length;
-  const of = r.run === null ? `the factory ${r.factory}` : `the run ${r.run} (factory ${r.factory})`;
-  const lines = [
-    `${r.agent}, in ${of} at ${r.level}: the rules in force can approve ${reached} of the ${r.gates.length} step(s) at their gate (${r.reach})`,
-    ...r.gates.flatMap(rowLines),
-    ...r.unloaded.map((u) => `  ${u.workflow} does not load, so its steps are not read: ${u.message}`),
-  ];
-  if (!r.suggested.length) return lines;
-  return [
-    ...lines,
-    'suggested, each reaching a step above:',
-    ...r.suggested.map((s) => `  ${s.id}: ${s.words}`),
-    `propose them with nemia policy propose ${r.agent} --file -, given the proposal of --json, which keeps what is proposed already;`,
-    `the person confirms each with nemia policy confirm ${r.agent} <id> --words '<its words>'.`,
-  ];
-}
-
 /**
  * `nemia policy reach <agent> (--factory <name> | --run <runId>)`: what an agent's rules can approve at a step's gate, and why not. The api
  * serves it as the nemia group's `reach` (`GET /api/policy/:name/reach?factory|run`). Refused (`Invalid`) before anything is read: a name
  * that is no agent's, neither or both of the factory and the run (`reachRefusal`); then as the factory or the run reads.
  */
-export const POLICY_REACH: Command<PolicyReach, ReachInput> = {
-  name: 'policy reach',
-  served: [{ endpoint: 'nemia.reach', request: renamed({ runId: 'run' }) }],
-  usage: '<agent> (--factory <name> | --run <runId>)',
-  help: [
-    "which steps at their gate the agent's rules in force could ever approve",
-    'unasked, in a factory or a run: why each other rule cannot (a step approved',
-    'before it runs has done nothing to recommend or check; one with no check',
-    'never passed one), what keeps a rule from a run now, and the rules that would',
-  ],
-  spec: {
-    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-    flags: [
-      { flag: '--factory', kind: 'name', key: 'factory', takes: `--factory takes the factory whose steps are read: ${REACH_FORM}.` },
-      { flag: '--run', kind: 'name', key: 'runId', takes: `--run takes the run whose steps are read: ${REACH_FORM}.` },
-    ],
-    unknown: (arg) => `nemia policy reach takes an agent's name and --factory or --run, not ${arg}: ${REACH_FORM}.`,
-  },
-  check: reachRefusal,
-  writes: false,
-  class: 'read',
+export const POLICY_REACH: Served<PolicyReach, ReachInput> = {
+  ...POLICY_REACH_WORDS,
   input: ReachInput,
   handler: (input) =>
     Effect.flatMap(StoreRoot, (home) =>
@@ -228,5 +177,4 @@ export const POLICY_REACH: Command<PolicyReach, ReachInput> = {
         Effect.suspend(() => reachOf(home, input)),
       ),
     ),
-  print: reachLines,
 };

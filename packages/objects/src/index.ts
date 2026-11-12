@@ -643,6 +643,23 @@ export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
 export { RUN_WORDS } from './commands-runs.ts';
 export { INBOX_WORDS } from './commands-inbox.ts';
 export { FACTORY_WORDS } from './commands-factories.ts';
-export { DEFINITION_WORDS } from './commands-definitions.ts';
+export {
+  DEFINITION_WORDS,
+  POLICY_CONFIRM_WORDS,
+  POLICY_PROPOSE_WORDS,
+  POLICY_REACH_WORDS,
+  POLICY_RM_WORDS,
+  POLICY_WORDS,
+  WORKFLOWS_RM_WORDS,
+} from './commands-definitions.ts';
+export {
+  AGENTS_CARD_WORDS,
+  AGENTS_COPY_WORDS,
+  AGENTS_CUSTOM_WORDS,
+  AGENTS_RM_WORDS,
+  AGENTS_RUN_WORDS,
+  AGENTS_SOURCES_WORDS,
+  AGENTS_WORDS,
+} from './commands-definitions-agents.ts';
 export { READ_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';

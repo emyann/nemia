@@ -80,10 +80,6 @@ test('`nemia policy reach`: which steps at their gate her rules can approve in a
     );
     assert.deepEqual(read.suggested.map((s) => s.id).sort(), ['approve-draft', 'approve-ship']);
     for (const s of read.suggested) assert.equal(s.words, ruleWords(s), 'its words are the words a confirm checks');
-    assert.ok(
-      POLICY_REACH.print(read, { name: 'nemia', factory: 'f' }).some((l) => l.includes('approve-ship')),
-      'the suggestions are printed',
-    );
     suggested = read.suggested;
   });
 

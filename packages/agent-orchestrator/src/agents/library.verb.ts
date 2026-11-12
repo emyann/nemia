@@ -5,17 +5,15 @@
  * agent's file, the board sends its own — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api guards
  * each write and words the board's answer around what each entry answers.
  */
-import { fromPlace, refusing } from '../command/requests.verb.ts';
-import { AGENTS_WRITE_WORDS } from 'objects';
+import { AGENTS_RM_WORDS, AGENTS_RUN_WORDS, AGENTS_WRITE_WORDS } from 'objects';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
-import { versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { yoursOrRefused } from '../yours/yours.ts';
 import { templatedTreeOf } from '../factory/door/factories.store.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Command, Served } from '../command/entry.verb.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
 import { agentRead } from '../roster/roster.store.ts';
-import { TRY_BUDGET } from '../try/try.ts';
 import { tryAgent } from '../try/try.verb.ts';
 import type { AgentDraft } from './agents.ts';
 import type { AgentSidecar, AgentWritten } from './agents.store.ts';
@@ -130,18 +128,8 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
 };
 
 /** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */
-export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
-  name: 'agents rm',
-  served: [{ endpoint: 'agents.delete', request: refusing('agents rm', ['repo'], fromPlace({ version: 'resourceVersion' }, ['repo'])) }],
-  usage: 'yours <name> --version <v>',
-  help: ['an agent of yours removed, at the --version it was read at'],
-  spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Agent's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
-  },
+export const AGENTS_REMOVE: Served<AgentRemoved, AgentRemoveInput> = {
+  ...AGENTS_RM_WORDS,
   input: AgentRemoveInput,
   handler: ({ from, name, version, repo }) =>
     Effect.gen(function* () {
@@ -150,38 +138,17 @@ export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
       const door = yield* AgentDoor;
       return yield* door.agents.remove(AgentName.read(name), version, { dir, ...(repo !== undefined && { repo }) });
     }),
-  print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
 };
 
 /**
  * An agent of yours tried on a short brief (`tryAgent`): its try's folder written and a run of it started with no repository, as any
  * folder team's is; a tick files it. Refused before anything is written, as `tryAgent` says.
  */
-export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
-  name: 'agents run',
-  served: [{ endpoint: 'agents.try', request: refusing('agents run', ['repo'], fromPlace({}, ['repo'])) }],
-  usage: 'yours <name> --brief <words>',
-  help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_BUDGET}`],
-  spec: writerSpec('agents run', 'yours <name> --brief <words>', PLACE_AND_NAME, [
-    {
-      flag: '--brief',
-      kind: 'text',
-      key: 'brief',
-      takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents run yours <name> --brief "<words>"',
-      twice: 'nemia agents run takes --brief once: a try is one brief.',
-    },
-  ]),
-  writes: true,
-  class: 'act',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Agent's `try` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
-  },
-  ticks: true,
+export const AGENTS_TRY: Served<{ id: string }, AgentTryInput> = {
+  ...AGENTS_RUN_WORDS,
   input: AgentTryInput,
   handler: ({ from, name, brief = '', repo = '' }) =>
     Effect.flatMap(StoreRoot, (home) => tryAgent({ who: 'nemia agents run', from, name, brief, repo, home })),
-  print: ({ id }, { name }) => [`${id}  a try of ${name} started: nemia ls shows how it goes, and its page on the board`],
 };
 
 /**
@@ -213,10 +180,10 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
 };
 
 /** The board's agent library entries, in the order the table lists them. */
-export const LIBRARY_ENTRIES: readonly Command[] = [
+export const LIBRARY_ENTRIES: readonly (Command | Served)[] = [
   AGENTS_WRITE,
   AGENTS_COPY,
   AGENTS_REMOVE,
   AGENTS_TRY,
   AGENTS_READ,
-] as readonly Command[];
+] as readonly (Command | Served)[];

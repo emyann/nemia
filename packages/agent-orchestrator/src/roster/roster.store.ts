@@ -125,7 +125,7 @@ export const findAgent = Effect.fn('findAgent')(function* (name: string, repo: s
 const linked = (at: string): boolean => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
 
 /** The file of the person's custom instructions for `name` in the store `home`, or null when they wrote none. */
-function customOf(home: string, name: string): string | null {
+export function customOf(home: string, name: string): string | null {
   const file = customInstructionsFile(home, name);
   return fs.lstatSync(file, { throwIfNoEntry: false }) ? file : null;
 }

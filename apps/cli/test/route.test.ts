@@ -28,10 +28,11 @@ const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const TABLE_NAMES = [...new Set(COMMANDS.map((c) => c.name.split(' ')[0] ?? ''))];
 
 test('every command of the table goes to its own CLI but a moved read, which asks the api, in process with --help, and refused with --local', () => {
-  const moved: readonly string[] = READ_VERBS;
+  const moved: readonly string[] = [...READ_VERBS, ...MOVED_COMMANDS];
   for (const name of TABLE_NAMES) {
     assert.equal(routeOf({ name, local: false, help: false, remote: false }), moved.includes(name) ? 'api' : 'process', name);
-    assert.equal(routeOf({ name, local: false, help: true, remote: false }), 'process', `${name} --help`);
+    const held: readonly string[] = MOVED_COMMANDS;
+    assert.equal(routeOf({ name, local: false, help: true, remote: false }), held.includes(name) ? 'api' : 'process', `${name} --help`);
     for (const remote of [false, true])
       assert.equal(routeOf({ name, local: true, help: false, remote }), 'refused', `${name} --local remote=${remote}`);
   }
@@ -81,7 +82,7 @@ test('`nemia inbox rm <card>` runs on the old path, never asking the api: a stor
 });
 
 test('under a remote context a verb about the store only the old path has is forwarded; a machine verb and a help still run here', () => {
-  const kept: readonly string[] = [...READ_VERBS, ...CLIENT_VERBS, ...MACHINE_VERBS];
+  const kept: readonly string[] = [...READ_VERBS, ...CLIENT_VERBS, ...MACHINE_VERBS, ...MOVED_COMMANDS];
   for (const name of TABLE_NAMES) {
     assert.equal(
       routeOf({ name, local: false, help: false, remote: true }),

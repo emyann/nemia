@@ -264,7 +264,8 @@ export const customInstructionsQuery = (name: string) =>
     queryKey: ['custom-instructions', name],
     queryFn: () =>
       call(
-        (c) => (name === NEMIA ? c.nemia.instructions() : c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+        (c) =>
+          name === NEMIA ? c.nemia.instructions() : c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: {} }),
         read(AgentInstructionsAnswer),
       ),
   });
@@ -281,13 +282,16 @@ export const writeCustomInstructions = (name: string, words: string): Promise<Cu
     (c) =>
       name === NEMIA
         ? c.nemia.writeInstructions({ payload: { words } })
-        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, payload: { words } }),
+        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: {}, payload: { words } }),
     write(AgentInstructionsAnswer, CUSTOM_WRITTEN),
   );
 
 /** Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has. */
 export const clearCustomInstructions = (name: string): Promise<CustomInstructionsCleared> =>
   call(
-    (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+    (c) =>
+      name === NEMIA
+        ? c.nemia.clearInstructions()
+        : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: {} }),
     write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),
   );

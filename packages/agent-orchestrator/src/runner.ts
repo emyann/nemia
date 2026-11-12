@@ -337,7 +337,7 @@ export { draftSteps, loadWorkflows, workflowDraftOfFiles, writeWorkflow, type Wo
 export { isMarkdown, textIn, workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
-export { agentRead, agentSkillsFound, listAgents, type Readings } from './roster/roster.store.ts';
+export { agentRead, agentSkillsFound, customOf, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
 export { TRY_STEP, triesDir, tryDir, tryFolder, writeTryFolder } from './try/try.store.ts';

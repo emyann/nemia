@@ -1,5 +1,5 @@
 /**
- * The runners of `nemia agents custom`, `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
+ * The runners of `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
  * runner of `nemia rm` (`RM`), which walks the many runs a command line names through the entry's handler, and of `nemia prune`, which
  * hands them to the package's many-run verbs (`judgingMany`, `freeingMany`) and prints what they answer; each asks a person's yes and
  * tallies what was not done into the exit code; the runner of `nemia admit`, which reads the call on stdin; and of `nemia say`, which
@@ -9,10 +9,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   admitted,
-  AGENTS,
-  AGENT_CARD,
-  AGENTS_CUSTOM,
-  POLICY_PROPOSE,
   PRUNE,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
@@ -274,60 +270,12 @@ function wordsFrom(file: string, name: string): string {
   }
 }
 
-/** The arguments of `command` with the words its `--file` names read in (`wordsFrom`), where it names one. */
-const withWords = (args: Args, command: string): Args =>
-  typeof args.file === 'string' ? { ...args, words: wordsFrom(args.file, command) } : args;
-
 /** A factory's words as `nemia factory rules` and `instruct` take them: the factory, the words `--file` names (`wordsFrom`), `--clear`. */
 const factoryWords = (args: Args, command: string): { factory: string; words?: string; clear?: boolean } => ({
   factory: typeof args.factory === 'string' ? args.factory : '',
   ...(typeof args.file === 'string' ? { words: wordsFrom(args.file, command) } : {}),
   ...(args.clear === true ? { clear: true } : {}),
 });
-
-/**
- * `nemia agents`' runner: a repository the command line names, else the folder it is typed in, as `[--repo .]` says, handed to its entry's
- * handler (`AGENTS`), which reads no repository where none is given (the api's, on an install with no factory named); forwarded, the
- * repository is the api's to resolve, and none is added. What the entry says of them printed.
- */
-export async function agentsRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = repoHere(env, args);
-  const data = await answered(env, e, place, AGENTS, asked);
-  for (const line of printed(AGENTS, data, asked)) console.log(line);
-}
-
-/**
- * The repository `nemia agents` and `nemia agents card` read: the one `--repo` names, else the folder the command is typed in; none where
- * the command line is forwarded, whose api resolves its own.
- */
-function repoHere(env: Env, args: Args): { repo?: string } {
-  const named = args.repo;
-  return typeof named === 'string' ? { repo: named } : forwardedOf(env) === undefined ? { repo: '.' } : {};
-}
-
-/**
- * `nemia agents card`'s runner: the agent named, from the place `--from` names where it does, in the repository `repoHere` says, handed
- * to its entry's handler (`AGENT_CARD`), which reads no repository where none is given; the card printed, and its note.
- */
-export async function agentsCardRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const { name, from } = args;
-  if (typeof name !== 'string') return usage(`nemia agents card takes the agent's name: nemia agents card ${AGENT_CARD.usage}.`);
-  const at: { from?: 'repo' | 'yours' } = from === 'repo' ? { from: 'repo' } : from === 'yours' ? { from: 'yours' } : {};
-  const asked = { name, ...repoHere(env, args), ...at };
-  const data = await answered(env, e, place, AGENT_CARD, asked);
-  for (const line of printed(AGENT_CARD, data, asked)) console.log(line);
-  for (const line of AGENT_CARD.note?.(data, asked) ?? []) console.error(line);
-}
-
-/**
- * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
- * store, and what the entry says of them printed.
- */
-export async function agentsCustomRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = inputFor(AGENTS_CUSTOM, withWords(args, AGENTS_CUSTOM.name));
-  const data = await answered(env, e, place, AGENTS_CUSTOM, asked);
-  for (const line of printed(AGENTS_CUSTOM, data, asked)) console.log(line);
-}
 
 /**
  * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
@@ -355,15 +303,6 @@ export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place
   const asked = serverAddOf(args);
   const data = await answered(env, e, place, FACTORY_SERVER_ADD, asked);
   for (const line of printed(FACTORY_SERVER_ADD, data, asked)) console.log(line);
-}
-
-/**
- * `nemia policy propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
- */
-export async function policyProposeRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = inputFor(POLICY_PROPOSE, withWords(args, POLICY_PROPOSE.name));
-  const data = await answered(env, e, place, POLICY_PROPOSE, asked);
-  for (const line of printed(POLICY_PROPOSE, data, asked)) console.log(line);
 }
 
 /**

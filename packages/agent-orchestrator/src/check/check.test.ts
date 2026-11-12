@@ -218,13 +218,14 @@ test("the check's harness and its bounds", async (t) => {
     assert.equal(HARNESSES.check.prepare, commandHarness.prepare);
     assert.equal(HARNESSES.check.streams, true, 'the runtime keeps its stdout and stderr whole, read through output');
   });
-  await t.test('the engine the run builds keeps its two harnesses, and gains the check', async () => {
+  await t.test('the engine the run builds keeps its two harnesses, and gains the check and the command harness', async () => {
     const engine = await import('agent-runtime');
     assert.deepEqual(
       Object.keys(HARNESSES),
-      ['claude', 'codex', 'check'],
-      "harnesses replaces the engine's default map, so it names all three, claude first: the first key is the fallback",
+      ['claude', 'codex', 'check', 'command'],
+      "harnesses replaces the engine's default map, so it names all four, claude first: the first key is the fallback",
     );
+    assert.equal(HARNESSES.command, commandHarness, "the runtime's command harness under its own name, for a fix and a script condition");
     assert.equal(HARNESSES.claude, 'claude', "the engine's own Claude Code harness");
     assert.equal(HARNESSES.codex, engine.codex);
     assert.equal(HARNESSES.check.name, 'check');

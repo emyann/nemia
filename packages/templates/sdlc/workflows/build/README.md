@@ -157,6 +157,21 @@ its commands, its paths, its tools — is in its own instructions (its `CLAUDE.m
 steps declares a closeout of its own (no `output:`, and no schema beside them): what each closes out on is its agent's, review's
 `findings` and `again` being Agora's.
 
+## What a machine needs before a run starts
+
+`workflow.yaml` declares the machine's needs (`spec.needs`), which the factory's README carries as its frontmatter: a run that has
+filed nothing waits while one is missing, and the readiness read names each with the fix to start. Two hold only where `github` is
+true, their checks met otherwise: `gh`, the GitHub CLI on the PATH, fixed by `node "$WF_CARRIED_FILES/needs.ts" install-gh` (the latest
+release for the machine into Nemia's tools folder, its sum checked, no sudo); and `gh-sign-in`, gh signed in to github.com with the
+`workflow` scope (`needs.ts scope workflow`), fixed by gh's browser sign-in, whose output shows the code to type at
+https://github.com/login/device, then `gh auth setup-git`. The third, `git-identity`, fills the git place's need of the same name: its
+first fix sets git's name and email from the account gh is signed in to, the email its noreply address
+`<id>+<login>@users.noreply.github.com` (`needs.ts identity`); the place's own fix, which asks for a name and an email, comes after it.
+
+**Not measured yet: the sign-in with no terminal.** A fix runs with no terminal, so the sign-in gives gh `</dev/null`. Whether gh then
+prints its code and polls until the browser approves, without waiting on Enter, has not been run on a real gh: the first real run of
+the fix must confirm it, and record the gh version it ran.
+
 ## What design hands the review: the pages it read
 
 A spec can rest on a page outside the repository: a standard, a vendor's documentation, a file of another repository read on the web.

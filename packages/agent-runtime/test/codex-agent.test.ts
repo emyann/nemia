@@ -541,13 +541,8 @@ test(
   WAITED,
   async (t) => {
     const s = story(t);
-    /**
-     * The shipped harness, its sign-in check bounded at `CODEX_SIGN_IN_MS`, which a signed-in or signed-out answer from the fake meets
-     * however loaded the machine is; the bound is shortened only for the check that never answers, on an engine of its own.
-     */
-    const engine = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex } }));
-    type Built = typeof engine;
-    const settled = async (t: Waiter, id: string, on: Built = engine) => {
+    const shipped = builtEngine(Engine.layer({ root: tmp('store'), harnesses: { codex } }));
+    const settled = async (t: Waiter, id: string, on: typeof shipped = shipped) => {
       await holds(
         t,
         async () => {
@@ -561,7 +556,7 @@ test(
 
     await s.test('signed out, the attempt ends unstartable, in words naming the sign-in, and nothing is run', async (t) => {
       const cwd = workdir({ login: 'out' });
-      const id = await Effect.runPromise(engine.file({ brief: 'the brief', cwd, harness: 'codex' }));
+      const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
       const state = await settled(t, id);
       assert.equal(state.settled, 'failed');
       const [attempt] = state.attempts;
@@ -574,7 +569,7 @@ test(
 
     await s.test('signed in, the step tried again runs as before', async (t) => {
       const cwd = workdir();
-      const id = await Effect.runPromise(engine.file({ brief: 'the brief', cwd, harness: 'codex' }));
+      const id = await Effect.runPromise(shipped.file({ brief: 'the brief', cwd, harness: 'codex' }));
       assert.equal((await settled(t, id)).settled, 'succeeded');
       assert.deepEqual(loginsOf(cwd), [['login', 'status']]);
       assert.equal(argvOf(cwd)[0]?.[0], 'exec');

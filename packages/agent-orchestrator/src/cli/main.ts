@@ -51,11 +51,8 @@ import {
   type DemandHost,
   renamedIn,
   withProposalsPass,
-  withResolutionProposer,
   type Env,
-  CLI_VERBS,
 } from '../runner.ts';
-import { forwardedOf, unlinked } from '../command/forward.verb.ts';
 import { printed, answered, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun } from './runs.ts';
@@ -204,14 +201,14 @@ async function commanded(
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.ticks === true && forwardedOf(env) === undefined) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
+  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
   const runner = RUNS.get(command.name);
   if (runner) return runner(env, args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const entry: Served & Partial<Pick<Command, 'print' | 'note'>> = command;
   const given = inputOf<Readonly<Record<string, unknown>>, Args>(entry, args);
-  const data = await answered(env, e, place, entry, given, withResolutionProposer);
+  const data = await answered(env, e, place, entry, given);
   for (const line of printed(entry, data, given)) console.log(line);
   for (const line of entry.note?.(data, given) ?? []) console.error(line);
 }
@@ -251,34 +248,10 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 }
 
 /**
- * The engine of a command line forwarded to another machine's api, which builds none here: every entry is called through `answered`,
- * which reads no engine when forwarded, so a read of this one is a runner that reached past the seam, said as such.
- */
-const unbuilt = (verb: string): Engine =>
-  new Proxy({} as Engine, {
-    get: () => {
-      throw new Error(
-        `nemia ${verb} reached for this machine's engine while forwarded to another's (NEMIA_SERVER): run it there, or here with NEMIA_CONTEXT=local.`,
-      );
-    },
-  });
-
-/**
- * Whether the name `named` runs forwarded: a command of the table or a verb of the CLI's own with an endpoint it calls (`served`); and a
- * help, which is printed here.
- */
-const linkedOrHelp = (name: string, rest: readonly string[]): boolean =>
-  rest.includes('--help') ||
-  [...TABLE.filter((c) => c.only?.side !== 'api'), ...CLI_VERBS].some((c) => c.name === name && c.served !== undefined);
-
-/**
  * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
  * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. `demand` is the machine a
  * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
  * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
- *
- * Forwarded to another machine's api (`NEMIA_SERVER`, `forwardedOf`), it builds no engine and checks no install of this machine's, starts
- * no daemon here, and refuses (`Invalid`) a command or a verb that no endpoint serves (`unlinked`): it runs only where its store is.
  */
 export async function main(
   argv: string[],
@@ -291,12 +264,10 @@ export async function main(
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
   const named = namedIn(renamed.words);
   if (named === undefined) return console.log(HELP);
-  const forwarded = forwardedOf(env) !== undefined;
-  if (forwarded && !linkedOrHelp(named.name, named.rest)) throw unlinked(named.name);
-  const exempt = forwarded || named.name === 'version' || named.rest.includes('--help');
+  const exempt = named.name === 'version' || named.rest.includes('--help');
   const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(env)), wfRoot(env), env);
   if (trial !== null) throw new Conflict({ message: trial });
-  const e = given ?? (forwarded ? unbuilt(named.name) : engine(env));
+  const e = given ?? engine(env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(env, command, named.rest, e, demand, place);
   const verb = VERBS.get(named.name);

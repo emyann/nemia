@@ -1,7 +1,7 @@
 /**
- * The one typed client of the `Api`: every consumer of the api — the client (`apps/cli`), the orchestrator's CLI forwarded to another
- * machine's api, the board — makes its client here (`apiClient`), and no other `HttpApiClient` of the `Api` is made in the repository
- * (`tools/guards/test/one-api-client.test.ts`). What it decides once, around the contract both sides share:
+ * The one typed client of the `Api`: every consumer of the api — the client (`apps/cli`) and the board — makes its client here
+ * (`apiClient`), and no other `HttpApiClient` of the `Api` is made in the repository (`tools/guards/test/one-api-client.test.ts`).
+ * What it decides once, around the contract both sides share:
  *
  * - each write without a body is sent as `{}` in JSON (`jsonBodied`), as the api's write guard takes it;
  * - the token, a session's or a person's, is presented as `Authorization: Bearer <token>`;

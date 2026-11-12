@@ -1,33 +1,28 @@
 /**
- * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
- * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia approve` of a loop — over a store and a repository of their own, on the
- * test place.
+ * `main`, the in-process CLI of the verbs about this machine: the help for a verb it does not know and for a store verb, whose words the
+ * client holds; the alias's hint. And what the handlers of the store verbs no other test reads answer, reached through `test/typed.ts`
+ * as the api calls them — `nemia cancel`, `nemia show`, `nemia logs` and `nemia approve` of a loop — over a store and a repository of
+ * their own, on the test place; the lines a person reads of them are the client's (`apps/cli/test/runs-lines.test.ts`).
  *
  * The root test below types `factory servers default`: a `factory servers` read is the factory's own existence (`factoryThere`) and its
- * record, both through the Factory door at the root `main` gives the handler as it is typed (`StoreRoot`, `storeConfigLayer` of the
+ * record, both through the Factory door at the root the handler is given as it is typed (`StoreRoot`, `storeConfigLayer` of the
  * process's environment), which is what that test pins. `default` has a record and no file, so the test plants only the record.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import http from 'node:http';
-import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { TaskPhase } from '../run.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
-import { story } from '../../test/story.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { advanceRun, CLI, TABLE, startRun, runWith as runEngine } from '../runner.ts';
 import { runRecord, writeRun } from '../record/record.store.ts';
 import { aliased, main, VERBS } from './main.ts';
 import { HELP, WF_HINT } from './flags.ts';
-import { offLine } from '../demand/demand.ts';
-import { FACTORY_HELP } from '../factory/factory.verb.ts';
-import { START_HELP } from '../start/commands.verb.ts';
 import { SHOW } from '../object/commands.verb.ts';
-import { handled } from '../../test/typed.ts';
+import { handled, typed as handlerOf } from '../../test/typed.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-main-');
@@ -138,44 +133,36 @@ test('wf, the alias, writes its one hint line on stderr before the help, and not
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
 });
 
-test('nemia auto, a renamed group, runs as nemia policy, with one hint line on stderr naming it, and stdout the same', async (t) => {
+/** What the handler of the store verb `argv` names answers, over `e` and this file's store. */
+const answered = (e: Engine, ...argv: string[]) => handlerOf(argv, e, undefined, stand().place, ENV);
+
+test('nemia auto, a renamed group, is read as nemia policy, answering what the new name answers', async () => {
   const { e } = board();
-  const hints: string[] = [];
-  t.mock.method(process.stderr, 'write', (chunk: string) => hints.push(chunk) > 0);
-  const now = await typed(t, e, 'policy', 'nemia');
-  assert.deepEqual(hints, [], 'the new name gives no hint');
-  const was = await typed(t, e, 'auto', 'nemia');
-  assert.deepEqual(was.out, now.out, 'the former name prints what the new one prints');
-  assert.equal(hints.length, 1, 'one hint line');
-  assert.match(hints[0], new RegExp(`\`${CLI} policy nemia\``), 'the hint names what to type now');
+  assert.deepEqual(await answered(e, 'auto', 'nemia'), await answered(e, 'policy', 'nemia'));
 });
 
-test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async (t) => {
+test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async () => {
   const { e } = board();
   const other = scratch('wf-main-other-');
   const file = path.join(other, 'factories', 'default', 'servers.json');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify({ servers: { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } } })}\n`);
   const was = process.env.WF_ROOT;
+  const read = async () => JSON.stringify(await handlerOf(['factory', 'servers', 'default'], e, undefined, stand().place));
   try {
     process.env.WF_ROOT = other;
-    const { out } = await typedIn(undefined)(t, e, 'factory', 'servers', 'default');
     assert.ok(
-      out.some((line) => line.includes('https://api.githubcopilot.com/mcp/')),
-      `the record under the root the process names is the one read, by servers.store.ts's required home: ${JSON.stringify(out)}`,
+      (await read()).includes('https://api.githubcopilot.com/mcp/'),
+      "the record under the root the process names is the one read, by servers.store.ts's required home",
     );
     process.env.WF_ROOT = was;
-    const back = await typedIn(undefined)(t, e, 'factory', 'servers', 'default');
-    assert.ok(
-      back.out.some((line) => line.includes('no server recorded')),
-      `and this root records none, so the read follows the root rather than a module's: ${JSON.stringify(back.out)}`,
-    );
+    assert.ok(!(await read()).includes('githubcopilot'), "and this root records none, so the read follows the root rather than a module's");
   } finally {
     process.env.WF_ROOT = was;
   }
 });
 
-test('main reads the environment it is handed, not the process’s: `logs` reads the run planted under the WF_ROOT it is given', async (t) => {
+test('a handler reads the environment it is handed, not the process’s: `logs` reads the run planted under the WF_ROOT it is given', async () => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'planted elsewhere', repo: aRepo(), workflowDir: oneStep() }));
   const given = scratch('wf-main-given-');
@@ -183,19 +170,17 @@ test('main reads the environment it is handed, not the process’s: `logs` reads
   writeRun(given, planted);
   const elsewhere = scratch('wf-main-process-');
   const was = process.env.WF_ROOT;
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
-  const error = t.mock.method(console, 'error', () => {});
   try {
     process.env.WF_ROOT = elsewhere;
-    await main(['logs', planted.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given });
-    await assert.rejects(main(['logs', run.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given }));
+    assert.deepEqual(
+      await handlerOf(['logs', planted.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given }),
+      {},
+      'the run under the root it was handed is read: its step has not run',
+    );
+    await assert.rejects(handlerOf(['logs', run.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given }));
   } finally {
     process.env.WF_ROOT = was;
-    log.mock.restore();
-    error.mock.restore();
   }
-  assert.deepEqual(out, ['implement has not run yet'], 'the run under the root main was handed is read, and not the one under its own');
 });
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
@@ -220,66 +205,45 @@ test('the help, once and alone, for no verb, a verb it does not know, and a name
     assert.deepEqual(await typed(t, e, verb), { out: help, err: [] }, `nemia ${verb}`);
 });
 
-test('the help, once and alone, for a verb given too little to act on, and for a former spelling given as little, typed on purpose', async (t) => {
+test('the help, once and alone, for a store verb, whose words the client holds, typed whole, given too little, or by a former name', async (t) => {
   const { e } = board();
   const help = (await typed(t, e)).out;
   for (const argv of [
+    ['start', 'a brief', '--workflows', 'w'],
     ['start'],
-    ['start', '--repo'],
-    ['plan'],
-    ['plan', '--repo'],
-    ['cancel'],
-    ['rm'],
-    ['decide'],
-    ['retry'],
+    ['cancel', 'r-1'],
     ['retry', '--round'],
-    ['retry', '--round', '--budget'],
-    ['approve'],
     ['round'],
-    ['round', '--budget'],
     ['accept'],
-    ['say', 'r-1'],
-    ['show'],
-    ['show', '--help'],
-    ['logs', 'r-1'],
+    ['show', 'r-1'],
     ['agents', 'card'],
-    ['agents', 'card', '--repo'],
   ])
     assert.deepEqual(await typed(t, e, ...argv), { out: help, err: [] }, `nemia ${argv.join(' ')}`);
 });
 
-test('nemia cancel: a run with a step in flight, the same run again, and a run already finished', async (t) => {
+test('nemia cancel: a run with a step in flight, the same run again, and a run already finished', async () => {
   const b = board();
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-  assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
-    out: [`${run.id}  cancelled`, `   asked to stop: implement  (the engine stops it on its next tick)`],
-    err: [offLine(ROOT)],
-  });
+  const stopped = (plan: unknown) => (plan as { stop: { name: string }[] }).stop.map((f) => f.name);
+  const first = (await answered(b.e, 'cancel', run.id)) as { id: string; plan: { kind: string } };
+  assert.deepEqual([first.id, first.plan.kind, stopped(first.plan)], [run.id, 'cancel', ['implement']]);
   const at = runRecord(ROOT, run.id).cancelledAt;
-  assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
-    out: [`${run.id}  already cancelled at ${at}`, `   asked to stop: implement  (the engine stops it on its next tick)`],
-    err: [offLine(ROOT)],
-  });
+  const again = (await answered(b.e, 'cancel', run.id)) as { plan: { kind: string; at?: string } };
+  assert.deepEqual([again.plan.kind, again.plan.at, stopped(again.plan)], ['already-cancelled', at, ['implement']]);
 
   const done = await runPlaced(startRun({ brief: 'done', repo, workflowDir: oneStep() }));
   await runWith(b.e, advanceRun(runRecord(ROOT, done.id)));
   b.settle(`${done.id}-implement`, 'succeeded', SIGNED);
   await runWith(b.e, advanceRun(runRecord(ROOT, done.id)));
-  assert.deepEqual(await typed(t, b.e, 'cancel', done.id), {
-    out: [`${done.id}  already succeeded — nothing to stop`],
-    err: [offLine(ROOT)],
-  });
+  assert.deepEqual(await answered(b.e, 'cancel', done.id), { id: done.id, plan: { kind: 'finished', status: 'succeeded' } });
 });
 
-test('nemia cancel of a run with nothing filed yet says so, a line more', async (t) => {
+test('nemia cancel of a run with nothing filed yet stops nothing', async () => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'not filed', repo: aRepo(), workflowDir: oneStep() }));
-  assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
-    out: [`${run.id}  cancelled`, `   nothing was in flight — no further steps will be filed`],
-    err: [offLine(ROOT)],
-  });
+  assert.deepEqual(await answered(b.e, 'cancel', run.id), { id: run.id, plan: { kind: 'cancel', stop: [] } });
 });
 
 test('nemia show --raw answers the record, the brief and each step body cut short', async () => {
@@ -293,20 +257,19 @@ test('nemia show --raw answers the record, the brief and each step body cut shor
   assert.equal((raw as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
 });
 
-test('nemia logs: a step that has not run, and the output of one that has, from the engine', async (t) => {
+test('nemia logs: a step that has not run, and the output of one that has, from the engine', async () => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'go', repo: aRepo(), workflowDir: oneStep() }));
-  assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
+  assert.deepEqual(await answered(b.e, 'logs', run.id, 'implement'), {});
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-  assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: [`the output of ${run.id}-implement`], err: [] });
-  assert.deepEqual(
-    await typed(t, b.e, 'logs', run.id, 'deploy'),
-    { out: ['deploy has not run yet'], err: [] },
-    'a step the run lacks has not run, exit 0',
-  );
+  assert.deepEqual(await answered(b.e, 'logs', run.id, 'implement'), {
+    taskId: `${run.id}-implement`,
+    output: `the output of ${run.id}-implement`,
+  });
+  assert.deepEqual(await answered(b.e, 'logs', run.id, 'deploy'), {}, 'a step the run lacks has not run');
 });
 
-test('REFUSED at shipped defaults, through main: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done', async (t) => {
+test("REFUSED at shipped defaults, by a store verb's own words: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done", async (t) => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
   const rows: Array<[string, string[], string[]]> = [
@@ -317,8 +280,8 @@ test('REFUSED at shipped defaults, through main: a word or a flag where a verb t
     ["cancel, a flag before the run's id", ['cancel', '--now', run.id], ['nemia cancel', "one run's id", 'not --now.']],
   ];
   for (const [row, argv, said] of rows)
-    await t.test(row, (st) =>
-      assert.rejects(typed(st, b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
+    await t.test(row, () =>
+      assert.rejects(answered(b.e, ...argv), (err: Error & { _tag?: string; exitCode?: number }) => {
         assert.equal(err._tag, 'Invalid');
         assert.equal(err.exitCode, 2);
         for (const fix of said) assert.ok(err.message.includes(fix), `${err.message} names ${fix}`);
@@ -328,16 +291,7 @@ test('REFUSED at shipped defaults, through main: a word or a flag where a verb t
   await t.test('nothing cancelled', () => assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined));
 });
 
-test('nemia factory --help and nemia start --help print their own help', async (t) => {
-  const { e } = board();
-  for (const [argv, help] of [
-    [['factory', '--help'], FACTORY_HELP],
-    [['start', '--help'], START_HELP],
-  ] as const)
-    assert.deepEqual((await typed(t, e, ...argv)).out, [help], `nemia ${argv.join(' ')}`);
-});
-
-test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
+test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async () => {
   const b = board();
   const loop = await runPlaced(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
   await runWith(b.e, advanceRun(runRecord(ROOT, loop.id)));
@@ -349,115 +303,13 @@ test('nemia approve of a loop out of rounds: what it accepted, and the file it w
   await runWith(b.e, advanceRun(runRecord(ROOT, loop.id)));
   b.settle(runRecord(ROOT, loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
   await runWith(b.e, advanceRun(runRecord(ROOT, loop.id)));
-  const { out, err } = await typed(t, b.e, 'approve', loop.id, '--message', 'as it stands');
-  assert.deepEqual(err, [offLine(ROOT)]);
-  assert.equal(out.length, 2, out.join('\n'));
-  assert.match(
-    out[0],
-    new RegExp(`^${loop.id}  accepted: try 1 of review as it stands, its findings open — nothing waits on it: its run can be decided$`),
-  );
-  assert.match(out[1], /^ {3}\/.+/);
-  assert.ok(fs.existsSync(out[1].trim()), out[1]);
-});
-
-test('REFUSED forwarded to another machine (NEMIA_SERVER): a verb no endpoint serves, Invalid, exit 2, before any engine is built', async () => {
-  const there: Env = { ...ENV, NEMIA_SERVER: 'http://127.0.0.1:9', NEMIA_SERVER_TOKEN: 't' };
-  for (const argv of [['tick'], ['up', '--stats'], ['version']])
-    await assert.rejects(main(argv, undefined, undefined, undefined, there), (err: { _tag?: string; exitCode?: number }) => {
-      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2], argv.join(' '));
-      return true;
-    });
-});
-
-test("forwarded to a daemon no one serves, a linked verb fails naming the server, and builds no engine of this machine's", async () => {
-  const there: Env = { ...ENV, NEMIA_SERVER: 'http://127.0.0.1:9' };
-  await assert.rejects(main(['pause-timeout'], undefined, undefined, undefined, there), (err: Error & { exitCode?: number }) => {
-    assert.match(err.message, /127\.0\.0\.1:9/);
-    assert.notEqual(err.exitCode, 2);
-    return true;
-  });
-});
-
-/** A card of another machine's inbox as its api answers it: `name`, in the factory `nemia`, naming the workflow `quick`. */
-const cardThere = (name: string) => ({
-  apiVersion: 'nemia/v1',
-  kind: 'Card',
-  metadata: { name, namespace: 'nemia', creationTimestamp: '2026-11-12T00:00:00.000Z', resourceVersion: '1' },
-  spec: { workflow: 'quick', body: 'Fix it' },
-  status: { state: 'filed', runs: [], inPlay: true, file: `${name}.md` },
-});
-
-test("a card filed on another machine's daemon is started by the command its filing printed, its workflow and factory the card's own", async (t) => {
-  const asked: { method: string; url: string; body: string }[] = [];
-  const server = http.createServer((req, res) => {
-    let body = '';
-    req.on('data', (chunk: Buffer) => (body += chunk.toString()));
-    req.on('end', () => {
-      asked.push({ method: req.method ?? '', url: req.url ?? '', body });
-      const answer = (status: number, value: unknown) => {
-        res.writeHead(status, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(value));
-      };
-      if (req.method === 'POST' && req.url === '/api/namespaces/default/cards') return answer(201, cardThere('fix-it-ab12'));
-      if (req.method === 'GET' && req.url === '/api/cards/fix-it-ab12') return answer(200, cardThere('fix-it-ab12'));
-      if (req.method === 'POST' && req.url === '/api/namespaces/nemia/cards/fix-it-ab12/start')
-        return answer(201, { id: 'fix-it-ab12-r1', card: 'fix-it-ab12' });
-      return answer(404, { _tag: 'Missing', message: `no route ${req.method} ${req.url}` });
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => server.close());
-  const there: Env = { ...ENV, NEMIA_SERVER: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, NEMIA_SERVER_TOKEN: 't' };
-  const typedThere = async (...argv: string[]): Promise<string[]> => {
-    const out: string[] = [];
-    const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
-    try {
-      await main(argv, undefined, undefined, undefined, there);
-    } finally {
-      log.mock.restore();
-    }
-    return out;
+  const approved = (await answered(b.e, 'approve', loop.id, '--message', 'as it stands')) as {
+    step: string;
+    try: number;
+    message: string | null;
+    loop: boolean;
+    file: string;
   };
-  const s = story(t);
-
-  let printed = '';
-  await s.test('`nemia inbox add` prints a start that names the card by its name, as the remote start takes it', async () => {
-    const filed = await typedThere('inbox', 'add', 'Fix it');
-    printed = /start it with (nemia start \S+)/.exec(filed.join('\n'))?.[1] ?? '';
-    assert.equal(printed, 'nemia start fix-it-ab12', filed.join('\n'));
-  });
-
-  await s.test('the printed start, typed as it stands, starts the card in its factory on its own workflow', async () => {
-    asked.length = 0;
-    const started = await typedThere(...printed.split(' ').slice(1));
-    assert.match(started.join('\n'), /fix-it-ab12-r1/);
-    const start = asked.find((a) => a.url.endsWith('/start'));
-    assert.equal(start?.url, '/api/namespaces/nemia/cards/fix-it-ab12/start', "started in the card's factory, its namespace");
-    assert.equal(JSON.parse(start?.body || '{}').workflow, undefined, "no workflow sent: the api takes the card's own");
-  });
-
-  await s.test('the card named with its .md starts the same card', async () => {
-    asked.length = 0;
-    await typedThere('start', 'fix-it-ab12.md');
-    assert.ok(
-      asked.some((a) => a.url === '/api/namespaces/nemia/cards/fix-it-ab12/start'),
-      asked.map((a) => a.url).join('\n'),
-    );
-  });
-
-  await s.test('`--workflows` given is still sent, by name', async () => {
-    asked.length = 0;
-    await typedThere('start', 'fix-it-ab12', '--workflows', 'build');
-    assert.equal(JSON.parse(asked.find((a) => a.url.endsWith('/start'))?.body || '{}').workflow, 'build');
-  });
-
-  await s.test('REFUSED: a brief in words names no card, and with no workflow is Invalid, exit 2, before anything is asked', async () => {
-    asked.length = 0;
-    await assert.rejects(typedThere('start', 'fix the login page'), (err: { _tag?: string; exitCode?: number; message?: string }) => {
-      assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
-      assert.match(err.message ?? '', /--workflows/);
-      return true;
-    });
-    assert.deepEqual(asked, []);
-  });
+  assert.deepEqual([approved.step, approved.try, approved.message, approved.loop], ['review', 1, 'as it stands', true]);
+  assert.ok(fs.existsSync(approved.file), approved.file);
 });

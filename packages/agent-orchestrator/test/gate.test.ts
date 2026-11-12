@@ -35,11 +35,10 @@ import {
 } from '../src/runner.ts';
 import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
-import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
+import { told } from './typed.ts';
 import { RM } from '../src/runner.ts';
 import { startedLines } from '../src/runner.ts';
 import type { Started } from '../src/start/commands.verb.ts';
@@ -52,8 +51,6 @@ type Approved = {
   file: string;
   caps: { step: string; usd: number; above: boolean; workflow: number | null }[];
 };
-import { COMMAND_WORDS } from 'objects';
-import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -66,13 +63,8 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `cli`.
- */
-const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
-const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));

@@ -47,21 +47,14 @@ import { freeing, freeingMany, judging, judgingMany, PRUNE_A_TURN, sized } from 
 import { PlaceService } from '../src/place/place.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed as onHandler } from './typed.ts';
+import { told } from './typed.ts';
 import { forgetTyped, type Typed } from './forgetting.ts';
-import { COMMAND_WORDS } from 'objects';
 
 const ROOT = scratch('wf-prune-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `main`.
- */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
-const stage = staged({ runWith: runEngine, main: typedOrMain, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */

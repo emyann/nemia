@@ -18,8 +18,7 @@ import { readFactoryAt } from '../factory/factory.store.ts';
 import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
 import { runRecord } from '../record/record.store.ts';
 import { advanceRun, startRun } from '../runner.ts';
-import { main } from '../cli/main.ts';
-import { typed } from '../../test/typed.ts';
+import { told } from '../../test/typed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
 import { FACTORY_PLAN } from '../factory/upgrade/upgrade.verb.ts';
 import { FACTORY_ADOPT } from './adopt.verb.ts';
@@ -31,10 +30,8 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const FACTORIES = path.join(ROOT, 'factories');
 const INBOX = path.join(ROOT, 'inbox');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-/** `nemia` as a person types it: a `nemia factory` verb, which the client holds, run onto its handler (`typed`); the rest by the CLI. */
-const routed = (argv: string[], e: Parameters<typeof main>[1], _demand: undefined, place: Parameters<typeof main>[3], env?: Env) =>
-  argv[0] === 'factory' ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
-const stage = staged({ runWith, main: routed, engineOf, env: ENV });
+/** `nemia` as a person types it: a verb the client holds run onto its handler (`told`); the rest by the CLI. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 /** Every file under `dir`, by its path in it, with its bytes, so a verb is seen to have written nothing there. */
 const bytesUnder = (dir: string): Record<string, string> =>
@@ -137,7 +134,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
-      run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
+      run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo))[0].split(' ')[0];
       runBefore = JSON.stringify(runRecord(ROOT, run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');

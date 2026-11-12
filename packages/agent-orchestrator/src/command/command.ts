@@ -12,6 +12,7 @@ import {
   CommandRefused,
   MACHINE_VERBS,
   RENAMED,
+  STREAM_COMMANDS,
   parseArgv as parseArgvOf,
   type Args,
   type CommandLink,
@@ -74,26 +75,10 @@ export function renamedValues(command: string, body: unknown): { body: unknown; 
 }
 
 /**
- * An endpoint of `objects`' `Api` that serves a verb (`CommandLink`), and what the command line forwarded to another machine's api
- * (`NEMIA_SERVER`, `src/command/forward.verb.ts`) reads of a link: `takes`, whether this link is the one a given input calls, on an entry
- * of more than one link (the first whose `takes` holds, the last where none says one); `request`, the call's input as the endpoint takes
- * it — its path, query and payload keys in one object — where the entry's input is not that already, reading on this machine what the
- * command names here (a template folder packed, a file's text), a promise rejected with the package's refusal where it cannot be sent;
- * and `answer`, the data the entry's `print` takes, made of the endpoint's decoded answer, where that is not it already.
- */
-export type EndpointLink = CommandLink & {
-  readonly takes?: (input: Readonly<Record<string, unknown>>) => boolean;
-  readonly request?: (input: Readonly<Record<string, unknown>>) => Promise<Readonly<Record<string, unknown>>>;
-  readonly answer?: (answer: unknown, input: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>;
-};
-
-/**
  * A command, as data: its words (`CommandWords`, `objects`' — the name, usage, help, spec, class, `check` and the rest, said there for a
- * command the client holds, `COMMAND_WORDS`); and its `served` links as the forwarded command line reads them (`EndpointLink`).
+ * command the client holds, `COMMAND_WORDS`), its `served` links the endpoints of `objects`' `Api` that serve it (`CommandLink`).
  */
-export type CommandSpec = Omit<CommandWords, 'served'> & {
-  readonly served?: readonly [EndpointLink, ...EndpointLink[]];
-};
+export type CommandSpec = CommandWords;
 
 /**
  * A command line's arguments after the command's name, read against `spec` (`objects`' `parseArgv`), its refusals `Invalid`, exit 2;
@@ -182,7 +167,7 @@ function sideBreaks(c: Entry): string[] {
 
 /** A tool of the MCP port: the endpoint it calls, its name, the entry whose link it is, and the query its link sends by default. */
 export type LinkedTool = {
-  readonly endpoint: EndpointLink['endpoint'];
+  readonly endpoint: CommandLink['endpoint'];
   readonly tool: string;
   readonly entry: string;
   readonly query: Readonly<Record<string, string>>;
@@ -198,11 +183,15 @@ export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool
     return tool === undefined ? [] : [{ endpoint: link.endpoint, tool, entry: entry.name, query: link.query ?? {} }];
   });
 
+/** Whether `name` is a command the client holds (`COMMAND_WORDS`) that answers once, no stream (`STREAM_COMMANDS`). */
+const heldOnce = (name: string): boolean =>
+  COMMAND_WORDS.some((w) => w.name === name) && !(STREAM_COMMANDS as readonly string[]).includes(name);
+
 /**
  * Where an entry's links break the rules: an entry the command line does not serve alone that links no endpoint, which the api would
- * serve with no tool on the port; a link after the first that names no tool (`as`), which only the first takes from the verb; and a link
- * before the last that says no `takes`, which the command line forwarded to another machine's api (`linkOf`) would never call, the last
- * being the one it calls where none before it holds — but on a command the client holds (`COMMAND_WORDS`), which nothing forwards.
+ * serve with no tool on the port; a command the client holds (`COMMAND_WORDS`) that links none, a stream aside (`STREAM_COMMANDS`),
+ * since the MCP port has a tool for every store verb the command line has, made of its links (`toolsOf`); and a link after the first
+ * that names no tool (`as`), which only the first takes from the verb.
  */
 function linkBreaks(c: Entry): string[] {
   const breaks: string[] = [];
@@ -210,16 +199,14 @@ function linkBreaks(c: Entry): string[] {
     breaks.push(
       `${c.name} links no endpoint and is not the command line's alone: give it served, the endpoint of objects' Api whose handler calls it, or only: { side: 'cli', why } where no endpoint serves it`,
     );
+  else if (c.served === undefined && heldOnce(c.name))
+    breaks.push(
+      `${c.name} is a command the client holds and links no endpoint, so the MCP port has no tool for it: give it served, the endpoint its runner in apps/cli calls`,
+    );
   for (const link of (c.served ?? []).slice(1))
     if (link.as === undefined)
       breaks.push(
         `${c.name}'s link to ${link.endpoint} names no tool: give it as, the tool's name on the port, as only the first link takes the verb's`,
-      );
-  const forwarded = !COMMAND_WORDS.some((w) => w.name === c.name);
-  for (const link of forwarded ? (c.served ?? []).slice(0, -1) : [])
-    if (link.takes === undefined)
-      breaks.push(
-        `${c.name}'s link to ${link.endpoint} says no takes: give it takes, which inputs call it when the command line is forwarded to another machine's api, as only the last link is called where no takes holds`,
       );
   return breaks;
 }

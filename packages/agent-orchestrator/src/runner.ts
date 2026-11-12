@@ -46,7 +46,6 @@ export {
   maxConcurrent,
   maxRuns,
   SESSION_VARIABLES,
-  FORWARD_VARIABLES,
   SERVING_VARIABLES,
   setting,
   type Settings,
@@ -503,7 +502,7 @@ export { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from './skills/skills.verb.ts'
 export { WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows/workflows.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, helpOf, leftOut, parseArgv } from './command/command.ts';
 export { toolsOf } from './command/command.ts';
-export type { EndpointLink, LinkedTool } from './command/command.ts';
+export type { LinkedTool } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Spec } from './command/command.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
@@ -593,7 +592,7 @@ export { delegationGet, delegationPut, delegationRemove, delegationsList } from 
 export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
-export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
+export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './pause/commands.verb.ts';
 export { TIMEOUT as PAUSE_TIMEOUT } from './pause/pause-timeout.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';

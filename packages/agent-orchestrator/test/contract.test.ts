@@ -59,10 +59,9 @@ const SPAWNER = 'apps/cli/src/local.ts';
 
 /**
  * Every file that may resolve `SPAWNED`: the client's, and the templates' tests' helper, which applies and renders a shipped template
- * through the CLI as a person does, the templates being reached by no import of the orchestrator's; and the api's test of a command line
- * forwarded to it (`NEMIA_SERVER`), which spawns the CLI against the api it serves, as the client does under a remote context.
+ * through the CLI as a person does, the templates being reached by no import of the orchestrator's.
  */
-const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts', 'apps/api/test/forwarded.boundary.test.ts'];
+const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts'];
 
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
 function breaches(file: string, text: string, guarded: Guarded): string[] {

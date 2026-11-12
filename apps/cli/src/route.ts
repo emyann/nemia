@@ -1,9 +1,10 @@
 /**
- * Which way a command goes, pure: refused where `--local` is typed, which reads no store in process any more; the api for a moved read
- * (`READ_VERBS`), for the client's own verbs (`CLIENT_VERBS`, whatever else is typed) and for a command whose words the client holds
- * (`MOVED_COMMANDS`, its help included), the orchestrator's own CLI for the rest and for a verb about this machine (`MACHINE_VERBS`),
- * whatever context is in use; forwarded, a verb about the store only the old path has, typed while the context names a remote daemon: that
- * CLI spawned with the context's server and token, calling the daemon's endpoints in place of its handlers (`contracts/route.contract.ts`).
+ * Which way a command goes, pure (`contracts/route.contract.ts`): refused where `--local` is typed, which reads no store in process any
+ * more; the api for a read of the client's (`READ_VERBS`), for the client's own verbs (`CLIENT_VERBS`, whatever else is typed) and for a
+ * command whose words the client holds (`MOVED_COMMANDS`, its help included); the orchestrator's own CLI for a verb about this machine
+ * (`MACHINE_VERBS`), a help of one, and, under this machine's context, a word no list holds, which that CLI refuses in its own words; and
+ * refused, a word typed while the context names a remote daemon that the client does not answer and that is no verb of this machine:
+ * nothing is forwarded, so no such word reaches this machine's store.
  * Each list is spelled once, here, and read by the contract and the code: no file of `src` imports a value of a contract, which ships the
  * verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
@@ -11,10 +12,11 @@ import { MACHINE_VERBS, MOVED_COMMANDS, type MovedCommand } from 'objects';
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 /**
- * The reads this client asks the api for whose words and help the orchestrator's CLI still holds: `doctor`, whose `fix` starts a fix on
- * the server the context names and follows it (`src/doctor.ts`). The other reads' words are the client's (`MOVED_COMMANDS`).
+ * The reads this client asks the api for whose help the orchestrator's CLI still holds: `doctor`, whose `fix` starts a fix on the server
+ * the context names and follows it (`src/doctor.ts`), and `daemon`, where the store's daemon stands (`src/reads/daemon.ts`), which that CLI
+ * keeps as the starter this client spawns on demand. The other reads' words are the client's (`MOVED_COMMANDS`).
  */
-export const READ_VERBS = ['doctor'] as const;
+export const READ_VERBS = ['doctor', 'daemon'] as const;
 
 /** A read this client asks the api for. */
 export type ReadVerb = (typeof READ_VERBS)[number];
@@ -39,10 +41,10 @@ export type MachineVerb = (typeof MACHINE_VERBS)[number];
 export type MovedName = MovedCommand;
 
 /**
- * Where a command goes: refused (`--local`, which names what to type instead), the api, the orchestrator's CLI in a process of its own on
- * this machine, or that CLI forwarded — a verb about
- * the store that only the old path has yet, typed while a context names a remote daemon: spawned with the context's server and token
- * (`forwardedEnv`, `src/context.ts`), it calls that daemon's endpoints and refuses in its own words a command none serves.
+ * Where a command goes: the api, the orchestrator's CLI in a process of its own on this machine, or refused — `--local`, and a word
+ * stranded under a remote context, each naming what to type instead. `forwarded`, the old path spawned against another machine's api,
+ * is retired and never answered: it stays a word of the type only for the contract's law that holds it so (`nothingIsForwarded`,
+ * `contracts/route.contract.ts`).
  */
 export type Route = 'api' | 'process' | 'forwarded' | 'refused';
 
@@ -62,13 +64,12 @@ export const routeOf: RouteOf = ({ name, local, help, remote }) => {
   if (local) return 'refused';
   if (clients.includes(name) || moved.includes(name)) return 'api';
   if (reads.includes(name)) return help ? 'process' : 'api';
-  return remote && !help && !machines.includes(name) ? 'forwarded' : 'process';
+  return remote && !help && !machines.includes(name) ? 'refused' : 'process';
 };
 
 /**
- * The name `argv` opens with as the route reads it: the longest of `MOVED_COMMANDS` its words open with (`workflows write`), else its
- * first word. A moved read typed with words it does not read (`inbox add`, a command of its own on the old path) hands them to the old
- * path itself, before it asks the api anything.
+ * The name `argv` opens with as the route reads it: the longest of `MOVED_COMMANDS` its words open with (`inbox add` over `inbox`), else
+ * its first word. A word a command does not take is refused by its own words, before the api is asked anything.
  */
 export const nameOf = (argv: readonly string[]): string => {
   const opens = moved.filter((name) => {

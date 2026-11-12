@@ -496,6 +496,7 @@ const handlerKeys = (command: Command): Set<string> =>
 /** The keys `handed` that `command`'s handler is never handed by the api: none, where the two sides read one spec. */
 const strayKeys = (command: Command, handed: Args): string[] => Object.keys(handed).filter((key) => !handlerKeys(command).has(key));
 
+/** The entry of the table `name` names, none for a stream the client alone runs (`watch`). */
 const entry = (name: string): Command => TABLE.find((c) => c.name === name) as Command;
 
 /** The names of the commands the client holds, which this CLI no longer runs. */
@@ -534,13 +535,16 @@ test("a command the client holds is no name of this CLI's: typed here, it prints
   for (const name of MOVED)
     await t.test(`nemia ${name}`, async (sub) => {
       const handed: unknown[] = [];
-      const handler = sub.mock.method(entry(name) as unknown as { handler: (args: Args) => never }, 'handler', (args: Args) => {
-        handed.push(args);
-        throw new Error('handed');
-      });
+      const held = entry(name) as unknown as { handler: (args: Args) => never } | undefined;
+      const handler =
+        held &&
+        sub.mock.method(held, 'handler', (args: Args) => {
+          handed.push(args);
+          throw new Error('handed');
+        });
       const before = snapshot(YOURS);
       const { out, refused } = await said(sub, ...(typedArgs[name] ?? [...name.split(' '), 'x']));
-      handler.mock.restore();
+      handler?.mock.restore();
       assert.equal(refused, undefined, refused);
       assert.equal(out, HELP, `nemia ${name} prints the help`);
       assert.deepEqual(handed, [], `nemia ${name} reaches no handler here`);

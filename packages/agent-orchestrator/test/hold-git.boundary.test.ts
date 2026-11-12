@@ -17,6 +17,7 @@ import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { names } from './assessed.ts';
 import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { typed as onHandler } from './typed.ts';
@@ -117,7 +118,7 @@ const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
 /** `nemia <verb>` run on its entry's handler, as the api calls it: the error it ended with, if it did. */
 const typed = async (_t: TestContext, e: Engine, ...argv: string[]) => {
   try {
-    await onHandler(argv, e, undefined, undefined, ENV);
+    await onHandler(argv, e, undefined, builtinGitPlace, ENV);
     return { error: undefined };
   } catch (err) {
     return { error: err as Error & { exitCode?: number; _tag?: string } };

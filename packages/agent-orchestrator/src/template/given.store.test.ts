@@ -13,7 +13,7 @@ import { Effect, Exit } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { StoreRoot } from '../config/root.store.ts';
 import { unpackArchive } from '../archive/archive.ts';
-import { sentTemplatesDir, templateGiven, templatePacked, withTemplateTaken } from './given.store.ts';
+import { sentTemplatesDir, templateGiven, withTemplateTaken } from './given.store.ts';
 
 const ROOT = scratch('wf-template-given-');
 
@@ -56,11 +56,6 @@ test("a --template word is made the request's: a name as it is, a folder packed 
   assert.deepEqual(await Effect.runPromise(templateGiven(archive)), packed, 'an archive is sent as its bytes');
   const nowhere = await Effect.runPromiseExit(templateGiven(path.join(at, 'nowhere')));
   assert.equal(refusedAs(nowhere), 'Missing');
-  assert.deepEqual(await templatePacked({ factory: 'mill', to: '1.0.0' }), { factory: 'mill', to: '1.0.0' });
-  assert.deepEqual(await templatePacked({ factory: 'mill', template: 'sdlc' }), {
-    factory: 'mill',
-    template: { name: 'sdlc' },
-  });
 });
 
 test('what was sent is the source a verb reads: kept where a factory is made of it, gone after a preview or a failure; REFUSED: no archive, no name', async () => {

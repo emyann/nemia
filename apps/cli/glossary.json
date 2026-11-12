@@ -1,15 +1,21 @@
 {
   "context": "cli",
   "title": "The client",
-  "about": "`apps/cli` is `nemia` and `wf` as a person types them: a client of the api, which spawns the orchestrator's own CLI for every verb it has not moved.",
+  "about": "`apps/cli` is `nemia` and `wf` as a person types them: a client of the api for every store verb, which spawns the orchestrator's own CLI for the verbs about this machine.",
   "paths": [
     "apps/cli"
   ],
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `refused`, any command typed with `--local`, exit 2, naming it typed without; `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed, and for a moved command (`MOVED_COMMANDS`), its help included; `process`, for every other verb, a help of one, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon.",
-      "type": "Route"
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`, proved by `apps/cli/contracts/route.contract.ts`): `api`, for a moved command (`MOVED_COMMANDS`), its help included, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed, and for its reads (`READ_VERBS`: `doctor`, `daemon`) asked of the api over HTTP; `process`, for a machine verb and a help of one, and under this machine's context for a word no list holds, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `refused`, exit 2, any command typed with `--local`, naming it typed without, and a word typed under a remote context that the client does not answer and this machine does not own, naming `nemia --help` and `NEMIA_CONTEXT=local`. Nothing is forwarded to another machine's api.",
+      "type": "Route",
+      "retired": [
+        {
+          "spelling": "notHere",
+          "card": "distribution: the laptop's nemia calls a remote daemon for every store verb, forwarding what it refused"
+        }
+      ]
     },
     {
       "term": "Client verb",
@@ -23,18 +29,7 @@
     },
     {
       "term": "Remote context",
-      "meaning": "a context that names a daemon on another machine (`Chosen` of kind `remote`, `apps/cli/src/context.ts`): the moved reads and the client's verbs ask its server with its token as `Authorization: Bearer` (`sessionHeaders`, `apps/cli/src/client.ts`, `WF_SESSION_TOKEN` first), this machine's lease is never read (`servedAt`, `apps/cli/src/where.ts`), no daemon is started here (`served`, `apps/cli/src/daemon.ts`), and a verb about the store only the in-process path has is forwarded (`forwardedEnv`), the words a moved read hands on among them (`handedOn`, `apps/cli/src/local.ts`); `nemia template export --factory`, which reads a store in process, is refused, naming `NEMIA_CONTEXT=local` (`factoryNotHere`)."
-    },
-    {
-      "term": "Forwarded",
-      "meaning": "the route of a verb about the store only the orchestrator's own CLI has, typed under a remote context (`routeOf`, `apps/cli/src/route.ts`, proved by `apps/cli/contracts/route.contract.ts`): that CLI spawned with the same words (`spawned`, `apps/cli/src/local.ts`) and the environment `forwardedEnv` makes (`apps/cli/src/where.ts`): the context's server in `NEMIA_SERVER` and its token in `NEMIA_SERVER_TOKEN`, never on the command line, and no `WF_ROOT`. It parses, checks and prints as ever and calls each command's endpoint on that daemon in place of its handler, refusing in its own words a command no endpoint serves. A help and a machine verb are never forwarded.",
-      "type": "Route",
-      "retired": [
-        {
-          "spelling": "notHere",
-          "card": "distribution: the laptop's nemia calls a remote daemon for every store verb, forwarding what it refused"
-        }
-      ]
+      "meaning": "a context that names a daemon on another machine (`Chosen` of kind `remote`, `apps/cli/src/context.ts`): the moved reads and the client's verbs ask its server with its token as `Authorization: Bearer` (`sessionHeaders`, `apps/cli/src/client.ts`, `WF_SESSION_TOKEN` first), this machine's lease is never read (`servedAt`, `apps/cli/src/where.ts`), no daemon is started here (`served`, `apps/cli/src/daemon.ts`), and nothing is forwarded: a word only this machine's old path has is refused, naming `nemia --help` and `NEMIA_CONTEXT=local` (`apps/cli/src/main.ts`); `nemia template export --factory` reads the factory's parts through its api and hands them to the export here (`templateExported`, `apps/cli/src/template-export.ts`)."
     },
     {
       "term": "Machine verb",
@@ -81,7 +76,7 @@
     },
     {
       "term": "Moved command",
-      "meaning": "a command whose words the client holds (`MOVED_COMMANDS`, `apps/cli/src/route.ts`, the names of `objects`' `COMMAND_WORDS`): parsed, helped, refused and printed in `apps/cli/src/commands/`, and run through the api under every context, its old path's runner deleted with the move: `workflows write`, `agents write` and `skills write`, whose files are read here and read into their spec by the api's `read`.",
+      "meaning": "a command whose words the client holds (`MOVED_COMMANDS`, `apps/cli/src/route.ts`, the names of `objects`' `COMMAND_WORDS`): every store verb, parsed, helped, refused and printed in `apps/cli/src/commands/`, a runner per verb under its group's folder, and run through the api under every context, the person's files read here; its entry in the orchestrator's table keeps its `input` and `handler` alone, which the api calls, and links the endpoint its runner calls (`served`).",
       "type": "MovedName"
     },
     {

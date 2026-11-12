@@ -55,10 +55,12 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
    carded, waiting in the inbox.
 4. §15 to §17, the rest of a harness's fence under its block (decision 12, after its slice 1 shipped on 2026-10-31): the runtime's
    generic `fence`, the api and the board on the block and `overridable:`, and the internal fields moved.
-5. The api-consumer intent's remaining slices, each a `build` card (`area=cli`, `initiative=api-consumer`), each closing its own api
-   gaps first and moving its verbs' words into `objects`' `COMMAND_WORDS` (slice 1, the foundation and the three writers, shipped):
-   the run's verbs; the inbox and labels; factories, policies and the rest of the three kinds; the moved reads' words; then forwarding
-   retired (`NEMIA_SERVER`, `src/command/forward.verb.ts`, `src/command/requests.verb.ts` deleted).
+
+The api-consumer intent shipped (2026-11-12): every store verb's words are `objects`' (`COMMAND_WORDS`) and its runner the client's
+(`apps/cli/src/commands/`), each linking the endpoint its runner calls, which `commandBreaks` holds (a stream, `watch`, aside); the
+run's verbs, the inbox and labels, factories, policies and the rest of the three kinds, the reads and the rest moved, and forwarding
+retired (`NEMIA_SERVER`, `src/command/forward.verb.ts`, `src/command/requests.verb.ts` deleted): a word under a remote context the
+client does not answer is refused, and `template export --factory` reads the factory through the api.
 
 A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
 4c, admission), the second item until 2026-10-24, is closed as decided that day (language work, decision 6): a try stays the
@@ -5916,7 +5918,7 @@ Tested in `src/watch/selector.test.ts` (each malformed form refused by name; the
 absent-key semantics; AND within and OR across; six selections a person types, each selecting different lines when one clause is
 dropped), `src/watch/cursor.store.test.ts` (the round trip, no temp left, the cut, a missing directory and a file that is no number
 refused), `src/subscription/subscription.test.ts` (the bookmark's line and its cadence), `src/command/command.test.ts` (the usage, the
-help word for word, and every refusal of what was typed), `src/cli/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
+help word for word, and every refusal of what was typed), `apps/cli/test/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
 bookmark under `--json`, and a cut) and `test/watch-selectors.test.ts` (the verb typed whole: `--once` stops at the end and prints the
 cursor, a selector takes the lines it names, and a watch resumes from its cursor file).
 
@@ -5952,7 +5954,7 @@ at 3:33 AM on 2026-10-16. The conversion wakes nobody newly on them: only a wake
 Tested in `src/subscription/former-wake.test.ts` (the per-word table, the subsumption, the two shipped lists, an unknown word, and each
 retired flag's refusal), `src/feed/reason.test.ts` (the equivalence over every word the package writes, and the ⊇ over all 256 subsets),
 `src/subscription/subscription.store.test.ts` (a stored wake record read back as selectors with its file untouched, and the four records
-left out), `src/subscription/subscription.verb.test.ts`, `src/cli/watch.test.ts` (the refusals by name), and
+left out), `src/subscription/subscription.verb.test.ts`, `apps/cli/test/watch.test.ts` (the refusals by name), and
 `src/subscription/deliver.verb.test.ts`.
 ## Shipped: the api's feed stream takes selectors and sends bookmarks (2026-10-16)
 

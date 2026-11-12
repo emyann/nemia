@@ -44,12 +44,9 @@ import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote } from '../src/run.ts';
 import { verdictWord } from '../src/check/check.ts';
 import { configRefusal, engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
+import { told } from './typed.ts';
 import { SAY } from '../src/say/commands.verb.ts';
-import type { Place } from '../src/runner.ts';
-import { COMMAND_WORDS } from 'objects';
 
 const ROOT = scratch('wf-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -61,13 +58,8 @@ const ENV: Env = {
   WF_DEFAULT_FACTORY_STARTS: '1',
   WF_VERIFY_REST: '1',
 };
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `main`.
- */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
-const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 const filesStore = filesStoreAt(ROOT);
 
 /** A repository with one commit, so `nemia start` has a base to record. */

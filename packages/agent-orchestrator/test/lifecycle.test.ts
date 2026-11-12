@@ -27,7 +27,7 @@ import { runDoorMemory } from '../src/runs/memory.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told } from './typed.ts';
 import type { RunsListed } from '../src/list/list.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -44,7 +44,7 @@ const ENV: Env = {
 };
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;

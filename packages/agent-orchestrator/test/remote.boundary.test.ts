@@ -31,7 +31,9 @@ import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, run
 import { engineOf } from '../src/runtime-client.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { handled, told } from './typed.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
+import { SAY } from '../src/say/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-remote-');
@@ -41,7 +43,7 @@ const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const stage = staged({ runWith, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 type Engine = ReturnType<typeof engine>;
 type Moment = Stream.Success<ReturnType<typeof followStep>>;
@@ -347,7 +349,11 @@ test(
           assert.equal(decided.includes('claude agents'), false, decided);
           assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
 
-          await printed(['say', id, 'ask', 'Brest, please.'], e);
+          await handled(
+            SAY,
+            { runId: id, step: 'ask', text: 'Brest, please.', caller: { kind: 'person' } },
+            { e, place: builtinGitPlace, env: ENV },
+          );
           await settle(c, e, id);
           assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
           assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
@@ -443,7 +449,7 @@ test(
 );
 
 /** `nemia argv` with the engine `main` makes itself, as a restarted `nemia up` would, and what it printed. */
-const own = (argv: string[]) => said(() => cli(argv, undefined, undefined, undefined, ENV));
+const own = (argv: string[]) => said(() => told(argv, engine(ENV), undefined, builtinGitPlace, ENV));
 
 const LOCAL = team('local', 'claude', 'work', 'Write a note on tides.');
 const REMOTE = team('remote', 'a2a:reviewer', 'work');
@@ -467,7 +473,7 @@ test(
         async (row) => {
           const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
           const good = JSON.stringify({ reviewer: { url: server.url } });
-          const start = (dir: string) => startedBy((argv) => cli(argv, undefined, undefined, undefined, ENV), dir, false);
+          const start = (dir: string) => startedBy((argv) => told(argv, engine(ENV), undefined, builtinGitPlace, ENV), dir, false);
           try {
             fs.writeFileSync(FILE, good);
             const away = await start(REMOTE);

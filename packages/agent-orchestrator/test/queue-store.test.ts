@@ -47,7 +47,7 @@ import {
 } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { told } from './typed.ts';
 import { cardFiles } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { passParents } from '../src/views/views.verb.ts';
@@ -70,7 +70,7 @@ const ENV: Record<string, string | undefined> = {
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof addToInboxVerb>[0]) => atRoot(addToInboxVerb(opts));
 const readInbox = () => atRoot(readInboxVerb());
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 
 /** A store verb typed, run on its entry's handler as the api calls it (`typed`), over `e` (the stage's engine when none is named). */

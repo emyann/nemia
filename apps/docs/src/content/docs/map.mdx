@@ -15,7 +15,7 @@ flowchart TD
   person -->|commands| cli[The nemia command]
   board -->|HTTP| api[The api]
   cli -->|HTTP| api
-  cli -.->|"spawns, for what it has not moved"| orchestrator
+  cli -.->|"spawns, for the verbs about this machine"| orchestrator
   api -->|three entries| orchestrator[The orchestrator]
   orchestrator -->|one client| runtime[The runtime]
   runtime -->|A2A| harness[Each harness]
@@ -23,9 +23,9 @@ flowchart TD
 
 - A person uses the board, or the `nemia` command (`apps/cli`), beside it: the order is `web, cli → api → orchestrator → runtime`.
 - The board reaches the api over HTTP, and nothing else (`apps/web/test/structure.test.ts`).
-- The `nemia` command asks the api over HTTP for its reads — `show`, `closeout`, `ls`, the inbox, `watch` — and runs every other verb,
-  and a read typed with `--local`, on the orchestrator's own command, which it spawns: it imports none of our packages, and from the
-  api only the shapes of its answers (`apps/cli/test/structure.test.ts`).
+- The `nemia` command asks the api over HTTP for every command about a store, and runs a verb about the machine it is typed on — its
+  service, its releases, a template's folder — on the orchestrator's own command, which it spawns: it imports none of our packages, and
+  from the api only the shapes of its answers (`apps/cli/test/structure.test.ts`).
 - The api reaches the orchestrator through its three public entries alone: `agent-orchestrator`, `agent-orchestrator/run` and
   `agent-orchestrator/workflow` (`packages/agent-orchestrator/test/contract.test.ts`).
 - The orchestrator reaches the runtime's behaviour through one client, `packages/agent-orchestrator/src/runtime-client.ts`, and its

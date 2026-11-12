@@ -4,21 +4,15 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { readPause, resumePause } from './pause.store.ts';
+import { resumePause } from './pause.store.ts';
 import { nowRead, pauseNow, pauseParked } from './pause.verb.ts';
-import { NOW_COST, nowLines, type Interrupt, type Pause, type Paused, type PausedNow } from './pause.ts';
+import { NOW_COST, type Interrupt, type Pause, type Paused, type PausedNow } from './pause.ts';
 import { Effect, Schema } from 'effect';
 import { PAUSE_WORDS, pauseRefusal, PauseWrite, RESUME_WORDS } from 'objects';
 import { pausedRead } from '../list/list.verb.ts';
 import { sessionsDrained, tried } from '../runtime-client.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import { saidOf } from '../command/command.ts';
-
-/**
- * What `nemia pause --now` without `--yes` says, before anything acts: the pause that stands, if one does, and each task at work but a
- * landing.
- */
-type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 
 /** What `nemia pause` answers: the pause put; with `now`, what it did (`PausedNow`). */
 type PauseAnswer = { pause: Pause } | PausedNow;
@@ -36,22 +30,10 @@ const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home: string) {
 });
 
 /**
- * What `nemia pause --now` would cut, said and nothing written: the pause that stands and each task at work but a landing. The CLI's own
- * question before it acts (`--yes` acts); the board asks its own, reading `GET /api/pause/now`.
- */
-export const pauseNowPreview = Effect.fnUntraced(function* () {
-  const home = yield* StoreRoot;
-  return { pause: readPause(home), interrupts: yield* nowRead() } satisfies PauseNowRead;
-});
-
-/** The lines `nemia pause --now` prints of what it would cut (`pauseNowPreview`). */
-export const pauseNowPreviewLines = ({ pause, interrupts }: PauseNowRead): readonly string[] => nowLines(interrupts, pause !== null);
-
-/**
  * `nemia pause`: the store paused, every session parked at its tool call's end within the timeout (`pauseParked`), on `POST /api/pause`
  * too; the pause as written, its timeout `--timeout` (`timeout` in the body) or the store's. Refused while a pause stands (`Conflict`).
- * `now` pauses at once (`pauseNow`). The verb takes no yes: `--yes` is the CLI's, whose runner says what `--now` would cut and acts on
- * `--yes` alone (`pauseNowPreview`).
+ * `now` pauses at once (`pauseNow`). The verb takes no yes: `--yes` is the client's, which says what `--now` would cut, as the api's
+ * `GET /api/pause/now` reads it (`PAUSE_NOW`), and acts on `--yes` alone.
  */
 export const PAUSE: Served<PauseAnswer, PauseWrite> = {
   ...PAUSE_WORDS,

@@ -1,13 +1,14 @@
 /**
- * Which way each command goes, as a person types it: every command of the orchestrator's table the client does not hold goes to its own
- * CLI but a read (`READ_VERBS`), which asks the api; the client's own verbs (`CLIENT_VERBS`) and the commands whose words it holds
- * (`MOVED_COMMANDS`: `show`, `closeout`, `ls`, `inbox` and `watch` among them) ask the api with `--help` too, under both contexts;
- * `--local` is refused, exit 2, naming a `nemia` command, whatever it is typed with. A command opens with the longest moved name its words
- * open with, else its first word (`nameOf`), and a word the bare `inbox` read does not take is refused by its words. Under a remote context
- * a verb about the store only the old path has is forwarded: the old path spawned with the context's server and token and without
- * `WF_ROOT`, seen by a planted entry in its place; a verb about this machine (`MACHINE_VERBS`, `template lint` among them) still runs
- * here, and `template export --factory`, which reads this machine's store, is refused, exit 2, naming `NEMIA_CONTEXT=local`. The laws of
- * `routeOf` are its contract's (`route.contract.ts`).
+ * Which way each command goes, as a person types it: the client's own verbs (`CLIENT_VERBS`) and the commands whose words it holds
+ * (`MOVED_COMMANDS`: every store verb, `cancel`, `inbox add`, `factory hire`, `ls` and `stats` among them) ask the api with `--help` too,
+ * under both contexts; its reads (`READ_VERBS`: `doctor`, `daemon`) ask it but for a help; a verb about this machine (`MACHINE_VERBS`)
+ * runs on the old path here, whatever the context; `--local` is refused, exit 2, naming a `nemia` command, whatever it is typed with. A
+ * command opens with the longest moved name its words open with, else its first word (`nameOf`), a former name read as the name it became
+ * (`renamedIn`), and a word the bare `inbox` read does not take is refused by its words. Nothing is forwarded: a word typed under a remote
+ * context that the client does not answer and this machine does not own is refused, exit 2, naming `nemia --help` and
+ * `NEMIA_CONTEXT=local`, and the old path never runs, seen by a planted entry in its place. `template export --factory` reads the
+ * factory's parts through the api of the context in use and hands them on stdin. The laws of `routeOf` are its contract's
+ * (`route.contract.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { COMMANDS } from 'agent-orchestrator';
-import { COMMAND_WORDS } from 'objects';
+import { COMMAND_WORDS, renamedIn } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
@@ -60,7 +61,9 @@ test("`MOVED_COMMANDS` are the names of `objects`' `COMMAND_WORDS`, in their ord
 test('`nameOf`: the longest moved name a command opens with, else its first word', () => {
   for (const [argv, name] of [
     [['ls', '-l', 'team=core'], 'ls'],
-    [['inbox', 'add', 'x'], 'inbox'],
+    [['inbox', 'add', 'x'], 'inbox add'],
+    [['inbox'], 'inbox'],
+    [['factory', 'hire', 'f', 'a'], 'factory hire'],
     [['decide', 'r-1'], 'decide'],
     [['workflows', 'write', 'yours', 'w', '--folder', 'd'], 'workflows write'],
     [['agents', 'write', '--help'], 'agents write'],
@@ -85,19 +88,39 @@ test("REFUSED: `nemia inbox <word>` the bare read does not take is refused by it
   assert.match(said, /nemia inbox add/, `it names the inbox's commands: ${said}`);
 });
 
-test('under a remote context a verb about the store only the old path has is forwarded; a machine verb and a help still run here', () => {
+test('under a remote context a word the client does not answer and this machine does not own is refused; a machine verb and a help still run here', () => {
   const kept: readonly string[] = [...READ_VERBS, ...CLIENT_VERBS, ...MOVED_COMMANDS, ...MACHINE_VERBS];
-  for (const name of TABLE_NAMES) {
+  for (const name of [...TABLE_NAMES, 'frobnicate', 'workflows'])
     assert.equal(
       routeOf({ name, local: false, help: false, remote: true }),
-      kept.includes(name) ? routeOf({ name, local: false, help: false, remote: false }) : 'forwarded',
+      kept.includes(name) ? routeOf({ name, local: false, help: false, remote: false }) : 'refused',
       name,
     );
-    assert.notEqual(routeOf({ name, local: false, help: true, remote: true }), 'forwarded', `${name} --help`);
-  }
+  for (const name of [...TABLE_NAMES, 'frobnicate'])
+    assert.notEqual(routeOf({ name, local: false, help: true, remote: true }), 'refused', `${name} --help`);
   for (const name of MACHINE_VERBS) assert.equal(routeOf({ name, local: false, help: false, remote: true }), 'process', name);
   for (const name of ['template', 'frontmatter', 'admit'])
     assert.ok((MACHINE_VERBS as readonly string[]).includes(name), `${name} reads and writes this machine's files, no store`);
+});
+
+test('a moved command of each group asks the api under both contexts and with --help, its former name included', () => {
+  for (const argv of [
+    ['cancel', 'r'],
+    ['inbox', 'add', 'x'],
+    ['factory', 'hire', 'f', 'a'],
+    ['ls'],
+    ['stats'],
+    ['accept', 'r', 's'],
+    ['round', 'r', 's'],
+  ]) {
+    const name = nameOf(renamedIn(argv).words);
+    assert.ok((MOVED_COMMANDS as readonly string[]).includes(name), `${argv.join(' ')} opens with ${name}, a moved command`);
+    for (const remote of [false, true])
+      for (const help of [false, true])
+        assert.equal(routeOf({ name, local: false, help, remote }), 'api', `${argv.join(' ')} ${help} ${remote}`);
+  }
+  assert.equal(nameOf(renamedIn(['accept', 'r', 's']).words), 'approve');
+  assert.equal(nameOf(renamedIn(['round', 'r', 's']).words), 'retry');
 });
 
 /** A laptop whose config's context in use is a remote daemon nothing serves, and whose store root is never made. */
@@ -116,15 +139,17 @@ function remoteLaptop(prefix: string): { env: NodeJS.ProcessEnv; root: string } 
 
 /**
  * A `node` option that loads, in `nemia`'s process, a resolve hook putting a planted entry in place of the orchestrator's CLI — what
- * `src/local.ts`, its one resolver, resolves to the package's `bin/nemia.ts` — which prints the words it was spawned with, and what it
- * reads of the forwarded variables and of `WF_ROOT`, as one JSON line.
+ * `src/local.ts`, its one resolver, resolves to the package's `bin/nemia.ts` — which prints the words it was spawned with, what it read
+ * on stdin and `WF_ROOT`, as one JSON line.
  */
 function plantedEntry(prefix: string): string {
   const entry = path.join(scratch(prefix), 'planted.mjs');
   fs.writeFileSync(
     entry,
-    'const { NEMIA_SERVER = null, NEMIA_SERVER_TOKEN = null, WF_ROOT = null } = process.env;\n' +
-      'process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), NEMIA_SERVER, NEMIA_SERVER_TOKEN, WF_ROOT }));\n',
+    "import fs from 'node:fs';\n" +
+      'const { WF_ROOT = null } = process.env;\n' +
+      "const stdin = process.argv.includes('-') ? fs.readFileSync(0, 'utf8') : null;\n" +
+      'process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), stdin, WF_ROOT }));\n',
   );
   const url = pathToFileURL(entry).href;
   const hook = `const r=n(s,c);return c.parentURL?.endsWith('/src/local.ts')&&r.url.endsWith('/bin/nemia.ts')?{url:${JSON.stringify(url)},shortCircuit:true}:r;`;
@@ -152,17 +177,15 @@ async function nemia(
   return { code, said, out };
 }
 
-test('under a remote context `start` is forwarded: the old path, with the server and token, no WF_ROOT', async () => {
+test('REFUSED: a word stranded under a remote context, exit 2, naming `nemia --help` and NEMIA_CONTEXT=local; the old path never runs', async () => {
   const { env, root } = remoteLaptop('nemia-route-remote-');
   const hook = plantedEntry('nemia-route-planted-');
-  for (const argv of [['start', 'card.md']]) {
+  for (const argv of [['frobnicate'], ['workflows', 'ls']]) {
     const { code, said, out } = await nemia(argv, env, hook);
-    assert.equal(code, 0, `nemia ${argv.join(' ')}: ${said}`);
-    assert.deepEqual(
-      JSON.parse(out),
-      { argv, NEMIA_SERVER: 'http://127.0.0.1:9', NEMIA_SERVER_TOKEN: 'tok', WF_ROOT: null },
-      argv.join(' '),
-    );
+    assert.equal(code, 2, `nemia ${argv.join(' ')}: ${said}`);
+    assert.match(said, /`nemia --help`/, argv.join(' '));
+    assert.match(said, new RegExp(`NEMIA_CONTEXT=local nemia ${argv.join(' ')}`), argv.join(' '));
+    assert.equal(out, '', 'the old path never ran');
   }
   assert.equal(fs.existsSync(root), false, "nothing wrote this machine's store");
 });
@@ -194,7 +217,7 @@ test("`--help` of `show`, `closeout`, `ls`, `inbox` and `watch` is the client's,
     }
 });
 
-test('under a remote context `template lint` runs here, unforwarded; `template export --factory` is refused, exit 2, naming NEMIA_CONTEXT=local', async () => {
+test('under a remote context `template lint` and an export of no factory run here; `template export --factory` asks the daemon first', async () => {
   const { env, root } = remoteLaptop('nemia-route-template-');
   const hook = plantedEntry('nemia-route-template-planted-');
   for (const argv of [
@@ -203,7 +226,7 @@ test('under a remote context `template lint` runs here, unforwarded; `template e
   ]) {
     const { code, said, out } = await nemia(argv, env, hook);
     assert.equal(code, 0, `nemia ${argv.join(' ')}: ${said}`);
-    assert.deepEqual(JSON.parse(out), { argv, NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: root }, argv.join(' '));
+    assert.deepEqual(JSON.parse(out), { argv, stdin: null, WF_ROOT: root }, argv.join(' '));
   }
   for (const argv of [
     ['template', 'export', 'shop', '--from', 'repo', '--factory', 'f'],
@@ -211,7 +234,7 @@ test('under a remote context `template lint` runs here, unforwarded; `template e
   ]) {
     const { code, said, out } = await nemia(argv, env, hook);
     assert.equal(code, 2, `nemia ${argv.join(' ')}: ${said}`);
-    assert.match(said, /NEMIA_CONTEXT=local nemia template export/, argv.join(' '));
+    assert.match(said, /127\.0\.0\.1:9/, 'it asked the daemon the context names, which takes no connection');
     assert.equal(out, '', 'the old path never ran');
   }
 });
@@ -266,5 +289,5 @@ test("`nemia workflows write yours w --folder d` is the client's under this mach
   }
   const { code, said, out } = await nemia(['workflows', 'ls'], local.env, hook);
   assert.equal(code, 0, said);
-  assert.deepEqual(JSON.parse(out), { argv: ['workflows', 'ls'], NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: local.root });
+  assert.deepEqual(JSON.parse(out), { argv: ['workflows', 'ls'], stdin: null, WF_ROOT: local.root });
 });

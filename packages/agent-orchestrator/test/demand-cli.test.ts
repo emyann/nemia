@@ -40,10 +40,6 @@ const MOVED: readonly string[] = COMMAND_WORDS.map((w) => w.name);
  * are not there.
  */
 const TICKING: Record<string, string[]> = {
-  'inbox queue': ['inbox', 'queue', 'no-card'],
-  'agents run': ['agents', 'run', 'yours', 'nobody', '--brief', 'Do it.'],
-  'factory upgrade': ['factory', 'upgrade', 'no-factory', '--to', '0.2.0'],
-  'factory resolve': ['factory', 'resolve', 'no-factory', 'review.md#rounds', '--ours'],
   daemon: ['daemon'],
   'doctor fix': ['doctor', 'fix', 'no-piece'],
 };

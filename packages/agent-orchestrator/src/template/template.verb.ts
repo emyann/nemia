@@ -1,20 +1,19 @@
 /**
  * `nemia template`, its forms entries of the command table, the command line's alone: `check`, which reads a template's folder or
  * archive and refuses every problem it has at once, each at its file and line; `export`, which writes a draft of one from a repository
- * and, with `--factory`, the factory's hires, instruction and rules; `pack`, which writes a checked folder into one archive, and `unpack`,
- * which writes an archive's folder back. Their handlers answer data, and the CLI prints it.
+ * and, with `--factory`, the factory's hires, instruction and rules, which the client (`apps/cli`) reads through the api of the context in
+ * use and hands on stdin (`--factory-parts -`), so no store is read here; `pack`, which writes a checked folder into one archive, and
+ * `unpack`, which writes an archive's folder back. Their handlers answer data, and the CLI prints it.
  */
+import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Result } from 'effect';
+import { Effect, Result, Schema } from 'effect';
+import { REVISIONS_POLICIES } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { writerText as textOf } from '../yours/yours.ts';
-import { instructionAt, type Factory } from '../factory/factory.ts';
-import { instructionFile, readInstructionAt } from '../factory/instruction.store.ts';
-import { factoriesDirAt, FactoryDoor, filedFactory } from '../factory/door/factories.store.ts';
-import { FactoryName } from '../factory/factory.model.ts';
 import { TemplateDoor } from './door/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
@@ -130,10 +129,21 @@ const FACTORY: Flag = {
   takes: 'nemia template export --factory takes a factory: --factory <name>',
 };
 
-/** `nemia template export`'s spec: the folder to write, `--from`, and `--factory`. */
+/**
+ * `--factory-parts <file|->`: where the factory's parts are read, stdin for `-`, as the client hands them; the command line's alone,
+ * since the parts are what the client read through the api of the context in use, and a person types `--factory <name>`.
+ */
+const FACTORY_PARTS: Flag = {
+  flag: '--factory-parts',
+  kind: 'text',
+  key: 'factoryParts',
+  takes: "nemia template export --factory-parts takes where the factory's parts are read: --factory-parts -",
+};
+
+/** `nemia template export`'s spec: the folder to write, `--from`, `--factory`, and the parts the client hands. */
 const EXPORT_SPEC: Spec = {
   positionals: [{ key: 'folder', takes: 'required', kind: 'text' }],
-  flags: [FROM, FACTORY],
+  flags: [FROM, FACTORY, FACTORY_PARTS],
   unknown: (arg) =>
     arg.startsWith('-')
       ? `nemia template export does not take ${arg}: nemia template export <folder> --from <repo> [--factory <name>].`
@@ -144,20 +154,44 @@ const EXPORT_SPEC: Spec = {
 /** What an export answers: the folder written, and where each part came from. */
 type Exported = { dir: string; from: ReadonlyArray<{ part: string; from: string }> };
 
-/** The instruction of `factory`, read where it keeps it, with the file it is read from. */
-export function instructionOf(home: string, factory: Factory): { words: string | null; error: string | null; file: string } {
-  const at = instructionAt(factory, instructionFile(home, factory.name));
-  return { ...readInstructionAt(at), file: at.file };
-}
+/** A factory's words as the client hands them: its words, or null where there are none, why they do not read, and its file. */
+const WordsGiven = Schema.Struct({ words: Schema.NullOr(Schema.String), error: Schema.NullOr(Schema.String), file: Schema.String });
 
-/** The factory `name`'s parts an export holds, read through the Factory door: the factory, its file, its instruction and its rules. */
-const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
-  const home = yield* StoreRoot;
-  const door = yield* FactoryDoor;
-  const factory = yield* filedFactory(name, 'rules');
-  const rules = yield* door.rules.read(FactoryName.read(name));
-  const file = path.join(factoriesDirAt(yield* StoreRoot), `${name}.json`);
-  return { factory, file, instruction: instructionOf(home, factory), rules } satisfies FactoryParts;
+/**
+ * A factory's parts as the client hands them on stdin (`--factory-parts -`), read through the api of the context in use: the factory's
+ * name, repositories, attached workflows, hires and revisions policy, where it is kept, its instruction and its rules.
+ */
+const PartsGiven = Schema.Struct({
+  factory: Schema.Struct({
+    name: Schema.String,
+    repos: Schema.Array(Schema.String),
+    workflows: Schema.Array(Schema.String),
+    hires: Schema.Record(Schema.String, Schema.String),
+    revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
+  }),
+  file: Schema.String,
+  instruction: WordsGiven,
+  rules: WordsGiven,
+});
+
+/**
+ * The parts of the factory `name` handed at `from` — `-`, stdin, or a file — read and decoded; refused, naming the command that hands
+ * them, where they do not read, do not decode, or are another factory's.
+ */
+const partsGiven = Effect.fn('partsGiven')(function* (name: string, from: string) {
+  const handOn = `the client hands them: nemia template export <folder> --from <repo> --factory ${name}`;
+  const text = yield* Effect.try({
+    try: () => fs.readFileSync(from === '-' ? 0 : from, 'utf8'),
+    catch: (err) => new Invalid({ message: `the parts of the factory ${name} do not read at ${from}: ${String(err)}; ${handOn}.` }),
+  });
+  const parts = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(PartsGiven))(text).pipe(
+    Effect.mapError((err) => new Invalid({ message: `the parts of the factory ${name} are not a factory's: ${err.message}; ${handOn}.` })),
+  );
+  if (parts.factory.name !== name)
+    return yield* Effect.fail(
+      new Invalid({ message: `the parts handed are the factory ${parts.factory.name}'s, not ${name}'s; ${handOn}.` }),
+    );
+  return parts satisfies FactoryParts;
 });
 
 /**
@@ -182,8 +216,7 @@ const exportFound = Effect.fnUntraced(function* (from: string) {
 });
 
 /** The template `nemia template export` asks for, made and checked (`exportTree`), then written through the Template door. */
-export const exportedTemplate = Effect.fn('templateExport')(function* (dir: string, from: string, factory: string | undefined) {
-  const parts = factory === undefined ? undefined : yield* factoryParts(factory);
+export const exportedTemplate = Effect.fn('templateExport')(function* (dir: string, from: string, parts: FactoryParts | undefined) {
   const found = yield* exportFound(from);
   const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, packageSkillNames(), found));
   yield* (yield* TemplateDoor).templates.create(TemplateSource.read(tree.dir), tree);
@@ -216,12 +249,21 @@ const TEMPLATE_EXPORT: Command<Exported> = {
   spec: EXPORT_SPEC,
   check: (args) =>
     leftOut(EXPORT_SPEC, args) ??
-    (textOf(args, 'from') === undefined ? 'nemia template export takes the repository to read: --from <repo>.' : null),
+    (textOf(args, 'from') === undefined ? 'nemia template export takes the repository to read: --from <repo>.' : null) ??
+    ((textOf(args, 'factory') === undefined) !== (textOf(args, 'factoryParts') === undefined)
+      ? "nemia template export reads a factory's parts handed with it: type `nemia template export <folder> --from <repo> --factory <name>`, which reads them through the api."
+      : null),
   writes: true,
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args) => exportedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', textOf(args, 'factory')),
+  handler: (args) =>
+    Effect.gen(function* () {
+      const factory = textOf(args, 'factory');
+      const handed = textOf(args, 'factoryParts');
+      const parts = factory === undefined || handed === undefined ? undefined : yield* partsGiven(factory, handed);
+      return yield* exportedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', parts);
+    }),
   print: ({ dir, from }) => [
     ...from.map(({ part, from: at }) => `${part}  ${at}`),
     `written: ${dir}`,

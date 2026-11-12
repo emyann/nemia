@@ -14,11 +14,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { loadWorkflows } from 'agent-orchestrator';
+import { FACTORY_APPLY, loadWorkflows } from 'agent-orchestrator';
 import { parseAgent, parseFolder, parseWorkflow, splitFrontmatter } from 'agent-orchestrator/workflow';
 import { PERSONS_EXIT } from '../sdlc/carried/exec.ts';
 import { scratch } from 'test-kit/scratch';
-import { copyOf, filesUnder, nemia, rendered, SDLC, storeEnv } from './template.ts';
+import { copyOf, filesUnder, handled, nemia, rendered, SDLC, storeEnv } from './template.ts';
 
 /** The template, copied once, and applied twice on one store: with every parameter set, and with none. */
 const COPY = copyOf(SDLC);
@@ -207,14 +207,15 @@ test("unset, the factory's own check is a clause that does nothing, and setting 
   }
 });
 
-test('REFUSED: a github that is no boolean, at apply, naming the --set that fixes it, which an undeclared parameter does not', () => {
+test('REFUSED: a github that is no boolean, at apply, naming the --set that fixes it, which an undeclared parameter does not', async () => {
   const env = storeEnv(scratch('nemia-sdlc-way-'));
   const repo = path.join(env.HOME!, 'repo');
   fs.mkdirSync(repo);
   spawnSync('git', ['init', '-q'], { cwd: repo, env });
-  const refused = nemia(env, 'factory', 'apply', 'x', '--template', COPY, '--repo', repo, '--no-trust', '--set', 'github=yes');
-  assert.notEqual(refused.code, 0, refused.out);
-  assert.match(refused.err, /--set github=(?:true|false)\b/);
+  await assert.rejects(
+    handled(env, FACTORY_APPLY, ['x', '--template', COPY, '--repo', repo, '--no-trust', '--set', 'github=yes']),
+    /--set github=(?:true|false)\b/,
+  );
   assert.equal(fs.existsSync(path.join(env.WF_ROOT!, 'factories', 'x')), false, 'and no factory is filed');
 });
 

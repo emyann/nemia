@@ -1,15 +1,16 @@
 /**
  * An upgrade of sdlc that changes implement's check, merged into a factory's tree by `nemia factory diff` on a scratch store, as an
- * operator previews it. The template's next version adds a script to the check line of `build` and of `quick` and names it in the
- * sentence of build's implement note that lists the check's scripts. A factory that spliced a check of its own into that line and
- * that sentence, by hand, conflicts on both; a factory that set its own check by the `implementCheck` parameter, and changed only a
- * line of its own elsewhere, merges with no conflict.
+ * operator previews it, run on its entry's handler. The template's next version adds a script to the check line of `build` and of
+ * `quick` and names it in the sentence of build's implement note that lists the check's scripts. A factory that spliced a check of its
+ * own into that line and that sentence, by hand, conflicts on both; a factory that set its own check by the `implementCheck` parameter,
+ * and changed only a line of its own elsewhere, merges with no conflict.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { copyOf, nemia, rendered, SDLC, storeEnv } from './template.ts';
+import { FACTORY_PLAN } from 'agent-orchestrator';
+import { copyOf, handled, rendered, SDLC, storeEnv } from './template.ts';
 
 /** The template the factories are applied from, which the test then moves to its next version in place. */
 const TEMPLATE = copyOf(SDLC);
@@ -66,40 +67,33 @@ const NEXT = (() => {
   return next;
 })();
 
-/** What `nemia factory diff <name> --to` the next version prints: its exit, the count of conflicts, and the lines that name one. */
-function diffOf(name: string): { code: number | null; conflicts: number; at: string[]; out: string } {
+/** What `nemia factory diff <name> --to` the next version previews, run on its entry's handler: each conflict's place, and what merged. */
+async function diffOf(name: string): Promise<{ at: string[]; merged: string[]; said: string }> {
   const { env } = factory(name);
-  const ran = nemia(env, 'factory', 'diff', name, '--to', NEXT);
-  const count = /^conflicts: (\d+)$/m.exec(ran.out);
-  assert.ok(count, `nemia factory diff ${name} says its conflicts:\n${ran.out}\n${ran.err}`);
+  const plan = await handled(env, FACTORY_PLAN, [name, '--to', NEXT]);
+  if (plan.kind !== 'upgrade') return assert.fail(`nemia factory diff ${name} previews no upgrade: ${JSON.stringify(plan)}`);
+  const { merge } = plan;
   return {
-    code: ran.code,
-    conflicts: Number(count[1]),
-    at: ran.out.split('\n').flatMap((line) => (/^ {2}\S/.test(line) && line.includes('workflows/') ? [line.trim()] : [])),
-    out: ran.out,
+    at: merge.conflicts.map((c) => c.at),
+    merged: merge.merged.map((m) => `${m.at} ${m.from}`),
+    said: JSON.stringify({ conflicts: merge.conflicts.map((c) => c.at), merged: merge.merged }),
   };
 }
 
-test("REFUSED: a check of its own spliced into sdlc's check line and sentence conflicts where the next version changes them", () => {
-  const diff = diffOf('spliced');
-  assert.equal(diff.code, 0, diff.out);
+test("REFUSED: a check of its own spliced into sdlc's check line and sentence conflicts where the next version changes them", async () => {
+  const diff = await diffOf('spliced');
   for (const at of ['workflows/build/implement.md#check', 'workflows/quick/implement.md#check'])
-    assert.ok(diff.at.includes(at), `${at} conflicts:\n${diff.out}`);
+    assert.ok(diff.at.includes(at), `${at} conflicts:\n${diff.said}`);
   assert.ok(
     diff.at.some((at) => at.startsWith('workflows/build/implement.md:')),
-    `and so does the sentence that lists the scripts:\n${diff.out}`,
+    `and so does the sentence that lists the scripts:\n${diff.said}`,
   );
 });
 
-test('a check of its own set by implementCheck merges with no conflict when the next version changes the check line and its sentence', () => {
-  const diff = diffOf('parameter');
-  assert.equal(diff.code, 0, diff.out);
-  assert.equal(diff.conflicts, 0, diff.out);
+test('a check of its own set by implementCheck merges with no conflict when the next version changes the check line and its sentence', async () => {
+  const diff = await diffOf('parameter');
+  assert.deepEqual(diff.at, [], diff.said);
   for (const workflow of ['build', 'quick'])
-    assert.match(
-      diff.out,
-      new RegExp(`^ {2}workflows/${workflow}/implement\\.md\\s+from the template$`, 'm'),
-      `${workflow}'s change merges in`,
-    );
-  assert.match(diff.out, /^ {2}RULES\.md\s+from your tree$/m, 'and the line of its own stays');
+    assert.ok(diff.merged.includes(`workflows/${workflow}/implement.md template`), `${workflow}'s change merges in:\n${diff.said}`);
+  assert.ok(diff.merged.includes('RULES.md factory'), `and the line of its own stays:\n${diff.said}`);
 });

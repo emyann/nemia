@@ -20,11 +20,6 @@ import {
   FACTORY_RM_WORDS,
   HireWrite,
 } from 'objects';
-/**
- * The long help `nemia factory --help` prints, which the client holds now (`objects`' `FACTORY_MANUAL`): said here under its old name
- * for the tests that still read it, until their verbs move.
- */
-export { FACTORY_MANUAL as FACTORY_HELP } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { Missing } from '../refusal/refusal.ts';
 import type { Args } from '../command/command.ts';

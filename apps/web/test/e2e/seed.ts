@@ -1578,6 +1578,8 @@ export const CARDS = {
       'See [the GFM spec](https://github.github.com/gfm/) and [not a link](javascript:alert(1)).',
     ].join('\n'),
     workflow: 'dev',
+    /** The model its run is to run a step on, for that run alone: the key's row reads it as written. */
+    model: 'build=fable',
     heading: 'What it needs',
     items: ['Headings, lists and tables drawn as such', "Code in the board's code block"],
     cells: ['inbox card', 'its body', 'workflow step', 'what its agent is told'],
@@ -1596,7 +1598,7 @@ export function seedInbox(root: string, repo: string, now = Date.now()): void {
   const cards = [
     { card: planned, text: `---\nworkflow: ${planned.workflow}\nrepo: ${repo}\n---\n${planned.body}\n` },
     { card: bare, text: `${bare.body}\n` },
-    { card: rich, text: `---\nworkflow: ${rich.workflow}\n---\n${rich.body}\n` },
+    { card: rich, text: `---\nworkflow: ${rich.workflow}\nmodel: ${rich.model}\n---\n${rich.body}\n` },
   ];
   for (const { card, text } of cards) {
     const file = path.join(root, 'inbox', `${card.name}.md`);

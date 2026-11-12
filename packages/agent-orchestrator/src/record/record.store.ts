@@ -79,6 +79,7 @@ const runBase = {
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
   scheduled: Schema.optional(Kept({ factory: Schema.String, workflow: Schema.String, due: Schema.String })),
   gates: Schema.optional(Strings),
+  models: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   factory: Schema.optional(Schema.String),
   mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   volumes: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),

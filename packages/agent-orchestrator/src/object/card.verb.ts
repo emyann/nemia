@@ -87,6 +87,7 @@ const cardOf = (l: InboxListing, text: string, filedAt: string, source = false):
       ...(l.workflow !== null ? { workflow: l.workflow } : {}),
       ...(l.repo !== null ? { repo: l.repo } : {}),
       ...(l.gate !== undefined ? { gate: l.gate } : {}),
+      ...(l.model !== undefined ? { model: { ...l.model } } : {}),
       ...(l.from.length ? { from: [...l.from] } : {}),
       ...(l.queued !== undefined ? { queued: l.queued.at } : {}),
       ...(body !== undefined ? { body } : {}),

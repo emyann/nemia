@@ -259,6 +259,12 @@
       "retired": []
     },
     {
+      "term": "Run's model",
+      "meaning": "the model a step runs on in one run alone, named at its start (`nemia start --model <step>=<model>`, a card's `model:`, a `--model` over the card's for the same step): frozen on the record as `models`, by step, and set on the step the record freezes and on every revision the run takes (`withModels`, `packages/agent-orchestrator/src/start/models.ts`), so a filing reads it where it reads a step's `model:`. Its other steps and every other run keep their agents'. One the step cannot run on is refused at start (`modelsRefusal`).",
+      "type": "RunModels",
+      "retired": []
+    },
+    {
       "term": "Handed run",
       "meaning": "a run another is handed as context (`nemia start --from`, a card's `from:`, the caller a route's card names), frozen on the record as `context`: what it concluded is a `## From run` section on the roots' briefs, and its artifacts and inputs folders, as found on disk at each filing, are mounted read-only on every local step and named on its brief. Never waited on.",
       "type": "HandedRunFolders",

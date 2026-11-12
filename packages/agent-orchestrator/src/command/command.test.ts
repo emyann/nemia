@@ -7,7 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { COMMAND_WORDS, CommandRefused, parseArgv as parseArgvOf } from 'objects';
+import { COMMAND_WORDS, CommandRefused, dollarsOf as dollarsOfObjects, parseArgv as parseArgvOf } from 'objects';
+import { dollarsOf } from '../keys/keys.ts';
 import {
   amountOf,
   commandBreaks,
@@ -1302,4 +1303,9 @@ test("a link's tool carries the query values its link sends where a call gives n
       ['inbox_card', {}],
     ],
   );
+});
+
+test("a budget's dollars read as the command line's parser reads an amount: keys' dollarsOf and objects' agree", () => {
+  for (const written of ['5', '2.50', ' 3 ', '0', '0.0', '-1', '1e3', '$5', '5 USD', '', '.5', '5.', '007'])
+    assert.equal(dollarsOf(written), dollarsOfObjects(written), written);
 });

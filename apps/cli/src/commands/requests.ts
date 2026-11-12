@@ -1,9 +1,11 @@
 /**
  * What the moved commands' runners share in making a request of what was typed: an argument read off the parsed words by its kind, the
  * namespace a run or a card is in, which the command line does not say and the api's path takes, the namespace a place names, and the
- * one label selector a query takes. A request is the client's concern: the api decodes it by the endpoint's Schema.
+ * one label selector a query takes, and a path sent to the daemon. A request is the client's concern: the api decodes it by the endpoint's Schema.
  */
+import path from 'node:path';
 import { type Args, DEFAULT_NAMESPACE } from 'objects';
+import { chosenOf } from '../context.ts';
 import { asked } from '../objects.ts';
 
 /** The text `args` holds under `key`, or undefined where none was given. */
@@ -50,6 +52,13 @@ export const selectorQuery = (args: Args): { readonly labelSelector?: string } =
   const texts = listArg(args, 'selector');
   return texts.length ? { labelSelector: texts.join(',') } : {};
 };
+
+/**
+ * A path a command line names for the daemon to read or keep (a repository, a tree), as it is sent: resolved from where it is typed under
+ * this machine's context, whose daemon reads this machine's disk; as typed under a remote one, where it names the daemon's machine.
+ */
+export const pathSent = (typed: string, env: NodeJS.ProcessEnv = process.env): string =>
+  chosenOf(env).kind === 'remote' ? typed : path.resolve(typed);
 
 /** `lines` printed on stdout, one each; nothing for none. */
 export const said = (lines: readonly string[]): void => {

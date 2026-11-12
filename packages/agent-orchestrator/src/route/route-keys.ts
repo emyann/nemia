@@ -93,7 +93,7 @@ const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const ROUTE_SHAPES = '`route: { from: <step>.<field>, table: { <value>: <route> } }`, `route: { script: <path> }` or `route: judge`';
 
 /** A condition's eval (`route:`), from its line: `judge`, or the JSON text `readKeys` kept of its map. Any other shape is refused. */
-function routeOf(step: string, text: string): RouteEval {
+export function routeOf(step: string, text: string): RouteEval {
   if (text.trim() === 'judge') return { kind: 'judge' };
   let map: unknown;
   try {

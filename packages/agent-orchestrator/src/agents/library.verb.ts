@@ -5,6 +5,7 @@
  * (`cli/writers.ts`), the board sends its form — and one agent read for its page (`AGENTS_READ`, `agentRead`), on the api alone. The api
  * guards each write and words the board's answer around what each entry answers.
  */
+import { fromPlace, givesNone, refusing, notSent } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
@@ -113,7 +114,10 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
  */
 export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
   name: 'agents write',
-  served: [{ endpoint: 'agents.create' }, { endpoint: 'agents.replace', as: 'agents_replace' }],
+  served: [
+    { endpoint: 'agents.create', takes: givesNone('version'), request: notSent('agents write') },
+    { endpoint: 'agents.replace', as: 'agents_replace', request: notSent('agents write') },
+  ],
   usage: '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
   help: [
     'an agent of yours, or of a templated --factory, written from its file:',
@@ -164,7 +168,7 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
 /** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */
 export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
   name: 'agents rm',
-  served: [{ endpoint: 'agents.delete' }],
+  served: [{ endpoint: 'agents.delete', request: refusing('agents rm', ['repo'], fromPlace({ version: 'resourceVersion' }, ['repo'])) }],
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
   spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
@@ -191,7 +195,7 @@ export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
  */
 export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
   name: 'agents run',
-  served: [{ endpoint: 'agents.try' }],
+  served: [{ endpoint: 'agents.try', request: refusing('agents run', ['repo'], fromPlace({}, ['repo'])) }],
   usage: 'yours <name> --brief <words>',
   help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_BUDGET}`],
   spec: writerSpec('agents run', 'yours <name> --brief <words>', PLACE_AND_NAME, [

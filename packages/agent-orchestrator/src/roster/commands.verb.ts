@@ -1,4 +1,5 @@
 /** `nemia agents` and `nemia agents card`, entries of the command table: the agents of both places, and one agent's card. */
+import { refusing, renamed } from '../command/requests.verb.ts';
 import { Effect } from 'effect';
 import { StoreRoot } from '../config/root.store.ts';
 import { agentCardRead, agentsRead } from './roster.store.ts';
@@ -48,7 +49,7 @@ function agentsRefusal(args: Args): string | null {
 /** `nemia agents`: every agent of both places, the repository's then yours, each read now through the Agent door. */
 export const AGENTS: Command<AgentsRead, AgentsInput> = {
   name: 'agents',
-  served: [{ endpoint: 'agents.list' }],
+  served: [{ endpoint: 'agents.list', request: refusing('agents', ['repo'], renamed({}, ['repo'])) }],
   usage: '[--repo .]',
   help: [
     "the agents a step may name, the repository's then yours: what each is",
@@ -71,7 +72,7 @@ export const AGENTS: Command<AgentsRead, AgentsInput> = {
 /** `nemia agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
 export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
   name: 'agents card',
-  served: [{ endpoint: 'agents.card' }],
+  served: [{ endpoint: 'agents.card', request: refusing('agents card', ['repo'], renamed({ from: 'origin' }, ['repo'])) }],
   usage: '<name> [--repo .] [--from repo|yours]',
   help: [
     'that agent in the shape of an A2A Agent Card, JSON on stdout and',

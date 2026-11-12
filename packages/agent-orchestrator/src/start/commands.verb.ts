@@ -4,6 +4,7 @@
  * command line's alone: its runner starts a run per card (`nemia start <folder>`), and `folderRefusal` says what such a start does not
  * take.
  */
+import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -159,6 +160,8 @@ const START_SPEC: Spec = {
  */
 type Started = {
   id: string;
+  /** That the run was started on another machine's api, which answers its id alone (`startedThere`): what is printed of it. */
+  there?: true;
   run: StartedRun;
   /** The store's root the run was started in, where its inputs and its copies of its workflow's files are. */
   home: string;
@@ -271,6 +274,23 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
             ]
           : []),
       ];
+
+/**
+ * The keys of a start that name files and folders of the machine it is typed on — the inputs and the cards copied into the run, the gates
+ * and a start with no worktree, which name a folder's own steps — which another machine's api is not sent.
+ */
+const PATHS_HERE = ['inputs', 'cards', 'gates', 'noWorktree'] as const;
+
+/** What another machine's api answers of a start (`runs.create`, `cards.start`): the run's id, which is what is printed of it. */
+const startedThere = (answer: unknown): Started => {
+  const { id } = answer as { id: string };
+  return { id, there: true } as Started;
+};
+
+/** The lines of a run started on another machine's api: its id, and how to read it there. */
+const startedThereLines = ({ id }: Started): string[] => [
+  `${id}  started on the daemon — nemia show ${id} reads it, and the daemon's next pass files its first step`,
+];
 
 /**
  * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, where
@@ -429,7 +449,24 @@ export type StartInput = typeof StartInput.Type;
  */
 export const START: Command<Started, StartInput> = {
   name: 'start',
-  served: [{ endpoint: 'runs.create' }, { endpoint: 'cards.start', as: 'inbox_start' }],
+  served: [
+    {
+      endpoint: 'runs.create',
+      takes: givesNone('card'),
+      request: refusing('start', PATHS_HERE, renamed({ workflows: 'workflow' }, ['repoNamed', 'instead', 'at', 'fix', 'card'])),
+      answer: startedThere,
+    },
+    {
+      endpoint: 'cards.start',
+      as: 'inbox_start',
+      request: refusing(
+        'start',
+        PATHS_HERE,
+        renamed({ workflows: 'workflow', card: 'name', instead: 'brief' }, ['brief', 'repo', 'repoNamed', 'at', 'fix', 'factory', 'cards']),
+      ),
+      answer: startedThere,
+    },
+  ],
   usage: START_USAGE,
   help: START_LINES,
   manual: START_HELP,
@@ -460,7 +497,7 @@ export const START: Command<Started, StartInput> = {
       ...(notVolumes.length ? { notVolumes } : {}),
     };
   }),
-  print: startedLines,
+  print: (started) => (started.there === true ? startedThereLines(started) : startedLines(started)),
 };
 
 /** What `nemia concluded` answers: the run, whether it has landed, and the section a root handed it as context would be handed now. */
@@ -477,7 +514,7 @@ const ConcludedInput = Schema.Struct({ runId: Schema.String });
 
 export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
   name: 'concluded',
-  served: [{ endpoint: 'runs.concluded' }],
+  served: [{ endpoint: 'runs.concluded', request: renamed({ runId: 'name' }) }],
   usage: '<runId>',
   help: ['what a run started with --from <runId> would be handed of it, now'],
   spec: {

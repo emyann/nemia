@@ -1,4 +1,5 @@
 /** `nemia say`, an entry of the command table: words to a step's session, journalled on its task (`sayRun`). */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { RunSay, type SaidAfter } from 'objects';
 import type { Speaker } from '../chat/chat.ts';
@@ -44,7 +45,7 @@ export const SAY: Command<
   SayInput
 > = {
   name: 'say',
-  served: [{ endpoint: 'runs.say' }],
+  served: [{ endpoint: 'runs.say', request: renamed({ runId: 'name' }, ['caller']) }],
   usage: '<runId> <step> [--as <name>] "<words>"',
   help: [
     "tell a step's running session something, through its harness: the",

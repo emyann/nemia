@@ -22,7 +22,9 @@ import {
   wfRoot,
 } from '../runner.ts';
 import { agentDraftOf, frontmatterKey, isReadme, skillDraftOf } from '../workflow.ts';
-import { inputFor, usage, placedIn, type Engine } from './flags.ts';
+import { forwardedAnswer, forwardedOf } from '../command/forward.verb.ts';
+import { notSent } from '../command/requests.verb.ts';
+import { answered, inputFor, usage, placedIn, type Engine } from './flags.ts';
 
 /** What a writer's runner reads its entry by: its name and usage, for a refusal. */
 type Writer = Pick<Command, 'name' | 'usage'>;
@@ -79,7 +81,7 @@ export async function agentsWriteRun(env: Env, args: Args, e: Engine, place: Pla
   const draft = readOf(file, () => agentDraftOf(path.basename(file, '.md'), text, (named) => besideOf(file, named)));
   const schema = schemaBeside(file, text);
   const asked = inputFor(command, { ...args, draft, ...(schema !== undefined && { schema }) });
-  const data = await runWith(e, placedIn(env, place, command.handler(asked)));
+  const data = await answered(env, e, place, command, asked);
   for (const line of command.print(data, asked)) console.log(line);
 }
 
@@ -96,7 +98,7 @@ export async function skillsWriteRun(env: Env, args: Args, e: Engine, place: Pla
     usage(`nemia skills write was asked to change ${args.name}, and ${path.resolve(file)} is the skill ${name}: name the skill it is.`);
   const change = readOf(file, () => skillDraftOf(file, name, text));
   const asked = inputFor(command, { ...args, change });
-  const data = await runWith(e, placedIn(env, place, command.handler(asked)));
+  const data = await answered(env, e, place, command, asked);
   for (const line of command.print(data, asked)) console.log(line);
 }
 
@@ -120,7 +122,8 @@ function carriedOf(folder: string, command: Writer): { path: string; text: strin
 }
 
 /**
- * `nemia workflows write`'s runner: the draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
+ * `nemia workflows write`'s runner, refused forwarded to another machine's api, which is not sent a draft folder yet (`notSent`): the
+ * draft folder `--folder` names read as a start reads a folder, its agents looked for beside it
  * and in yours, through the Workflow door (`draftSteps`), or in the tree written for the place `factory` (`templatedTreeOf`) and its
  * repository, filled with its hires (`factoryDraftOf`), into the
  * steps the builder sends, its README where it has one, and the other files it carries (`carriedOf`).
@@ -128,6 +131,10 @@ function carriedOf(folder: string, command: Writer): { path: string; text: strin
 export async function workflowsWriteRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   const home = wfRoot(env);
   const command = WORKFLOWS_WRITE;
+  if (forwardedOf(env) !== undefined) {
+    await forwardedAnswer(notSent(command.name)({}));
+    return;
+  }
   const folder = pathOf(args, 'folder', command, 'the draft folder whose steps and README to write');
   if (!fs.statSync(folder, { throwIfNoEntry: false })?.isDirectory())
     usage(`nemia workflows write reads the folder ${path.resolve(folder)}, and it is not one. Name the draft folder.`);
@@ -145,6 +152,6 @@ export async function workflowsWriteRun(env: Env, args: Args, e: Engine, place: 
     ...(readme !== undefined && { readme: textOf(path.join(folder, readme), command) }),
     ...(files.length > 0 && { files }),
   };
-  const data = await runWith(e, placedIn(env, place, command.handler(asked)));
+  const data = await answered(env, e, place, command, asked);
   for (const line of command.print(data, asked)) console.log(line);
 }

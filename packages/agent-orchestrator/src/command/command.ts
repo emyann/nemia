@@ -611,7 +611,9 @@ export const toolsOf = (entry: Pick<CommandSpec, 'name' | 'served'>): LinkedTool
 
 /**
  * Where an entry's links break the rules: an entry the command line does not serve alone that links no endpoint, which the api would
- * serve with no tool on the port; and a link after the first that names no tool (`as`), which only the first takes from the verb.
+ * serve with no tool on the port; a link after the first that names no tool (`as`), which only the first takes from the verb; and a link
+ * before the last that says no `takes`, which the command line forwarded to another machine's api (`linkOf`) would never call, the last
+ * being the one it calls where none before it holds.
  */
 function linkBreaks(c: Entry): string[] {
   const breaks: string[] = [];
@@ -623,6 +625,11 @@ function linkBreaks(c: Entry): string[] {
     if (link.as === undefined)
       breaks.push(
         `${c.name}'s link to ${link.endpoint} names no tool: give it as, the tool's name on the port, as only the first link takes the verb's`,
+      );
+  for (const link of (c.served ?? []).slice(0, -1))
+    if (link.takes === undefined)
+      breaks.push(
+        `${c.name}'s link to ${link.endpoint} says no takes: give it takes, which inputs call it when the command line is forwarded to another machine's api, as only the last link is called where no takes holds`,
       );
   return breaks;
 }

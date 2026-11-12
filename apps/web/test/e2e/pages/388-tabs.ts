@@ -55,7 +55,10 @@ async function clicks(page: Page): Promise<void> {
   await expectTab(page, 'Capabilities', 'a click on Capabilities selects it');
   expectAt(page, '/capabilities', 'and opens its own address, which carries no bar');
   await expectCount(page.locator('aside[data-bar]'), 0, 'the floating bar is closed');
-  await expectVisible(page.locator('section[aria-label="Skills"]'), "the Capabilities page is drawn in the tab's panel");
+  await expectVisible(
+    page.locator('[data-unread="several-factories"]'),
+    "the Capabilities page is drawn in the tab's panel: with All picked on the seed's several factories, it asks for one",
+  );
   await idle(page);
   await nextVisit(page, (again) => expectTab(again, 'Capabilities', 'a next visit to /capabilities opens the Capabilities tab'));
 }

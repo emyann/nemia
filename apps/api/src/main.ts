@@ -19,7 +19,7 @@
  * the one asked for, or a free one for `PORT=0`. It keeps an idle connection past the longest its clients pool one (`SERVER_TIMEOUTS`,
  * port.ts), so a client's first call after a pause is answered rather than reset. Refused first (`Conflict`), binding nothing: a
  * checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the
- * one it was built from (`repoOf`).
+ * folder it was built from, none for an address (`repoOf`), where the pass ticks in the folder it runs in.
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
@@ -110,13 +110,16 @@ const listening = Effect.acquireRelease(
     }),
 );
 
+/** The folder the pass ticks in: the api's repository, else, for an api with none (`repoOf`), where it runs, as `tickRun` given none. */
+const tickedIn = repoOf(process.env, running) ?? process.cwd();
+
 const asked = args;
 if (!asked.ticks) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(
     up(e, {
       every: asked.every,
-      repo: repoOf(process.env, running),
+      repo: tickedIn,
       holder: 'api',
       series: [STEP_FOLLOWS],
       quota: (name) => Effect.promise(() => daemonQuota(asker, name, () => engineRead('quota', e.quota(name)))()),

@@ -54,7 +54,7 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
 const volumesNow = Effect.fn('volumesNow')(function* (
   e: Engine,
   how: SummaryHow,
-  repo: string,
+  repo: string | undefined,
   namespace: string,
   isDirectory: (at: string) => boolean,
 ) {
@@ -68,7 +68,7 @@ const volumesNow = Effect.fn('volumesNow')(function* (
 export const volumeList = Effect.fn('volumeList')(function* (
   e: Engine,
   how: SummaryHow,
-  repo: string,
+  repo: string | undefined,
   namespace: string,
   query: ObjectQuery,
   isDirectory: (at: string) => boolean = onDisk,
@@ -81,7 +81,7 @@ export const volumeList = Effect.fn('volumeList')(function* (
 export const volumeObject = Effect.fn('volumeObject')(function* (
   e: Engine,
   how: SummaryHow,
-  repo: string,
+  repo: string | undefined,
   namespace: string,
   name: string,
   isDirectory: (at: string) => boolean = onDisk,

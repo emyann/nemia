@@ -164,7 +164,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
   });
 
   await t.test(
-    "a repository outside the factory is a 422 naming the factory's, the ?repo= and the add — given, or the api's own of two",
+    "a repository outside the factory is a 422 naming the factory's, the ?repo= and the add; of two, none named, a 422 naming them",
     async () => {
       const sorted = [repoR, repoS].sort();
       const named = await workflowsListed<never>(app, `factory=pair&repo=${encodeURIComponent(own)}`);
@@ -177,7 +177,8 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
       const fallen = await workflowsListed<never>(app, 'factory=pair');
       assert.equal(fallen.status, 422, 'two repositories: none is filled in, and the api own is not one of them');
-      assert.ok(said(fallen.body).startsWith(`${own}: the factory pair works on`), said(fallen.body));
+      saysAll(said(fallen.body), [...sorted, `?factory=pair&repo=${sorted[0]}`]);
+      assert.ok(!said(fallen.body).includes(own), 'the api own, which is not one of them, is not offered');
       const inside = await workflowsListed<WorkflowListing>(app, `factory=pair&repo=${encodeURIComponent(repoS)}`);
       assert.equal(inside.status, 200, 'one of its repositories is served');
     },

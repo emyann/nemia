@@ -1,16 +1,97 @@
-import { frameTabsOf, sidebar, railPlace, litOf } from '../board.ts';
-import { expectCount, expectTexts, expectVisible } from '../checks.ts';
-import { CHECKOUT, WORKFLOWS } from '../seed.ts';
+import path from 'node:path';
+import type { Page } from 'playwright';
+import { frameTabsOf, sidebar, railPlace, litOf, photograph, themeOf } from '../board.ts';
+import { expectCount, expectTexts, expectVisible, idle } from '../checks.ts';
+import { CHECKOUT, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
+import { OUT } from '../world.ts';
+
+/** The page at `to`, from where the page is. */
+const visit = async (page: Page, to: string): Promise<void> => {
+  await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+};
+
+/**
+ * The page where the api reads no repository, each reason of objects' `CapabilitiesUnread`: with All picked on the seed's several
+ * factories, as the api answers it; a factory on several repositories and a store with no factory, which the seed has neither of, as an
+ * answer held by `route` — each pictured, and the page left on the checkout.
+ */
+async function unread(page: Page): Promise<void> {
+  const theme = await themeOf(page);
+  await visit(page, '/capabilities');
+  const several = page.locator('[data-unread="several-factories"]');
+  await expectVisible(several, 'with All picked, the store having several factories, the page reads none and says to pick one');
+  await expectVisible(several.locator('[data-factory-picker]'), 'with the factory picker beside it');
+  await expectCount(page.locator('section[aria-label="Skills"]'), 0, 'and lists no section under a path');
+  await photograph(page, path.join(OUT, `capabilities-pick-factory-${theme}.png`), { fullPage: true });
+
+  await visit(page, `/capabilities?factory=${FACTORIES.bare}`);
+  await expectVisible(
+    page.locator('article > p code', { hasText: `${path.sep}${FACTORIES.bare}` }),
+    `picked, the factory ${FACTORIES.bare}'s repository is read`,
+  );
+  await expectVisible(page.locator('section[aria-label="Skills"]'), 'and its sections are drawn');
+
+  const read = await page.request.get(new URL('/api/capabilities?factory=default', page.url()).href);
+  const { measured, readOnly } = (await read.json()) as { measured: unknown; readOnly: unknown };
+  const answer = (unread: object) => ({
+    unread,
+    skills: [],
+    agents: [],
+    mcp: [],
+    denied: [],
+    asked: [],
+    allowed: [],
+    warnings: [],
+    measured,
+    readOnly,
+    steps: [],
+  });
+  const repos = ['/srv/acme/api', '/srv/acme/web'];
+  const held = {
+    'several-repositories': answer({
+      reason: 'several-repositories',
+      message: 'The factory acme works on 2 repositories: pick the one to read.',
+      factory: 'acme',
+      repos,
+      commands: [],
+    }),
+    'no-factory': answer({
+      reason: 'no-factory',
+      message:
+        'No factory is filed in this store, and this api has no repository of its own: file a factory, and the page reads its repository.',
+      factory: null,
+      repos: [],
+      commands: ['nemia factory add <name> --repo <path>', 'nemia factory apply <name> --template <name> --repo <path>'],
+    }),
+  };
+  for (const [reason, body] of Object.entries(held)) {
+    await page.route('**/api/capabilities**', (route) => route.fulfill({ json: body }));
+    await visit(page, `/capabilities?factory=default&repo=${encodeURIComponent(`/held/${reason}`)}`);
+    await expectVisible(page.locator(`[data-unread="${reason}"]`), `the page says ${reason}`);
+    if (reason === 'several-repositories')
+      for (const repo of repos)
+        await expectVisible(
+          page.locator(`a[data-pick-repo="${repo}"][href*="repo="]`),
+          `each repository a link to the page read on it (${repo})`,
+        );
+    else await expectCount(page.locator('[data-command]'), 2, 'the lines that file a factory, add and apply');
+    await photograph(page, path.join(OUT, `capabilities-${reason}-${theme}.png`), { fullPage: true });
+    await page.unroute('**/api/capabilities**');
+  }
+  await visit(page, '/capabilities?factory=default');
+}
 
 export default {
   /**
    * The Capabilities page, a tab of Settings: the checkout's skills, agents, MCP servers, deny rules and ask rules, each
    * with where it was read from, and what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the
-   * harness's own set, and yours, on Codex, which claims nothing it was not measured to have.
+   * harness's own set, and yours, on Codex, which claims nothing it was not measured to have. Read in the default factory, on the
+   * checkout; with All picked, on the seed's several factories, it reads none and says why (`unread`).
    */
   name: 'capabilities',
-  route: '/capabilities',
+  route: '/capabilities?factory=default',
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(railPlace(page, 'Settings').and(litOf(page)), 'the rail lights Settings on its page');
@@ -218,5 +299,6 @@ export default {
       0,
       'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read',
     );
+    await unread(page);
   },
 } satisfies PageSpec;

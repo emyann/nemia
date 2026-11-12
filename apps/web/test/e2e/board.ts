@@ -25,7 +25,7 @@ import { API, measuring, photographing, store } from './world.ts';
 export const SECTIONS = ['Inbox', 'Runs', 'Workflows'] as const;
 
 /** The pages whose `?factory=` picks a factory; on any other page only the path of a factory's floor or settings does. */
-const LISTINGS = ['/inbox', '/runs', '/workflows'];
+const LISTINGS = ['/inbox', '/runs', '/workflows', '/capabilities'];
 
 /** The factory `url` picks, as the board reads it: the name of a factory's floor or settings, else a listing's `?factory=`, else none. */
 export const pickedIn = (url: URL): string | null =>

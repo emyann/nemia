@@ -7,22 +7,26 @@
  */
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
-import { factoryRepo, filedAtOnce, Invalid, listedAtOnce, outsideRefusal, type Factory, type Running } from 'agent-orchestrator';
+import { filedAtOnce, Invalid, listedAtOnce, outsideRefusal, type Factory, type Running } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 
-/** What a request is answered in: its repository, and its factory, none for the default factory. */
-export type Place = { repo: string; factory: Factory | undefined };
+/**
+ * What a request is answered in: its repository, none where it has none; its factory, none for the default factory; and whether the
+ * request named either (`?factory=`, `?repo=`), which a page read per factory tells from a request that leaves both to the api.
+ */
+export type Place = { repo: string | undefined; factory: Factory | undefined; named: boolean };
 
 /** What of the request `placeFor` reads: its query's `factory` and `repo`, each undefined where it is not given. */
 export type PlaceQuery = { factory: string | undefined; repo: string | undefined };
 
 /**
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: the api's own (`repoOf`),
- * then those of each factory in the store whose file reads, in the order the Factory door lists them (`listedAtOnce`).
+ * where it has one, then those of each factory in the store whose file reads, in the order the Factory door lists them (`listedAtOnce`).
  */
 export function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): string[] {
   const named = listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo))));
-  return [...new Set([repoOf(env, running), ...named])];
+  const own = repoOf(env, running);
+  return [...new Set([...(own === undefined ? [] : [own]), ...named])];
 }
 
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
@@ -45,25 +49,50 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
 /**
  * The factory and the repository a request is answered in, read off its query.
  *
- * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else the api's own repository. A `?repo=`
- *   that is not the api's own nor any factory's (`knownRepos`) is refused, `Invalid`.
+ * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else the api's own repository, none where
+ *   the api has none (`repoOf`). A `?repo=` that is not the api's own nor any factory's (`knownRepos`) is refused, `Invalid`.
  * - A factory named: read from the store at `home`, as a start reads it (`filedAtOnce`: `Invalid` for a name that is no slug or a file that
- *   does not read, `Missing` for none of that name). Its repository is the package's (`factoryRepo`): `?repo=`, else its only one, else the
- *   api's own; one that is not among its repositories (`outsideRefusal`) is refused, `Invalid`.
+ *   does not read, `Missing` for none of that name). Its repository is `?repo=`, else its only one, else the api's own where that is one
+ *   of its repositories, else none; a `?repo=` that is not among its repositories (`outsideRefusal`) is refused, `Invalid`.
  *
- * Throws each refusal as the package's kind, so `app.onError` answers it by that kind.
+ * A place with no repository is not refused here: a handler that needs one asks for it (`repoNeeded`), and the Capabilities page says why
+ * there is none. Throws each refusal as the package's kind, so `app.onError` answers it by that kind.
  */
 export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string, running?: Running): Place {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
   if (query.factory === undefined || query.factory === DEFAULT_NAMESPACE) {
-    if (named === undefined) return { repo: repoOf(env, running), factory: undefined };
+    if (named === undefined) return { repo: repoOf(env, running), factory: undefined, named: query.factory !== undefined };
     const known = knownRepos(env, home, running);
     if (!known.includes(named)) throw unknownRepo(named, known);
-    return { repo: named, factory: undefined };
+    return { repo: named, factory: undefined, named: true };
   }
   const factory = filedAtOnce(home, query.factory);
-  if (factory === undefined) return { repo: named ?? repoOf(env, running), factory: undefined };
-  const repo = path.resolve(factoryRepo(factory, named, repoOf(env, running)));
-  if (outsideRefusal(factory, repo) !== undefined) throw outsideRepo(factory, repo);
-  return { repo, factory };
+  if (factory === undefined) return { repo: named ?? repoOf(env, running), factory: undefined, named: true };
+  if (named !== undefined) {
+    if (outsideRefusal(factory, named) !== undefined) throw outsideRepo(factory, named);
+    return { repo: named, factory, named: true };
+  }
+  const [only, ...more] = factory.repos;
+  if (only !== undefined && !more.length) return { repo: path.resolve(only), factory, named: true };
+  const own = repoOf(env, running);
+  return { repo: own !== undefined && outsideRefusal(factory, own) === undefined ? own : undefined, factory, named: true };
+}
+
+/**
+ * The repository `place` is answered on, for a handler that reads or writes one: refused, `Invalid`, where it has none — a factory of
+ * several repositories that the request names none of, naming them and the `?repo=` that picks one; or the default factory of an api that
+ * has no repository of its own, naming the `?factory=` that picks a factory and the `nemia factory add` that files one.
+ */
+export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
+  if (place.repo !== undefined) return place.repo;
+  if (place.factory !== undefined) {
+    const repos = place.factory.repos.map((r) => path.resolve(r)).sort();
+    throw new Invalid({
+      message: `the factory ${place.factory.name} works on ${repos.join(', ')}: name the one to read, ?factory=${place.factory.name}&repo=${repos[0] ?? '<path>'}.`,
+    });
+  }
+  throw new Invalid({
+    message:
+      'this api has no repository of its own: it runs a release whose source is no folder. Name a factory to read in, ?factory=<name>, or file one: nemia factory add <name> --repo <path>.',
+  });
 }

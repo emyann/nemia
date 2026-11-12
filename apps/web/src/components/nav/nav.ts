@@ -8,8 +8,11 @@ const under = (to: string) => (path: string) => path === to || path.startsWith(`
 /** The factory whose own page `path` is, its floor or its settings, `/factories/<name>/settings`; none for any other page. */
 const ownerOf = (path: string): string | undefined => /^\/factories\/([^/]+)(?:\/settings)?$/.exec(path)?.[1];
 
-/** The pages whose list reads `?factory=` and narrows to the one it names: the Inbox, Runs and Workflows. */
-const LISTINGS = ['/inbox', '/runs', '/workflows'] as const;
+/**
+ * The pages whose list reads `?factory=` and narrows to the one it names: the Inbox, Runs and Workflows, and Capabilities, which reads
+ * the repository of the factory it names.
+ */
+const LISTINGS = ['/inbox', '/runs', '/workflows', '/capabilities'] as const;
 
 /** A page of `LISTINGS`. */
 type Listing = (typeof LISTINGS)[number];
@@ -102,8 +105,8 @@ export function destinationHref(id: string, picked: string | undefined, first: s
 
 /**
  * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
- * settings, else the `?factory=` of a section's page — the Inbox, Runs or Workflows — or of a workflow's page or a step's, which
- * read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
+ * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Capabilities — or of a workflow's page or a step's,
+ * which read in it, and of a factory's own agent or skill, and of no other page under them; none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
   return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) || ownDefinitionAt(path) ? factorySearch(search).factory : undefined);

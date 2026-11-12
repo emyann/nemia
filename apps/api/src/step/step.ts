@@ -16,6 +16,7 @@ import type { SkillsFound, StepSpec } from 'agent-orchestrator/workflow';
 import { DEFAULT_NAMESPACE, type WorkflowStepPage } from 'objects';
 import { foundInOf, sourceOf, type SkillSource } from '../skills/skills.ts';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { agentSkillsOf, keyRows, placesOf, stepSourceOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /** How many of a step's runs its page lists, newest first. */
@@ -188,7 +189,8 @@ export async function stepPage(
   { name, from, dir }: { name: string; from: WorkflowSource; dir: string },
   asked: string,
 ): Promise<WorkflowStepPage> {
-  const { repo, home, factory, memo } = s;
+  const { home, factory, memo } = s;
+  const repo = repoNeeded(s);
   const input = { name, step: asked, dir, repo, ...(factory && { factory: factory.name }) };
   const { step: found, steps } = await s.inRequest(WORKFLOWS_STEP.handler(input));
   if (!found) throw new Missing({ message: `No step '${asked}' in workflow ${name} (${dir}). Its steps are: ${steps.join(', ')}.` });

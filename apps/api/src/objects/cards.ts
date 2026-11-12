@@ -35,6 +35,7 @@ import {
 import { Api, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { cardStart } from '../runs/start.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 import { wantsTable } from './table.ts';
@@ -118,7 +119,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           throw new Refused({
             message: "`workflow` is a workflow folder's name, with no `/`: send one, or leave it out. Nothing was filed.",
           });
-        const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s.repo, s.home);
+        const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, repoNeeded(s), s.home);
         if ('status' in asked) throw readerRefused(asked);
         const { text, ...keys } = asked;
         const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));

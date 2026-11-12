@@ -12,13 +12,14 @@
 import { approveProgram, declineProgram, proposalGet, proposalsList, proposeProgram, type ProposalPlace } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
 import { listed } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** Where a proposal is judged and applied: the store's root, and the repository the request is placed on (`placeFor`). */
-export const placeOf = (s: Served): ProposalPlace => ({ home: s.home, repo: s.repo });
+export const placeOf = (s: Served): ProposalPlace => ({ home: s.home, repo: repoNeeded(s) });
 
 export const proposalsHandlers = readsBounded(Api, 'proposals', (handlers) =>
   handlers

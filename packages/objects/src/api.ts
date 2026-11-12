@@ -29,6 +29,9 @@
  *
  * In each factory's namespace, groups `proposals` and `delegations` (`proposal-api.ts`): a change of the factory's definitions proposed,
  * approved, declined and listed, and what the person lets an agent approve unasked.
+ *
+ * The runs, the cards, the factories, a factory's MCP servers, the agents and the skills are each listed as their `<Kind>List`, or as
+ * the same page's `Table` where the request asks for one (`TABLE_ACCEPT`): two successes of one status. A watch answers no Table.
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';

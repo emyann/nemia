@@ -353,8 +353,8 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                tree, the template (none: drop the file), or the text of a file; once
                                each conflict of a workflow, an agent, a skill, a hire or the rules and
                                instruction has one, that object is proposed as they compose it, to
-                               approve (nemia proposals approve <p> -n <name>); a carried file stays a choice;
-                               the daemon merges once each has one and each proposal applied
+                               approve (nemia proposals approve <p> -n <name>); a carried file stays
+                               a choice; the daemon merges once each has one and each proposal applied
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it

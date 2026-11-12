@@ -400,7 +400,7 @@ test("REFUSED stale: the rules or the instruction written after the Factory was 
   }
 });
 
-test("a status move alone makes a Factory proposal stale: its version is the served object's, status and all", async () => {
+test("a status move alone leaves a Factory proposal fresh: its version is its generation's, spec, rules and instruction, never the status", async () => {
   factory('moving');
   const object = await factoryChanged('moving', { rules: 'Mine.' });
   const proposed = await run(proposeProgram(agentOf('implementer', 'moving'), 'moving', { objects: [object] }, PLACE));
@@ -414,7 +414,7 @@ test("a status move alone makes a Factory proposal stale: its version is the ser
       observedGeneration: 1,
     }),
   );
-  assert.equal((await run(approveProgram(PERSON, 'moving', proposed.metadata.name, PLACE))).status.phase, 'stale');
+  assert.equal((await run(approveProgram(PERSON, 'moving', proposed.metadata.name, PLACE))).status.phase, 'applied');
 });
 
 test('REFUSED as it is written: a workflow the Workflow door refuses leaves the proposal failed, naming nothing written, and the tree as it was', async () => {

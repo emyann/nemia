@@ -716,8 +716,8 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
     'tree, the template (none: drop the file), or the text of a file; once',
     'each conflict of a workflow, an agent, a skill, a hire or the rules and',
     'instruction has one, that object is proposed as they compose it, to',
-    'approve (nemia proposals approve <p> -n <name>); a carried file stays a choice;',
-    'the daemon merges once each has one and each proposal applied',
+    'approve (nemia proposals approve <p> -n <name>); a carried file stays',
+    'a choice; the daemon merges once each has one and each proposal applied',
   ],
   spec: RESOLVE_SPEC,
   check: (args) =>

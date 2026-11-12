@@ -28,8 +28,7 @@ const whole = (v: Version): boolean =>
   Number.isInteger(v.major) && Number.isInteger(v.minor) && Number.isInteger(v.patch) && v.major >= 0 && v.minor >= 0 && v.patch >= 0;
 
 /** Whether the tag asked for goes back past the store's floor: both are versions, and the tag's is older. */
-const pastTheFloor = (target: Version | null, floor: Version | null): boolean =>
-  target !== null && floor !== null && older(target, floor);
+const pastTheFloor = (target: Version | null, floor: Version | null): boolean => target !== null && floor !== null && older(target, floor);
 
 const upgradeStartSpec = spec<(target: Version | null, floor: Version | null, inFlight: boolean) => UpgradeStartRefusal | null>({
   requires: ({ input: [target, floor] }) => (target === null || whole(target)) && (floor === null || whole(floor)),
@@ -57,7 +56,8 @@ const olderThanRunning = (i: InstalledVersion, running: Version | null): boolean
   running !== null && i.version !== null && older(i.version, running);
 
 /** Whether the installed release `i` is not older than `j`: both versions, `i`'s at least `j`'s. */
-const atLeast = (i: InstalledVersion, j: InstalledVersion): boolean => i.version !== null && j.version !== null && !older(i.version, j.version);
+const atLeast = (i: InstalledVersion, j: InstalledVersion): boolean =>
+  i.version !== null && j.version !== null && !older(i.version, j.version);
 
 const previousReleaseSpec = spec<(installed: readonly InstalledVersion[], running: Version | null) => string | null>({
   requires: ({ input: [installed, running] }) =>

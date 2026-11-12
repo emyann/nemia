@@ -35,7 +35,10 @@ export type Upgrade = typeof Upgrade.Type;
 export const PreviousRelease = Schema.Struct({ tag: Schema.String, refused: Schema.optionalKey(Schema.String) });
 export type PreviousRelease = typeof PreviousRelease.Type;
 
-/** `GET /api/upgrades`: the release going back goes to (null where none older is installed), and the store's last upgrade (null where none). */
+/**
+ * `GET /api/upgrades`: the release going back goes to (null where none older is installed), and the store's last upgrade (null where
+ * none).
+ */
 export const UpgradesRead = Schema.Struct({ previous: Schema.NullOr(PreviousRelease), last: Schema.NullOr(Upgrade) });
 export type UpgradesRead = typeof UpgradesRead.Type;
 

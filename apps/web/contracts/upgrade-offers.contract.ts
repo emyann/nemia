@@ -11,7 +11,10 @@ import { type Implementation, spec } from '@emyann/tsverify';
 export type UpgradeOffersRead = {
   /** The release check read a release newer than the one the server runs (`latest.newer`). */
   readonly newer: boolean;
-  /** The release going back goes to, and whether the store's floor refuses it (`previous.refused` present); null where none is installed. */
+  /**
+   * The release going back goes to, and whether the store's floor refuses it (`previous.refused` present); null where none is
+   * installed.
+   */
   readonly previous: { readonly refused: boolean } | null;
   /** The store's last upgrade is still at work (its phase `pending` or `running`). */
   readonly upgrading: boolean;

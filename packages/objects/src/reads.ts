@@ -152,7 +152,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'readiness.read': { shape: 'one', why: 'one piece per area and per need the machine and its factories declare' },
   'readiness.fixOf': { shape: 'one', why: 'its output is the tail the orchestrator keeps of it (FIX_TAIL_BYTES), never the whole' },
   'readiness.fixOutput': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },
-  'upgrades.read': { shape: 'one', why: 'the release going back goes to and the store\'s last upgrade, its output a tail' },
+  'upgrades.read': { shape: 'one', why: "the release going back goes to and the store's last upgrade, its output a tail" },
   'upgrades.upgradeOf': { shape: 'one', why: 'its output is the tail the orchestrator keeps of it, never the whole' },
   'upgrades.output': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },
   'pairings.list': { shape: 'one', why: 'the tickets a person asked for, each short-lived: a handful at once' },

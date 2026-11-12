@@ -3,8 +3,8 @@
  * `contracts/upgrade-start.contract.ts`: whether a start is refused before anything is filed (`upgradeStartRefusal`), and the release going
  * back goes to (`previousRelease`).
  */
-import type { PreviousRelease, UpgradeStartRefused } from '../../contracts/upgrade-start.contract.ts';
-import { goingBackRefused, type Version } from './floor.ts';
+import type { NewestOlder, PreviousRelease, UpgradeStartRefused } from '../../contracts/upgrade-start.contract.ts';
+import { goingBackRefused } from './floor.ts';
 
 export type { InstalledVersion, UpgradeStartRefusal } from '../../contracts/upgrade-start.contract.ts';
 
@@ -19,21 +19,34 @@ export const upgradeStartRefusal: UpgradeStartRefused = (target, floor, inFlight
   return null;
 };
 
-/** Whether `a` is an older release than `b`, number by number: `olderThan`, written so the verifier reads it. */
-const older = (a: Version, b: Version): boolean =>
-  a.major < b.major || (a.major === b.major && (a.minor < b.minor || (a.minor === b.minor && a.patch < b.patch)));
+/**
+ * The newest of the releases `installed` whose version is older than `running`, its tag and its version's numbers; `found` false where
+ * none is, or `running` is null. One pass, keeping the newest older release seen so far, each comparison written number by number so
+ * the verifier guesses the loop's invariants from the laws (a call in the loop's condition left them unguessed).
+ */
+export const newestOlder: NewestOlder = (installed, running) => {
+  let best = { found: false, tag: '', major: 0, minor: 0, patch: 0 };
+  for (const r of installed) {
+    const v = r.version;
+    if (
+      running !== null &&
+      v !== null &&
+      (v.major < running.major ||
+        (v.major === running.major && (v.minor < running.minor || (v.minor === running.minor && v.patch < running.patch)))) &&
+      (!best.found ||
+        v.major > best.major ||
+        (v.major === best.major && (v.minor > best.minor || (v.minor === best.minor && v.patch >= best.patch))))
+    )
+      best = { found: true, tag: r.tag, major: v.major, minor: v.minor, patch: v.patch };
+  }
+  return best;
+};
 
 /**
  * The tag of the release going back goes to: the newest of the releases `installed` whose version is older than `running`, the one the
- * server runs; null where none is installed, or the server runs no versioned release (`running` null).
+ * server runs (`newestOlder`); null where none is installed, or the server runs no versioned release (`running` null).
  */
 export const previousRelease: PreviousRelease = (installed, running) => {
-  if (running === null) return null;
-  const found = installed.find((i) => {
-    const v = i.version;
-    return (
-      v !== null && older(v, running) && installed.every((j) => j.version === null || !older(j.version, running) || !older(v, j.version))
-    );
-  });
-  return found === undefined ? null : found.tag;
+  const found = newestOlder(installed, running);
+  return found.found ? found.tag : null;
 };

@@ -59,6 +59,54 @@ const olderThanRunning = (i: InstalledVersion, running: Version | null): boolean
 const atLeast = (i: InstalledVersion, j: InstalledVersion): boolean =>
   i.version !== null && j.version !== null && !older(i.version, j.version);
 
+/**
+ * The newest installed release older than the one the server runs, as `newestOlder` keeps it while it reads the installed ones: whether
+ * one was found, its tag, and its version's three numbers.
+ */
+export type Newest = {
+  readonly found: boolean;
+  readonly tag: string;
+  readonly major: number;
+  readonly minor: number;
+  readonly patch: number;
+};
+
+/** Whether the installed release `i` carries the version of `n`: a version, number by number the same. */
+const carries = (i: InstalledVersion, n: Newest): boolean =>
+  i.version !== null && i.version.major === n.major && i.version.minor === n.minor && i.version.patch === n.patch;
+
+/** Whether the installed release `j`, a version, is not newer than `n`. */
+const noNewerThan = (j: InstalledVersion, n: Newest): boolean =>
+  j.version !== null && !older({ major: n.major, minor: n.minor, patch: n.patch }, j.version);
+
+/**
+ * The helper `previousRelease` leans on, so its laws are proved from a loop's invariants rather than asked of a search (a newest older
+ * release exists wherever an older one does takes induction): the newest installed release older than `running`.
+ */
+const newestOlderSpec = spec<(installed: readonly InstalledVersion[], running: Version | null) => Newest>({
+  requires: ({ input: [installed, running] }) =>
+    (running === null || whole(running)) && installed.every((i) => i.version === null || whole(i.version)),
+  ensures: {
+    anInstalledOlderOne: {
+      description: 'The release found is one of those installed, by its tag and its version, older than the one the server runs',
+      condition: ({ input: [installed, running], output }) =>
+        !output.found || installed.some((i) => i.tag === output.tag && carries(i, output) && olderThanRunning(i, running)),
+    },
+    noOlderOneIsNewer: {
+      description: 'No installed release older than the one the server runs is newer than the release found',
+      condition: ({ input: [installed, running], output }) =>
+        !output.found || installed.every((j) => !olderThanRunning(j, running) || noNewerThan(j, output)),
+    },
+    foundWhereThereIsOne: {
+      description: 'A release is found exactly where an older one is installed',
+      condition: ({ input: [installed, running], output }) => output.found === installed.some((i) => olderThanRunning(i, running)),
+    },
+  },
+});
+
+/** `newestOlder`'s type: the newest of `installed` older than `running`, `found` false where none is. */
+export type NewestOlder = Implementation<typeof newestOlderSpec>;
+
 const previousReleaseSpec = spec<(installed: readonly InstalledVersion[], running: Version | null) => string | null>({
   requires: ({ input: [installed, running] }) =>
     (running === null || whole(running)) && installed.every((i) => i.version === null || whole(i.version)),

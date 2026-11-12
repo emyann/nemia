@@ -82,7 +82,7 @@ Each release carries what a machine installs from (`install.sh`) and what `nemia
 | `nemia-<tag>-darwin-arm64.tar.gz`| the same, for macOS on Apple silicon                                                        |
 | `SHA256SUMS`                     | one line per archive, `<sha256>  <asset>`, as `sha256sum` writes it                         |
 | `install.sh`                     | the installer (`install.sh` beside this file), a POSIX sh script                            |
-| `latest.json`                    | `{ "tag": "v<x.y.z>", "version": "<x.y.z>" }`, attached last: its presence says the release is whole |
+| `latest.json`                    | `{ "tag": "v<x.y.z>", "version": "<x.y.z>", "notes": "<the release's page>" }`, attached last: its presence says the release is whole; `notes` is the link the board shows beside an upgrade |
 
 GitHub serves the newest release's assets at `https://github.com/<owner>/<repo>/releases/latest/download/<asset>`, and any release's
 at `.../releases/download/<tag>/<asset>`; that `releases` URL is the download base an archive's `release.json` names as its `source`.

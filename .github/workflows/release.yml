@@ -172,7 +172,7 @@ jobs:
           if-no-files-found: error
 
   # Every asset onto the release: the three archives, their SHA256SUMS merged, install.sh, and latest.json last, which says the
-  # release is whole. --clobber makes a rerun replace what an earlier one attached.
+  # release is whole and names the release's page as its notes, the link the board's Settings shows beside an upgrade. --clobber makes a rerun replace what an earlier one attached.
   upload:
     needs: [tag, archive]
     runs-on: ubuntu-latest
@@ -200,7 +200,8 @@ jobs:
           cp parts/*/nemia-*.tar.gz assets/
           cat parts/*/SHA256SUMS | sort -k2 > assets/SHA256SUMS
           cp tools/release/install.sh assets/
-          printf '{ "tag": "%s", "version": "%s" }\n' "$TAG" "${TAG#v}" > assets/latest.json
+          notes="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          printf '{ "tag": "%s", "version": "%s", "notes": "%s" }\n' "$TAG" "${TAG#v}" "$notes" > assets/latest.json
       - name: Attach the assets to the release, latest.json last
         timeout-minutes: 10
         env:

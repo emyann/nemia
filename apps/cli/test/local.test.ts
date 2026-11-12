@@ -155,3 +155,16 @@ test('--local is refused, exit 2, before the in-process parser reads the words, 
   assert.equal(stdout, '', 'the old path never ran');
   assert.ok(stderr.includes('nemia version --json'), stderr);
 });
+
+test('`doctor carry --local`, which an older `nemia upgrade` types, exits as `doctor carry` does on the same store, its output the same', async () => {
+  const { root, env } = aStore('carry');
+  const stubs = path.join(SCRATCH, 'carry', 'stubs');
+  fs.mkdirSync(stubs, { recursive: true });
+  fs.writeFileSync(path.join(stubs, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const offline = { ...env, PATH: `${stubs}${path.delimiter}${env.PATH ?? ''}` };
+  const plain = await nemia(['doctor', 'carry'], offline);
+  const local = await nemia(['doctor', 'carry', '--local'], offline);
+  assert.equal(plain.code, 0, plain.stderr);
+  assert.equal(local.code, plain.code, local.stderr);
+  assert.equal(local.stdout.replaceAll(root, '<store>'), plain.stdout.replaceAll(root, '<store>'));
+});

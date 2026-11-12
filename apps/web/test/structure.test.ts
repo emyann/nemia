@@ -39,8 +39,16 @@ import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
-/** The files that open a stream from the api, and only they: the feed, a step's conversation, her chat, and a fix's output. */
-const STREAMS = ['src/lib/useFeed.ts', 'src/lib/useStepTranscript.ts', 'src/lib/useNemiaChat.ts', 'src/lib/useFixFollow.ts'];
+/**
+ * The files that open a stream from the api, and only they: the feed, a step's conversation, her chat, a fix's output, and an upgrade's.
+ */
+const STREAMS = [
+  'src/lib/useFeed.ts',
+  'src/lib/useStepTranscript.ts',
+  'src/lib/useNemiaChat.ts',
+  'src/lib/useFixFollow.ts',
+  'src/lib/useUpgradeFollow.ts',
+];
 
 /** The one file that renders markdown: every surface that shows a text written in markdown draws it through its `Markdown`. */
 const RENDERER = 'src/components/markdown/Markdown.tsx';

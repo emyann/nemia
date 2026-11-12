@@ -1,20 +1,8 @@
 import type { WorkflowListing } from '../../lib/api/workflows.ts';
 import { unreadWorkflows, workflowKey } from '../../lib/inbox';
 
-/** The workflows a card can name, as a select's options: those that read, in the order listed, yours marked, each by `workflowKey`. */
-export function WorkflowOptions({ workflows }: { workflows: readonly WorkflowListing[] }) {
-  return workflows
-    .filter((w) => w.error === null)
-    .map((w) => (
-      <option key={workflowKey(w)} value={workflowKey(w)}>
-        {w.name}
-        {w.from === 'yours' ? ' (yours)' : ''}
-      </option>
-    ));
-}
-
 /**
- * The workflows `WorkflowOptions` leaves out of the list, each by name with why it does not read; nothing when every one reads. Drawn as
+ * The workflows a list leaves out, each by name with why it does not read; nothing when every one reads. Drawn as
  * what a person weighs: the workflow is theirs to correct before it is offered.
  */
 export function WorkflowsUnread({ workflows }: { workflows: readonly WorkflowListing[] }) {

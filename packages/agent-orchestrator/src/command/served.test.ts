@@ -25,7 +25,6 @@ const LEFT_OUT = [
   'claude-token set',
   'claude-token status',
   'claude-token rm',
-  'upgrade',
   'version',
   'frontmatter rewrite',
   'tick',

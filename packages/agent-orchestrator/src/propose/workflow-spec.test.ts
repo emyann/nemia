@@ -71,3 +71,16 @@ test("a key the loader reads as text though it holds a map is carried as readKey
   const routedBack = renderStep({ name: 'gate', body: routed?.body ?? '', ...routed?.keys, routes: ['a', 'b'] } as never);
   assert.match(routedBack, /^route:\n {2}script: route\.ts$/m, 'and written back, a map again');
 });
+
+test("a harness's block is read into its fence keys as the parser reads it, written back as the block, and a key no step has stays to be refused", () => {
+  const text = '---\nplace: git\nclaude:\n  fence:\n    disallowedTools: Bash(*:4318*), Bash(*:4317*)\n---\nDo it.\n';
+  const [step] = workflowSpecOf([{ name: 'design.md', text }]).steps;
+  assert.deepEqual(step?.keys, { place: 'git', disallowedTools: ['Bash(*:4318*)', 'Bash(*:4317*)'] });
+  assert.ok(Schema.is(StepKeys)(step?.keys), "objects' StepKeys, as it stands");
+  const written = renderStep({ name: 'design', body: step?.body ?? '', ...step?.keys } as never);
+  assert.match(written, /^claude:\n {2}fence:\n {4}disallowedTools: /m, 'written back under its block');
+  assert.deepEqual(parseWorkflow('design', written).disallowedTools, parseWorkflow('design', text).disallowedTools);
+  const [misspelled] = workflowSpecOf([{ name: 'design.md', text: text.replace('claude:', 'claud:') }]).steps;
+  assert.ok(misspelled !== undefined && 'claud' in misspelled.keys, 'a key no step has is carried, for the write to refuse');
+  assert.throws(() => renderStep({ name: 'design', body: misspelled.body, ...misspelled.keys } as never));
+});

@@ -309,9 +309,14 @@ test('REFUSED: a card queued on the folder, freed by the commands its refusal na
     Conflict,
     `${dir} is still needed: card queued-idea is queued to start on ${dir}: nemia inbox queue queued-idea --off takes it back, and nemia inbox queue queued-idea --workflow <w> then queues it on another. Nothing was removed.`,
   );
-  assert.throws(() => queueInInbox('queued-idea', { workflow: other }), Conflict, 'a card still queued is not queued on another');
+  assert.throws(
+    () => queueInInbox('queued-idea', { workflow: path.basename(other) }),
+    Conflict,
+    'a card still queued is not queued on another',
+  );
   queueInInbox('queued-idea', { off: true });
-  queueInInbox('queued-idea', { workflow: other });
+  queueInInbox('queued-idea', { workflow: path.basename(other) });
+  await assert.rejects(remove(other), Conflict, 'a card queued by the folder name, as a card names its workflow now, holds it too');
   await remove(dir);
   assert.equal(fs.existsSync(dir), false);
   const idle = folder('card-idle', { 'only.md': '---\nplace: git\n---\nDo it.\n' });

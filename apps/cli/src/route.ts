@@ -21,8 +21,11 @@ export const READ_VERBS = ['doctor', 'daemon'] as const;
 /** A read this client asks the api for. */
 export type ReadVerb = (typeof READ_VERBS)[number];
 
-/** The verbs this client alone has, generic over every kind the api serves: no process answers them. */
-export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide'] as const;
+/**
+ * The verbs this client alone has, generic over every kind the api serves, and `channel`, the feed pushed into a Claude Code session
+ * (`src/watch/channel.ts`): no process answers them.
+ */
+export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide', 'channel'] as const;
 
 /** One of `CLIENT_VERBS`. */
 export type ClientVerb = (typeof CLIENT_VERBS)[number];

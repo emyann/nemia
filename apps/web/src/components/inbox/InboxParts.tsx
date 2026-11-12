@@ -18,8 +18,9 @@ import { BUTTON_OUTLINED } from '../../lib/classes';
 
 /**
  * A card's line under its title: its name; the factory it names, linked to its floor, or, for a card that names none (`unassigned`),
- * that it has no factory yet, and never a tag; its workflow and repository when it names them; and when it was filed. An entry that does
- * not read as a card says nothing of a factory.
+ * that it has no factory yet, and never a tag; its workflow when it names one; an older card's `repo:`, retired and struck, since the
+ * factory places the run and the line is read by nothing; and when it was filed. An entry that does not read as a card says nothing of a
+ * factory.
  */
 export function CardMeta({ entry }: { entry: InboxEntry }) {
   return (
@@ -39,9 +40,9 @@ export function CardMeta({ entry }: { entry: InboxEntry }) {
         </span>
       )}
       {entry.repo && (
-        <span data-repo className="font-mono break-all">
+        <s data-repo="retired" title="retired: the factory places the run" className="font-mono break-all">
           {entry.repo}
-        </span>
+        </s>
       )}
       {entry.filedAt && <Instant at={entry.filedAt} about="When its file was last written" />}
     </p>

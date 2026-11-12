@@ -35,16 +35,14 @@ import {
   cardsSearch,
   factoriesOffered,
   factoryPreset,
+  cardRepo,
   factoryRepoOf,
   hasPage,
-  ignoredRepoNote,
   inboxBadgeTitle,
   inPlay,
-  namedElsewhere,
   newestCardsFirst,
   notStarted,
   ordinal,
-  presetOf,
   queueable,
   queueNeedsFactory,
   queuedWord,
@@ -99,9 +97,6 @@ const WORKFLOWS = [
   listing('mine', 'yours', '/home/me/.agent-workflows/workflows/mine'),
 ];
 
-/** The api's repository, whose workflows WORKFLOWS lists as the repository's. */
-const HERE = '/code/app';
-
 /** An entry as the inbox lists it: a card by its name, a stray file by its own, which is its name too. */
 const entryOf = (name: string, card = true) => ({ name, file: card ? `${name}.md` : name });
 
@@ -126,7 +121,7 @@ const answered = (status: number, body: object | string, statusText = '') =>
     headers: { 'content-type': 'application/json' },
   });
 
-test('newestCardsFirst, hasPage, namedElsewhere: the cards in order, a refusal on its own entry, and which entry has a page', async (t) => {
+test('newestCardsFirst, hasPage: the cards in order, a refusal on its own entry, and which entry has a page', async (t) => {
   await t.test('the cards are listed newest first, by when each was filed, then by name; one whose time is not known goes last', () => {
     const cards = [
       entry('older-k2q9', '2026-09-15T10:00:00.000Z'),
@@ -264,92 +259,10 @@ test('newestCardsFirst, hasPage, namedElsewhere: the cards in order, a refusal o
   });
 });
 
-test("presetOf, ignoredRepoNote, afterFor: a card's start preset, its repository said, and the runs it waits on", async (t) => {
-  await t.test(
-    "a card's start is preset to the workflow it names, found as a start finds it: a name is the repository's, a path that folder",
-    () => {
-      assert.equal(
-        presetOf('dev', null, HERE, WORKFLOWS),
-        WORKFLOWS[0],
-        "a name is the repository's workflow, though yours has one of that name too",
-      );
-      for (const repo of [HERE, `${HERE}/`])
-        assert.equal(
-          presetOf('dev', repo, HERE, WORKFLOWS),
-          WORKFLOWS[0],
-          `a card about the api's repository, ${repo}, names one of its workflows`,
-        );
-      assert.equal(
-        presetOf('/home/me/.agent-workflows/workflows/dev', null, HERE, WORKFLOWS),
-        WORKFLOWS[2],
-        'an absolute path is that folder, yours included',
-      );
-      assert.equal(presetOf('/home/me/.agent-workflows/workflows/mine/', null, HERE, WORKFLOWS), WORKFLOWS[3], 'with a trailing slash too');
-      assert.equal(
-        presetOf('/code/app/workflows/dev', '/code/other', HERE, WORKFLOWS),
-        WORKFLOWS[0],
-        'an absolute path on a card about another repository is that folder',
-      );
-      assert.equal(workflowKey(WORKFLOWS[2]), 'yours:dev');
-    },
-  );
-  await t.test(
-    'REFUSED: no preset for a card that names no workflow, a workflow nobody here has, one that does not read, a name only yours has, or a relative path',
-    () => {
-      for (const workflow of [
-        null,
-        '',
-        'nope',
-        'broken',
-        '/code/app/workflows/broken',
-        'mine',
-        '../workflows/dev',
-        'workflows/dev',
-        '.',
-        '..',
-        '/elsewhere/dev',
-      ]) {
-        assert.equal(presetOf(workflow, null, HERE, WORKFLOWS), null, String(workflow));
-      }
-    },
-  );
-  await t.test(
-    "REFUSED: no preset for a name on a card about another repository, though the api's repository has a workflow of that name — a start looks for it in the card's",
-    () => {
-      assert.equal(presetOf('dev', '/code/other', HERE, WORKFLOWS), null);
-      assert.equal(presetOf('dev', '/code/app-two', HERE, WORKFLOWS), null, "a repository whose path starts with the api's is another");
-      assert.equal(namedElsewhere('dev', '/code/other', HERE), true);
-      for (const [workflow, repo] of [
-        ['dev', null],
-        ['dev', HERE],
-        ['dev', `${HERE}/`],
-        ['/code/other/workflows/dev', '/code/other'],
-        ['../workflows/dev', '/code/other'],
-        [null, '/code/other'],
-      ] as const) {
-        assert.equal(namedElsewhere(workflow, repo, HERE), false, `${workflow} on ${repo}`);
-      }
-    },
-  );
-  await t.test(
-    "a card's repository on a team that works in folders: the start form says it is not looked at, before the start, and names it",
-    () => {
-      const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
-      const said = ignoredRepoNote(inFolders, '/code/app');
-      assert.equal(
-        said,
-        "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.",
-        "said before the start: a start the api takes opens the run's page, so the api's `ignoredRepo` on the start is never read here",
-      );
-      assert.match(said, /\/code\/app/, 'and it names the repository the card named, not a repository in general');
-    },
-  );
-  await t.test('REFUSED: nothing is said of a repository a run does look at, nor of a card that names none', () => {
-    const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
-    const inFolders = { ...onRepo, folderTeam: true };
-    assert.equal(ignoredRepoNote(onRepo, '/code/app'), null, 'a team that works on a repository looks at the one the card names');
-    for (const none of [undefined, null, ''])
-      assert.equal(ignoredRepoNote(inFolders, none), null, `a card that names none: ${JSON.stringify(none)}`);
+test("afterFor, workflowKey: the runs a card's start waits on, and a workflow as a pick is keyed", async (t) => {
+  await t.test('a workflow as a pick is keyed by its source and its name: yours and the repository may each have one of a name', () => {
+    assert.equal(workflowKey(WORKFLOWS[0]), 'repo:dev');
+    assert.equal(workflowKey(WORKFLOWS[2]), 'yours:dev');
   });
   await t.test('a start sends the runs it waits on, as they were picked', () => {
     const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
@@ -388,7 +301,7 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
     async (t) => {
       let answer = (): Response => answered(201, cardAnswer('cache-the-views-k2q9', 'pair'), 'Created');
       const sent = sending(t, () => answer());
-      const card = { body: 'Cache the views', workflow: 'dev', from: 'repo' as const, repo: '/code/app', factory: 'pair' };
+      const card = { body: 'Cache the views', workflow: 'dev', factory: 'pair' };
       assert.deepEqual(await fileCard(card), { name: 'cache-the-views-k2q9' });
       const [{ url, init }] = sent as [(typeof sent)[number]];
       assert.deepEqual(
@@ -398,7 +311,13 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
       const { factory: _, ...body } = card;
       assert.deepEqual(JSON.parse(String(init?.body)), body, 'the factory is the namespace, never sent twice');
       answer = () => answered(201, cardAnswer('a-k2q9'), 'Created');
-      await fileCard({ body: 'An idea' });
+      const held = { body: 'An idea', repo: '/code/app', from: 'repo' };
+      await fileCard(held);
+      assert.deepEqual(
+        JSON.parse(String(sent[1]?.init?.body)),
+        { body: 'An idea' },
+        'never a repository nor an origin, whatever the caller held',
+      );
       assert.equal(sent[1]?.url, '/api/namespaces/default/cards', 'a card that names no factory is filed in default');
 
       answer = () => answered(422, { error: 'the idea names no directory' });
@@ -455,7 +374,7 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
     async (t) => {
       let answer = (): Response => answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created');
       const sent = sending(t, () => answer());
-      const asked = { workflow: 'dev', from: 'repo' as const, brief: "Show each step's cost", after: ['p-1'] };
+      const asked = { workflow: 'dev', brief: "Show each step's cost", after: ['p-1'] };
       const card = { name: 'show-what-a-step-cost-c3cw', factory: null };
       assert.deepEqual(await startCard(card, asked), { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' });
       assert.equal(sent[0]?.url, '/api/namespaces/default/cards/show-what-a-step-cost-c3cw/start');
@@ -494,20 +413,27 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
       );
     },
   );
-  await t.test('a card started in a factory says the factory and its repository in the query, the body as before', async (t) => {
-    const sent = sending(t, () => answered(201, { id: 'r', card: 'c' }, 'Created'));
-    const asked = { workflow: 'good', from: 'repo' as const, brief: 'Hire' };
-    await startCard({ name: 'c', factory: null }, asked, { factory: 'hiring', repo: '/r/x' });
-    assert.equal(sent[0]?.url, '/api/namespaces/default/cards/c/start?factory=hiring&repo=%2Fr%2Fx');
-    assert.deepEqual(JSON.parse(String(sent[0]?.init?.body)), asked);
-    await startCard({ name: 'c', factory: 'hiring' }, asked, { factory: 'default', repo: '/r/x' });
-    await startCard({ name: 'c', factory: 'hiring' }, asked);
-    assert.deepEqual(
-      sent.slice(1).map((s) => s.url),
-      ['/api/namespaces/hiring/cards/c/start', '/api/namespaces/hiring/cards/c/start'],
-      'the default factory, and no place, send no query',
-    );
-  });
+  await t.test(
+    'REFUSED: a card started in a factory says the factory alone in the query, never a repository, nor an origin in the body',
+    async (t) => {
+      const sent = sending(t, () => answered(201, { id: 'r', card: 'c' }, 'Created'));
+      const asked = { workflow: 'good', brief: 'Hire' };
+      await startCard({ name: 'c', factory: null }, { ...asked, from: 'repo', repo: '/r/x' } as typeof asked, 'hiring');
+      assert.equal(sent[0]?.url, '/api/namespaces/default/cards/c/start?factory=hiring', "the factory's wiring places the run");
+      assert.deepEqual(
+        JSON.parse(String(sent[0]?.init?.body)),
+        asked,
+        'the workflow by its name, which the factory finds, whatever the caller held',
+      );
+      await startCard({ name: 'c', factory: 'hiring' }, asked, 'default');
+      await startCard({ name: 'c', factory: 'hiring' }, asked);
+      assert.deepEqual(
+        sent.slice(1).map((s) => s.url),
+        ['/api/namespaces/hiring/cards/c/start', '/api/namespaces/hiring/cards/c/start'],
+        'the default factory, and no place, send no query',
+      );
+    },
+  );
   await t.test("a run started of no card goes to its factory's namespace, its repository in the query, none for the default", async (t) => {
     const sent = sending(t, () => answered(201, { id: 'r' }, 'Created'));
     await startRun({ workflow: 'good', from: 'repo', brief: 'Hire' }, { factory: 'hiring', repo: '/r/x' });
@@ -518,23 +444,6 @@ test('fileCard, dropCard, startCard, queueCard: what the board sends the api for
       ['/api/namespaces/hiring/runs?repo=%2Fr%2Fx', '/api/namespaces/default/runs', '/api/namespaces/default/runs'],
     );
   });
-});
-
-test("factoryRepoOf: the repository a card's factory picks, read off the factories as the orchestrator reads it", () => {
-  const f = (name: string, repos: string[], extra: { default?: boolean; error?: string | null } = {}) => ({
-    name,
-    repos,
-    default: extra.default ?? false,
-    error: extra.error ?? null,
-  });
-  const factories = [f('solo', ['/code/app']), f('pair', ['/r/a', '/r/b']), f('broken', ['/r/c'], { error: 'bad' })];
-  assert.equal(factoryRepoOf({ repo: null, factory: 'solo' }, factories), '/code/app', 'its one repository');
-  assert.equal(factoryRepoOf({ repo: '/code/own', factory: 'solo' }, factories), null, 'a card that names its own');
-  assert.equal(factoryRepoOf({ repo: null, factory: 'pair' }, factories), null, 'a factory with several');
-  assert.equal(factoryRepoOf({ repo: null, factory: 'broken' }, factories), null, 'a factory that does not read');
-  assert.equal(factoryRepoOf({ repo: null, factory: null }, factories), null, 'no factory');
-  assert.equal(factoryRepoOf({ repo: null, factory: 'default' }, [f('default', ['/x'], { default: true })]), null, 'the default');
-  assert.equal(factoryRepoOf({ repo: null, factory: 'solo' }, undefined), null, 'the factories unread');
 });
 
 test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and the Factory say it', async (t) => {
@@ -642,42 +551,39 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
     },
   );
   await t.test(
-    "a start the tick tried and did not make says so as `wf inbox` does: refused, it stays queued and waits for you; failed, it is tried again — the repository named for a card of a factory that names none, never for one that names no factory, and a why the card's own refusal says not said twice",
+    "a start the tick tried and did not make says so as `wf inbox` does: refused, it stays queued and waits for you; failed, it is tried again — the repository named for a card of a factory, as its factory's where its wiring gives it, never for one that names no factory, and a why the card's own refusal says not said twice",
     () => {
       const at = '2026-09-16T10:00:00.000Z';
       const refused = { at, repo: '/code/app', why: 'no workflow gone in /code/app/workflows.', refused: true };
       assert.equal(
-        triedLine({ repo: '/code/app', factory: 'solo', factoryRepo: null, error: null, tried: refused }, 'then'),
-        'Not started at then: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
+        triedLine({ factory: 'solo', factoryRepo: null, error: null, tried: refused }, 'then'),
+        'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
+        'a factory that wires no repository for it: the try names where it was, and no daemon is told to run elsewhere',
       );
       assert.equal(
-        triedLine({ repo: null, factory: 'solo', factoryRepo: null, error: null, tried: refused }, 'then'),
-        'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run the daemon in the repository it is about.',
-        "a factory that picks no repository: tried on the daemon's, which may run elsewhere",
+        triedLine({ factory: 'solo', factoryRepo: '/code/app', error: null, tried: refused }, 'then'),
+        "Not started at then on /code/app, its factory's repository for its workflow: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.",
+        'tried on the repository its factory wires for its workflow, from a daemon anywhere',
       );
       assert.equal(
-        triedLine({ repo: null, factory: 'solo', factoryRepo: '/code/app', error: null, tried: refused }, 'then'),
-        "Not started at then on /code/app, its factory's one repository: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.",
-        "tried on its factory's one repository, from a daemon anywhere: no daemon is told to run elsewhere",
+        triedLine({ factory: 'solo', factoryRepo: '/r/b', error: null, tried: refused }, 'then'),
+        'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
+        'a try on another repository than its wiring gives now (the wiring changed since) is not said to be the wired one',
       );
       const unfactored = 'card.md: this card names no factory, and a card is started only in the factory named for it.';
       assert.equal(
-        triedLine({ repo: null, factory: null, factoryRepo: null, error: null, tried: { ...refused, why: unfactored } }, 'then'),
+        triedLine({ factory: null, factoryRepo: null, error: null, tried: { ...refused, why: unfactored } }, 'then'),
         `Not started at then: ${unfactored} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.`,
         'a card that names no factory is refused wherever a daemon runs: no repository is named to run one in',
       );
-      const gone = 'card.md: `repo: /code/gone` names no directory.';
+      const gone = 'card.md: `workflow: a/b` names a path; a card names a workflow by its name.';
       assert.equal(
-        triedLine(
-          { repo: '/code/gone', factory: null, factoryRepo: null, error: gone, tried: { ...refused, repo: '/code/gone', why: gone } },
-          'then',
-        ),
+        triedLine({ factory: null, factoryRepo: null, error: gone, tried: { ...refused, repo: '/code/gone', why: gone } }, 'then'),
         'Not started at then. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
       );
       assert.equal(
         triedLine(
           {
-            repo: '/code/app',
             factory: 'solo',
             factoryRepo: null,
             error: null,
@@ -685,7 +591,7 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
           },
           'then',
         ),
-        'Failed at then: git: not a git repository. Not a refusal: the tick tries it again on every pass, where it keeps its place.',
+        'Failed at then on /code/app: git: not a git repository. Not a refusal: the tick tries it again on every pass, where it keeps its place.',
       );
     },
   );
@@ -725,6 +631,7 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
   untrusted: [],
   volumes: [],
   costLines: {},
+  workflowRepos: {},
   template: null,
 });
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];
@@ -733,31 +640,34 @@ const SOLO = { name: 'solo', repos: ['/r/a'] };
 
 const PAIR = { name: 'pair', repos: ['/r/a', '/r/b'] };
 
-const GIT = { name: 'good', from: 'repo' as const, folderTeam: false };
-
-const FOLDERS = { name: 'notes', from: 'yours' as const, folderTeam: true };
-
 test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and place, the filing box and the badge", async (t) => {
   await t.test(
-    "a card's place: none in the default factory; a factory's one repository filled in; the card's repo: among several, else none to pick",
+    "a card's place: none in the default factory; else its factory, the workflow it names where offered, and the repository wired for it",
     () => {
       assert.equal(cardPlace(entry('a', null), FACTORIES, FILE_FACTORY), null);
       assert.equal(cardPlace(entry('a', null, { factory: 'default' }), FACTORIES, FILE_FACTORY), null);
-      assert.deepEqual(cardPlace(entry('a', null, { factory: 'solo' }), FACTORIES, FILE_FACTORY), {
-        factory: 'solo',
-        repos: ['/r/a'],
-        repo: '/r/a',
-      });
-      assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair', repo: '/r/b' }), FACTORIES, FILE_FACTORY), {
-        factory: 'pair',
-        repos: ['/r/a', '/r/b'],
-        repo: '/r/b',
-      });
-      assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair' }), FACTORIES, FILE_FACTORY), {
-        factory: 'pair',
-        repos: ['/r/a', '/r/b'],
-        repo: null,
-      });
+      const solo = cardPlace(entry('a', null, { factory: 'solo', workflow: 'good' }), FACTORIES, FILE_FACTORY);
+      assert.ok(solo && !('why' in solo));
+      assert.deepEqual([solo.factory.name, solo.workflow, solo.on], ['solo', 'good', { repo: '/r/a' }], "the factory's only one");
+      const pair = cardPlace(entry('a', null, { factory: 'pair', workflow: 'good', repo: '/r/b' }), FACTORIES, FILE_FACTORY);
+      assert.ok(pair && !('why' in pair) && pair.on !== null && 'refused' in pair.on);
+      assert.equal(pair.on.refused, 'unwired', "several, none wired: never the card's retired repo:");
+      const wired = [
+        ...FACTORIES.filter((f) => f.name !== 'pair'),
+        { ...factoryOn('pair', ['/r/a', '/r/b']), workflowRepos: { good: 'b' } },
+      ];
+      const placed = cardPlace(entry('a', null, { factory: 'pair', workflow: 'good' }), wired, FILE_FACTORY);
+      assert.ok(placed && !('why' in placed));
+      assert.deepEqual(placed.on, { repo: '/r/b' }, 'the one its wiring names');
+      for (const workflow of [null, 'nope', '/code/app/workflows/good', 'workflows/good']) {
+        const none = cardPlace(entry('a', null, { factory: 'pair', workflow }), FACTORIES, FILE_FACTORY);
+        assert.ok(none && !('why' in none));
+        assert.deepEqual(
+          [none.workflow, none.on],
+          [null, null],
+          `${workflow}: no workflow the factory offers by that name, so none preset`,
+        );
+      }
     },
   );
   await t.test(
@@ -871,70 +781,29 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     assert.equal(factoryPreset('solo', []), '', 'shown, and not offered');
   });
   await t.test(
-    'REFUSED: the box sends no repository a person did not choose — none with no factory, none for a factory on one repository, whatever a list held before',
+    'REFUSED: the box never sends a repository nor an origin — a card names its factory and a workflow by name, the factory places its run',
     () => {
-      assert.deepEqual(
-        cardFiling({ idea: 'An idea', factory: null, repo: '/r/b', workflow: GIT }),
-        { body: 'An idea' },
-        'no factory: the idea alone, also when a workflow and a repository were picked under a factory chosen before',
-      );
-      const solo = cardFiling({ idea: 'An idea', factory: SOLO, repo: '', workflow: GIT });
-      assert.deepEqual(solo, { body: 'An idea', factory: 'solo', workflow: 'good', from: 'repo' });
-      assert.equal('repo' in solo, false, "a factory's only repository is the factory's to give");
-      assert.equal(
-        'repo' in cardFiling({ idea: 'An idea', factory: SOLO, repo: '/r/a', workflow: null }),
-        false,
-        'nor is it sent when a list held it under a factory chosen before: one repository offers no list',
-      );
-      assert.equal(
-        'repo' in cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/elsewhere', workflow: null }),
-        false,
-        "a repository picked under another factory is none of this one's",
-      );
+      assert.deepEqual(cardFiling({ idea: 'An idea', factory: null, workflow: 'good' }), { body: 'An idea' }, 'no factory: the idea alone');
+      assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, workflow: null }), { body: 'An idea', factory: 'pair' });
+      for (const factory of [SOLO, PAIR]) {
+        const filed = cardFiling({ idea: 'An idea', factory, workflow: 'good' });
+        assert.deepEqual(filed, { body: 'An idea', factory: factory.name, workflow: 'good' }, factory.name);
+        assert.equal('repo' in filed, false, `${factory.name}: the factory's wiring places the run, never the card`);
+        assert.equal('from' in filed, false, `${factory.name}: the factory finds the workflow by its name`);
+      }
+      const held = { idea: 'An idea', factory: PAIR, workflow: 'good', repo: '/r/b', from: 'repo' } as Parameters<typeof cardFiling>[0];
+      assert.deepEqual(Object.keys(cardFiling(held)).sort(), ['body', 'factory', 'workflow'], 'whatever a caller still holds');
     },
   );
   await t.test(
-    'in a factory on several repositories the box sends the one a person picked, and none with a workflow that works in folders',
-    () => {
-      assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '', workflow: null }), { body: 'An idea', factory: 'pair' });
-      assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/b', workflow: GIT }), {
-        body: 'An idea',
-        factory: 'pair',
-        workflow: 'good',
-        from: 'repo',
-        repo: '/r/b',
-      });
-      assert.deepEqual(cardFiling({ idea: 'An idea', factory: PAIR, repo: '/r/b', workflow: FOLDERS }), {
-        body: 'An idea',
-        factory: 'pair',
-        workflow: 'notes',
-        from: 'yours',
-      });
-    },
-  );
-  await t.test(
-    "a card of no factory starts nowhere until a factory is picked, then in that factory's place: its one repository, or the card's repo: among several",
+    "a card of no factory starts nowhere until a factory is picked, then in that factory's place, whatever repository the card names",
     () => {
       assert.equal(startPlace(entry('a', null), '', FACTORIES, FILE_FACTORY), null);
-      assert.deepEqual(startPlace(entry('a', null), 'solo', FACTORIES, FILE_FACTORY), { factory: 'solo', repos: ['/r/a'], repo: '/r/a' });
-      assert.deepEqual(startPlace(entry('a', null, { factory: 'default', repo: '/r/b/' }), 'pair', FACTORIES, FILE_FACTORY), {
-        factory: 'pair',
-        repos: ['/r/a', '/r/b'],
-        repo: '/r/b/',
-      });
-      assert.deepEqual(startPlace(entry('a', null), 'pair', FACTORIES, FILE_FACTORY), {
-        factory: 'pair',
-        repos: ['/r/a', '/r/b'],
-        repo: null,
-      });
-    },
-  );
-  await t.test(
-    'REFUSED: a card about a repository the picked factory does not work on has no place there — it says why, naming both',
-    () => {
-      assert.deepEqual(startPlace(entry('a', null, { repo: '/code/app' }), 'pair', FACTORIES, FILE_FACTORY), {
-        why: "The card is about /code/app, and the factory pair works on /r/a, /r/b: pick a factory that works on it, or change the card's repo: line.",
-      });
+      const solo = startPlace(entry('a', null, { workflow: 'good', repo: '/code/app' }), 'solo', FACTORIES, FILE_FACTORY);
+      assert.ok(solo && !('why' in solo));
+      assert.deepEqual([solo.factory.name, solo.workflow, solo.on], ['solo', 'good', { repo: '/r/a' }]);
+      const gone = startPlace(entry('a', null), 'gone', FACTORIES, FILE_FACTORY);
+      assert.ok(gone && 'why' in gone, 'a factory the store does not have says why');
     },
   );
   await t.test(
@@ -1008,4 +877,35 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       assert.deepEqual([CARD_WORDS[outcome].word, CARD_WORDS[outcome].hue], [ENDED[outcome].word, ENDED[outcome].hue], outcome);
     }
   });
+});
+
+test("cardRepo, factoryRepoOf: the repository a card's factory wires for its workflow, read off the factories as the orchestrator reads it", () => {
+  const wired = (name: string, repos: string[], workflowRepos: Record<string, string> = {}) => ({
+    ...factoryOn(name, repos),
+    workflowRepos,
+  });
+  const factories = [
+    wired('solo', ['/code/app']),
+    wired('pair', ['/r/app', '/r/docs'], { good: 'docs' }),
+    factoryOn('broken', ['/r/c'], 'bad'),
+    factoryOn('default', ['/x']),
+  ];
+  const card = (factory: string | null, workflow: string | null, repo: string | null = null) =>
+    entry('c', null, { factory, workflow, repo });
+  assert.deepEqual(cardRepo(card('solo', 'good'), factories), { repo: '/code/app' }, 'its only one');
+  assert.deepEqual(cardRepo(card('solo', null), factories), { repo: '/code/app' }, 'its only one, with no workflow named');
+  assert.deepEqual(cardRepo(card('pair', 'good'), factories), { repo: '/r/docs' }, 'the one its wiring names for the workflow');
+  assert.deepEqual(cardRepo(card('pair', 'good', '/r/app'), factories), { repo: '/r/docs' }, "never the card's repo:, which is retired");
+  const unwired = cardRepo(card('pair', 'other'), factories);
+  assert.ok(unwired !== null && 'refused' in unwired && unwired.refused === 'unwired', 'several, and none named for it');
+  assert.match(unwired.why, /nemia factory attach pair other --repo/);
+  assert.equal(cardRepo(card('pair', null), factories), null, 'several, and no workflow named: its start picks one');
+  assert.equal(cardRepo(card('pair', '/code/app/workflows/good'), factories), null, 'a path is no workflow name');
+  assert.equal(cardRepo(card('broken', 'good'), factories), null, 'a factory that does not read');
+  assert.equal(cardRepo(card(null, 'good'), factories), null, 'no factory: the daemon places it');
+  assert.equal(cardRepo(card('default', 'good'), factories), null, 'the default');
+  assert.equal(cardRepo(card('gone', 'good'), factories), null, 'a factory not listed');
+  assert.equal(cardRepo(card('solo', 'good'), undefined), null, 'the factories unread');
+  assert.equal(factoryRepoOf(card('pair', 'good'), factories), '/r/docs');
+  assert.equal(factoryRepoOf(card('pair', 'other'), factories), null, 'a refusal is no repository');
 });

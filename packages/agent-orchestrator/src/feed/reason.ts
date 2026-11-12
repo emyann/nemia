@@ -70,9 +70,10 @@ export const DENIED = 'denied: ';
 
 /**
  * The word each of a person's acts, each of the two runtime faults, a step's closeout read, the store's pause, a factory's level and
- * its conflicts, and a pinned run behind its files say, the one place it is spelled: the owner named the first six at their slice's
- * design gate, `closed out` on its card, `revisions behind` at its design's, `level changed` on its card and the conflicts' two at theirs,
- * and `reason.test.ts` holds each literally beside the rule below that reads it back.
+ * its conflicts, a pinned run behind its files and the store's readiness say, the one place it is spelled: the owner named the first six
+ * at their slice's design gate, `closed out` on its card, `revisions behind` at its design's, `level changed` on its card, the
+ * conflicts' two at theirs and the readiness' two codes on theirs (`NotReady`, `Ready`, said as the codes read), and `reason.test.ts`
+ * holds each literally beside the rule below that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by**: the retired prose match found its words anywhere inside a line's word, so
  * `failed`, `blocked` or `needs:` in one of these would have woken a subscriber for a fact the owner said waits on nobody — which is why a
@@ -89,6 +90,8 @@ export const LINE_WORDS = {
   StorePaused: 'store paused',
   StoreResumed: 'store resumed',
   LevelChanged: 'level changed',
+  NotReady: 'not ready',
+  Ready: 'ready',
   ConflictsPending: 'conflicts pending',
   ConflictsSettled: 'conflicts settled',
   RevisionsBehind: 'revisions behind',
@@ -137,6 +140,8 @@ export const REASONS = {
   StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
   StoreResumed: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
   LevelChanged: { kinds: ['Store'], type: 'Normal', source: 'person' },
+  NotReady: { kinds: ['Store'], type: 'Warning' },
+  Ready: { kinds: ['Store'], type: 'Normal' },
   ConflictsPending: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   ConflictsSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
 } as const satisfies Record<string, Entry>;
@@ -250,13 +255,16 @@ const STEP_WORDS: readonly Rule[] = [
 ];
 
 /**
- * The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`); and a factory's level in force,
- * a word that stands per factory until the level changes (`levelLines`).
+ * The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`); a factory's level in force,
+ * a word that stands per factory until the level changes (`levelLines`); and the store's readiness, a word that stands until a piece a
+ * run waits on goes missing or is put back (`readinessLines`), the tick's judgement of the daemon's read.
  */
 const STORE_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.StorePaused, reason: 'StorePaused' },
   { is: LINE_WORDS.StoreResumed, reason: 'StoreResumed' },
   { is: LINE_WORDS.LevelChanged, reason: 'LevelChanged' },
+  { is: LINE_WORDS.NotReady, reason: 'NotReady' },
+  { is: LINE_WORDS.Ready, reason: 'Ready' },
 ];
 
 /**

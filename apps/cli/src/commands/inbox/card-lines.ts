@@ -20,10 +20,16 @@ export const labelsText = (labels: Readonly<Record<string, string>>): string => 
 /** The card's file in the inbox, as the api names it: `<name>.md`. */
 export const fileOf = (card: Card): string => card.status.file ?? `${card.metadata.name}.md`;
 
-/** `  repo: <r>  factory: <f>`, each where the card has it: what a line of a card says after its workflow. */
-export const repoFactory = (card: Card): string => {
+/**
+ * `  repo: <r> (retired)  factory: <f>`, each where the card has it: what a line of a queued card says after its workflow, an older card's
+ * `repo:` said retired, since its factory places its run.
+ */
+export const repoFactory = (card: Card): string => `${card.spec.repo ? `  repo: ${card.spec.repo} (retired)` : ''}${factoryLine(card)}`;
+
+/** `  factory: <f>`, where the card is in one: what a line of a card filed says after its workflow. */
+export const factoryLine = (card: Card): string => {
   const factory = factoryOf(card);
-  return `${card.spec.repo ? `  repo: ${card.spec.repo}` : ''}${factory ? `  factory: ${factory}` : ''}`;
+  return factory ? `  factory: ${factory}` : '';
 };
 
 /** Refuses a `--workflow` given as a path, for `command` typed as `form`: a workflow is named, and the daemon finds it by its name. */

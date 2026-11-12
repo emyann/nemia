@@ -18,6 +18,8 @@ import {
   unofferedScheduleRefusal,
   unscheduledRefusal,
   workflowNameRefusal,
+  repoNameRefusal,
+  reposNamed,
   type Factory,
 } from '../src/factory/factory.ts';
 import {
@@ -43,7 +45,14 @@ export const words = [
   assume(costLinedDetachRefusal, { pure: true }),
   assume(unofferedScheduleRefusal, { pure: true }),
   assume(unscheduledRefusal, { pure: true }),
+  assume(repoNameRefusal, { pure: true }),
 ];
+
+/**
+ * How many of a factory's repositories have a folder name: the domain's word for a repository the wiring names, read the same by the laws
+ * and the code; what a folder name is (the last segment of a resolved path) is its tests'.
+ */
+export const repoCount = assume(reposNamed, { pure: true });
 
 /** Whether hires hire into a workflow's steps: the domain's word, read the same by the laws and the code. */
 export const hiring = assume(hiresInto, { pure: true });
@@ -142,9 +151,19 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
         output?.kind === 'Missing',
     },
     attachAccepted: {
-      description: 'An attach of a well-named workflow is never refused',
-      condition: ({ input: [, change], output }) =>
-        change.verb !== 'attach' || workflowNameRefusal(change.workflow) !== undefined || output === null,
+      description:
+        'An attach of a well-named workflow that names no repository, or one by a folder name one repository alone has, is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        (change.repo !== undefined && reposNamed(factory, change.repo) !== 1) ||
+        output === null,
+    },
+    attachRepoKnown: {
+      description:
+        'An attach that names a repository by a folder name none of its repositories has, or several share, is refused, as Invalid',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb !== 'attach' || change.repo === undefined || reposNamed(factory, change.repo) === 1 || output?.kind === 'Invalid',
     },
     takesWhatItCan: {
       description: 'A change but a hire, well named, that the factory can take is never refused',
@@ -200,6 +219,7 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
     'output.harnessSettings',
     'output.costLines',
     'output.origins',
+    'output.workflowRepos',
   ],
   ensures: {
     detachWithdraws: {
@@ -238,3 +258,36 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
   },
 });
 export type Rewired = Implementation<typeof rewiredSpec>;
+
+/**
+ * The workflows' repositories after a change of the wiring (`reposRewired`), which `rewired` writes as the factory's `workflowRepos`
+ * on an attach that names one and on a detach: its own function, since the verifier reads no optional field of the factory through the
+ * spread `rewired` copies the rest by (tsverify's `docs/reads.md`), so `rewired` leaves `output.workflowRepos` open to these laws. A
+ * workflow named `__proto__` is left out of `attachWiresRepo`: a record holds no key of that name, JavaScript setting the prototype
+ * there instead, and no workflow is so named.
+ */
+const reposRewiredSpec = spec<
+  (wired: Readonly<Record<string, string>> | undefined, change: WiringChange) => Readonly<Record<string, string>> | undefined
+>({
+  /**
+   * Whether a wiring that names no repository is said by an empty record or by none is the code's: the factory's file writes neither
+   * (`fileContentOf`, `factory.store.ts`), and a start reads both as naming none (`workflowRepo`).
+   */
+  open: ['output'],
+  ensures: {
+    attachWiresRepo: {
+      description: 'After an attach that names a repository, the workflow works on it',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'attach' ||
+        change.repo === undefined ||
+        change.workflow === '__proto__' ||
+        (output !== undefined && Object.hasOwn(output, change.workflow) && output[change.workflow] === change.repo),
+    },
+    detachUnwires: {
+      description: 'After a detach the factory names no repository for the workflow',
+      condition: ({ input: [, change], output }) =>
+        change.verb !== 'detach' || output === undefined || !Object.hasOwn(output, change.workflow),
+    },
+  },
+});
+export type ReposRewired = Implementation<typeof reposRewiredSpec>;

@@ -100,19 +100,20 @@ test('the box with no factory to offer has the one choice, and the line that fil
   );
 });
 
-test("the box preset to the address's factory says its one repository as text, and offers the repositories of a factory on several as a list with none chosen", async () => {
+test("the box preset to the address's factory lists the workflows it offers by name, and says the repository as text — never a Repository list", async () => {
   const solo = await routedWith(createElement(FileCard, { shown: 'solo' }), [[['factories'], LISTED], STORE_ANSWER]);
   assert.match(solo, /<option value="solo" selected="">solo<\/option>/);
   assert.match(solo, /data-factory-repo="true"[^>]*>\/r\/a<\/p>/);
   assert.doesNotMatch(solo, /<input|data-parked/, 'no repository to type');
-  assert.match(solo, />Workflow<\/label>/);
+  assert.match(
+    solo,
+    />Workflow<\/label><select[^>]*><option value="" selected="">None: chosen at start<\/option><option value="dev">dev<\/option><\/select>/,
+  );
 
   const pair = await routedWith(createElement(FileCard, { shown: 'pair' }), [[['factories'], LISTED], STORE_ANSWER]);
-  assert.match(
-    pair,
-    />Repository<\/label><select[^>]*><option value="" selected="">None: chosen at start<\/option><option value="\/r\/a">\/r\/a<\/option><option value="\/r\/b">\/r\/b<\/option><\/select>/,
-  );
-  assert.match(pair, /data-needs-repo="true"/, 'its workflows are read once a repository is picked');
+  assert.doesNotMatch(pair, />Repository<\/label>|<option value="\/r\/a">/, 'no repository picker: the factory places the run');
+  assert.doesNotMatch(pair, /data-needs-repo/, 'and its workflows are offered with none picked');
+  assert.match(pair, /<option value="dev">dev<\/option>/);
 });
 
 test("a queued card's ghost says how long ago it was queued as every page says an age: just now under a minute, then in minutes", async () => {
@@ -122,4 +123,57 @@ test("a queued card's ghost says how long ago it was queued as every page says a
   const html = await routedWith(createElement(QueueLane, { cards: [queuedAgo(20_000, 'fresh'), queuedAgo(3 * 60_000 + 20_000, 'older')] }));
   const ages = [...html.matchAll(/<time[^>]*>([^<]*)<\/time>/g)].map((m) => m[1]);
   assert.deepEqual(ages, ['queued just now', 'queued 3 minutes ago']);
+});
+
+/** `LISTED` with the factory `pair` wiring `dev` to `wired`, the folder name of one of its repositories, or to none. */
+const pairWired = (wired: string | null) =>
+  LISTED.map((f) =>
+    f.name === 'pair'
+      ? {
+          ...f,
+          workflowRepos: wired === null ? {} : { dev: wired },
+          commands: { ...f.commands, attach: 'nemia factory attach pair <workflow>' },
+        }
+      : f,
+  );
+
+test("a card's start in a factory of two repositories shows the one its wiring gives the card's workflow, never a Repository list", async () => {
+  const { FactoryCardStart } = await import('../src/components/factory/FactoryCardStart.tsx');
+  const card = inboxCard({ factory: 'pair', workflow: 'dev', repo: '/r/a' });
+  const start = (wired: string | null) =>
+    routedWith(createElement(FactoryCardStart, { entry: card, onStarted: () => {}, onRefused: () => {} }), [
+      [['factories'], pairWired(wired)],
+      STORE_ANSWER,
+    ]);
+  const wired = await start('b');
+  assert.match(wired, /<option value="dev" selected="">dev<\/option>/, "preset to the card's workflow, among those the factory offers");
+  assert.match(wired, /data-factory-repo="true"[^>]*>\/r\/b<\/p>/, "the wired one, not the card's retired repo:");
+  assert.doesNotMatch(wired, />Repository<\/label>|<option value="\/r\/a">/, 'no repository picker');
+  const unwired = await start(null);
+  assert.match(unwired, /data-unwired="unwired"/);
+  assert.match(unwired, /nemia factory attach pair dev --repo &lt;name&gt;, one of a, b/, 'naming the attach that wires it');
+  assert.doesNotMatch(unwired, /data-factory-repo|>Repository<\/label>/, 'and no repository to start on, nor to pick');
+});
+
+test("a queued card's ghost says the repository its factory wires for its workflow, or not wired — never the card's nor the daemon's", async () => {
+  const { QueueLane } = await import('../src/components/inbox/QueueLane.tsx');
+  const queued = inboxCard({
+    name: 'q',
+    factory: 'pair',
+    workflow: 'dev',
+    repo: '/r/a',
+    state: 'queued',
+    queued: { at: new Date().toISOString(), place: 1 },
+  });
+  const lane = (wired: string | null) => routedWith(createElement(QueueLane, { cards: [queued] }), [[['factories'], pairWired(wired)]]);
+  assert.match(await lane('b'), /data-ghost-repo="true"[^>]*title="\/r\/b"[^>]*>b<\/span>/);
+  const unwired = await lane(null);
+  assert.match(unwired, /data-ghost-repo="not wired"[^>]*>not wired<\/span>/);
+  assert.match(unwired, /title="[^"]*nemia factory attach pair dev --repo/, 'the attach on hover');
+  assert.doesNotMatch(unwired, /daemon/);
+});
+
+test("an older card's repo: is shown retired, struck, never as where it runs", async () => {
+  const html = await routedWith(createElement(InboxParts.CardMeta, { entry: inboxCard({ factory: 'solo', repo: '/code/app' }) }));
+  assert.match(html, /<s data-repo="retired" title="retired: the factory places the run"[^>]*>\/code\/app<\/s>/);
 });

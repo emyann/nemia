@@ -301,9 +301,11 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
         return s.inRequest(FACTORY_TRUST.handler({ factory: name }));
       }),
     )
-    .handle('attach', ({ params: { name, workflow } }) =>
+    .handle('attach', ({ params: { name, workflow }, payload }) =>
       writtenThen(`PUT /api/factories/${name}/workflows/${workflow}`, name, async (s) => {
-        const { file, already } = await s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow }));
+        const { file, already } = await s.inRequest(
+          FACTORY_ATTACH.handler({ factory: name, workflow, ...(payload.repo === undefined ? {} : { repo: payload.repo }) }),
+        );
         return { file, already };
       }),
     )

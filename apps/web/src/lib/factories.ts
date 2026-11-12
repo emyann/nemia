@@ -147,12 +147,42 @@ export const factoryBlocks = (factories: readonly Factory[], runs: readonly Fact
     runs.some((run) => run.factory === null),
   ).map((f) => blockOf(f, runs));
 
+/** Why a factory gives a workflow no repository, closed: several and none named, a name none has, a name two share. */
+type WorkflowRepoRefusal = 'unwired' | 'unknown' | 'shared';
+
+/** The repository a workflow starts on in a factory, by its path, or why the factory gives it none, naming the attach that fixes it. */
+export type StartRepo = { repo: string } | { refused: WorkflowRepoRefusal; why: string };
+
+/** A factory as `startRepo` reads it: its name, its repositories, its wiring and the line that attaches a workflow. */
+type Wired = Pick<Factory, 'name' | 'repos' | 'workflowRepos'> & { commands: Pick<Factory['commands'], 'attach'> };
+
 /**
- * The repository a card starts on in `factory`: the card's `repo:`, else the factory's one repository when it has only one, else null — a
- * person picks it among the factory's.
+ * The repository a run of `workflow` starts on in `factory`, a mirror of the orchestrator's `workflowRepo`
+ * (`packages/agent-orchestrator/src/factory/factory.ts`, proved by its `contracts/workflow-repo.contract.ts`), which places the run: the
+ * one whose folder name (`repoName`) the factory's wiring names for the workflow (`workflowRepos`), else its only one. Refused where it
+ * has several and names none (`unwired`), names one none has (`unknown`), or one two share (`shared`), each `why` naming the factory's
+ * attach (`commands.attach`, as the api answers it) with `--repo` and the folder names to pick among. Never a card's `repo:`, which is
+ * retired: a card names a factory and a workflow, and the factory alone places its run. A prototype's name names no workflow's repository.
  */
-export const startRepo = (factory: Pick<Factory, 'repos'>, cardRepo: string | null): string | null =>
-  cardRepo ?? (factory.repos.length === 1 ? factory.repos[0] : null);
+export function startRepo(factory: Wired, workflow: string): StartRepo {
+  const wired = Object.hasOwn(factory.workflowRepos, workflow) ? factory.workflowRepos[workflow] : undefined;
+  const named = wired === undefined ? factory.repos : factory.repos.filter((repo) => repoName(repo) === wired);
+  const [one, ...more] = named;
+  if (one !== undefined && !more.length) return { repo: one };
+  const refused: WorkflowRepoRefusal = wired === undefined ? 'unwired' : one === undefined ? 'unknown' : 'shared';
+  const names = [...new Set(factory.repos.map(repoName))].sort().join(', ') || 'none';
+  const attach = `${factory.commands.attach.replace('<workflow>', workflow)} --repo <name>, one of ${names}`;
+  const why = {
+    unwired: `The factory ${factory.name} works on several repositories and names none for ${workflow}: ${attach}.`,
+    unknown: `The factory ${factory.name} names for ${workflow} a folder name none of its repositories has: ${attach}.`,
+    shared: `The factory ${factory.name} names for ${workflow} a folder name two of its repositories share, so it cannot tell which: file it on folders of distinct names, or ${attach}.`,
+  }[refused];
+  return { refused, why };
+}
+
+/** The repository a floor or an address starts on in `factory`: the one `named`, else its only one, else none until a person picks. */
+const repoOn = (factory: Pick<Factory, 'repos'>, named: string | null): string | null =>
+  named ?? (factory.repos.length === 1 ? (factory.repos[0] ?? null) : null);
 
 /**
  * Where a factory's floor starts a run: the factory, its repositories and the one it starts on — its only one, else null until a person
@@ -167,7 +197,7 @@ export const floorPlace = (factory: Factory): { factory: string; repos: string[]
       why: `The factory ${factory.name} names no repository to start a run on: give its file one, or file it again with ${factory.commands.rm} and ${factory.commands.add}.`,
     };
   }
-  return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, null) };
+  return { factory: factory.name, repos: factory.repos, repo: repoOn(factory, null) };
 };
 
 /** Why a workflow the factory lists cannot start: its folder's `error`, else the steps its hires leave `unfilled`; null when it can. */
@@ -219,7 +249,7 @@ export type ListPlace =
 /**
  * Where `address` reads a list of workflows among `factories` (`ListPlace`): `every` for no factory and for the default one; `refused`
  * for a name no factory has, a factory whose file does not read and one on no repository, in `floorPlace`'s words; `in` the factory on
- * the repository the address names, else its only one (`startRepo`); `pick` where it has several and the address names none — never a
+ * the repository the address names, else its only one (`repoOn`); `pick` where it has several and the address names none — never a
  * guess among them, nor the default factory's repository.
  */
 export const listPlace = (address: PagePlace, factories: readonly Factory[]): ListPlace => {
@@ -229,7 +259,7 @@ export const listPlace = (address: PagePlace, factories: readonly Factory[]): Li
   const floor = factory ? floorPlace(factory) : null;
   if (!floor) return { kind: 'refused', factory: name, why: `No factory is named ${name}.` };
   if ('why' in floor) return { kind: 'refused', factory: name, why: floor.why };
-  const on = startRepo(floor, repo ?? null);
+  const on = repoOn(floor, repo ?? null);
   return on === null
     ? { kind: 'pick', factory: name, repos: floor.repos }
     : { kind: 'in', place: { factory: name, repo: on }, repos: floor.repos };

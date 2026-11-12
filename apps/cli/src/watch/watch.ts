@@ -51,19 +51,29 @@ function askedOf(args: Args): Asked {
   };
 }
 
-/** The cursor a cursor file holds, none where there is no file; refused, exit 2, naming the file, where it holds no whole number. */
-function savedIn(file: string | undefined): number | undefined {
+/** The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no whole number. */
+export function savedIn(file: string | undefined): number | undefined | 'refused' {
   if (file === undefined || fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
   const text = fs.readFileSync(file, 'utf8').trim();
-  if (/^\d+$/.test(text)) return Number(text);
+  return /^\d+$/.test(text) ? Number(text) : 'refused';
+}
+
+/**
+ * The cursor `nemia watch`'s cursor file holds, none where there is none; refused, exit 2, naming the file, where it holds no whole
+ * number.
+ */
+function watchSaved(file: string | undefined): number | undefined {
+  const saved = savedIn(file);
+  if (saved !== 'refused') return saved;
+  const text = fs.readFileSync(file ?? '', 'utf8').trim();
   throw new Refused(
-    `${file} is no cursor file: it holds ${JSON.stringify(text.slice(0, 40))}, where a watch keeps a whole number of bytes. Delete it to ` +
+    `${file ?? ''} is no cursor file: it holds ${JSON.stringify(text.slice(0, 40))}, where a watch keeps a whole number of bytes. Delete it to ` +
       `read the feed from its start, or name another: nemia watch --cursor-file <path>`,
   );
 }
 
 /** Writes `cursor` to the cursor file, whole: to a temp name beside it, then renamed over it, as the in-process watch writes it. */
-const kept = (file: string | undefined, cursor: number): void => {
+export const kept = (file: string | undefined, cursor: number): void => {
   if (file === undefined) return;
   const temp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temp, `${cursor}\n`);
@@ -211,7 +221,7 @@ const noneAnswers = (base: string, why: string): Refused =>
  * api answers.
  */
 async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened> {
-  const saved = savedIn(asked.cursorFile);
+  const saved = watchSaved(asked.cursorFile);
   at.cursor = saved ?? asked.cursor ?? 0;
   let got = await opened(base, asked, at.cursor);
   if (got.kind === 'refused' && got.status === 400 && saved !== undefined && asked.cursorFile !== undefined) {
@@ -288,7 +298,7 @@ const stretch = (asked: Asked, at: At, live: { state: 'up' | 'down'; base: strin
   });
 
 /** The signals that stop a followed watch, each with the code it exits with: 128 and the signal's number. */
-const SIGNALS = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((s) => [s, 128 + os.constants.signals[s]] as const);
+export const SIGNALS = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((s) => [s, 128 + os.constants.signals[s]] as const);
 
 /**
  * Runs `program`, which never ends of itself, until a signal interrupts it; resolves 128 and the signal's number once its finalizers

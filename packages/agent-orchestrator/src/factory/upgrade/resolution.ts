@@ -4,11 +4,12 @@
  * choice (`resolvedBy`); what the proposal recorded for an owner is to the factory controller's pass, by its phase now (`resolutionOf`);
  * an owner as the key `resolutions.json` and the pass's maps name it (`ownerKey`, `ownerOfKey`); a conflict's address as the segments of
  * its path and its key (`segmentsOf`, `keyOf`), and each conflict's owner by it (`conflictOwners`); and the template's render with a taken
- * owner's files given the tree's, so the merge keeps the tree's copy of what the applied proposal wrote (`takenFromTree`). Pure.
+ * owner's files given the tree's, so the merge keeps the tree's copy of what the applied proposal wrote (`takenFromTree`); and the lines
+ * that resolve again the conflicts a proposal resolves, once it cannot apply (`resolvedAgain`). Pure.
  */
 import type { ResolutionKind, ResolutionOf, ResolutionOwner, ResolvedBy } from '../../../contracts/resolution.contract.ts';
 import { textIn } from '../../folder/folder.ts';
-import type { Conflict, TreeFile } from './merge.ts';
+import { resolveLine, type Choice, type Conflict, type TreeFile } from './merge.ts';
 
 /** The folders beside the workflows in a tree's `workflows/` that hold no workflow: its agents, its skills, the carried files. */
 const HELD_FOLDERS: readonly string[] = ['agents', 'skills', 'carried'];
@@ -211,4 +212,32 @@ export function conflictOwners(
     if (owner !== null) owners.set(at, ownerKey(owner));
   }
   return owners;
+}
+
+/** What resolves again the conflicts of an owner whose proposal cannot apply: the owner as a person reads it, and a line per conflict. */
+export type ResolvedAgain = { readonly owner: string; readonly lines: readonly string[] };
+
+/**
+ * The lines that resolve again, in the factory `factory`, the conflicts the proposal `proposal` resolves, where `proposals` (by owner key,
+ * as `resolutions.json` records them) names it as an owner's: each conflict of that owner the person chose for (`choices`), as
+ * `resolveLine` says it. None where no owner's resolution is that proposal.
+ */
+export function resolvedAgain(
+  factory: string,
+  proposal: string,
+  proposals: Readonly<Record<string, string>>,
+  choices: Readonly<Record<string, Choice>>,
+): ResolvedAgain | undefined {
+  const recorded = Object.entries(proposals).find(([, name]) => name === proposal);
+  if (recorded === undefined) return undefined;
+  const owner = ownerOfKey(recorded[0]);
+  const key = ownerKey(owner);
+  const lines = Object.keys(choices)
+    .filter((at) => {
+      const of = resolvedBy(segmentsOf(at), keyOf(at), true, factory);
+      return of !== null && ownerKey(of) === key;
+    })
+    .sort()
+    .map((at) => resolveLine(factory, at));
+  return { owner: `the ${owner.kind} ${owner.name}`, lines };
 }

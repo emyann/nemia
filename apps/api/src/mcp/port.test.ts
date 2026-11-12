@@ -2,7 +2,9 @@
  * The MCP port at `/mcp` (`mcpPort`), spoken to by the SDK's own `Client` over a transport whose fetch goes into the app: with a person's
  * token it lists the generated tools and serves a call by the endpoint the tool is linked to, a refusal of that endpoint answered as a
  * tool's error; the gate in front of it refuses no token, a session's token and a token never minted, each 401 by its word; and a call
- * still pending is told to its caller as progress, every interval, where the caller gave a progress token. Statuses, refusal words and
+ * still pending is told to its caller as progress, every interval, where the caller gave a progress token; and the feed's resources on
+ * the modern era: declared subscribable, a listen of a view acknowledged and told of each new line, a read answering it, a URI no view
+ * refused -32602 holding nothing, and a closed listen letting its view go. Statuses, refusal words and
  * whether an error carries words are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine and the test place; a run planted as its record alone, nothing of it filed; the tokens
@@ -13,14 +15,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
 import { Hono } from 'hono';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
-import { Api, RUN_STATES } from 'objects';
+import { until } from '../../test/waits.ts';
+import { Beats } from '../layer.ts';
+import { Api, EventList, RUN_STATES } from 'objects';
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
@@ -336,4 +340,86 @@ test("GET /mcp with a person's token answers 405: the port keeps no stream", asy
     headers: { accept: 'text/event-stream', authorization: `Bearer ${personToken}` },
   });
   assert.equal(res.status, 405);
+});
+
+/** The app with the feed read again every 50 ms, so a line appended reaches a watch without waiting out the default beat. */
+const feedApp = eachTest(() =>
+  appOver(standIn(), stand(), Layer.succeed(Beats)({ ...Beats.defaultValue(), feed: '50 millis', watch: '50 millis' })),
+);
+
+/** A run's line of the feed as the tick writes it, appended to the harness's store. */
+const runLine = (run: string) =>
+  fs.appendFileSync(
+    path.join(root, 'feed.jsonl'),
+    `${JSON.stringify({ at: '2026-11-12T10:00:00.000Z', run, word: 'running', labels: { run, factory: 'mill' } })}\n`,
+  );
+
+test('in the modern era the port declares resources.subscribe and lists the feed templates; in the legacy era it declares resources alone', async () => {
+  const modern = await connected(app, 'modern');
+  assert.equal(modern.getServerCapabilities()?.resources?.subscribe, true, 'modern: resources.subscribe');
+  const { resourceTemplates } = await modern.listResourceTemplates();
+  assert.ok(
+    resourceTemplates.some((t) => t.uriTemplate === 'nemia:///api/events{?labelSelector*}'),
+    'the feed is a template',
+  );
+  await modern.close();
+  const legacy = await connected(app, 'legacy');
+  assert.ok(legacy.getServerCapabilities()?.resources !== undefined, 'legacy: resources');
+  assert.notEqual(legacy.getServerCapabilities()?.resources?.subscribe, true, 'legacy: no subscribe');
+  await legacy.close();
+});
+
+test("subscriptions/listen of nemia:///api/events is acknowledged, told of a new feed line, its read answers that line's Event, and its close lets the view go", async (t) => {
+  const port = mcpPort(feedApp);
+  const host = new Hono().all('/mcp', port);
+  const client = await connected(() => host, 'modern');
+  const uri = 'nemia:///api/events';
+  const updated: string[] = [];
+  client.setNotificationHandler('notifications/resources/updated', (n) => void updated.push(n.params.uri));
+  const listening = await client.listen({ resourceSubscriptions: [uri] });
+  assert.deepEqual(listening.honoredFilter.resourceSubscriptions, [uri], 'the URI acknowledged');
+  assert.equal(port.liveViews(), 1, 'one view followed');
+  runLine('r-port-feed');
+  await until(t, () => updated.includes(uri), 'notifications/resources/updated for the URI', { everyMs: 20 });
+  const read = await client.readResource({ uri });
+  const content = read.contents[0];
+  assert.ok(content !== undefined && 'text' in content, 'the read answers text');
+  const list = Schema.decodeUnknownSync(EventList)(JSON.parse(content.text));
+  assert.ok(
+    list.items.some((e) => e.involved.name === 'r-port-feed'),
+    "the read answers the line's Event",
+  );
+  await listening.close();
+  await until(t, () => port.liveViews() === 0, 'the view let go once its listen closed', { everyMs: 20 });
+  await client.close();
+});
+
+test('REFUSED -32602: a listen naming nemia:///api/runs, the templates named, no view opened', async () => {
+  const port = mcpPort(feedApp);
+  const res = await new Hono().all('/mcp', port).request('/mcp', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      authorization: `Bearer ${personToken}`,
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'subscriptions/listen',
+      params: {
+        notifications: { resourceSubscriptions: ['nemia:///api/runs'] },
+        _meta: {
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+          'io.modelcontextprotocol/clientInfo': { name: 'port-test', version: '0.0.0' },
+          'io.modelcontextprotocol/clientCapabilities': {},
+        },
+      },
+    }),
+  });
+  const answer = (await res.json()) as { id?: unknown; error?: { code?: number; message?: string } };
+  assert.equal(answer.id, 7);
+  assert.equal(answer.error?.code, -32602);
+  assert.ok(answer.error?.message?.includes('nemia:///api/events{?labelSelector*}'), 'the refusal names the templates');
+  assert.equal(port.liveViews(), 0, 'no view opened');
 });

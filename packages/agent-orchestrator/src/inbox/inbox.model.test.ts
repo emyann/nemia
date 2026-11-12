@@ -13,7 +13,6 @@ import { runId } from '../record/record.store.ts';
 const CARD = parseInboxCard(
   'cache-the-views-k2q9.md',
   '---\nworkflow: dev\nrepo: /home/me/code/app\nqueued: 2026-09-16T10:00:00.000Z\ngate: plan\nfactory: pipao\nfrom: a-k2q9, b-3z4w\nlabels: { team: core }\n---\nCache the views.\n',
-  () => true,
 );
 
 test("a card's name is checked on create by inboxNameRefusal's rule and read as any string", async (t) => {
@@ -30,7 +29,7 @@ test("a card's name is checked on create by inboxNameRefusal's rule and read as 
 
 test('a card decodes as parseInboxCard reads one, and one breaking what its reader upholds is refused', async (t) => {
   await t.test('every key set', () => assert.equal(Schema.decodeUnknownResult(Card)(CARD)._tag, 'Success'));
-  await t.test('none set', () => assert.equal(Schema.is(Card)(parseInboxCard('x-k2q9.md', 'Cache the views.\n', () => true)), true));
+  await t.test('none set', () => assert.equal(Schema.is(Card)(parseInboxCard('x-k2q9.md', 'Cache the views.\n')), true));
   const rows: Record<string, object> = {
     'a file that is not its name with .md': { ...CARD, file: 'other.md' },
     'queued with no workflow': { name: 'x', file: 'x.md', queued: '2026-09-16T10:00:00.000Z', body: 'x' },

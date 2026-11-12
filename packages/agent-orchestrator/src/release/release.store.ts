@@ -123,6 +123,21 @@ export function ranInto(argv: readonly string[], cwd: string, env: NodeJS.Proces
   }
 }
 
+/** The size of `log` in bytes, 0 where it is not there yet: where what a command appends to it starts (`lastLineFrom`). */
+export const logSize = (log: string): number => fs.statSync(log, { throwIfNoEntry: false })?.size ?? 0;
+
+/**
+ * The last line with words in it that `log` holds past its first `from` bytes and the line `ranInto` names the command by, trimmed: where
+ * what it ran ended its output; undefined where it printed none.
+ */
+export function lastLineFrom(log: string, from: number): string | undefined {
+  const [, ...printed] = fs.readFileSync(log).subarray(from).toString('utf8').split('\n');
+  return printed
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .at(-1);
+}
+
 /** Writes `release.json` into the built tree, the last thing a build writes into it. */
 export const writeReleaseFile = (tree: string, file: ReleaseFile): void =>
   fs.writeFileSync(path.join(tree, RELEASE_FILE), `${JSON.stringify(file, null, 2)}\n`);

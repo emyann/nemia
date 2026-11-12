@@ -4708,7 +4708,9 @@ What was measured, on Claude Code 2.1.278, before building on it:
   every start; `--setting-sources ''` stops it. `~/.claude.json`'s feature-flag cache time is written on every start, flags or not.
   `--bare` would be tidier and cannot be used: it turns OAuth off, and with it the subscription.
 - **What else could answer, and why not.** The SDK's method is the same request behind a node dependency the api does not need.
-  `rate_limit_event` arrives only with a model turn, which spends. `/usage` is interactive only, and there is no `claude usage`
+  `rate_limit_event` arrives only with a model turn, which spends — so it is never asked for; but a factory's sessions spend anyway, and
+  where a token's `get_usage` has no limits the quota shows the newest one they received (`token`'s `heard`, `docs/harness.md` of the
+  runtime, *The plan's utilization a session hears*). `/usage` is interactive only, and there is no `claude usage`
   subcommand. The OAuth usage endpoint would mean the api reading Claude Code's credentials itself.
 
 What a run-level guard ("do not start a run above 90%") would need — out of scope here:

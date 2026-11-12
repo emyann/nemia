@@ -13,7 +13,7 @@ nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>]
 nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
 nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--downgrade]
 nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
-nemia factory attach <factory> <workflow>
+nemia factory attach <factory> <workflow> [--repo <name>]
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
@@ -78,6 +78,10 @@ factory, naming the repositories its work is on, the workflows it offers and the
   nemia factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
                  workflows attached to it — none, until one is. Only the name is stored, and a step that
                  names its own agent is filled already; whether the workflow exists is judged at the start.
+                 --repo <name> names the repository its runs work on, by its folder's name: required where
+                 the factory has several repositories, its only one otherwise. A card and a brief started
+                 in the factory run on it, never on the folder they are typed in; attach an attached
+                 workflow again with --repo to change it.
   nemia factory detach takes a workflow back, once the factory hires no one into its steps, schedules it no more
                  and sets it no cost line.
   nemia factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step

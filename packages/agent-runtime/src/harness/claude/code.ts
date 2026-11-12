@@ -31,6 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Parked, Sighting } from '../../core/index.ts';
 import { claudeQuota } from './quota.ts';
+import { claudeHeardFile } from './heard.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import {
   besideRun,
@@ -132,13 +133,18 @@ const claudePrepare = (
   return { ...io, bridgeFile };
 };
 
-/** The hold a job's process is handed (`claudePrepare`): none without a store, its hold file cleared of a former attempt's. */
+/**
+ * The hold a job's process is handed (`claudePrepare`): none without a store, its hold file cleared of a former attempt's; and with the
+ * store, the file its sessions keep the newest event they heard of the plan on (`claudeHeardFile`).
+ */
 const holdIo = (beside: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
   if (hold === undefined) return {};
   const holdFile = beside(HOLD_END);
+  const heardFile = claudeHeardFile(hold.root);
   fs.rmSync(holdFile, { force: true });
   return {
     holdFile,
+    heardFile,
     drainFile: sessionDrainFile(hold.root),
     ...(hold.holdMs !== undefined ? { holdMs: hold.holdMs } : {}),
     ...(hold.holdPollMs !== undefined ? { holdPollMs: hold.holdPollMs } : {}),
@@ -337,7 +343,8 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
  * process holds the attached sessions; a long-lived task attached beside them (`withAttached`), refused `unstartable` with no holder
  * (`LONG_LIVED_UNHELD`). Every verb is the jobs' runner's, each look reading a job's bridge file and hold file into its sighting
  * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the plan's usage through the Agent SDK (`claudeQuota`), of the
- * Claude Code its jobs run, and `answer` is the holder's, where this engine holds the sessions.
+ * Claude Code its jobs run, a token's answer carrying what the store's sessions last heard (`claudeHeardFile`), and `answer` is the
+ * holder's, where this engine holds the sessions.
  */
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
@@ -368,6 +375,7 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
     interrupt: (session) => interruptThrough(job, session),
     ...answerOf(attached),
     quota: claudeQuota({
+      heardFile: claudeHeardFile(root),
       ...(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
       ...(options.harnessBin === undefined ? {} : { harnessBin: options.harnessBin }),
     }),

@@ -38,6 +38,7 @@ export { latestRelease, runningRelease } from './release/version.verb.ts';
 export { claudeTokenFile, claudeTokenStatus, loadClaudeToken, tokenWarningLine, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
 export { readinessOf, liveFacts, type ReadinessFacts, type CommandRead } from './needs/readiness.verb.ts';
 export { startFix, fixOf, followFix, type FixFollowed } from './needs/fix.verb.ts';
+export { startUpgrade, upgradeOf, followUpgrade, upgradesRead, RunningCode, type UpgradeFollowed } from './release/upgrade-job.verb.ts';
 export { NeedsMemory, needsMemoryLayer, type NeedsMemo } from './needs/needs.verb.ts';
 export { toolsDir } from './config/root.store.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
@@ -84,9 +85,10 @@ export { MCP_TRANSPORTS, nameFor, transportOf, type McpTransport } from './runti
 export { lifecycleGraph, type LifecycleGraph } from './runtime-client.ts';
 /**
  * What a harness says of its subscription's limits, as the engine's `quota` answers it: the limits, each with its use and its reset, or
- * why there are none. Re-exported because the api cannot import agent-runtime, as `nameFor` is.
+ * why there are none, and what a token's sessions last heard of them (`HeardQuota`). Re-exported because the api cannot import
+ * agent-runtime, as `nameFor` is.
  */
-export type { HarnessQuota, QuotaLimit } from './runtime-client.ts';
+export type { HarnessQuota, HeardQuota, QuotaLimit } from './runtime-client.ts';
 /** Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure. */
 export { unreadableJournal } from './runtime-client.ts';
 export {
@@ -192,16 +194,7 @@ export { AgentDoor, type AgentDoorShape } from './agents/agent-door.store.ts';
 export { SkillDoor, type SkillDoorShape } from './skills/skill-door.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './custom/custom.store.ts';
 export { cardToStart, planLines, planStopped, type Card, type Planned } from './plan/plan.ts';
-export {
-  INBOX_KEY_MEANINGS,
-  INBOX_KEYS,
-  inboxLines,
-  inboxNameRefusal,
-  noCardLine,
-  queueLine,
-  queueOrder,
-  workflowAt,
-} from './inbox/index.ts';
+export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, queueLine, queueOrder } from './inbox/index.ts';
 export type { CardRun, CardState, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   factoryLines,
@@ -367,7 +360,7 @@ export {
 } from './views/views.verb.ts';
 export { endWords, phaseOfView, type AttemptEnd, type EngineOutcome } from './views/views-words.ts';
 export type { Bridge, CheckReport } from './views/views.verb.ts';
-export { repoFor, startRun } from './start/start.verb.ts';
+export { repoFor, startRun, wiredRepoFor } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export { advanceRun, type Advanced } from './tick/advance.verb.ts';
@@ -448,7 +441,7 @@ export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
-export { CONCLUDED, START, StartInput, startedLines } from './start/commands.verb.ts';
+export { cardRepoRefusal, CONCLUDED, START, StartInput, startedLines } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';

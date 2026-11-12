@@ -44,8 +44,8 @@ export type CardKey = (typeof CARD_KEYS)[number];
  */
 export const CARD_KEY_MEANINGS: Readonly<Record<CardKey, string>> = {
   workflow:
-    "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
-  repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
+    'what runs the card when it is started: the name of a workflow its factory offers; else the start names one. A path an older card holds is not read',
+  repo: "retired: an older card's repository, read and not used, since the card's factory places its run (`nemia factory attach <factory> <workflow> --repo <name>`); a new or changed value is refused",
   queued:
     'the time `nemia inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
   gate: 'a step of its workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, in the run it starts: none when unset',
@@ -117,8 +117,8 @@ export const CardStatus = Schema.Struct({
   /** How many cards are queued and not started, every factory's, the card among them: on the answer of a queue alone. */
   queueLength: Schema.optionalKey(Schema.Number),
   /**
-   * The repository a queued card that names none starts on, its factory's one repository: on the answer of a queue alone, where it has
-   * one.
+   * The repository a queued card starts on, the one its factory's wiring names for its workflow, else its factory's only one: on the
+   * answer of a queue alone, where it has one.
    */
   factoryRepo: Schema.optionalKey(Schema.String),
 });
@@ -139,8 +139,9 @@ export const CardList = listOf('Card', Card);
 export type CardList = typeof CardList.Type;
 
 /**
- * A card filed (create): its body, the workflow that runs it with where that is read from (`from`, `repo` or `yours`, where both have
- * one of that name), the repository it is about, the factory it is filed in, and its labels as `key=value`.
+ * A card filed (create): its body, the workflow that runs it by name, the factory it is filed in, and its labels as `key=value`. `from`
+ * is retired, read and ignored: the factory finds the workflow. `repo` is retired and refused: the factory places the card's run
+ * (`nemia factory attach <factory> <workflow> --repo <name>`).
  */
 export const CardFile = Schema.Struct({
   body: Schema.String,
@@ -153,11 +154,11 @@ export const CardFile = Schema.Struct({
 export type CardFile = typeof CardFile.Type;
 
 /**
- * A card started: the workflow its run is started on and where it is read from — the card's own `workflow:` when it names none, as
- * `nemia start <card>` takes it — the runs it waits on (`after`) and reads as context
- * (`context`), the brief given in place of the card's body, the labels it is started with (`key=value`, `key-`), the inbox cards it is
- * handed (`cards`), the repository it works on in place of the card's `repo:` (`repo`, a path the daemon reads), and what a start of a
- * brief takes beside (`startExtras`: models, gates, no worktree, inputs).
+ * A card started: the workflow its run is started on, by name — the card's own `workflow:` when it names none, as `nemia start <card>`
+ * takes it, `from` being retired, read and ignored, since the factory finds the workflow and places the run — the runs it waits on
+ * (`after`) and reads as context (`context`), the brief given in place of the card's body, the labels it is started with
+ * (`key=value`, `key-`), the inbox cards it is handed (`cards`), and what a start of a brief takes beside (`startExtras`: models, gates,
+ * no worktree, inputs).
  */
 export const CardStart = Schema.Struct({
   workflow: Schema.optionalKey(Schema.String),
@@ -167,7 +168,6 @@ export const CardStart = Schema.Struct({
   brief: Schema.optionalKey(Schema.String),
   label: Schema.optionalKey(Schema.Array(Schema.String)),
   cards: Schema.optionalKey(Schema.Array(Schema.String)),
-  repo: Schema.optionalKey(Schema.String),
   ...startExtras,
 });
 export type CardStart = typeof CardStart.Type;

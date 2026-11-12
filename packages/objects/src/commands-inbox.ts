@@ -7,7 +7,7 @@ import { CLI, type Args, type CommandWords, type Flag, type Spec } from './comma
 import { leftOut } from './commands-flags.ts';
 
 /** What one of `nemia inbox add`'s value flags names, once per card. */
-const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--repo': 'repository', '--factory': 'factory' };
+const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--factory': 'factory' };
 
 /** One of `nemia inbox add`'s value flags, keyed by its name, taking what `takes` says, once. */
 const addFlag = (flag: string, takes: string): Flag => ({
@@ -18,10 +18,9 @@ const addFlag = (flag: string, takes: string): Flag => ({
   twice: `${CLI} inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag] ?? 'value'}.`,
 });
 
-/** `nemia inbox add`'s flags: `--workflow`, `--repo` and `--factory`, once each, and `--label`, once per label. */
+/** `nemia inbox add`'s flags: `--workflow` and `--factory`, once each, and `--label`, once per label. */
 const ADD_FLAGS: readonly Flag[] = [
   addFlag('--workflow', `the workflow to start the card on, by its name: ${CLI} inbox add "<idea>" --workflow <name>`),
-  addFlag('--repo', `the repository the idea is about: ${CLI} inbox add "<idea>" --repo <path>`),
   addFlag('--factory', `the factory that processes the card: ${CLI} inbox add "<idea>" --factory <name>`),
   {
     flag: '--label',
@@ -32,23 +31,28 @@ const ADD_FLAGS: readonly Flag[] = [
   },
 ];
 
-/** `nemia inbox add`'s spec: the idea, then its flags. */
+/** Why `nemia inbox add` takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run. */
+const ADD_REPO_REFUSAL = `${CLI} inbox add does not take --repo: a card names its factory and its workflow, never a repository, and its run works on the repository the factory names for the workflow. File the idea with --factory <factory> --workflow <workflow>, and name the repository on the factory: ${CLI} factory attach <factory> <workflow> --repo <name>. Nothing was filed.`;
+
+/** `nemia inbox add`'s spec: the idea, then its flags; `--repo` refused (`ADD_REPO_REFUSAL`). */
 const ADD_SPEC: Spec = {
   positionals: [{ key: 'idea', takes: 'required', kind: 'text' }],
   flags: ADD_FLAGS,
   unknown: (arg) =>
-    arg.startsWith('-')
-      ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --repo <path>, --factory <name> and --label <key=value> once per label.`
-      : `${CLI} inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — ${CLI} inbox add "<idea>" — or give it as a file: ${CLI} inbox add ./idea.md.`,
+    arg === '--repo' || arg.startsWith('--repo=')
+      ? ADD_REPO_REFUSAL
+      : arg.startsWith('-')
+        ? `${CLI} inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name> and --label <key=value> once per label.`
+        : `${CLI} inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — ${CLI} inbox add "<idea>" — or give it as a file: ${CLI} inbox add ./idea.md.`,
   apart: (_value, flag) => ADD_FLAGS.find((f) => f.flag === flag)?.takes ?? '',
-  missing: `${CLI} inbox add takes the idea, first: ${CLI} inbox add "<idea>" [--workflow <name>] [--repo <path>] [--factory <name>], or a file: ${CLI} inbox add ./idea.md. Nothing was filed.`,
+  missing: `${CLI} inbox add takes the idea, first: ${CLI} inbox add "<idea>" [--workflow <name>] [--factory <name>], or a file: ${CLI} inbox add ./idea.md. Nothing was filed.`,
 };
 
 /** `nemia inbox add`: an idea, words or a file's text read where it is typed, filed as a card. */
 export const INBOX_ADD_WORDS = {
   name: 'inbox add',
   served: [{ endpoint: 'cards.create' }],
-  usage: '"<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
+  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...',
   help: ['park an idea as a card in the inbox, named from its first line'],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),

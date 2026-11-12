@@ -1,8 +1,9 @@
 /**
- * The queue on real git, in a store of its own: a queued card whose start the place cannot read, or whose `repo:` is no git repository.
+ * The queue on real git, in a store of its own: a queued card whose start the place cannot read, or whose daemon's folder is no git
+ * repository.
  *
  * - a queued card whose start fails without a refusal (`.worktreeinclude` a link to itself): the test place has no link.
- * - a queued card whose `repo:` is no git repository, in the place's words: the test place words its refusals its own way.
+ * - a queued card on a daemon whose folder is no git repository, in the place's words: the test place words its refusals its own way.
  * - a `nemia up` at a cap of 1 names the card its queue is stuck on: the same link.
  *
  * The store is the test's own, at `ROOT`, given as `ENV`.
@@ -217,11 +218,13 @@ const fromCard = (card: string) => listRuns(ROOT).filter((r) => r.from?.inbox ==
 test('a queued card whose start fails without a refusal — its `.worktreeinclude` a link to itself, which its place cannot read, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `nemia up`, and started once the failure clears', async (t) => {
   emptyStore(undefined);
   const b = board();
-  const repo = aRepoWith('dev');
   const broken = aRepoWith('dev');
   fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
-  aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
+  const cwd = process.cwd();
+  process.chdir(broken);
+  t.after(() => process.chdir(cwd));
+  aCard('odd-include-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
+  aCard('behind-c3d4', { workflow: 'dev', queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
 
   const first = await runWith(b.e, tickRun());
   assert.ok(first.queue && 'failed' in first.queue, JSON.stringify(first.queue));
@@ -236,7 +239,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   const listed = (await listedLines(b.e)).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
-    / {2}queued 1 of 2 — failed at \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
+    / {2}queued 1 of 2 — failed at \S+ on \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,
   );
 
   const up = board();
@@ -264,7 +267,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started on \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/,
   );
   const again = await runWith(b.e, tickRun());
   assert.deepEqual(
@@ -293,13 +296,16 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
 });
 
-test("REFUSED at shipped defaults: a queued card whose `repo:` is no git repository, in the place's words, left queued; and the daemon's own stderr is left alone: git's words are not passed through", async (t) => {
+test("REFUSED at shipped defaults: a queued card on a daemon whose folder is no git repository, in the place's words, left queued; and the daemon's own stderr is left alone: git's words are not passed through", async (t) => {
   emptyStore(undefined);
   const b = board();
   const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
   fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
   fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  const cwd = process.cwd();
+  process.chdir(bare);
+  t.after(() => process.chdir(cwd));
+  aCard('no-git-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
 
   const said: string[] = [];
   const stderr = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
@@ -321,7 +327,7 @@ test("REFUSED at shipped defaults: a queued card whose `repo:` is no git reposit
   assert.ok(pass.queue && 'refused' in pass.queue, JSON.stringify(pass.queue));
   assert.ok(
     queueLine(pass.queue).startsWith(
-      `no-git-a1b2 not started: ${bare} is not a git repository: run git init there and commit once, or name a repository with --repo — left queued as it is`,
+      `no-git-a1b2 not started on ${bare}: ${bare} is not a git repository: run git init there and commit once, or name a repository with --repo — left queued as it is`,
     ),
     `the place's open refuses it, and the card is said once with its name on it: ${queueLine(pass.queue)}`,
   );
@@ -333,7 +339,10 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
   const b = board();
   const broken = aRepoWith('dev');
   fs.symlinkSync('.worktreeinclude', path.join(broken, '.worktreeinclude'));
-  aCard('odd-include-a1b2', { workflow: 'dev', repo: broken, queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
+  const cwd = process.cwd();
+  process.chdir(broken);
+  t.after(() => process.chdir(cwd));
+  aCard('odd-include-a1b2', { workflow: 'dev', queued: '2026-09-16T09:00:00.000Z' }, 'Its include file is a link to itself');
   const before = await runWith(b.e, tickRun());
   assert.ok(
     before.queue && 'failed' in before.queue && !before.queue.again,
@@ -367,7 +376,7 @@ test('a `nemia up` at a cap of 1 names the card its queue is stuck on once a slo
   );
   assert.match(
     named[0],
-    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links/,
+    /^\d\d:\d\d:\d\d  odd-include-a1b2 not started on \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links/,
   );
   const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
   assert.ok(filed >= 0 && filed < printed.indexOf(named[0]), `the pass that held the slot came first: ${printed.join('\n')}`);

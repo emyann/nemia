@@ -6,7 +6,7 @@
 import { DEFAULT_NAMESPACE, INBOX_QUEUE_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { said, switchArg, textArg } from '../requests.ts';
-import { repoFactory, workflowNamed } from './card-lines.ts';
+import { factoryOf, repoFactory, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_QUEUE_WORDS;
 
@@ -15,11 +15,11 @@ export const queuedLines = (card: Card): string[] => {
   const name = card.metadata.name;
   const { place, queueLength, factoryRepo } = card.status;
   const at = queueLength === undefined ? `${place ?? '?'} in the queue` : `${place ?? '?'} of ${queueLength}`;
-  const where = card.spec.repo
-    ? ''
-    : factoryRepo
-      ? `, on ${factoryRepo}, its factory's one repository`
-      : ', on the repository nemia up runs in';
+  const where = factoryRepo
+    ? `, on ${factoryRepo}, its factory's repository for its workflow`
+    : factoryOf(card) === undefined
+      ? ', on the repository nemia up runs in'
+      : '';
   return [
     `${name}  queued at ${card.spec.queued ?? ''}, ${at}  workflow: ${card.spec.workflow ?? ''}${repoFactory(card)}`,
     `the tick starts it on its own once its turn comes and a run slot is free${where} — take it back with nemia inbox queue ${name} --off`,

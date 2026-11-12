@@ -4,14 +4,18 @@
  *
  *     ---
  *     workflow: dev
- *     repo: /home/me/code/app
+ *     factory: app
  *     queued: 2026-09-16T10:00:00.000Z
  *     ---
  *     Cache the engine's views between passes.
  *
  * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and
- * that is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about. And an inbox
- * card has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
+ * that is chosen at start; it is a workflow's name, the folder its factory offers. And an inbox card has no `after:`: what it waits on is
+ * said at start, when the runs it could wait on are known.
+ *
+ * `repo:` is retired: a card names its factory and its workflow, never a repository, and the factory's wiring places its run (`nemia
+ * factory attach <factory> <workflow> --repo <name>`). A new one is refused where a card is filed or written whole; an old card's still
+ * reads, lists and is said as not read at its start (`ignoredRepoLine`), whatever it names.
  *
  * `queued:` marks a card to start on its own (`nemia inbox queue`): the time it was queued, which orders the queue. The tick starts the
  * oldest such card when a run slot is free (`queueOrder`, `startQueued` in inbox.verb.ts).
@@ -19,9 +23,9 @@
  * `gate:` names a step of the card's workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, for
  * the run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
  *
- * `factory:` names the factory that processes the card: its run is started in it, on its repository when it has one. A card is started
- * only in a factory named for it, here or at start, never one inferred from its folder or its `repo:` (`unfactoredCardRefusal`). Whether
- * the factory is there, offers the workflow and works on the repository is the start's to say.
+ * `factory:` names the factory that processes the card: its run is started in it, on the repository its wiring names for the card's
+ * workflow, else its only one (`workflowRepo`). A card is started only in a factory named for it, here or at start, never one inferred from
+ * its folder (`unfactoredCardRefusal`). Whether the factory is there, offers the workflow and names it a repository is the start's to say.
  *
  * `labels:` is a person's labels on the card, a YAML map of a key to its value (`labels: { team: core }`), each pair as a label is
  * spelled (`labelRefusal`): what a selector picks the card by, beside its `workflow:` and `factory:` (`cardLabels`), and what the run it
@@ -34,14 +38,14 @@
  * file and the tick's tries — and its run's phase from then on, read from the run each time the inbox is read and never stored on the
  * card; sent as is.
  *
- * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
- * (inbox.store.ts and inbox.verb.ts read them).
+ * Pure: handed a card's text, the folder's entries, the run records and the factories, never reading one (inbox.store.ts and inbox.verb.ts
+ * read them).
  */
 import { modelsOf, modelsText } from '../start/index.ts';
 import path from 'node:path';
 import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
-import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
+import { factoryNameRefusal, namedRepos, workflowNameRefusal, workflowRepo, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import type { RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
@@ -62,10 +66,11 @@ export type InboxCard = {
   /** Its file's name, as a refusal names it. */
   file: string;
   /**
-   * The workflow to start it on, as written — a name under the repository's `workflows/`, or a path to a workflow folder — when it says.
+   * The workflow to start it on, as written, when it says: a workflow's name, the folder its factory offers. An old card's path to a
+   * workflow folder still reads, and its start names no workflow by it.
    */
   workflow?: string;
-  /** The absolute path of the repository the idea is about, when it says. */
+  /** An old card's `repo:`, retired: read as written and never to place a run (`ignoredRepoLine`). */
   repo?: string;
   /** When it was queued to start on its own (`nemia inbox queue`), as an ISO time: what orders the queue. Absent on a card not queued. */
   queued?: string;
@@ -120,25 +125,15 @@ function refuse(why: string): never {
 
 /**
  * One inbox card, from its file's text — or refused, naming the file and the fix: a key an inbox card does not have (`after:` among them),
- * a key set twice or to nothing, a `repo:` that is not an absolute path or names no directory (`isDirectory`), a `queued:` that is not an
+ * a key set twice or to nothing, a `queued:` that is not an
  * ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one step or is a step's
  * `true`, a `factory:` that is not a factory's name (`factoryNameRefusal`), an empty body, and a frontmatter that never closes.
  */
-export function parseInboxCard(file: string, text: string, isDirectory: (at: string) => boolean): InboxCard {
+export function parseInboxCard(file: string, text: string): InboxCard {
   const { block, body } = splitFrontmatter(file, text);
   const keys = block === null ? {} : inboxKeys(file, block);
-  const { repo, workflow, queued, gate, model, factory, from } = keys;
+  const { workflow, queued, gate, model, factory, from } = keys;
   const name = file.slice(0, -'.md'.length);
-  if (repo !== undefined && !path.isAbsolute(repo)) {
-    refuse(
-      `${file}: \`repo: ${repo}\` is not an absolute path. \`repo:\` is the repository the idea is about, from the root — \`repo: /home/me/code/app\` — since a relative one would name a different repository from wherever the card is started.`,
-    );
-  }
-  if (repo !== undefined && !isDirectory(repo)) {
-    refuse(
-      `${file}: \`repo: ${repo}\` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.`,
-    );
-  }
   if (queued !== undefined && !isInstant(queued)) {
     refuse(
       `${file}: \`queued: ${queued}\` is not a time. \`queued:\` is when the card was queued to start on its own, as nemia inbox queue writes it — \`queued: 2026-09-16T10:00:00.000Z\` — which orders the queue. Delete the line, and queue the card with nemia inbox queue ${name}.`,
@@ -202,9 +197,9 @@ function fromRuns(file: string, from: string): string[] {
  * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
  * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
  */
-export function cardOrWhy(file: string, text: string, isDirectory: (at: string) => boolean): { card: InboxCard } | { why: string } {
+export function cardOrWhy(file: string, text: string): { card: InboxCard } | { why: string } {
   try {
-    return { card: parseInboxCard(file, text, isDirectory) };
+    return { card: parseInboxCard(file, text) };
   } catch (err) {
     if (err instanceof WorkflowError) return { why: err.message };
     throw err;
@@ -228,11 +223,11 @@ function refuseFactoryKey(file: string, factory: string): void {
 export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string): string {
   const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --repo <root>';
   const atStart = fix === undefined ? '' : `, or name it at start: ${fix}`;
-  return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
+  return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: nemia inbox add "<idea>" --factory <name>. Nothing was started.`;
 }
 
 /**
- * An inbox card's frontmatter as key → value: `workflow:` and `repo:`, each at most once, to something; any other key refused by name.
+ * An inbox card's frontmatter as key → value: each of its keys at most once, to something; any other key refused by name.
  * `filing` is true for a file `nemia inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start
  * that gives the wait, since `file` is where the idea is now, and no card's path.
  */
@@ -275,16 +270,27 @@ function flatKeys(file: string, block: string, filing: boolean): Partial<Record<
       ? filing
         ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>.md --after <runId>.`
         : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/${file} --after <runId>. Delete the line.`
-      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, and a person's labels on it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+      : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, an old card's retired repository, when it was queued to start on its own, the step its run waits at for a person, the model a step runs on in its run, the factory that processes it, the runs it is handed as context, and a person's labels on it; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
 /**
- * A card's workflow as the card writes it: a path — one with a slash, or `.` or `..` — absolute against `dir`, where it was written from,
- * so it names the same folder from the inbox; a bare name as it is, a workflow the repository has, found at start. `dir` is absolute.
+ * The workflow a card names by its `workflow:`, or none: its value where it is a workflow's name (`workflowNameRefusal`), and nothing for
+ * an old card's path, which names no workflow its factory offers.
  */
-export function workflowAt(given: string, dir: string): string {
-  return /[\\/]/.test(given) || given === '.' || given === '..' ? path.resolve(dir, given) : given;
+export const cardWorkflowName = (workflow: string | null | undefined): string | undefined =>
+  workflow == null || workflowNameRefusal(workflow) !== undefined ? undefined : workflow;
+
+/**
+ * Why `workflow`, given as a card's `workflow:` by `where` (`--workflow`, `spec.workflow`, a file's line), cannot be one, or undefined: a
+ * card names its workflow by its name, the folder its factory offers, never a path (`workflowNameRefusal`); then what was not done.
+ * Silent for an empty one, which the card's reader refuses as a key with no value.
+ */
+export function cardWorkflowRefusal(where: string, workflow: string, notDone: string): string | undefined {
+  const refused = workflow.trim() === '' ? undefined : workflowNameRefusal(workflow);
+  return refused === undefined
+    ? undefined
+    : `${where} ${workflow}: ${refused} A card names the workflow its factory offers, by name — nemia factory ls lists them. ${notDone}`;
 }
 
 /**
@@ -352,19 +358,22 @@ export type InboxListing = {
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
   /**
-   * The repository the card's factory picks for it (`factoryRepoOf`): its factory's one repository, for a card that names none — null for
-   * a card that names its own, one whose factory has several or does not read, and an entry that does not read as a card.
+   * The repository the card's factory works on for its workflow (`factoryRepoOf`): the one its wiring names, else its only one — null for
+   * a card of the default factory, one whose factory names none for it or does not read, one that names no workflow by its name, and an
+   * entry that does not read as a card.
    */
   factoryRepo: string | null;
 };
 
 /**
  * A queued card's start the tick tried and did not make, as it writes it down: when, the card's text as it was, the repository it was tried
- * on — the card's `repo:`, or the daemon's for a card that names none — why, and whether it was a refusal.
+ * on (`queueRepo`) — its factory's for its workflow, `''` where its factory names none, or the daemon's for a card of the default factory —
+ * why, and whether it was a refusal.
  *
- * `refused` is the package's own refusal, by name, exit 2 — the workflow gone, the repository gone, a card that does not read: it lasts.
+ * `refused` is the package's own refusal, by name, exit 2 — the workflow gone, no repository wired, a card that does not read: it lasts.
  * The tick does not try that card again while its text is the same and it would be tried on the same repository (`nextQueued`) — an edit, a
- * queue taken back and given again, or a daemon in another repository for a card that names none, is a new try. Anything else — git failing
+ * queue taken back and given again, a factory's wiring that names a repository now, or a daemon in another repository for a card of the
+ * default factory, is a new try. Anything else — git failing
  * while the start reads the repository, a file that cannot be read — is a failure, not a verdict on the card: it is tried again on the next
  * pass.
  */
@@ -415,30 +424,18 @@ export const cardInPlay = (l: Pick<InboxListing, 'state'>): boolean => CARD_IN_P
 export type CardListing = Omit<InboxListing, 'state'>;
 
 /**
- * The workflow, repository and factory a card that does not read lists, off its lenient reading (`lenient`): each as written where it is
- * queued, null where it is not, does not say one, or did not read even leniently.
- */
-function queuedKeys(lenient: InboxCard | undefined): Pick<InboxListing, 'workflow' | 'repo' | 'factory'> {
-  const kept = lenient?.queued !== undefined ? lenient : undefined;
-  return { workflow: kept?.workflow ?? null, repo: kept?.repo ?? null, factory: kept?.factory ?? null };
-}
-
-/**
  * The inbox as `nemia inbox` lists it before its runs' phases are read (`CardListing`), by file name: every entry of the folder — a folder
  * inside it by its name and a trailing `/` — each card with the runs its name is on (`startedAs`), and each entry that is not a card listed
  * with why, never hidden. A hidden file and a README are not listed: the one is an editor's, the other says what the folder is for. A
  * queued card says when, and its place in the order; and, when the tick's last try of its start is of the card as it stands (`tries`, by
- * name), that try. A queued card that reads but for a `repo:` naming no directory keeps its place, with its workflow and repository as
- * written, the repository keying its try: the start refuses it by name, as it refuses a workflow gone, and it never leaves the queue with
- * nothing said. An entry that does not read for another reason is not queued. Each card says the repository its factory picks for it
- * (`factoryRepo`), from the store's `factories` that read, by name: with none handed, none picks one.
+ * name), that try. An entry that does not read is not queued. Each card says the repository its factory works on for its workflow
+ * (`factoryRepo`), from the store's `factories` that read, by name: with none handed, none.
  */
 export function cardsListed(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],
-  isDirectory: (at: string) => boolean,
   tries: ReadonlyMap<string, MissedStart> = new Map(),
-  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
+  factories: ReadonlyMap<string, WiredFactory> = new Map(),
 ): CardListing[] {
   const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
     const t = tries.get(name);
@@ -465,7 +462,7 @@ export function cardsListed(
       }
       const name = file.slice(0, -'.md'.length);
       const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
-      const read = cardOrWhy(file, text, isDirectory);
+      const read = cardOrWhy(file, text);
       if ('card' in read) {
         const { card } = read;
         return {
@@ -480,28 +477,23 @@ export function cardsListed(
           from: card.from ?? [],
           startedAs,
           labels: card.labels ?? {},
-          factoryRepo: factoryRepoOf({ repo: card.repo ?? null, factory: card.factory ?? null }, factories),
+          factoryRepo: factoryRepoOf({ workflow: card.workflow ?? null, factory: card.factory ?? null }, factories),
           error: null,
           ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
       }
-      const loose = cardOrWhy(file, text, () => true);
-      const lenient = 'card' in loose ? loose.card : undefined;
-      const queued = lenient?.queued;
-      const { workflow, repo, factory } = queuedKeys(lenient);
       return {
         name,
         file,
         title: null,
-        workflow,
-        repo,
-        factory,
+        workflow: null,
+        repo: null,
+        factory: null,
         from: [],
         startedAs,
         labels: {},
-        factoryRepo: factoryRepoOf({ repo, factory }, factories),
+        factoryRepo: null,
         error: read.why,
-        ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
       };
     });
   queueOrder(listed).forEach((l, i) => {
@@ -517,12 +509,11 @@ export function cardsListed(
 export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly CardRun[],
-  isDirectory: (at: string) => boolean,
   tries: ReadonlyMap<string, MissedStart> = new Map(),
-  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
+  factories: ReadonlyMap<string, WiredFactory> = new Map(),
 ): InboxListing[] {
   const phases = new Map(runs.map((r) => [r.id, r.phase] as const));
-  return cardsListed(files, runs, isDirectory, tries, factories).map((l) => ({
+  return cardsListed(files, runs, tries, factories).map((l) => ({
     ...l,
     state: cardState({ ...l, phases: l.startedAs.flatMap((id) => phases.get(id) ?? []) }),
   }));
@@ -539,34 +530,35 @@ export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'star
     .sort((a, b) => a.at.localeCompare(b.at) || a.l.name.localeCompare(b.l.name))
     .map(({ l }) => l);
 
+/** A factory as a card's placement reads it: its repositories and the repository its wiring names each workflow. */
+export type WiredFactory = Pick<Factory, 'repos' | 'workflowRepos'>;
+
 /**
- * The repository a card's factory picks for it: its factory's one repository, for a card with no `repo:` whose factory is among
- * `factories`, the store's that read, by name, and has exactly one. Null for a card that names its own, one of the default factory, and one
- * whose factory has several repositories or does not read: there the card's `repo:`, or the daemon's, is the one (`queueRepo`). Pure.
+ * The repository a card's factory works on for the card's workflow (`workflowRepo`): the one its wiring names, else its only one. Null
+ * for a card of the default factory, one whose factory is not among `factories` (the store's that read, by name) or names it none, and
+ * one that names no workflow by its name. The card's own `repo:` is never read. Pure.
  */
-export function factoryRepoOf(
-  l: Pick<InboxListing, 'repo' | 'factory'>,
-  factories: ReadonlyMap<string, Pick<Factory, 'repos'>>,
-): string | null {
-  if (l.repo !== null || l.factory === null) return null;
-  const repos = factories.get(l.factory)?.repos;
-  const [only] = repos ?? [];
-  return repos?.length === 1 && only !== undefined ? only : null;
+export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>): string | null {
+  const factory = l.factory === null ? undefined : factories.get(l.factory);
+  const workflow = cardWorkflowName(l.workflow);
+  if (factory === undefined || workflow === undefined) return null;
+  const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
+  return 'repo' in of ? of.repo : null;
 }
 
 /**
- * The repository the tick tries a queued card on, from a daemon in `daemonRepo`: its `repo:`, else the one its factory picks
- * (`factoryRepoOf`), else the daemon's. A card whose factory is not among `factories` — the default, or one whose file does not read — is
- * tried on its `repo:` or the daemon's, and its start refuses it by name. `fromDaemon` is true when the repository is the daemon's because
- * neither the card nor its factory names one: the only start that turns on where the daemon runs.
+ * The repository the tick tries a queued card on, from a daemon in `daemonRepo`: for a card that names a factory, the one that factory's
+ * wiring names for its workflow (`factoryRepoOf`), else `''`, none — the start refuses it by name, and the try is remembered on `''`, so a
+ * wiring that names one later is a new try; for a card of the default factory, the daemon's (`fromDaemon`), the only start that turns
+ * on where the daemon runs. The card's own `repo:` is never read.
  */
 export function queueRepo(
-  l: Pick<InboxListing, 'repo' | 'factory'>,
+  l: Pick<InboxListing, 'workflow' | 'factory'>,
   daemonRepo: string,
-  factories: ReadonlyMap<string, Pick<Factory, 'repos'>>,
+  factories: ReadonlyMap<string, WiredFactory>,
 ): { repo: string; fromDaemon: boolean } {
-  const chosen = l.repo ?? factoryRepoOf(l, factories);
-  return { repo: chosen ?? daemonRepo, fromDaemon: chosen === null };
+  if (l.factory === null) return { repo: daemonRepo, fromDaemon: true };
+  return { repo: factoryRepoOf(l, factories) ?? '', fromDaemon: false };
 }
 
 /**
@@ -574,10 +566,10 @@ export function queueRepo(
  * as it stands — its text the same, and tried on the repository it would be tried on now (`queueRepo`, with the store's `factories` by
  * name). A card whose start failed for any other reason keeps its place, and is tried again. Pure.
  */
-export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'repo' | 'factory'>>(
+export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'workflow' | 'factory'>>(
   listing: readonly L[],
   repo: string,
-  factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
+  factories: ReadonlyMap<string, WiredFactory> = new Map(),
 ): L | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
 
 /**
@@ -592,18 +584,18 @@ export type QueueStarted =
   | { card: string; failed: string; again: boolean; on?: string };
 
 /**
- * The card's own `repo:` when the run started from it looks at no repository — a folder team's does not, and a card written by hand, or by
- * a writer that does not ask `cardRepoRefusal`, may carry one. Said and not refused, since a card on disk cannot be edited from the board.
+ * An old card's own `repo:`, which no start reads: `repo:` is retired, and the card's factory places its run. Said and not refused, since
+ * an old card on disk would be stranded by a refusal; a new one is refused where a card is written.
  *
  * One writer, so a person reads the same sentence wherever the card was started: `nemia start` prints it under the run, and a tick's
  * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in inbox.verb.ts is what both are given.
  */
 export const ignoredRepoLine = (repo: string): string =>
-  `the card's repo: ${repo} was not looked at — this workflow's steps work in folders, with no git repository`;
+  `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
 
 /**
  * A pass's start of a queued card, as `nemia up` and `nemia tick` log it: `started <card> as <runId>`, or why it was not started, and what
- * then. A card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon
+ * then. A card whose retired `repo:` was not read says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon
  * that says it — `nemia up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
  * terminal.
  */
@@ -622,19 +614,19 @@ export function queueLine(q: QueueStarted): string {
 }
 
 /**
- * What `nemia inbox` says of a queued card's last try (`inboxLines`): when, on which repository for a card that names none — the one its
- * factory picks said as such — and why; refused, how to have it tried again, and running `nemia up` elsewhere only when the daemon's
- * repository was the one; failed otherwise, that the tick tries it again. Empty for a card not tried.
+ * What `nemia inbox` says of a queued card's last try (`inboxLines`): when, on which repository — the one its factory works on for its
+ * workflow said as such, none where it names none — and why; refused, how to have it tried again, and running `nemia up` elsewhere only
+ * when the daemon's repository was the one; failed otherwise, that the tick tries it again. Empty for a card not tried.
  */
 export function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
   const t = l.tried;
   if (!t) return '';
-  const said = l.error === null && !l.repo && (l.factory !== null || unfactoredStarts);
-  const its = t.repo === l.factoryRepo ? ", its factory's one repository" : '';
+  const said = t.repo !== '' && (l.factory !== null || unfactoredStarts);
+  const its = t.repo === l.factoryRepo ? ", its factory's repository for its workflow" : '';
   const on = said ? ` on ${t.repo}${its}` : '';
-  const why = t.why !== l.error ? `: ${t.why}` : '';
+  const why = `: ${t.why}`;
   if (!t.refused) return ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
-  const elsewhere = said && l.factoryRepo === null ? ', or run nemia up in the repository it is about' : '';
+  const elsewhere = said && l.factory === null ? ', or run nemia up in the repository it is about' : '';
   return ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${elsewhere}, and the tick tries it again`;
 }
 
@@ -642,10 +634,10 @@ export function triedClause(l: InboxListing, unfactoredStarts: boolean): string 
  * What `nemia inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them,
  * and the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when
  * the tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries
- * it again. A reason the entry's own error already says is not said twice. A card that names no factory is refused wherever a daemon runs,
+ * it again. A card that names no factory is refused wherever a daemon runs,
  * and its try names no repository to run one in, unless `unfactoredStarts` (`WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch) starts it.
- * A try on the repository the card's factory picks (`factoryRepo`) says so, and names no daemon's repository to run one in: only a try on
- * the daemon's own (`queueRepo`) does (`triedClause`).
+ * A try on the repository the card's factory works on (`factoryRepo`) says so, and names no daemon's repository to run one in: only a try
+ * on the daemon's own (`queueRepo`) does (`triedClause`). An old card's `repo:` is listed as retired.
  */
 export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false, show: LabelsShown = {}): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
@@ -656,7 +648,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     const tried = triedClause(l, unfactoredStarts);
     const labelled = labelSegments(cardLabels(l), show);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}${labelled}`;
-    return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.model ? `  model: ${modelsText(l.model)}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
+    return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo} (retired)` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.model ? `  model: ${modelsText(l.model)}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}${labelled}`;
   });
 }
 
@@ -709,21 +701,16 @@ function splitOrProse(from: string, text: string): { block: string | null; body:
  * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — a block that reads as YAML
  * (`frontmatterOrNull`) as keys each of `INBOX_KEYS`, or an `after:`, which is refused by name — gives its keys
  * and its body; any other text, a frontmatter that never closes included, is the body whole, as `nemia start` takes a brief that is
- * not a card. `workflow`, `repo` and `factory`, when given, are written over the text's own, the keys in `INBOX_KEYS`' order. Refused
- * too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one line, and a `queued:` in the text: a card is
+ * not a card. `workflow` and `factory`, when given, are written over the text's own, the keys in `INBOX_KEYS`' order. Refused
+ * too: text with nothing in it, a `workflow` or `factory` given on more than one line, a `workflow:` given or in the text that is no
+ * workflow's name (`cardWorkflowRefusal`), a `repo:` in the text, retired (`retiredRepoRefusal`), and a `queued:` in the text: a card is
  * queued once it is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with
  * a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
- *
- * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
- * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
- * `../workflows/dev` would name a workflow of the store's rather than the one beside the file. Without `dir`, it is written as it is.
  */
 export function ideaCard(
   from: string,
   text: string,
-  givenKeys: { workflow?: string; repo?: string; factory?: string; labels?: Labels },
-  isDirectory: (at: string) => boolean,
-  dir?: string,
+  givenKeys: { workflow?: string; factory?: string; labels?: Labels },
 ): { text: string; body: string } {
   const { labels: givenLabels, ...given } = givenKeys;
   if (!text.trim()) {
@@ -753,15 +740,25 @@ export function ideaCard(
         `${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card nemia inbox add names: nemia inbox queue <name>.`,
       );
     }
+    if (read.repo !== undefined) refuse(`${from}: \`repo: ${read.repo}\` — ${retiredRepoRefusal('Nothing was filed.')}`);
     keys = read;
     body = split.body;
-    if (keys.workflow !== undefined && dir !== undefined) keys.workflow = workflowAt(keys.workflow, dir);
   }
   const written = { ...keys, ...definedOf(given), ...(givenLabels !== undefined ? { labels: givenLabels } : {}) };
+  const refusedWorkflow =
+    written.workflow === undefined ? undefined : cardWorkflowRefusal(`${from}: workflow`, written.workflow, 'Nothing was filed.');
+  if (refusedWorkflow !== undefined) refuse(refusedWorkflow);
   const card = cardWritten(written, body);
-  parseInboxCard(from, card, isDirectory);
+  parseInboxCard(from, card);
   return { text: card, body };
 }
+
+/**
+ * Why a card is given no repository — `repo:` is retired: a card names its factory and its workflow, and the factory's wiring places its
+ * run — with the attach that names a workflow's repository; then what was not done.
+ */
+export const retiredRepoRefusal = (notDone: string): string =>
+  `a card names its factory and its workflow, never a repository: the factory places its run, on the repository its wiring names for the workflow. Leave the repository out, and name it on the factory: nemia factory attach <factory> <workflow> --repo <name>. ${notDone}`;
 
 /**
  * A card's file: its keys in `INBOX_KEYS`' order, written as YAML (`renderFrontmatter`), then its body. A body that opens with a `---`
@@ -791,33 +788,27 @@ function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labe
  * as `nemia inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
  * `ideaCard` keeps it. Pure; the text it gives reads back as a card (`parseInboxCard`), or is refused as one would be.
  */
-export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
-  return cardText(card, { workflow: workflow ?? card.workflow, queued: at ?? undefined }, isDirectory);
+export function queuedText(card: InboxCard, at: string | null, workflow?: string): string {
+  return cardText(card, { workflow: workflow ?? card.workflow, queued: at ?? undefined });
 }
 
 /**
  * A card's text with `from:` set to `runs` — or taken off, for none — every other key kept: what `nemia inbox from` writes. Written again
  * as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
  */
-export const fromText = (card: InboxCard, runs: readonly string[], isDirectory: (at: string) => boolean): string =>
-  cardText(card, { from: fromLine(runs) }, isDirectory);
+export const fromText = (card: InboxCard, runs: readonly string[]): string => cardText(card, { from: fromLine(runs) });
 
 /**
  * A card's text with `labels:` set to `labels`, in key order — or taken off, for none — every other key kept: what `nemia label inbox`
  * writes. Written again as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
  */
-export const labelledText = (card: InboxCard, labels: Labels, isDirectory: (at: string) => boolean): string =>
-  cardText(card, { labels }, isDirectory);
+export const labelledText = (card: InboxCard, labels: Labels): string => cardText(card, { labels });
 
 /**
  * A card's text, its keys written over by `over` and the frontmatter written again in the keys' order, its comments dropped; a body that
  * opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Read back before it is given.
  */
-export function cardText(
-  card: InboxCard,
-  over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels },
-  isDirectory: (at: string) => boolean,
-): string {
+export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }): string {
   const keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels } = {
     workflow: card.workflow,
     repo: card.repo,
@@ -830,7 +821,7 @@ export function cardText(
     ...over,
   };
   const text = cardWritten(keys, card.body);
-  parseInboxCard(card.file, text, isDirectory);
+  parseInboxCard(card.file, text);
   return text;
 }
 
@@ -872,16 +863,27 @@ export function inboxNameOf(at: string, dir: string): string | null {
 }
 
 /**
- * Why a card cannot be started on no workflow: it names none, and none was given — with the workflows the repository has to name one of,
- * and how. `where` is what `nemia start` is given for the card: its name, as the start takes it on this machine and on another's.
+ * Why a card cannot be started on no workflow: it names none by its name — none at all, or an old card's path (`oldPath`), which names no
+ * workflow its factory offers — and none was given; with the workflows `offered.by` offers (its factory, or for a card of the default
+ * factory the repository's `workflows/`) to name one of, and how. `where` is what `nemia start` is given for the card: its name, as the
+ * start takes it on this machine and on another's.
  */
-export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, repo: string, workflows: readonly string[]): string {
-  const dir = path.join(repo, 'workflows');
+export function noWorkflowRefusal(
+  card: Pick<InboxCard, 'file'>,
+  where: string,
+  offered: { by: string; workflows: readonly string[] },
+  oldPath?: string,
+): string {
+  const named =
+    oldPath === undefined
+      ? 'the card names none, and none was given'
+      : `the card's \`workflow: ${oldPath}\` is a path, and a card names its workflow by its name; none was given`;
+  const [first] = offered.workflows;
   return (
-    `${card.file}: no workflow — the card names none, and none was given, so nothing says what runs it. ` +
-    (workflows.length
-      ? `The repository's workflows are: ${workflows.join(', ')}, in ${dir}. Name one: nemia start ${where} --workflows ${workflows[0]}, or write \`workflow: ${workflows[0]}\` in the card.`
-      : `${dir} has no workflows. Give a workflow folder: nemia start ${where} --workflows <dir>, or write \`workflow:\` in the card.`)
+    `${card.file}: no workflow — ${named}, so nothing says what runs it. ` +
+    (first !== undefined
+      ? `${offered.by} offers: ${offered.workflows.join(', ')}. Name one: nemia start ${where} --workflows ${first}, or write \`workflow: ${first}\` in the card.`
+      : `${offered.by} offers none. Name a workflow: nemia start ${where} --workflows <name>, or write \`workflow: <name>\` in the card.`)
   );
 }
 

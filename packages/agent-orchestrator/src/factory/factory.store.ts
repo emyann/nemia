@@ -79,7 +79,8 @@ const VolumeEntrySchema = Schema.StructWithRest(
  * this file whether or not it is made from a template, since they are the person's and never the template's; the settings of a harness its
  * runs' sessions are given (`harnessSettings`), kept here for the same reason and judged by the model at the door, not on read; the cost
  * line it sets for each workflow it offers (`costLines`), kept here for the same reason; the git URL of each repository it was given
- * by one, by its folder (`origins`); and the template it was made from, when it was
+ * by one, by its folder (`origins`); the repository each workflow works on, by folder name (`workflowRepos`), where it is made from no
+ * template (one made from a template keeps it in its tree's wiring, as an attach writes it); and the template it was made from, when it was
  * (`nemia factory apply`): its folder, its version and the parameters given; its `generation`, the count of changes to its spec, absent on
  * a file written before the counter; a volume's `name`. A key a later `nemia` writes is kept.
  */
@@ -95,6 +96,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     harnessSettings: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
     costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Number)),
     origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     generation: Schema.optionalKey(Schema.Number),
     template: Schema.optionalKey(
       Schema.StructWithRest(
@@ -143,15 +145,23 @@ function factoryFile(home: string, name: string): FileRead {
 }
 
 /**
- * The workflows, hires and revisions policy of a templated factory `name`: its tree's, none while the tree is not rendered, or why they
- * do not read.
+ * The workflows, hires, revisions policy and workflows' repositories of a templated factory `name`: its tree's, none while the tree is
+ * not rendered, or why they do not read.
  */
-function treeWiringOf(home: string, name: string): Pick<Factory, 'workflows' | 'hires' | 'revisions'> | { error: string } {
+function treeWiringOf(
+  home: string,
+  name: string,
+): Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'> | { error: string } {
   const read = readTreeWiring(home, name);
   if ('absent' in read) return { workflows: [], hires: {} };
   if ('error' in read) return read;
-  const { workflows, hires, revisions } = read.wiring;
-  return { workflows, hires, ...(revisions === undefined ? {} : { revisions }) };
+  const { workflows, hires, revisions, workflowRepos } = read.wiring;
+  return {
+    workflows,
+    hires,
+    ...(revisions === undefined ? {} : { revisions }),
+    ...(workflowRepos === undefined ? {} : { workflowRepos }),
+  };
 }
 
 /**
@@ -161,7 +171,10 @@ function treeWiringOf(home: string, name: string): Pick<Factory, 'workflows' | '
  */
 function factoryOf(home: string, name: string, content: FactoryFile): Factory | { error: string } {
   const template = content.template;
-  const own = content.revisions === undefined ? {} : { revisions: content.revisions };
+  const own = {
+    ...(content.revisions === undefined ? {} : { revisions: content.revisions }),
+    ...(content.workflowRepos === undefined ? {} : { workflowRepos: content.workflowRepos }),
+  };
   const wiring =
     template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {}, ...own } : treeWiringOf(home, name);
   if ('error' in wiring) return wiring;
@@ -299,9 +312,10 @@ export function createFactoryAt(home: string, factory: Factory): string {
 /**
  * What the file of `factory` holds, written over `content`, what it held, every key the model does not name kept where it was: its
  * repositories; its workflows, hires and schedules where the file named the key or the factory names one (made from a template, its
- * workflows, hires and revisions policy are its tree's, and the file's are left as they were); where its instruction is kept and its
- * revisions policy where it says, the key gone where it does not; its volumes where it has any, in this file even where it is made from a
- * template; its harness settings where it names any; and its template, the keys a later `nemia` wrote beside it kept.
+ * workflows, hires, revisions policy and workflows' repositories are its tree's, and the file's are left as they were); where its
+ * instruction is kept and its revisions policy where it says, the key gone where it does not; its volumes where it has any, in this file
+ * even where it is made from a template; its harness settings where it names any; and its template, the keys a later `nemia` wrote
+ * beside it kept.
  */
 function fileContentOf(content: FactoryFile | undefined, factory: Factory): FactoryFile {
   const next: Record<string, unknown> = { ...content, repos: factory.repos };
@@ -316,6 +330,10 @@ function fileContentOf(content: FactoryFile | undefined, factory: Factory): Fact
     named('workflows', factory.workflows, factory.workflows.length > 0);
     named('hires', factory.hires, Object.keys(factory.hires).length > 0);
     kept('revisions', factory.revisions);
+    kept(
+      'workflowRepos',
+      factory.workflowRepos !== undefined && Object.keys(factory.workflowRepos).length ? factory.workflowRepos : undefined,
+    );
   }
   named('schedules', factory.schedules, Object.keys(factory.schedules).length > 0);
   kept('instruction', factory.instruction);
@@ -461,12 +479,37 @@ const DONE = {
 type Rewrite = keyof typeof DONE;
 
 /** The wiring a factory's tree holds, as its workflows, hires and revisions policy, for telling whether a rewrite changes it. */
-const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions'>): string =>
-  JSON.stringify([[...wiring.workflows].sort(), wiring.hires, wiring.revisions ?? null]);
+const wiringKey = (wiring: Pick<Factory, 'workflows' | 'hires' | 'revisions' | 'workflowRepos'>): string =>
+  JSON.stringify([[...wiring.workflows].sort(), wiring.hires, wiring.revisions ?? null, wiring.workflowRepos ?? null]);
 
 /** The file a factory's wiring is kept in: its tree's `factory.json` where it is made from a template, else its own file. */
 const wiringFileAt = (home: string, factory: Factory): string =>
   factory.template === undefined ? fileAt(home, factory.name) : path.join(treeDir(home, factory.name), 'factory.json');
+
+/**
+ * The wiring of the templated factory `factory` written into its tree's `factory.json` — its workflows, hires, revisions policy and
+ * workflows' repositories, every other key kept — where it changes it: the file written, or undefined where it was left as it was.
+ * Refused: a tree whose wiring does not read (`Invalid`), and one not rendered yet where the wiring changes (`Conflict`).
+ */
+function treeRewired(home: string, factory: Factory, notDone: string): string | undefined {
+  const { name } = factory;
+  const tree = readTreeWiring(home, name);
+  if ('error' in tree) throw new Invalid({ message: `the factory ${name}: ${tree.error} ${notDone}` });
+  const was = 'absent' in tree ? { workflows: [], hires: {} } : tree.wiring;
+  const { revisions: _was, workflowRepos: _wired, ...rest } = was;
+  const wired = factory.workflowRepos !== undefined && Object.keys(factory.workflowRepos).length ? factory.workflowRepos : undefined;
+  const next = {
+    ...rest,
+    workflows: factory.workflows,
+    hires: factory.hires,
+    ...(factory.revisions === undefined ? {} : { revisions: factory.revisions }),
+    ...(wired === undefined ? {} : { workflowRepos: wired }),
+  };
+  if (wiringKey(was) === wiringKey(next)) return undefined;
+  if ('absent' in tree) throw new Conflict({ message: unrenderedTreeRefusal(name, treeDir(home, name), notDone) });
+  writeTreeWiring(home, name, next);
+  return path.join(treeDir(home, name), 'factory.json');
+}
 
 /**
  * The factory `factory` written back into the store `home`, the file it was read from: its file, every key the model does not name
@@ -486,23 +529,7 @@ export function rewriteFactoryAt(home: string, factory: Factory, notDone = 'Noth
   const content = read.content;
   const written = generationWritten(factoryOf(home, name, content), factory, counted);
   let changed = read.file;
-  if ((content.template ?? factory.template) !== undefined) {
-    const tree = readTreeWiring(home, name);
-    if ('error' in tree) throw new Invalid({ message: `the factory ${name}: ${tree.error} ${notDone}` });
-    const was = 'absent' in tree ? { workflows: [], hires: {} } : tree.wiring;
-    const { revisions: _was, ...rest } = was;
-    const next = {
-      ...rest,
-      workflows: factory.workflows,
-      hires: factory.hires,
-      ...(factory.revisions === undefined ? {} : { revisions: factory.revisions }),
-    };
-    if (wiringKey(was) !== wiringKey(next)) {
-      if ('absent' in tree) throw new Conflict({ message: unrenderedTreeRefusal(name, treeDir(home, name), notDone) });
-      writeTreeWiring(home, name, next);
-      changed = path.join(treeDir(home, name), 'factory.json');
-    }
-  }
+  if ((content.template ?? factory.template) !== undefined) changed = treeRewired(home, factory, notDone) ?? changed;
   const after = fileContentOf(content, written);
   if (JSON.stringify(after) !== JSON.stringify(content)) writeWhole(read.file, `${JSON.stringify(after, null, 2)}\n`);
   return changed;
@@ -600,11 +627,16 @@ export function fireAgentAt(home: string, opts: { factory: string; step: string 
 /**
  * `nemia factory attach`: the workflow whose folder is named `workflow` attached to the factory `factory`, which then offers it; the file's
  * workflows kept sorted, each named once, and every other key kept. One already attached is not written again (`already`). Only the name
- * is stored: whether the workflow exists is judged when a run starts in the factory. Refused before anything is written: the name
- * (`workflowNameRefusal`, `Invalid`) and the factory (`toChange`).
+ * is stored: whether the workflow exists is judged when a run starts in the factory; `repo`, the folder name of the repository its runs
+ * work on, where one is named. Refused before anything is written: the name (`workflowNameRefusal`, `Invalid`), the factory
+ * (`toChange`), and a `repo` none or several of its repositories are named (`Invalid`).
  */
-export function attachWorkflowAt(home: string, opts: { factory: string; workflow: string }): { file: string; already?: true } {
-  const { was, now, file } = wiredAt(home, opts.factory, { verb: 'attach', workflow: opts.workflow });
+export function attachWorkflowAt(
+  home: string,
+  opts: { factory: string; workflow: string; repo?: string },
+): { file: string; already?: true } {
+  const change = { verb: 'attach', workflow: opts.workflow, ...(opts.repo === undefined ? {} : { repo: opts.repo }) } as const;
+  const { was, now, file } = wiredAt(home, opts.factory, change);
   return now === was ? { file, already: true } : { file };
 }
 

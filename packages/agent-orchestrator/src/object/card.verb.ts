@@ -64,7 +64,7 @@ const keyOf = (l: InboxListing): string => `${l.name}\n${l.file}`;
 const bodyOf = (l: InboxListing, text: string): { readonly body?: string; readonly error?: string } => {
   if (l.error !== null) return { error: l.error };
   try {
-    return { body: parseInboxCard(l.file, text, () => true).body };
+    return { body: parseInboxCard(l.file, text).body };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }

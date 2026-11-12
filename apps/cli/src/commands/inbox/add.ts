@@ -1,16 +1,16 @@
 /**
- * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...`: an idea filed as a
- * card through the Card's `create`, in the namespace of `--factory` (`default` for none). A file is read here and its text sent (Q8); a
- * folder is refused, naming the command. `--workflow` is sent by its name, a path refused; `--repo` is a path the daemon keeps
- * (`pathSent`); `--label` each edit as typed.
+ * `nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...`: an idea filed as a card through the
+ * Card's `create`, in the namespace of `--factory` (`default` for none). A file is read here and its text sent (Q8); a folder is refused,
+ * naming the command. `--workflow` is sent by its name, a path refused; `--label` each edit as typed. A card names no repository: its
+ * words refuse `--repo`, the factory's wiring placing its run.
  */
 import fs from 'node:fs';
 import { DEFAULT_NAMESPACE, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { textOf } from '../files.ts';
-import { listArg, pathSent, said, textArg } from '../requests.ts';
-import { fileOf, labelsText, repoFactory, workflowNamed } from './card-lines.ts';
+import { listArg, said, textArg } from '../requests.ts';
+import { factoryLine, fileOf, labelsText, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
 
@@ -37,7 +37,7 @@ export const filedLines = (card: Card): string[] => {
   const { spec } = card;
   const title = (spec.body ?? '').split('\n')[0] ?? '';
   return [
-    `${name}  ${title.slice(0, 56)}${spec.workflow ? `  workflow: ${spec.workflow}` : ''}${repoFactory(card)}${labels && Object.keys(labels).length ? `  labels: ${labelsText(labels)}` : ''}`,
+    `${name}  ${title.slice(0, 56)}${spec.workflow ? `  workflow: ${spec.workflow}` : ''}${factoryLine(card)}${labels && Object.keys(labels).length ? `  labels: ${labelsText(labels)}` : ''}`,
     ...leftOutLines(card),
     `filed: ${fileOf(card)} — start it with nemia start ${name}${spec.workflow ? '' : ' --workflows <w>'}`,
   ];
@@ -47,14 +47,12 @@ export const filedLines = (card: Card): string[] => {
 export async function inboxAdd(args: Args): Promise<number> {
   const body = ideaOf(textArg(args, 'idea') ?? '');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
-  const repo = textArg(args, 'repo');
   const factory = textArg(args, 'factory');
   const label = listArg(args, 'label');
   const namespace = factory !== undefined && factory !== '' ? factory : DEFAULT_NAMESPACE;
   const payload = {
     body,
     ...(workflow === undefined ? {} : { workflow }),
-    ...(repo === undefined ? {} : { repo: pathSent(repo) }),
     ...(label.length ? { label } : {}),
   };
   said(filedLines(await asked(COMMAND, (c) => c.cards.create({ params: { namespace }, payload }))));

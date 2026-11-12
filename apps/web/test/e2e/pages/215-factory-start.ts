@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, startOf, themeOf, isRunStart } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { FACTORIES, WORKFLOWS } from '../seed.ts';
+import { FACTORIES, onSeveralRepos, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
 
@@ -52,13 +52,50 @@ async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<vo
   await expectCount(bar, 0, 'a second Escape closes the bar');
 }
 
+/**
+ * The factory on two repositories: no repository to pick; `workflow`, picked by name, unwired says the attach, and wired to `checkout`'s
+ * folder name in the factory's file says it, offering its start there. The file is put back.
+ */
+async function severalRepos(page: Page, workflow: string, checkout: string, theme: string): Promise<void> {
+  const factory = FACTORIES.hiring.name;
+  const { back } = onSeveralRepos(store!);
+  try {
+    let bar = await openStart(page);
+    await expectCount(bar.getByRole('option', { name: 'Pick where it runs' }), 0, 'on two repositories, none is offered to pick');
+    await bar.getByLabel('Workflow').selectOption(workflow);
+    await expectVisible(
+      bar.locator('[data-unwired="unwired"]', { hasText: `nemia factory attach ${factory} ${workflow} --repo <name>` }),
+      `${workflow} unwired says the attach that names its repository`,
+    );
+    await expectCount(bar.locator('form[aria-label^="Start a run of"]'), 0, 'with no Start: the api would refuse it');
+    await settled(page);
+    await photograph(page, path.join(OUT, `factory-start-unwired-${theme}.png`));
+
+    const file = path.join(store!, 'factories', `${factory}.json`);
+    const read = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
+    fs.writeFileSync(file, JSON.stringify({ ...read, workflowRepos: { [workflow]: path.basename(checkout) } }, null, 2));
+    bar = await openStart(page);
+    await bar.getByLabel('Workflow').selectOption(workflow);
+    await expectVisible(bar.locator('[data-repo]', { hasText: `On ${checkout}` }), `wired, ${workflow} says the repository it runs on`);
+    await expectVisible(
+      bar.locator(`form[aria-label="Start a run of ${workflow}"]`).or(bar.locator(`[data-workflow="repo:${workflow}"]`)),
+      'and offers it there',
+    );
+    await settled(page);
+    await photograph(page, path.join(OUT, `factory-start-wired-${theme}.png`));
+  } finally {
+    back();
+  }
+}
+
 export default {
   /**
    * A run is started from a factory's floor: the sidebar's Start a run opens the floating bar on the factory's one repository, fixed,
    * listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's
    * words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief,
    * and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires, the
-   * agent hired and the run are taken back.
+   * agent hired and the run are taken back. On a second repository the factory then works on two: the bar offers no repository to
+   * pick, the workflow is picked by name, and, unwired, it says why with the attach; wired by the factory's file, it says the wired one.
    */
   name: 'factory-start',
   route: `/factories/${FACTORIES.hiring.name}`,
@@ -124,6 +161,7 @@ export default {
       await idle(other);
       await settled(other);
       await photograph(other, path.join(OUT, `factory-start-started-${theme}.png`));
+      await severalRepos(other, workflow, checkout, theme);
       const seen = problems();
       if (seen.length)
         throw new Refused(

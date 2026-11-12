@@ -42,6 +42,25 @@ test('an archive install keeps the newest release it read in releases/latest.jso
   assert.deepEqual(readLatest(root), { tag: 'v1.3.0', version: '1.3.0' });
 });
 
+test("a latest.json's notes are kept where they are an http(s) address, and dropped where they are anything else", async () => {
+  for (const [notes, kept] of [
+    ['https://example.org/releases/tag/v1.3.0', true],
+    ['http://example.org/notes', true],
+    ['javascript:alert(1)', false],
+    ['file:///etc/passwd', false],
+    ['not an address', false],
+    [42, false],
+  ] as const) {
+    const base = scratch('wf-check-notes-');
+    fs.mkdirSync(path.join(base, 'latest', 'download'), { recursive: true });
+    fs.writeFileSync(path.join(base, 'latest', 'download', 'latest.json'), JSON.stringify({ tag: 'v1.3.0', version: '1.3.0', notes }));
+    const { done, root } = await checked(install('archive', pathToFileURL(base).href));
+    const expected = kept ? { tag: 'v1.3.0', version: '1.3.0', notes } : { tag: 'v1.3.0', version: '1.3.0' };
+    assert.deepEqual(done, { kind: 'read', latest: expected }, String(notes));
+    assert.deepEqual(readLatest(root), expected, String(notes));
+  }
+});
+
 test('NEMIA_RELEASE_CHECK=off, a build and a checkout read nothing and write nothing', async () => {
   for (const [running, env, kind] of [
     [install('archive'), { NEMIA_RELEASE_CHECK: 'off' }, 'off'],

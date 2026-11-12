@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
-import { addFactory } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, removeFactory } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -100,9 +100,16 @@ const filedFrom = async (res: Response): Promise<Filed> => {
 };
 const drop = (name: string, headers: Record<string, string> = JSON_TYPE) =>
   app.request(`/api/namespaces/default/cards/${name}`, { method: 'DELETE', headers });
-/** A start: of the card `card` names at the Card's own `start`, the rest of the body its; or of a run from a brief, with no card. */
-const startCard = ({ card, ...body }: { card?: string } & Record<string, unknown>, headers: Record<string, string> = JSON_TYPE) =>
-  app.request(card === undefined ? '/api/namespaces/default/runs' : `/api/namespaces/default/cards/${card}/start`, {
+/**
+ * A start: of the card `card` names at the Card's own `start`, in the namespace `namespace`, the rest of the body its; or of a run from a
+ * brief, with no card.
+ */
+const startCard = (
+  { card, ...body }: { card?: string } & Record<string, unknown>,
+  headers: Record<string, string> = JSON_TYPE,
+  namespace = 'default',
+) =>
+  app.request(card === undefined ? `/api/namespaces/${namespace}/runs` : `/api/namespaces/${namespace}/cards/${card}/start`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -151,17 +158,33 @@ const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }
   return assert.fail(`${JSON.stringify(opts)} was filed, and should have been refused`);
 };
 
+/**
+ * A factory of its own on the folder `about`, with a `dev` of its own attached, its step naming its agent: a card filed in it starts on
+ * `about`, its one repository, whatever the card says. Its name, for the test to file its cards in and remove it after.
+ */
+const onFolder = (about: string): string => {
+  const name = `on-${path
+    .basename(about)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')}`;
+  write(path.join(about, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: implementer\n---\nImplement it.\n');
+  write(path.join(about, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+  addFactory({ name, repos: [about] });
+  attachWorkflow({ factory: name, workflow: 'dev' });
+  return name;
+};
+
 test('a person starts a card: the run carries where it came from, and the card stays in the inbox, listed as started', async (t) => {
   const s = story(t);
   await s.test(
-    'POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card stays, listed as started',
+    "POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow it names by name, `after` — on the api's repository, `from` ignored — the record carries `from`, and the card stays, listed as started",
     async () => {
       clear();
-      const { card } = onStore(addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo }));
+      const { card } = onStore(addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine' }));
       const other = onStore(addToInbox({ text: 'Another idea' }));
       const parent = await runWith(
         engine(process.env),
-        startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' }),
+        startFromInbox({ name: other.card.name, callerRepo: repo, workflow: 'dev', brief: 'A run to wait on' }),
       );
 
       const res = await startCard({
@@ -207,12 +230,12 @@ test('a person starts a card: the run carries where it came from, and the card s
       );
 
       const { card: plain } = onStore(addToInbox({ text: 'Keep the brief\n\nAs the card says it.' }));
-      const bodied = await startCard({ workflow: 'mine', card: plain.name });
+      const bodied = await startCard({ workflow: 'dev', card: plain.name });
       assert.equal(bodied.status, 201, await bodied.clone().text());
       const bodiedRun = runsAtOnce(root).runs.read(((await bodied.json()) as CardStarted).id);
       assert.deepEqual(
         [bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from],
-        ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }],
+        ['Keep the brief\n\nAs the card says it.', dev, { inbox: plain.name }],
         "a brief left out is the card's body",
       );
     },
@@ -269,7 +292,7 @@ test('POST /api/runs with `card` of a card already started is refused, 409, nami
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */
 const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}): Promise<string> => {
   try {
-    await runWith(engine(process.env), startFromInbox({ name, callerRepo: repo, workflow: dev, ...extra }));
+    await runWith(engine(process.env), startFromInbox({ name, callerRepo: repo, workflow: 'dev', ...extra }));
   } catch (err) {
     assert.equal((err as { exitCode?: unknown }).exitCode, 2);
     return (err as Error).message;
@@ -328,7 +351,7 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
   );
 
   await t.test(
-    "a card whose `repo:` is a folder a run cannot branch from — no git checkout, no commit, or a `.worktreeinclude` that is a directory — is a 422 in the place's words, and nothing is written or removed",
+    "a card whose factory's repository is a folder a run cannot branch from — no git checkout, no commit, or a `.worktreeinclude` that is a directory — is a 422 in the place's words, and nothing is written or removed",
     async () => {
       clear();
       const plain = scratch('nemia-api-inbox-plain-');
@@ -343,14 +366,16 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
         [empty, [`${empty} has no commit yet`, 'commit once']],
         [odd, [`${path.join(odd, '.worktreeinclude')} is not a file`, 'remove it']],
       ] as const) {
-        const { card } = onStore(addToInbox({ text: 'Not a repository', repo: about }));
-        const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
+        const factory = onFolder(about);
+        const { card } = onStore(addToInbox({ text: 'Not a repository', factory }));
+        const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' }, JSON_TYPE, factory);
         assert.equal(res.status, 422, about);
         const words = ((await res.json()) as Refused).error;
         assert.ok(words.startsWith(facts[0]), words);
         for (const fact of facts) assert.ok(words.includes(fact), `${fact}: ${words}`);
         assert.deepEqual(runFiles(), [], 'no run written');
         assert.deepEqual(cards(), [`${card.name}.md`], 'the card stays');
+        removeFactory(factory);
         clear();
       }
     },
@@ -377,7 +402,8 @@ test('POST /api/runs with `card`: what a start of a card refuses, writing nothin
         assert.equal(res.status, 400, JSON.stringify(brief));
       }
       const unknown = await startCard({ workflow: 'nope', card: card.name });
-      assert.equal(unknown.status, 404, "the workflow is still the api's to find, among its folders");
+      assert.equal(unknown.status, 422, "the workflow is the package's to find, by its name, as `nemia start <card>` finds it");
+      names(((await unknown.json()) as Refused).error, 'nope');
       assert.deepEqual(runFiles(), []);
       assert.deepEqual(cards(), [`${card.name}.md`]);
     },
@@ -391,10 +417,12 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: odd });
   fs.symlinkSync('.worktreeinclude', path.join(odd, '.worktreeinclude'));
   const said = t.mock.method(console, 'error', () => {});
-  const { card } = onStore(addToInbox({ text: 'Its include file is a link to itself', repo: odd }));
+  const factory = onFolder(odd);
+  t.after(() => removeFactory(factory));
+  const { card } = onStore(addToInbox({ text: 'Its include file is a link to itself', factory }));
   let failure: (Error & { exitCode?: unknown }) | undefined;
   try {
-    await runWith(engine(process.env), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
+    await runWith(engine(process.env), startFromInbox({ name: card.name, callerRepo: repo, workflow: 'dev' }));
   } catch (err) {
     failure = err as Error & { exitCode?: unknown };
   }
@@ -402,7 +430,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
     failure && failure.exitCode !== 2 && failure.message.startsWith("the place's open was not heard: open threw before it answered: ELOOP"),
     failure?.message,
   );
-  const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' });
+  const res = await startCard({ workflow: 'dev', card: card.name, brief: 'Do it.' }, JSON_TYPE, factory);
   assert.equal(res.status, 500);
   assert.equal(((await res.json()) as Refused).error, failure.message);
   assert.deepEqual(runFiles(), [], 'no run written');
@@ -411,12 +439,12 @@ test("a card whose start fails without a refusal — its repository's `.worktree
   assert.equal(errors.length, 1, 'the failure said once on stderr');
   const lines = said.mock.calls.filter((call) => typeof call.arguments[0] === 'string').map((call) => String(call.arguments[0]));
   assert.equal(lines.length, 1, `beside it, the request's own line at Error: ${JSON.stringify(lines)}`);
-  assert.match(lines[0], /^\d\d:\d\d:\d\d {2}POST \/api\/namespaces\/default\/cards\/[^ ]+\/start 500 \d+ms$/);
+  assert.match(lines[0], new RegExp(`^\\d\\d:\\d\\d:\\d\\d {2}POST /api/namespaces/${factory}/cards/[^ ]+/start 500 \\d+ms$`));
 });
 
 /**
- * Two repositories that are not the api's, each with a `dev`, the second with a `solo` the first has not: `mill` works on the first,
- * `pair` on both.
+ * Two repositories that are not the api's, each with a `dev`, the second with a `solo` the first has not: `mill` works on the first, and
+ * attaches `dev`; `pair` on both, and attaches `dev`, wired to the second, and `solo`, wired to none.
  */
 const first = scratch('nemia-api-inbox-first-');
 const second = scratch('nemia-api-inbox-second-');
@@ -424,8 +452,16 @@ for (const cwd of [first, second]) execFileSync('git', ['init', '-q', '-b', 'mai
 write(path.join(first, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it here.\n');
 write(path.join(second, 'workflows', 'dev', 'implement.md'), '---\nplace: git\n---\nImplement it there.\n');
 write(path.join(second, 'workflows', 'solo', 'implement.md'), '---\nplace: git\n---\nImplement it alone.\n');
+for (const at of [first, second]) {
+  write(path.join(at, 'workflows', 'dev', 'implement.md'), '---\nplace: git\nharness: claude\nagent: implementer\n---\nImplement it.\n');
+  write(path.join(at, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: at });
+}
 addFactory({ name: 'mill', repos: [first] });
+attachWorkflow({ factory: 'mill', workflow: 'dev' });
 addFactory({ name: 'pair', repos: [first, second] });
+attachWorkflow({ factory: 'pair', workflow: 'dev', repo: path.basename(second) });
+attachWorkflow({ factory: 'pair', workflow: 'solo' });
 
 test("a person files cards, in a factory and out of one, lists them, opens a card's page, and drops one", async (t) => {
   const s = story(t);
@@ -435,7 +471,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
   });
 
   await s.test(
-    "the Card's create files a card as `nemia inbox add` does: the idea alone; a repository's workflow by name; yours as its folder; the repository it is about — and GET /api/cards lists each with its body and when it was filed",
+    "the Card's create files a card as `nemia inbox add` does: the idea alone; a workflow by its name, a repository's or yours, `from` ignored; no repository — and GET /api/cards lists each with its body and when it was filed",
     async () => {
       clear();
       const bare = await file({ body: 'Cache the views between passes\n\nThe tick reads each task twice.' });
@@ -453,42 +489,33 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       assert.equal(
         fs.readFileSync(filed.file, 'utf8'),
         'Cache the views between passes\n\nThe tick reads each task twice.\n',
-        'no frontmatter for a card that says nothing of its workflow or repository',
+        'no frontmatter for a card that says nothing of its workflow',
       );
 
-      const named = await filedFrom(await file({ body: 'Show what a step cost', workflow: 'dev', repo }));
+      const named = await filedFrom(await file({ body: 'Show what a step cost', workflow: 'dev' }));
       assert.equal(
         fs.readFileSync(named.file, 'utf8'),
-        `---\nworkflow: dev\nrepo: ${repo}\n---\nShow what a step cost\n`,
-        "the repository's, on a card about the api's repository: by name, as `nemia inbox add --workflow dev` writes it",
+        `---\nworkflow: dev\n---\nShow what a step cost\n`,
+        "the repository's, by name, as `nemia inbox add --workflow dev` writes it, and no `repo:`",
       );
       const yours = await filedFrom(await file({ body: 'Plan the inbox', workflow: 'mine' }));
-      assert.deepEqual(
-        [yours.workflow, yours.repo],
-        [mine, null],
-        "yours: its folder, since a name on a card is looked for under the repository's workflows/, where yours is not",
-      );
-      assert.equal(
-        (await filedFrom(await file({ body: 'Both, the repository', workflow: 'both', from: 'repo' }))).workflow,
-        'both',
-        "one both have, said which: the repository's by name",
-      );
-      assert.equal(
-        (await filedFrom(await file({ body: 'Both, yours', workflow: 'both', from: 'yours' }))).workflow,
-        path.join(root, 'workflows', 'both'),
-        'one both have, said which: yours by folder',
-      );
-      const elsewhere = scratch('nemia-api-inbox-elsewhere-');
-      assert.equal(
-        (await filedFrom(await file({ body: 'Elsewhere', workflow: 'dev', repo: elsewhere }))).workflow,
-        dev,
-        "the repository's, on a card about another repository: its folder, since the name would be looked for in that one",
-      );
+      assert.deepEqual([yours.workflow, yours.repo], ['mine', null], 'yours: by its name too, never a folder');
+      for (const from of ['repo', 'yours'] as const) {
+        assert.equal(
+          (await filedFrom(await file({ body: `Both, said ${from}`, workflow: 'both', from }))).workflow,
+          'both',
+          `one both have, said ${from}: by its name, \`from\` read and ignored`,
+        );
+      }
+      const fromAlone = await filedFrom(await file({ body: 'From alone', from: 'repo' }));
+      assert.deepEqual([fromAlone.workflow, fromAlone.repo], [null, null], '`from` with no workflow: filed, `from` ignored');
+      const nobodys = await filedFrom(await file({ body: 'Nobody has it', workflow: 'nope' }));
+      assert.equal(nobodys.workflow, 'nope', 'out of a factory, a name is filed as it is: no repository is looked at to find it');
 
       const old = new Date('2026-09-01T10:00:00.000Z');
       fs.utimesSync(filed.file, old, old);
       const entries = await listed();
-      assert.equal(entries.length, 6);
+      assert.equal(entries.length, 7);
       const bareEntry = entries.find((e) => e.name === filed.name)!;
       assert.deepEqual(
         bareEntry,
@@ -511,41 +538,26 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const namedEntry = entries.find((e) => e.name === named.name)!;
       assert.deepEqual(
         [namedEntry.title, namedEntry.workflow, namedEntry.repo, namedEntry.body],
-        ['Show what a step cost', 'dev', repo, 'Show what a step cost'],
+        ['Show what a step cost', 'dev', null, 'Show what a step cost'],
       );
       assert.ok(Date.parse(namedEntry.filedAt) > old.getTime());
     },
   );
 
   await s.test(
-    "the Card's create writes an absolute repo as `nemia inbox add --repo` does — no trailing slash, no `.` or `..` — so a card's run records the repository as every other run on it does",
+    "an old card's `repo:` is listed as it was written, and never read: its start runs on the api's repository and answers it as `ignoredRepo`",
     async () => {
       clear();
-      for (const given of [
-        `${repo}/`,
-        `${repo}//`,
-        `${repo}/./`,
-        `${path.dirname(repo)}/../${path.basename(path.dirname(repo))}/${path.basename(repo)}`,
-      ]) {
-        const res = await file({ body: `About ${given}`, workflow: 'dev', repo: given });
-        assert.equal(res.status, 201, `${given}: ${await res.clone().text()}`);
-        const filed = await filedFrom(res);
-        assert.deepEqual(
-          [filed.repo, filed.workflow],
-          [repo, 'dev'],
-          `${given}: the api's own repository once written as it is, so its workflow is written by name, as for the repository given plainly`,
-        );
-        assert.equal(fs.readFileSync(filed.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nAbout ${given}\n`, given);
-      }
-
-      const { name } = await filedFrom(await file({ body: 'Started from a slash', repo: `${repo}/` }));
-      const started = await startCard({ workflow: 'dev', card: name });
+      const elsewhere = scratch('nemia-api-inbox-elsewhere-');
+      write(path.join(inbox, 'from-before-k2q9.md'), `---\nworkflow: dev\nrepo: ${elsewhere}/\n---\nFiled before repo: was retired\n`);
+      const entry = (await listed()).find((e) => e.name === 'from-before-k2q9');
+      assert.deepEqual([entry?.repo, entry?.workflow], [`${elsewhere}/`, 'dev'], 'an old card still reads, its `repo:` listed');
+      const started = await startCard({ card: 'from-before-k2q9' });
       assert.equal(started.status, 201, await started.clone().text());
-      assert.equal(
-        runsAtOnce(root).runs.read(((await started.json()) as CardStarted).id).repo,
-        repo,
-        'started, the run names the repository as the api does, so the board lists it with the runs on it',
-      );
+      const answered = (await started.json()) as CardStarted;
+      assert.equal(answered.ignoredRepo, `${elsewhere}/`, "the card's `repo:`, said as not read");
+      const run = runsAtOnce(root).runs.read(answered.id);
+      assert.deepEqual([run.repo, run.workflowDir], [repo, dev], "started on the api's repository, its workflow found there by name");
     },
   );
 
@@ -640,7 +652,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
   });
 
   await s.test(
-    "the Card's create in a factory's namespace files the card in it, as `nemia inbox add --factory` does: its `factory:` key, its workflow as a start in the factory finds it, and no `repo:` nobody sent — and GET /api/cards lists it with its factory",
+    "the Card's create in a factory's namespace files the card in it, as `nemia inbox add --factory` does: its `factory:` key, a workflow it attaches by name, and no `repo:` — and GET /api/cards lists it with its factory",
     async () => {
       clear();
       const res = await file({ body: 'Mill the views', factory: 'mill', workflow: 'dev', from: 'repo' });
@@ -650,15 +662,13 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       assert.equal(
         fs.readFileSync(filed.file, 'utf8'),
         '---\nworkflow: dev\nfactory: mill\n---\nMill the views\n',
-        "the factory's one repository is its own to give at start: the card writes no repo: line",
+        "the factory's repository is its wiring's to give at start: the card writes no repo: line",
       );
       const entry = (await listed()).find((e) => e.name === filed.name)!;
       assert.deepEqual([entry.factory, entry.repo, entry.workflow], ['mill', null, 'dev']);
 
       const idea = await filedFrom(await file({ body: 'Mill it later', factory: 'mill' }));
       assert.equal(fs.readFileSync(idea.file, 'utf8'), '---\nfactory: mill\n---\nMill it later\n', 'a factory and no workflow');
-      const yours = await filedFrom(await file({ body: 'Mill mine', factory: 'mill', workflow: 'mine' }));
-      assert.equal(yours.workflow, mine, 'yours: by its folder, in a factory as out of one');
 
       const none = await filedFrom(await file({ body: 'No factory' }));
       assert.equal(none.factory, null, 'a filing with no factory answers none');
@@ -667,21 +677,33 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
   );
 
   await s.test(
-    "the Card's create in a factory on several repositories writes `repo:` only when one was sent, and a workflow only one of them has by its folder",
+    "a card in a factory on several repositories is filed with no `repo:`, and started on the repository the factory's wiring names for its workflow; one it names none for is a 422 naming the attach, and nothing is written",
     async () => {
       clear();
-      const sent = await filedFrom(await file({ body: 'There', factory: 'pair', workflow: 'dev', repo: `${second}/` }));
+      const there = await filedFrom(await file({ body: 'There', factory: 'pair', workflow: 'dev' }));
       assert.equal(
-        fs.readFileSync(sent.file, 'utf8'),
-        `---\nworkflow: dev\nrepo: ${second}\nfactory: pair\n---\nThere\n`,
-        'the repository sent, resolved, and its workflow by name',
+        fs.readFileSync(there.file, 'utf8'),
+        '---\nworkflow: dev\nfactory: pair\n---\nThere\n',
+        'its workflow by name, no repository',
       );
-      const found = await filedFrom(await file({ body: 'Alone', factory: 'pair', workflow: 'solo' }));
+      const started = await startCard({ card: there.name }, JSON_TYPE, 'pair');
+      assert.equal(started.status, 201, await started.clone().text());
+      const run = runsAtOnce(root).runs.read(((await started.json()) as CardStarted).id);
       assert.deepEqual(
-        [found.workflow, found.repo],
-        [path.join(second, 'workflows', 'solo'), null],
-        'no repository sent: none written, and the one folder found is written whole, so a start on either repository finds it',
+        [run.factory, run.repo, run.workflowDir],
+        ['pair', second, path.join(second, 'workflows', 'dev')],
+        'pair wires dev to its second repository: the run works there, though its first has a dev too',
       );
+
+      const alone = await filedFrom(await file({ body: 'Alone', factory: 'pair', workflow: 'solo' }));
+      assert.deepEqual([alone.workflow, alone.repo], ['solo', null], 'filed: pair attaches solo, and the wiring is read at start');
+      const before = runFiles();
+      const unwired = await startCard({ card: alone.name }, JSON_TYPE, 'pair');
+      assert.equal(unwired.status, 422, 'pair names no repository for solo: never a guess');
+      names(((await unwired.json()) as Refused).error, 'nemia factory attach pair solo --repo', path.basename(second));
+      assert.deepEqual(runFiles(), before, 'nothing written');
+      assert.ok(cards().includes(`${alone.name}.md`), 'the card stays');
+
       const bare = await filedFrom(await file({ body: 'Bare', factory: 'pair' }));
       assert.deepEqual([bare.factory, bare.repo, bare.workflow], ['pair', null, null]);
     },
@@ -754,7 +776,7 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
   );
 
   await t.test(
-    "a filing of the wrong shape is a 400 in the api's words, a `from` with no workflow too, a workflow that is a path a 422, a workflow nobody has a 404, one both have a 409 — before anything is written",
+    "a filing of the wrong shape is a 400 in the api's words, a workflow that is a path a 422, and a hidden one the package's 422 — before anything is written",
     async () => {
       clear();
       const refused = async (res: Response, status: number, sent: unknown, ...facts: string[]) => {
@@ -772,33 +794,21 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
           '`workflow`',
         );
       await refused(await file({ body: 'An idea', workflow: 'dev', from: 'elsewhere' }), 400, 'from', '`payload.from`');
-      await refused(
-        await file({ body: 'An idea', from: 'repo' }),
-        400,
-        'from alone: a 400 as the reader says it, no status folded',
-        '`workflow`',
-      );
       for (const about of [42, null, ['/tmp']]) await refused(await file({ body: 'An idea', repo: about }), 400, about, '`payload.repo`');
 
-      const unknown = await file({ body: 'An idea', workflow: 'nope' });
-      assert.equal(unknown.status, 404);
-      assert.ok(((await unknown.json()) as Refused).error.startsWith("No workflow 'nope' in "));
-      write(path.join(repo, 'workflows', '.draft', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
-      assert.equal(
-        (await file({ body: 'An idea', workflow: '.draft' })).status,
-        404,
-        'found among the folders, never joined: a hidden folder is none of them',
+      await refused(
+        await file({ body: 'An idea', workflow: '.draft' }),
+        422,
+        'a hidden folder names no workflow: the package refuses it by name',
+        '.draft',
       );
-      const both = await file({ body: 'An idea', workflow: 'both' });
-      assert.equal(both.status, 409);
-      assert.ok(((await both.json()) as Refused).error.startsWith("Both the repository and yours have a workflow named 'both'"));
 
       assert.deepEqual(cards(), []);
     },
   );
 
   await t.test(
-    "what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a relative repo, one naming no directory, a repo on two lines, an `after:` in the idea's frontmatter — and nothing is written",
+    "what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a `repo` of any kind, retired, the api's own repository among them, an `after:` in the idea's frontmatter — and nothing is written",
     async () => {
       clear();
       const cases: Array<{ body: string; repo?: string }> = [
@@ -807,6 +817,7 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
         { body: 'An idea', repo: 'code/myapp' },
         { body: 'An idea', repo: path.join(repo, 'not-there') },
         { body: 'An idea', repo: `${repo}\n${repo}` },
+        { body: 'An idea', repo },
         { body: '---\nafter: some-run\n---\nWait for it.' },
       ];
       for (const asked of cases) {
@@ -880,31 +891,28 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
   );
 
   await t.test(
-    "a `repo` that is none of the factory's is a 422 naming those it works on, and a workflow two of its repositories have, with no `repo`, a 409 naming `repo` — and no card is written",
+    'a `repo` sent to a factory is a 422 naming the attach, its own repositories among them, and a workflow the factory does not attach a 422 naming the attach — and no card is written',
     async () => {
       clear();
-      const outside = await file({ body: 'An idea', factory: 'mill', repo: second });
-      assert.equal(outside.status, 422);
-      const outsideSaid = ((await outside.json()) as Refused).error;
-      assert.ok(outsideSaid.startsWith(`${second}: the factory mill works on ${first}`), outsideSaid);
-      assert.ok(outsideSaid.includes('as `repo`') && outsideSaid.endsWith('Nothing was filed.'), outsideSaid);
-      const relative = await file({ body: 'An idea', factory: 'mill', repo: 'code/myapp' });
-      assert.equal(relative.status, 422, 'a relative path is none of them either');
-      const two = await file({ body: 'An idea', factory: 'pair', workflow: 'dev' });
-      assert.equal(two.status, 409);
-      const twoSaid = ((await two.json()) as Refused).error;
-      assert.ok(twoSaid.startsWith(`The factory pair works on ${[first, second].join(', ')}`), twoSaid);
-      for (const fact of [
-        "'dev'",
-        path.join(first, 'workflows', 'dev'),
-        path.join(second, 'workflows', 'dev'),
-        '`"repo": "<one of them>"`',
-      ]) {
-        assert.ok(twoSaid.includes(fact), `${fact}: ${twoSaid}`);
+      for (const [factory, about] of [
+        ['mill', second],
+        ['mill', first],
+        ['mill', 'code/myapp'],
+        ['pair', second],
+      ] as const) {
+        const res = await file({ body: 'An idea', factory, workflow: 'dev', repo: about });
+        assert.equal(res.status, 422, `${factory} ${about}: a card's \`repo\` is retired`);
+        names(((await res.json()) as Refused).error, about, 'nemia factory attach');
       }
-      const nowhere = await file({ body: 'An idea', factory: 'pair', workflow: 'nope' });
-      assert.equal(nowhere.status, 404);
-      assert.ok(((await nowhere.json()) as Refused).error.startsWith("No workflow 'nope' in "));
+      for (const [factory, workflow] of [
+        ['pair', 'nope'],
+        ['mill', 'solo'],
+        ['mill', 'mine'],
+      ] as const) {
+        const res = await file({ body: 'An idea', factory, workflow });
+        assert.equal(res.status, 422, `${factory} does not attach ${workflow}`);
+        names(((await res.json()) as Refused).error, workflow, `nemia factory attach ${factory} ${workflow}`);
+      }
       assert.deepEqual(cards(), []);
     },
   );

@@ -187,6 +187,7 @@ const millView: Factory = {
   untrusted: [],
   volumes: [{ path: '/home/me/notes', readOnly: true, commands: { rm: 'nemia factory volume rm mill notes' } }],
   costLines: {},
+  workflowRepos: {},
 };
 
 test("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", async (t) => {

@@ -79,7 +79,7 @@ function workflow(team: string, name: string, files: Record<string, string>): st
 
 /**
  * The tests' team with two more workflows: `plain`, implement then review, and `notes`, a folder team; the factory `trio` filed afresh
- * on three repositories, both attached. Its repositories, sorted, the team and the two folders.
+ * on three repositories, both attached, `plain` working on the first. Its repositories, sorted, the team and the two folders.
  */
 function fresh(): { repos: string[]; team: string; plain: string; notes: string } {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
@@ -91,7 +91,8 @@ function fresh(): { repos: string[]; team: string; plain: string; notes: string 
   const notes = workflow(team, 'notes', { write: '---\nworkspace: folder\nagent: implementer\n---\nWrite it.\n' });
   const repos = [aRepo(), aRepo(), aRepo()].sort();
   addFactoryAt(ROOT, { name: 'trio', repos });
-  for (const name of ['plain', 'notes']) attachWorkflowAt(ROOT, { factory: 'trio', workflow: name });
+  attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'plain', repo: path.basename(repos[0]) });
+  attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'notes' });
   return { repos, team, plain, notes };
 }
 
@@ -148,7 +149,7 @@ test('mounts on every filing: a factory run whose implement writes one folder of
     review: '---\nafter: implement\nplace: git\nagent: reviewer\nloop: implement\nrounds: 2\n---\nReview it.\n',
     ship: '---\nafter: review\nplace: git\nworkspace: base\nagent: shipper\ngate: true\n---\nShip it.\n',
   });
-  attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide' });
+  attachWorkflowAt(ROOT, { factory: 'trio', workflow: 'wide', repo: path.basename(own) });
   const given = path.join(ROOT, 'template-draft.md');
   fs.writeFileSync(given, 'the draft\n');
   const inbox = path.join(ROOT, 'inbox');

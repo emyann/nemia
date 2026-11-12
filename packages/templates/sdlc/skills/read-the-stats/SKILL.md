@@ -33,8 +33,8 @@ description: "Read a factory's stats since the janitor's last run, against the s
 6. **Read the inbox** (`nemia inbox`, and its cards in the inbox folder your brief names, mounted read-only: read them with Read, Grep
    and Glob): propose nothing a card there already says, under its title or another. The check files no card whose title one there already has.
 7. **Write each card ready to start**: a title of one line, what to correct; the correction exactly — the rule, or the line and the
-   file it goes in; the evidence, the numbers of both periods; the agent; and the factory, the workflow and the repository it is
-   started with — the factory and repository the runs it is about ran in (`--by factory`, `--by repo`), and the workflow that changes
-   that repository's agents and skills.
+   file it goes in; the evidence, the numbers of both periods; the agent; and the factory and the workflow it is started with — the
+   factory the runs it is about ran in (`--by factory`), and the workflow that changes its agents and skills. A card names no
+   repository: its run works on the one the factory wires to the workflow.
 8. **Sign off** with the period, the period it is compared with, the report in markdown — what moved, with its numbers, and the
    corrections — and the cards. No card is filed by you: your step's check files them, and a person decides which to start.

@@ -38,6 +38,7 @@ import {
   type FeedPause,
   type FeedLevels,
   type FeedConflicts,
+  type FeedReadiness,
   type FeedWords,
   lineAsRead,
 } from './feed.ts';
@@ -260,7 +261,8 @@ export const feedDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed
  * (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is said of the store.
  * `levels` is each factory's level in force as the pass read it (`levelsNow`), whose changes the feed says (`levelLines`); none given,
  * none said. `conflicts` is each factory's `ConflictsPending` condition as the pass read it (`conflictsNow`), whose turns the feed says
- * (`conflictLines`); none given, none said.
+ * (`conflictLines`); none given, none said. `readiness` is the store's readiness as the daemon last read it, whose moves the feed says
+ * (`readinessLines`); none given, none said.
  *
  * `memo` is the fold its caller has read so far, which this moves: it is read on to the end of the feed first — the lines the caller wrote
  * last pass, and any another wrote — and read again from the start when it does not fit the feed: another generation (a file cut and put
@@ -277,12 +279,14 @@ export const feedPass = (
     pause,
     levels,
     conflicts,
+    readiness,
   }: {
     at?: string;
     unjudged?: ReadonlySet<string>;
     pause?: FeedPause;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
+    readiness?: FeedReadiness;
   } = {},
 ): Effect.Effect<FeedAppended, Refusal> =>
   Effect.gen(function* () {
@@ -296,7 +300,7 @@ export const feedPass = (
     foldFeed(memo.fold, read.lines);
     memo.cursor = read.cursor;
     memo.generation = end?.generation;
-    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts);
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts, readiness);
     const size = end?.cursor ?? 0;
     if (!lines.length) return { lines, before: size, after: size, leading: '' };
     const appended = yield* door.lines.append(lines);
@@ -332,6 +336,7 @@ export const recordFeed = (
     pause?: FeedPause;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
+    readiness?: FeedReadiness;
   } = {},
 ): FeedAppended => within('act', () => ran(feedPass(doorAt(home), memo, now, pass)));
 

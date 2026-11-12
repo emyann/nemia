@@ -56,13 +56,12 @@ export const INBOX: Served<{ cards: InboxListing[]; ended: number; defaultStarts
 };
 
 /**
- * What `nemia inbox add`'s handler takes: the idea's text, the file it was read from and that file's folder (`from`, `dir`), and the keys
- * the card writes. Its own, not `objects`' `CardFile`: a body's `from` is where a workflow is read from, and the api finds the folder.
+ * What `nemia inbox add`'s handler takes: the idea's text, the file it was read from (`from`, what a refusal calls it), and the keys the
+ * card writes; `repo`, retired, refused whenever given (`addToInbox`). Its own, not `objects`' `CardFile`.
  */
 export const InboxAddInput = Schema.Struct({
   idea: Schema.String,
   from: Schema.optionalKey(Schema.String),
-  dir: Schema.optionalKey(Schema.String),
   workflow: Schema.optionalKey(Schema.String),
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String),

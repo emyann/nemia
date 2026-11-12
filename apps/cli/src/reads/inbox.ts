@@ -28,7 +28,7 @@ const inPlay = (row: Table['rows'][number]): boolean => {
  */
 export const inboxSaid = (listed: number, selector: readonly string[], ended: number): string =>
   listed
-    ? `\nstart one: nemia start <name> [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`
+    ? `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`
     : ended
       ? `no card in play${selector.length ? ` matches -l ${selector.join(' -l ')}` : ''}, and ${ended} whose run ended — list them with nemia inbox --all`
       : selector.length

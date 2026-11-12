@@ -6,7 +6,8 @@
  *
  * And a folder team as the board finds and files for it, with the repository the api is pointed at a plain directory that is no
  * repository at all: `repoOf` resolves a path and never asks git, so the api runs, the store's own workflows list, and a card for a
- * team that works in folders is filed with no `repo:` — and refused with one.
+ * team that works in folders is filed by its workflow's name with no `repo:` — a card's `repo` being retired, refused for every team —
+ * and started on the api's repository, an old card's `repo:` said as ignored.
  */
 import { root } from './harness.ts';
 import { listedIn } from './definitions.ts';
@@ -338,7 +339,19 @@ test("a folder run read on the board: listed by its kind and place, its page wit
   );
 });
 
-test('a folder team as the board finds and files for it, the repository a plain directory: listed as one, a card filed without a repository and refused with one, a card started on it says the repository it looked at none of', async (t) => {
+/** The folder team as the api's repository has it: a card names a workflow its factory offers, the default's the repository's. */
+const teamInRepo = (): void => fs.cpSync(team, path.join(notARepo, 'workflows', 'notes'), { recursive: true });
+
+/**
+ * An old card, filed before `repo:` was retired, for the team that works on a repository, and started on the one that works in folders,
+ * as the board's start form lets a person pick another: a filing refuses a `repo` now, so it is written as it was. Its name.
+ */
+const oldCard = (name: string, body: string, repo: string): string => {
+  fs.writeFileSync(path.join(root, 'inbox', `${name}.md`), `---\nworkflow: change\nrepo: ${repo}\n---\n${body}\n`);
+  return name;
+};
+
+test('a folder team as the board finds and files for it, the repository a plain directory: listed as one, a card filed without a repository and refused with one, a card started on it says the `repo:` it read none of', async (t) => {
   const s = story(t);
   await s.test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
     const listed = await listedIn<{ name: string; from: string; folderTeam: boolean; error: string | null }>(app(), 'workflows');
@@ -351,7 +364,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
     assert.equal(listed.find((w) => w.name === 'change')?.folderTeam, false, 'a team that works on a repository is not one');
   });
   await s.test(
-    'REFUSED: POST /api/namespaces/default/cards files a card for a folder team with a repository — filed without one, refused with one',
+    "REFUSED: POST /api/namespaces/default/cards files a card for a folder team with a repository — filed by the workflow's name without one, refused with one, as for any team",
     async () => {
       const json = { 'content-type': 'application/json' };
       const filed = await app().request('/api/namespaces/default/cards', {
@@ -360,32 +373,30 @@ test('a folder team as the board finds and files for it, the repository a plain 
         body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours' }),
       });
       assert.equal(filed.status, 201);
-      assert.equal(((await filed.json()) as Card).spec.repo, undefined, 'filed with no repository');
+      const { spec } = (await filed.json()) as Card;
+      assert.deepEqual([spec.repo, spec.workflow], [undefined, 'notes'], 'filed with no repository, its workflow by name, `from` ignored');
 
       const refused = await app().request('/api/namespaces/default/cards', {
         method: 'POST',
         headers: json,
         body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours', repo: notARepo }),
       });
-      assert.equal(refused.status, 422);
+      assert.equal(refused.status, 422, 'a repo is retired for every team');
       const { error } = (await refused.json()) as { error: string };
-      names(error, `--repo ${notARepo}`, '`place: folder`');
+      names(error, notARepo, 'nemia factory attach');
       assert.deepEqual(fs.readdirSync(path.join(root, 'inbox')).length, 1, 'nothing more written');
     },
   );
   await s.test(
-    'a card started on a folder team carries the repository it named and the run looked at none of — and a card that names none, nothing',
+    'a card started on a folder team carries the `repo:` an old card names and the run read none of — and a card that names none, nothing',
     async () => {
       const json = { 'content-type': 'application/json' };
-      const file = async (body: string, repo?: string): Promise<string> => {
+      teamInRepo();
+      const file = async (body: string): Promise<string> => {
         const res = await app().request('/api/namespaces/default/cards', {
           method: 'POST',
           headers: json,
-          /**
-           * Filed for the team that works on a repository, which takes a `repo:`, and started on the one that works in folders, as the
-           * board's start form lets a person pick another: how a card comes to name a repository no run looks at.
-           */
-          body: JSON.stringify({ body, workflow: 'change', from: 'yours', ...(repo !== undefined ? { repo } : {}) }),
+          body: JSON.stringify({ body, workflow: 'change' }),
         });
         assert.equal(res.status, 201, await res.clone().text());
         return ((await res.json()) as Card).metadata.name;
@@ -397,7 +408,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
           body: JSON.stringify({ workflow: 'notes', from: 'yours', brief: 'Write the note.' }),
         });
 
-      const named = await file('a note on the tides, from a card that names a repository', notARepo);
+      const named = oldCard('a-note-on-the-tides-k2q9', 'a note on the tides, from a card that names a repository', notARepo);
       const res = await startOn(named);
       const started = (await res.json()) as { id: string; card: string; ignoredRepo?: string; error?: string };
       assert.equal(res.status, 201, started.error);
@@ -405,7 +416,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
       assert.equal(
         started.ignoredRepo,
         notARepo,
-        "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
+        "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not read",
       );
       const run = (await objectOf(app(), started.id)).spec;
       assert.deepEqual(

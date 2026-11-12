@@ -552,7 +552,12 @@ export {
   type HarnessPart,
   TICKET_STATES,
   type TicketState,
+  UPGRADE_PHASES,
+  type UpgradePhase,
+  UPGRADE_STREAM_EVENTS,
+  type UpgradeStreamEventName,
 } from './words.ts';
+export { PreviousRelease, Upgrade, UpgradeStart, UpgradeStreamEvent, UpgradesGroup, UpgradesRead } from './upgrade.ts';
 export {
   Fix,
   FixStart,

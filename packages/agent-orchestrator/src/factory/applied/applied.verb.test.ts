@@ -459,6 +459,12 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       assert.deepEqual(wiring().workflows, ['dev', 'other', 'triage']);
       detached(ROOT, 'wired', 'other');
       assert.deepEqual(readFactoryAt(ROOT, 'wired').workflows, ['dev', 'triage']);
+      attachWorkflowAt(ROOT, { factory: 'wired', workflow: 'dev', repo: path.basename(repo) });
+      assert.deepEqual(
+        [wiring().workflowRepos, readFactoryAt(ROOT, 'wired').workflowRepos],
+        [{ dev: path.basename(repo) }, { dev: path.basename(repo) }],
+        "a workflow's repository is written into the tree's wiring, as the attach is, and read back",
+      );
       followed(ROOT, 'wired', 'follow');
       assert.deepEqual(
         [wiring().revisions, readFactoryAt(ROOT, 'wired').revisions],
@@ -467,8 +473,8 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       );
       assert.deepEqual(
         JSON.parse(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8')),
-        { ...JSON.parse(own), generation: 6 },
-        "the factory's own file is written only for its generation, one more for each change of the tree's wiring: fire, hire, attach, detach, revisions",
+        { ...JSON.parse(own), generation: 7 },
+        "the factory's own file is written only for its generation, one more for each change of the tree's wiring: fire, hire, attach, detach, a workflow's repository, revisions",
       );
       const tree = fs.readFileSync(path.join(treeDir(ROOT, 'wired'), 'factory.json'), 'utf8');
       const notes = scratch('wf-applied-volume-');

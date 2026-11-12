@@ -115,16 +115,26 @@ export const FACTORY_ADD: Served<{ name: string; repos: readonly string[]; file:
     }),
 };
 
-/** What `nemia factory attach` and `detach` take: the factory, and the workflow by its folder's name. */
-export const WorkflowWireInput = Schema.Struct({ factory: Schema.String, workflow: Schema.String });
+/**
+ * What `nemia factory attach` and `detach` take: the factory, the workflow by its folder's name, and for an attach the folder name of the
+ * repository its runs work on (`repo`), where one is named.
+ */
+export const WorkflowWireInput = Schema.Struct({
+  factory: Schema.String,
+  workflow: Schema.String,
+  repo: Schema.optional(Schema.String),
+});
 export type WorkflowWireInput = typeof WorkflowWireInput.Type;
 
 /** `nemia factory attach`: one workflow attached to one factory, or said to be attached already. */
 export const FACTORY_ATTACH: Served<{ file: string; already: boolean }, WorkflowWireInput> = {
   ...FACTORY_ATTACH_WORDS,
   input: WorkflowWireInput,
-  handler: ({ factory, workflow }) =>
-    Effect.map(wire(factory, { verb: 'attach', workflow }), ({ was, now, file }) => ({ file, already: now === was })),
+  handler: ({ factory, workflow, repo }) =>
+    Effect.map(wire(factory, { verb: 'attach', workflow, ...(repo === undefined ? {} : { repo }) }), ({ was, now, file }) => ({
+      file,
+      already: now === was,
+    })),
 };
 
 /** `nemia factory detach`: one workflow taken from one factory. */

@@ -6,7 +6,7 @@
 import { type Args, REVISIONS_POLICIES } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
-import { listArg, said, switchArg } from '../requests.ts';
+import { listArg, said, switchArg, textArg } from '../requests.ts';
 import { repoSent, textOf, trustedLines, writtenOf } from './lines.ts';
 
 /** `nemia factory add`: the factory filed on its repositories, then the trust asked for each place unless `--no-trust`. */
@@ -20,13 +20,19 @@ export async function factoryAdd(args: Args): Promise<number> {
   return 0;
 }
 
-/** `nemia factory attach`: one workflow given to one factory, or that it had it already. */
+/**
+ * `nemia factory attach`: one workflow given to one factory, on the repository `--repo` names where it names one, or that it had it
+ * already.
+ */
 export async function factoryAttach(args: Args): Promise<number> {
   const [factory, workflow] = [textOf(args, 'factory'), textOf(args, 'workflow')];
-  const answer = await asked('factory attach', (c) => c.factories.attach({ params: { name: factory, workflow } }));
+  const repo = textArg(args, 'repo');
+  const answer = await asked('factory attach', (c) =>
+    c.factories.attach({ params: { name: factory, workflow }, payload: repo === undefined ? {} : { repo } }),
+  );
   const { file, already } = writtenOf(answer, 'factory attach');
   said([
-    `${factory}  ${already === true ? 'already attached' : 'attached'} ${workflow}`,
+    `${factory}  ${already === true ? 'already attached' : 'attached'} ${workflow}${repo === undefined ? '' : `, works on ${repo}`}`,
     `${already === true ? 'unchanged' : 'attached'}: ${file}`,
   ]);
   return 0;

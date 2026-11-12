@@ -2,7 +2,8 @@
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the
  * runtime's types the controllers use (`Engine`, `TaskView`, `TranscriptEvent`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`,
- * `QuotaLimit`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
+ * `HeardQuota`, `QuotaLimit`, `nameFor`, `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from
+ * the runtime.
  *
  * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
  * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
@@ -83,6 +84,7 @@ export type {
   CodexArgs,
   Denial,
   HarnessQuota,
+  HeardQuota,
   QuotaLimit,
   RefusedMove,
   TaskView,
@@ -166,14 +168,18 @@ export const unreadableJournal = (err: unknown): string | undefined => {
  * The engine's harnesses: each a step runs on (`STEP_HARNESSES`, the runtime's that run a brief), as the runtime configures it by default
  * (`DEFAULT_HARNESSES`), then the run's `check`: the runtime's command harness, under the name checks have always run under, so the
  * runtime keeps their streams in `runs/check/` and a check filed before it reads the same. It runs a step's `check:` command as the
- * task's `config` gives it (`checkArgv`, `src/check/check.ts`). Passing `harnesses` REPLACES the engine's
- * default map rather than adding to it, so the step harnesses are named again here — leaving them out would
- * quietly send every step to whichever harness came first.
+ * task's `config` gives it (`checkArgv`, `src/check/check.ts`). Then the runtime's command harness under its own name, `command`, on
+ * which a need's fix (`startFix`) and a script condition (`fileScripts`) are filed. Passing `harnesses` REPLACES the engine's default
+ * map rather than adding to it, so the step harnesses and `command` are named again here — leaving a step's out would quietly send
+ * every step to whichever harness came first, and leaving `command` out refuses every fix and script condition at its filing.
  *
  * A step runs on the engine's harness of its name as a job, which ends on its own, asks nobody in any mode, and keeps a spend cap. Each
- * harness, `check` among them, is a pool of its own.
+ * harness is a pool of its own, so a fix or a script condition never waits behind a run's checks, nor a check behind them.
  */
-export const HARNESSES: Readonly<Record<string, HarnessConfig>> & { readonly check: typeof commandHarness & { readonly name: string } } = {
+export const HARNESSES: Readonly<Record<string, HarnessConfig>> & {
+  readonly check: typeof commandHarness & { readonly name: string };
+  readonly command: typeof commandHarness;
+} = {
   ...Object.fromEntries(
     STEP_HARNESSES.flatMap((name) => {
       const config = Object.hasOwn(DEFAULT_HARNESSES, name) ? DEFAULT_HARNESSES[name] : undefined;
@@ -181,6 +187,7 @@ export const HARNESSES: Readonly<Record<string, HarnessConfig>> & { readonly che
     }),
   ),
   check: { ...commandHarness, name: 'check' },
+  command: commandHarness,
 };
 
 /**

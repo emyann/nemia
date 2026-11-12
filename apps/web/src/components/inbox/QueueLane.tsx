@@ -1,23 +1,27 @@
 import { Link } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { workflowNameOf } from '@/lib/api/workflows';
 import { type InboxEntry } from '@/lib/api/inbox';
 import { agoWords } from '@/lib/runWords';
 import { repoName } from '@/lib/factory';
-import { ordinal } from '@/lib/inbox';
+import { cardRepo, ordinal } from '@/lib/inbox';
 import { instantWhole } from '@/lib/instant';
 import { useNow } from '@/lib/useNow';
 
 /**
  * The queue on the Factory: every queued inbox card, in the order the tick starts them (`queueOf`), drawn as a ghost of the card its run
  * will be — at the floor's left edge, where work comes in, and off the floor itself: a ghost is no node, so nothing waits on it and it
- * waits on nothing, and it neither moves nor is moved by the cards. Each says its place, its first line, its workflow and repository, and
- * how long ago it was queued, as every page says an age (`agoWords`); a start the tick tried and did not make is marked, refused or
+ * waits on nothing, and it neither moves nor is moved by the cards. Each says its place, its first line, its workflow, the repository its
+ * factory wires for that workflow (`cardRepo`) or `not wired` with the attach on hover — never the card's nor the daemon's — and how
+ * long ago it was queued, as every page says an age (`agoWords`); a start the tick tried and did not make is marked, refused or
  * failed, with why on hover. A ghost opens the card's page.
  *
  * Beside the floor on a wide screen, a column that scrolls; above it on a narrow one, a row that does.
  */
 export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   const now = useNow(30_000);
+  const factories = useQuery(factoriesQuery).data;
   return (
     <aside
       aria-label="Queued cards"
@@ -29,7 +33,7 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
       <ol className="flex gap-2 md:flex-col">
         {cards.map((card) => (
           <li key={card.name} className="w-56 shrink-0 md:w-auto">
-            <Ghost card={card} now={now} />
+            <Ghost card={card} now={now} factories={factories} />
           </li>
         ))}
       </ol>
@@ -37,7 +41,7 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   );
 }
 
-function Ghost({ card, now }: { card: InboxEntry; now: number }) {
+function Ghost({ card, now, factories }: { card: InboxEntry; now: number; factories: readonly Factory[] | undefined }) {
   const { queued, tried } = card;
   const place = queued!.place!;
   const title = card.title ?? card.file;
@@ -67,13 +71,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
             {workflowNameOf(card.workflow)}
           </span>
         )}
-        <span
-          data-ghost-repo
-          className="shrink-0 truncate"
-          title={card.repo ?? 'It names no repository: it starts on the one the daemon runs in'}
-        >
-          {card.repo ? repoName(card.repo) : "the daemon's repository"}
-        </span>
+        <GhostRepo card={card} factories={factories} />
       </span>
       {tried && (
         <span
@@ -91,5 +89,24 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
         </span>
       )}
     </Link>
+  );
+}
+
+/**
+ * Where a ghost's run will work: the repository its factory wires for its workflow, by its folder's name, the path on hover; `not
+ * wired`, with the attach that wires it on hover, where the factory gives it none; nothing while the factories are unread, or where its
+ * factory decides at start (a card that names no workflow in a factory of several).
+ */
+function GhostRepo({ card, factories }: { card: InboxEntry; factories: readonly Factory[] | undefined }) {
+  const on = cardRepo(card, factories);
+  if (on === null) return null;
+  return 'repo' in on ? (
+    <span data-ghost-repo className="shrink-0 truncate" title={on.repo}>
+      {repoName(on.repo)}
+    </span>
+  ) : (
+    <span data-ghost-repo="not wired" className="shrink-0 truncate text-yours" title={on.why}>
+      not wired
+    </span>
   );
 }

@@ -69,6 +69,12 @@ test('a person files a factory, wires its parts, sees each in the listing, and r
   await s.test('`factory attach` attaches the workflow, and says so again unchanged; `hire` and `fire` fill its step', async () => {
     assert.match(await out(['factory', 'attach', 'mill', 'make']), /^mill  attached make$/m);
     assert.match(await out(['factory', 'attach', 'mill', 'make']), /^unchanged: /m);
+    const folder = path.basename(repo);
+    assert.match(
+      await out(['factory', 'attach', 'mill', 'make', '--repo', folder]),
+      new RegExp(`^mill  (already )?attached make, works on ${folder}$`, 'm'),
+      '--repo names the repository its runs work on, said on its line',
+    );
     assert.match(await out(['factory', 'hire', 'mill', 'implementer', '--step', 'make/code']), /^mill  make\/code ← implementer$/m);
     assert.match(
       await out(['factory', 'hire', 'mill', 'reviewer', '--step', 'make/code']),

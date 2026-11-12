@@ -52,10 +52,17 @@ export const Release = Schema.Struct({
 export type Release = typeof Release.Type;
 
 /**
- * The newest release the daemon's release check last read (`$WF_ROOT/releases/latest.json`): its version, and whether it is newer than
- * the one the api runs. Absent where no check has read one: code run from a repository, a store whose check is off, or one not yet made.
+ * The newest release the daemon's release check last read (`$WF_ROOT/releases/latest.json`): its version, whether it is newer than
+ * the one the api runs, its tag (what `POST /api/upgrades` takes), and the address of its notes where the release publishes one
+ * (`notes` in its `latest.json`). Absent where no check has read one: code run from a repository, a store whose check is off, or one
+ * not yet made.
  */
-export const LatestRelease = Schema.Struct({ version: Schema.String, newer: Schema.Boolean });
+export const LatestRelease = Schema.Struct({
+  version: Schema.String,
+  newer: Schema.Boolean,
+  tag: Schema.optionalKey(Schema.String),
+  notes: Schema.optionalKey(Schema.String),
+});
 export type LatestRelease = typeof LatestRelease.Type;
 
 /**
@@ -392,6 +399,12 @@ export const Quota = Schema.Struct({
   keepMs: Schema.Number,
   markAt: Schema.Number,
   said: OrNull(Schema.String),
+  /**
+   * Where Claude Code is signed in by a long-lived token, whose `get_usage` has no limits: the windows are those the newest
+   * `rate_limit_event` of the sessions said, and this is when a session's turn received it and how long ago, in ms (`fresh`); null while
+   * no session has reported one (`no-plan`). Left out where the windows are `get_usage`'s own, for every other answer, and by an older api.
+   */
+  heard: Schema.optionalKey(OrNull(Schema.Struct({ at: Schema.String, ageMs: Schema.Number }))),
 });
 export type Quota = typeof Quota.Type;
 

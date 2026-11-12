@@ -64,21 +64,24 @@ test('the group is the six writes, in the order the help lists them, each linkin
   );
 });
 
-test('`nemia inbox add` takes the idea, then --workflow, --repo and --factory once each, and --label once per label', () => {
-  assert.deepEqual(
-    read(INBOX_ADD_WORDS, ['an idea', '--workflow', 'dev', '--repo', 'r', '--factory', 'f', '--label', 'a=b', '--label', 'c-']),
-    { idea: 'an idea', workflow: 'dev', repo: 'r', factory: 'f', label: ['a=b', 'c-'] },
-  );
+test('`nemia inbox add` takes the idea, then --workflow and --factory once each, and --label once per label', () => {
+  assert.deepEqual(read(INBOX_ADD_WORDS, ['an idea', '--workflow', 'dev', '--factory', 'f', '--label', 'a=b', '--label', 'c-']), {
+    idea: 'an idea',
+    workflow: 'dev',
+    factory: 'f',
+    label: ['a=b', 'c-'],
+  });
 });
 
-test('REFUSED by `nemia inbox add`: no idea, two, a flag it does not take, one given twice or with no value', () => {
+test('REFUSED by `nemia inbox add`: no idea, two, a flag it does not take, --repo, retired, one given twice or with no value', () => {
   refuses(INBOX_ADD_WORDS, [], 'takes the idea, first', 'nemia inbox add "<idea>"', '[--factory <name>]', 'nemia inbox add ./idea.md');
   refuses(INBOX_ADD_WORDS, ['--workflow', 'dev'], 'takes the idea, first', 'nemia inbox add "<idea>"');
   refuses(INBOX_ADD_WORDS, ['an idea', '--workflow'], 'nemia inbox add "<idea>" --workflow <name>');
   refuses(INBOX_ADD_WORDS, ['an idea', '--workflow='], 'nemia inbox add "<idea>" --workflow <name>');
-  refuses(INBOX_ADD_WORDS, ['an idea', '--repo', 'a', '--repo', 'b'], 'nemia inbox add takes --repo once');
+  refuses(INBOX_ADD_WORDS, ['an idea', '--repo', 'a'], 'does not take --repo', 'nemia factory attach <factory> <workflow> --repo <name>');
+  refuses(INBOX_ADD_WORDS, ['an idea', '--repo=a'], 'does not take --repo', 'nemia factory attach <factory> <workflow> --repo <name>');
   refuses(INBOX_ADD_WORDS, ['an idea', '--factory', 'a', '--factory', 'b'], 'nemia inbox add takes --factory once');
-  refuses(INBOX_ADD_WORDS, ['an idea', '--workflows', 'dev'], 'does not take --workflows', '--workflow <name>', '--repo <path>');
+  refuses(INBOX_ADD_WORDS, ['an idea', '--workflows', 'dev'], 'does not take --workflows', '--workflow <name>', '--factory <name>');
   refuses(INBOX_ADD_WORDS, ['an', 'idea'], 'idea is a second', 'nemia inbox add "<idea>"');
 });
 

@@ -68,6 +68,7 @@ import {
   FactoryRevisionsWrite,
   FactoryRules,
   FactoryRulesWrite,
+  FactoryAttachWrite,
   FactorySettingWrite,
   FactoryTrusted,
 } from './factory.ts';
@@ -106,6 +107,7 @@ import { KINDS, type Kind } from './words.ts';
 import { APIResourceList } from './discovery.ts';
 import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './server-api.ts';
 import { ReadinessGroup } from './readiness.ts';
+import { UpgradesGroup } from './upgrade.ts';
 import { PairGroup, PairingsGroup } from './pairing.ts';
 
 export {
@@ -334,6 +336,7 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }),
   HttpApiEndpoint.put('attach', '/api/factories/:name/workflows/:workflow', {
     params: factoryWorkflowParams,
+    payload: FactoryAttachWrite,
     success: FactoryObject,
     error: objectErrors,
   }),
@@ -836,6 +839,7 @@ export const Api = HttpApi.make('nemia')
   .add(ServerGroup)
   .add(NemiaGroup)
   .add(ReadinessGroup)
+  .add(UpgradesGroup)
   .add(PairGroup)
   .add(PairingsGroup);
 

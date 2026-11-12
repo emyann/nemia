@@ -292,20 +292,15 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
   );
 }
 
-test('a card that names a repository, started on a team that works in folders: the form says the repository is not looked at, and names it', async () => {
-  const html = await startMarkup(true, '/code/app');
-  const said = textsOf(html).find((text) => text.startsWith("The card's repo:"));
-  assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
-  assert.match(html, /data-ignored-repo/, 'in a note of its own, which the e2e and a person can find');
-});
-
-test('REFUSED at shipped defaults: no such note on a team that works on a repository, nor for a card that names none', async () => {
-  assert.doesNotMatch(
-    await startMarkup(false, '/code/app'),
-    /data-ignored-repo|is not looked at/,
-    'the repository is looked at, and the form says where the run goes: a note would contradict it',
-  );
-  assert.doesNotMatch(await startMarkup(true), /data-ignored-repo|is not looked at/, 'a card that names no repository has nothing to say');
+test("REFUSED: a card's start says nothing of a card's repository, retired: the factory places the run, a folder team's included", async () => {
+  for (const [inFolders, repo] of [
+    [true, '/code/app'],
+    [false, '/code/app'],
+    [true, undefined],
+  ] as const) {
+    assert.doesNotMatch(await startMarkup(inFolders, repo), /data-ignored-repo|is not looked at/, `${inFolders} ${repo}`);
+  }
+  assert.match(await startMarkup(false, '/code/app'), /Runs in <code[^>]*>\/code\/app<\/code>/, 'the repository its factory wires, said');
 });
 
 test("a try's run is tagged try and names the agent it tried, linked to its page; any other run names its workflow, linked to its page in the run's place", async () => {

@@ -65,7 +65,7 @@ test('REFUSED: a program run through runWith says no Info line, and still says i
   assert.equal(said.filter((s) => s.includes('an error a command must not swallow')).length, 1, said.join('\n'));
 });
 
-test("the engine runs each step harness, then the run's check; the daemon asks for the quota of a harness that declares one, and no other", () => {
-  assert.deepEqual(Object.keys(HARNESSES), [...STEP_HARNESSES, 'check']);
-  assert.deepEqual(quotaHarnesses(), ['claude'], 'codex and the check report no quota');
+test("the engine runs each step harness, then the run's check and the command harness; the daemon asks for the quota of a harness that declares one, and no other", () => {
+  assert.deepEqual(Object.keys(HARNESSES), [...STEP_HARNESSES, 'check', 'command']);
+  assert.deepEqual(quotaHarnesses(), ['claude'], 'codex, the check and the command harness report no quota');
 });

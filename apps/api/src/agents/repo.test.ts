@@ -7,7 +7,6 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { OpenApi } from 'effect/http-api';
@@ -19,7 +18,6 @@ import { app } from '../app.ts';
 const own = scratch('nemia-api-repo-own-');
 const theirs = scratch('nemia-api-repo-theirs-');
 process.env.HKB_REPO = own;
-for (const repo of [own, theirs]) execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 addFactory({ name: 'elsewhere', repos: [theirs] });
 fs.mkdirSync(path.join(theirs, 'workflows', 'agents'), { recursive: true });
 fs.writeFileSync(path.join(theirs, 'workflows', 'agents', 'outrider.md'), '---\ndescription: Rides out.\n---\nRide out.\n');

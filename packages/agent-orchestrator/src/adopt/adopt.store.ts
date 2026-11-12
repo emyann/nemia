@@ -31,7 +31,7 @@ const folderDigest = (dir: string): string | null => (fs.existsSync(dir) ? diges
 function cardIn(file: string, text: string): ReturnType<typeof parseInboxCard> | undefined {
   if (!file.endsWith('.md') || file.includes('/')) return undefined;
   try {
-    return parseInboxCard(file, text, () => true);
+    return parseInboxCard(file, text);
   } catch {
     return undefined;
   }

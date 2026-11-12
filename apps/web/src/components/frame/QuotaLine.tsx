@@ -1,12 +1,12 @@
 import { TriangleAlert } from 'lucide-react';
 import type { Quota } from '@/lib/api/quota';
-import { lastWords, quotaTitle, type WindowWords, windowWords } from '@/lib/quota';
-import { agoWords } from '@/lib/runWords';
+import { lastWords, quotaTitle, readingAge, type WindowWords, windowWords } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 
 /**
  * The subscription's quota over a factory's floor, led by `Quota on this machine:`, since it is the machine's and not the factory's: each
- * window Claude Code answered with, as a percentage used with its reset in the person's own time, and how old the answer is — or, when
+ * window Claude Code answered with, as a percentage used with its reset in the person's own time, and how old the answer is — on a
+ * machine signed in by a token, the windows its sessions' own turns were told, and how long ago a turn was told them — or, when
  * there is nothing to show as now, the api's sentence saying why and what to do, with the last good reading under it, dimmed and dated, so
  * that nobody takes it for now. A window used past the api's mark is marked. A row of its own under the counts, since it never fits beside
  * them. Nothing until it is read; why, when it cannot be. The age moves between reads: the api is read again every minute, and answers from
@@ -44,7 +44,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
       </div>
     );
   }
-  const age = quota.askedAt ? agoWords(new Date(quota.askedAt), now) : null;
+  const age = readingAge(quota, now);
   return (
     <p
       data-quota="fresh"
@@ -56,8 +56,8 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
         <Window key={w.key} words={windowWords(w, now)} markAt={quota.markAt} data={{ 'data-quota-window': w.key }} emphasis />
       ))}
       {age && (
-        <span data-quota-age className="text-body-small">
-          read {age}
+        <span data-quota-age data-quota-heard={quota.heard ? '' : undefined} className="text-body-small">
+          {age}
         </span>
       )}
     </p>

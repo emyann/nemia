@@ -710,7 +710,7 @@ test('a big quiet store: forty finished runs beside three in flight cost a pass 
       await runWith(h.e, approveRun(second.id, 'ship', 'Merge it too.'));
 
       const gone = folder('work');
-      const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: gone, repo: REPO });
+      const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: path.basename(gone) });
       queueInInbox(card.name);
       fs.rmSync(gone, { recursive: true });
       const refused = await s.verified();

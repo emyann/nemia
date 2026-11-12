@@ -450,6 +450,8 @@ export const EVENT_REASONS = [
   'StorePaused',
   'StoreResumed',
   'LevelChanged',
+  'NotReady',
+  'Ready',
   'ConflictsPending',
   'ConflictsSettled',
 ] as const;
@@ -806,6 +808,22 @@ export const FIX_STREAM_EVENTS = ['output', 'ended'] as const;
 
 /** One of `FIX_STREAM_EVENTS`. */
 export type FixStreamEventName = (typeof FIX_STREAM_EVENTS)[number];
+
+/**
+ * Where an upgrade started from the board or the MCP port stands (`Upgrade.phase`), as the runtime's task that runs `nemia upgrade <tag>`
+ * says: filed and not yet started (`pending`, waiting for a slot), running, or ended — `succeeded` on exit 0, `failed` on any other end,
+ * the pointer `releases/current` left where it was.
+ */
+export const UPGRADE_PHASES = ['pending', 'running', 'succeeded', 'failed'] as const;
+
+/** One of `UPGRADE_PHASES`. */
+export type UpgradePhase = (typeof UPGRADE_PHASES)[number];
+
+/** One event of an upgrade's output stream: `output`, a chunk of what it printed; `ended`, its end, its data the `Upgrade` as JSON. */
+export const UPGRADE_STREAM_EVENTS = ['output', 'ended'] as const;
+
+/** One of `UPGRADE_STREAM_EVENTS`. */
+export type UpgradeStreamEventName = (typeof UPGRADE_STREAM_EVENTS)[number];
 
 /**
  * What a need's fix is (`NeedFix.kind`): one the server runs to put the need in place (`puts`, a fix that says no kind); one a person

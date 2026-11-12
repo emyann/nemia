@@ -5,7 +5,7 @@
  * A `file:` base is read from the disk, which Node's `fetch` refuses. Each request sends nothing but a generic client name
  * (`CLIENT_NAME`). Also the two records an archive install keeps beside its releases: the store's floor, `$WF_ROOT/store.json`
  * (`readableFrom`, raised by the daemon as it takes the store, `raiseStoreFloor`), and the newest release the release check read,
- * `$WF_ROOT/releases/latest.json`, each written whole by a rename.
+ * `$WF_ROOT/releases/latest.json` (its notes' address kept where it is an http(s) one), each written whole by a rename.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,17 +71,32 @@ export function sumOf(sums: string, name: string): string | undefined {
   return undefined;
 }
 
-/** What `latest.json` says of the newest release: its tag, and its version. */
-export type LatestFile = { readonly tag: string; readonly version: string };
+/**
+ * What `latest.json` says of the newest release: its tag, its version, and the address of its release notes where it gives one that is
+ * an http(s) URL (`notes`).
+ */
+export type LatestFile = { readonly tag: string; readonly version: string; readonly notes?: string };
 
-const LatestSchema = Schema.Struct({ tag: Schema.String, version: Schema.String });
+const LatestSchema = Schema.Struct({ tag: Schema.String, version: Schema.String, notes: Schema.optionalKey(Schema.Unknown) });
 
-/** `text` read as a `latest.json` whose tag is a version, or undefined. */
+/** `notes` where it is the address of a page a browser opens over http(s), else undefined: any other value is dropped, never shown. */
+function notesOf(notes: unknown): string | undefined {
+  if (typeof notes !== 'string') return undefined;
+  try {
+    const url = new URL(notes);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? notes : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** `text` read as a `latest.json` whose tag is a version, its notes kept where they are an http(s) address (`notesOf`), or undefined. */
 export function latestOf(text: string): LatestFile | undefined {
   try {
     const decoded = Schema.decodeUnknownResult(LatestSchema)(JSON.parse(text));
     if (Result.isFailure(decoded) || parseVersion(decoded.success.tag) === null) return undefined;
-    return { tag: decoded.success.tag, version: decoded.success.version };
+    const notes = notesOf(decoded.success.notes);
+    return { tag: decoded.success.tag, version: decoded.success.version, ...(notes === undefined ? {} : { notes }) };
   } catch {
     return undefined;
   }

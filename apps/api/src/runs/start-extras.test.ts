@@ -10,11 +10,12 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { app } from '../app.ts';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, eachTest } from '../../test/placed.ts';
 import { runsAtOnce } from 'agent-orchestrator';
 import { TEAM } from '../../test/team.ts';
 
@@ -23,11 +24,19 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** The factory `acme`, made from a template, on one scratch git repository, its tree holding the test team's `dev`. */
+/**
+ * The factory `acme`, made from a template, on one scratch repository, its tree holding the test team's `dev`: a repository of the test
+ * place (`testPlace`), given to it for each test, the api served over it and the runtime's stand-in.
+ */
 const repo = scratch('nemia-api-start-extras-');
 process.env.HKB_REPO = repo;
-execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
+const stand = eachTest(() => {
+  const place = testPlace();
+  place.world.repository(repo, {});
+  return place;
+});
+const engine = eachTest(testEngine);
+const app = () => appOver(engine(), stand());
 const tree = path.join(root, 'factories', 'acme', 'tree');
 fs.cpSync(TEAM, path.join(tree, 'workflows'), { recursive: true });
 write(
@@ -40,7 +49,7 @@ const JSON_TYPE = { 'content-type': 'application/json' };
 
 /** `body` posted to `url` in `acme`'s namespace. */
 const post = (url: string, body: unknown) =>
-  app.request(`/api/namespaces/acme/${url}`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
+  app().request(`/api/namespaces/acme/${url}`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
 
 /** A picture's first bytes, which are no UTF-8 text. */
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0x00]);
@@ -112,7 +121,7 @@ test('DELETE a run of a workflow: refused as a try alone, removed whole with ?wh
   assert.equal(res.status, 201, await res.clone().text());
   const { id } = (await res.json()) as { id: string };
   const del = (query: string) =>
-    app.request(`/api/namespaces/acme/runs/${id}${query}`, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
+    app().request(`/api/namespaces/acme/runs/${id}${query}`, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
   assert.equal((await del('')).status, 409, 'a run of a workflow is no try: nemia rm removes it');
   assert.equal(
     (await del('?whole=true&forceUnmerged=true')).status,
@@ -120,7 +129,7 @@ test('DELETE a run of a workflow: refused as a try alone, removed whole with ?wh
     '--force-unmerged forces --delete-branches, and alone deletes nothing',
   );
   assert.equal(
-    (await app.request(`/api/namespaces/acme/runs/${id}/cancel`, { method: 'POST', headers: JSON_TYPE, body: '{}' })).status,
+    (await app().request(`/api/namespaces/acme/runs/${id}/cancel`, { method: 'POST', headers: JSON_TYPE, body: '{}' })).status,
     200,
   );
   const gone = await del('?whole=true&deleteBranches=true');

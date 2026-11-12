@@ -19,7 +19,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                what a run started with --from <runId> would be handed of it, now
                                on the port: concluded
   nemia inbox
-                               the cards still in play: name, first line, workflow and repo when set,
+                               the cards still in play: name, first line, workflow when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
                                run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
                                their labels on each line; -o wide: every column
@@ -267,18 +267,21 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                refused before anything is written
                                --factory <name>: the workflow must be attached to the factory, whose
                                hires fill its steps, and a step left with no agent is refused (nemia
-                               factory --help). A factory with one repository gives the run its
-                               --repo, and a repository not one of the factory's is refused, naming
-                               them. Without it, the run is started in the factory whose repository
-                               holds --repo, else where nemia start is typed, on that repository, when
-                               one factory alone does; none, or two, is refused, naming the fix.
+                               factory --help). Without it, the run is started in the factory whose
+                               repository holds --repo, else the daemon's own repository, when one
+                               factory alone does; none, or two, is refused, naming the fix. In a
+                               factory the run works on the repository it names for the workflow
+                               (nemia factory attach <factory> <workflow> --repo <name>), else its
+                               only one: --repo only finds the factory, and the start says so where
+                               it differs
                                The default factory is history only: --factory default is refused
                                a card of the inbox (nemia inbox --help), by its name, starts its body,
                                or --brief "<brief>" in its place, and stays in the inbox, listed as
-                               started: --workflows is its workflow: unless given, --factory its
-                               factory:, and a card that names no factory either way is refused
+                               started: --workflows, a name, is its workflow: unless given, --factory
+                               its factory:, and a card that names no factory either way is refused;
+                               --repo is refused: its factory places the run
                                on the port: start, inbox_start
-  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
+  nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
                                on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]
@@ -440,9 +443,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                approve (nemia proposals approve <p> -n <name>); a carried file stays
                                a choice; the daemon merges once each has one and each proposal applied
                                on the port: factory_resolve
-  nemia factory attach <factory> <workflow>
+  nemia factory attach <factory> <workflow> [--repo <name>]
                                offer a workflow in a factory, by its folder's name: a factory offers
-                               only the workflows attached to it
+                               only the workflows attached to it; --repo names the repository its runs
+                               work on, by folder name, required where the factory has several
                                on the port: factory_attach
   nemia factory detach <factory> <workflow>
                                take a workflow back, once no hire fills its steps
@@ -634,8 +638,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                it where the login service runs the pointer: jobs run on, and the
                                daemon's sessions are given up to the timeout to end their tool calls
                                (--timeout <d>, else nemia pause-timeout), park, and resume as the same try on
-                               the new release. A tag built already is switched to without a
-                               rebuild, so an older tag rolls back. --repo:
+                               the new release; then say each piece the new release reads missing
+                               that a run waits on, with its fix. A tag built already is switched
+                               to without a rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia). Then it removes each release that is
                                not current, not among the two newest, and that no session or
@@ -643,7 +648,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                and each build log older than 30 days, as the daemon does every five
                                minutes. A tag older than the oldest release that can read the store
                                (store.json) is refused before anything is fetched or built
-                               CLI only: builds for minutes and restarts the daemon that serves the api
+                               on the port: upgrade
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former
                                line form, under the folders given or the store's own. --check: write

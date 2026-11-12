@@ -1,17 +1,18 @@
 /**
  * A card's start in a factory, on the Inbox page — the one it names (`factory:`), or, for a card that names none, the one a person picks
- * first: the repository it starts on, the workflow among those the factory offers there, read with its hires, and `StartRun` sending
- * both, as a start of the card in a factory from the command line does.
+ * first: the workflow among those the factory offers, by name; the repository the factory wires for it, shown, never picked; the
+ * workflow read there with its hires; and `StartRun` sending the start, as a start of the card in a factory from the command line does.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { factoriesQuery } from '../../lib/api/factories.ts';
+import { factoriesQuery, type Factory } from '../../lib/api/factories.ts';
 import { factoryWorkflowsQuery, type Place, type Started } from '../../lib/api/workflows.ts';
 import { storeQuery } from '../../lib/api/store.ts';
 import { type InboxEntry } from '../../lib/api/inbox.ts';
-import { cardPlace, factoriesOffered, presetOf, startPlace, workflowKey, type CardPlace } from '../../lib/inbox';
+import { startRepo } from '../../lib/factories';
+import { cardPlace, factoriesOffered, startPlace, type CardPlace } from '../../lib/inbox';
 import { StartRun } from '../run/StartRun';
-import { FIELD, WorkflowOptions, WorkflowsUnread } from '../workflow/WorkflowOptions';
+import { FIELD, WorkflowsUnread } from '../workflow/WorkflowOptions';
 
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
@@ -20,7 +21,7 @@ type Told = { onStarted: (started: Started) => void; onRefused: (message: string
 
 /**
  * The start of a card that names its factory, in its place among the factories (`cardPlace`, `Placed`): why it cannot start, for a
- * factory not listed or one whose file does not read; else its repository and its workflows.
+ * factory not listed or one whose file does not read; else its workflows and the repository it wires for the one picked.
  */
 export function FactoryCardStart({ entry, onStarted, onRefused }: { entry: InboxEntry } & Told) {
   const factories = useQuery(factoriesQuery);
@@ -87,11 +88,13 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
 }
 
 /**
- * A card's start in `place`: why it cannot start there (`data-unplaced`); else a picker of the factory's repositories, when the card
- * names none of several, and the workflows the factory offers on the one it starts on (`InFactory`).
+ * A card's start in `place`: why it cannot start there (`data-unplaced`); else the Workflow list, the factory's offered workflows by
+ * name, preset to the card's where the factory offers it; then, for the one picked, the repository the factory wires for it
+ * (`startRepo`), said and never picked, or why it gives none, naming the attach (`data-unwired`); and the workflow read there (`OnRepo`).
  */
 function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; place: CardPlace } & Told) {
   const [picked, setPicked] = useState<string | null>(null);
+  const field = useId();
   if ('why' in place) {
     return (
       <p data-unplaced className="text-body-small text-yours">
@@ -99,114 +102,109 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
       </p>
     );
   }
-  const repo = place.repo ?? picked;
-  return (
-    <>
-      {place.repo === null && (
-        <RepoPicker
-          repos={place.repos}
-          picked={picked}
-          onPick={setPicked}
-          note={
-            <>
-              The card names no repository, and the factory {code(place.factory)} works on {place.repos.length}.
-            </>
-          }
-        />
-      )}
-      {repo !== null && (
-        <InFactory key={repo} entry={entry} place={{ factory: place.factory, repo }} onStarted={onStarted} onRefused={onRefused} />
-      )}
-    </>
-  );
-}
-
-/** A factory's repositories to start a run on, when it has several: a person picks one; `note` says, under it, why the pick is theirs. */
-export function RepoPicker({
-  repos,
-  picked,
-  onPick,
-  note,
-}: {
-  repos: readonly string[];
-  picked: string | null;
-  onPick: (repo: string) => void;
-  note: ReactNode;
-}) {
-  const field = useId();
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={field} className="block text-body-medium font-medium">
-        Repository
-      </label>
-      <select id={field} value={picked ?? ''} onChange={(event) => onPick(event.target.value)} className={`${FIELD} sm:max-w-md`}>
-        <option value="" disabled>
-          Pick where it runs
-        </option>
-        {repos.map((repo) => (
-          <option key={repo} value={repo}>
-            {repo}
-          </option>
-        ))}
-      </select>
-      <p className="text-body-small text-muted-foreground">{note}</p>
-    </div>
-  );
-}
-
-/**
- * The workflows `place`'s factory offers on its repository, preset from the card as on any card's start, and `StartRun` in the factory. A
- * workflow whose steps the factory's hires leave with no agent says so in place of the start, in the package's words (`unfilled`).
- */
-function InFactory({ entry, place, onStarted, onRefused }: { entry: InboxEntry; place: Place } & Told) {
-  const workflows = useQuery(factoryWorkflowsQuery(place));
-  const [picked, setPicked] = useState<string | null>(null);
-  const preset = workflows.data ? presetOf(entry.workflow, entry.repo, place.repo, workflows.data) : null;
-  const key = picked ?? (preset ? workflowKey(preset) : '');
-  const workflow = workflows.data?.find((w) => w.error === null && workflowKey(w) === key) ?? null;
-  const field = useId();
-
+  const { factory } = place;
+  const offered = factory.workflows ?? [];
+  const workflow = picked ?? place.workflow;
+  const on = workflow === null ? null : startRepo(factory, workflow);
   return (
     <>
       <div className="space-y-1.5">
         <label htmlFor={field} className="block text-body-medium font-medium">
           Workflow
         </label>
-        {workflows.error ? (
-          <p className="text-body-small text-failure">
-            Could not list the workflows of the factory {code(place.factory)}: {workflows.error.message}
+        {offered.length === 0 ? (
+          <p data-no-workflow className="text-body-small text-yours">
+            The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
-        ) : !workflows.data ? (
-          <p className="text-body-small text-muted-foreground">Reading the workflows…</p>
         ) : (
-          <select id={field} value={key} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
+          <select id={field} value={workflow ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
             <option value="" disabled>
               Pick what runs it
             </option>
-            <WorkflowOptions workflows={workflows.data} />
+            {offered.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
           </select>
         )}
-        {workflows.data && <WorkflowsUnread workflows={workflows.data} />}
-        <p className="text-body-small text-muted-foreground">
-          The workflows the factory {code(place.factory)} offers on {code(place.repo)}, with its hires.
-        </p>
+        <p className="text-body-small text-muted-foreground">The workflows the factory {code(factory.name)} offers.</p>
       </div>
-      {workflow?.unfilled ? (
-        <p data-unfilled className="text-body-small whitespace-pre-wrap break-words text-yours">
-          {workflow.unfilled}
-        </p>
-      ) : (
-        workflow && (
-          <StartRun
-            workflow={workflow}
-            card={{ name: entry.name, factory: entry.factory, body: entry.body ?? '' }}
-            repo={place.repo}
-            place={place}
-            onStarted={onStarted}
-            onRefused={onRefused}
-          />
-        )
+      {on !== null && workflow !== null && <Wired factory={factory} workflow={workflow} on={on} />}
+      {on !== null && workflow !== null && 'repo' in on && (
+        <OnRepo
+          key={`${workflow}:${on.repo}`}
+          entry={entry}
+          workflow={workflow}
+          place={{ factory: factory.name, repo: on.repo }}
+          onStarted={onStarted}
+          onRefused={onRefused}
+        />
       )}
     </>
+  );
+}
+
+/**
+ * The repository `factory` wires for `workflow`, as text a person reads and never a pick: the factory alone places a card's run. Or why
+ * it gives none, with the attach that fixes it (`startRepo`).
+ */
+function Wired({ factory, workflow, on }: { factory: Pick<Factory, 'name'>; workflow: string; on: ReturnType<typeof startRepo> }) {
+  if ('why' in on) {
+    return (
+      <p data-unwired={on.refused} className="text-body-small break-words text-yours">
+        {on.why}
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <p className="text-body-medium font-medium">Repository</p>
+      <p data-factory-repo className="font-mono text-body-small break-all text-muted-foreground">
+        {on.repo}
+      </p>
+      <p className="text-body-small text-muted-foreground">
+        Where the factory {code(factory.name)} runs {code(workflow)}: its wiring decides, never the card.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The workflow `workflow` as the factory offers it on `place`'s repository, read with its hires, and `StartRun` in the factory. One
+ * that does not read, or whose steps the factory's hires leave with no agent, says so in place of the start, in the package's words.
+ */
+function OnRepo({ entry, workflow, place, onStarted, onRefused }: { entry: InboxEntry; workflow: string; place: Place } & Told) {
+  const workflows = useQuery(factoryWorkflowsQuery(place));
+  const listed = workflows.data?.filter((w) => w.name === workflow) ?? [];
+  const read = listed.find((w) => w.error === null) ?? null;
+  const unread = read === null && listed.some((w) => w.error !== null);
+
+  if (workflows.error) {
+    return (
+      <p className="text-body-small text-failure">
+        Could not read the workflow {code(workflow)} of the factory {code(place.factory)}: {workflows.error.message}
+      </p>
+    );
+  }
+  if (!workflows.data) return <p className="text-body-small text-muted-foreground">Reading the workflow…</p>;
+  if (unread) return <WorkflowsUnread workflows={listed} />;
+  return read?.unfilled ? (
+    <p data-unfilled className="text-body-small whitespace-pre-wrap break-words text-yours">
+      {read.unfilled}
+    </p>
+  ) : read === null ? (
+    <p data-not-offered className="text-body-small text-yours">
+      The factory {code(place.factory)} lists no workflow {code(workflow)} on {code(place.repo)}.
+    </p>
+  ) : (
+    <StartRun
+      workflow={read}
+      card={{ name: entry.name, factory: entry.factory, body: entry.body ?? '' }}
+      repo={place.repo}
+      place={place}
+      onStarted={onStarted}
+      onRefused={onRefused}
+    />
   );
 }

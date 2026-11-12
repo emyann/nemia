@@ -25,6 +25,7 @@ import { mcpPort } from './mcp/index.ts';
 import { saidRequest } from './request/request.ts';
 import { Followings } from './steps/index.ts';
 import { Engine } from './store.ts';
+import { UpgradeStarts } from './upgrades/index.ts';
 
 /**
  * What the api answers an error a route on Hono threw: a refusal — the orchestrator's by its tag, the api's own refusal of a session token
@@ -45,7 +46,8 @@ export const answerError: ErrorHandler = (err, c) => {
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine (`Engine`)
  * and the store's root and settings, read from `env` (`StoreRoot` and `StoreConfig`, `storeConfigLayer`: `WF_ROOT` and every `WF_`
  * setting), an MCP asker and a quota asker with nothing asked yet
- * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), an informer of each run's judgement holding none, which the
+ * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), the one permit an upgrade's start is filed under
+ * (`UpgradeStarts`), an informer of each run's judgement holding none, which the
  * daemon's passes fill and every request reads (`informerLayer`: one per app, so the store's daemon and the board's reads judge a run
  * once), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the process's daemon writes them
  * (`feedHubLayer`), the git place (`gitPlaceLayer`), and the memory of the store's machine needs (`needsMemoryLayer`): one per app, which
@@ -66,6 +68,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,
+    UpgradeStarts.live,
     informerLayer(),
     Followings.live,
     feedHubLayer(),

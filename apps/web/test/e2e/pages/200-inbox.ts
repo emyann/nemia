@@ -51,22 +51,25 @@ async function startIn(p: Page, name: string): Promise<Locator> {
  */
 const inFactory = (text: string): string => text.replace('\n---\n', `\nfactory: ${FACTORY}\n---\n`);
 
-/** Refuses unless `answered`, a start's answer, was sent to FACTORY on `repo`, in its query: no start of this page names no factory. */
-function expectInFactory(answered: Response, repo: string): void {
+/**
+ * Refuses unless `answered`, a start's answer, was sent to FACTORY in its query, and no repository: no start of this page names no
+ * factory, and none names a repository, which the factory's wiring decides.
+ */
+function expectInFactory(answered: Response): void {
   const sent = new URL(answered.url()).searchParams;
-  if (sent.get('factory') !== FACTORY || sent.get('repo') !== repo)
-    throw new Refused(`the start names the factory picked and its repository in its query — it was sent to ${answered.url()}`);
+  if (sent.get('factory') !== FACTORY || sent.has('repo'))
+    throw new Refused(`the start names the factory picked in its query, and no repository — it was sent to ${answered.url()}`);
 }
 
 export default {
   /**
    * The inbox: the seeded cards, newest first, and the queue; a card filed from the box into a factory, queued, unqueued, then removed
    * with its Remove; a card's start form, in the factory picked for it, preset from the card. Each in a page of its own: a card started,
-   * which opens its run's page and stays listed, started; a card started already; a card about a repository the factory
-   * picked does not work on; stray files and a folder, each listed with why it is no card; an empty inbox; and a start, a remove and a
-   * queue each refused behind the page's back. Every start picks its factory first, and is sent with it (`expectInFactory`); the
-   * factory is made able to start its workflow for the page (`hiringStarts`). Every write is taken back, so every page after this one,
-   * in either theme, reads the store as seeded.
+   * which opens its run's page and stays listed, started; a card started already; an older card that names a repository, retired,
+   * whose start says the factory's own; stray files and a folder, each listed with why it is no card; an empty inbox; and a start, a
+   * remove and a queue each refused behind the page's back. Every start picks its factory first, and is sent with it and no repository
+   * (`expectInFactory`); the factory is made able to start its workflow for the page (`hiringStarts`). Every write is taken back, so
+   * every page after this one, in either theme, reads the store as seeded.
    */
   name: 'inbox',
   route: '/inbox',
@@ -398,7 +401,7 @@ async function visit(page: Page): Promise<void> {
         ),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
-      expectInFactory(started, checkout);
+      expectInFactory(started);
       if (started.status() !== 201)
         throw new Refused(`the api starts the card, through the board's proxy — it answered ${started.status()}: ${await started.text()}`);
       const answer = (await started.json()) as { id: string };
@@ -518,23 +521,26 @@ async function visit(page: Page): Promise<void> {
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
       await idle(other);
+      const retired = cardIn(other, elsewhereName).locator('s[data-repo="retired"]', { hasText: elsewhere });
+      await expectVisible(retired, `an older card's repo: ${elsewhere} is listed struck`);
+      if ((await retired.getAttribute('title')) !== 'retired: the factory places the run')
+        throw new Refused(`and says on hover that it is retired — its title is ${await retired.getAttribute('title')}`);
       const item = await startIn(other, elsewhereName);
+      await expectCount(item.locator('[data-unplaced]'), 0, `the card's repo: no longer keeps it out of ${FACTORY}`);
       await expectTexts(
-        item.locator('[data-unplaced]'),
-        [
-          `The card is about ${elsewhere}, and the factory ${FACTORY} works on ${checkout}: pick a factory that works on it, or change the card's repo: line.`,
-        ],
-        `a card about ${elsewhere} has no place in ${FACTORY}, which works on ${checkout}: its start says so, naming both`,
+        item.locator('[data-factory-repo]'),
+        [checkout],
+        `its start says the repository ${FACTORY} gives its workflow (${checkout}), never the card's`,
       );
-      await expectCount(item.getByRole('combobox', { name: 'Workflow' }), 0, 'with no Workflow list');
-      await expectCount(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 0, 'and no Start: the api would refuse it');
+      await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'with no Repository list');
+      await expectVisible(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 'and its Start');
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), { fullPage: true });
       await idle(other);
       const seen = problems();
       if (seen.length)
         throw new Refused(
-          `no console error and no failed request on a card about another repository — ${seen.length} seen:\n    ${seen.join('\n    ')}`,
+          `no console error and no failed request on a card that names a repository, retired — ${seen.length} seen:\n    ${seen.join('\n    ')}`,
         );
     } finally {
       await other.close();
@@ -670,7 +676,7 @@ async function visit(page: Page): Promise<void> {
         }),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
-      expectInFactory(answered, checkout);
+      expectInFactory(answered);
       const { error } = (await answered.json()) as { error?: string };
       if (answered.status() !== 404 || !error?.startsWith(`no card ${bare.name}`)) {
         throw new Refused(
@@ -796,7 +802,7 @@ async function visit(page: Page): Promise<void> {
         ),
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
-      expectInFactory(answered, checkout);
+      expectInFactory(answered);
       const { error } = (await answered.json()) as { error?: string };
       if (answered.status() !== 409 || !error?.includes(STARTED_AS)) {
         throw new Refused(

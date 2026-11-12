@@ -379,6 +379,32 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
   });
 });
 
+test('REFUSED: an attach naming a repository the factory has no folder of that name for, nothing written; one named is written to its file, and a detach takes it off', async (t) => {
+  const shop = (): string => {
+    const repo = fresh();
+    addFactoryAt(ROOT, { name: 'shop', repos: [repo] });
+    attachWorkflowAt(ROOT, { factory: 'shop', workflow: 'dev' });
+    return repo;
+  };
+  await t.test('an unknown name is Invalid, naming the attach and the folder names to choose from', async () => {
+    const repo = shop();
+    const before = bytesOf('shop');
+    await assert.rejects(
+      main(['factory', 'attach', 'shop', 'dev', '--repo', 'nope'], noEngine()),
+      refused('Invalid', 'nope', 'nemia factory attach shop dev --repo', path.basename(repo)),
+    );
+    assert.deepEqual(bytesOf('shop'), before);
+  });
+  await t.test("its folder's name is kept in the factory's own file, and a detach takes it off with the workflow", async () => {
+    const repo = shop();
+    await main(['factory', 'attach', 'shop', 'dev', '--repo', path.basename(repo)], noEngine());
+    assert.deepEqual(fileOf('shop').workflowRepos, { dev: path.basename(repo) });
+    assert.deepEqual(readFactoryAt(ROOT, 'shop').workflowRepos, { dev: path.basename(repo) });
+    detached(ROOT, 'shop', 'dev');
+    assert.equal(fileOf('shop').workflowRepos, undefined);
+  });
+});
+
 test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', async (t) => {
   const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
   const rows: Array<[string, (repo: string) => unknown, 'Missing' | 'Invalid', (repo: string) => string[]]> = [

@@ -63,10 +63,15 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   return dir;
 };
 
-/** An inbox card of `planned()`'s workflow, its frontmatter given `model:` as `model` says. */
-const card = (name: string, workflowDir: string, model: string) => {
+/**
+ * An inbox card of `planned()`'s workflow, its frontmatter given `model:` as `model` says: the folder copied under `repo`'s `workflows/`,
+ * where a card started in `repo` finds it by its name, the only way a card names its workflow.
+ */
+const card = (name: string, workflowDir: string, model: string, repo: string) => {
+  const workflow = path.basename(workflowDir);
+  fs.cpSync(workflowDir, path.join(repo, 'workflows', workflow), { recursive: true });
   fs.mkdirSync(inboxDir(ROOT), { recursive: true });
-  fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${workflowDir}\nmodel: ${model}\n---\nPlan the flag.\n`);
+  fs.writeFileSync(path.join(inboxDir(ROOT), `${name}.md`), `---\nworkflow: ${workflow}\nmodel: ${model}\n---\nPlan the flag.\n`);
   return name;
 };
 
@@ -148,7 +153,7 @@ test("a card's `model:` runs its run's step on it, and a start's `--model` for t
   const dir = planned();
   await t.test("the card's alone", async () => {
     const { run } = await runPlaced(
-      startFromInbox({ name: card('plan-the-flag-m1a1', dir, 'review=fable'), callerRepo: repo, isolate: false }),
+      startFromInbox({ name: card('plan-the-flag-m1a1', dir, 'review=fable', repo), callerRepo: repo, isolate: false }),
     );
     assert.deepEqual(runRecord(ROOT, run.id).models, { review: 'fable' });
     assert.deepEqual(frozenModels(run.id), { plan: 'opus', implement: 'opus', review: 'fable' });
@@ -156,7 +161,7 @@ test("a card's `model:` runs its run's step on it, and a start's `--model` for t
   await t.test('with a --model for the same step and another', async () => {
     const { run } = await runPlaced(
       startFromInbox({
-        name: card('plan-the-flag-m2b2', dir, 'review=fable'),
+        name: card('plan-the-flag-m2b2', dir, 'review=fable', repo),
         callerRepo: repo,
         isolate: false,
         models: { review: 'sonnet', plan: 'fable' },
@@ -191,7 +196,9 @@ test('a step’s model at start, REFUSED before a run is written', async (t) => 
     [
       "a card's `model:` the step cannot run on, in the card's words",
       () =>
-        runPlaced(startFromInbox({ name: card('plan-the-flag-m3c3', dir, 'review=claude-sonnet-4-5'), callerRepo: repo, isolate: false })),
+        runPlaced(
+          startFromInbox({ name: card('plan-the-flag-m3c3', dir, 'review=claude-sonnet-4-5', repo), callerRepo: repo, isolate: false }),
+        ),
       ['plan-the-flag-m3c3.md: `model: review=claude-sonnet-4-5`'],
     ],
   ] as Array<[string, () => Promise<unknown>, string[]]>) {

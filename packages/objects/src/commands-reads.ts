@@ -135,7 +135,7 @@ export const INBOX_READ_WORDS = {
   name: 'inbox',
   usage: '',
   help: [
-    'the cards still in play: name, first line, workflow and repo when set,',
+    'the cards still in play: name, first line, workflow when set,',
     'and started as <runId>, <phase> (nemia inbox --help); --all: those whose',
     'run ended too; -l: the cards whose labels match; --show-labels, -L <key>:',
     'their labels on each line; -o wide: every column',

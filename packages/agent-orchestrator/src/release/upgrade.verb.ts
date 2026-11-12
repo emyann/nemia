@@ -4,11 +4,14 @@
  * without a rebuild, so a rollback is the same command with an older tag. On an archive install the tag's published archive is
  * downloaded, checked against its checksum and smoke-run instead (`archived`), the newest where no tag is named. Either way a tag older
  * than the oldest release that can read the store (`store.json`, `goingBackRefused`) is refused before anything is built or fetched.
- * The command the CLI serves alone: it builds for minutes and restarts the daemon that serves the api.
+ * The command the CLI serves alone: it builds for minutes and restarts the daemon that serves the api. Its link to `POST /api/upgrades`
+ * (`served`) is the same upgrade filed by the server as a job of the engine (`upgrade-job.verb.ts`), which the MCP port offers as a tool.
  */
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
-import { Cause, Effect } from 'effect';
+import { spawnSync } from 'node:child_process';
+import { Cause, Effect, Schema } from 'effect';
+import { Readiness, readinessSaid, runsWait, type ReadinessPiece } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
@@ -35,6 +38,8 @@ import { goingBackRefused, parseVersion, versionTag } from './floor.ts';
 import {
   buildingOf,
   placeRelease,
+  lastLineFrom,
+  logSize,
   ranInto,
   releaseDir,
   releaseFileOf,
@@ -96,18 +101,22 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
 }
 
 /**
- * The new tree's own `nemia doctor carry --local` run on the store at `root` (`ranInto`, its output into the build's log): it installs,
- * at the new release's pins, each harness the store holds activated or a release carries (`carryHarnesses`), so nothing that ran stops
- * after the switch. Refused (`Invalid`, naming the log) where it exits non-zero: nothing is switched. `archive` says where the tree's
- * `nemia` is: an archive's `bin/nemia`, a build's npm bin.
+ * The new tree's own `nemia doctor carry` run on the store at `root` (`ranInto`, its output into the build's log): it installs, at the
+ * new release's pins, each harness the store holds activated or a release carries (`carryHarnesses`), so nothing that ran stops after
+ * the switch. Typed without `--local`, which a release's cli refuses on every verb but this one. Refused (`Invalid`, naming the last
+ * line the carry printed and the log) where it exits non-zero: nothing is switched. `archive` says where the tree's `nemia` is: an
+ * archive's `bin/nemia`, a build's npm bin.
  */
 function carried(tag: string, building: Building, archive: boolean, root: string, env: NodeJS.ProcessEnv): void {
   const nemia = archive ? path.join(building.tree, 'bin', 'nemia') : path.join(building.tree, 'node_modules', '.bin', 'nemia');
-  const exit = ranInto([nemia, 'doctor', 'carry', '--local'], building.tree, { ...env, WF_ROOT: root }, building.log);
-  if (exit !== 0)
+  const from = logSize(building.log);
+  const exit = ranInto([nemia, 'doctor', 'carry'], building.tree, { ...env, WF_ROOT: root }, building.log);
+  if (exit !== 0) {
+    const last = lastLineFrom(building.log, from);
     throw new Invalid({
-      message: `${BY} ${tag}: its nemia doctor carry, which installs this store's harnesses at ${tag}'s pins, exited ${exit}, so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}, then run the upgrade again.`,
+      message: `${BY} ${tag}: its nemia doctor carry, which installs this store's harnesses at ${tag}'s pins, exited ${exit}${last === undefined ? '' : `, its last line: ${last}`}; so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}, then run the upgrade again.`,
     });
+  }
 }
 
 /**
@@ -223,6 +232,56 @@ function floorRefusal(tag: string, root: string): void {
 const installedNemia = (root: string, archive: boolean): string =>
   archive ? path.join(releasesDir(root), CURRENT, 'bin', 'nemia') : path.join(releasesDir(root), CURRENT, 'node_modules', '.bin', 'nemia');
 
+/** How long the installed release's readiness read may take: the daemon it asks has just been restarted onto it. */
+const READINESS_READ_MS = 60_000;
+
+/** The readiness read `nemia doctor --json` printed, or why there is none. */
+function readinessOfJson(out: string): Readiness | string {
+  try {
+    return Schema.decodeUnknownSync(Readiness)(JSON.parse(out));
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+/**
+ * The installed release's own readiness read, run once the daemon was restarted onto it: `releases/current`'s `nemia doctor --json` on the
+ * store at `root`, under the context `local` whatever context the person uses (`NEMIA_CONTEXT`), so it asks this machine's daemon, and the
+ * pieces it reads are the new release's — this process's code is the older one's and cannot know them. Where a run waits on a missing
+ * piece (`runsWait`), one line saying the store is not ready (`readinessSaid`), then each missing piece a run waits on with the fixes that
+ * put it there; nothing where it reads ready. The client's own pieces (area `client`: the server reached, the token taken, `nemia` on
+ * PATH) hold no run of the store's and are never among them: one of them missing that a run waits on means the server's read did not reach
+ * this command, which says so, with the piece's fix. A read that does not answer is one line naming the command to type. Never a refusal:
+ * the upgrade itself succeeded.
+ */
+function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv): string[] {
+  const ran = spawnSync(installedNemia(root, archive), ['doctor', '--json'], {
+    env: { ...env, WF_ROOT: root, NEMIA_CONTEXT: 'local' },
+    encoding: 'utf8',
+    timeout: READINESS_READ_MS,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const read = ran.error === undefined ? readinessOfJson(ran.stdout) : ran.error.message;
+  if (typeof read === 'string')
+    return [`what ${tag} needs before a run could not be read (nemia doctor --json: ${read}): read it with nemia doctor`];
+  const held = (p: ReadinessPiece): boolean => p.state === 'missing' && (p.cost ?? 'run') === 'run';
+  const unreached = read.pieces.find((p) => p.area === 'client' && held(p));
+  if (unreached !== undefined)
+    return [
+      `what ${tag} needs before a run could not be read: ${unreached.message}${unreached.fixes[0] ? ` (${unreached.fixes[0].command})` : ''}, then read it with nemia doctor`,
+    ];
+  const server = { ...read, pieces: read.pieces.filter((p) => p.area !== 'client') };
+  if (!runsWait(server)) return [];
+  const missing = server.pieces.filter(held);
+  return [
+    `on ${tag} the store is ${readinessSaid(server)}; every new run is held until each is in place:`,
+    ...missing.flatMap((p) => [
+      `  ✗ ${p.name}${p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`}: ${p.message}`,
+      ...p.fixes.map((f) => `      ${f.command}  — ${f.message}`),
+    ]),
+  ];
+}
+
 /**
  * The daemon after the switch: restarted through the take-over where the service holds the lease and its file runs `releases/current`;
  * else named and left running, with the line that moves it; else nothing to restart.
@@ -301,7 +360,8 @@ const tagOf = (args: Args, running: Running) => {
 
 /**
  * Upgrades the store to `tag` (`archived` on an archive install, else `prepared`, each of which switches the pointer), restarts the daemon
- * (`restarted`), then removes what no one needs (`removedAfter`); refused before the switch, and before anything is fetched or built where
+ * (`restarted`), says what the new release reads missing where the daemon now runs it (`readinessAfter`), then removes what no one needs
+ * (`removedAfter`); refused before the switch, and before anything is fetched or built where
  * the tag is no release's name or goes back past the store's floor (`floorRefusal`). `running` is the code this command runs, which says
  * whether the store is an archive install.
  */
@@ -331,6 +391,7 @@ export const upgrade = Effect.fn('upgrade')(function* (
       ? `downloaded ${tag} (${release.commit.slice(0, 7)}) for ${release.platform ?? 'this machine'} into ${dir}: its checksum matched and its nemia version ran`
       : `built ${tag} (${release.commit.slice(0, 7)}) into ${dir}: npm ci, npm run build and npm run ${RELEASE_CHECK} passed`;
   const daemon = yield* restarted(args, host, tag, archive !== null);
+  const readiness = daemon.restart === 'service' ? readinessAfter(tag, root, archive !== null, env) : [];
   const retained = yield* removedAfter(root, host, running);
   return {
     release,
@@ -338,7 +399,7 @@ export const upgrade = Effect.fn('upgrade')(function* (
     built,
     ...daemon,
     removed: retained.removed,
-    lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines, ...retained.lines],
+    lines: [said, `releases/${CURRENT} now names ${tag}`, ...daemon.lines, ...readiness, ...retained.lines],
   } satisfies Upgraded;
 });
 
@@ -359,8 +420,9 @@ const UPGRADE: Command<Upgraded> = {
     'it where the login service runs the pointer: jobs run on, and the',
     "daemon's sessions are given up to the timeout to end their tool calls",
     '(--timeout <d>, else nemia pause-timeout), park, and resume as the same try on',
-    'the new release. A tag built already is switched to without a',
-    'rebuild, so an older tag rolls back. --repo:',
+    'the new release; then say each piece the new release reads missing',
+    'that a run waits on, with its fix. A tag built already is switched',
+    'to without a rebuild, so an older tag rolls back. --repo:',
     "the repository the tag is in (the running release's source);",
     '--name: the service (nemia). Then it removes each release that is',
     'not current, not among the two newest, and that no session or',
@@ -381,6 +443,7 @@ const UPGRADE: Command<Upgraded> = {
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
+  served: [{ endpoint: 'upgrades.start' }],
   handler: (args) => Effect.flatMap(StoreRoot, (home) => Effect.flatMap(timedHost(args, home, 'upgrade'), (host) => upgrade(args, host))),
   print: (data) => data.lines,
 };

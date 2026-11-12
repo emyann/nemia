@@ -119,16 +119,29 @@ export const FACTORY_ADD_WORDS = {
   },
 } as const satisfies CommandWords;
 
-/** `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
+/** `nemia factory attach`'s `--repo <name>`: the folder name of the factory's repository the workflow's runs work on. */
+const WORKS_ON = {
+  flag: '--repo',
+  kind: 'text',
+  key: 'repo',
+  takes:
+    "--repo takes the folder name of one of the factory's repositories, the one the workflow's runs work on: nemia factory attach <factory> <workflow> --repo <name>",
+  twice: 'nemia factory attach takes --repo once: a workflow works on one repository.',
+} satisfies Flag;
+
+/**
+ * `nemia factory attach`'s and `detach`'s spec: the factory, then the workflow; an attach takes `--repo <name>` besides, a detach no
+ * flag, an unknown one refused wherever it stands.
+ */
 const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   positionals: [
     { key: 'factory', takes: 'required', kind: 'name' },
     { key: 'workflow', takes: 'required', kind: 'name' },
   ],
-  flags: [],
+  flags: verb === 'attach' ? [WORKS_ON] : [],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>.`
+      ? `nemia factory ${verb} does not take ${arg}. It takes the factory, then the workflow: nemia factory ${verb} <factory> <workflow>${verb === 'attach' ? ' [--repo <name>]' : ''}.`
       : `nemia factory ${verb} takes one workflow, and ${arg} is a second: nemia factory ${verb} <factory> <workflow>, once per workflow.`,
   missing: `nemia factory ${verb} takes the factory, then the workflow, by its folder's name: nemia factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
   flagFirst: true,
@@ -138,8 +151,12 @@ const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
 export const FACTORY_ATTACH_WORDS = {
   name: 'factory attach',
   served: [{ endpoint: 'factories.attach' }],
-  usage: '<factory> <workflow>',
-  help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
+  usage: '<factory> <workflow> [--repo <name>]',
+  help: [
+    "offer a workflow in a factory, by its folder's name: a factory offers",
+    'only the workflows attached to it; --repo names the repository its runs',
+    'work on, by folder name, required where the factory has several',
+  ],
   spec: workflowSpec('attach'),
   writes: true,
   class: 'ask',

@@ -14,6 +14,7 @@ export {
   usageOptions,
 } from './quota.ts';
 export type { OpenUsage, UsageAsk } from './quota.ts';
+export { claudeHeardFile, heardOf, keepHeard, readHeard } from './heard.ts';
 export {
   CLAUDE_AUTO_DROPPED,
   CLAUDE_CONTEXT_TOKENS,

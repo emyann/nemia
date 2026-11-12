@@ -2,13 +2,14 @@
  * The runner of `nemia start`: a run of a workflow named by its name (the Run's `create`), from a brief in words or a file's text read
  * here — a file that opens with a plan card's frontmatter giving its body and its `workflow:` — or of an inbox card named by its name (the
  * Card's `start`). What the api cannot read from where it runs is read here and sent as data: the brief's file, each `--input` file by
- * its name and its bytes, and `--repo` as `pathSent` sends a path. A plan folder and a workflow given as a path are refused, naming the
- * start by name; so is a brief whose workflow is not named. It prints the lines the api answers (`RunStarted.lines`).
+ * its name and its bytes, and `--repo` as `pathSent` sends a path, which only finds the factory of a brief's start (its run works on the
+ * repository the factory's wiring names) and is refused on a card's, whose factory places its run. A plan folder and a workflow given as
+ * a path are refused, naming the start by name; so is a brief whose workflow is not named. It prints the lines the api answers
+ * (`RunStarted.lines`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { type Args, type CardStart, DEFAULT_NAMESPACE, type RunStart, START_WORDS } from 'objects';
-import { chosenOf } from '../../context.ts';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, pathSent, said, switchArg, textArg } from '../requests.ts';
@@ -138,24 +139,6 @@ async function cardNamed(word: string): Promise<{ name: string; namespace: strin
 const insteadOf = (instead: string): string =>
   fs.statSync(instead, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(instead, 'utf8') : instead;
 
-/**
- * The repository of the folder `nemia start` is typed in, where it is in one: the nearest folder up from here that holds a `.git` — a
- * folder of a checkout, a file of a worktree — as `git rev-parse --show-toplevel` finds it, read here with no process spawned.
- */
-function repoHere(from: string = process.cwd()): string | undefined {
-  for (let dir = path.resolve(from); ; dir = path.dirname(dir)) {
-    if (fs.existsSync(path.join(dir, '.git'))) return dir;
-    if (path.dirname(dir) === dir) return undefined;
-  }
-}
-
-/** The repository a start sends: `--repo` as `pathSent` sends it; with none, on this machine's daemon alone, the one it is typed in. */
-function repoOf(args: Args): string | undefined {
-  const typed = textArg(args, 'repo');
-  if (typed !== undefined) return pathSent(typed);
-  return chosenOf(process.env).kind === 'remote' || textArg(args, 'factory') !== undefined ? undefined : repoHere();
-}
-
 /** The lines a start prints: the api's, or, of an api that says none, the run started and what reads it. */
 const startedLines = ({ id, lines }: { id: string; lines?: readonly string[] }): string[] =>
   lines?.length
@@ -166,14 +149,16 @@ const startedLines = ({ id, lines }: { id: string; lines?: readonly string[] }):
 async function cardStart(card: { name: string; namespace: string }, args: Args): Promise<number> {
   const workflows = textArg(args, 'workflows');
   const instead = textArg(args, 'instead');
-  const repo = textArg(args, 'repo');
+  if (textArg(args, 'repo') !== undefined)
+    throw new Refused(
+      `nemia start ${card.name} does not take --repo: a card's run works on the repository its factory names for its workflow, never one its start names. Start it without --repo, and name the repository on the factory: nemia factory attach <factory> <workflow> --repo <name>. Nothing was started.`,
+    );
   const factory = textArg(args, 'factory');
   const namespace = card.namespace === DEFAULT_NAMESPACE && factory !== undefined ? factory : card.namespace;
   const payload: CardStart = {
     ...extrasOf(args),
     ...(workflows !== undefined ? { workflow: byName(workflows, card.name) } : {}),
     ...(instead !== undefined ? { brief: insteadOf(instead) } : {}),
-    ...(repo !== undefined ? { repo: pathSent(repo) } : {}),
   };
   said(startedLines(await asked(COMMAND, (c) => c.cards.start({ params: { namespace, name: card.name }, payload }))));
   return 0;
@@ -205,7 +190,8 @@ export async function start(args: Args): Promise<number> {
   const brief = plan ? plan.body : (text?.trim() ?? arg);
   const factory = textArg(args, 'factory');
   const namespace = factory ?? DEFAULT_NAMESPACE;
-  const repo = repoOf(args);
+  const typedRepo = textArg(args, 'repo');
+  const repo = typedRepo === undefined ? undefined : pathSent(typedRepo);
   const payload: RunStart = { ...extrasOf(args), workflow, brief };
   said(
     startedLines(await asked(COMMAND, (c) => c.runs.create({ params: { namespace }, query: repo !== undefined ? { repo } : {}, payload }))),

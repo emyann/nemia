@@ -174,7 +174,7 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
     async (t) => {
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
-      const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo })).card;
+      const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
       const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'gone' })).card;
       const parked = onStore(addToInbox({ text: 'Not queued' })).card;
       onStore(queueInInbox(first.name));
@@ -229,7 +229,7 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
       clear();
       t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
       const first = onStore(addToInbox({ text: 'Cache the views between passes', workflow: 'dev' })).card;
-      const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'dev', repo })).card;
+      const second = onStore(addToInbox({ text: 'Show what a step cost', workflow: 'dev' })).card;
 
       const queued = await queue(first.name);
       assert.equal(queued.status, 200, await queued.clone().text());
@@ -292,16 +292,21 @@ test("a person queues cards, reads their order and the tick's tries, and takes t
   );
 
   await s.test(
-    'a queued card whose repository is gone is listed in its place, and taken back as `--off` does without the check',
+    'a queued old card whose `repo:` names a folder gone is listed in its place, with no error — its `repo:` retired, never read — and taken back as `--off` does',
     async () => {
       clear();
       const about = scratch('nemia-api-queue-gone-');
-      const { card } = onStore(addToInbox({ text: 'About a repository deleted', workflow: 'dev', repo: about }));
+      fs.mkdirSync(inbox, { recursive: true });
+      fs.writeFileSync(
+        path.join(inbox, 'about-a-deleted-repo-k2q9.md'),
+        `---\nworkflow: dev\nrepo: ${about}\n---\nAbout a repository deleted\n`,
+      );
+      const card = { name: 'about-a-deleted-repo-k2q9' };
       onStore(queueInInbox(card.name));
       fs.rmSync(about, { recursive: true, force: true });
       const cards = await listed();
       const entry = cards.find((c) => c.metadata.name === card.name);
-      assert.match(entry?.status.error ?? '', /names no directory/);
+      assert.deepEqual([entry?.status.error, entry?.spec.repo], [undefined, about], 'the card reads: no directory is looked for');
       assert.deepEqual(inLine(cards), [card.name], 'in its place in the queue');
 
       const off = await unqueue(card.name);

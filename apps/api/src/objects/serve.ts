@@ -51,6 +51,7 @@ import { templatesHandlers } from '../template-objects/templates.ts';
 import { serverHandlers } from '../server/index.ts';
 import { nemiaHandlers } from '../nemia/index.ts';
 import { readinessHandlers } from '../readiness/readiness.ts';
+import { upgradesHandlers } from '../upgrades/index.ts';
 import { pairHandlers, pairingsHandlers } from '../pairing/pairing.ts';
 
 /** Where every path the api serves is listed, with what each takes. */
@@ -189,6 +190,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         serverHandlers,
         nemiaHandlers,
         readinessHandlers,
+        upgradesHandlers,
         pairHandlers,
         pairingsHandlers,
       ]),

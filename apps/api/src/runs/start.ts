@@ -8,13 +8,17 @@
  * The workflow a body names is found among the folders a start finds one in (`folderOf`, workflows/workflows.ts), in the factory the
  * request is served in: never a path sent.
  */
+import path from 'node:path';
 import {
+  cardRepoRefusal,
+  Invalid as Refused,
   START,
   sentInputRefusal,
   sentInputsRemoved,
   sentInputsWritten,
   startedLines,
   startFactoryAtOnce,
+  wiredRepoFor,
   type StartInput,
 } from 'agent-orchestrator';
 import { type CardStart, type CardStarted, Conflict, Invalid, Missing, type RunStart, type RunStarted } from 'objects';
@@ -109,31 +113,29 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
 
 /**
  * The card `card` started as `nemia start <card> --factory <namespace>` starts it: what the Card's `start` verb runs (src/objects), the
- * request placed in its namespace's factory. On the workflow `body` names, found among the folders a start finds one in (`folderOf`), the
- * factory's tree first — the workflow not found its refusal, by its status — or, where it names none, the card's own `workflow:`, which
- * the package finds as `nemia start` does (`startFromInbox`). In the factory `factory` where one is named over the card's own: one that
- * names none either way is refused, its fix `?factory=<name>`. With the request's repository as the caller's, `instead` the brief given in
- * place of the card's body, which may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card>
- * --brief ""` is. Answered with the run's id, what `nemia start` prints of it, and the card's name — the card kept in the inbox, listed
- * as started — and the card's `repo:` the run did not look at, as `ignoredRepo`, as `nemia start` prints it.
+ * request placed in its namespace's factory. On the workflow `body` names, by its name, or, where it names none, the card's own
+ * `workflow:`, each found as `nemia start` finds it (`startFromInbox`), on the repository the factory's wiring names for it: never one the
+ * request names, a `?repo=` being refused (`cardRepoRefusal`, `Invalid`), and `from` read and ignored. In the factory `factory` where one
+ * is named over the card's own: one that names none either way is refused, its fix `?factory=<name>`. With the request's repository as the
+ * repository of a card of the default factory, `instead` the brief given in place of the card's body, which may be left out, for the body
+ * as it is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is. Answered with the run's id, what `nemia start`
+ * prints of it, and the card's name — the card kept in the inbox, listed as started — and the card's `repo:` the run did not look at, as
+ * `ignoredRepo`, as `nemia start` prints it. Its models, gates, no worktree and the files handed to its steps are the body's.
  */
-export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined): Promise<CardStarted | Refusal> {
-  const repo = repoNeeded(s);
-  const folder = body.workflow === undefined ? undefined : folderOf(body.workflow, body.from, repo, s.home, s.factory?.tree);
-  if (folder !== undefined && 'status' in folder) return folder;
+export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined): Promise<CardStarted> {
+  if (s.repoNamed) throw new Refused({ message: cardRepoRefusal(card) });
   const handed = handedOf(body);
   const given: StartInput = {
     card,
-    at: repo,
+    ...(s.repo !== undefined ? { at: s.repo } : {}),
     factory,
     fix: '?factory=<name>',
-    workflows: folder?.dir,
+    workflows: body.workflow,
     instead: body.brief,
     after: handed.after,
     context: handed.context,
     cards: handed.cards,
     label: handed.label,
-    ...(body.repo !== undefined ? { repo: body.repo } : {}),
     ...extrasOf(body),
   };
   const started = await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) }));
@@ -152,27 +154,36 @@ export async function cardStart(s: Served, card: string, body: CardStart, factor
  * wait on (`afterRefusal`). A failure that is not a refusal is a 500, git's on a repository it cannot branch from among them — no git
  * checkout, no commit — which the queue tries again on its next pass. In a factory (the namespace of one), the run is started in it
  * (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a repository outside it, each
- * an `Invalid`. Every run is started in a factory: a start in `default`, which names none, runs in the one factory whose repository holds
- * the api's repository, or `?repo=`, on that repository (`startFactoryAtOnce`, as `nemia start` finds it), and is refused, `Invalid`, where
- * none or two do, naming the namespace to start it in.
+ * an `Invalid`. In a factory named or found, the run works on the repository its wiring names for the workflow (`wiredRepoFor`),
+ * `?repo=` having only found the factory, which the answer's lines say where it names another (`repoFoundFactory`); one it names none for
+ * is refused, `Invalid`, naming the attach. Every run is started in a factory: a start in `default`, which names none, runs in the one
+ * factory whose repository holds the api's repository, or `?repo=`, on that repository (`startFactoryAtOnce`, as `nemia start` finds it),
+ * and is refused, `Invalid`, where none or two do, naming the namespace to start it in.
  */
 export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
   const { home, factory } = s;
-  const repo = repoNeeded(s);
-  const asked = startOf(body, repo, home, factory?.tree);
-  if ('status' in asked) throw declaredAs(START_REFUSALS, asked);
+  const wiredIn = (name: string) => wiredRepoFor(home, name, path.basename(body.workflow));
+  const named = factory === undefined ? undefined : wiredIn(factory.name);
+  const repo = named ?? repoNeeded(s);
+  const first = startOf(body, repo, home, factory?.tree);
+  if ('status' in first) throw declaredAs(START_REFUSALS, first);
   const found = factory
     ? { factory, repo }
     : startFactoryAtOnce(home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts);
+  const wired = named ?? (found.factory === undefined ? undefined : wiredIn(found.factory.name));
+  const at = wired ?? found.repo ?? repo;
+  const asked = at === repo ? first : startOf(body, at, home, found.factory?.tree);
+  if ('status' in asked) throw declaredAs(START_REFUSALS, asked);
   const given: StartInput = {
     brief: asked.brief,
-    repo: found.repo ?? repo,
+    repo: at,
     workflows: asked.dir,
     after: asked.after,
     context: asked.context,
     cards: asked.cards,
     label: asked.label,
     factory: found.factory?.name,
+    ...(wired !== undefined && s.repoNamed && s.repo !== undefined && s.repo !== wired ? { repoFoundFactory: s.repo } : {}),
     ...extrasOf(body),
   };
   return startedOf(await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) })));

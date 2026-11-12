@@ -88,8 +88,8 @@ export const adoptRefusal: AdoptRefusal = (factory, adoption) => {
 
 /**
  * `factory` taken over by `template`, running from `tree`: its name, repositories, schedules, instruction, volumes, harness settings,
- * cost lines and origins kept; its workflows, hires and revisions policy the template's `wiring`. A cost line of a workflow the
- * wiring does not offer is refused at the door's write, naming its `nemia factory cost-line rm`.
+ * cost lines, origins and workflows' repositories kept; its workflows, hires and revisions policy the template's `wiring`. A cost line
+ * of a workflow the wiring does not offer is refused at the door's write, naming its `nemia factory cost-line rm`.
  */
 export const adopted: Adopted = (factory, wiring, template, tree) => ({
   name: factory.name,
@@ -105,6 +105,7 @@ export const adopted: Adopted = (factory, wiring, template, tree) => ({
   harnessSettings: factory.harnessSettings,
   costLines: factory.costLines,
   origins: factory.origins,
+  workflowRepos: factory.workflowRepos,
 });
 
 /** A hire a takeover changes: a step hired into by the template only (`added`), by the factory only (`dropped`), or by both, apart. */

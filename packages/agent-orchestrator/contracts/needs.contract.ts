@@ -8,7 +8,7 @@
  * - `needsHolding`: the needs that hold a run before its first session. A run that has filed no task yet waits on every need of its
  *   workflow that is missing, and on none other; a run that has filed one is never held by a need, so a sign-in lapsing mid-run does not
  *   stop work in flight. Level-triggered: the pass hands the reading of this sweep, and a need met on the next starts the run.
- * - `fixRefusal`: whether a caller may start a need's fix. A place's fix (the places Nemia ships) always; a workflow's only where the
+ * - `fixRefusal`: whether a caller may start a need's fix. A place's fix (the builtin places) always; a workflow's only where the
  *   factory it came with has its places trusted (`nemia factory trust <factory>`), the trust command named otherwise.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
@@ -67,7 +67,7 @@ const needsHoldingSpec = spec<(filedAny: boolean, needs: readonly NeedRead[]) =>
 /** `needsHolding`'s type, which src/needs/needs.ts takes. */
 export type NeedsHolding = Implementation<typeof needsHoldingSpec>;
 
-/** Where a fix was declared: a place Nemia ships, or a workflow of a factory whose places are trusted or not. */
+/** Where a fix was declared: a builtin place, or a workflow of a factory whose places are trusted or not. */
 export type FixOrigin = { readonly kind: 'place' } | { readonly kind: 'workflow'; readonly trusted: boolean };
 
 /** Whether a fix may be started, or why not. */
@@ -76,7 +76,7 @@ export type FixRefusal = 'allowed' | 'untrusted';
 const fixRefusalSpec = spec<(origin: FixOrigin) => FixRefusal>({
   ensures: {
     aPlacesFixIsAllowed: {
-      description: 'A fix a place Nemia ships declares may be started by any caller with a person’s token',
+      description: 'A fix a builtin place declares may be started by any caller with a person’s token',
       condition: ({ input: [origin], output }) => origin.kind !== 'place' || output === 'allowed',
     },
     aTrustedWorkflowsFixIsAllowed: {

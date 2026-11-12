@@ -753,7 +753,7 @@ export type AddressKind = (typeof ADDRESS_KINDS)[number];
 /**
  * The areas of the readiness read, each piece in one: the harness's sign-in, the service and its linger, the bind, the machine
  * (cgroup v2, `systemd --user`, the tools folder on PATH), a place's need (the git identity), a workflow's need, the factories, the
- * release, and the client's own pieces a laptop adds (its context reaches the server, its token is accepted).
+ * release, and the client's own pieces a laptop adds (its context reaches the server, the server takes its token).
  */
 export const READINESS_AREAS = ['harness', 'service', 'bind', 'machine', 'place', 'workflow', 'factory', 'release', 'client'] as const;
 

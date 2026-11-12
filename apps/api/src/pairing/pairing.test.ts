@@ -100,7 +100,7 @@ test('a full pairing: asked, waiting, approved by the person, claimed once, and 
 test('a first-visit link: made by the person alone, claimed with no token into the HttpOnly cookie, once', async () => {
   sessionRunning();
   assert.equal((await send('POST', '/api/links', { base: 'http://127.0.0.1:8787' }, sessionToken)).status, 403, "a session's token");
-  assert.equal((await send('POST', '/api/links', { base: 'ftp://nowhere' }, personToken)).status, 400, 'a base that is no http url');
+  assert.equal((await send('POST', '/api/links', { base: 'ftp://nowhere' }, personToken)).status, 422, 'a base that is no http url');
   const made = await send('POST', '/api/links', { base: 'http://127.0.0.1:8787' }, personToken);
   assert.equal(made.status, 200, await made.clone().text());
   const secret = new URL(((await made.json()) as { url: string }).url).searchParams.get('link');

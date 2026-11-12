@@ -337,7 +337,7 @@ export type PlaceSay = { readonly [K in (typeof SAY_LISTS)[number]]: readonly st
 /**
  * What a place declares of itself: the tools a landing session is denied, the sentences the code prints for it (`PlaceSay`), and the
  * machine needs a run in it has (`needs`, src/needs/): each a check and the fixes that put it in place, which a run of a repository waits
- * on before its first session and the readiness read lists. A place Nemia ships declares them, so its fixes are started for any caller.
+ * on before its first session and the readiness read lists. A builtin place declares them, so its fixes are started for any caller.
  */
 export type PlaceDeclared = {
   readonly denyWhileLanding: readonly string[];
@@ -380,7 +380,7 @@ export const unansweredWords = (outcome: { readonly refused: string } | { readon
   'refused' in outcome ? outcome.refused : outcome.unread.said;
 
 /**
- * The names of the needs the places Nemia ships declare (`PlaceDeclared.needs`), which a template's workflow need may fill (`fills`): read
+ * The names of the needs the builtin places declare (`PlaceDeclared.needs`), which a template's workflow need may fill (`fills`): read
  * by the template's check, which reaches no place's code, and held equal to the git place's declaration by `src/place/place.store.test.ts`.
  */
 export const SHIPPED_PLACE_NEEDS: readonly string[] = ['git-identity'];

@@ -2,7 +2,7 @@
  * The machine's needs, read: each declared check run as a shell command (`checkRan`), under a time limit, with the tools folder first on
  * its PATH, and what it said kept in this process's memory of the readings (`NeedsMemory`), which the pass hands `assess` for each run
  * (`runNeeds`, read by `readRun`) and the readiness read lists. The sweep (`needsOnce`) runs beside the passes, as the disk's does
- * (`needs`, run by `sweepLoop`): every check of the places Nemia ships, of every factory's workflows, and of every run that has filed
+ * (`needs`, run by `sweepLoop`): every check of the builtin places, of every factory's workflows, and of every run that has filed
  * nothing and asked since the last sweep. Level-triggered: each sweep reads every check again, and a reading is never a transition.
  * A controller: it reads the store's factories and folders and runs the checks.
  */
@@ -40,7 +40,7 @@ export const checkKey = (at: CheckAt): string => [at.carriedFiles ?? '', at.work
 /**
  * One process's memory of its needs' readings, kept to be read and never to decide: the store it reads for (`home`), each check's last
  * reading by its key (`readings`), the checks a read asked for since the last sweep (`asked`), which the next sweep reads again, the
- * needs of the places Nemia ships as the daemon's place declared them (`placeNeeds`), the count of readings changed (`version`, what the
+ * needs of the builtin places as the daemon's place declared them (`placeNeeds`), the count of readings changed (`version`, what the
  * informer checks a run that has filed nothing against), and how long a check may run (`checkMs`). Lost at a restart, and read afresh.
  */
 export type NeedsMemo = {
@@ -125,7 +125,7 @@ export const checkRan = (home: string, at: CheckAt, { shell = 'sh', ms }: CheckO
     });
   });
 
-/** The checks of the places Nemia ships, as the memory holds them: each run with no workflow's folders. */
+/** The checks of the builtin places, as the memory holds them: each run with no workflow's folders. */
 const placeChecks = (memo: NeedsMemo): CheckAt[] => memo.placeNeeds.map((need) => ({ check: need.check }));
 
 /** A factory's workflow: its factory, its folder's name, and the folder its live files are in. */
@@ -148,7 +148,7 @@ export const workflowChecks = (w: FactoryWorkflow, needs: readonly Need[]): Chec
   needs.map((need) => ({ check: need.check, workflowFiles: w.dir, carriedFiles: carriedDirOf(w.dir) }));
 
 /**
- * One sweep over the needs of the store `memo` reads for: every check of the places Nemia ships, of every factory's workflows as their
+ * One sweep over the needs of the store `memo` reads for: every check of the builtin places, of every factory's workflows as their
  * files are now, and of each run that asked since the last sweep (`asked`), each run once at most `AT_ONCE` at a time under the memory's
  * limit, its reading kept and each that changed counted (`version`). A key no longer asked for is forgotten. Answers the readings by key.
  */

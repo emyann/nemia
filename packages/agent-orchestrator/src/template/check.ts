@@ -207,7 +207,7 @@ function stepRefusals(held: Held): Refusal[] {
 
 /**
  * What each workflow's machine needs (`spec.needs`) break beyond their shape (`layout.ts`): a name declared twice in one workflow, and a
- * `fills` naming no need of the places Nemia ships (`placeNeeds`), whose fixes it would go before.
+ * `fills` naming no need of the builtin places (`placeNeeds`), whose fixes it would go before.
  */
 function needRefusals(held: Held, placeNeeds: readonly string[]): Refusal[] {
   return [...held.workflows].flatMap(([workflow, { file, needs }]) => {
@@ -225,7 +225,7 @@ function needRefusals(held: Held, placeNeeds: readonly string[]): Refusal[] {
               {
                 file,
                 at: [...at, 'fills'],
-                message: `fills names ${fills}, which no place Nemia ships declares${placeNeeds.length ? ` (${placeNeeds.join(', ')})` : ''}: name one of those, or remove fills to make it a need of ${workflow}'s own.`,
+                message: `fills names ${fills}, which no builtin place declares${placeNeeds.length ? ` (${placeNeeds.join(', ')})` : ''}: name one of those, or remove fills to make it a need of ${workflow}'s own.`,
               },
             ]
           : []),
@@ -475,7 +475,7 @@ const sharedFileRefusals = (folder: ReadFolder, held: Held, lines: (file: string
  * parameter or file named that the folder lacks, a step's words, each harness's block against the runtime's knobs for it, and an
  * undeclared parameter's expression in a text the render writes, at its line. `packageSkills`: Nemia's place and builtin skills, each a
  * skill the folder need not carry; `text`, the words of one of its files, by its path; `lines`, the lines of a file of shared lines, or
- * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the places Nemia ships declare, which a workflow's
+ * undefined where it is no YAML list of strings; `placeNeeds`, the names of the needs the builtin places declare, which a workflow's
  * need may fill. None for a template that passes.
  */
 export function checkTemplate(

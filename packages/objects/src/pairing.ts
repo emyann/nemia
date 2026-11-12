@@ -91,5 +91,9 @@ export class PairingsGroup extends HttpApiGroup.make('pairings').add(
     success: Pairing,
     error: [Missing, Conflict, Forbidden, Failed],
   }),
-  HttpApiEndpoint.post('link', '/api/links', { payload: LinkRequest, success: LinkMinted, error: [BadRequest, Forbidden, Failed] }),
+  HttpApiEndpoint.post('link', '/api/links', {
+    payload: LinkRequest,
+    success: LinkMinted,
+    error: [BadRequest, Invalid, Forbidden, Failed],
+  }),
 ) {}

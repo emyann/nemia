@@ -21,7 +21,7 @@
  *   dash. 403 (`Forbidden`) unless the caller is the person (a token of theirs, the board's cookie, or none on a store not exposed): a
  *   session's token never lets another client in. 404 for no pairing under the code, 409 for one lapsed or claimed.
  * - `POST /api/links` — a first-visit link made under `base`, else the board's own address (`boardBase`: the address the api ticking the
- *   store leased, else the one it listens on). 403 unless the caller is the person; 400 (`BadRequest`) for a base that is no http(s) url.
+ *   store leased, else the one it listens on). 403 unless the caller is the person; 422 (`Invalid`) for a base that is no http(s) url.
  */
 import { Clock, Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
@@ -35,7 +35,7 @@ import {
   pairingClaimed,
   pairingsListed,
 } from 'agent-orchestrator';
-import { Api, BadRequest, Forbidden, Invalid } from 'objects';
+import { Api, Forbidden } from 'objects';
 import type { Served } from '../layer.ts';
 import { answeredWrite } from '../objects/refused.ts';
 import { cookieSent, overHttps } from '../server/session.ts';
@@ -84,6 +84,6 @@ export const pairingsHandlers = HttpApiBuilder.group(Api, 'pairings', (handlers)
       ticketed((s, nowMs) => {
         personOnly(s, 'POST /api/links');
         return linkMinted(s.home, payload.base ?? boardBase(leasedUrl(s.home), s.env), nowMs);
-      }).pipe(Effect.mapError((err) => (err instanceof Invalid ? new BadRequest({ error: err.error }) : err))),
+      }),
     ),
 );

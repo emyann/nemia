@@ -1,5 +1,5 @@
 /**
- * A need's fix, started and followed: `startFix` finds the fix a person asks for — of a place Nemia ships, or of a factory's workflow —
+ * A need's fix, started and followed: `startFix` finds the fix a person asks for — of a builtin place, or of a factory's workflow —
  * refuses one a workflow of an untrusted factory declares (`fixRefusal`), and files it on the runtime as a command task, so its output is
  * kept whole and it outlives the request that started it (a device-code sign-in waits minutes on a person); `fixOf` reads it back through
  * the engine, its phase and the end of what it printed; `followFix` follows that output as it grows, then the fix as it ended. Once a fix
@@ -90,7 +90,7 @@ function workflowDeclaring(home: string, placeNeeds: readonly Need[], start: Fix
 }
 
 /**
- * The fix `start` asks for, found where it was declared: a need of the places Nemia ships (`placeNeeds`) when no workflow is named, else a
+ * The fix `start` asks for, found where it was declared: a need of the builtin places (`placeNeeds`) when no workflow is named, else a
  * need of the workflow named of the factory named (`workflowDeclaring`). Refused (`Missing`) for a factory, a workflow or a need that is
  * not there, and (`Invalid`) for a workflow named without its factory or the other way round, and an index no fix of the need has.
  */
@@ -108,7 +108,7 @@ function fixFound(home: string, placeNeeds: readonly Need[], start: FixStart): F
       : { need: placed, declared: (placed?.fixes ?? []).map((fix) => ({ fix, origin: 'place' })) };
   if (need === undefined)
     throw new Missing({
-      message: `no need ${start.need} is declared ${workflow === undefined ? 'by a place Nemia ships' : `by ${factory}'s workflow ${workflow} nor its place`}: nemia readiness lists every need with the command that fixes it.`,
+      message: `no need ${start.need} is declared ${workflow === undefined ? 'by a builtin place' : `by ${factory}'s workflow ${workflow} nor its place`}: nemia readiness lists every need with the command that fixes it.`,
     });
   const chosen = declared[index];
   if (chosen === undefined || !Number.isInteger(index))

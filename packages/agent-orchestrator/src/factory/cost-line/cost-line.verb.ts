@@ -3,6 +3,7 @@
  * factory's own file through the Factory door, whether or not it is made from a template: a factory's cost lines are the person's, never
  * the template's. Served on both sides, typed by their `input`: the api's `putCostLine` and `deleteCostLine` call these handlers.
  */
+import { renamed } from '../../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import type { Args, Spec } from '../../command/command.ts';
 import type { Command } from '../../command/entry.verb.ts';
@@ -93,7 +94,7 @@ export type CostLineRemoved = { file: string; factory: string; workflow: string 
  */
 export const FACTORY_COST_LINE_SET: Command<CostLineSet, CostLineSetInput> = {
   name: 'factory cost-line set',
-  served: [{ endpoint: 'factories.putCostLine' }],
+  served: [{ endpoint: 'factories.putCostLine', request: renamed({ factory: 'name' }) }],
   usage: SET_USAGE,
   help: [
     'set what a run of a workflow may cost before its gate says so, in dollars:',
@@ -128,7 +129,7 @@ export const FACTORY_COST_LINE_SET: Command<CostLineSet, CostLineSetInput> = {
  */
 export const FACTORY_COST_LINE_RM: Command<CostLineRemoved, CostLineRmInput> = {
   name: 'factory cost-line rm',
-  served: [{ endpoint: 'factories.deleteCostLine' }],
+  served: [{ endpoint: 'factories.deleteCostLine', request: renamed({ factory: 'name' }) }],
   usage: RM_USAGE,
   help: ["take a workflow's cost line off a factory"],
   spec: specOf('rm', RM_USAGE, false),

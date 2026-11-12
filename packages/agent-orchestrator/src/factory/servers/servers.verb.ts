@@ -10,6 +10,7 @@
  * The default factory is given a record here, in the controller, while `factories/default.json` stays refused in the store — as
  * `levels.verb.ts` has the default factory's special case.
  */
+import { renamed } from '../../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
@@ -308,7 +309,7 @@ type Added = { file: string; name: string; server: FactoryServers[string]; repla
  */
 export const FACTORY_SERVER_ADD: Command<Added, ServerAddInput> = {
   name: 'factory server add',
-  served: [{ endpoint: 'mcpservers.put' }],
+  served: [{ endpoint: 'mcpservers.put', request: renamed({ factory: 'namespace', server: 'name' }) }],
   usage: ADD_USAGE,
   help: ["record a remote MCP server for a factory: its steps' sessions are", 'handed it, and an agent `mcp:` line names it'],
   spec: ADD_SPEC,
@@ -351,7 +352,7 @@ const RM_USAGE = '<factory> <server>';
  */
 export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }, ServerRmInput> = {
   name: 'factory server rm',
-  served: [{ endpoint: 'mcpservers.delete' }],
+  served: [{ endpoint: 'mcpservers.delete', request: renamed({ factory: 'namespace', server: 'name' }) }],
   usage: RM_USAGE,
   help: ["take a server off a factory's record"],
   spec: {

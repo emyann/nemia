@@ -5,6 +5,7 @@
  * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the read and the write as the nemia group's
  * `level` and `setLevel` (`objects`' Api), each calling its handler by type (`LevelInput`).
  */
+import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
 import { NemiaLevelSet, DEFAULT_NAMESPACE } from 'objects';
@@ -238,7 +239,10 @@ function factoryArgsRefusal(args: Args): string | null {
  */
 export const LEVEL: Command<NemiaLevel, LevelInput> = {
   name: 'level',
-  served: [{ endpoint: 'nemia.level' }, { endpoint: 'nemia.setLevel', as: 'level_set' }],
+  served: [
+    { endpoint: 'nemia.level', takes: givesNone('level'), request: refusing('level', ['factory', 'for', 'end'], renamed({}, ['level'])) },
+    { endpoint: 'nemia.setLevel', as: 'level_set' },
+  ],
   usage: '[manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]',
   help: [
     "Nemia, the store's own agent: bare, where she is, each factory's level and",

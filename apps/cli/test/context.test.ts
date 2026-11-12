@@ -3,7 +3,9 @@
  * `nemia config set-context` and `use-context` with mode 0600, the token read from a file and never from the command line, and printed
  * by no verb; `NEMIA_CONTEXT` names one for a single command, and a name the file does not hold is refused, exit 2, naming `nemia config
  * get-contexts`. Under a remote context a moved read asks that daemon with the context's token, and nothing reads this machine's store
- * or starts a daemon: the client's own store root is never made. The laws of `contextOf` are its contract's (`context.contract.ts`).
+ * or starts a daemon: the client's own store root is never made, and the old path is forwarded with the context's server and token in
+ * the orchestrator's `FORWARD_VARIABLES` and no `WF_ROOT` (`forwardedEnv`). The laws of `contextOf` are its contract's
+ * (`context.contract.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +16,9 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { servedStore, type Said } from './served.ts';
+import { FORWARD_VARIABLES as ORCHESTRATOR_FORWARD_VARIABLES } from 'agent-orchestrator';
 import { chosenOf, configFileOf, configWritten, contextOf } from '../src/context.ts';
+import { FORWARD_VARIABLES, forwardedEnv } from '../src/where.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 
@@ -69,6 +73,19 @@ test('`contextOf`: none named is this machine, `local` too, the variable wins ov
   assert.deepEqual(contextOf(config, 'local'), { kind: 'local' });
   assert.deepEqual(contextOf(config, ''), { kind: 'remote', ...vps });
   assert.deepEqual(contextOf(config, 'gone'), { kind: 'refused', name: 'gone' });
+});
+
+test("`forwardedEnv`: the context's server and token in the forwarded variables, the rest kept, `WF_ROOT` dropped", () => {
+  assert.deepEqual(FORWARD_VARIABLES, ORCHESTRATOR_FORWARD_VARIABLES, "the orchestrator's names, spelled once in the client");
+  const chosen = { kind: 'remote', name: 'vps', server: 'http://vps:7777', token: 't1' } as const;
+  const env = { HOME: '/somewhere/a', WF_ROOT: '/somewhere/a/.agent-workflows', NEMIA_SERVER: 'http://stale:1', PATH: '/bin' };
+  assert.deepEqual(forwardedEnv(chosen, env), {
+    HOME: '/somewhere/a',
+    PATH: '/bin',
+    NEMIA_SERVER: 'http://vps:7777',
+    NEMIA_SERVER_TOKEN: 't1',
+  });
+  assert.equal(env.WF_ROOT, '/somewhere/a/.agent-workflows', 'the environment handed in is not changed');
 });
 
 test('`chosenOf`: the file read, and NEMIA_CONTEXT trimmed over it, blank being none', () => {

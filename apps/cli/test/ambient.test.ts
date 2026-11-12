@@ -13,6 +13,8 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
+  NEMIA_SERVER: 'http://the-persons-vps:7777',
+  NEMIA_SERVER_TOKEN: 'a-token-of-the-persons',
   NEMIA_CONTEXT: 'the-persons-vps',
   XDG_CONFIG_HOME: '/elsewhere/.config',
 };

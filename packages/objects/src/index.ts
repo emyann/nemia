@@ -184,6 +184,27 @@ export {
   FactoryUpgrade,
   FactoryVolume,
   HarnessSettings,
+  TemplateGiven,
+  FactoryCreate,
+  FactoryCreated,
+  VolumeWrite,
+  VolumeAdded,
+  VolumeRemoved,
+  FactoryApplyWrite,
+  FactoryApplied,
+  FactoryAdoptWrite,
+  FactoryAdopted,
+  FactoryDiffWrite,
+  FactoryUpgradePlan,
+  FactoryAdoptPlan,
+  FactoryPlan,
+  FactoryUpgradeWrite,
+  FactoryUpgraded,
+  FactoryResolveWrite,
+  FactoryResolved,
+  MERGED_FROM,
+  MERGE_BASES,
+  HIRE_CHANGE_KINDS,
 } from './factory.ts';
 export {
   McpServer,
@@ -192,10 +213,21 @@ export {
   McpServerSpec,
   McpServerStatus,
   McpServerWrite,
+  SignInCallback,
   SignInStarted,
   SignInState,
   SignedOut,
 } from './mcp-server.ts';
+export {
+  type ApiShape,
+  type EndpointKeys,
+  type EndpointShape,
+  UNTAKEN_QUERY,
+  endpointKeysOf,
+  endpointOf,
+  keysOfEndpoint,
+  streamsOf,
+} from './endpoint-keys.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';

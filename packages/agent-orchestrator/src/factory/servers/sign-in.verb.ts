@@ -1,7 +1,8 @@
 /**
  * A factory's server signed in to and out of, from the board: the server read off the factory's record, the builtin secret picked for
- * its client (`shippedSecretOf`), and the engine asked to hold the sign-in (`mcpSignIn`), read it (`mcpSignInState`) or clear it
- * (`mcpSignOut`). The secret is handed to the engine and to nothing else: no answer here carries it.
+ * its client (`shippedSecretOf`), and the engine asked to hold the sign-in (`mcpSignIn`), read it (`mcpSignInState`), complete it with
+ * the address a person's browser landed on (`mcpSignInCallback`) or clear it (`mcpSignOut`). The secret is handed to the engine and to
+ * nothing else: no answer here carries it, and the pasted address is in no answer or refusal either.
  *
  * Not a command of the table, so no CLI verb: a sign-in waits on a browser, and a CLI one would have to hold its own process open for
  * it (`docs/features.md`).
@@ -34,9 +35,12 @@ const recorded = (factory: string, server: string, home: string, verb: string) =
     }),
   );
 
-/** A refusal of the engine's, in a refusal's kind: a port another sign-in waits on is a `Conflict`, anything else `Invalid`. */
-const kindOf = (e: { readonly message: string; readonly held: boolean }) =>
-  e.held ? new Conflict({ message: e.message }) : new Invalid({ message: e.message });
+/**
+ * A refusal of the engine's, in a refusal's kind: a port another sign-in waits on, or a callback pasted where no sign-in waits, is a
+ * `Conflict`, anything else `Invalid`.
+ */
+const kindOf = (e: { readonly message: string; readonly held: boolean; readonly callback?: string }) =>
+  e.held || e.callback === 'none-waiting' ? new Conflict({ message: e.message }) : new Invalid({ message: e.message });
 
 /**
  * A sign-in to `server` of `factory` started: the address the person opens, and when it stops waiting. A server of a client built
@@ -54,6 +58,23 @@ export const serverSignInState = Effect.fn('serverSignInState')(function* (facto
   yield* recorded(factory, server, home, 'read');
   const e = yield* EngineService;
   return yield* e.mcpSignInState(server);
+});
+
+/**
+ * `server`'s waiting sign-in handed `url`, the address the person's browser landed on once they approved, where that browser runs on
+ * another machine than the engine: answers the sign-in's state, which reads `connected` once the harness took it. Refused as the server
+ * is read (`Missing`), where no sign-in to it waits (`Conflict`), and where the address is not its redirect with a code and a state
+ * (`Invalid`).
+ */
+export const serverSignInCallback = Effect.fn('serverSignInCallback')(function* (
+  factory: string,
+  server: string,
+  url: string,
+  home: string,
+) {
+  yield* recorded(factory, server, home, 'signed in to');
+  const e = yield* EngineService;
+  return yield* e.mcpSignInCallback(server, url).pipe(Effect.mapError(kindOf));
 });
 
 /** `server`'s sign-in cleared, so a session handed it reads `needs-auth` until a person signs in again. */

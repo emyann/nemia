@@ -51,6 +51,7 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   mcpState: Effect.catch(() => Effect.succeed({ read: true, servers: [] })),
   mcpSignIn: Effect.catch(() => Effect.succeed({ authUrl: 'https://elsewhere.example', until: '2026-01-01T00:00:00.000Z' })),
   mcpSignInState: Effect.map(() => ({ state: 'connected' })),
+  mcpSignInCallback: Effect.catch(() => Effect.succeed({ state: 'connected' })),
   mcpSignOut: Effect.catch(() => Effect.succeed({ signedOut: true })),
   io: Effect.map((io) => ({ ...(io as object), reads: 0 })),
 };

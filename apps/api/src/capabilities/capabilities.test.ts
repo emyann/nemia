@@ -26,6 +26,8 @@ assert.equal(
 );
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'mcp-server.ts');
+/** A server that speaks the legacy era alone, imported from no SDK. */
+const LEGACY_SERVER = path.join(import.meta.dirname, '..', '..', 'test', 'fixtures', 'legacy-mcp-server.ts');
 
 /** A checkout with only these files in it. An object is written as JSON. */
 const repoWith = (files: Record<string, string | object>): string => {
@@ -289,12 +291,12 @@ test("a server that never answers is an error once its time is up, and it is sto
       server.error!.includes(`did not list its tools: it did not list its tools within ${deadlineMs / 1000} s.`),
       `try ${tries}: ${server.error}`,
     );
-    const [pid] = startsIn(starts);
-    if (pid === undefined) {
+    const pids = startsIn(starts);
+    if (pids.length === 0) {
       assert.ok(tries < SILENT_TRIES, `the server started within its deadline, on one of ${SILENT_TRIES} tries`);
       continue;
     }
-    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
+    for (const pid of pids) assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `${pid}: no start of the server is left running`);
     return;
   }
 });
@@ -312,11 +314,11 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
   const ended = exit.then(() => true);
   let over = false;
   while (startsIn(starts).length === 0 && !over) over = await Promise.race([ended, new Promise<boolean>((r) => setTimeout(r, 20, false))]);
-  const [pid] = startsIn(starts);
-  assert.ok(pid, 'the server started before its ask ended');
+  assert.ok(startsIn(starts).length > 0, 'the server started before its ask ended');
   stop.abort();
   assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
-  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the server is not left running');
+  for (const pid of startsIn(starts))
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `${pid}: no start of the server is left running`);
 });
 
 test("each server is asked once while an app runs: requests after the first, and requests at once, read that answer, the app's environment naming the repository", async () => {
@@ -334,15 +336,41 @@ test("each server is asked once while an app runs: requests after the first, and
   const [first, second] = await Promise.all([capabilitiesOf(), capabilitiesOf()]);
   const third = await capabilitiesOf();
   assert.equal(first.repo, repo, "the repository the app's environment names, not the process's");
-  assert.equal(startsIn(starts).length, 1, 'started once');
+  assert.equal(startsIn(starts).length, 2, 'asked once: started twice, the era probe and the connection');
   for (const answer of [second, third]) assert.deepEqual(answer.mcp, first.mcp);
 
   write(path.join(repo, '.mcp.json'), {
     mcpServers: { fixture: { ...fixture({ HKB_TEST_STARTS: starts }), args: [FIXTURE_SERVER, '--edited'] } },
   });
   const edited = await capabilitiesOf();
-  assert.equal(startsIn(starts).length, 2, 'a server started otherwise is another server: started again for the edited entry');
+  assert.equal(
+    startsIn(starts).length,
+    4,
+    'a server started otherwise is another server: asked again for the edited entry, its probe and its connection',
+  );
   assert.deepEqual(edited.mcp[0].args, [FIXTURE_SERVER, '--edited']);
+});
+
+test('a server that speaks only 2025-11-25, one on both eras, and one on 2026-07-28 only each list their tools', async () => {
+  const repo = repoWith({
+    '.mcp.json': {
+      mcpServers: {
+        legacy: { command: process.execPath, args: [LEGACY_SERVER], env: {} },
+        both: fixture(),
+        modern: fixture({ HKB_TEST_ERA: 'modern' }),
+      },
+    },
+    '.claude/settings.json': { enabledMcpjsonServers: ['legacy', 'both', 'modern'] },
+  });
+  const { mcp } = await capabilitiesOf(repo);
+  const toolsOf = (name: string) => {
+    const server = mcp.find((s) => s.name === name);
+    assert.equal(server?.error, null, `${name}: ${server?.error}`);
+    return server?.tools?.map((t) => t.name);
+  };
+  assert.deepEqual(toolsOf('legacy'), ['recall']);
+  assert.deepEqual(toolsOf('both'), ['echo', 'wipe']);
+  assert.deepEqual(toolsOf('modern'), ['echo', 'wipe']);
 });
 
 test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} expanded from the api's environment, which the server inherits — and shown as written", async () => {

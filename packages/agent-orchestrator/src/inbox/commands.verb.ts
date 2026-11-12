@@ -5,6 +5,8 @@
  * `from:` (`nemia inbox from`) is the command line's alone: the api writes it as part of the Card's whole write (`update`, `replaceCard`),
  * and reads one card with its file as written (`get`).
  */
+import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
+import type { Card } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
@@ -128,7 +130,7 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStart
   writes: false,
   class: 'read',
   served: [
-    { endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' } },
+    { endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' }, takes: givesNone('name') },
     { endpoint: 'cards.getAll', as: 'inbox_card' },
   ],
   only: {
@@ -222,13 +224,42 @@ export const InboxAddInput = Schema.Struct({
 export type InboxAddInput = typeof InboxAddInput.Type;
 
 /**
+ * A Card the api answered, as the inbox's own card (`InboxCard`) the command line prints: its name, its body and the keys its spec
+ * carries, its factory by its namespace (none for `default`), its labels.
+ */
+const inboxCardOf = (card: Card): InboxCard => {
+  const { metadata, spec, status } = card;
+  return {
+    name: metadata.name,
+    file: status.file ?? `${metadata.name}.md`,
+    body: spec.body ?? '',
+    ...(spec.workflow === undefined ? {} : { workflow: spec.workflow }),
+    ...(spec.repo === undefined ? {} : { repo: spec.repo }),
+    ...(spec.queued === undefined ? {} : { queued: spec.queued }),
+    ...(spec.gate === undefined ? {} : { gate: spec.gate }),
+    ...(spec.from === undefined ? {} : { from: [...spec.from] }),
+    ...(metadata.namespace === undefined || metadata.namespace === 'default' ? {} : { factory: metadata.namespace }),
+    ...(metadata.labels === undefined || Object.keys(metadata.labels).length === 0 ? {} : { labels: { ...metadata.labels } }),
+  };
+};
+
+/**
+ * What another machine's api answers of a card filed (`cards.create`: the Card), as `nemia inbox add` prints it: the card, and its file
+ * by its name in that machine's inbox, which a start names it by there.
+ */
+const filedThere = (answer: unknown): { card: InboxCard; file: string } => {
+  const card = inboxCardOf(answer as Card);
+  return { card, file: card.file };
+};
+
+/**
  * `nemia inbox add`: an idea filed as a card. Its handler is handed the idea's text under `idea`, and, for an idea read from a file, the
  * file under `from` and its folder under `dir`, the folder a workflow's path is read from: the CLI's runner reads the file, and the api's
  * route finds the workflow among the folders a start finds one in, so neither a path nor a file reaches the handler from a body.
  */
 export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   name: 'inbox add',
-  served: [{ endpoint: 'cards.create' }],
+  served: [{ endpoint: 'cards.create', request: renamed({ idea: 'body' }, ['dir', 'from']), answer: filedThere }],
   usage: '"<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
   help: ['park an idea as a card in the inbox, named from its first line'],
   spec: ADD_SPEC,
@@ -290,6 +321,25 @@ type Queued = {
   factoryRepo: string | null;
 };
 
+/**
+ * What another machine's api answers of a card queued or taken back (the Card), as `nemia inbox queue` prints it: its place in the queue
+ * where it has one, and of how many unsaid, which the Card does not carry.
+ */
+const queuedThere = (answer: unknown, input: Readonly<Record<string, unknown>>): Queued => {
+  const read = answer as Card;
+  const card = inboxCardOf(read);
+  return {
+    name: card.name,
+    file: card.file,
+    was: input.off === true ? 'taken back' : 'queued',
+    queued: card.queued ?? null,
+    place: read.status.place ?? null,
+    of: null,
+    card,
+    factoryRepo: null,
+  };
+};
+
 /** What `nemia inbox queue`'s handler takes: the card, the workflow written with the mark (the command line's alone), and `off`. */
 export const InboxQueueInput = Schema.Struct({
   name: Schema.String,
@@ -305,7 +355,15 @@ export type InboxQueueInput = typeof InboxQueueInput.Type;
  */
 export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
   name: 'inbox queue',
-  served: [{ endpoint: 'cards.queue' }, { endpoint: 'cards.unqueue', as: 'inbox_unqueue' }],
+  served: [
+    {
+      endpoint: 'cards.queue',
+      takes: givesNone('off'),
+      request: refusing('inbox queue', ['workflow'], renamed({}, ['off'])),
+      answer: queuedThere,
+    },
+    { endpoint: 'cards.unqueue', as: 'inbox_unqueue', request: renamed({}, ['off', 'workflow']), answer: queuedThere },
+  ],
   usage: '<name> [--workflow <w>] [--off]',
   help: ['mark a card to start on its own: the tick starts the oldest queued', 'card once a run slot is free; --off takes the mark back'],
   spec: QUEUE_SPEC,
@@ -339,10 +397,38 @@ export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
     if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${file}`];
     return [
-      `${name}  queued at ${card.queued}, ${place} of ${of}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
+      `${name}  queued at ${card.queued}, ${of === null ? `${place} in the queue` : `${place} of ${of}`}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
       `the tick starts it on its own once its turn comes and a run slot is free${card.repo ? '' : factoryRepo ? `, on ${factoryRepo}, its factory's one repository` : ', on the repository nemia up runs in'} — take it back with nemia inbox queue ${name} --off`,
     ];
   },
+};
+
+/**
+ * The Card's `update` that sets `from:` as `nemia inbox from` asks, forwarded to another machine's api: the card as its runner read it
+ * there (`current`), written whole with its `from:` set to the runs named, or taken off for `--off`, at the version it was read at.
+ */
+const fromWritten = (input: Readonly<Record<string, unknown>>) => {
+  const current = input.current as Card | undefined;
+  if (current === undefined)
+    return Promise.reject(
+      new Invalid({
+        message: 'nemia inbox from forwarded reads the card first: run it through its runner, nemia inbox from <name> <run>...',
+      }),
+    );
+  const { from: _was, ...spec } = current.spec;
+  const runs = input.off === true ? [] : runsOf(input as Args);
+  return Promise.resolve({
+    name: current.metadata.name,
+    metadata: current.metadata.resourceVersion === undefined ? {} : { resourceVersion: current.metadata.resourceVersion },
+    spec: runs.length ? { ...spec, from: runs } : spec,
+  });
+};
+
+/** What another machine's api answers of a card's `from:` written (the Card), as `nemia inbox from` prints it, beside what it was. */
+const fromThere = (answer: unknown, input: Readonly<Record<string, unknown>>): InboxFrom & { name: string; from: string[] } => {
+  const card = inboxCardOf(answer as Card);
+  const was = (input.current as Card | undefined)?.spec.from ?? [];
+  return { card, file: card.file, was: [...was], name: card.name, from: card.from ?? [] };
 };
 
 /** `nemia inbox from`'s spec: the card's name, then the runs it is handed as context, or `--off`. */
@@ -366,6 +452,7 @@ const runsOf = (args: Args): string[] => (Array.isArray(args.runs) ? args.runs.m
  */
 export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> = {
   name: 'inbox from',
+  served: [{ endpoint: 'cards.update', request: fromWritten, answer: fromThere }],
   usage: '<name> <run>... | --off',
   help: ['set the runs a card is handed as context (from:), read and', 'never waited on; --off takes them off'],
   spec: FROM_SPEC,
@@ -379,7 +466,7 @@ export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> =
   class: 'act',
   only: {
     side: 'cli',
-    why: "the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler",
+    why: "the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler, which its link calls with the card read first (`fromWritten`)",
   },
   handler: (args) =>
     Effect.map(setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args)), (done) => ({

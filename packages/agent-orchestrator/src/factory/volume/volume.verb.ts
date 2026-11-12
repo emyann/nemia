@@ -18,10 +18,13 @@ import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 /** The text under `key`, as the spec read it. */
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
-/** Why the api does not write a volume: the board lists them and writes none. */
+/**
+ * Why the command line takes a volume's write by its arguments: the api serves it as the Factory's `addVolume` and `removeVolume`,
+ * calling these handlers with a path of the machine it runs on.
+ */
 const ONLY_HERE = {
   side: 'cli',
-  why: 'a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none',
+  why: "the api serves it as the Factory's `addVolume` and `removeVolume` of `objects`' Api, calling this handler: a volume is a folder of the machine the store runs on, named there by its whole path",
 } as const;
 
 /** What a writable volume is not, said wherever a person reads one. */
@@ -80,6 +83,7 @@ type Added = { file: string; volume: Volume; was: boolean | null };
  */
 export const FACTORY_VOLUME_ADD: Command<Added> = {
   name: 'factory volume add',
+  served: [{ endpoint: 'factories.addVolume' }],
   usage: ADD_USAGE,
   help: [
     "mount a folder of this machine for every local step of a factory's runs,",
@@ -117,6 +121,7 @@ const RM_USAGE = '<factory> <path>';
 /** `nemia factory volume rm`: a volume taken off a factory, by its path; runs started after mount it no more. */
 export const FACTORY_VOLUME_RM: Command<{ file: string; removed: string }> = {
   name: 'factory volume rm',
+  served: [{ endpoint: 'factories.removeVolume' }],
   usage: RM_USAGE,
   help: ['take a volume off a factory, by its path'],
   spec: {

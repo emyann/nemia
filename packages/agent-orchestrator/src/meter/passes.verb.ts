@@ -2,6 +2,7 @@
  * `nemia passes`, and `GET /api/passes`: what the recent passes of the tick cost (`PassesRead`), read off the store's `tick-recent.json`
  * (`recentPasses`), so the command line and the api answer the same, whichever process ticks. A controller: an entry of the command table.
  */
+import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { recentPasses } from '../daemon/daemon.store.ts';
@@ -46,7 +47,7 @@ export type PassesInput = typeof PassesInput.Type;
 /** `nemia passes`: the recent passes of the tick, a histogram of their times and where it went, phase by phase. */
 export const PASSES: Command<PassesRead, PassesInput> = {
   name: 'passes',
-  served: [{ endpoint: 'server.passes' }],
+  served: [{ endpoint: 'server.passes', request: renamed({}, ['json']) }],
   usage: '[--last <n>] [--json]',
   help: [
     'what the recent passes of the tick cost: their median and slowest',

@@ -74,8 +74,11 @@ import {
   withProposalsPass,
   withResolutionProposer,
   type Env,
+  CLI_VERBS,
+  PAUSE_NOW,
 } from '../runner.ts';
-import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
+import { forwardedOf, unlinked } from '../command/forward.verb.ts';
+import { answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import {
   admitRun,
@@ -88,7 +91,7 @@ import {
   rmVerb,
   sayRun,
 } from './runs.ts';
-import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
+import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
@@ -385,11 +388,12 @@ function watchVerb(env: Env, args: Args, e: Engine, place: Place): void | Promis
  */
 async function pauseRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
   if (args.now === true && args.yes !== true) {
-    for (const line of pauseNowPreviewLines(await runWith(e, placedIn(env, place, pauseNowPreview())))) console.log(line);
+    const preview = await forwardedOr(env, PAUSE_NOW, {}, () => runWith(e, placedIn(env, place, pauseNowPreview())));
+    for (const line of pauseNowPreviewLines(preview)) console.log(line);
     return;
   }
   const given = inputOf(PAUSE, args);
-  const data = await runWith(e, placedIn(env, place, PAUSE.handler(given)));
+  const data = await answered(env, e, place, PAUSE, given);
   for (const line of PAUSE.print(data, given)) console.log(line);
 }
 
@@ -403,7 +407,8 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
- * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia factory server
+ * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia inbox from`,
+ * whose runner reads the card first where the command line is forwarded; `nemia factory server
  * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
  * and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
@@ -417,6 +422,7 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['start', startRun],
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
+  ['inbox from', inboxFromRun],
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],
@@ -449,13 +455,13 @@ async function commanded(
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
+  if (command.ticks === true && forwardedOf(env) === undefined) await Effect.runPromise(ensureDaemon(demand(wfRoot(env))));
   const runner = RUNS.get(command.name);
   if (runner) return runner(env, args, e, place);
   if (command.handler === undefined)
     throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const given = inputOf(command, args);
-  const data = await runWith(e, placedIn(env, place, withResolutionProposer(command.handler(given))));
+  const data = await answered(env, e, place, command, given, withResolutionProposer);
   for (const line of command.print(data, given)) console.log(line);
   for (const line of command.note?.(data, given) ?? []) console.error(line);
 }
@@ -488,10 +494,34 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 }
 
 /**
+ * The engine of a command line forwarded to another machine's api, which builds none here: every entry is called through `answered`,
+ * which reads no engine when forwarded, so a read of this one is a runner that reached past the seam, said as such.
+ */
+const unbuilt = (verb: string): Engine =>
+  new Proxy({} as Engine, {
+    get: () => {
+      throw new Error(
+        `nemia ${verb} reached for this machine's engine while forwarded to another's (NEMIA_SERVER): run it there, or here with NEMIA_CONTEXT=local.`,
+      );
+    },
+  });
+
+/**
+ * Whether the name `named` runs forwarded: a command of the table or a verb of the CLI's own with an endpoint it calls (`served`); and a
+ * help, which is printed here.
+ */
+const linkedOrHelp = (name: string, rest: readonly string[]): boolean =>
+  rest.includes('--help') ||
+  [...TABLE.filter((c) => c.only?.side !== 'api'), ...CLI_VERBS].some((c) => c.name === name && c.served !== undefined);
+
+/**
  * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
  * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. `demand` is the machine a
  * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
  * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
+ *
+ * Forwarded to another machine's api (`NEMIA_SERVER`, `forwardedOf`), it builds no engine and checks no install of this machine's, starts
+ * no daemon here, and refuses (`Invalid`) a command or a verb that no endpoint serves (`unlinked`): it runs only where its store is.
  */
 export async function main(
   argv: string[],
@@ -504,10 +534,12 @@ export async function main(
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
   const named = namedIn(renamed.words);
   if (named === undefined) return console.log(HELP);
-  const exempt = named.name === 'version' || named.rest.includes('--help');
+  const forwarded = forwardedOf(env) !== undefined;
+  if (forwarded && !linkedOrHelp(named.name, named.rest)) throw unlinked(named.name);
+  const exempt = forwarded || named.name === 'version' || named.rest.includes('--help');
   const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(wfRoot(env)), wfRoot(env), env);
   if (trial !== null) throw new Conflict({ message: trial });
-  const e = given ?? engine(env);
+  const e = given ?? (forwarded ? unbuilt(named.name) : engine(env));
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(env, command, named.rest, e, demand, place);
   const verb = VERBS.get(named.name);

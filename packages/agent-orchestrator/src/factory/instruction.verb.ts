@@ -4,6 +4,7 @@
  * bare, and set or cleared in the factory's spec — and `nemia factory instruct`, the text the store keeps, written or cleared. The api's
  * Factory `instruction` and `…InstructionWords` verbs (`objects`' Api) call their handlers by their `input`.
  */
+import { givesNone, renamed } from '../command/requests.verb.ts';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
 import { FactoryInstructionWords } from 'objects';
@@ -165,9 +166,22 @@ const placed = (args: InstructionInput): Effect.Effect<FactoryInstruction, Refus
 export const FACTORY_INSTRUCTION: Command<FactoryInstruction, InstructionInput> = {
   name: 'factory instruction',
   served: [
-    { endpoint: 'factories.instruction' },
-    { endpoint: 'factories.putInstruction', as: 'factory_instruction_put' },
-    { endpoint: 'factories.deleteInstruction', as: 'factory_instruction_delete' },
+    {
+      endpoint: 'factories.instruction',
+      takes: givesNone('path', 'store', 'clear'),
+      request: renamed({ factory: 'name' }, ['path', 'store', 'clear']),
+    },
+    {
+      endpoint: 'factories.putInstruction',
+      as: 'factory_instruction_put',
+      takes: givesNone('clear'),
+      request: renamed({ factory: 'name' }, ['clear']),
+    },
+    {
+      endpoint: 'factories.deleteInstruction',
+      as: 'factory_instruction_delete',
+      request: renamed({ factory: 'name' }, ['path', 'store', 'clear']),
+    },
   ],
   usage: '<name> [--path <path> | --store | --clear]',
   help: [
@@ -225,7 +239,14 @@ type Instructed = FactoryInstruction & { removed?: boolean };
  */
 export const FACTORY_INSTRUCT: Command<Instructed, InstructInput> = {
   name: 'factory instruct',
-  served: [{ endpoint: 'factories.putInstructionWords' }, { endpoint: 'factories.deleteInstructionWords', as: 'factory_instruct_delete' }],
+  served: [
+    { endpoint: 'factories.putInstructionWords', takes: givesNone('clear'), request: renamed({ factory: 'name' }, ['clear']) },
+    {
+      endpoint: 'factories.deleteInstructionWords',
+      as: 'factory_instruct_delete',
+      request: renamed({ factory: 'name' }, ['words', 'clear']),
+    },
+  ],
   usage: '<name> --file <path>|- | --clear',
   help: [
     'write the instruction the store keeps for a factory (- for stdin), what',

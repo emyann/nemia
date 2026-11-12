@@ -993,6 +993,10 @@
       "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`, which a test's seat drops."
     },
     {
+      "term": "Forwarded",
+      "meaning": "the command line run as a client of another machine's api: given `NEMIA_SERVER` and `NEMIA_SERVER_TOKEN` (`FORWARD_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`), which the client sets under a context naming a remote daemon, it parses, checks and prints as ever and calls each command's linked endpoint in place of its handler (`forwardedCall`, `packages/agent-orchestrator/src/command/forward.verb.ts`); a command no endpoint serves is refused."
+    },
+    {
       "term": "Store floor",
       "meaning": "the oldest release that can read the store, recorded in `<WF_ROOT>/store.json` (`readableFrom`, `packages/agent-orchestrator/src/release/archive.store.ts`). Each release says the oldest that reads what it writes (`STORE_READABLE_FROM`, `packages/agent-orchestrator/src/release/floor.ts`); the daemon raises the record to it as it takes the store and never lowers it (`floorAfter`), and `nemia upgrade <tag>` refuses a tag below it, naming the floor (`goingBackRefused`).",
       "type": "Version"

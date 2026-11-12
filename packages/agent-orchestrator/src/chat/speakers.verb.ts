@@ -6,6 +6,7 @@
  * own file (`speakers.json`, `chat.store.ts`), which `chatSay` reads to take an agent's words or refuse them, and `nemia say` reads for
  * an agent that speaks to a step's session with no token (`stepSpeaker`, say.ts).
  */
+import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
@@ -79,7 +80,7 @@ export const CHAT_SPEAKERS: Command<Speakers, SpeakersInput> = {
 /** `nemia chat allow <name>`: an agent may speak in her chat under `name`, its words drawn as its own. Asked of the person every time. */
 export const CHAT_ALLOW: Command<Speakers, SpeakerInput> = {
   name: 'chat allow',
-  served: [{ endpoint: 'nemia.allowSpeaker' }],
+  served: [{ endpoint: 'nemia.allowSpeaker', request: renamed({ name: 'speaker' }) }],
   usage: '<name>',
   help: [
     "let an agent speak in her chat under a name, and to a step's session",
@@ -99,7 +100,7 @@ export const CHAT_ALLOW: Command<Speakers, SpeakerInput> = {
 /** `nemia chat disallow <name>`: no agent speaks in her chat under `name` any more. Asked of the person every time. */
 export const CHAT_DISALLOW: Command<Speakers, SpeakerInput> = {
   name: 'chat disallow',
-  served: [{ endpoint: 'nemia.disallowSpeaker' }],
+  served: [{ endpoint: 'nemia.disallowSpeaker', request: renamed({ name: 'speaker' }) }],
   usage: '<name>',
   help: ['take a name back: words under it are refused. Asked of you every time'],
   spec: nameSpec('disallow'),

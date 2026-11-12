@@ -131,7 +131,8 @@ export { MCP_TRANSPORTS, transportOf, type McpTransport } from 'agent-runtime';
 export { MCP_STATES, McpStateRefused, type McpServerState, type McpServersRead } from 'agent-runtime';
 /**
  * A server's sign-in as the engine holds it: what a sign-in answers at once (`McpSignInStarted`), the words of its state
- * (`SIGN_IN_STATES`, `McpSignInState`), and what the three verbs are refused with (`McpSignInRefused`, `held` where a sign-in waits).
+ * (`SIGN_IN_STATES`, `McpSignInState`), and what the four verbs are refused with (`McpSignInRefused`, `held` where a sign-in waits,
+ * `callback` why a pasted callback was refused).
  */
 export { McpSignInRefused, SIGN_IN_STATES, type McpSignInStarted, type McpSignInState } from 'agent-runtime';
 /**

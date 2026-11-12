@@ -3,6 +3,7 @@
  * folder (`routeAsk`), which wins over the condition's own answer on the next pass (`answeredRoute`). A controller, served on both sides:
  * the api's Run `route` (`POST /api/namespaces/:namespace/runs/:name/steps/:step/route`) calls it with its typed input (`RouteInput`).
  */
+import { renamed } from '../command/requests.verb.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Schema } from 'effect';
@@ -61,7 +62,7 @@ export type RouteInput = typeof RouteInput.Type;
 /** `nemia route`: the route written for the try the condition is on, and the file it is in. */
 export const ROUTE: Command<{ step: string; try: number; route: string; at: string; file: string }, RouteInput> = {
   name: 'route',
-  served: [{ endpoint: 'runs.route' }],
+  served: [{ endpoint: 'runs.route', request: renamed({ runId: 'name' }) }],
   usage: '<runId> <condition> <route>',
   help: [
     'route a condition by hand: the next tick takes your route over the',

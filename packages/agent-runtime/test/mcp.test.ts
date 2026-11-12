@@ -92,6 +92,12 @@ const configsUnder = (root: string) =>
 const CLAUDES = ['claude'] as const;
 
 /**
+ * A placeholder token, which `claude auth status` reads as signed in (`docs/harness.md`): a spawn refused for its checkout is refused for
+ * that, past the sign-in check, on a machine signed out as on one signed in.
+ */
+const SIGNED_IN_BY_PLACEHOLDER = { CLAUDE_CODE_OAUTH_TOKEN: 'a-placeholder-token' };
+
+/**
  * The servers a job is given, and how, read off the options its own process builds from its spawn request (`attachedOptions`):
  * `servers` is `Options.mcpServers`, `strict` whether nothing else loads, and `chrome` whether the operator's Chrome is left on.
  * A job names no `--mcp-config` at all — there is no argv of ours on that road — so what it loads is read here and the files it
@@ -264,7 +270,7 @@ type Refusal = { name: string; refused: (t: Waiter) => Promise<string | undefine
 const REFUSALS: readonly Refusal[] = [
   ...CLAUDES.map((harness) => ({
     name: `${harness}: a checkout whose .mcp.json is not JSON is refused before anything runs, naming the file`,
-    refused: (t: Waiter) => unstartable(t, { cwd: brokenCheckout(), harness }),
+    refused: (t: Waiter) => unstartable(t, { cwd: brokenCheckout(), harness, config: { env: SIGNED_IN_BY_PLACEHOLDER } }),
     names: ['.mcp.json is not valid JSON', 'remove it from the checkout'],
   })),
   ...[...CLAUDES, 'codex'].flatMap((harness) => [

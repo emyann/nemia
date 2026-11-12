@@ -12,7 +12,11 @@
  *
  * A verb about this machine (`MACHINE_VERBS`, the distribution intent's Q6) runs on this machine whatever the context: its login
  * service, its releases, a daemon of its own, a pass, its tokens, and the files it reads and writes and no store (`template`,
- * `frontmatter`, `admit`).
+ * `frontmatter`, `admit`). `nemia upgrade` is among them as before: it upgrades this machine's install under every context, a remote
+ * one included. The server a context names is upgraded by another verb, `nemia server upgrade [<tag> | --back]`: `server`, one of the
+ * client's own verbs (`CLIENT_VERBS`), asks that server's api (`POST /api/upgrades`) under every context, its help included, by the
+ * laws for a client verb below (`clientVerbsAskTheApi`), so the same words never upgrade one machine under one context and another
+ * under the next.
  *
  * The verb lists, `Route` and `Routed` are `src/route.ts`'s, imported here: no shipped source reads a value of a contract, which loads
  * the verifier (`tools/guards/test/no-contract-values.test.ts`).

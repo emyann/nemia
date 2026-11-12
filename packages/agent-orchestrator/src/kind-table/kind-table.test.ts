@@ -155,7 +155,7 @@ test("a skill's row: its description from its entry where its spec has none, its
           entry: { id: 'git', name: 'git', description: 'Keep work in git.', tags: [] },
           preload: true,
           cost: { preload: true, listed: 10, body: 900, perTurn: 910 },
-          usedBy: [{ from: 'repo', name: 'grace' }],
+          usedBy: [{ from: 'repo', name: 'implementer' }],
           shadowedBy: 'factory',
         },
       }),
@@ -169,7 +169,7 @@ test("a skill's row: its description from its entry where its spec has none, its
     Note: 'shadowed by factory',
     Preload: 'preload',
     Cost: '910 tokens a turn',
-    'Used by': 'repo/grace',
+    'Used by': 'repo/implementer',
     Tags: 'vcs, git',
   });
 });
@@ -179,12 +179,12 @@ test("a factory's row: the default's sentence, one that does not read, one with 
     page('FactoryList', [
       factoryOf('default'),
       factoryOf('broken', { status: { error: 'factory.yaml does not parse\nat line 3' } }),
-      factoryOf('nemia', {
+      factoryOf('acme', {
         spec: {
           repos: ['/r/one', '/r/two'],
           workflows: ['quick', 'build'],
-          hires: { review: 'agora', implement: 'grace' },
-          template: { source: 'sdlc', version: '1.2.0', params: {} },
+          hires: { review: 'reviewer', implement: 'implementer' },
+          template: { source: 'starter', version: '1.2.0', params: {} },
           revisions: 'follow',
           costLines: { build: 80 },
           volumes: [{ name: 'cache', path: '/v', readOnly: true }],
@@ -204,16 +204,16 @@ test("a factory's row: the default's sentence, one that does not read, one with 
   assert.match(String(cellsOf(table, 0).Note), /names no factory/);
   assert.equal(cellsOf(table, 0).Workflows, 'all');
   assert.equal(cellsOf(table, 1).Note, 'factory.yaml does not parse');
-  const nemia = cellsOf(table, 2);
-  assert.equal(nemia.Repositories, '/r/one, /r/two');
-  assert.match(String(nemia.Note), /Claude Code: \/r\/one/);
-  assert.match(String(nemia.Note), /ConflictsPending True/);
-  assert.doesNotMatch(String(nemia.Note), /Applied True/);
-  assert.equal(nemia.Workflows, 'build, quick');
-  assert.equal(nemia.Hires, 'implement ← grace, review ← agora');
-  assert.match(String(nemia.Template), /^sdlc 1\.2\.0, applied at 1\.2\.0$/);
-  assert.equal(nemia['Cost lines'], 'build $80.00');
-  assert.match(String(nemia.Volumes), /\/v/);
+  const acme = cellsOf(table, 2);
+  assert.equal(acme.Repositories, '/r/one, /r/two');
+  assert.match(String(acme.Note), /Claude Code: \/r\/one/);
+  assert.match(String(acme.Note), /ConflictsPending True/);
+  assert.doesNotMatch(String(acme.Note), /Applied True/);
+  assert.equal(acme.Workflows, 'build, quick');
+  assert.equal(acme.Hires, 'implement ← implementer, review ← reviewer');
+  assert.match(String(acme.Template), /^starter 1\.2\.0, applied at 1\.2\.0$/);
+  assert.equal(acme['Cost lines'], 'build $80.00');
+  assert.match(String(acme.Volumes), /\/v/);
 });
 
 test("an MCP server's row: unread where never read, its tools counted, its headers named and never their values", () => {

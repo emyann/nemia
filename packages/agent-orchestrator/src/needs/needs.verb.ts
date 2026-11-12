@@ -10,7 +10,6 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { Context, Effect, Layer, type Duration } from 'effect';
 import type { Need, NeedState } from 'objects';
-import { sweepLoop } from '../forget/prune/free.verb.ts';
 import { pathLedByTools, StoreRoot, toolsDir } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { FactoryListing } from '../factory/factory.ts';
@@ -223,12 +222,6 @@ const fixWords = (need: Need, fromPlace: boolean, workflow: { factory: string; w
   if (fromPlace || workflow !== undefined) return fixCommandOf(need.name, workflow);
   return first.command;
 };
-
-/**
- * The sweep, for as long as the daemon runs: `needsOnce` over `memo`, then a rest of `NEEDS_EVERY` (`sweepLoop`). A sweep that fails
- * keeps the readings it had: a check that cannot be read holds nothing new.
- */
-export const needs = (memo: NeedsMemo) => sweepLoop(() => needsOnce(memo), NEEDS_EVERY, "The machine's needs could not be read this sweep");
 
 /** Where the memory's version stands for `run`: what the informer keeps beside a run that has filed nothing, and none for any other. */
 export const needsVersionOf = (memo: NeedsMemo | undefined, run: Run): number | undefined =>

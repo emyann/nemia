@@ -1,10 +1,9 @@
 /**
  * What kind of address a bind names, and whether the daemon may listen there unasked (`contracts/address-kind.contract.ts`): the parse
  * of a text (`addressParsed`), its kind (`addressKind`), whether a bind of that kind is listened on or waits on the person's
- * acknowledgement (`bindExposure`), and this machine's own addresses with their kinds (`machineAddresses`), which `nemia service
+ * acknowledgement (`bindExposure`), and a machine's addresses with their kinds (`machineAddresses`), which `nemia service
  * addresses` lists and the installer offers. `nemia service install --bind` and the api's start judge a bind by the same two.
  */
-import os from 'node:os';
 import type { AddressKind } from 'objects';
 import type { AddressKindOf, BindExposure, Exposure, Parsed } from '../../contracts/address-kind.contract.ts';
 
@@ -111,8 +110,13 @@ export type MachineAddress = {
   readonly kind: AddressKind;
 };
 
-/** This machine's addresses with their kinds, as `os.networkInterfaces` gives them (or `interfaces` given), loopback first. */
-export const machineAddresses = (interfaces: NodeJS.Dict<os.NetworkInterfaceInfo[]> = os.networkInterfaces()): readonly MachineAddress[] =>
+/** An interface's address as `os.networkInterfaces` gives it, the two fields read here. */
+export type InterfaceAddress = { readonly address: string; readonly family: string };
+
+/** A machine's addresses with their kinds, from its interfaces as `os.networkInterfaces` gives them, loopback first. Pure. */
+export const machineAddresses = (
+  interfaces: Readonly<Record<string, readonly InterfaceAddress[] | undefined>>,
+): readonly MachineAddress[] =>
   Object.entries(interfaces)
     .flatMap(([name, infos]) =>
       (infos ?? []).map((info) => ({

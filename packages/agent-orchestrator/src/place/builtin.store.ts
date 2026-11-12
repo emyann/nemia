@@ -6,7 +6,6 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import type { Need } from 'objects';
 import { gitPlace } from '../../place/git/place.ts';
 import { PlaceService, type Place } from './place.store.ts';
 import { PLACE_SKILLS } from '../skills/read.store.ts';
@@ -24,12 +23,6 @@ export const meteredPlace = (place: Place): Place => ({
 
 /** The git place, metered: one object for every factory and repository of the process it is given to. */
 export const builtinGitPlace: Place = meteredPlace(gitPlace({ started: countSpawn }));
-
-/**
- * The machine needs the places Nemia ships declare (`PlaceDeclared.needs`): the git place's. Their fixes are started for any caller with a
- * person's token (`fixRefusal`), and a template's workflow need may fill one (`fills`).
- */
-export const builtinPlaceNeeds = (): readonly Need[] => builtinGitPlace.declared.needs ?? [];
 
 /** `builtinGitPlace` as the layer a program is given it by. */
 export const gitPlaceLayer = PlaceService.layer(builtinGitPlace);

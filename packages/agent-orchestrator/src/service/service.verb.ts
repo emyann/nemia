@@ -625,7 +625,7 @@ export const ADDRESSES: Command<Addresses> = {
   writes: false,
   class: 'read',
   only: { side: 'cli', why: 'it reads the network interfaces of the machine the command runs on' },
-  handler: () => Effect.sync(() => ({ addresses: machineAddresses() })),
+  handler: () => Effect.sync(() => ({ addresses: machineAddresses(os.networkInterfaces()) })),
   print: (data, args) =>
     args.json === true
       ? [JSON.stringify({ addresses: data.addresses })]

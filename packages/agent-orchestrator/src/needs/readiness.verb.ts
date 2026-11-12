@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from 'agent-runtime';
+import { codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from '../runtime-client.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';

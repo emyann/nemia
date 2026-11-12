@@ -38,8 +38,8 @@ test('a text that is no address parses to nothing; an IPv6 text to its eight gro
 
 test("this machine's addresses come with their kinds, loopback first", () => {
   const listed = machineAddresses({
-    eth0: [{ address: '192.168.1.20', family: 'IPv4', netmask: '', mac: '', internal: false, cidr: null }],
-    lo: [{ address: '127.0.0.1', family: 'IPv4', netmask: '', mac: '', internal: true, cidr: null }],
+    eth0: [{ address: '192.168.1.20', family: 'IPv4' }],
+    lo: [{ address: '127.0.0.1', family: 'IPv4' }],
   });
   assert.deepEqual(
     listed.map((a) => [a.interface, a.kind]),

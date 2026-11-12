@@ -378,3 +378,9 @@ export const sayFilled = (template: string, holes: Readonly<Record<string, strin
 /** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
 export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>
   'refused' in outcome ? outcome.refused : outcome.unread.said;
+
+/**
+ * The names of the needs the places Nemia ships declare (`PlaceDeclared.needs`), which a template's workflow need may fill (`fills`): read
+ * by the template's check, which reaches no place's code, and held equal to the git place's declaration by `src/place/place.store.test.ts`.
+ */
+export const SHIPPED_PLACE_NEEDS: readonly string[] = ['git-identity'];

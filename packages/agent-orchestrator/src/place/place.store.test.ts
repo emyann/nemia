@@ -7,7 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cause, Effect } from 'effect';
-import { sayFilled, type PlaceAnswers, type PlaceOutcome } from './place.ts';
+import { SHIPPED_PLACE_NEEDS, sayFilled, type PlaceAnswers, type PlaceOutcome } from './place.ts';
+import { builtinGitPlace } from './builtin.store.ts';
 import { PlaceService, STOP_GRACE_MS, openPlace, stoppedWords, threwWords, trialMerges, type Place } from './place.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { placeOver, unreadBy } from '../../test/place-over.ts';
@@ -139,4 +140,11 @@ test("sayFilled fills each hole it is handed, and leaves a hole it is not, and a
   assert.equal(sayFilled('git -C {path} switch -c <branch>', { path: '/w' }), 'git -C /w switch -c <branch>');
   assert.equal(sayFilled('git -C {repo} status', { path: '/w' }), 'git -C {repo} status');
   assert.equal(sayFilled('{toString} {path}', { path: '/w' }), '{toString} /w', 'a name the holes only inherit is no hole they name');
+});
+
+test("the needs the template's check knows the shipped places by are the git place's own, by name", () => {
+  assert.deepEqual(
+    (builtinGitPlace.declared.needs ?? []).map((need) => need.name),
+    SHIPPED_PLACE_NEEDS,
+  );
 });

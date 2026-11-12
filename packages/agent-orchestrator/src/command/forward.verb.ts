@@ -17,6 +17,7 @@ import {
   DEFAULT_NAMESPACE,
   endpointKeysOf,
   type EndpointKeys,
+  jsonBodied,
   keysOfEndpoint,
   Forbidden as ForbiddenAnswer,
   Invalid as InvalidAnswer,
@@ -72,16 +73,6 @@ export function partsOf(
     payload: pick(keys.payloadKeys),
   };
 }
-
-/**
- * `request`, where it is a write the typed client gives no body (an endpoint with no payload), with `{}` as its body, sent as
- * `content-type: application/json`: the api's write guard refuses a write without that header, as a body any page could send; a read, and
- * a write with a body of its own, as it is.
- */
-export const jsonBodied = (request: HttpClientRequest.HttpClientRequest): HttpClientRequest.HttpClientRequest =>
-  request.method === 'GET' || request.method === 'HEAD' || request.body._tag !== 'Empty'
-    ? request
-    : HttpClientRequest.bodyJsonUnsafe(request, {});
 
 /**
  * The typed client of the `Api` at `forwarded`'s server: each bodiless write sent as JSON (`jsonBodied`), each request presenting its token

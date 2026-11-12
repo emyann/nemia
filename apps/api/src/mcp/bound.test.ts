@@ -15,8 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { CLI_VERBS, Informer, informerMemo, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
@@ -125,10 +124,16 @@ const settled = () => {
   });
 };
 
-/** The SDK's client connected to `/mcp` of this file's app, presenting the person's token. */
-async function connected(): Promise<Client> {
+/**
+ * The SDK's client connected to `/mcp` of this file's app, presenting the person's token: by `initialize` (2025-11-25, the client's
+ * default), or pinned to 2026-07-28 where `modern`.
+ */
+async function connected(modern = false): Promise<Client> {
   const on = app();
-  const client = new Client({ name: 'bound-test', version: '0.0.0' });
+  const client = new Client(
+    { name: 'bound-test', version: '0.0.0' },
+    modern ? { versionNegotiation: { mode: { pin: '2026-07-28' } } } : {},
+  );
   await client.connect(
     new StreamableHTTPClientTransport(new URL('http://127.0.0.1:8787/mcp'), {
       fetch: async (url: string | URL, init?: RequestInit) => on.request(url, init),
@@ -165,27 +170,29 @@ test('every list tool, called with its path alone on a store of a planted size, 
   }
 });
 
-test('ls answers a run a line, its status, cost, waits and steps among the columns, a page at a time with the token of the next', async () => {
-  settled();
-  const client = await connected();
-  const first = await call(client, 'ls');
-  const lines = first.text.split('\n');
-  const header = lines[0] ?? '';
-  for (const column of ['NAME', 'STATUS', 'COST', 'WAITS', 'STEPS']) assert.ok(header.includes(column), `the header names ${column}`);
-  assert.equal(first.structured, undefined, 'the lines alone, never the runs as objects');
-  const more = lines.at(-1) ?? '';
-  const token = /continue (\S+)$/.exec(more)?.[1];
-  assert.ok(token, `a last line names the next page's token: ${more}`);
-  const runLines = (text: string) => text.split('\n').filter((l) => l.startsWith('r-'));
-  assert.equal(runLines(first.text).length, PORT_PAGE, 'a page of the port, where the call gives no limit');
-  const names = new Set(runLines(first.text).map((l) => l.split(' ')[0]));
-  for (let next: string | undefined = token; next !== undefined;) {
-    const page = await call(client, 'ls', { continue: next });
-    for (const l of runLines(page.text)) names.add(l.split(' ')[0]);
-    next = /continue (\S+)$/.exec(page.text.split('\n').at(-1) ?? '')?.[1];
-  }
-  for (const id of BIG_RUNS) assert.ok(names.has(id), `${id} is listed on some page`);
-});
+for (const modern of [false, true])
+  test(`${modern ? '2026-07-28' : '2025-11-25'}: ls answers a run a line, its status, cost, waits and steps among the columns, a page at a time with the token of the next`, async () => {
+    settled();
+    const client = await connected(modern);
+    assert.equal(client.getProtocolEra(), modern ? 'modern' : 'legacy');
+    const first = await call(client, 'ls');
+    const lines = first.text.split('\n');
+    const header = lines[0] ?? '';
+    for (const column of ['NAME', 'STATUS', 'COST', 'WAITS', 'STEPS']) assert.ok(header.includes(column), `the header names ${column}`);
+    assert.equal(first.structured, undefined, 'the lines alone, never the runs as objects');
+    const more = lines.at(-1) ?? '';
+    const token = /continue (\S+)$/.exec(more)?.[1];
+    assert.ok(token, `a last line names the next page's token: ${more}`);
+    const runLines = (text: string) => text.split('\n').filter((l) => l.startsWith('r-'));
+    assert.equal(runLines(first.text).length, PORT_PAGE, 'a page of the port, where the call gives no limit');
+    const names = new Set(runLines(first.text).map((l) => l.split(' ')[0]));
+    for (let next: string | undefined = token; next !== undefined;) {
+      const page = await call(client, 'ls', { continue: next });
+      for (const l of runLines(page.text)) names.add(l.split(' ')[0]);
+      next = /continue (\S+)$/.exec(page.text.split('\n').at(-1) ?? '')?.[1];
+    }
+    for (const id of BIG_RUNS) assert.ok(names.has(id), `${id} is listed on some page`);
+  });
 
 test('inbox answers the cards in play alone unless asked for every one, a card a line and never its body; inbox_card reads one whole', async () => {
   settled();

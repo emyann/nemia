@@ -1,10 +1,12 @@
 /**
- * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable
- * HTTP, built afresh for each request (the SDK's low-level `Server` and its web-standard transport, no session), serving the tools
- * generated from the command table (`portTools`, tools.ts). A call of a tool is a request to the endpoint its verb links, presenting the
- * caller's own `Authorization`, handed to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and
- * nothing of tokens or refusals is said again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else
- * is the tool's error, in the api's own words, which say what to do next.
+ * The MCP port, `/mcp`: how a coding agent on another machine operates this store. A stateless MCP server over Streamable HTTP, served
+ * by the SDK's `createMcpHandler` in both eras — 2026-07-28 (`server/discover`, each request carrying its version in `_meta`, every
+ * result its `resultType`, the tool list its `ttlMs` and `cacheScope`) and 2025-11-25 (`initialize`, each request answered on its own) —
+ * a fresh low-level `Server` for each request (`portServer`), serving the tools generated from the command table (`portTools`,
+ * tools.ts) in its order. A call of a tool is a request to the endpoint its verb links, presenting the caller's own `Authorization`,
+ * handed to the app's own `fetch`: every middleware, refusal and memo applies to it as to any client, and nothing of tokens or refusals
+ * is said again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else is the tool's error, in the
+ * api's own words, which say what to do next.
  *
  * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults
  * its link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
@@ -12,14 +14,12 @@
  * page past it is asked again shorter, and any other answer past it refused with how to narrow it, never cut.
  *
  * The caller's token is the gate's before this is reached (`callerGate`, caller/caller.ts: `/mcp` needs a person's). While a call is
- * pending, a client that gave a progress token is told progress every 30 s (`PROGRESS_EVERY_MS`), so a host that ends a silent call
- * (`nemia wait`, up to four minutes and a half) hears it is alive.
+ * pending, a client that gave a progress token is told progress at once, so its answer streams from its start, and then every 30 s
+ * (`PROGRESS_EVERY_MS`), so a host that ends a silent call (`nemia wait`, up to four minutes and a half) hears it is alive.
  */
 import { Effect, Schedule } from 'effect';
 import type { Context } from 'hono';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { type CallToolResult, CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { type CallToolResult, createMcpHandler, Server } from '@modelcontextprotocol/server';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
@@ -29,13 +29,19 @@ import { type PortTool, portTools } from './tools.ts';
 /** How often a pending call is told as progress, where its caller gave a progress token: under any host's idle bound. */
 export const PROGRESS_EVERY_MS = 30_000;
 
+/**
+ * How long a 2026-07-28 host may answer the port's `tools/list` from its cache (`ttlMs`): five minutes, the spec's own example, so a
+ * daemon upgraded under a connected host shows its tools within that. A 2025-11-25 host is given none: that era has no such field.
+ */
+export const PORT_LIST_TTL_MS = 300_000;
+
 /** What the port calls a tool's endpoint through: the app it is mounted on. */
 export type Fetching = { readonly fetch: (request: Request) => Response | Promise<Response> };
 
 /** The port's knobs: how often a pending call is told as progress (`PROGRESS_EVERY_MS` unless a test gives a shorter one). */
 export type PortOptions = { readonly progressEveryMs?: number };
 
-/** What the server says of itself on `initialize`, beside its instructions (`PORT_INSTRUCTIONS`, instructions.ts). */
+/** What the server says of itself on `initialize` and `server/discover`, beside its instructions (`PORT_INSTRUCTIONS`, instructions.ts). */
 const SERVER_INFO = { name: 'nemia', version: '1' };
 
 /** A value of a call's arguments as a path segment or a query value says it: a string as it is, anything else as its JSON. */
@@ -180,12 +186,6 @@ export async function called(
   }
 }
 
-/** Whether `body`, a JSON-RPC message or a batch, holds a call that asked to be told progress: its answer is then a stream. */
-const asksProgress = (body: unknown): boolean =>
-  (Array.isArray(body) ? body : [body]).some(
-    (m) => isRecord(m) && isRecord(m.params) && isRecord(m.params._meta) && m.params._meta.progressToken !== undefined,
-  );
-
 /** A tool as `tools/list` says it: its name, description, input and hints, and nothing of how the port calls it. */
 const listed = (tool: PortTool) => ({
   name: tool.name,
@@ -195,55 +195,59 @@ const listed = (tool: PortTool) => ({
 });
 
 /**
- * The handler of `/mcp`, calling the app `appOf` gives (the app it is mounted on: `mcpPort(() => app)` in app.ts). A POST is one
- * JSON-RPC message or a batch, answered as JSON, or as a stream where a call asked to be told progress; any other method is a 405, as a
- * stateless server opens no stream of its own. The tools are generated once, as the handler is made.
+ * The server that answers one request of `/mcp`, in whichever era it speaks (the SDK's `createMcpHandler` asks for one per request):
+ * it says what Nemia is (`PORT_INSTRUCTIONS`) on `initialize` and on `server/discover`, lists `tools` in the order given, each list
+ * cacheable by its caller alone for `PORT_LIST_TTL_MS` on 2026-07-28, and answers a call through `app` (`called`), presenting the
+ * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
+ * go beside these.
+ */
+export function portServer(tools: readonly PortTool[], appOf: () => Fetching, progressEveryMs: number): Server {
+  const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
+  const list = tools.map(listed);
+  const server = new Server(SERVER_INFO, {
+    capabilities: { tools: {} },
+    instructions: PORT_INSTRUCTIONS,
+    cacheHints: { 'tools/list': { ttlMs: PORT_LIST_TTL_MS, cacheScope: 'private' } },
+  });
+  server.setRequestHandler('tools/list', () => ({ tools: list }));
+  server.setRequestHandler('tools/call', async ({ params }, ctx) => {
+    const tool = byName.get(params.name);
+    if (tool === undefined) return failed(`${params.name} is no tool of this port: list them (tools/list) and call one of those`);
+    const from = ctx.http?.req;
+    if (from === undefined) return failed(`${tool.name} is called over HTTP alone: POST the call to the api's /mcp`);
+    const call = Effect.promise(() => called(tool, params.arguments ?? {}, from, appOf(), ctx.mcpReq.signal));
+    const token = ctx.mcpReq._meta?.progressToken;
+    if (token === undefined) return Effect.runPromise(call);
+    let progress = 0;
+    const told = Effect.promise(() =>
+      ctx.mcpReq
+        .notify({
+          method: 'notifications/progress',
+          params: { progressToken: token, progress: ++progress, message: `${tool.name} is still running` },
+        })
+        .catch(() => undefined),
+    );
+    const beat = told.pipe(Effect.delay(progressEveryMs), Effect.repeat(Schedule.spaced(progressEveryMs)));
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        yield* told;
+        yield* Effect.forkScoped(beat);
+        return yield* call;
+      }).pipe(Effect.scoped),
+    );
+  });
+  return server;
+}
+
+/**
+ * The handler of `/mcp`, calling the app `appOf` gives (the app it is mounted on: `mcpPort(() => app)` in app.ts): the SDK's serving
+ * entry, made once, a fresh `portServer` for each request. A 2026-07-28 request (its version in `_meta`, `server/discover` among them)
+ * is answered as JSON, or as a stream where its call is told progress; a 2025-11-25 one (`initialize`, then each request on its own)
+ * by the SDK's stateless leg, which streams; a GET or a DELETE is a 405, as the port keeps no stream or session of its own. The tools
+ * are generated once, as the handler is made, in the command table's order.
  */
 export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVERY_MS }: PortOptions = {}) {
   const tools = portTools(TABLE, CLI_VERBS, Api);
-  const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
-  return async (c: Context): Promise<Response> => {
-    if (c.req.method !== 'POST')
-      return c.json(
-        { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'The port keeps no stream: POST each JSON-RPC message to /mcp' } },
-        405,
-        { allow: 'POST' },
-      );
-    const from = c.req.raw;
-    const body: unknown = await from
-      .clone()
-      .json()
-      .catch(() => undefined);
-    const server = new Server(SERVER_INFO, { capabilities: { tools: {} }, instructions: PORT_INSTRUCTIONS });
-    server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: tools.map(listed) }));
-    server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
-      const tool = byName.get(params.name);
-      if (tool === undefined) return failed(`${params.name} is no tool of this port: list them (tools/list) and call one of those`);
-      const call = Effect.promise(() => called(tool, params.arguments ?? {}, from, appOf(), extra.signal));
-      const token = params._meta?.progressToken;
-      if (token === undefined) return Effect.runPromise(call);
-      let progress = 0;
-      const told = Effect.promise(() =>
-        extra
-          .sendNotification({
-            method: 'notifications/progress',
-            params: { progressToken: token, progress: ++progress, message: `${tool.name} is still running` },
-          })
-          .catch(() => undefined),
-      );
-      const beat = told.pipe(Effect.delay(progressEveryMs), Effect.repeat(Schedule.spaced(progressEveryMs)));
-      return Effect.runPromise(
-        Effect.gen(function* () {
-          yield* Effect.forkScoped(beat);
-          return yield* call;
-        }).pipe(Effect.scoped),
-      );
-    });
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: !asksProgress(body),
-    });
-    await server.connect(transport);
-    return transport.handleRequest(from, body === undefined ? {} : { parsedBody: body });
-  };
+  const handler = createMcpHandler(() => portServer(tools, appOf, progressEveryMs), { legacy: 'stateless', responseMode: 'auto' });
+  return (c: Context): Promise<Response> => handler.fetch(c.req.raw);
 }

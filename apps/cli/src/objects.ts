@@ -4,7 +4,8 @@
  * read asks it once through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
  *
  * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`, `Forbidden`, `Unauthorized`) is the api's own words, exit 2,
- * but a `Conflict`, a stale version, exit 1. Every request carries the token this client calls with (`callerToken`). A 404 whose body is no refusal is a daemon older than this client, refused naming the restart; another status the `Api` declares no
+ * but a `Conflict`, a stale version, exit 1. Every request carries the token this client calls with (`callerToken`). A 404 whose
+ * body is no refusal is a daemon older than this client, refused naming the restart; another status the `Api` declares no
  * error for is said in the api's words where it gave some (`Answered`); an answer that does not decode as the `Api` says is one too,
  * the daemon and this client being of two builds. A call the api takes and does not answer within `READ_BOUND_MS` gives up, refused
  * naming the service's status and its restart: it starts no daemon, since one holds the port and took the request.

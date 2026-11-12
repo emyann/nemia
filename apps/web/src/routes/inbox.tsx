@@ -194,8 +194,8 @@ function NoneShown({ ended, over }: { ended: boolean; over: number }) {
 }
 
 /**
- * The tick's last try of a card's start (`Tried`), saying the repository its factory picks for it, which the Card does not carry: read off
- * the factories (`factoryRepoOf`).
+ * The tick's last try of a card's start (`Tried`), saying the repository its factory wires for the card's workflow, which the Card does not
+ * carry: read off the factories with their wiring (`factoryRepoOf`).
  */
 function TriedHere({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
   const factories = useQuery(factoriesQuery).data;

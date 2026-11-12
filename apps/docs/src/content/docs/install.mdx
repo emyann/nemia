@@ -110,6 +110,10 @@ it from standard input. The token is kept in `~/.agent-workflows/claude-token`, 
 starts, however it was started. `nemia claude-token status` says whether one is set, never the token itself, and
 `nemia claude-token rm` takes it away. Nemia never sends, logs or serves it, and the board never asks for it.
 
+With no token set, and no sign-in of Claude Code's own, a Claude session does not start: it ends saying nothing started, and names
+`claude setup-token`. The daemon reads the token when it starts, so start it again after `nemia claude-token set`, then try the step
+again. The check sees only that a token is there: a token that has expired or been revoked still shows at the session's first request.
+
 Each person uses their own token, on their own machine. A server that others use while it runs on one person's token makes that
 person's account available to them, which Anthropic's
 [Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section 2, _Account creation and access_, forbid: "You also

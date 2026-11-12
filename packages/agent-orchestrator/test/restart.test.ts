@@ -29,6 +29,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { runGiven, runOver } from './placed.ts';
+import { gatedJob } from './gated-job.ts';
 import { engine, startRun, tickRun, runWith as runEngine } from '../src/runner.ts';
 import { runRecord, rewriteRun } from '../src/record/record.store.ts';
 
@@ -55,8 +56,9 @@ const T0 = Date.parse('2026-09-25T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
 /**
- * A fake `claude` and `codex` on PATH, sessions that run until their gate opens, and the run files of the two jobs the old engine
- * started, which the test writes as their workers write them, each beaten again before a pass so its lease holds.
+ * A fake Claude Code named the jobs' own (`gatedJob`) and a fake `codex` on PATH, sessions that run until their gate opens, and the run
+ * files of the two jobs the old engine started, which the test writes as their workers write them, each beaten again before a pass so
+ * its lease holds.
  */
 const fakes = () => {
   const bin = scratch('wf-restart-bin-');
@@ -66,23 +68,7 @@ const gate = require('node:path').join(${JSON.stringify(gates)}, ${prompt});
 const wait = () => (fs.existsSync(gate) ? process.exit(0) : setTimeout(wait, 50));
 wait();
 `;
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-let got = '';
-process.stdin.on('data', (c) => {
-  got += c;
-  const nl = got.indexOf('\\n');
-  if (nl === -1) return;
-  process.stdin.pause();
-  const prompt = JSON.parse(got.slice(0, nl)).message.content;
-  ${runUntilGate('prompt')}
-});
-`,
-    { mode: 0o755 },
-  );
+  gatedJob(bin, gates);
   fs.writeFileSync(
     path.join(bin, 'codex'),
     `#!${process.execPath}

@@ -285,13 +285,24 @@ test('the server starts as configured, from the repository root, and offers brow
   }
 });
 
-/** A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`. */
+/**
+ * A fake `claude` in a new folder, first on PATH while `f` runs: it writes the argv of the session it is started for to `args`, and
+ * answers `auth status` signed in, as the runtime asks before a job's spawn.
+ */
 const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>): Promise<T> => {
   const bin = scratch('wf-mcp-bin-');
   const args = path.join(bin, 'args');
   fs.writeFileSync(
     path.join(bin, 'claude'),
-    ['#!/bin/sh', 'case "$1" in', '  agents) echo "[]" ;;', `  *) printf '%s\\n' "$@" > '${args}'; exit 1 ;;`, 'esac', ''].join('\n'),
+    [
+      '#!/bin/sh',
+      'case "$1" in',
+      '  agents) echo "[]" ;;',
+      `  auth) echo '{"loggedIn":true}' ;;`,
+      `  *) printf '%s\\n' "$@" > '${args}'; exit 1 ;;`,
+      'esac',
+      '',
+    ].join('\n'),
     { mode: 0o755 },
   );
   const prev = process.env.PATH;

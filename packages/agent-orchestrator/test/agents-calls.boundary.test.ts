@@ -1,7 +1,7 @@
 /**
  * What a pass asks Claude Code, at shipped defaults: the client's `engine(ENV)` and `tick()`, over a run started from a workflow
  * folder, so `advance` reads every step in flight as the daemon does. A fake `claude` first on PATH counts each `claude agents` call, and a
- * job reads its brief and runs until the test ends it.
+ * job, on the same fake named its Claude Code (`gatedJob`), runs until the test stops it.
  *
  * A `claude agents` call costs about 0.2-0.4 s, and every Claude Code session is a job, read off its run file: a pass asks it nothing, and
  * `advance` reads the views the runtime's pass reported (`reportedEngine`) rather than viewing each step in flight, which would observe
@@ -24,6 +24,7 @@ import { engine, startRun, tickRun, runWith as runEngine, gitPlaceLayer } from '
 import { runRecord } from '../src/record/record.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { gatedJob } from './gated-job.ts';
 
 const ROOT = scratch('wf-agents-calls-');
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
@@ -49,34 +50,22 @@ const folder = (keys = '') => {
   return dir;
 };
 
-/** The fake `claude`, and the count of `claude agents` calls. */
+/**
+ * The fake `claude` first on PATH, named the jobs' own Claude Code too (`gatedJob`), and the count of its `claude agents` calls. A job
+ * holds until the test stops it: its gate, named by its brief, is never opened.
+ */
 const fakes = () => {
   const bin = scratch('wf-agents-calls-bin-');
   const counter = path.join(bin, 'agents-calls');
-  const ended = path.join(bin, 'ended');
   fs.writeFileSync(counter, '');
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-if (args[0] === 'agents') {
+  const head = `if (args[0] === 'agents') {
   fs.appendFileSync(${JSON.stringify(counter)}, 'agents\\n');
   process.stdout.write('[]');
-} else {
-  // A job: reads its brief, the first line on its stdin, and runs until the test is over.
-  process.stdin.once('data', () => process.stdin.pause());
-  const wait = () => (fs.existsSync(${JSON.stringify(ended)}) ? process.exit(0) : setTimeout(wait, 50));
-  wait();
-}
-`,
-    { mode: 0o755 },
-  );
+  process.exit(0);
+}`;
+  gatedJob(bin, scratch('wf-agents-calls-gates-'), head);
   process.env.PATH = `${bin}:${process.env.PATH}`;
-  return {
-    agentsCalls: () => fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean).length,
-    end: () => fs.writeFileSync(ended, ''),
-  };
+  return { agentsCalls: () => fs.readFileSync(counter, 'utf8').split('\n').filter(Boolean).length };
 };
 
 const fake = fakes();
@@ -136,7 +125,6 @@ test('a job left running across a restart is read at work on the first pass of a
 });
 
 test('the board drains', WAITED, async (t) => {
-  fake.end();
   await Effect.runPromise(e.stop(taskOf(jobRun.id)));
   await until(
     t,

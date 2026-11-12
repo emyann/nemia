@@ -376,6 +376,23 @@ transcript saved, when it has one" (`sdk.d.ts:6182-6185`); this is what that sav
   was 0.00037, its own turn alone. So a holder that kills its sessions' Claude Code loses what they spent, which is why the let-go ends
   them through the SDK (`parked`, `harness/claude/attached.ts`) and kills only what outlives its bound.
 
+## `claude auth status`
+
+What tells, without starting a session, whether this machine's Claude Code holds a credential: what a job's spawn asks
+(`harness/claude/sign-in.ts`). Measured on the SDK's bundled Claude Code **2.1.322, 2026-11-12**, by the operator and again by the
+implement step:
+
+- **Signed in through claude.ai**: JSON on stdout, `loggedIn: true`, `authMethod: claude.ai`, exit 0.
+- **Signed out** (a `CLAUDE_CONFIG_DIR` with no login, no token in the environment): `loggedIn: false`, `authMethod: none`, exit 1.
+- **A placeholder `CLAUDE_CODE_OAUTH_TOKEN`** under that same empty config: `loggedIn: true`, `authMethod: oauth_token`,
+  `loginExpiresAt: null`, exit 0. The command reads a credential's presence, never its validity: a setup-token that has expired (they
+  last a year), been revoked or mistyped reads signed in, and fails at the session's first request.
+
+The CLI reference documents it (<https://code.claude.com/docs/en/cli-reference>, read 2026-11-12): "Show authentication status as JSON
+… Exits with code 0 if logged in, 1 if not", `authMethod` one of `none`, `claude.ai`, `oauth_token`, `api_key`, `api_key_helper`,
+`third_party`. The SDK's own reads do not answer it: `Query.accountInfo()` needs a query, so a session started, and has no
+`loggedIn`. Whether a claude.ai login whose refresh fails reads `loggedIn: false` is unmeasured.
+
 ## A memory limit, held by a scope
 
 Not Claude Code's own, but the host every harness runs on: what a scope of systemd's user manager does to a limited task's process

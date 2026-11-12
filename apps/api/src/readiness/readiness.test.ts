@@ -114,8 +114,9 @@ test("a session's token starts no fix: 403, and nothing is filed", async () => {
   );
   Effect.runSync(engineFor(engine()).file({ id: task, brief: 'Be on.', cwd: root, harness: 'claude' }));
   engine().settle(task, 'working');
-  const before = Effect.runSync(engineFor(engine()).list()).length;
+  const before = Effect.runSync(engineFor(engine()).list()).views.length;
+  assert.ok(before > 0, 'the session task is listed, so the count is read');
   const res = await send('POST', '/api/readiness/fixes', { need: 'identity', answers: { name: 'x', email: 'y@example.com' } }, token);
   assert.equal(res.status, 403);
-  assert.equal(Effect.runSync(engineFor(engine()).list()).length, before, 'no fix filed');
+  assert.equal(Effect.runSync(engineFor(engine()).list()).views.length, before, 'no fix filed');
 });

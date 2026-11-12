@@ -3,11 +3,11 @@
  * `resolutionOf`): a conflict's address read as its path's segments (`segmentsOf`), an owner's key read back (`ownerOfKey`), each
  * conflict's owner by its address, the wiring's key among it (`conflictOwners`), and the render given a taken owner's files from the tree
  * (`takenFromTree`) — a Workflow's, an Agent's, a Skill's, the Factory's, a Hire's one key of the wiring — after which the merge has no
- * conflict left in that owner's files.
+ * conflict left in that owner's files; and the lines that resolve again the conflicts of a proposal that cannot apply (`resolvedAgain`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { conflictOwners, mergeTrees, ownerKey, ownerOfKey, segmentsOf, takenFromTree, type TreeFile } from './index.ts';
+import { conflictOwners, mergeTrees, ownerKey, ownerOfKey, resolvedAgain, segmentsOf, takenFromTree, type TreeFile } from './index.ts';
 
 /** A tree of text files, by path. */
 const tree = (files: Record<string, string>): TreeFile[] =>
@@ -21,6 +21,27 @@ const texts = (files: readonly TreeFile[]): Record<string, string> =>
 const LOGO = Buffer.from([0x89, 0x50, 0x00, 0x47]);
 
 test("an upgrade's resolution, row by row: an address's segments, and a taken workflow's files from the tree", async (t) => {
+  await t.test("a proposal an owner's resolution is names each conflict of that owner to resolve again; another proposal none", () => {
+    const choices = {
+      'workflows/flow/check.ts:3-3': { text: 'x' },
+      'workflows/flow/review.md#rounds': 'theirs' as const,
+      'workflows/other/plan.md#budget': 'ours' as const,
+      'workflows/carried/land.ts:1-1': 'theirs' as const,
+    };
+    const proposals = { 'Workflow/flow': 'person-a', other: 'person-b' };
+    assert.deepEqual(resolvedAgain('crew', 'person-a', proposals, choices), {
+      owner: 'the Workflow flow',
+      lines: [
+        "nemia factory resolve crew 'workflows/flow/check.ts:3-3' --ours|--theirs|--file <path>",
+        "nemia factory resolve crew 'workflows/flow/review.md#rounds' --ours|--theirs|--file <path>",
+      ],
+    });
+    assert.deepEqual(resolvedAgain('crew', 'person-b', proposals, choices)?.lines, [
+      "nemia factory resolve crew 'workflows/other/plan.md#budget' --ours|--theirs|--file <path>",
+    ]);
+    assert.equal(resolvedAgain('crew', 'person-c', proposals, choices), undefined);
+  });
+
   await t.test("an address is cut to its file's path and split: a whole file, a key, base lines, the wiring's key", () => {
     assert.deepEqual(segmentsOf('workflows/flow/check.ts'), ['workflows', 'flow', 'check.ts']);
     assert.deepEqual(segmentsOf('workflows/flow/check.ts:3-4'), ['workflows', 'flow', 'check.ts']);

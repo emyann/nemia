@@ -588,3 +588,97 @@ test('a workflow whose step writes checkFailurePolicy as a block map: a conflict
     assert.equal(textIn(treeDir(ROOT, name), IMPLEMENT), applied, 'the block map stays a block map');
   });
 });
+
+/** The step the factory's own edit changes, the file it adds and what that holds, and a skill the factory's repository alone holds. */
+const IMPLEMENT = 'workflows/dev/implement.md';
+const PICTURES = 'workflows/dev/pictures.ts';
+const OWN = 'export const pictures = true;\n';
+const OWN_CHECK = 'check: npm test && npm run typecheck\nskills: look';
+
+/**
+ * A factory `name` applied from the tests' team at 0.1.0, then edited in its tree as `nemia workflows write factory` edits it: a file
+ * added to dev, and dev's implement given another check and a skill only the factory's repository holds, as the nemia factory's
+ * overlays give one; the person and the template's 0.2.0 each changing a line of dev's script, the upgrade filed: its conflicts.
+ */
+async function editedAfterApply(t: { mock: { method: Function } }, name: string): Promise<string[]> {
+  const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
+  fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+  fs.mkdirSync(path.join(repo, '.claude/skills/look'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.claude/skills/look/SKILL.md'), '---\nname: look\ndescription: Look at the board.\n---\nLook.\n');
+  stage.place().world.repository(repo, {});
+  stage.place().world.commit(repo, 'base');
+  const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
+  exportTemplate({ dir: at, from: repo });
+  fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
+  await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+  reconciled(factory(name));
+  const tree = treeDir(ROOT, name);
+  fs.writeFileSync(path.join(tree, PICTURES), OWN);
+  rewrite(tree, IMPLEMENT, 'check: npm test && npm run typecheck && npm run lint', OWN_CHECK);
+  fs.writeFileSync(path.join(tree, SCRIPT), SCRIPT_AT.ours);
+  edit(at, 'nemia.yaml', (spec) => {
+    spec.version = '0.2.0';
+  });
+  fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.theirs);
+  await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
+  return (reconciled(factory(name)).upgrade?.conflicts ?? []).map((c) => c.at);
+}
+
+test("a tree edited after its apply: the resolution is proposed on the tree as it stands, and approving it keeps the factory's own edits", async (t) => {
+  const s = story(t);
+  const name = 'edited';
+  let proposed = '';
+
+  await s.test("the factory's own edits after its apply, a file added and a step changed in dev, and one conflict in it", async (t) => {
+    assert.deepEqual(await editedAfterApply(t, name), [SCRIPT_LINE]);
+  });
+
+  await s.test("resolved with a file, the workflow is proposed with the factory's own edits", async (t) => {
+    await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
+    proposed = recordedFor(name, 'Workflow/dev') ?? '';
+    assert.deepEqual(proposalsOf(name), [proposed]);
+    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual([implement.keys.check, implement.keys.skills], ['npm test && npm run typecheck', ['look']]);
+    assert.deepEqual(
+      spec.files.filter((f: { path: string }) => f.path === 'pictures.ts'),
+      [{ path: 'pictures.ts', text: OWN }],
+    );
+  });
+
+  await s.test('approved, the upgrade applies, and the applied dev keeps the added file and the changed step', async () => {
+    const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
+    assert.equal(approved.status.phase, 'applied', approved.status.message);
+    const merged = reconciled(factory(name));
+    assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
+    const tree = treeDir(ROOT, name);
+    assert.equal(textIn(tree, SCRIPT), SCRIPT_AT.composed);
+    assert.equal(textIn(tree, PICTURES), OWN);
+    assert.ok(textIn(tree, IMPLEMENT).includes(`${OWN_CHECK}\n`), 'the changed step stays');
+  });
+});
+
+test('a tree written between the resolve and the approval: the approval is refused stale, naming the resolve to type again', async (t) => {
+  const s = story(t);
+  const name = 'moved';
+  let proposed = '';
+
+  await s.test('resolved with a file, then dev written in the tree before the person approves', async (t) => {
+    assert.deepEqual(await editedAfterApply(t, name), [SCRIPT_LINE]);
+    await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
+    proposed = recordedFor(name, 'Workflow/dev') ?? '';
+    fs.writeFileSync(path.join(treeDir(ROOT, name), PICTURES), 'export const pictures = false;\n');
+  });
+
+  await s.test(
+    'approved, it is stale: nothing written, its message the resolve line of the conflict, the upgrade still waiting',
+    async () => {
+      const after = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
+      assert.equal(after.status.phase, 'stale');
+      assert.ok(after.status.message?.includes(`nemia factory resolve ${name} '${SCRIPT_LINE}'`), after.status.message);
+      assert.equal(textIn(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
+      assert.equal(textIn(treeDir(ROOT, name), PICTURES), 'export const pictures = false;\n');
+      assert.equal(reconciled(factory(name)).version, '0.1.0');
+    },
+  );
+});

@@ -3,7 +3,7 @@
  * door (`replaceCard`), refused as `cardWriteRefusal` says; and the `resourceVersion` a card is served and compared at (`cardVersion`).
  * A controller: Effect programs over the Card and Run doors.
  */
-import { modelsText } from '../start/models.ts';
+import { modelsText } from '../start/index.ts';
 import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardWrite, DEFAULT_NAMESPACE } from 'objects';

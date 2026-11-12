@@ -6,7 +6,7 @@
  * person reads it beside its run, the runs it was started as, and its labels. A client prints the cells and keeps no printer of its own.
  * Pure.
  */
-import { modelsText } from '../start/models.ts';
+import { modelsText } from '../start/index.ts';
 import type { TableColumnDefinition } from 'objects';
 import { labelsText } from '../labels/labels.ts';
 import { cardLabels, phaseSaid, triedClause, type InboxListing } from './inbox.ts';

@@ -3,7 +3,7 @@
  * taking the card out of the inbox; and the inbox listed with each card's state (`inboxJudged`), which reads each started card's run's
  * phase. A controller: Effect programs, which reach the runtime through `start/start.verb.ts` and the judged list.
  */
-import { modelsText, type RunModels } from '../start/models.ts';
+import { modelsText, type RunModels } from '../start/index.ts';
 import { setting } from '../config/config.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';

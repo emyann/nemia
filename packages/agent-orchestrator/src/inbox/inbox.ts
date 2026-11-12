@@ -37,7 +37,7 @@
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
  * (inbox.store.ts and inbox.verb.ts read them).
  */
-import { modelsOf, modelsText } from '../start/models.ts';
+import { modelsOf, modelsText } from '../start/index.ts';
 import path from 'node:path';
 import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';

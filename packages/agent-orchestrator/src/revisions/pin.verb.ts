@@ -12,7 +12,7 @@
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
  */
-import { withModels } from '../start/models.ts';
+import { withModels } from '../start/index.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';

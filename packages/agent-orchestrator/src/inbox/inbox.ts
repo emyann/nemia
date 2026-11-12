@@ -178,7 +178,8 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
  */
 function cardModels(file: string, line: string): Record<string, string> {
   const read = modelsOf(line.split(','));
-  if ('why' in read) refuse(`${file}: \`model: ${line}\` ${read.why}, comma-separated: \`model: implement=fable, review=opus\`. Correct the line.`);
+  if ('why' in read)
+    refuse(`${file}: \`model: ${line}\` ${read.why}, comma-separated: \`model: implement=fable, review=opus\`. Correct the line.`);
   return read.models;
 }
 

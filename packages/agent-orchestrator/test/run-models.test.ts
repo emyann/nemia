@@ -96,7 +96,17 @@ test("a step's model named at start, from `nemia start --model` to the step file
   const dir = planned();
   let id = '';
   await s.test('`nemia start --model implement=fable` freezes it on the record and on implement alone, and says so', async () => {
-    const printed = await printedBy(['start', 'plan the flag', '--workflows', dir, '--repo', repo, '--no-worktree', '--model', 'implement=fable']);
+    const printed = await printedBy([
+      'start',
+      'plan the flag',
+      '--workflows',
+      dir,
+      '--repo',
+      repo,
+      '--no-worktree',
+      '--model',
+      'implement=fable',
+    ]);
     id = printed[0].split(' ')[0];
     assert.deepEqual(runRecord(ROOT, id).models, { implement: 'fable' });
     assert.deepEqual(frozenModels(id), { plan: 'opus', implement: 'fable', review: 'opus' });
@@ -134,7 +144,9 @@ test("a card's `model:` runs its run's step on it, and a start's `--model` for t
   const repo = aRepo();
   const dir = planned();
   await t.test("the card's alone", async () => {
-    const { run } = await runPlaced(startFromInbox({ name: card('plan-the-flag-m1a1', dir, 'review=fable'), callerRepo: repo, isolate: false }));
+    const { run } = await runPlaced(
+      startFromInbox({ name: card('plan-the-flag-m1a1', dir, 'review=fable'), callerRepo: repo, isolate: false }),
+    );
     assert.deepEqual(runRecord(ROOT, run.id).models, { review: 'fable' });
     assert.deepEqual(frozenModels(run.id), { plan: 'opus', implement: 'opus', review: 'fable' });
   });
@@ -160,7 +172,11 @@ test('a step’s model at start, REFUSED before a run is written', async (t) => 
   const starting = (models: Record<string, string>, workflowDir = dir) =>
     runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir, isolate: false, models }));
   for (const [row, refusing, facts] of [
-    ['a step the workflow does not have, naming its steps', () => starting({ desing: 'fable' }), ['--model desing=fable', 'plan, implement, review']],
+    [
+      'a step the workflow does not have, naming its steps',
+      () => starting({ desing: 'fable' }),
+      ['--model desing=fable', 'plan, implement, review'],
+    ],
     ["`inherit`, a subagent's word", () => starting({ plan: 'inherit' }), ['--model plan=inherit']],
     [
       'a model that drops the step’s `auto`, naming the models that keep it',
@@ -172,7 +188,8 @@ test('a step’s model at start, REFUSED before a run is written', async (t) => 
     ['`nemia start <folder> --model`', () => stage.main(['start', ROOT, '--model', 'plan=fable']), ['--model']],
     [
       "a card's `model:` the step cannot run on, in the card's words",
-      () => runPlaced(startFromInbox({ name: card('plan-the-flag-m3c3', dir, 'review=claude-sonnet-4-5'), callerRepo: repo, isolate: false })),
+      () =>
+        runPlaced(startFromInbox({ name: card('plan-the-flag-m3c3', dir, 'review=claude-sonnet-4-5'), callerRepo: repo, isolate: false })),
       ['plan-the-flag-m3c3.md: `model: review=claude-sonnet-4-5`'],
     ],
   ] as Array<[string, () => Promise<unknown>, string[]]>) {

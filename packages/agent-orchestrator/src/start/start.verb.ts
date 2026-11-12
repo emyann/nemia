@@ -115,8 +115,8 @@ const stepsIn = Effect.fnUntraced(function* (workflowDir: string, places: Places
  * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
  *   `gates` beside the workflow's own and given the factory's judged `harnessSettings`: a word, a window, a cap or a bridge
  *   (`remote: true`) its harness does not take;
- * - a step `models` names that it cannot run on (`modelsRefusal`): one the workflow does not have, one on a remote agent, and a Claude
- *   Code step in `auto` on a model that drops it; the steps are then judged with their models set (`withModels`), so what the harness
+ * - a step `models` names that it cannot run on (`modelsRefusal`): one the workflow does not have, one on a remote agent, and one whose
+ *   mode the model drops; the steps are then judged with their models set (`withModels`), so what the harness
  *   refuses of a step's config on its model is refused as `refused` refuses it;
  * - a step whose `tools:` names a tool nothing its session would be allowed (`unallowedRefusal`, pure, asked of a folder a waiting run
  *   takes again too), judged against `allows`, the allow rules the run's own repository grants a session started in it (`repoAllows`).

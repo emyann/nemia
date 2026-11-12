@@ -140,9 +140,7 @@ test("`model:` names a step's model in the card's run alone, carried by the card
 
   const [listed] = inboxListing([{ file: 'cache-the-views-k2q9.md', text }], [], isDirectory);
   assert.deepEqual(listed.model, { implement: 'fable', review: 'opus' });
-  assert.deepEqual(inboxLines([listed]), [
-    'cache-the-views-k2q9  Cache the views.  workflow: dev  model: implement=fable, review=opus',
-  ]);
+  assert.deepEqual(inboxLines([listed]), ['cache-the-views-k2q9  Cache the views.  workflow: dev  model: implement=fable, review=opus']);
   assert.equal(
     queuedText(card, '2026-09-16T10:00:00.000Z', isDirectory),
     '---\nworkflow: dev\nqueued: 2026-09-16T10:00:00.000Z\nmodel: implement=fable, review=opus\n---\nCache the views.\n',

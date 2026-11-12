@@ -399,7 +399,7 @@ const START_LINES: readonly string[] = [
   "its other steps, and every other run, keep their agents' models. Once",
   "per step, over an inbox card's model: for the same step. Refused, naming",
   "the models that keep it, where the step's harness refuses the model or",
-  "its permission mode is dropped on it",
+  'its permission mode is dropped on it',
   '--workflows takes a folder, or a name under <repo>/workflows/: dev',
   'a folder of cards starts a plan, a run per card, parents first, at',
   'the command line alone (nemia start --help)',

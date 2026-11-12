@@ -229,7 +229,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
+  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]
                                start a run of a workflow from a brief, a text, a card of the inbox or a
                                folder of cards
                                --after <runId>: file nothing of this run until nemia decide says that
@@ -242,6 +242,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --gate <step>: that step's closeout waits for nemia approve before
                                anything after it is filed, as a step's own gate: true does; once
                                per step. An inbox card's gate: <step> is one more
+                               --model <step>=<model>: that step runs on the model in this run alone;
+                               its other steps, and every other run, keep their agents' models. Once
+                               per step, over an inbox card's model: for the same step. Refused, naming
+                               the models that keep it, where the step's harness refuses the model or
+                               its permission mode is dropped on it
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
                                a folder of cards starts a plan, a run per card, parents first, at
                                the command line alone (nemia start --help)

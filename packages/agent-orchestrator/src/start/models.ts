@@ -38,7 +38,7 @@ export const modelsText = (models: RunModels): string =>
 /**
  * Why a run of `steps` cannot run on `models`, said by `said` (`--model implement=fable`, or a card's line) — or undefined where it can:
  * a step the workflow does not have; `inherit`, a subagent's word no step's session can take; a step on a remote agent, which runs as its
- * operator configured it; and a Claude Code step in `auto` on a model that drops it (`autoDropped`), naming the
+ * operator configured it; and a step whose mode the model drops (`autoDropped`), naming the
  * models that keep it, as `nemia retry --model` is refused. What the harness refuses of the config the step is then filed with is the
  * start's next question (`configRefused`), asked of the steps with the models set (`withModels`).
  */
@@ -47,12 +47,12 @@ export function modelsRefusal(steps: readonly StepSpec[], models: RunModels, sai
     const step = steps.find((s) => s.name === name);
     if (!step) return `${said(name)}: the workflow has no step ${name} — its steps are ${steps.map((s) => s.name).join(', ')}.`;
     if (model === 'inherit')
-      return `${said(name)}: \`inherit\` is Claude Code's word for a subagent on its caller's model, and a step's session has no caller. Name a model: ${name}=sonnet.`;
+      return `${said(name)}: \`inherit\` is a subagent's word for its caller's model, and a step's session has no caller. Name a model: ${name}=sonnet.`;
     if (isRemoteHarness(step.harness))
       return `${said(name)}: ${name} runs on \`harness: ${step.harness}\`, a remote A2A agent, which runs as its operator configured it: A2A carries no model, and the runtime refuses a task filed with one. Leave ${name} out.`;
     const dropped = autoDropped(step.harness, model, modeOf(step));
     if (dropped)
-      return `${said(name)}: ${name} ${dropped}. Name a model that keeps it — ${name}=sonnet, or opus, or fable — or start a workflow whose step names a mode the model keeps: \`permissionMode: acceptEdits\`, or \`permissionMode: dontAsk\` with \`allowedTools:\` rules.`;
+      return `${said(name)}: ${name} ${dropped}. Name a model that keeps it — ${name}=sonnet, or opus, or fable — or start a workflow whose step names a mode the model keeps.`;
   }
   return undefined;
 }

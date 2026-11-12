@@ -706,3 +706,15 @@ export const FEED_STREAM_EVENTS = [
   'readable',
 ] as const;
 export type FeedStreamEventName = (typeof FEED_STREAM_EVENTS)[number];
+
+/**
+ * The name of the board's cookie that holds one of the person's tokens: set HttpOnly by `POST /api/session` from a token the person
+ * pasted, sent by the browser on every request of the board's, and read by the api as the request's token where it presents no bearer.
+ */
+export const TOKEN_COOKIE = 'nemia-token';
+
+/** What `POST /api/session` and `DELETE /api/session` did to the board's cookie: set it, or cleared it. */
+export const SESSION_COOKIE_STATES = ['set', 'cleared'] as const;
+
+/** One of `SESSION_COOKIE_STATES`. */
+export type SessionCookieState = (typeof SESSION_COOKIE_STATES)[number];

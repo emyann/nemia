@@ -25,14 +25,30 @@ import {
   typedGraphOf,
   unattachedRefusal,
   WORKFLOWS_REMOVE,
+  workflowDraftOfFiles,
   workflowStale,
   workflowNeeds,
   workflowReadmeWith,
   workflowVersion,
   type FolderLoaded,
+  type WorkflowFilesRead,
 } from 'agent-orchestrator';
-import { Api, API_VERSION, Conflict, Invalid, Missing, type Need, type Workflow, type WorkflowFile, type WorkflowStep } from 'objects';
+import {
+  Api,
+  API_VERSION,
+  Conflict,
+  Invalid,
+  Missing,
+  type Need,
+  type DefinitionFiles,
+  type Workflow,
+  type WorkflowCreate,
+  type WorkflowFile,
+  type WorkflowSpec,
+  type WorkflowStep,
+} from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
@@ -40,6 +56,7 @@ import { draftOf, isRoleKey, keyForm, schemasOf, write, yourAgentsRead, type Ste
 import { workflowNameRefusal } from './words.ts';
 import {
   listed as listingOf,
+  listedStep,
   loadedAt,
   loadedOf,
   placesOf,
@@ -97,7 +114,7 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
 /** Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository, yours. */
 export const heldIn = (s: Served): Held<Folder>[] => [
   ...treeWorkflowsHeld(s, 'factory'),
-  ...foldersHeld(s, 'repo', 'repo', path.join(s.repo, 'workflows')),
+  ...foldersHeld(s, 'repo', 'repo', path.join(repoNeeded(s), 'workflows')),
   ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
 ];
 
@@ -129,6 +146,34 @@ const writtenStep = (step: ListedStep): WorkflowStep => {
   );
   return { name: step.name, keys, body: own ? own.body : step.body };
 };
+
+/**
+ * The spec of a folder read off the files sent (`workflowDraftOfFiles`), in the words a GET of the same folder answers it: each step as
+ * its file writes it (`writtenStep` over the listing's `listedStep`, in no factory), its description and README, and its other text
+ * files, left out where it has none.
+ */
+const specRead = ({ steps, readme, description, files }: WorkflowFilesRead): WorkflowSpec => ({
+  description,
+  readme,
+  steps: steps.map(listedStep(new Map())).map(writtenStep),
+  ...(files.length > 0 && { files: [...files] }),
+});
+
+/**
+ * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the api's repository and yours, as a GET of
+ * the same folder in yours reads it: its name and its spec, writing nothing. On an api with no repository (an install, no factory
+ * named), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Refused `Invalid` without a
+ * name, and as the reader refuses.
+ */
+async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
+  if (name === undefined)
+    throw new Invalid({
+      error:
+        'POST /api/workflows/read reads a folder under its name: send `{ "name": "<the folder\'s name>", "files": [{ "path", "text" }] }`.',
+    });
+  const read = await s.inRequest(workflowDraftOfFiles(name, files, s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home)));
+  return { metadata: { name }, spec: specRead(read) };
+}
 
 /** A step the object sends, as the builder takes it: `agent` among its keys makes every key its own, and its body its own note. */
 const stepBodyOf = (step: WorkflowStep): StepBody => ({
@@ -200,18 +245,19 @@ const workflowObject = (
  * factory of its wiring as one applied from it is.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
+  const repo = repoNeeded(s);
   const loaded = await loadedOf(
     s.e,
     s,
     served.map((f) => f.item.dir),
-    s.repo,
+    repo,
     s.home,
     s.factory,
   );
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: { from, dir } }) =>
       Effect.gen(function* () {
-        const version = yield* workflowVersion(dir, placesOf(s.repo, s.home));
+        const version = yield* workflowVersion(dir, placesOf(repo, s.home));
         const revision = namespace === undefined ? undefined : yield* definitionRevision('workflow', name, version);
         const folder = loadedAt(loaded, dir);
         return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder, revision);
@@ -245,7 +291,7 @@ const writing = (s: Served, name: string, changes: boolean) => ({
   trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
-  repo: s.repo,
+  repo: repoNeeded(s),
   home: s.home,
   changes,
   inRequest: s.inRequest,
@@ -297,7 +343,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
           });
         const at = writing(s, name, true);
-        const now = await s.inRequest(workflowVersion(at.dir, placesOf(s.repo, s.home)));
+        const now = await s.inRequest(workflowVersion(at.dir, placesOf(repoNeeded(s), s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
         return workflowAt(s, namespace, name, 'yours');
@@ -325,5 +371,6 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         return stepPage(s, { name, ...item }, step);
       }),
     )
+    .handle('read', ({ payload }) => answered((s) => folderRead(s, payload)))
     .handle('keys', () => answered(async (s) => keyForm(await s.inRequest(yourAgentsRead(s.home)), s.home))),
 );

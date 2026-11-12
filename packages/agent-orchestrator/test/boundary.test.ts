@@ -274,13 +274,11 @@ const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];
 
 /**
  * The package's files the CLI imports past `runner.ts` until its re-exports name them, each by the CLI's file: the forwarding of a
- * command line to a remote daemon (`src/command/forward.verb.ts`), the writers it refuses to send (`src/command/requests.verb.ts`), and
- * `inbox from`'s entry (`src/inbox/commands.verb.ts`). `runner.ts` is not this change's to edit; a pair is dropped once it re-exports
- * the names.
+ * command line to a remote daemon (`src/command/forward.verb.ts`) and `inbox from`'s entry (`src/inbox/commands.verb.ts`). `runner.ts`
+ * is not this change's to edit; a pair is dropped once it re-exports the names.
  */
 const CLI_FORWARDS: readonly (readonly [cli: string, reaches: string])[] = [
-  ...['flags', 'main', 'runs', 'start', 'writers'].map((f) => [`src/cli/${f}.ts`, 'src/command/forward.verb.ts'] as const),
-  ['src/cli/writers.ts', 'src/command/requests.verb.ts'],
+  ...['flags', 'main', 'runs', 'start'].map((f) => [`src/cli/${f}.ts`, 'src/command/forward.verb.ts'] as const),
   ['src/cli/start.ts', 'src/inbox/commands.verb.ts'],
 ];
 
@@ -1074,7 +1072,6 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
         'src/cli/flags.ts',
         'src/cli/runs.ts',
         'src/cli/start.ts',
-        'src/cli/writers.ts',
         'src/command/forward.verb.ts',
         'src/runner.ts',
       ],

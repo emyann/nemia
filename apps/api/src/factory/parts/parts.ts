@@ -8,8 +8,8 @@ import { factoryNameRefusal, Invalid as Refused, type ObjectQuery } from 'agent-
 import { repoOf } from '../../capabilities/capabilities.ts';
 import type { Served } from '../../layer.ts';
 
-/** The repository the default factory is on: the api's own. */
-export const defaultRepo = (s: Served): string => repoOf(s.env, s.running);
+/** The repository the default factory is on: the api's own, none where the api has none (`repoOf`). */
+export const defaultRepo = (s: Served): string | undefined => repoOf(s.env, s.running);
 
 /** One selector, several, or none, as a list. */
 const listOf = (given: string | readonly string[] | undefined): string[] =>

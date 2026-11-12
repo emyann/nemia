@@ -19,10 +19,11 @@ import {
   PROPOSABLE_KINDS,
   type ProposableKind,
   type Proposal,
+  type ProposalCreate,
   type ProposedObject,
   RESOURCE_PLURALS,
 } from 'objects';
-import { asked, discovered, noLocal } from '../objects.ts';
+import { asked, discovered } from '../objects.ts';
 import { Refused } from '../refused.ts';
 import { isRecord, objectsOf, type Read, readOf, servedOf, textOf } from './apply.ts';
 
@@ -242,7 +243,6 @@ export async function propose(args: readonly string[]): Promise<number> {
     process.stdout.write(PROPOSE_HELP);
     return 0;
   }
-  if (args.includes('--local')) throw noLocal('propose');
   const said = parsed(args);
   let namespace: string;
   let objects: ProposedObject[];
@@ -260,8 +260,15 @@ export async function propose(args: readonly string[]): Promise<number> {
     ({ namespace, objects } = await fromText(text, file, said.namespace));
   }
   const payload = { objects, ...(said.at !== undefined ? { applyAt: said.at } : {}), ...(why !== undefined ? { why } : {}) };
-  const ns = namespace;
-  const made = await asked('propose', (c) => c.proposals.create({ params: { namespace: ns }, payload }));
+  return proposalMade('propose', namespace, payload);
+}
+
+/**
+ * The proposal `payload` asks, made in the factory `namespace` for the command `verb` names, and printed (`proposalLines`): the one call
+ * a proposal is made by, `nemia propose`'s and a writer's on the `factory` place alike.
+ */
+export async function proposalMade(verb: string, namespace: string, payload: ProposalCreate): Promise<number> {
+  const made = await asked(verb, (c) => c.proposals.create({ params: { namespace }, payload }));
   process.stdout.write(proposalLines(made, namespace));
   return 0;
 }
@@ -272,7 +279,6 @@ export async function proposals(args: readonly string[]): Promise<number> {
     process.stdout.write(PROPOSALS_HELP);
     return 0;
   }
-  if (args.includes('--local')) throw noLocal('proposals');
   const [action, name, ...rest] = args;
   if ((action !== 'approve' && action !== 'decline') || name === undefined || name.startsWith('-'))
     throw new Refused(

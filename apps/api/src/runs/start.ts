@@ -13,6 +13,7 @@ import { type CardStart, Conflict, Invalid, Missing, type RunStart } from 'objec
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { folderOf } from '../workflows/workflows.ts';
 
 /** What a start's own refusals are answered as, by their status: no such workflow, one in each source, no brief. */
@@ -74,12 +75,13 @@ export async function cardStart(
   body: CardStart,
   factory: string | undefined,
 ): Promise<{ id: string; card: string; ignoredRepo?: string } | Refusal> {
-  const folder = body.workflow === undefined ? undefined : folderOf(body.workflow, body.from, s.repo, s.home, s.factory?.tree);
+  const repo = repoNeeded(s);
+  const folder = body.workflow === undefined ? undefined : folderOf(body.workflow, body.from, repo, s.home, s.factory?.tree);
   if (folder !== undefined && 'status' in folder) return folder;
   const handed = handedOf(body);
   const given: StartInput = {
     card,
-    at: s.repo,
+    at: repo,
     factory,
     fix: '?factory=<name>',
     workflows: folder?.dir,
@@ -112,7 +114,8 @@ export async function cardStart(
  * none or two do, naming the namespace to start it in.
  */
 export async function runStart(s: Served, body: RunStart): Promise<{ id: string }> {
-  const { repo, home, factory } = s;
+  const { home, factory } = s;
+  const repo = repoNeeded(s);
   const asked = startOf(body, repo, home, factory?.tree);
   if ('status' in asked) throw declaredAs(START_REFUSALS, asked);
   const found = factory

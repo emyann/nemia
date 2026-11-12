@@ -61,11 +61,11 @@ test('the rows flatten through arrays and $ref: every kind has fields, and a wor
     );
 });
 
-test('`nemia explain --help` is its own; `--local` is refused exit 2 naming `nemia service status`', async () => {
+test('`nemia explain --help` is its own; `--local` is refused exit 2 by the route, naming the command without it', async () => {
   const help = await store.nemia(['explain', '--help']);
   assert.equal(help.code, 0, help.err);
   assert.match(help.out, /^nemia explain <resource>/);
   const local = await store.nemia(['explain', 'cards', '--local']);
   assert.equal(local.code, 2, local.err);
-  assert.match(local.err, /nemia service status/);
+  assert.match(local.err, /`nemia explain cards`/);
 });

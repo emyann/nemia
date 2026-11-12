@@ -1,8 +1,9 @@
 /**
  * What `nemia` does with no daemon serving its store (the intent's Q14): a moved read with the start turned off is refused, exit 2, naming
- * the command that reads in process (`--local`) and the one that installs the service; the same read typed with `--local` reads the store
- * in process; the verbs that need no daemon — `version`, `service status`, `template lint` — run with none and no flag; a write reaches
- * the in-process path with its words intact, seen by what it writes into the store; and `--local` never reaches the in-process parser.
+ * the command that starts one here (`nemia up`) and the one that installs the service, and never `--local`; the old path, spawned
+ * directly (`captured`), still reads the store in process; the verbs that need no daemon — `version`, `service status`, `template lint`
+ * — run with none and no flag; a write reaches the in-process path with its words intact, seen by what it writes into the store; and
+ * `--local` is refused wherever it is typed, before the in-process parser reads the words.
  * Each `nemia` is this checkout's bin, run as a child on a scratch store, waited on for its exit.
  */
 import { test } from 'node:test';
@@ -12,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
+import { captured } from '../src/local.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-local-');
@@ -91,21 +93,22 @@ function seedGated(root: string): void {
   fs.writeFileSync(path.join(root, 'engine', 'tasks', `${task}.jsonl`), journal.map((line) => `${JSON.stringify(line)}\n`).join(''));
 }
 
-test('with no daemon and the start off, a moved read is refused, exit 2, naming the read in process and the install', async () => {
+test('with no daemon and the start off, a moved read is refused, exit 2, naming `nemia up` and the install, never --local', async () => {
   const { root, env } = aStore('refused');
   const { code, stderr } = await nemia(['ls'], env);
   assert.equal(code, 2, stderr);
-  assert.ok(stderr.includes('nemia ls --local'), stderr);
+  assert.ok(stderr.includes('nemia up'), stderr);
   assert.ok(stderr.includes('nemia service install'), stderr);
+  assert.ok(!stderr.includes('--local'), stderr);
   assert.ok(stderr.includes('NEMIA_DAEMON_START=off'), stderr);
   assert.equal(fs.existsSync(path.join(root, 'daemon.json')), false);
 });
 
-test('nemia ls --local reads the store in process, with no daemon', async () => {
+test('the old path, spawned directly, reads the store in process, with no daemon', async () => {
   const { root, env } = aStore('ls-local');
   seedGated(root);
-  const { code, stdout, stderr } = await nemia(['ls', '--local'], env);
-  assert.equal(code, 0, stderr);
+  const { code, stdout } = await captured(['ls'], env);
+  assert.equal(code, 0, stdout);
   assert.ok(stdout.includes(GATED.id), stdout);
   assert.equal(fs.existsSync(path.join(root, 'daemon.json')), false);
 });
@@ -139,9 +142,10 @@ test('nemia approve <run> <step> reaches the in-process path with its words inta
   assert.ok(said.includes(GATED.step), said);
 });
 
-test('--local is taken off before the in-process parser reads the words, wherever it is typed', async () => {
+test('--local is refused, exit 2, before the in-process parser reads the words, wherever it is typed, naming the command without it', async () => {
   const { env } = aStore('stripped');
   const { code, stdout, stderr } = await nemia(['version', '--local', '--json'], env);
-  assert.equal(code, 0, stderr);
-  assert.equal(typeof (JSON.parse(stdout) as { version: unknown }).version, 'string');
+  assert.equal(code, 2, stderr);
+  assert.equal(stdout, '', 'the old path never ran');
+  assert.ok(stderr.includes('nemia version --json'), stderr);
 });

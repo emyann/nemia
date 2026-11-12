@@ -8,7 +8,7 @@
 import { OpenApi } from 'effect/http-api';
 import { API_VERSION, Api, type Kind } from 'objects';
 import type { ExplainedOf, FieldRow } from '../../contracts/explain.contract.ts';
-import { discovered, noLocal, resourceFor } from '../objects.ts';
+import { discovered, resourceFor } from '../objects.ts';
 import { Refused } from '../refused.ts';
 
 /** The field at `path` and the fields directly under it, or a refusal where the kind has none there (`contracts/explain.contract.ts`). */
@@ -116,7 +116,6 @@ export async function explain(args: readonly string[]): Promise<number> {
     process.stdout.write(EXPLAIN_HELP);
     return 0;
   }
-  if (args.includes('--local')) throw noLocal('explain');
   const [typed, ...more] = args;
   if (typed === undefined || typed.startsWith('-') || more.length)
     throw new Refused('nemia explain: name one resource, and a field of it where you ask one: `nemia explain <resource>[.<field>]...`');

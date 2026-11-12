@@ -47,7 +47,7 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, three are open:
+**What remains, in order.** Of the numbered items, these are open:
 
 1. §1, a run that grows steps from a plan.
 2. §13, the cases `test/run.test.ts` still holds: the say cases, to move beside `src/say/`; its timeline cases are fj03 slice 4's.
@@ -55,6 +55,10 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
    carded, waiting in the inbox.
 4. §15 to §17, the rest of a harness's fence under its block (decision 12, after its slice 1 shipped on 2026-10-31): the runtime's
    generic `fence`, the api and the board on the block and `overridable:`, and the internal fields moved.
+5. The api-consumer intent's remaining slices, each a `build` card (`area=cli`, `initiative=api-consumer`), each closing its own api
+   gaps first and moving its verbs' words into `objects`' `COMMAND_WORDS` (slice 1, the foundation and the three writers, shipped):
+   the run's verbs; the inbox and labels; factories, policies and the rest of the three kinds; the moved reads' words; then forwarding
+   retired (`NEMIA_SERVER`, `src/command/forward.verb.ts`, `src/command/requests.verb.ts` deleted).
 
 A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
 4c, admission), the second item until 2026-10-24, is closed as decided that day (language work, decision 6): a try stays the
@@ -2648,8 +2652,8 @@ the caller runs it again with `--version`; a workflow's own schemas left to a fo
   `src/yours/yours.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
   alone hands (`draft`, `schema`, `change`, `readme`). Each handler resolves yours from its store and refuses any other place
   (`yoursOrRefused`, `src/yours/yours.ts`).
-- **The runners** (`src/cli/writers.ts`): an agent's file read into its draft with the result schema its `output:` names beside it, a
-  SKILL.md into the skill's form, a draft folder's steps and README as a start reads them; then handed to the handler without the path.
+- **The runners** (moved to the client, `apps/cli/src/commands/`, by the api-consumer intent's slice 1): an agent's file and the
+  schemas beside it, a SKILL.md, a draft folder's files, read on the client's machine and read into their spec by the api's `read`.
   `agents remove`, `agents try` and `workflows remove` need none.
 - **The try** (`tryAgent`, `src/try/try.verb.ts`) refuses, in order, the place, an empty brief, an agent not there or that does not
   read, one a try cannot run, a skill only the repository has, and a try of it still moving; then writes its folder and starts a run with

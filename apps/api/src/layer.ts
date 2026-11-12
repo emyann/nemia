@@ -134,13 +134,15 @@ const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect
 /**
  * The services as a handler reads them, each under the name the helpers it calls take it by (`placeService` the place a package program
  * asks, given with `runPlaced`), and where the request is answered (`placeFor`, factory/place.ts): `repo`, the repository it is answered
- * on, and `factory`, the factory it names, none for the default.
+ * on, none where it has none, `factory`, the factory it names, none for the default, and whether it named either (`named`).
  */
 export type Served = {
   env: NodeJS.ProcessEnv;
   running: Running | undefined;
-  repo: string;
+  repo: string | undefined;
   factory: Factory | undefined;
+  /** Whether the request named its factory or its repository (`placeFor`). */
+  named: boolean;
   e: Engine['Service'];
   placeService: PlaceService['Service'];
   home: string;

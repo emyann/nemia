@@ -342,13 +342,13 @@ test('REFUSED: apply of a Proposal exits 2 naming `nemia propose`, and writes no
   assert.ok(requests.every((r) => r.method === 'GET'));
 });
 
-test('`nemia propose --help` and `nemia proposals --help` are their own; `--local` is refused exit 2 naming `nemia service status`', async () => {
+test('`nemia propose --help` and `nemia proposals --help` are their own; `--local` is refused exit 2 by the route, naming the command without it', async () => {
   for (const verb of ['propose', 'proposals']) {
     const help = await nemia([verb, '--help']);
     assert.equal(help.code, 0, help.err);
     assert.match(help.out, new RegExp(`^nemia ${verb} `));
     const local = await nemia([verb, '--local']);
     assert.equal(local.code, 2, local.err);
-    assert.match(local.err, /nemia service status/);
+    assert.match(local.err, new RegExp(`\`nemia ${verb}\``));
   }
 });

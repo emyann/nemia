@@ -3,29 +3,10 @@
  * break the rules (`classBreaks`). Pure: an agent's fence is derived from the classes (`nemiaFence`), and a call's admission reads them
  * (`admissionOf`).
  */
+import type { CommandClass } from 'objects';
 
-/**
- * The class of a command an agent calls, and what admission does with a call of it:
- *
- * - `read`: writes nothing, and runs unasked;
- * - `act`: a write that runs unasked;
- * - `ask`: a write that asks the person each time — what cannot be undone, the person's own settings;
- * - `answer`: an answer to what waits on the person — a step at its gate, a step's question, a loop out of rounds — which admission asks
- *   the person of where the run's state says it waits on them;
- * - `none`: refused, out of the agent's reach;
- * - a command that reads bare and sets with some words: a read, but a write that asks given one of `setsBy` — a flag (`--clear`) or a
- *   positional word (`manual`) — or, `sets: 'none'`, one out of reach; `readsBy`, the flags it takes that only read.
- *
- * A factory's definition written by hand is the person's: an agent proposes it (`nemia propose`) and the person, or an agent within its
- * delegation, approves (`PROPOSED_INSTEAD`, `agentClassOf`).
- */
-export type CommandClass =
-  | 'read'
-  | 'act'
-  | 'ask'
-  | 'answer'
-  | 'none'
-  | { readonly bare: 'read'; readonly sets: 'ask' | 'none'; readonly setsBy: readonly string[]; readonly readsBy?: readonly string[] };
+/** The class of a command an agent calls (`objects`' `CommandClass`, which the client reads too), said once in its entry. */
+export type { CommandClass } from 'objects';
 
 /**
  * The commands that write a factory's definitions — its wiring, servers, rules and instruction, and the `factory` form of a workflow's, an

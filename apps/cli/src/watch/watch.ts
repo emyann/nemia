@@ -198,10 +198,10 @@ const startedOver = (file: string, saved: number, refusal: string): string =>
   `nemia watch: ${file} held cursor ${saved}, which the feed cannot be read from (${refusal}) — reading the feed there is ` +
   'now from its start, and keeping 0 there: a line said before may be said again.';
 
-/** No api answers a `--once`: refused, naming the read in process and the restart. */
+/** No api answers a `--once`: refused, naming the restart. */
 const noneAnswers = (base: string, why: string): Refused =>
   new Refused(
-    `no daemon answers at ${base} (${why}). Read the feed in process, \`nemia watch … --local\`, or start the daemon: \`nemia service restart\``,
+    `no daemon answers at ${base} (${why}). Start the daemon, \`nemia service restart\` (or \`nemia up\` where no service is installed), then type \`nemia watch\` again`,
   );
 
 /**
@@ -223,7 +223,7 @@ async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened | '
   if (got.kind === 'refused')
     throw new Refused(
       got.status === 404 && got.bare
-        ? `the daemon at ${base} does not serve /api/feed/stream: it is older than this nemia. Restart it, \`nemia service restart\`, or read in process: \`nemia watch … --local\``
+        ? `the daemon at ${base} does not serve /api/feed/stream: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia watch\` again`
         : got.said,
     );
   if (got.kind === 'open') kept(asked.cursorFile, at.cursor);

@@ -11,8 +11,7 @@
  * /api/readiness/fixes`), the answers its asks need given by `--answer` or, at a terminal, asked there, then follows its output
  * (`GET /api/readiness/fixes/:id/output`, server-sent `output` chunks and the `ended` Fix), printing it as it comes; a line that
  * holds the code the fix declares (`code`, a pattern: a device code) is shown again on its own, spaced, to be read across a room. It
- * exits 0 when the fix succeeded, 1 otherwise. With `--local` the orchestrator's own `readiness` reads this machine's store in process
- * (`routeOf`).
+ * exits 0 when the fix succeeded, 1 otherwise. `--local` is refused by the route, as for every command (`routeOf`).
  */
 import os from 'node:os';
 import path from 'node:path';
@@ -42,7 +41,6 @@ const USAGE = [
   'nemia readiness [--json]            what the server needs to run, and this laptop, each in place or missing',
   'nemia readiness fix <need> [--factory <f>] [--workflow <w>] [--index <n>] [--answer <name>=<value>]…',
   '                                    start the fix of <need> on the server and follow its output',
-  'nemia readiness --local             read this machine’s store in process',
 ];
 
 /** A `nemia readiness` typed otherwise than its usage: refused, exit 2, naming it. */

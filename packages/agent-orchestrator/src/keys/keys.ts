@@ -183,7 +183,10 @@ export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
 
 /**
  * Dollars as a person writes them — `5`, `2.50` — or undefined for anything else: digits, and a point with digits after it, above
- * zero. What `budget:` takes, and `nemia retry --budget` and `nemia retry --round --budget` too.
+ * zero. What `budget:` takes, and `nemia retry --budget` and `nemia retry --round --budget` too. The same rule as `objects`' `dollarsOf`,
+ * which the command line's parser reads an amount by: kept here because `agent-orchestrator/run` and `/workflow` load no more of
+ * effect than `effect/Data` (`test/refusal.test.ts`), and `objects`' entry loads its Schemas; `src/command/command.test.ts` holds the two
+ * equal.
  */
 export function dollarsOf(written: string): number | undefined {
   const value = written.trim();

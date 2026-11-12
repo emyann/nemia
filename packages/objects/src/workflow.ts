@@ -321,6 +321,15 @@ export const WorkflowCreate = Schema.Struct({ metadata: Schema.Struct({ name: Sc
 export type WorkflowCreate = typeof WorkflowCreate.Type;
 
 /**
+ * A definition's files as a person keeps them, sent to be read into its spec (`POST /api/{workflows|agents|skills}/read`), which writes
+ * nothing: a workflow's folder, its files directly in it; an agent's file first, then the files beside it its `output:` may name; a
+ * skill's SKILL.md first, then its folder's other text files. Each by its path in the folder, with `/`, and its text. `name`, the name it
+ * is read under where its files say none: a workflow's folder, an agent's file without `.md`, a skill whose SKILL.md names none.
+ */
+export const DefinitionFiles = Schema.Struct({ name: Schema.optionalKey(Schema.String), files: Schema.Array(WorkflowFile) });
+export type DefinitionFiles = typeof DefinitionFiles.Type;
+
+/**
  * One key of a step's form (`GET /api/workflows/keys`): the key, the package's line of what it means, how it is set, the words it may be
  * set to where there are some, and, for a key whose words are the harness's, those of each harness.
  */

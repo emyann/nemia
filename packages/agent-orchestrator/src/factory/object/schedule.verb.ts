@@ -45,7 +45,12 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
  * The schedules of the factory `namespace`, read now, the runs read through `memo` where one is handed; none for the default factory or a
  * file that does not read; `Missing` where no factory has the name.
  */
-const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: string, namespace: string, memo: ScheduleRuns | undefined) {
+const schedulesOf = Effect.fn('schedulesOf')(function* (
+  home: string,
+  repo: string | undefined,
+  namespace: string,
+  memo: ScheduleRuns | undefined,
+) {
   const { listing } = yield* factoryFiled(home, repo, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');
@@ -56,7 +61,7 @@ const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, repo: stri
 /** A page of the schedules of the factory `namespace` (`ScheduleList`), read now at the store `home`, the runs through `memo`. */
 export const scheduleList = Effect.fn('scheduleList')(function* (
   home: string,
-  repo: string,
+  repo: string | undefined,
   namespace: string,
   query: ObjectQuery,
   memo: ScheduleRuns | undefined,
@@ -68,7 +73,7 @@ export const scheduleList = Effect.fn('scheduleList')(function* (
 /** The schedule of the workflow `name` in the factory `namespace`, the runs read through `memo`; `Missing` where it schedules none. */
 export const scheduleObject = Effect.fn('scheduleObject')(function* (
   home: string,
-  repo: string,
+  repo: string | undefined,
   namespace: string,
   name: string,
   memo: ScheduleRuns | undefined,

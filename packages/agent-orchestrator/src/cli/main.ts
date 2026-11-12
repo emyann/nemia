@@ -4,6 +4,7 @@
  */
 import path from 'node:path';
 import { Effect, Layer, Schema, Stream, type Duration } from 'effect';
+import { COMMAND_WORDS } from 'objects';
 import {
   breakdownLines,
   ceilingLines,
@@ -94,7 +95,6 @@ import {
   sayRun,
 } from './runs.ts';
 import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
-import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
 export const LIVENESS_EVERY: Duration.Input = '2 seconds';
@@ -411,8 +411,8 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
- * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
- * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; `nemia inbox from`,
+ * `nemia agents custom`, `nemia factory instruct` and `nemia policy propose`, whose runners read the files and folders a command line
+ * names before their handlers; `nemia inbox from`,
  * whose runner reads the card first where the command line is forwarded; `nemia factory server
  * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
  * and `nemia admit`, whose runner reads the call on stdin: handed its
@@ -433,9 +433,6 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['factory rules', factoryRulesRun],
   ['factory server add', factoryServerAddRun],
   ['policy propose', policyProposeRun],
-  ['agents write', agentsWriteRun],
-  ['skills write', skillsWriteRun],
-  ['workflows write', workflowsWriteRun],
   ['admit', admitRun],
   ['pause', pauseRun],
   ['say', sayRun],
@@ -484,17 +481,24 @@ function inputOf(command: Command, args: Args): Args {
   return usage(`nemia ${command.name} was given arguments its handler does not take: nemia ${command.name} ${command.usage}.`);
 }
 
-/** The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`. */
-const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name), ...VERBS.keys()];
+/** The names of the commands the client holds (`objects`' `COMMAND_WORDS`), which this CLI no longer runs. */
+const MOVED: readonly string[] = COMMAND_WORDS.map((w) => w.name);
 
 /**
- * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none. A name that heads
- * others (`agents`, before `agents card`) given a word none of them is gets that word, and refuses it in its own words.
+ * The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`; a command the client holds left
+ * out, though its entry stays in the table for the api to call.
+ */
+const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api' && !MOVED.includes(c.name)).map((c) => c.name), ...VERBS.keys()];
+
+/**
+ * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none, and none where a
+ * command the client holds (`MOVED`) is longer, so its words print the help rather than reach a name that heads it (`agents`). A name
+ * that heads others (`agents`, before `agents card`) given a word none of them is gets that word, and refuses it in its own words.
  */
 function namedIn(argv: readonly string[]): { name: string; rest: string[] } | undefined {
   const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
-  const name = NAMES.filter(opens).sort((a, b) => b.length - a.length)[0];
-  if (name === undefined) return undefined;
+  const name = [...NAMES, ...MOVED].filter(opens).sort((a, b) => b.length - a.length)[0];
+  if (name === undefined || MOVED.includes(name)) return undefined;
   return { name, rest: argv.slice(name.split(' ').length) };
 }
 

@@ -4,8 +4,10 @@ Workflows as folders of markdown, runs of their steps, a tick that files and adm
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
 
-The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and spawns this
-package's CLI for everything else — every write, a help, and a read typed with `--local` — with the same words. `bin/nemia.ts`
+The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and the commands
+whose words it holds, and spawns this package's CLI for everything else — every other write and a help — with the same words. A command
+in `objects`' `COMMAND_WORDS` is the client's: its entry in the table here spreads those words and keeps its `input` and `handler` alone
+(the api calls it), and this CLI no longer names it (`namedIn`). `bin/nemia.ts`
 and `bin/wf.ts` are that in-process CLI, the old path: exported as `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned by
 `apps/cli/src/local.ts` alone, and no package declares them as its bins. A change to a moved read's output changes the client's printer
 too, which holds parity with this one until the in-process reads retire.

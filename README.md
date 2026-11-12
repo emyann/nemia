@@ -73,7 +73,8 @@ Claude Code it starts is the one thing the runtime names, so the quota is read b
 on. It writes no transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
 the variables a Claude Code session hands its children taken out, should the api run inside one; how it signs in
 (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, a provider's switch) is kept, as the engine's workers keep it. That claude must be
-signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (`claude`, then `/login`): an API key, Bedrock
+signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (that Claude Code, then `/login`; the header names it by its
+path, which on an install with no Claude Code of its own is the release's): an API key, Bedrock
 or Vertex has no plan limits to show, and nor has a token of `claude setup-token` (`CLAUDE_CODE_OAUTH_TOKEN`, which `nemia claude-token
 set` keeps), which can make model requests but not read the plan's usage: Claude Code answers it no plan limits without asking, and
 the header says so in its own words, with what would make it answer — a `/login` and the token taken away (`nemia claude-token rm`).

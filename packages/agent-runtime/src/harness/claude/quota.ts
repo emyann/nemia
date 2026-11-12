@@ -11,6 +11,7 @@ import os from 'node:os';
 import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { Effect } from 'effect';
 import type { HarnessQuota, QuotaLimit } from '../seam.ts';
+import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
 /** How long an ask may take before it is given up on, and its query closed. */
@@ -150,9 +151,9 @@ export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
  * response around it, which only the SDK sees. A plan whose `rate_limits` are null is `unanswered`, as the SDK's type for this answer
  * says: "or null when unavailable".
  */
-export function quotaOfUsage(usage: unknown, env: NodeJS.ProcessEnv = {}): HarnessQuota {
+export function quotaOfUsage(usage: unknown, env: NodeJS.ProcessEnv = {}, program: string | null = null): HarnessQuota {
   if (!isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
-  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token' } : { kind: 'no-plan' };
+  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token', program } : { kind: 'no-plan', program };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
   if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
   if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
@@ -186,7 +187,7 @@ const saidIn = (message: string): string => {
  * in its own words; no Claude Code to ask is `missing`; anything else is `failed`, with the exit code or the signal the SDK read where
  * it read one, and what the child said on its stderr (`saidIn`).
  */
-export function quotaOfRefusal(error: unknown): HarnessQuota {
+export function quotaOfRefusal(error: unknown, program: string | null = null): HarnessQuota {
   const { errorClass, exitCode, signal, message } = (isObject(error) ? error : {}) as SdkError;
   const said = saidIn(typeof message === 'string' ? message : String(error));
   if (errorClass === 'executable_not_found') return { kind: 'missing' };
@@ -196,6 +197,7 @@ export function quotaOfRefusal(error: unknown): HarnessQuota {
     code: typeof exitCode === 'number' ? exitCode : null,
     signal: typeof signal === 'string' ? signal : null,
     said,
+    program,
   };
 }
 
@@ -207,8 +209,8 @@ export function quotaOfRefusal(error: unknown): HarnessQuota {
  * one named, the SDK throws nothing for its absence there (it fails the spawn, read by `quotaOfRefusal`), so a throw is read as any
  * other refusal.
  */
-const quotaOfUnopened = (cause: unknown, named: string | undefined): HarnessQuota =>
-  named === undefined ? { kind: 'missing' } : quotaOfRefusal(cause);
+const quotaOfUnopened = (cause: unknown, named: string | undefined, program: string | null): HarnessQuota =>
+  named === undefined ? { kind: 'missing' } : quotaOfRefusal(cause, program);
 
 /** An ask that threw before its query was open, told apart from one whose question was refused. */
 class Unopened {
@@ -222,9 +224,11 @@ class Unopened {
  * Ask Claude Code for the plan's usage: the Claude Code the sessions run (`quotaExecutable` of `command`, the engine's `claudeExecutable`,
  * and of `env`, this process's environment by default), read at each ask. Open a query for the question (`sdkUsageAsk`, or the `ask`
  * given), put it, and read what it answers (`quotaOfUsage`), how it refused (`quotaOfRefusal`), or why it could not be opened
- * (`quotaOfUnopened`). The query is taken in the ask's scope and closed as it closes, whatever ends it: an outcome, the timeout
- * (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never fails: every way it can go is a `HarnessQuota`, and no Claude
- * Code to ask is `missing`: the one named is not there, or the SDK bundles none for this platform.
+ * (`quotaOfUnopened`), each answer a person meets by running Claude Code by hand naming the one asked as a path to type (`program`:
+ * `claudeExecutableOf`, the one named, else the SDK's own bundled CLI, which on an install is the release's). The query is taken in the
+ * ask's scope and closed as it closes, whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an
+ * interruption. Never fails: every way it can go is a `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there,
+ * or the SDK bundles none for this platform.
  */
 export const claudeQuota = ({
   command,
@@ -234,15 +238,20 @@ export const claudeQuota = ({
 }: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
   Effect.suspend(() => {
     const executable = quotaExecutable(command, env);
+    const program = claudeExecutableOf(executable) ?? null;
     return Effect.acquireRelease(Effect.try({ try: () => ask(executable), catch: (cause) => new Unopened(cause) }), (open) =>
       Effect.promise(() => open.close().catch(() => undefined)),
     ).pipe(
       Effect.flatMap((open) => Effect.tryPromise({ try: () => open.usage({ skipBehaviors: true }), catch: (cause) => cause })),
       Effect.match({
-        onSuccess: (usage) => quotaOfUsage(usage, env),
-        onFailure: (cause) => (cause instanceof Unopened ? quotaOfUnopened(cause.cause, executable) : quotaOfRefusal(cause)),
+        onSuccess: (usage) => quotaOfUsage(usage, env, program),
+        onFailure: (cause) =>
+          cause instanceof Unopened ? quotaOfUnopened(cause.cause, executable, program) : quotaOfRefusal(cause, program),
       }),
       Effect.scoped,
-      Effect.timeoutOrElse({ duration: timeoutMs, orElse: () => Effect.succeed<HarnessQuota>({ kind: 'timeout', ms: timeoutMs }) }),
+      Effect.timeoutOrElse({
+        duration: timeoutMs,
+        orElse: () => Effect.succeed<HarnessQuota>({ kind: 'timeout', ms: timeoutMs, program }),
+      }),
     );
   });

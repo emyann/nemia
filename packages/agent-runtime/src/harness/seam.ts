@@ -189,16 +189,20 @@ export type QuotaLimit = { key: string; usedPercentage: number; resetsAt: string
  *   missing     there is no program to ask: the one named is not there, or the harness's own is not installed
  *   timeout     no answer within `ms`
  *   failed      the process ended, or could not start, before it answered: its exit code or signal, and its stderr's last line
+ *
+ * `program`, on the four that a person answers by running the harness by hand (`no-plan` and `token`, to sign it in; `timeout` and
+ * `failed`, to see why), is the program that was asked, as a path a person can type on that machine — on an install with no harness of its
+ * own on PATH, the one the release carries — or null where none was found.
  */
 export type HarnessQuota =
   | { kind: 'windows'; limits: QuotaLimit[]; subscription: string | null }
-  | { kind: 'no-plan' }
-  | { kind: 'token' }
+  | { kind: 'no-plan'; program: string | null }
+  | { kind: 'token'; program: string | null }
   | { kind: 'unanswered'; subscription: string | null }
   | { kind: 'unknown'; what: string }
   | { kind: 'missing' }
-  | { kind: 'timeout'; ms: number }
-  | { kind: 'failed'; code: number | null; signal: string | null; said: string };
+  | { kind: 'timeout'; ms: number; program: string | null }
+  | { kind: 'failed'; code: number | null; signal: string | null; said: string; program: string | null };
 
 /**
  * A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), the harness its task was filed on, and,

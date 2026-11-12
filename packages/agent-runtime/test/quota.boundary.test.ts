@@ -154,7 +154,7 @@ test("the quota asks the Claude Code the sessions run — the engine's, else the
   await s.test('REFUSED: an ask that timed out leaves no claude behind, however long its claude would have taken', async () => {
     const silent = aStandIn(NEVER_MS);
     const timed = await Effect.runPromise(claudeQuota({ command: silent.claude, timeoutMs: 300 }));
-    assert.deepEqual(timed, { kind: 'timeout', ms: 300 }, 'the silent claude outlasted the ask');
+    assert.deepEqual(timed, { kind: 'timeout', ms: 300, program: silent.claude }, 'the silent claude outlasted the ask, which names it');
     const pid = silent.pidOf();
     assert.ok(pid !== null && gone(pid), `the timed-out ask let its claude go (pid ${pid})`);
   });

@@ -153,6 +153,12 @@ const unknownRead = (what: string): Read => ({
 export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
 
 /**
+ * The command a person types to run the Claude Code that was asked: the path the engine named it by (`program`), which on an install
+ * with no Claude Code on PATH is the one the release carries; `claude` where the engine found none to name.
+ */
+const typed = (program: string | null): string => program ?? 'claude';
+
+/**
  * What the engine's answer says to the board, judged at `now` for the windows' resets: the plan's windows (`fresh`), or why there are none,
  * with what to do. Pure. A plan none of whose limits is a window the board shows is `unknown`.
  */
@@ -169,14 +175,14 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'timeout',
-        said: `Claude Code did not answer the usage request within ${ageWord(asked.ms)}: run claude -p in a shell where the api runs to see why.`,
+        said: `Claude Code did not answer the usage request within ${ageWord(asked.ms)}: run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
       };
     case 'failed': {
       const how = asked.code !== null ? `exit ${asked.code}` : asked.signal ? `killed by ${asked.signal}` : 'it did not start';
       return {
         ...none,
         state: 'failed',
-        said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run claude -p in a shell where the api runs to see why.`,
+        said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run ${typed(asked.program)} -p in a shell where the api runs to see why.`,
       };
     }
     case 'rejected':
@@ -189,13 +195,13 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-plan',
-        said: "No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run claude, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.",
+        said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run ${typed(asked.program)}, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR.`,
       };
     case 'token':
       return {
         ...none,
         state: 'no-plan',
-        said: "No plan limits to show: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, run claude and /login under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.",
+        said: `No plan limits to show: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage. For the quota, run ${typed(asked.program)}, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api.`,
       };
     case 'unanswered':
       return {

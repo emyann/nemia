@@ -324,8 +324,11 @@ const unfinishedNeeding = Effect.fnUntraced(function* (
   return out;
 });
 
-/** A fix's phase off its task's view: as it settled (`succeeded`, else `failed`), `running` once an attempt began, else `pending`. */
-export const fixPhaseOf = (view: TaskView | undefined): FixPhase => {
+/**
+ * The phase of a job filed as a command task — a fix, an upgrade (`upgrade-job.verb.ts`) — off its task's view: as it settled (`succeeded`,
+ * else `failed`), `running` once an attempt began, else `pending`.
+ */
+export const commandPhaseOf = (view: TaskView | undefined): FixPhase => {
   if (view === undefined) return 'pending';
   if (view.state.settled) return view.state.settled === 'succeeded' ? 'succeeded' : 'failed';
   return view.state.attempts.length ? 'running' : 'pending';
@@ -339,7 +342,7 @@ const fixRead = (record: FixRecord, view: TaskView | undefined, output: string):
     need: record.need,
     ...(record.factory === undefined ? {} : { factory: record.factory }),
     ...(record.workflow === undefined ? {} : { workflow: record.workflow }),
-    phase: fixPhaseOf(view),
+    phase: commandPhaseOf(view),
     output,
     ...(record.code === undefined ? {} : { code: record.code }),
     ...(typeof exitCode === 'number' ? { exitCode } : {}),

@@ -225,11 +225,16 @@ test("feedWords and versionWords: the feed's word and the version serving the bo
   );
 });
 
-test('newerReleaseWords: the frame says a newer release, only where the api read one newer', () => {
+test('newerReleaseWords: the frame says a newer release, and sends the person to Settings, only where the api read one newer', () => {
   const checkout = { kind: 'checkout', root: '/home/me/nemia' } as const;
   assert.match(
     newerReleaseWords({ version: '1.2.0', release: checkout, latest: { version: '1.3.0', newer: true } }) ?? '',
     /^nemia 1\.3\.0 is out: /,
+  );
+  assert.match(
+    newerReleaseWords({ version: '1.2.0', release: checkout, latest: { version: '1.3.0', newer: true } }) ?? '',
+    /Settings/,
+    'the note sends the person to Settings, where the server is upgraded',
   );
   assert.equal(newerReleaseWords({ version: '1.3.0', release: checkout, latest: { version: '1.3.0', newer: false } }), null);
   assert.equal(newerReleaseWords({ version: '1.2.0', release: checkout }), null);

@@ -234,6 +234,18 @@ store as it now is, and the refusal names that release.
 of an installed release reads the release list's newest entry every six hours, sending nothing about you or your store. Set
 `NEMIA_RELEASE_CHECK=off` in its environment to turn that off; a checkout of the repository never checks.
 
+### From the board
+
+The board's _Settings_ opens on the server's release: the one it runs and, when the daemon has read a newer one, that release with a
+link to its notes and an _Upgrade_ button. Pressing it asks once, then runs `nemia upgrade <tag>` on the server, exactly as you would
+type it there. Its output shows as it runs. The daemon restarts onto the new release partway through, and the page says so and reads the
+output again once it is back. It then shows the release the server now runs, or the upgrade's refusal and its log, with the server
+still on the release it ran. Any piece the new release needs before runs can start shows beside it, with its fix.
+
+_Back_ goes to the newest installed release older than the one the server runs, under the same rule as `nemia upgrade`: where the
+store's oldest readable release is newer, Back is shown refused and names it. Only a person may press either button. A session's token
+is refused, as for a fix on _Setup_. The MCP port offers the same upgrade as its `upgrade` tool, behind the person's token.
+
 ## Signing in from a remote browser
 
 Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as a factory's MCP server

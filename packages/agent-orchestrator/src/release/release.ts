@@ -197,8 +197,11 @@ export function checkoutPromiseLine(release: LeaseRelease | Running): string | n
   );
 }
 
-/** The newest release the store's release check last read, and whether it is newer than the one this code runs (`LatestRelease`). */
-export type Latest = { readonly version: string; readonly newer: boolean };
+/**
+ * The newest release the store's release check last read: its version and tag, whether it is newer than the one this code runs, and the
+ * address of its notes where the check kept one (`LatestRelease`).
+ */
+export type Latest = { readonly version: string; readonly tag?: string; readonly newer: boolean; readonly notes?: string };
 
 /**
  * What `nemia version` says: the release's version, this `nemia`'s release, the store's pointer, the release the daemon runs — and, where

@@ -666,7 +666,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                and each build log older than 30 days, as the daemon does every five
                                minutes. A tag older than the oldest release that can read the store
                                (store.json) is refused before anything is fetched or built
-                               CLI only: builds for minutes and restarts the daemon that serves the api
+                               on the port: upgrade
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former
                                line form, under the folders given or the store's own. --check: write

@@ -7,7 +7,7 @@ import { FrameHeader } from '@/components/frame/FrameHeader';
 import { FrameRail } from '@/components/frame/FrameRail';
 import { FrameTabs } from '@/components/frame/FrameTabs';
 import { NewerRelease } from '@/components/frame/NewerRelease';
-import { NemiaDock } from '@/components/nemia/NemiaDock';
+import { DOCK_ROOM, NemiaDock } from '@/components/nemia/NemiaDock';
 import { OpenBar } from '@/components/factory/OpenBar';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
@@ -30,7 +30,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * feed once for the whole page: what moves on it is read again at once, the polls slow while it is open, and the gauges say which. Her
  * chat is held over the whole frame too (`NemiaChatProvider`), one stream of hers for the visit, which her docked face and the chat page
  * both read, so a navigation neither closes it nor opens another; her docked face is drawn on every page but one whose route's
- * `staticData` says it `ownsChat`, the chat page, which is the panel itself. React
+ * `staticData` says it `ownsChat`, the chat page, which is the panel itself. Under every page it is drawn over, the page ends on room as
+ * tall as her face and its gap to the window's foot (`DOCK_ROOM`), so a page scrolled to its end shows its last line above her. React
  * Aria's `RouterProvider` sends every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page
  * again.
  */
@@ -50,7 +51,11 @@ function Root() {
           <FrameRail path={path} search={search} />
           <div className="flex min-w-0 flex-1 flex-col">
             <FrameHeader path={path} search={search} feed={feed} />
-            <main data-frame-page className="relative flex min-w-0 flex-1 flex-col bg-background">
+            <main
+              data-frame-page
+              style={ownsChat ? undefined : { paddingBottom: DOCK_ROOM }}
+              className="relative flex min-w-0 flex-1 flex-col bg-background"
+            >
               <NewerRelease />
               <FrameTabs path={path}>
                 {fullBleed ? (

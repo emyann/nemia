@@ -50,8 +50,7 @@ const claudeSignInSpec = spec<(ask: ClaudeSignInAsk) => ClaudeSignIn>({
     },
     noAnswerIsUnknown: {
       description: 'A command that did not run, or answered neither way, leaves the sign-in unknown',
-      condition: ({ input: [ask], output }) =>
-        ask.kind === 'timed-out' || saysIn(ask) || saysOut(ask) || output === 'unknown',
+      condition: ({ input: [ask], output }) => ask.kind === 'timed-out' || saysIn(ask) || saysOut(ask) || output === 'unknown',
     },
   },
 });

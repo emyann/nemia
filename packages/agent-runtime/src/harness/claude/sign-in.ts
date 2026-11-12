@@ -89,7 +89,8 @@ const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked
     timeout: ms,
     env: { ...withoutTelemetry(process.env), ...r.config?.env },
   });
-  if (ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT') return { ask: { kind: 'timed-out' }, status: undefined };
+  if (ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT')
+    return { ask: { kind: 'timed-out' }, status: undefined };
   if (ran.error !== undefined || ran.status === null) return { ask: { kind: 'not-run' }, status: undefined };
   const status = authStatusOf(ran.stdout ?? '');
   return { ask: { kind: 'exited', code: ran.status, loggedIn: status?.loggedIn }, status };

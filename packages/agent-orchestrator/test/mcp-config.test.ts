@@ -294,7 +294,15 @@ const withFakeClaude = async <T>(f: (args: string, claude: string) => Promise<T>
   const args = path.join(bin, 'args');
   fs.writeFileSync(
     path.join(bin, 'claude'),
-    ['#!/bin/sh', 'case "$1" in', '  agents) echo "[]" ;;', `  auth) echo '{"loggedIn":true}' ;;`, `  *) printf '%s\\n' "$@" > '${args}'; exit 1 ;;`, 'esac', ''].join('\n'),
+    [
+      '#!/bin/sh',
+      'case "$1" in',
+      '  agents) echo "[]" ;;',
+      `  auth) echo '{"loggedIn":true}' ;;`,
+      `  *) printf '%s\\n' "$@" > '${args}'; exit 1 ;;`,
+      'esac',
+      '',
+    ].join('\n'),
     { mode: 0o755 },
   );
   const prev = process.env.PATH;

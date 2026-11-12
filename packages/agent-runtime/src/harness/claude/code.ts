@@ -171,8 +171,8 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  * - `prepare`: first, whether this machine's Claude Code is signed in (`claude auth status`, bounded by `signInMs`, `CLAUDE_SIGN_IN_MS`
  *   unless a test shortens it): signed out, or with no answer in time, the spawn is refused and the attempt ends `unstartable`, in words
  *   naming how to sign in. It sees a credential's presence, never its validity: an expired or revoked token passes, and fails at the
- *   session's first request. Then, for the bridge file it names where the task asks for one, and the hold file and the sessions' drain where it is handed a
- *   store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
+ *   session's first request. Then, for the bridge file it names where the task asks for one, and the hold file and the sessions'
+ *   drain where it is handed a store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
  *   `Options.mcpServers`, read by `everyMcpServer` inside the bin, and a job writes no MCP config file: a checkout whose `.mcp.json`
  *   is not JSON refuses the spawn here, before the worker starts, so the attempt ends `unstartable` in those words rather than
  *   failing inside the bin.

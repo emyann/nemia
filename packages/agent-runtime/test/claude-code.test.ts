@@ -648,10 +648,9 @@ test(
       const { Engine } = await import('../src/index.ts');
       const { builtEngine } = await import('./engine.ts');
       const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
-      // A placeholder token, which `claude auth status` reads as signed in (docs/harness.md): the spawn's sign-in check passes, and the CLI
-      // refuses the flag before any request.
-      const env = { CLAUDE_CODE_OAUTH_TOKEN: 'a-placeholder-token' };
-      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config: { env, claude: { frobnicate: true } } }));
+      const signedInByPlaceholder = { CLAUDE_CODE_OAUTH_TOKEN: 'a-placeholder-token' };
+      const config = { env: signedInByPlaceholder, claude: { frobnicate: true } };
+      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config }));
       await until(
         t,
         async () => {

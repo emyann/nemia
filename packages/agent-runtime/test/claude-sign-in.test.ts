@@ -17,7 +17,8 @@ import { story } from 'test-kit/checkpoints';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 /** Where Claude Code keeps its transcripts, for the stand-in and the runtime's reader alike: set before `src` is imported. */
-process.env.CLAUDE_CONFIG_DIR = scratch('ae-sign-in-config-');
+const CONFIG = scratch('ae-sign-in-config-');
+process.env.CLAUDE_CONFIG_DIR = CONFIG;
 
 const { Engine } = await import('../src/index.ts');
 const { builtEngine } = await import('./engine.ts');

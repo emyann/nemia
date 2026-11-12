@@ -87,24 +87,21 @@ type Plan = {
 };
 
 /**
- * `auth status`, as Claude Code answers it (`docs/harness.md`, *`claude auth status`*), before the SDK's protocol: `STANDIN_AUTH` unset or
- * `in` prints a signed-in answer and exits 0, `out` a signed-out one and exits 1, and `hang` answers nothing until it is killed. Each ask is
- * recorded in `auth.jsonl` of `STANDIN_DIR`, where one is named, never in `argv.jsonl`: a test that reads a session's starts reads only those.
+ * `auth status`, as Claude Code answers it (`docs/harness.md`), before the SDK's protocol: `STANDIN_AUTH` unset or `in` signed in,
+ * exit 0; `out` signed out, exit 1; `hang` nothing, until it is killed. Each ask is recorded in `auth.jsonl` of `STANDIN_DIR`, where
+ * one is named, never in `argv.jsonl`.
  */
-if (process.argv[2] === 'auth') {
+const answerAuth = async (): Promise<never> => {
   if (process.env.STANDIN_DIR) {
     fs.appendFileSync(path.join(process.env.STANDIN_DIR, 'auth.jsonl'), `${JSON.stringify(process.argv.slice(2))}\n`);
   }
   const auth = process.env.STANDIN_AUTH ?? 'in';
-  if (auth === 'hang') await new Promise<never>(() => setInterval(() => {}, 60_000));
-  else if (auth === 'out') {
-    process.stdout.write(`${JSON.stringify({ loggedIn: false, authMethod: 'none' })}\n`);
-    process.exit(1);
-  } else {
-    process.stdout.write(`${JSON.stringify({ loggedIn: true, authMethod: 'oauth_token' })}\n`);
-    process.exit(0);
-  }
-}
+  if (auth === 'hang') return new Promise<never>(() => setInterval(() => {}, 60_000));
+  const loggedIn = auth !== 'out';
+  process.stdout.write(`${JSON.stringify({ loggedIn, authMethod: loggedIn ? 'oauth_token' : 'none' })}\n`);
+  return process.exit(loggedIn ? 0 : 1);
+};
+if (process.argv[2] === 'auth') await answerAuth();
 
 const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;

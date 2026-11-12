@@ -38,10 +38,9 @@ export const proposalsPass = Effect.fn('proposalsPass')(function* (place: Propos
 
 /**
  * The proposals pass as the tick runs it (`ProposalsAct`): at the store's root the pass was given, its runs' states as it judged them; a
- * refusal of the whole pass is said in the log and costs no other part of the tick. The folder the tick hands it is not read: each
- * proposal's factory says its own repositories.
+ * refusal of the whole pass is said in the log and costs no other part of the tick. Each proposal's factory says its own repositories.
  */
-export const proposalsActed: ProposalsActed = (_repo, runs, judged) =>
+export const proposalsActed: ProposalsActed = (runs, judged) =>
   Effect.gen(function* () {
     const home = yield* StoreRoot;
     const acted = yield* Effect.result(proposalsPass({ home }, runStatesOf(runs, judged)));

@@ -706,11 +706,11 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
       .filter((call) => call.argv.some((arg) => arg.includes('/actions/jobs/')))
       .map((call) => call.argv),
     [
-      ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
-      ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs'],
-      ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs', '--allow-escape-sequences'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs', '--allow-escape-sequences'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs', '--allow-escape-sequences'],
     ],
-    'each failing job is read by its id, the gathering `ci` last',
+    'each failing job is read by its id, the gathering `ci` last, once where gh prints it with the flag',
   );
 
   for (const [conclusion, code] of [
@@ -731,6 +731,50 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
     );
     assert.ok(refused.err.includes(conclusion.toLowerCase()), refused.err);
     assert.ok(refused.err.includes(RETRY), refused.err);
+  }
+});
+
+/** The escape a terminal's colour code opens with, built from its code so no raw one sits in this file. */
+const ESC = String.fromCharCode(0x1b);
+
+test("a red job's failing lines reach the step, without their colour codes, on a gh that refuses escape sequences and on one before it", () => {
+  const FLAG = '--allow-escape-sequences';
+  const log = stamped([
+    `${ESC}[36;1mnpm test${ESC}[0m`,
+    `templates:test: ${ESC}[31m✖ failing tests:${ESC}[39m`,
+    'templates:test: test at test/a.test.ts:3:1',
+    `templates:test: ${ESC}[31m✖ the colours are gone (2ms)${ESC}[39m`,
+    `templates:test:   ${ESC}[32mAssertionError [ERR_ASSERTION]: plain${ESC}[39m`,
+  ]);
+  const at5678 = 'actions/jobs/5678/logs';
+  for (const [gh, logs] of [
+    [
+      '2.103.3, which prints escape sequences only when given the flag',
+      [
+        { when: `${at5678} ${FLAG}`, out: log },
+        { when: at5678, status: 1, err: `the response contains terminal escape sequences; pass ${FLAG} to output it anyway` },
+      ],
+    ],
+    [
+      '2.45.0, which has no such flag and prints the log as it is',
+      [
+        { when: `${at5678} ${FLAG}`, status: 1, err: `unknown flag: ${FLAG}` },
+        { when: at5678, out: log },
+      ],
+    ],
+  ] as const) {
+    const at = placed();
+    at.gh.answers([
+      ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+      { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
+      ...logs,
+    ]);
+    const r = pr(at, 'wait', CI, { WF_CI_POLL_SECONDS: '0' });
+    assert.equal(r.code, 1, `${gh}: ${r.out}`);
+    for (const told of ['✖ the colours are gone (2ms)', 'AssertionError [ERR_ASSERTION]: plain'])
+      assert.ok(r.err.includes(told), `${gh}: the failing line, plain: ${told}\n${r.err}`);
+    assert.ok(!r.err.includes(ESC), `${gh}: no escape sequence reaches the step:\n${JSON.stringify(r.err)}`);
+    assert.doesNotMatch(r.err, /gave no log/, `${gh}: ${r.err}`);
   }
 });
 

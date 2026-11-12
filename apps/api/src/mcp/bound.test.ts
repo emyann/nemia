@@ -97,10 +97,12 @@ write(
     })),
   }),
 );
+/** How long each planted agent's one-line description is: a page of `PORT_PAGE` of their lines is past the bound. */
+const AGENT_DESCRIPTION = Math.ceil((ANSWER_BOUND * 1.5) / PORT_PAGE);
 for (let i = 0; i < 20; i++)
   write(
     path.join(root, 'workflows', 'agents', `agent-${String(i).padStart(2, '0')}.md`),
-    `---\nharness: claude\n---\n${words(8_000, `agent ${i}`)}\n`,
+    `---\nharness: claude\ndescription: ${words(AGENT_DESCRIPTION, `described ${i}`)}\n---\n${words(8_000, `agent ${i}`)}\n`,
   );
 
 /**
@@ -220,14 +222,27 @@ test('inbox answers the cards in play alone unless asked for every one, a card a
   assert.ok(one.text.includes(CARD_BODY('parked-03').slice(0, 200)), "a card's read answers its file as written");
 });
 
-test('a list of long items with no limit is asked a page short enough to fit, the rest left to its token', async () => {
+test('a list of long lines with no limit is asked a page short enough to fit, the rest left to its token', async () => {
   const client = await connected();
   const answer = await call(client, 'agents', { namespace: 'default' });
   assert.equal(answer.isError, false, answer.text.slice(0, 300));
-  const list = answer.structured as { items: unknown[]; metadata: { continue?: string } };
-  assert.ok(list.items.length > 0 && list.items.length < PORT_PAGE, `${list.items.length} agents on the page`);
-  assert.ok(list.metadata.continue, 'the token of the next page');
-  assert.ok(answer.size <= ANSWER_BOUND);
+  const agentLines = answer.text.split('\n').filter((l) => l.startsWith('agent-'));
+  assert.ok(agentLines.length > 0 && agentLines.length < PORT_PAGE, `${agentLines.length} agents on the page`);
+  assert.ok(/continue (\S+)$/.test(answer.text.split('\n').at(-1) ?? ''), 'the token of the next page');
+  assert.ok(answer.size <= ANSWER_BOUND, `${answer.size} characters`);
+});
+
+test('agents answers an agent a line, its name, origin and description among the columns, and never its instructions', async () => {
+  const client = await connected();
+  const answer = await call(client, 'agents', { namespace: 'default', limit: 2 });
+  assert.equal(answer.isError, false, answer.text.slice(0, 300));
+  assert.equal(answer.structured, undefined, 'the lines alone, never the agents as objects');
+  const [header = '', ...rest] = answer.text.split('\n');
+  for (const column of ['NAME', 'ORIGIN', 'DESCRIPTION']) assert.ok(header.includes(column), `the header names ${column}`);
+  const agentLines = rest.filter((l) => l.startsWith('agent-'));
+  assert.equal(agentLines.length, 2, 'an agent a line');
+  assert.ok(agentLines[0]?.includes('described 0'), 'its description');
+  assert.ok(!answer.text.includes('agent 0 agent 0'), 'nothing of its instructions');
 });
 
 test('REFUSED: a read that is no page, past the bound, is an error naming how to narrow it, short, with nothing of the body', async () => {

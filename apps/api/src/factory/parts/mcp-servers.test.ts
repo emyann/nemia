@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { BUILTIN_SERVERS, builtinServers } from 'agent-orchestrator';
 import { addFactory } from 'agent-orchestrator/testing';
-import { HEADER_MASK } from 'objects';
+import { HEADER_MASK, TABLE_ACCEPT, tableLines, type Table } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../../app.ts';
 
@@ -160,4 +160,33 @@ test("Nemia's builtin servers are the orchestrator package's own folder, never a
     builtinServers(BUILTIN_SERVERS).some((s) => s.name === 'github'),
     "GitHub's hosted server is a builtin one",
   );
+});
+
+/** The cell of `row` under the column `name` of `table`. */
+const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+  row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
+
+test("a factory's MCP servers asked as a Table answer a server's columns and a line each, a header named and never its value", async () => {
+  await answered(send('PUT', `${URL}/docs`, { url: 'https://docs.example/mcp', headers: { 'X-Toolsets': 'secret-toolsets' } }));
+  try {
+    const res = await app.request(URL, { headers: { accept: TABLE_ACCEPT } });
+    assert.equal(res.status, 200);
+    const table = (await res.json()) as Table;
+    assert.equal(table.kind, 'Table');
+    assert.deepEqual(
+      table.columnDefinitions.filter((c) => c.priority === 0).map((c) => c.name),
+      ['Name', 'Type', 'URL', 'State', 'Tools', 'Error'],
+    );
+    assert.equal(table.rows.length, 1);
+    const [row] = table.rows;
+    assert.ok(row);
+    assert.equal(cellOf(table, row, 'Headers'), 'X-Toolsets');
+    assert.ok(!JSON.stringify(table).includes('secret-toolsets'), "a header's value is in no cell");
+    const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
+    assert.equal(lines.length, 2, 'a header, then a line for the server');
+    assert.match(lines[1] ?? '', /^docs\s+http\s+https:\/\/docs\.example\/mcp\s+unread/);
+    assert.equal((await answered<McpServerList>(app.request(URL))).kind, 'McpServerList', 'a list asked for no Table is the list');
+  } finally {
+    await answered(send('DELETE', `${URL}/docs`, {}));
+  }
 });

@@ -13,7 +13,7 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, type SkillChange } from 'agent-orchestrator';
+import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, skillTable, type SkillChange } from 'agent-orchestrator';
 import { SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
@@ -33,6 +33,7 @@ import {
 } from './skills.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answeredWriteIn, readerRefused } from '../objects/refused.ts';
+import { wantsTable } from '../objects/table.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
 import {
   listed,
@@ -171,10 +172,13 @@ const draftOf = (spec: SkillSpec, name: string, route: string): SkillChange => {
 export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const { origin, ...page } = query;
-        return listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
-      }),
+      Effect.flatMap(wantsTable, (table) =>
+        answeredWriteIn(namespace, async (s) => {
+          const { origin, ...page } = query;
+          const list = listed('Skill', await skillObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
+          return table ? skillTable(list) : list;
+        }),
+      ),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, (s) => skillAt(s, namespace, name, originAsked(query.origin))),

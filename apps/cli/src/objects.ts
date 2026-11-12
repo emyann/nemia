@@ -13,7 +13,7 @@
 import { Cause, Duration, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
 import { HttpApiClient } from 'effect/http-api';
-import { Api, type APIResource, Conflict, Forbidden, Invalid, Missing, Unauthorized, Unjudged } from 'objects';
+import { Api, type APIResource, Conflict, Forbidden, Invalid, Missing, type Table, Unauthorized, Unjudged } from 'objects';
 import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
 import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
@@ -134,9 +134,22 @@ export async function asked<A, E>(
   return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs);
 }
 
+/**
+ * A list's page, of a list that answers a `Table` only where asked for one (`TABLE_ACCEPT`), which a read of its objects never asks: a
+ * `Table` all the same is an api this client does not read, said as such.
+ */
+export const pageOf = <L extends { readonly items: readonly unknown[] }, E>(
+  listed: Effect.Effect<L | Table, E>,
+): Effect.Effect<L, E | Error> =>
+  Effect.flatMap(listed, (list) =>
+    'items' in list
+      ? Effect.succeed(list)
+      : Effect.fail(new Error('the api answered a Table to a list asked for its objects: restart it, `nemia service restart`')),
+  );
+
 /** The factories the api lists (`FactoryList`, `GET /api/factories`), the default first on its own repository, for the read `verb`. */
 export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>
-  asked(verb, (client) => client.factories.listAll({ query: {} }), env);
+  asked(verb, (client) => pageOf(client.factories.listAll({ query: {} })), env);
 
 /** Every resource the api serves (`GET /api`), for the verb `verb` names: what `get`, `apply` and `explain` resolve a word against. */
 export const discovered = async (verb: string, env: NodeJS.ProcessEnv = process.env): Promise<readonly APIResource[]> =>

@@ -84,7 +84,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A request body is decoded by its endpoint's Schema** and refused 400 with the `field` it stopped at (`decodeRefused` in
   `src/objects/serve.ts`): no schema message reaches a response. A new key goes into the Schema in `objects`, with a test that makes it refuse.
 - **A server-side `Table`** (Kubernetes' `Accept: application/json;as=Table;g=meta.k8s.io;v=v1`, `TABLE_ACCEPT`) is answered where an
-  endpoint declares `Table` beside its list (runs, cards) and the request accepts it (`wantsTable`, `src/objects/table.ts`).
+  endpoint declares `Table` beside its list (runs, cards, agents, skills, factories, a factory's MCP servers) and the request accepts
+  it (`wantsTable`, `src/objects/table.ts`); its columns are the orchestrator's (`runTable`, `cardTable`, `src/kind-table/`), and a row's
+  object is the item's metadata (`PartialObjectMetadata`) but a card's, the card whole.
 - **A feed fixture writes the events the runtime writes**: the runtime decodes its feed, so a fixture event missing a field the
   runtime always writes fails the read, not the assertion you meant.
 - **A handler reads what it needs through `served(c, …)`** (`layer.ts`), never off a module: the engine, the store's root, the

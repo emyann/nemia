@@ -21,7 +21,10 @@ export type ScheduleRepoAsk = {
   readonly wired: boolean;
 };
 
-/** Why a schedule's write is refused for its repository, closed: a retired `repo` set or changed, or a workflow the wiring places nowhere. */
+/**
+ * Why a schedule's write is refused for its repository, closed: a retired `repo` set or changed, or a workflow the wiring places
+ * nowhere.
+ */
 export type ScheduleRepoRefusal = 'repo' | 'unwired';
 
 /** Whether the write sets a `repo` the schedule has none of, or another than the one it has: leaving it out sets none. */
@@ -30,7 +33,8 @@ const placesByRepo = (ask: ScheduleRepoAsk): boolean => ask.repoSent !== undefin
 const scheduleRepoRefusalSpec = spec<(ask: ScheduleRepoAsk) => ScheduleRepoRefusal | null>({
   ensures: {
     repoRetired: {
-      description: "A write that sets a schedule's repository, or changes an old schedule's, is refused: the factory's wiring places its runs",
+      description:
+        "A write that sets a schedule's repository, or changes an old schedule's, is refused: the factory's wiring places its runs",
       condition: ({ input: [ask], output }) => !placesByRepo(ask) || output === 'repo',
     },
     oldRepoKept: {

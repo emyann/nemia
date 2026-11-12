@@ -42,6 +42,7 @@ export {
   maxConcurrent,
   maxRuns,
   SESSION_VARIABLES,
+  FORWARD_VARIABLES,
   setting,
   type Settings,
   settingsOf,

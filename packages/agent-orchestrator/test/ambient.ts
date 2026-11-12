@@ -38,7 +38,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { SESSION_VARIABLES } from '../src/config/config.store.ts';
+import { FORWARD_VARIABLES, SESSION_VARIABLES } from '../src/config/config.store.ts';
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
 export const SENTINEL = 'set-it-in-the-test';
@@ -49,7 +49,7 @@ process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.NEMIA_DAEMON_START = 'off';
 delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
-for (const name of SESSION_VARIABLES) delete process.env[name];
+for (const name of [...SESSION_VARIABLES, ...FORWARD_VARIABLES]) delete process.env[name];
 
 /** Where a harness keeps its own files in a test: a folder of this process's, never the person's. */
 export const CONFIG = scratch('wf-ambient-claude-');

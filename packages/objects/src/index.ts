@@ -192,10 +192,21 @@ export {
   McpServerSpec,
   McpServerStatus,
   McpServerWrite,
+  SignInCallback,
   SignInStarted,
   SignInState,
   SignedOut,
 } from './mcp-server.ts';
+export {
+  type ApiShape,
+  type EndpointKeys,
+  type EndpointShape,
+  UNTAKEN_QUERY,
+  endpointKeysOf,
+  endpointOf,
+  keysOfEndpoint,
+  streamsOf,
+} from './endpoint-keys.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';

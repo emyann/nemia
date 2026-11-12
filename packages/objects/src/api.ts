@@ -50,7 +50,7 @@ import {
   FactoryTrusted,
 } from './factory.ts';
 import { Hire, HireList, HireWrite } from './hire.ts';
-import { McpServer, McpServerList, McpServerWrite, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
+import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
 import { KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
@@ -349,6 +349,12 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
   }),
   HttpApiEndpoint.get('signInState', '/api/namespaces/:namespace/mcpservers/:name/sign-in', {
     params: cardParams,
+    success: SignInState,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('signInCallback', '/api/namespaces/:namespace/mcpservers/:name/sign-in/callback', {
+    params: cardParams,
+    payload: SignInCallback,
     success: SignInState,
     error: objectErrors,
   }),

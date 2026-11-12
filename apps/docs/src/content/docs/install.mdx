@@ -110,6 +110,10 @@ it from standard input. The token is kept in `~/.agent-workflows/claude-token`, 
 starts, however it was started. `nemia claude-token status` says whether one is set, never the token itself, and
 `nemia claude-token rm` takes it away. Nemia never sends, logs or serves it, and the board never asks for it.
 
+With no token set, and no sign-in of Claude Code's own, a Claude session does not start: it ends saying nothing started, and names
+`claude setup-token`. The daemon reads the token when it starts, so start it again after `nemia claude-token set`, then try the step
+again. The check sees only that a token is there: a token that has expired or been revoked still shows at the session's first request.
+
 Each person uses their own token, on their own machine. A server that others use while it runs on one person's token makes that
 person's account available to them, which Anthropic's
 [Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section 2, _Account creation and access_, forbid: "You also
@@ -117,7 +121,10 @@ may not make your Account available to anyone else."
 
 A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
 connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
-itself still work.
+itself still work. Nor can it read the plan's usage, so the board's quota shows no limits on such a server, and says why. For the
+quota, sign in on the server with the Claude Code the sessions run — the board names it by its path; on a server with only the
+release, it is the one the release carries, `~/.agent-workflows/releases/current/node_modules/@anthropic-ai/claude-agent-sdk-<platform>-<arch>/claude`
+— then `/login`, and take the token away (`nemia claude-token rm`).
 
 ## A repository by its URL
 

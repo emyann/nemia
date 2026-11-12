@@ -709,6 +709,10 @@ const applied = Effect.fn('applied')(function* (args: Args) {
   return { name, repos, file, template, place, tree } satisfies Applied;
 });
 
+/** What `nemia factory apply` takes after its verb, said by its usage and by `nemia factory add`'s refusal of a `--template`. */
+export const APPLY_USAGE =
+  '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]';
+
 /**
  * `nemia factory apply`: a factory filed from a template, its places then trusted as `nemia factory add` trusts them unless
  * `--no-trust` (`trustPlaces`); the daemon renders its tree.
@@ -716,7 +720,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
 export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
   name: 'factory apply',
   served: [{ endpoint: 'factories.apply', request: templatePacked }],
-  usage: '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]',
+  usage: APPLY_USAGE,
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),

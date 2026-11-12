@@ -397,6 +397,17 @@ export { PRUNE, RM } from './forget/commands.verb.ts';
 export { CLOSEOUT, LOGS, SHOW, TOLD, TRIES, TRY } from './object/commands.verb.ts';
 export { STATS } from './stats/commands.verb.ts';
 export { STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT } from './steps/commands.verb.ts';
+export {
+  transcriptAskedRead,
+  transcriptCursorOf,
+  transcriptCursorRead,
+  transcriptCut,
+  transcriptKindsOf,
+  transcriptPaged,
+  type TranscriptAsked,
+  type TranscriptAt,
+  type TranscriptPaged,
+} from './transcript-page/transcript-page.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';

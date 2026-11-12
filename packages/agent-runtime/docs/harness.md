@@ -241,6 +241,22 @@ with `updatedPermissions` set to the `suggestions` it was handed, as an always a
   accounts for (not measured apart). An always allow returns every suggestion, as the SDK's comment on them asks (`sdk.d.ts:232-239`), and so can change
   more than the one rule its choice's description names first.
 
+## The quota of a token
+
+**A Claude Code signed in only by `CLAUDE_CODE_OAUTH_TOKEN` — the token `claude setup-token` makes, which `nemia claude-token set`
+keeps — answers `get_usage` with no plan limits, and asks the usage service nothing** (SDK 0.3.322, its bundled Claude Code 2.1.322,
+2026-11-11). Read off the bundled CLI: a token from that variable is given the scopes `CLAUDE_CODE_OAUTH_SCOPES` names, else
+`user:inference` alone; `get_usage` answers `rate_limits_available` as signed in to claude.ai *and* holding `user:profile`, and asks
+`/api/oauth/usage` only when it is true; its own schema says it is false for "API key, Bedrock, Vertex, or missing profile scope".
+Measured: the bundled CLI, asked through the SDK in a scratch `HOME` and `CLAUDE_CONFIG_DIR` with only a placeholder token in the
+variable, answered `{"subscription_type":null,"rate_limits_available":false,"rate_limits":null}` in under half a second — the same
+answer, field for field, as with no sign-in at all. The answer is decided from the token's scopes before any request, so a real token
+answers the same; none was at hand to confirm it against the service. So the answer cannot tell a token from no subscription: the
+quota tells them apart by the environment it hands the ask (`quotaOfUsage`, `TOKEN_VARIABLE`), and reads it as `token`. What would
+make it answer is a sign-in that holds `user:profile` — `claude` then `/login` under the same `CLAUDE_CONFIG_DIR` — with the variable
+taken away, since a set `CLAUDE_CODE_OAUTH_TOKEN` is read before the stored login. Measured by a throwaway probe kept outside the
+repository.
+
 ## The claude.ai bridge
 
 **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,
@@ -359,6 +375,23 @@ transcript saved, when it has one" (`sdk.d.ts:6182-6185`); this is what that sav
 - **A process killed (`SIGKILL`) prints no result and saves nothing, and its resume counts from nothing**: the resume's first result
   was 0.00037, its own turn alone. So a holder that kills its sessions' Claude Code loses what they spent, which is why the let-go ends
   them through the SDK (`parked`, `harness/claude/attached.ts`) and kills only what outlives its bound.
+
+## `claude auth status`
+
+What tells, without starting a session, whether this machine's Claude Code holds a credential: what a job's spawn asks
+(`harness/claude/sign-in.ts`). Measured on the SDK's bundled Claude Code **2.1.322, 2026-11-12**, by the operator and again by the
+implement step:
+
+- **Signed in through claude.ai**: JSON on stdout, `loggedIn: true`, `authMethod: claude.ai`, exit 0.
+- **Signed out** (a `CLAUDE_CONFIG_DIR` with no login, no token in the environment): `loggedIn: false`, `authMethod: none`, exit 1.
+- **A placeholder `CLAUDE_CODE_OAUTH_TOKEN`** under that same empty config: `loggedIn: true`, `authMethod: oauth_token`,
+  `loginExpiresAt: null`, exit 0. The command reads a credential's presence, never its validity: a setup-token that has expired (they
+  last a year), been revoked or mistyped reads signed in, and fails at the session's first request.
+
+The CLI reference documents it (<https://code.claude.com/docs/en/cli-reference>, read 2026-11-12): "Show authentication status as JSON
+… Exits with code 0 if logged in, 1 if not", `authMethod` one of `none`, `claude.ai`, `oauth_token`, `api_key`, `api_key_helper`,
+`third_party`. The SDK's own reads do not answer it: `Query.accountInfo()` needs a query, so a session started, and has no
+`loggedIn`. Whether a claude.ai login whose refresh fails reads `loggedIn: false` is unmeasured.
 
 ## A memory limit, held by a scope
 

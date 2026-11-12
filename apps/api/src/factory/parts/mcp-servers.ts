@@ -7,7 +7,6 @@
  * (`builtinServerList`), a spec each and no namespace.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   mcpServerTable,
   builtinServerList,
@@ -27,6 +26,7 @@ import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 import { wantsTable } from '../../objects/table.ts';
+import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The route of the server `name` of `namespace`, as a refusal says it. */
 const routeOf = (method: string, namespace: string, name: string, sub = ''): string =>
@@ -42,7 +42,7 @@ const named = (route: string, namespace: string, name: string): void => {
 /** The server `name` of `namespace`, read now. */
 const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, defaultRepo(s), namespace, name));
 
-export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handlers) =>
+export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>
@@ -100,6 +100,6 @@ export const mcpServersHandlers = HttpApiBuilder.group(Api, 'mcpservers', (handl
     ),
 );
 
-export const builtinHandlers = HttpApiBuilder.group(Api, 'builtin', (handlers) =>
-  handlers.handle('mcpservers', () => answered(async () => builtinServerList())),
+export const builtinHandlers = readsBounded(Api, 'builtin', (handlers) =>
+  handlers.handle('mcpservers', ({ query }) => answered((s) => s.inRequest(builtinServerList(queryOf(query))))),
 );

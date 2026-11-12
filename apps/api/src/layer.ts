@@ -26,6 +26,7 @@ import {
   EngineService,
   type LastSaid,
 } from 'agent-orchestrator';
+import { ANSWER_MOST } from 'objects';
 import { McpAsker } from './capabilities/capabilities.ts';
 import { routeOf } from './request/request.ts';
 import { type Place, placeFor } from './factory/place.ts';
@@ -96,6 +97,12 @@ export type BeatsShape = {
 export const Beats = Context.Reference<BeatsShape>('api/Beats', { defaultValue: () => ({}) });
 
 /**
+ * The most an answer's JSON is, in characters, before the api refuses it (`readHandled`, objects/answer-bound.ts): `ANSWER_MOST`, unless
+ * the app's layer gives another, as a test does to see every read refused (`Layer.succeed(AnswerBound)(1)`).
+ */
+export const AnswerBound = Context.Reference<number>('api/AnswerBound', { defaultValue: () => ANSWER_MOST });
+
+/**
  * Every service a handler may read: what an app's layer provides whole, the steps followed live among them (`Followings`), and the place
  * the package's programs ask (`PlaceService`).
  */
@@ -150,6 +157,8 @@ export type Served = {
   informer: InformerMemo | undefined;
   followings: Followings['Service'];
   beats: BeatsShape;
+  /** The most an answer's JSON is, in characters, before the api refuses it (`AnswerBound`). */
+  answerMost: number;
   /** Who the request is from: the person, or the agent's session its token names (`callerGate`, caller/caller.ts). */
   caller: ProposalCaller;
   /** The trace the request's programs join (`runPlaced`, store.ts): the app's tracer and the request's server span; none outside one. */
@@ -223,6 +232,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
           informer: yield* Informer,
           followings: yield* Followings,
           beats: yield* Beats,
+          answerMost: yield* AnswerBound,
           caller: c.var.caller,
           trace: yield* traceOf(c),
           inRequest,

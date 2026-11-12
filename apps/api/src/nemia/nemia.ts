@@ -7,7 +7,6 @@
  * by its kind (`answered`, objects/refused.ts).
  */
 import type { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   AGENTS_CUSTOM,
   CHAT_ALLOW,
@@ -27,6 +26,7 @@ import { Api } from 'objects';
 import type { Served } from '../layer.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 import { chatAnswer, chatPage, chatRead, chatSend, chatStop, chatStream } from './chat.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /**
  * What `GET /api/policy/:name` and its writes answer, as the package types it: read by the board's wire test until it reads `objects`'
@@ -51,7 +51,7 @@ const wordsOf = async (s: Served, args: { words?: string }) => {
   return read;
 };
 
-export const nemiaHandlers = HttpApiBuilder.group(Api, 'nemia', (handlers) =>
+export const nemiaHandlers = readsBounded(Api, 'nemia', (handlers) =>
   handlers
     .handle('level', () => answered((s) => s.inRequest(LEVEL.handler({}))))
     .handle('setLevel', ({ payload }) => answeredWrite((s) => s.inRequest(LEVEL.handler(payload))))

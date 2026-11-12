@@ -1,8 +1,9 @@
 /**
  * `nemia decide`, a verb of the client's own, on a stub server that answers `GET /api/health` and `GET /api/runs/:runId/decision` as the
  * api does (`objects`' `RunDecision`): the screen printed off the read, the commands numbered; at a terminal the one picked run as the
- * client runs that verb, its placeholder asked first, a `git` one printed and never run; off a terminal nothing run. `--local` and
- * `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit 2, before any read.
+ * client runs that verb, its placeholder asked first, a `git` one printed and never run; off a terminal nothing run; every diff asked
+ * whole (`?diffs=*`). `--local` and `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit
+ * 2, before any read.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -114,7 +115,9 @@ function ioOf(interactive: boolean, lines: readonly string[] = []) {
 test('off a terminal, the screen of the decision is printed off the api read, its commands numbered, and nothing is run', async () => {
   const { io, ran, said } = ioOf(false);
   assert.equal(await decide(['r-1'], io.run, io, env), 0);
-  assert.ok(asked.includes('/api/runs/r-1/decision'), 'it read the decision of the api');
+  const read = asked.find((url) => url.startsWith('/api/runs/r-1/decision'));
+  assert.ok(read !== undefined, 'it read the decision of the api');
+  assert.equal(new URL(read, 'http://x').searchParams.get('diffs'), '*', 'it asked every diff whole, the screen printing them in full');
   const out = said();
   assert.match(out, /^r-1$/m);
   assert.match(out, /touched {2}wf\/r-1\/plan: 1 file/);

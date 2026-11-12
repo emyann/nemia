@@ -4653,7 +4653,8 @@ backoff stay in the api.
   half as often at once; 4 h leaves a service that answers again read within the five-hour window. `HKB_QUOTA_BACKOFF_MS` sets the first
   wait (the e2e sets 0). In memory, beside the rest: a restart costs one ask.
 - **The states**, each HTTP 200 with a sentence saying what to do: `fresh` (the windows), `asking`, `no-plan`
-  (`rate_limits_available: false`: an API key, Bedrock, Vertex, or not signed in), `unanswered` (`rate_limits_available: true` and
+  (`rate_limits_available: false`: an API key, Bedrock, Vertex, or not signed in; or a token of `claude setup-token`, which holds no
+  `user:profile` scope, said apart in its own words: the runtime's `token`), `unanswered` (`rate_limits_available: true` and
   `rate_limits: null`: signed in, and Anthropic's usage service gave Claude Code nothing — seen by the owner on 2026-09-19, hours
   after the quota began to come from `get_usage`, with `Usage fetch returned a fieldless or non-object body (in-band error)` in
   2.1.278's `--debug` log; said as possibly the service limiting how often it is asked, never as a fact), `no-claude` (the SDK's `executable_not_found`), `timeout`,

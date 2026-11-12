@@ -10,13 +10,15 @@ import path from 'node:path';
 import { Effect, Exit, Tracer } from 'effect';
 import {
   claudeQuota,
+  EXECUTABLE_VARIABLE,
   type OpenUsage,
-  QUOTA_COMMAND,
+  quotaExecutable,
   quotaOfRefusal,
   quotaOfUsage,
   usageEnv,
   usageOptions,
 } from '../src/harness/claude/index.ts';
+import { claudeExecutableOf } from '../src/harness/mcp-sign-in.ts';
 import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from 'test-kit/scratch';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
@@ -93,8 +95,25 @@ test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — 
     "Claude Code 2.1.278's recorded answers read as what they were: the plan's limits, no plan, nothing from the usage service",
     () => {
       assert.deepEqual(quotaOfUsage(usageOf('plan')), PLAN);
-      assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan' });
+      assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan', program: null });
       assert.deepEqual(quotaOfUsage(usageOf('unanswered')), { kind: 'unanswered', subscription: 'max' });
+    },
+  );
+  await t.test(
+    "no plan limits, asked of a Claude Code signed in by a token of `claude setup-token`, is the token's: it cannot read the plan, which is not no plan",
+    () => {
+      const token = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
+      assert.deepEqual(
+        quotaOfUsage(usageOf('no-plan'), token, '/opt/claude'),
+        { kind: 'token', program: '/opt/claude' },
+        'naming the Claude Code asked, to sign in otherwise',
+      );
+      assert.deepEqual(
+        quotaOfUsage(usageOf('no-plan'), { CLAUDE_CODE_OAUTH_TOKEN: '' }),
+        { kind: 'no-plan', program: null },
+        'an empty variable signs in nothing',
+      );
+      assert.deepEqual(quotaOfUsage(usageOf('plan'), token), PLAN, 'a token whose Claude Code reads the plan reads as the plan');
     },
   );
   await t.test(
@@ -132,7 +151,7 @@ test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — 
             exitCode: 3,
           }),
         ),
-        { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail' },
+        { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail', program: null },
         "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
       );
       assert.deepEqual(
@@ -142,10 +161,16 @@ test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — 
             signal: 'SIGKILL',
           }),
         ),
-        { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory' },
+        { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory', program: null },
         "the signal is a field of the SDK's error, read as one",
       );
-      assert.deepEqual(quotaOfRefusal('nope'), { kind: 'failed', code: null, signal: null, said: 'nope' });
+      assert.deepEqual(quotaOfRefusal('nope', '/opt/claude'), {
+        kind: 'failed',
+        code: null,
+        signal: null,
+        said: 'nope',
+        program: '/opt/claude',
+      });
     },
   );
 });
@@ -179,12 +204,57 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
   );
   assert.equal(given.cwd, machineTempDir(), 'an ask runs its claude in the temp directory');
   assert.deepEqual(
-    [given.persistSession, given.strictMcpConfig, given.settingSources, given.pathToClaudeCodeExecutable],
-    [false, true, [], 'claude'],
-    "no session written, no MCP server but one named here, none of the user's settings, and the `claude` the sessions run on — never the SDK's own bundled CLI, which an ask that named none would drive",
+    [given.persistSession, given.strictMcpConfig, given.settingSources],
+    [false, true, []],
+    "no session written, no MCP server but one named here, none of the user's settings",
   );
-  assert.equal(QUOTA_COMMAND, 'claude', 'the Claude Code an ask drives when none is named is a bare name, resolved on PATH');
+  assert.equal(
+    Object.hasOwn(given, 'pathToClaudeCodeExecutable'),
+    false,
+    'with no Claude Code named the option is left off, so the SDK drives its own, as a job does — not a `claude` on PATH',
+  );
   assert.equal(usageOptions('/bin/claude').pathToClaudeCodeExecutable, '/bin/claude', 'the Claude Code named is the one asked');
+});
+
+test("the Claude Code an ask drives is the one the sessions run: the engine's where it names one, else the one a job inherits, else the SDK's own — never resolved on PATH", async (t) => {
+  const PATH = scratch('ae-quota-path-');
+  const rows: Array<[string, string | undefined, NodeJS.ProcessEnv, string | undefined]> = [
+    [
+      "the engine's `claudeExecutable`, over the one the environment names",
+      '/engine/claude',
+      { [EXECUTABLE_VARIABLE]: '/env/claude', PATH },
+      '/engine/claude',
+    ],
+    [
+      'the one the environment names, which every job inherits, where the engine names none',
+      undefined,
+      { [EXECUTABLE_VARIABLE]: '/env/claude', PATH },
+      '/env/claude',
+    ],
+    ["the SDK's own where neither names one, whatever `claude` PATH holds", undefined, { PATH }, undefined],
+    ["the SDK's own where the variable is empty, as a job reads it", undefined, { [EXECUTABLE_VARIABLE]: '', PATH }, undefined],
+  ];
+  for (const [name, named, env, asked] of rows)
+    await t.test(name, async () => {
+      assert.equal(quotaExecutable(named, env), asked);
+      const stand = standIn(async () => usageOf('plan'));
+      assert.deepEqual(await Effect.runPromise(claudeQuota({ ...(named ? { command: named } : {}), env, ask: stand.ask })), PLAN);
+      assert.equal(stand.seen.command, asked, 'the ask was opened over that Claude Code');
+      assert.equal(usageOptions(asked, env).pathToClaudeCodeExecutable, asked, "and the SDK's query is given it, or nothing");
+    });
+});
+
+test('REFUSED: an ask whose query cannot be opened — the SDK throwing in words, with no errorClass, as it does when its platform package is not installed — answers, never dies: with no Claude Code named, the SDK found none of its own, `missing`; with one named, a refusal in its words', async (t) => {
+  const throwing: OpenUsage = () => {
+    throw new Error('Native CLI binary for linux-x64 not found. Reinstall @anthropic-ai/claude-agent-sdk without --omit=optional.');
+  };
+  await t.test("none named and none inherited: the SDK's own is not installed, so there is no Claude Code to ask", async () => {
+    assert.deepEqual(await Effect.runPromise(claudeQuota({ env: {}, ask: throwing })), { kind: 'missing' });
+  });
+  await t.test('one named: the throw is read as any refusal, with what it said', async () => {
+    const asked = await Effect.runPromise(claudeQuota({ command: '/bin/claude', env: {}, ask: throwing }));
+    assert.deepEqual([asked.kind, asked.kind === 'failed' && asked.program], ['failed', '/bin/claude'], 'naming the Claude Code asked');
+  });
 });
 
 test('REFUSED: an ask that threw, timed out or was interrupted closes its query all the same', async () => {
@@ -193,7 +263,12 @@ test('REFUSED: an ask that threw, timed out or was interrupted closes its query 
   assert.deepEqual([refused.seen.asks, refused.seen.closes], [1, 1], 'a refusal closes its query');
 
   const silent = standIn(() => new Promise<unknown>(() => {}));
-  assert.deepEqual(await Effect.runPromise(claudeQuota({ timeoutMs: 20, ask: silent.ask })), { kind: 'timeout', ms: 20 });
+  assert.deepEqual(
+    await Effect.runPromise(claudeQuota({ timeoutMs: 20, env: {}, ask: silent.ask })),
+    { kind: 'timeout', ms: 20, program: claudeExecutableOf(undefined) ?? null },
+    "with none named, the Claude Code it names to run by hand is the SDK's own bundled CLI — on an install, the release's — never a `claude` on PATH",
+  );
+  assert.match(claudeExecutableOf(undefined) ?? '', /claude-agent-sdk-[^/]+\/claude(\.exe)?$/, "this checkout's SDK bundles one");
   assert.deepEqual([silent.seen.asks, silent.seen.closes], [1, 1], 'an ask that timed out closed its query by the time it resolved');
 
   const held = standIn(() => new Promise<unknown>(() => {}));

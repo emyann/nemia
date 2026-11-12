@@ -134,7 +134,11 @@ test('every run is the plain RunList whole, a label selector going with it, each
     ],
   );
   await (runsSelectedQuery('team=blue').queryFn as unknown as () => Promise<RunRow[]>)();
-  assert.deepEqual(asked.map(decodeURIComponent), ['/api/runs', '/api/runs?labelSelector=team=blue'], 'no state, no page: the list whole');
+  assert.deepEqual(
+    asked.map(decodeURIComponent),
+    ['/api/runs?limit=500', '/api/runs?limit=500&labelSelector=team=blue'],
+    'no state, no page: every page of the list, of the most a page holds',
+  );
 });
 
 test("the frame is the RunList of the runs not finished, split by each run's state, with the list's counts and asOf", async (t) => {
@@ -177,8 +181,8 @@ test("the frame is the RunList of the runs not finished, split by each run's sta
   );
   await readOpen('a b');
   assert.deepEqual(asked.map(decodeURIComponent), [
-    '/api/runs?fieldSelector=status.state!=finished',
-    '/api/namespaces/a b/runs?fieldSelector=status.state!=finished',
+    '/api/runs?limit=500&fieldSelector=status.state!=finished',
+    '/api/namespaces/a b/runs?limit=500&fieldSelector=status.state!=finished',
   ]);
   assert.deepEqual(openRunsQuery().queryKey, ['runs-open']);
   assert.deepEqual(openRunsQuery('a b').queryKey, ['runs-open', 'a b']);

@@ -13,11 +13,11 @@
  *   (`Missing`). Its 200 is `{ name }`.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import { SUBSCRIBE, subscriptionList, subscriptionNameRefusal, subscriptionObject, UNSUBSCRIBE } from 'agent-orchestrator';
 import { Api, BadRequest } from 'objects';
 import { queryOf } from '../factory/parts/parts.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** A subscription's name that names no file of its own, refused before anything is read: a 400 in the package's words. */
 const misnamed = (name: string): Effect.Effect<void, BadRequest> => {
@@ -25,7 +25,7 @@ const misnamed = (name: string): Effect.Effect<void, BadRequest> => {
   return wrong === undefined ? Effect.void : Effect.fail(new BadRequest({ error: wrong }));
 };
 
-export const subscriptionsHandlers = HttpApiBuilder.group(Api, 'subscriptions', (handlers) =>
+export const subscriptionsHandlers = readsBounded(Api, 'subscriptions', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => answered((s) => s.inRequest(subscriptionList(queryOf(query)))))
     .handle('get', ({ params: { name } }) => answered((s) => s.inRequest(subscriptionObject(name))))

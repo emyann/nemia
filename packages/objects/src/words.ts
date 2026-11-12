@@ -730,3 +730,9 @@ export const SESSION_COOKIE_STATES = ['set', 'cleared'] as const;
 
 /** One of `SESSION_COOKIE_STATES`. */
 export type SessionCookieState = (typeof SESSION_COOKIE_STATES)[number];
+
+/**
+ * The shape of a read the api serves (`ReadBound`, reads.ts): a list's page, a read from a cursor, a whole read by part, one object, a
+ * stream, a file's bytes.
+ */
+export const READ_SHAPES = ['page', 'cursor', 'part', 'one', 'stream', 'bytes'] as const;

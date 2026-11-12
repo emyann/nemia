@@ -19,10 +19,11 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { CLI_VERBS, Informer, informerMemo, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import { Api } from 'objects';
+import { Api, type ApiGetName, READS } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { ANSWER_BOUND, PORT_PAGE } from './bound.ts';
 import { portTools } from './tools.ts';
+import { called } from './port.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -117,7 +118,14 @@ const settled = () => {
   Effect.runSync(engine().file({ id: `t-${LONG_CLOSEOUT}-0`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${LONG_CLOSEOUT}-0`, 'succeeded', {
     exitCode: 0,
-    closeout: { outcome: 'done', summary: 'Wrote a lot.', needs: null, artifacts: [], body: words(60_000, 'a long account') },
+    closeout: {
+      apiVersion: 'nemia/v1',
+      outcome: 'done',
+      summary: 'Wrote a lot.',
+      needs: null,
+      artifacts: [],
+      body: words(60_000, 'a long account'),
+    },
   });
   Effect.runSync(engine().file({ id: `t-${WIDE_CLOSEOUT}-0`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(`t-${WIDE_CLOSEOUT}-0`, 'succeeded', {
@@ -162,7 +170,7 @@ async function call(client: Client, name: string, args: Record<string, unknown> 
 test('every list tool, called with its path alone on a store of a planted size, answers within the bound', async () => {
   settled();
   const client = await connected();
-  const lists = portTools(TABLE, CLI_VERBS, Api).filter((t) => t.queryKeys.includes('limit'));
+  const lists = portTools(TABLE, CLI_VERBS, Api).filter((t) => t.method === 'GET' && READS[t.endpoint as ApiGetName]?.shape === 'page');
   assert.ok(lists.length >= 5, `${lists.length} list tools read off the tables`);
   for (const tool of lists) {
     const args = Object.fromEntries(tool.pathKeys.map((key) => [key, 'default']));
@@ -245,22 +253,54 @@ test('agents answers an agent a line, its name, origin and description among the
   assert.ok(!answer.text.includes('agent 0 agent 0'), 'nothing of its instructions');
 });
 
-test('REFUSED: a read that is no page, past the bound, is an error naming how to narrow it, short, with nothing of the body', async () => {
+test('REFUSED: a closeout whose body alone is past the bound is an error naming its body page, never the fields it was sent none of', async () => {
   settled();
   const client = await connected();
-  const answer = await call(client, 'tries', { runId: LONG_CLOSEOUT, step: 'step-0' });
+  const answer = await call(client, 'closeout', { runId: LONG_CLOSEOUT, step: 'step-0', try: '1', bodyLimit: '60000' });
   assert.equal(answer.isError, true, `refused: ${answer.size} ${answer.text.slice(0, 400)}`);
   assert.ok(answer.text.length < 2_000, `${answer.text.length} characters of refusal`);
   assert.equal(answer.structured, undefined, 'no body carried');
   assert.ok(!answer.text.includes('a long account'), 'nothing of the answer');
-  assert.ok(/narrow/.test(answer.text), 'it says how to narrow the read');
+  for (const key of ['bodyFrom', 'bodyLimit']) assert.ok(answer.text.includes(key), `it names ${key}`);
+  assert.ok(!answer.text.includes('fields'), 'never the fields, which the call sent naming none, the least it asks');
+  const paged = await call(client, 'closeout', { runId: LONG_CLOSEOUT, step: 'step-0', try: '1', bodyLimit: '10000' });
+  assert.equal(paged.isError, false, 'its body read by a page as it says fits');
+  assert.equal((paged.structured as { closeout: { bodyNext?: number } }).closeout.bodyNext, 10_000, 'the page after it is named');
+});
+
+test('a step transcript past the bound is asked again with its last halved, as a list is asked again with its limit halved', async () => {
+  const tool = portTools(TABLE, CLI_VERBS, Api).find((t) => t.endpoint === 'steps.transcript');
+  assert.ok(tool, 'a tool reads a step transcript');
+  const asked: Array<Record<string, string>> = [];
+  const fetching = {
+    fetch: async (request: Request) => {
+      const query = Object.fromEntries(new URL(request.url).searchParams);
+      asked.push(query);
+      const count = Number(query.last ?? query.limit ?? 200);
+      const events = Array.from({ length: count }, (_, i) => ({ kind: 'text', text: words(600, `event ${i}`) }));
+      return Response.json({ events, cursor: 'c', live: false, open: false });
+    },
+  };
+  const result = await called(tool, { runId: 'r', step: 's' }, new Request('http://127.0.0.1/mcp'), fetching);
+  assert.equal(result.isError, undefined, 'answered once a page fits');
+  assert.deepEqual(
+    asked.map((q) => [q.last, q.limit]),
+    [
+      ['50', undefined],
+      ['25', undefined],
+    ],
+    'its link asks the last 50, then the last 25: never a limit beside last, which the read refuses',
+  );
 });
 
 test("closeout and try answer a closeout narrowly, its output's fields named and left out, each asked for by name", async () => {
   settled();
   const client = await connected();
-  const whole = await app().request(`/api/runs/${WIDE_CLOSEOUT}/steps/step-0/tries/1/closeout`);
-  assert.ok((await whole.text()).length > ANSWER_BOUND, 'the closeout read whole is past the bound');
+  const whole = await app().request(`/api/runs/${WIDE_CLOSEOUT}/steps/step-0/tries/1/closeout?fields=*`);
+  assert.ok(
+    (await whole.text()).length * 2 > ANSWER_BOUND,
+    'the closeout read with every field is past the bound, as the port counts it: its text and its structured content',
+  );
   for (const tool of ['closeout', 'try']) {
     const narrow = await call(client, tool, { runId: WIDE_CLOSEOUT, step: 'step-0', try: '1' });
     assert.equal(narrow.isError, false, narrow.text.slice(0, 300));

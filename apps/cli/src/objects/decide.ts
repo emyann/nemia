@@ -6,7 +6,8 @@
  * to run: a `nemia` command is run as this client runs that verb, the words a placeholder holds (`"<objection>"`) asked first; a `git`
  * command is printed and never run. Off a terminal it prints and runs nothing.
  *
- * It refuses `--local`, as every verb of the client's own; `--sensitive <globs>` is sent as the read's `?sensitive=`.
+ * It refuses `--local`, as every verb of the client's own; `--sensitive <globs>` is sent as the read's `?sensitive=`. It prints the diffs
+ * the decision shows in full, so it asks for them whole (`?diffs=*`): the api answers none whole unless asked.
  */
 import readline from 'node:readline';
 import type { DecideCommand, Decidable, RunDecision } from 'objects';
@@ -209,7 +210,7 @@ export async function decide(
     throw new Refused(`nemia decide takes the run alone, and --sensitive <globs>: nemia decide <runId> (nemia decide --help)`);
   const decision = await asked(
     'decide',
-    (client) => client.runs.decision({ params: { runId }, query: sensitive === undefined ? {} : { sensitive } }),
+    (client) => client.runs.decision({ params: { runId }, query: { diffs: '*', ...(sensitive === undefined ? {} : { sensitive }) } }),
     env,
   );
   for (const line of decisionLines(runId, decision)) io.output.write(`${line}\n`);

@@ -17,7 +17,6 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   agentTable,
   AGENT_CARD,
@@ -65,6 +64,7 @@ import {
   type Held,
   type Origin,
 } from '../definitions/served.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** The agents of the factory's tree, read as the repository's are, then told apart by their origin. */
 const treeAgents = (s: Served) =>
@@ -275,7 +275,7 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
   return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
 }
 
-export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
+export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       Effect.flatMap(wantsTable, (table) =>

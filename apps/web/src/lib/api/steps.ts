@@ -9,6 +9,8 @@ import {
   StepPath as StepPathAnswer,
   StepStreamEvent,
   StepTranscript as StepTranscriptAnswer,
+  TRANSCRIPT_PAGE,
+  type StepTranscript,
   type LifecycleEdge,
   type LifecycleTransition as LifecycleTransitionAnswer,
   type LifecycleVerb,
@@ -72,9 +74,36 @@ export const STEP_STREAM_SCHEMAS: { readonly [K in keyof StreamData]: Schema.Dec
 export const transcriptPath = (runId: string, step: string) =>
   `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/transcript`;
 
-/** One read of a step's conversation, from the start. */
-export const readTranscript = (runId: string, step: string, signal?: AbortSignal) =>
-  call((c) => c.steps.transcript({ params: { runId, step }, query: {} }), read(StepTranscriptAnswer), signal);
+/** A page of a step's conversation, of the most a page holds, from `after` (the cursor a page before answered), the start for none. */
+const transcriptPage = (runId: string, step: string, after: string | undefined, signal?: AbortSignal) =>
+  call(
+    (c) =>
+      c.steps.transcript({
+        params: { runId, step },
+        query: { limit: String(TRANSCRIPT_PAGE.most), ...(after === undefined ? {} : { after }) },
+      }),
+    read(StepTranscriptAnswer),
+    signal,
+  );
+
+/**
+ * One read of a step's conversation, from the start, whole: the api answers a page of it and says `more` where events already said are
+ * left after it, so the read goes on at once from each page's `cursor` while it says so, before the page follows the stream from the last
+ * cursor. Every page's events in order, and the last page's cursor, `live` and `open`. A page that says `more` and answers back the cursor
+ * it was asked from is an api that would be asked forever, refused naming the restart.
+ */
+export async function readTranscript(runId: string, step: string, signal?: AbortSignal): Promise<StepTranscript> {
+  let page = await transcriptPage(runId, step, undefined, signal);
+  const events = [...page.events];
+  while (page.more === true && page.cursor !== null) {
+    const from = page.cursor;
+    page = await transcriptPage(runId, step, from, signal);
+    events.push(...page.events);
+    if (page.more === true && page.cursor === from)
+      throw new Error('The api answered a page of the conversation from the cursor it was asked from: restart the api (npm run dev).');
+  }
+  return { ...page, events };
+}
 
 /**
  * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`stepStamp`), so the feed's `step` event, which

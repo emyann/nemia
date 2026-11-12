@@ -49,7 +49,7 @@ const page = async (url: string) => {
   return Schema.decodeUnknownSync(EventList)(body);
 };
 
-test('?limit=2 walked by continue answers each line once, in the order written, remainingItemCount counting down', async () => {
+test('?limit=2 walked by continue answers each line once, in the order written; only the last page counts what is left, none', async () => {
   const names: string[] = [];
   const remaining: Array<number | undefined> = [];
   let next: string | undefined;
@@ -62,7 +62,11 @@ test('?limit=2 walked by continue answers each line once, in the order written, 
     pages++;
   } while (next && pages < 10);
   assert.deepEqual(names, ['r-1', 'r-2', '4242', 'r-3', 'r-4']);
-  assert.deepEqual(remaining, [3, 1, 0]);
+  assert.deepEqual(
+    remaining,
+    [undefined, undefined, 0],
+    'a page read to the page and one past it never counts the rest of the feed: remainingItemCount is optional, as in Kubernetes',
+  );
 });
 
 test('a labelSelector takes the lines /api/feed/stream?selector= sends, each by the cursor after it', async () => {

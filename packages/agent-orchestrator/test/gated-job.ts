@@ -6,7 +6,8 @@
  *
  * The script answers each control request the SDK sends, `initialize` first, with an empty success; takes the first user message
  * as its brief; and, once a file named for the brief appears in `gates`, prints a result and leaves when its stdin ends, as the
- * worker closes it at the result. `head` is code run first, for a fake that answers a command line of its own (`claude agents`).
+ * worker closes it at the result. It answers `auth status` signed in, as the runtime asks before a job's spawn. `head` is code run
+ * next, for a fake that answers a command line of its own (`claude agents`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +18,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline');
 const args = process.argv.slice(2);
+if (args[0] === 'auth') {
+  process.stdout.write('{"loggedIn":true}\\n');
+  process.exit(0);
+}
 ${head}
 const print = (line) => process.stdout.write(JSON.stringify(line) + '\\n');
 const sessionId = require('node:crypto').randomUUID();

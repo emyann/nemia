@@ -4,18 +4,18 @@
  * so a warm read reads no finished run's record — written (`nemia factory schedule`) and taken back (`factory unschedule`), each entry
  * called by its `input`.
  */
-import { HttpApiBuilder } from 'effect/http-api';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE, scheduleList, scheduleObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
+import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The schedule `name` of `namespace`, read now, the runs it fired through the app's memo. */
 const scheduleIn = (s: Served, namespace: string, name: string) =>
   s.inRequest(scheduleObject(s.home, defaultRepo(s), namespace, name, s.memo.records.factories));
 
-export const schedulesHandlers = HttpApiBuilder.group(Api, 'schedules', (handlers) =>
+export const schedulesHandlers = readsBounded(Api, 'schedules', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {

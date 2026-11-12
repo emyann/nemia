@@ -1,8 +1,8 @@
 /**
  * The workflow layer's feed: one line for each change in what the tick judged of a run or of a step, one from each daemon once it has
  * taken the store (`startedLine`), one for each pause of the store put and lifted (`storeOnce`), and one for each change of a factory's
- * level in force (`levelLines`) and of its conflicts pending or settled (`conflictLines`), appended to `$WF_ROOT/feed.jsonl`, and read by
- * `nemia watch`.
+ * level in force (`levelLines`), of its conflicts pending or settled (`conflictLines`) and of the store's readiness (`readinessLines`),
+ * appended to `$WF_ROOT/feed.jsonl`, and read by `nemia watch`.
  *
  * The engine keeps a feed of what happened to its tasks (`engine/feed.jsonl`: filed, started, ended, settled). What the workflow layer
  * decides on top of it — a step at its gate, one that signed off blocked, a loop out of rounds, a run waiting on another, a person's
@@ -346,7 +346,7 @@ const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Rea
  * to the same state: the last word said of each run and step wins, a `removed` forgets a run and everything of it, and a one-shot goes to
  * its own count and never to a step's last word. The store's one-shots are counted as a run's are (`storeOnce` reads them back), and a
  * `removed` leaves them, being of no run; a factory's level line is the last word said of that factory (`levelKey`, `levelLines` reads it
- * back); any other store line — a code a newer `nemia` names — is no word the fold keeps. A factory's conflicts line is the last word
+ * back), and a readiness line the last said of the store's readiness (`READINESS_KEY`, `readinessLines` reads it back); any other store line — a code a newer `nemia` names — is no word the fold keeps. A factory's conflicts line is the last word
  * said of its conflicts (`conflictsKey`, `conflictLines` reads it back), and any other factory line is passed. A daemon's line is no
  * run's. Pure.
  */
@@ -376,7 +376,10 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   return fold;
 }
 
-/** The store's line `l` folded: a one-shot counted, a factory's level kept as the last word said of it, any other passed. */
+/**
+ * The store's line `l` folded: a one-shot counted, a factory's level and the store's readiness each kept as the last word said of it,
+ * any other passed.
+ */
 function foldStore(fold: FeedFold, l: StoreLine): void {
   const involved = involvedOf(l);
   const reason = reasonOfLine(l, involved);

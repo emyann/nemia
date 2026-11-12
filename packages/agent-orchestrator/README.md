@@ -111,8 +111,15 @@ note the level in force in words (`acme is at auto until <its end>, then semi-au
 stands per factory, not a one-shot: the same pass reads each factory's level in force (`levelsNow`) and writes a line where it is not
 what the feed said of that factory last, so a set from the board or the CLI, a raise, its `--end` and its end passing, which nothing
 writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
-(`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. `nemia watch -l
-kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
+(`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. The store's
+readiness is a line of the store too, a word that stands as a level does: the daemon reads its readiness (`readinessOf`) beside the
+needs' sweep, every `NEEDS_EVERY`, and hands each pass the latest read; while a piece a run waits on is missing the pass writes one
+`not ready`, `reason: "NotReady"`, `type: "Warning"`, its note each such piece and the command of its fix (`mise (nemia/quick): nemia
+doctor fix mise --factory nemia --workflow quick; …`), again only where what is missing moves, and once none is one `ready`, `reason:
+"Ready"`, both the tick's. Each is read off the feed's own lines, never remembered, so a restarted daemon says it again exactly where the
+read moved, and a store the feed never called not ready is never said ready. `nemia upgrade`, once it has restarted the daemon onto the
+new release, runs that release's `nemia doctor --json` and prints the same pieces under a line saying the store is not ready, and still
+succeeds. `nemia watch -l kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
 (`involved {kind: 'Factory'}`, labelled with it): `conflicts pending`, `reason: "ConflictsPending"`, when the `ConflictsPending` condition
 its controller writes to its status turns True, its note the condition's message, and `conflicts settled`, `reason: "ConflictsSettled"`,
 when it turns back, both `Normal` and the tick's. A word that stands per factory, compared by its reason alone (`conflictsDue`): the pass

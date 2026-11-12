@@ -22,7 +22,7 @@ import { engineOf } from '../../runtime-client.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService, type Place } from '../../place/place.store.ts';
 import { readFactoriesAt } from '../factory.store.ts';
-import { cloneTarget } from './clones.ts';
+import { cloneFolder, cloneTarget } from './clones.ts';
 import { clonesOnce, freshCloneMemory } from './clones.verb.ts';
 import type { Env } from '../../config/config.store.ts';
 
@@ -32,7 +32,7 @@ const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 heldUnasked(engine);
 
-test('a --repo value read as a path or as the folder of its clone, one repository named any way one folder', async (t) => {
+test('a --repo value read as a path or as the folder its clone is kept in, one repository named any way one folder, a plain URL kept under its host', async (t) => {
   const rows: readonly (readonly [string, string])[] = [
     ['git@GitHub.com:o/r.git', 'github.com/o/r'],
     ['ssh://git@github.com/o/r', 'github.com/o/r'],
@@ -41,6 +41,9 @@ test('a --repo value read as a path or as the folder of its clone, one repositor
     ['https://github.com/o/r/', 'github.com/o/r'],
     ['https://u@github.com/o/r', 'github.com/o/r'],
     ['file:///srv/o/r.git', 'localhost/srv/o/r'],
+    ['https://example.com/team/tool', 'example.com/team/tool'],
+    ['git@example.com:team/tool', 'example.com/team/tool'],
+    ['git@example.com:/srv/tool.git/', 'example.com/srv/tool'],
     ['./a:b', 'path'],
     ['/abs', 'path'],
     ['repo', 'path'],
@@ -53,7 +56,8 @@ test('a --repo value read as a path or as the folder of its clone, one repositor
   for (const [given, read] of rows)
     await t.test(given, () => {
       const target = cloneTarget(given);
-      assert.equal(target.kind === 'url' ? target.folder : target.kind, read);
+      const kept = target.kind === 'url' ? path.relative(path.join(ROOT, 'clones'), cloneFolder(ROOT, target.folder)) : target.kind;
+      assert.equal(kept, read);
     });
 });
 

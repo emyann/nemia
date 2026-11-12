@@ -88,7 +88,8 @@ const recordedFor = (factory: string, owner: string): string => readResolutions(
 
 /**
  * A factory `name` applied from the tests' team at 0.1.0, its template carrying a note in the reviewer's skill and a carried script, the
- * person's change and the template's 0.2.0 each made by `change` to the tree and to the template, the upgrade filed: its conflicts' addresses.
+ * person's change and the template's 0.2.0 each made by `change` to the tree and to the template, the upgrade filed: its conflicts'
+ * addresses.
  */
 async function upgraded(
   t: { mock: { method: Function } },

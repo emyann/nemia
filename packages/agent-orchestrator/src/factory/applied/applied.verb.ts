@@ -1,10 +1,10 @@
 /**
  * A factory made from a template. `nemia factory apply`, an entry of the command table, the command line's alone, files
- * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`).
- * The factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template,
- * its base (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version
- * its file wants merged three ways once the person has chosen for each conflict, and an owner's resolution — a Workflow's, an Agent's, a Skill's, a Hire's or the Factory's — proposed by
- * `nemia factory resolve`, has applied (`upgradePass`), and its status written — the version and
+ * `factories/<name>.json` with the template it was made from, its parameters given with `--set`, and nothing else (`FACTORY_APPLY`). The
+ * factory controller (`reconcile`): on each pass, level-triggered, each factory made from a template is read against its template, its base
+ * (`applied/`) rendered once where it is absent, its tree seeded once from the base where it is absent, an upgrade to the version its file
+ * wants merged three ways once the person has chosen for each conflict, and an owner's resolution — a Workflow's, an Agent's, a Skill's, a
+ * Hire's or the Factory's — proposed by `nemia factory resolve`, has applied (`upgradePass`), and its status written — the version and
  * digest of its base and its conditions, `Applied` and `ConflictsPending` (`reconcileFactory`). Nothing is carried between passes: what a
  * pass does, it reads off the disk. A tree once seeded is the person's, written here again only by an upgrade's merge, and never over a
  * write of theirs made since the merge read it.

@@ -1,9 +1,9 @@
 /**
- * The proposer of an owner's resolution as the command line gives it (`ResolutionProposer`, `proposer.verb.ts`): the object proposed
- * with `proposeProgram` at the version it is at now (`currentOf`) — an update, a creation where nothing is at its name, a removal where it
- * is given no spec; the Factory and a Hire always an update, a Hire whose spec hires no one its step fired — by the caller the session's token in `WF_SESSION_TOKEN` names (`sessionCaller`): the person from
- * a shell, the session's agent from a session, held to its own factory. A token refused is refused `Conflict`; the rest as
- * `proposeProgram` refuses it, another factory's session among them (`Forbidden`).
+ * The proposer of an owner's resolution as the command line gives it (`ResolutionProposer`, `proposer.verb.ts`): the object proposed with
+ * `proposeProgram` at the version it is at now (`currentOf`) — an update, a creation where nothing is at its name, a removal where it is
+ * given no spec; the Factory and a Hire always an update, a Hire whose spec hires no one its step fired — by the caller the session's token
+ * in `WF_SESSION_TOKEN` names (`sessionCaller`): the person from a shell, the session's agent from a session, held to its own factory. A
+ * token refused is refused `Conflict`; the rest as `proposeProgram` refuses it, another factory's session among them (`Forbidden`).
  */
 import path from 'node:path';
 import { Effect } from 'effect';

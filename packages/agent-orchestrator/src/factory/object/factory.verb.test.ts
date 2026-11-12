@@ -88,7 +88,11 @@ test('every object decodes as the objects say a Factory is, and its resourceVers
   for (const o of objects) assert.ok(Schema.is(FactorySchema)(o), o.metadata.name);
   const without = factoryObjectsOf({ ...listed, untrusted: [] }, repo, home).find((o) => o.metadata.name === 'acme');
   assert.notDeepEqual(without?.status, byName('acme')?.status, 'the status moved');
-  assert.equal(without?.metadata.resourceVersion, byName('acme')?.metadata.resourceVersion, 'as metadata.generation, a status write moves no version');
+  assert.equal(
+    without?.metadata.resourceVersion,
+    byName('acme')?.metadata.resourceVersion,
+    'as metadata.generation, a status write moves no version',
+  );
   assert.equal(
     factoryObjectsOf(listed, repo, home).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
     byName('acme')?.metadata.resourceVersion,

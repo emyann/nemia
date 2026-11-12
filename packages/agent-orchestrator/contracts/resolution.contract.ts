@@ -13,7 +13,9 @@
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { ProposalPhase, ProposableKind } from 'objects';
 
-/** The kinds whose proposal resolves an upgrade's conflict: every kind a proposal carries but an McpServer, which the tree holds none of. */
+/**
+ * The kinds whose proposal resolves an upgrade's conflict: every kind a proposal carries but an McpServer, which the tree holds none of.
+ */
 export type ResolutionKind = Exclude<ProposableKind, 'McpServer'>;
 
 /** The object whose proposal resolves a conflict: its kind and its name in the factory. */
@@ -28,7 +30,11 @@ const inAWorkflow = (segments: readonly string[]): boolean =>
 
 /** The agent a file directly in the agents' folder belongs to, by its name: `<agent>.md` or `<agent>.schema.json`; none for another. */
 const agentOfFile = (file: string): string | null => {
-  const name = file.endsWith('.schema.json') ? file.slice(0, -'.schema.json'.length) : file.endsWith('.md') ? file.slice(0, -'.md'.length) : '';
+  const name = file.endsWith('.schema.json')
+    ? file.slice(0, -'.schema.json'.length)
+    : file.endsWith('.md')
+      ? file.slice(0, -'.md'.length)
+      : '';
   return name.length > 0 ? name : null;
 };
 
@@ -62,11 +68,8 @@ const aHire = (segments: readonly string[], key: string | null): boolean =>
 const is = (owner: ResolutionOwner | null, kind: ResolutionKind, name: string | null | undefined): boolean =>
   owner !== null && owner.kind === kind && owner.name === name;
 
-const resolvedBySpec = spec<
-  (segments: readonly string[], key: string | null, text: boolean, factory: string) => ResolutionOwner | null
->({
-  requires: ({ input: [segments, , , factory] }) =>
-    segments.length > 0 && segments.every((s) => s.length > 0) && factory.length > 0,
+const resolvedBySpec = spec<(segments: readonly string[], key: string | null, text: boolean, factory: string) => ResolutionOwner | null>({
+  requires: ({ input: [segments, , , factory] }) => segments.length > 0 && segments.every((s) => s.length > 0) && factory.length > 0,
   ensures: {
     workflowTextByItsWorkflow: {
       description: "A conflict in a text file directly in a workflow's folder is resolved by a proposal of that Workflow",
@@ -96,7 +99,12 @@ const resolvedBySpec = spec<
       description:
         "A conflict anywhere else — the wiring's other keys or the wiring whole, a file nested deeper in a workflow's folder, any other file — is resolved by the person's choice",
       condition: ({ input: [segments, key], output }) =>
-        inAWorkflow(segments) || agentAt(segments) !== null || inASkill(segments) || aHire(segments, key) || factoryText(segments) || output === null,
+        inAWorkflow(segments) ||
+        agentAt(segments) !== null ||
+        inASkill(segments) ||
+        aHire(segments, key) ||
+        factoryText(segments) ||
+        output === null,
     },
     bytesByAChoice: {
       description: 'A conflict in a file that is not text, which no spec carries, is resolved by the person’s choice',

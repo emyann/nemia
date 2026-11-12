@@ -46,12 +46,22 @@ const hireOfKey = (key: string | null): string | null => {
  */
 export const resolvedBy: ResolvedBy = (segments, key, text, factory) => {
   if (!text) return null;
+  return segments.length === 1 ? rootOwner(segments[0] ?? '', key, factory) : workflowsOwner(segments);
+};
+
+/**
+ * The owner of a file at the tree's root, `top`, its key `key`: the rules and the instruction by the Factory, a hire of the wiring by its
+ * Hire.
+ */
+const rootOwner = (top: string, key: string | null, factory: string): ResolutionOwner | null => {
+  if (top === 'RULES.md' || top === 'NEMIA.md') return { kind: 'Factory', name: factory };
+  const hire = top === WIRING_FILE ? hireOfKey(key) : null;
+  return hire === null ? null : { kind: 'Hire', name: hire };
+};
+
+/** The owner of a file under the tree's `workflows/`, by its path's segments: a Workflow, an Agent, a Skill, or none. */
+const workflowsOwner = (segments: readonly string[]): ResolutionOwner | null => {
   const [top, folder, file] = segments;
-  if (segments.length === 1) {
-    if (top === 'RULES.md' || top === 'NEMIA.md') return { kind: 'Factory', name: factory };
-    const hire = top === WIRING_FILE ? hireOfKey(key) : null;
-    return hire === null ? null : { kind: 'Hire', name: hire };
-  }
   if (top !== 'workflows' || folder === undefined) return null;
   if (folder === 'skills') return segments.length >= 4 && file !== undefined ? { kind: 'Skill', name: file } : null;
   if (segments.length !== 3 || file === undefined) return null;
@@ -102,7 +112,10 @@ export const keyOf = (at: string): string | null => {
 export const allText = (...sides: readonly (TreeFile | undefined)[]): boolean =>
   sides.every((side) => side === undefined || textIn(side.bytes) !== null);
 
-/** The key of the owner of a whole file of the tree, at the path `at`, where one owns it whole; the wiring, which a Hire owns by a key, none. */
+/**
+ * The key of the owner of a whole file of the tree, at the path `at`, where one owns it whole; the wiring, which a Hire owns by a key,
+ * none.
+ */
 const fileOwnerKey = (at: string, factory: string): string | null => {
   const owner = resolvedBy(at.split('/'), null, true, factory);
   return owner === null ? null : ownerKey(owner);

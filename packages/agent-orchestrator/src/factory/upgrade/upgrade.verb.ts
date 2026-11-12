@@ -2,13 +2,12 @@
  * A templated factory's upgrade, as the command line asks it: `nemia factory diff` previews the merge of its tree with the template at
  * another version, rendered with the factory's parameters overlaid by each `--set`, and writes nothing (`FACTORY_PLAN`); `nemia factory
  * upgrade` writes the version wanted, the template's source where `--template` names one, and the parameters it rendered with, into the
- * factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve`
- * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict an object of the tree
- * owns (`resolvedBy`: a Workflow, an Agent, a Skill, a Hire or the Factory), once each conflict of that owner has one, proposes the owner as
- * the choices compose it (`ownerSpec`), a Proposal of it at its version now, by the caller its session's token names (`sessionCaller`),
- * and records it beside the choices by the owner's key (`ownerKey`); the controller merges once each other conflict — a carried file's,
- * the wiring's other keys', a file's that is not text — has a choice and each such proposal applied. A run in flight keeps the folders
- * frozen on its record.
+ * factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve` writes the person's choice for
+ * one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and, for a conflict an object of the tree owns (`resolvedBy`: a Workflow, an
+ * Agent, a Skill, a Hire or the Factory), once each conflict of that owner has one, proposes the owner as the choices compose it
+ * (`ownerSpec`), a Proposal of it at its version now, by the caller its session's token names (`sessionCaller`), and records it beside the
+ * choices by the owner's key (`ownerKey`); the controller merges once each other conflict — a carried file's, the wiring's other keys', a
+ * file's that is not text — has a choice and each such proposal applied. A run in flight keeps the folders frozen on its record.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -706,7 +705,8 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
 
 /**
  * `nemia factory resolve`: the person's choice for one conflict of an upgrade; for the conflicts of an owner — a Workflow, an Agent, a
- * Skill, a Hire or the Factory — once each has one, the proposal of that owner, to approve; the daemon merges once each conflict has a choice and each such proposal applied.
+ * Skill, a Hire or the Factory — once each has one, the proposal of that owner, to approve; the daemon merges once each conflict has a
+ * choice and each such proposal applied.
  */
 export const FACTORY_RESOLVE: Command<Resolved> = {
   name: 'factory resolve',

@@ -1,14 +1,25 @@
 /**
  * What Nemia's routes take and answer (`NemiaGroup`, nemia-api.ts): where she is (`NemiaLevel`) and the write of her level and each
- * factory's (`NemiaLevelSet`); the facts she keeps (`NemiaMemory`); an agent's rules for auto (`PolicyList`) and a rule confirmed as the
- * person read it (`PolicyRuleConfirm`); her chat — a page of it (`ChatHistory`), each event (`ChatEvent`), what is sent, answered, read
- * and stopped, and the stream's frames (`ChatStreamEvent`); and her custom instructions (`NemiaInstructions`).
+ * factory's (`NemiaLevelSet`); the facts she keeps (`NemiaMemory`); an agent's rules for auto (`PolicyList`), a rule confirmed as the
+ * person read it (`PolicyRuleConfirm`), the agent's proposal (`PolicyProposal`) and what its rules reach (`PolicyReach`); her chat — a
+ * page of it (`ChatHistory`), each event (`ChatEvent`), what is sent, answered, read and stopped, the stream's frames
+ * (`ChatStreamEvent`), and the names an agent may speak under (`ChatSpeakers`); and her custom instructions (`NemiaInstructions`).
  *
  * The orchestrator's verbs answer these shapes, its types assignable to each: a key the verb answers and the Schema does not say would be
  * dropped from the wire, so each says every key.
  */
 import { Schema } from 'effect';
-import { CALL_STATES, CHANGE_VERBS, CHAT_FROM, ENGINE_PHASES, LEVELS, RULE_ANSWERS, RULE_ORIGINS } from './words.ts';
+import {
+  CALL_STATES,
+  CHANGE_VERBS,
+  CHAT_FROM,
+  ENGINE_PHASES,
+  LEVELS,
+  NEVER_HOLDS,
+  POLICY_REACHES,
+  RULE_ANSWERS,
+  RULE_ORIGINS,
+} from './words.ts';
 
 /** A level by its word. */
 const LevelWord = Schema.Literals(LEVELS);
@@ -72,15 +83,17 @@ export const NemiaMemory = Schema.Struct({
  * absent), the conditions it needs (each a word of the orchestrator's `CONDITIONS`, a fact admission reads of a run), a dollar line the
  * run's spend stays under (none where absent), and where it came from.
  */
-const gateRuleFields = {
+const gateRuleBareFields = {
   id: Schema.String,
   answer: Schema.Literals(RULE_ANSWERS),
   steps: Schema.optional(Schema.Array(Schema.String)),
   when: Schema.Array(Schema.String),
   under: Schema.optional(Schema.Number),
   from: Schema.optional(Schema.Literals(RULE_ORIGINS)),
-  words: Schema.String,
 };
+
+/** A rule at a gate with its words. */
+const gateRuleFields = { ...gateRuleBareFields, words: Schema.String };
 
 /** A rule at a gate with its words. */
 export const PolicyRule = Schema.Struct(gateRuleFields);
@@ -89,7 +102,7 @@ export const PolicyRule = Schema.Struct(gateRuleFields);
  * A rule under which the agent approves a proposal of one factory unasked, with its words: what it covers, as a delegation's grant does,
  * whether it takes a proposal that widens access, and the agents whose proposals it takes (every agent where empty).
  */
-const proposalRuleFields = {
+const proposalRuleBareFields = {
   id: Schema.String,
   answer: Schema.Literal('approve-proposal'),
   factory: Schema.String,
@@ -99,8 +112,10 @@ const proposalRuleFields = {
   widens: Schema.Boolean,
   proposedBy: Schema.Array(Schema.String),
   from: Schema.optional(Schema.Literal('proposed')),
-  words: Schema.String,
 };
+
+/** A rule for approving proposals with its words. */
+const proposalRuleFields = { ...proposalRuleBareFields, words: Schema.String };
 
 /** A rule for approving proposals, with its words. */
 export const ProposalPolicyRule = Schema.Struct(proposalRuleFields);
@@ -133,6 +148,88 @@ export const PolicyList = Schema.Struct({
 
 /** A confirm of a rule: its words as the person read them, so what is confirmed is what they read. */
 export const PolicyRuleConfirm = Schema.Struct({ words: Schema.String });
+
+/**
+ * An agent's proposal, as `nemia policy propose` reads it from `--file`: `words`, its JSON text, `{ "rules": [...], "guidance": [...] }`,
+ * the rules it proposes from its custom instruction and the words the machinery cannot hold, kept as guidance.
+ */
+export const PolicyProposal = Schema.Struct({ words: Schema.String });
+
+/** Whose steps at their gate `GET /api/policy/:name/reach` reads: one factory's (`factory`) or one run's (`run`), exactly one of them. */
+export const PolicyReachQuery = { factory: Schema.optionalKey(Schema.String), run: Schema.optionalKey(Schema.String) };
+
+/** A step at its gate, as reach reads it: its workflow, its name, whether it is approved before it runs, and whether it has a check. */
+const gateSiteFields = {
+  workflow: Schema.String,
+  step: Schema.String,
+  approvedFirst: Schema.Boolean,
+  hasCheck: Schema.Boolean,
+};
+
+/**
+ * Why a rule in force can never approve at a gate, its first reason, with its words: it only tries a step again (`answers-retry`), it
+ * covers other steps (`other-steps`), or it needs a condition (`condition`, a word of the orchestrator's `CONDITIONS`, as a rule's `when`)
+ * that never holds there (`never-holds`), and why (`because`).
+ */
+export const RuleMiss = Schema.Union([
+  Schema.Struct({ rule: Schema.String, why: Schema.Literal('answers-retry'), words: Schema.String }),
+  Schema.Struct({ rule: Schema.String, why: Schema.Literal('other-steps'), words: Schema.String }),
+  Schema.Struct({
+    rule: Schema.String,
+    why: Schema.Literal('never-holds'),
+    condition: Schema.String,
+    because: Schema.Literals(NEVER_HOLDS),
+    words: Schema.String,
+  }),
+]);
+
+/**
+ * A step at its gate and what reaches it: the rules in force that could approve it (`reachedBy`), the proposed rules not in force that
+ * could (`proposedBy`), each rule in force that cannot with its first reason (`misses`), and, of a run, each rule that reaches it with
+ * what keeps it from approving now — the conditions that do not hold and whether the run is over its dollar line (`now`).
+ */
+export const GateReach = Schema.Struct({
+  ...gateSiteFields,
+  reachedBy: Schema.Array(Schema.String),
+  proposedBy: Schema.Array(Schema.String),
+  misses: Schema.Array(RuleMiss),
+  now: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        rule: Schema.String,
+        unmet: Schema.Struct({ conditions: Schema.Array(Schema.String), overLine: Schema.Boolean }),
+        words: Schema.String,
+      }),
+    ),
+  ),
+});
+
+/**
+ * What an agent's rules reach, as `nemia policy reach --json` prints it: the agent; the factory read, and the run where one was named
+ * (null where none); the factory's level now; how many of the steps at their gate the rules in force reach (`reach`); a row for each such
+ * step (`gates`); the rules suggested for the steps no rule reaches, each with its words; the whole proposal to propose them by
+ * (`proposal`, what the agent proposed already with the suggestions added, for `PUT /api/policy/:name/proposal`); and each workflow
+ * attached to the factory that does not load, with why.
+ */
+export const PolicyReach = Schema.Struct({
+  agent: Schema.String,
+  factory: Schema.String,
+  run: Schema.NullOr(Schema.String),
+  level: LevelWord,
+  reach: Schema.Literals(POLICY_REACHES),
+  gates: Schema.Array(GateReach),
+  suggested: Schema.Array(Schema.Union([PolicyRule, ProposalPolicyRule])),
+  proposal: Schema.Struct({
+    rules: Schema.Array(Schema.Union([Schema.Struct(gateRuleBareFields), Schema.Struct(proposalRuleBareFields)])),
+    guidance: Schema.Array(Schema.String),
+  }),
+  unloaded: Schema.Array(Schema.Struct({ workflow: Schema.String, message: Schema.String })),
+});
+export type PolicyReach = typeof PolicyReach.Type;
+
+/** The names the person allowed an agent to speak under in her chat, as `nemia chat speakers` lists them and each write answers. */
+export const ChatSpeakers = Schema.Struct({ allowed: Schema.Array(Schema.String) });
+export type ChatSpeakers = typeof ChatSpeakers.Type;
 
 /** One choice of a question: what it reads as, what it means, and whether she recommended it. */
 export const AskOption = Schema.Struct({ label: Schema.String, description: Schema.String, recommended: Schema.Boolean });

@@ -150,7 +150,7 @@
     },
     {
       "term": "Skill",
-      "meaning": "a skill folder a factory's starts can find, served in the factory's namespace: its `spec` what its SKILL.md says, its `status` where it was found, what it costs a turn and who gives it (`Skill`, `packages/objects/src/skill.ts`).",
+      "meaning": "a skill folder a factory's starts can find, served in the factory's namespace: its `spec` what its SKILL.md says and the folder's other text files (`spec.files`), its `status` where it was found, what it costs a turn and who gives it (`Skill`, `packages/objects/src/skill.ts`).",
       "type": "Skill"
     },
     {

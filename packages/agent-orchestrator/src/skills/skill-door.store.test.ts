@@ -1,7 +1,8 @@
 /**
  * The Skill door's files layer: the door's walks (`test/skill-walks.ts`) on a fresh scratch store each, and what only the files can be
- * asked — the model's check made before any layer acts, the default door's root, a link never written through, and a copy staged
- * beside where it goes, so one that fails part-way leaves no half a skill.
+ * asked — the model's check made before any layer acts, the default door's root, a link never written through, a copy staged
+ * beside where it goes, so one that fails part-way leaves no half a skill, and a file of a skill that is not text — a picture — never
+ * read among its other files nor touched by a write that gives them, nor a link among them written through.
  *
  * Through the door a link at a skill's name is judged by its version before the writer reads the link: a new skill there finds something
  * else at its name, and a version read at the folder it points at is not the link's (`skillVersion` digests a link as one), each a
@@ -92,11 +93,49 @@ test('REFUSED before any layer acts: a skill the model refuses — no descriptio
     throw new Error('the layer was reached');
   };
   const layer: SkillLayer = {
-    skills: { found: unreached, list: unreached, read: unreached, there: () => ({ kind: 'none' }), write: unreached, copy: unreached },
+    skills: {
+      found: unreached,
+      list: unreached,
+      read: unreached,
+      there: () => ({ kind: 'none' }),
+      write: unreached,
+      copy: unreached,
+      others: unreached,
+    },
   };
   const door = skillDoorOver(layer);
   for (const description of [null, ' ', 'one\npreload: true'])
     assert.deepEqual(act(door.skills.write(SkillName.read('tidy-notes'), aSkill('tidy-notes', { description }), undefined, '/s/skills')), {
       refused: 'Invalid',
     });
+});
+
+test("a picture in a skill's folder is not among its other files, and a write that gives them leaves it as it was", () => {
+  const { library, door } = store();
+  const files = [{ path: 'notes/how.md', text: 'One fact a line.\n' }];
+  const { version } = done(door.skills.write(SkillName.read('tidy-notes'), { ...aSkill(), files }, undefined, library));
+  const picture = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1]);
+  fs.mkdirSync(path.join(library, 'tidy-notes', 'img'));
+  fs.writeFileSync(path.join(library, 'tidy-notes', 'img', 'logo.png'), picture);
+  assert.deepEqual(done(door.skills.others(SkillName.read('tidy-notes'), library)), files);
+  const moved = done(door.skills.there(SkillName.read('tidy-notes'), library));
+  assert.ok(moved.kind === 'held' && moved.version !== version, 'the picture is counted in the version all the same');
+  done(door.skills.write(SkillName.read('tidy-notes'), { ...aSkill(), files: [] }, moved.kind === 'held' ? moved.version : '', library));
+  assert.deepEqual(done(door.skills.others(SkillName.read('tidy-notes'), library)), []);
+  assert.equal(fs.existsSync(path.join(library, 'tidy-notes', 'notes', 'how.md')), false);
+  assert.deepEqual(new Uint8Array(fs.readFileSync(path.join(library, 'tidy-notes', 'img', 'logo.png'))), picture);
+});
+
+test('REFUSED: a file a write gives at a link in the skill is never written through, Invalid, what it points at as it was', () => {
+  const { library, door } = store();
+  done(door.skills.write(SkillName.read('tidy-notes'), aSkill(), undefined, library));
+  const outside = scratch('wf-skill-outside-');
+  fs.symlinkSync(outside, path.join(library, 'tidy-notes', 'notes'));
+  const files = [{ path: 'notes/how.md', text: 'Through.\n' }];
+  const now = done(door.skills.there(SkillName.read('tidy-notes'), library));
+  assert.deepEqual(
+    act(door.skills.write(SkillName.read('tidy-notes'), { ...aSkill(), files }, now.kind === 'held' ? now.version : '', library)),
+    { refused: 'Invalid' },
+  );
+  assert.deepEqual(fs.readdirSync(outside), []);
 });

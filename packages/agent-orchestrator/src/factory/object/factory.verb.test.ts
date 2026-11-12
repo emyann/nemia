@@ -84,10 +84,15 @@ test('a stray file is listed with why it does not read, and hides no other', () 
   assert.equal(objects.length, 3);
 });
 
-test('every object decodes as the objects say a Factory is, and its resourceVersion moves with its status', () => {
+test('every object decodes as the objects say a Factory is, and its resourceVersion stands when its status alone moves', () => {
   for (const o of objects) assert.ok(Schema.is(FactorySchema)(o), o.metadata.name);
   const without = factoryObjectsOf({ ...listed, untrusted: [] }, repo, home).find((o) => o.metadata.name === 'acme');
-  assert.notEqual(without?.metadata.resourceVersion, byName('acme')?.metadata.resourceVersion);
+  assert.notDeepEqual(without?.status, byName('acme')?.status, 'the status moved');
+  assert.equal(
+    without?.metadata.resourceVersion,
+    byName('acme')?.metadata.resourceVersion,
+    'as metadata.generation, a status write moves no version',
+  );
   assert.equal(
     factoryObjectsOf(listed, repo, home).find((o) => o.metadata.name === 'acme')?.metadata.resourceVersion,
     byName('acme')?.metadata.resourceVersion,
@@ -116,7 +121,7 @@ test("a Factory's resourceVersion moves with its rules and its instruction, read
   fs.rmSync(rules);
   moves('rules removed');
   fs.rmSync(instruction);
-  assert.equal(versionOf('acme'), plain, 'a factory that keeps neither again has the version of its spec and status alone');
+  assert.equal(versionOf('acme'), plain, 'a factory that keeps neither again has the version of its spec alone');
   assert.equal(versionOf('default'), byName('default')?.metadata.resourceVersion, "the default factory's version does not move");
 });
 

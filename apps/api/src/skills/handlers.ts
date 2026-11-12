@@ -2,16 +2,19 @@
  * The skills group's handlers (`objects`' `Api`): a namespace's skills as objects, each place read itself so a name two places hold is
  * served once, first origin wins, and `?origin=` reads each: the factory's tree (`<tree>/workflows/skills`), the repository
  * (its own skills folder, `repoSkillsDir`, then `workflows/skills`), yours (`librarySkills`) and Nemia's builtin (`BUILTIN_SKILLS`).
- * Its spec is the SKILL.md as a draft, or its body alone where it does not read as one, `status.error` saying why (`skillSpecOf`).
+ * Its spec is the SKILL.md as a draft, or its body alone where it does not read as one, `status.error` saying why (`skillSpecOf`), and
+ * the folder's other text files (`spec.files`, at any depth), left out where it has none.
  *
  * Writes are yours, in `default` alone (`writeGoes`), through `skills write`: made, written whole or its `preload:` alone at the
- * `metadata.resourceVersion` it was read at, and a builtin one copied to yours (`copy`). `files` lists a skill's files by their path in it.
+ * `metadata.resourceVersion` it was read at — its `spec.files`, where given, the whole set of the folder's other text files, so one left
+ * out is removed and a file that is not text left — and a builtin one copied to yours (`copy`). `files` lists a skill's files by their
+ * path in it.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand } from 'agent-orchestrator';
-import { SKILLS_FOLDER, type SkillDraft } from 'agent-orchestrator/workflow';
+import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, type SkillChange } from 'agent-orchestrator';
+import { SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
 import {
@@ -22,7 +25,7 @@ import {
   repoSkillsDir,
   skillDraftFrom,
   skillSpecOf,
-  skillVersionAt,
+  skillShownAt,
   skillUsers,
   written,
   yourSkillsRead,
@@ -45,7 +48,7 @@ import {
 
 /** What a write sends, said by its refusals. */
 const SHAPE =
-  '`{ "metadata": { "name"?, "resourceVersion"? }, "spec": { "body", "title"?, "description"?, "tags"?, "examples"?, "preload"? } }`, or `{ "metadata": { "resourceVersion" }, "preload": true | false }`';
+  '`{ "metadata": { "name"?, "resourceVersion"? }, "spec": { "body", "title"?, "description"?, "tags"?, "examples"?, "preload"?, "files"?: [{ "path", "text" }] } }`, or `{ "metadata": { "resourceVersion" }, "preload": true | false }`';
 
 /** A skill as a place holds it: its folder, and what its SKILL.md reads as (`SkillRead`), or why it does not. */
 type Row = Pick<SkillRow, 'dir' | 'entry' | 'error' | 'preload' | 'cost'>;
@@ -99,13 +102,15 @@ function specOf({ dir, error }: Row, name: string): { spec: SkillSpec; unread: s
  */
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
-  const versions = new Map(await Promise.all(read.map(async (dir) => [dir, await skillVersionAt(s, dir)] as const)));
+  const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir)] as const)));
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>
       Effect.gen(function* () {
         const { dir, entry, error, preload, cost } = row;
-        const version = versions.get(dir) ?? '';
-        const { spec, unread } = specOf(row, name);
+        const version = shown.get(dir)?.version ?? '';
+        const files = shown.get(dir)?.files ?? [];
+        const { spec: read, unread } = specOf(row, name);
+        const spec: SkillSpec = files.length > 0 ? { ...read, files } : read;
         const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
         const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
         const copyHint =
@@ -152,11 +157,15 @@ async function skillAt(s: Served, namespace: string, name: string, asked?: Origi
   return one;
 }
 
-/** A spec as the draft the package writes, named `name`; refused as `skillDraftFrom` refuses it. */
-const draftOf = (spec: SkillSpec, name: string, route: string): SkillDraft => {
-  const draft = skillDraftFrom({ ...spec, name }, route, SHAPE);
+/**
+ * A spec as the change the package writes, named `name`: its draft, refused as `skillDraftFrom` refuses it, and its `files` where given,
+ * which the package judges.
+ */
+const draftOf = (spec: SkillSpec, name: string, route: string): SkillChange => {
+  const { files, ...lines } = spec;
+  const draft = skillDraftFrom({ ...lines, name }, route, SHAPE);
   if ('status' in draft) throw readerRefused(draft);
-  return draft;
+  return { ...draft, ...(files !== undefined && { files }) };
 };
 
 export const skillsHandlers = HttpApiBuilder.group(Api, 'skills', (handlers) =>

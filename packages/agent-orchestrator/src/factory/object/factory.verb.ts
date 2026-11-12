@@ -5,9 +5,11 @@
  * other. A factory's parts read it through `factoryFiled`: its spec and its listing, off one read of the store's factories, no status, and
  * no run. A factory's `metadata.generation` is its file's count of changes to its spec (`generationOf`); its status the controller's
  * `status.json` (its conditions, each with the time it last moved, the generation that pass observed, the version applied and an upgrade
- * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec and status, and of its
- * rules and its instruction, the sub-resources read beside it (`partsOf`), so a live read that changes moves it with no file written, and
- * an edit of its rules or its instruction moves it as a write of its spec does — a proposal read before either goes stale. And
+ * waiting) and its places a harness does not trust, read live; its `resourceVersion` a digest of its encoded spec, and of its rules and
+ * its instruction, the sub-resources read beside it (`partsOf`), never of its status: an edit of its rules or its instruction moves it as
+ * a write of its spec does, so a proposal read before either goes stale, and a controller's pass, which writes only the status, moves
+ * nothing, so a Factory proposal recorded in that status stays fresh. That is Kubernetes' `metadata.generation`, which counts changes to
+ * an object's desired state and which a status write never moves; a watch tells a change of the status by the status itself. And
  * `factoryCommands`, the lines a person types for one factory, built off the command table as the board read them before.
  *
  * Every kind of a factory's parts is listed the one way (`objectsListed`, `src/object/listed.verb.ts`).
@@ -95,7 +97,10 @@ const partsOf = (listing: Exclude<FactoryListing, { error: string }>, home: stri
   return isBlank(rules) && isBlank(instruction) ? undefined : { rules, instruction };
 };
 
-/** A factory's object, of its spec and status and when it was filed: its `resourceVersion` their digest, and its `parts`' where given. */
+/**
+ * A factory's object, of its spec and status and when it was filed: its `resourceVersion` the digest of its spec and its `parts`' where
+ * given, never of its status (see the file's head).
+ */
 const objectOf = (
   meta: Omit<ObjectMeta, 'resourceVersion'>,
   spec: FactoryObject['spec'],
@@ -104,7 +109,7 @@ const objectOf = (
 ): FactoryObject => ({
   apiVersion: API_VERSION,
   kind: 'Factory',
-  metadata: { ...meta, resourceVersion: versionOf(spec, status, parts) },
+  metadata: { ...meta, resourceVersion: versionOf(spec, null, parts) },
   spec,
   status,
 });

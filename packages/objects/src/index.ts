@@ -241,7 +241,7 @@ export {
   AgentWrite,
   GivenSkill,
 } from './agent.ts';
-export { Skill, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite } from './skill.ts';
+export { Skill, SkillFile, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite } from './skill.ts';
 export { Template, TemplateList, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
 export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, SubscriptionStatus } from './subscription.ts';
 export { Event, EventInvolved, EventList } from './event.ts';

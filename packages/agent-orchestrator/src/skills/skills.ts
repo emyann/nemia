@@ -1,8 +1,8 @@
 /**
  * A skill on an agent: the entry an agent's card lists for it (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`,
- * `skillDraftOf`), its `preload:` line switched alone (`withPreload`), a rule it declares (`SkillRule`), and the paths of the work it is
- * for (`appliesOf`, `appliesMatch`): its `applies:` line, globs from the folder a session runs in, which `nemia stats` reads to tell a try
- * that touched them; the harness ignores it.
+ * `skillDraftOf`), the paths of its other text files judged (`skillFilesRefusal`), its `preload:` line switched alone (`withPreload`), a
+ * rule it declares (`SkillRule`), and the paths of the work it is for (`appliesOf`, `appliesMatch`): its `applies:` line, globs from the
+ * folder a session runs in, which `nemia stats` reads to tell a try that touched them; the harness ignores it.
  */
 import type { LookedUp, LookupRoot } from '../../contracts/lookup.contract.ts';
 import { FRONTMATTER, refuse, SKILLS_FOLDER, splitFrontmatter } from '../step/step.ts';
@@ -147,6 +147,28 @@ export type SkillDraft = {
   preload?: boolean;
   body: string;
 };
+
+/** A text file of a skill's folder beside its SKILL.md: its path in the folder, with `/`, at any depth, and its text. */
+export type SkillOther = { readonly path: string; readonly text: string };
+
+/**
+ * Why the files a write of a skill gives are not its other text files, or undefined where they are: each path in the folder, written with
+ * `/` — never absolute, empty, with an empty, `.` or `..` part, or a `\\` — never its SKILL.md, which the spec's body writes, and each
+ * given once. Pure.
+ */
+export function skillFilesRefusal(files: readonly SkillOther[] | undefined): string | undefined {
+  if (files === undefined) return undefined;
+  const fix = "give each file by its path in the skill's folder, with /, as notes/how.md.";
+  for (const [i, { path }] of files.entries()) {
+    if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) return `a skill's file ${JSON.stringify(path)} is absolute: ${fix}`;
+    if (path.includes('\\')) return `a skill's file ${JSON.stringify(path)} is written with \\: ${fix}`;
+    if (path.split('/').some((part) => part === '' || part === '.' || part === '..'))
+      return `a skill's file ${JSON.stringify(path)} is no path inside its folder — empty, or with an empty, . or .. part: ${fix}`;
+    if (path === 'SKILL.md') return "a skill's files are those beside its SKILL.md, which its body writes: leave SKILL.md out of them.";
+    if (files.findIndex((other) => other.path === path) !== i) return `a skill's file ${path} is given twice: give each file once.`;
+  }
+  return undefined;
+}
 
 /** The frontmatter keys `renderSkill` writes. Every other key a SKILL.md has is kept as written: Claude Code's, or another tool's. */
 const SKILL_WRITES = ['name', 'title', 'description', 'tags', 'examples', 'preload'];

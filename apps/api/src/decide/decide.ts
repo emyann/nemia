@@ -4,7 +4,7 @@
  * journal does not read, in the words the board says it with.
  */
 import { Effect } from 'effect';
-import { Unjudged } from 'objects';
+import { decisionNarrowed, fieldsNamed, Unjudged } from 'objects';
 import { Informer, runDecision } from 'agent-orchestrator';
 import { answered } from '../objects/refused.ts';
 
@@ -22,8 +22,11 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
  * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's
  * comma-separated globs, names the files shown in full in place of the defaults.
  */
-export const decisionHandler = (runId: string, sensitive?: string) =>
+export const decisionHandler = (runId: string, sensitive?: string, diffs?: string) =>
   Effect.flatMap(
     answered((s) => s.inRequest(Effect.provideService(runDecision(runId, globsOf(sensitive)), Informer, s.informer))),
-    (read) => ('unjudged' in read ? Effect.fail(new Unjudged({ error: read.unjudged })) : Effect.succeed(read.decision)),
+    (read) =>
+      'unjudged' in read
+        ? Effect.fail(new Unjudged({ error: read.unjudged }))
+        : Effect.succeed(diffs === undefined ? read.decision : decisionNarrowed(read.decision, fieldsNamed(diffs))),
   );

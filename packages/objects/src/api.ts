@@ -150,15 +150,22 @@ const factoryParams = { name: Schema.String };
 const factoryWorkflowParams = { name: Schema.String, workflow: Schema.String };
 const factorySettingParams = { name: Schema.String, setting: Schema.String };
 
+/**
+ * The query of a list of cards: a list's (`listQuery`), and `fieldSelector`, the cards by whether they are still in play, in Kubernetes'
+ * spelling: `status.inPlay=true` (or `==true`, `!=false`) the cards not started or whose run has not ended, `status.inPlay=false` those
+ * whose run ended; an empty one, or none, every card. Any other is refused `Invalid`, naming the forms it takes.
+ */
+const cardListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };
+
 /** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
 const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 
 /** The inbox's cards as objects. */
 export class CardsGroup extends HttpApiGroup.make('cards').add(
-  HttpApiEndpoint.get('listAll', '/api/cards', { query: listQuery, success: CardListOrTable, error: cardErrors }),
+  HttpApiEndpoint.get('listAll', '/api/cards', { query: cardListQuery, success: CardListOrTable, error: cardErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
     params: { namespace: Schema.String },
-    query: listQuery,
+    query: cardListQuery,
     success: CardListOrTable,
     error: cardErrors,
   }),

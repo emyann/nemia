@@ -13,7 +13,6 @@
 import { templateList, templateObject, templateTree, type Factory } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
 import { agentObjectsOf, treeAgentsHeld } from '../agents/index.ts';
 import { listed, servedNamed, servedOf } from '../definitions/served.ts';
 import { skillObjectsOf, treeSkillsHeld } from '../skills/index.ts';
@@ -24,14 +23,15 @@ import { readsBounded } from '../objects/answer-bound.ts';
 
 /**
  * The request's services placed in the template `name`'s render, as a factory made from it is: its workflows and hires the render's
- * wiring, no schedules, its tree the render's folder, on the request's repository. `Missing` where Nemia builds in no template of that
- * name, `Invalid` where it does not render with its parameters' defaults.
+ * wiring, no schedules, its tree the render's folder, on the request's repository, none where it reads none: its tree, yours and the
+ * builtins are read then (`repoLayer`). `Missing` where Nemia builds in no template of that name, `Invalid` where it does not render with
+ * its parameters' defaults.
  */
 async function renderedIn(s: Served, name: string): Promise<Served> {
   const tree = await s.inRequest(templateTree(name));
   const factory: Factory = {
     name: tree.name,
-    repos: [repoNeeded(s)],
+    repos: s.repo === undefined ? [] : [s.repo],
     workflows: tree.workflows,
     hires: tree.hires,
     schedules: {},

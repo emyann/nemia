@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { app } from '../app.ts';
 import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
-import { addFactory, attachWorkflow, removeFactory } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, hireAgent, removeFactory } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
 import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
@@ -24,8 +24,11 @@ import type { Card, CardList } from 'objects';
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`): its refusal thrown as itself. */
 const onStore = <A, E>(program: Effect.Effect<A, E, StoreRoot>): A => Effect.runSync(Effect.provideService(program, StoreRoot, root));
+/**
+ * The scratch repository, and `desk`, the factory filed on it: a card in `default` is started there by `?factory=desk`, and a run from a
+ * brief there by `?repo=`, which finds `desk`, the one factory that holds it (`startCard`). The default factory reads no repository.
+ */
 const repo = scratch('nemia-api-inbox-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
@@ -63,6 +66,10 @@ const mine = path.join(root, 'workflows', 'mine');
 write(path.join(mine, 'plan.md'), '---\nplace: git\n---\nWrite PLAN.md.\n');
 write(path.join(repo, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 write(path.join(root, 'workflows', 'both', 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
+write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+addFactory({ name: 'desk', repos: [repo] });
+attachWorkflow({ factory: 'desk', workflow: 'dev' });
+hireAgent({ factory: 'desk', agent: 'implementer', step: 'dev/implement' });
 
 const inbox = path.join(root, 'inbox');
 const cards = (): string[] => (fs.existsSync(inbox) ? fs.readdirSync(inbox).sort() : []);
@@ -102,18 +109,19 @@ const drop = (name: string, headers: Record<string, string> = JSON_TYPE) =>
   app.request(`/api/namespaces/default/cards/${name}`, { method: 'DELETE', headers });
 /**
  * A start: of the card `card` names at the Card's own `start`, in the namespace `namespace`, the rest of the body its; or of a run from a
- * brief, with no card.
+ * brief, with no card. In `default`, a card is started in `desk` (`?factory=desk`) and a brief on the scratch repository (`?repo=`).
  */
 const startCard = (
   { card, ...body }: { card?: string } & Record<string, unknown>,
   headers: Record<string, string> = JSON_TYPE,
   namespace = 'default',
 ) =>
-  app.request(card === undefined ? `/api/namespaces/${namespace}/runs` : `/api/namespaces/${namespace}/cards/${card}/start`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
+  app.request(
+    card === undefined
+      ? `/api/namespaces/${namespace}/runs${namespace === 'default' ? `?repo=${encodeURIComponent(repo)}` : ''}`
+      : `/api/namespaces/${namespace}/cards/${card}/start${namespace === 'default' ? '?factory=desk' : ''}`,
+    { method: 'POST', headers, body: JSON.stringify(body) },
+  );
 /** A Card as the list answers it, in the keys a card's page says it by. */
 const entryOf = (c: Card) => ({
   name: c.metadata.name,
@@ -177,7 +185,7 @@ const onFolder = (about: string): string => {
 test('a person starts a card: the run carries where it came from, and the card stays in the inbox, listed as started', async (t) => {
   const s = story(t);
   await s.test(
-    "POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow it names by name, `after` — on the api's repository, `from` ignored — the record carries `from`, and the card stays, listed as started",
+    'POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow it names by name, `after` — in `desk`, on its repository, `from` ignored — the record carries `from`, and the card stays, listed as started',
     async () => {
       clear();
       const { card } = onStore(addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine' }));
@@ -292,6 +300,24 @@ const startRefusal = async (name: string, extra: { brief?: string; after?: strin
 };
 
 test('POST /api/runs with `card`: what a start of a card refuses, writing nothing and removing nothing', async (t) => {
+  await t.test(
+    'a card in no factory, started in `default` with no ?factory=, is a 422 naming ?factory= and `factory:` — never started on a folder — and nothing is written',
+    async () => {
+      clear();
+      const { card } = onStore(addToInbox({ text: 'Somewhere to start' }));
+      const res = await app.request(`/api/namespaces/default/cards/${card.name}/start`, {
+        method: 'POST',
+        headers: JSON_TYPE,
+        body: JSON.stringify({ workflow: 'dev' }),
+      });
+      assert.equal(res.status, 422);
+      const said = ((await res.json()) as Refused).error;
+      for (const fact of [card.name, '?factory=<name>', 'factory:']) assert.ok(said.includes(fact), `${fact}: ${said}`);
+      assert.deepEqual(runFiles(), []);
+      assert.deepEqual(cards(), [`${card.name}.md`]);
+    },
+  );
+
   await t.test("a `card` that is not there is a 404 naming it, the Card's own `Missing` — and nothing is written", async () => {
     clear();
     const { card } = onStore(addToInbox({ text: 'The card that is there' }));
@@ -434,7 +460,7 @@ test("a card whose start fails without a refusal — its repository's `.worktree
 });
 
 /**
- * Two repositories that are not the api's, each with a `dev`, the second with a `solo` the first has not: `mill` works on the first, and
+ * Two repositories that are not `desk`'s, each with a `dev`, the second with a `solo` the first has not: `mill` works on the first, and
  * attaches `dev`; `pair` on both, and attaches `dev`, wired to the second, and `solo`, wired to none.
  */
 const first = scratch('nemia-api-inbox-first-');
@@ -536,7 +562,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
   );
 
   await s.test(
-    "an old card's `repo:` is listed as it was written, and never read: its start runs on the api's repository and answers it as `ignoredRepo`",
+    "an old card's `repo:` is listed as it was written, and never read: its start runs on its factory's repository and answers it as `ignoredRepo`",
     async () => {
       clear();
       const elsewhere = scratch('nemia-api-inbox-elsewhere-');
@@ -548,7 +574,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       const answered = (await started.json()) as CardStarted;
       assert.equal(answered.ignoredRepo, `${elsewhere}/`, "the card's `repo:`, said as not read");
       const run = runsAtOnce(root).runs.read(answered.id);
-      assert.deepEqual([run.repo, run.workflowDir], [repo, dev], "started on the api's repository, its workflow found there by name");
+      assert.deepEqual([run.repo, run.workflowDir], [repo, dev], "started on desk's repository, its workflow found there by name");
     },
   );
 
@@ -799,7 +825,7 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
   );
 
   await t.test(
-    "what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a `repo` of any kind, retired, the api's own repository among them, an `after:` in the idea's frontmatter — and nothing is written",
+    "what the package refuses to file is a 422 carrying its sentence word for word — an idea with nothing in it, a `repo` of any kind, retired, a factory's repository among them, an `after:` in the idea's frontmatter — and nothing is written",
     async () => {
       clear();
       const cases: Array<{ body: string; repo?: string }> = [
@@ -874,7 +900,7 @@ test("what a filing, a card's page or a drop refuses, writing nothing", async (t
       const unknown = await file({ body: 'An idea', factory: 'nobody' });
       assert.equal(unknown.status, 404);
       const said = ((await unknown.json()) as Refused).error;
-      assert.ok(said.endsWith('Its factories are: mill, pair. Nothing was filed.'), said);
+      assert.ok(said.endsWith('Its factories are: desk, mill, pair. Nothing was filed.'), said);
       const slug = await file({ body: 'An idea', factory: 'Not A Slug' });
       assert.equal(slug.status, 422);
       assert.deepEqual(cards(), []);

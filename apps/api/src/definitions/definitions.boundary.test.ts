@@ -15,9 +15,18 @@ import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 
+/**
+ * The scratch repository, which the factory `works` works on: read in `default` by its `?repo=` (`onRepoUrl`), which that factory lets
+ * the api read.
+ */
 const repo = scratch('nemia-api-definitions-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+
+/** `url` with the scratch repository's `?repo=`, where it asks the default factory and names no repository. */
+const onRepoUrl = (url: string): string =>
+  !/^\/api\/namespaces\/default(?:[/?]|$)/.test(url) || /[?&]repo=/.test(url)
+    ? url
+    : `${url}${url.includes('?') ? '&' : '?'}repo=${encodeURIComponent(repo)}`;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -53,11 +62,11 @@ type Obj = {
 type List = { kind: string; metadata: { continue?: string; remainingItemCount?: number }; items: Obj[] };
 
 const get = async <T>(url: string): Promise<{ status: number; body: T }> => {
-  const res = await app.request(url);
+  const res = await app.request(onRepoUrl(url));
   return { status: res.status, body: (await res.json()) as T };
 };
 const send = async (method: string, url: string, body?: unknown, headers: Record<string, string> = json) => {
-  const res = await app.request(url, { method, headers, ...(body !== undefined && { body: JSON.stringify(body) }) });
+  const res = await app.request(onRepoUrl(url), { method, headers, ...(body !== undefined && { body: JSON.stringify(body) }) });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> & Obj };
 };
 const byName = (list: List) => Object.fromEntries(list.items.map((o) => [o.metadata.name, o]));

@@ -60,7 +60,7 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
 /**
  * Every skill the namespace holds, at each origin: the factory's tree's (`treeSkillsHeld`); yours, the repository's and the builtin as the
  * picker lists them (`listSkills`: where an agent of yours finds each name, a link or a SKILL.md that does not read listed with why). On
- * no repository (an install, no factory named), the repository's are none.
+ * no repository (the default factory with no `?repo=`), the repository's are none.
  */
 async function heldIn(s: Served): Promise<Held<Row>[]> {
   const own = await treeSkillsHeld(s, 'factory');

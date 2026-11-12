@@ -23,11 +23,17 @@ import { listedOf, objectOf } from '../../test/run-reads.ts';
 import { listWorkflows, specOf } from './workflows.ts';
 import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runsAtOnce, settingsOf } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
-/** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
+import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator/testing';
+/**
+ * The scratch repository, a git repository, as `nemia start` reads its HEAD: read in the default factory by `?repo=`, which the factory
+ * `bench`, filed on it, lets the api read (`placeFor`); a start there runs in `bench`, the one factory that holds it, which offers `good`
+ * and `broken`.
+ */
 const repo = scratch('nemia-api-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
+/** The `?repo=` that reads the scratch repository. */
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** A folder's version as the board lists it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 /** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
@@ -72,6 +78,17 @@ write(path.join(repo, 'workflows', 'NOTES.txt'), 'Ideas for workflows.\n');
 write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
 write(path.join(repo, 'workflows', '.draft', 'implement.md'), '---\nplace: git\n---\nImplement it.\n');
 write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nImplement what you are asked.\n');
+
+addFactory({ name: 'bench', repos: [repo] });
+for (const workflow of ['good', 'broken']) attachWorkflow({ factory: 'bench', workflow });
+
+/**
+ * The repository's implementer hired into each step of `good` in `bench`, so a start of it there is filled: from the first start on, the
+ * step's page in the default factory names `bench` among those that hire into it.
+ */
+const benchHires = (): void => {
+  for (const step of ['implement', 'review']) hireAgent({ factory: 'bench', agent: 'implementer', step: `good/${step}` });
+};
 
 /** Yours, in the store: one step, and no README — kept in git, as a person's own workflows may be. */
 const mine = path.join(root, 'workflows', 'mine');
@@ -132,7 +149,7 @@ const loaderRefusal = (dir: string): string => {
 };
 
 const post = (body: unknown) =>
-  app.request('/api/namespaces/default/runs', {
+  app.request(`/api/namespaces/default/runs?${ON_REPO}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -194,7 +211,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
       const refused = loaderRefusal(broken);
       assert.match(refused, /review: `afer` is not a key a step has/);
 
-      const listing = await everyOrigin<WorkflowListing>(app, 'workflows');
+      const listing = await everyOrigin<WorkflowListing>(app, 'workflows', 'default', ON_REPO);
       for (const w of listing)
         assert.equal(w.version, versionOf(w.dir), `${w.name}: at the version its files are at, which a save from the board carries`);
       assert.deepEqual(listing, [
@@ -490,7 +507,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
         fs.rmSync(dir, { recursive: true });
         fs.rmSync(path.join(repo, 'workflows', 'agents', 'looker.md'));
       });
-      const listed = (await listedIn<WorkflowListing>(app, 'workflows')).find((w) => w.name === 'served');
+      const listed = (await listedIn<WorkflowListing>(app, 'workflows', ON_REPO)).find((w) => w.name === 'served');
       const of = (name: string) => listed?.steps.find((step) => step.name === name);
       assert.deepEqual(
         [of('look')?.spec.mcp, of('look')?.mcp],
@@ -506,7 +523,7 @@ test("a person reads the workflows on the board, opens a step's page, and is ref
 
 /** A step's page, as the board asks for it: the Workflow's `step` in `default`, from the origin `from`. */
 const stepPage = (from: string, name: string, step: string) =>
-  app.request(`/api/namespaces/default/workflows/${name}/steps/${step}?origin=${from}`);
+  app.request(`/api/namespaces/default/workflows/${name}/steps/${step}?origin=${from}&${ON_REPO}`);
 
 /** Every key a step may set, in the package's order, with the values `set` gives over the `place: git` every step says, and its meaning. */
 const rows = (set: Record<string, string | null>) =>
@@ -524,6 +541,7 @@ const filesOf = (dir: string): Array<[string, string]> =>
     .map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
 test('a person starts runs from the board: the record as `nemia start` writes it, `after` frozen and read, `context` filed at once', async (t) => {
+  benchHires();
   const s = story(t);
   await s.test(
     'POST /api/namespaces/default/runs starts a run of the workflow it names as `nemia start` does: the record is written, and nothing is filed',
@@ -539,8 +557,8 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       const run = runsAtOnce(root).runs.read(id);
       assert.deepEqual(
         fs.readdirSync(path.join(root, 'runs', id)),
-        ['workflow'],
-        'the folder holds only the copy of the workflow folder the run took',
+        ['agents', 'workflow'],
+        "the folder holds only the copy of the workflow folder the run took, and its steps' agents rendered: bench hires one into each",
       );
       assert.deepEqual(fs.readdirSync(path.join(root, 'runs', id, 'workflow')), [run.workflowFiles]);
       assert.deepEqual(
@@ -600,7 +618,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
   );
 
   await s.test('GET /api/repository is the repository a start runs in, as the start form lists the runs of', async () => {
-    const res = await app.request('/api/repository');
+    const res = await app.request('/api/repository?factory=bench');
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { repo });
   });
@@ -703,7 +721,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
 
 /** A start of the repository's `good`, sent with exactly `headers`. */
 const sentWith = (headers: Record<string, string>) =>
-  app.request('/api/namespaces/default/runs', {
+  app.request(`/api/namespaces/default/runs?${ON_REPO}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }),
@@ -713,6 +731,7 @@ const sentWith = (headers: Record<string, string>) =>
 const fieldOf = async (res: Response): Promise<string> => ((await res.json()) as { field?: string }).field ?? '';
 
 test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, and the name two places have', async (t) => {
+  benchHires();
   await t.test(
     'an unknown workflow (404, naming the ones there are), a missing or blank brief (422), a body `RunStart` does not read (400, naming the key) — and nothing is written',
     async () => {
@@ -777,7 +796,7 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
 
   await t.test(
     "what `startRun` refuses is a 422 — a folder the loader refuses, a step named for another's check, which names itself — and nothing is written",
-    async () => {
+    async (t) => {
       const before = runFiles();
 
       const broke = await post({ workflow: 'broken', brief: 'Do it.' });
@@ -786,6 +805,11 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
       const clash = path.join(root, 'workflows', 'clash');
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
+      const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
+      write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
+      t.after(() => fs.rmSync(yoursImplementer));
+      attachWorkflow({ factory: 'bench', workflow: 'clash' });
+      for (const step of ['build', 'build-check']) hireAgent({ factory: 'bench', agent: 'implementer', step: `clash/${step}` });
       assert.equal(
         (
           await listWorkflows(
@@ -889,9 +913,12 @@ test('POST /api/namespaces/default/runs: what a start refuses, writing nothing, 
 
   await t.test(
     'REFUSED: a name both the repository and yours have is a 409 until `from` says which, and then starts that one',
-    async () => {
+    async (t) => {
       const yours = path.join(root, 'workflows', 'good');
       write(path.join(yours, 'implement.md'), '---\nplace: git\n---\nImplement it my way.\n');
+      const yoursImplementer = path.join(root, 'workflows', 'agents', 'implementer.md');
+      write(yoursImplementer, '---\nharness: claude\n---\nImplement what you are asked.\n');
+      t.after(() => fs.rmSync(yoursImplementer));
       const before = runFiles();
 
       const both = await post({ workflow: 'good', brief: 'Do it.' });

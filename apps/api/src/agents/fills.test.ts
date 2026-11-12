@@ -4,9 +4,9 @@
  * tagged with the factories it fills a step in. A step is credited to the agent file a start would run it with, found as the loader finds
  * it (`lookupRoots`), never to every agent of that name.
  *
- * The api's own repository (`HKB_REPO`) is `repoR`. Its `alpha` has `implement`, naming no agent, and `review`, naming `iris`; `gamma/plan`
- * names `cleo`; `delta/ship` names none; `broken/named` names `bo` beside `broken/bad`, a step the loader refuses, and `broken/stray`,
- * which names `../agents/cleo`, no agent's name. `repoR` has `ada`,
+ * The default factory reads `repoR` by `?repo=` (`ON_REPO`), which the factories filed on it let the api read. Its `alpha` has
+ * `implement`, naming no agent, and `review`, naming `iris`; `gamma/plan` names `cleo`; `delta/ship` names none; `broken/named` names `bo`
+ * beside `broken/bad`, a step the loader refuses, and `broken/stray`, which names `../agents/cleo`, no agent's name. `repoR` has `ada`,
  * `iris`, `cleo` and `bo` in `workflows/agents/`, and `max` in `.claude/agents/`. Yours has `ada`, `max` and `zed`, and the workflow
  * `omega`, whose `step` names none. `repoS` is a second repository with no workflow.
  *
@@ -33,7 +33,7 @@ const write = (file: string, text: string): void => {
 const agentText = (does: string): string => `---\nharness: claude\n---\n${does}\n`;
 
 const repoR = scratch('nemia-api-fills-r-');
-process.env.HKB_REPO = repoR;
+const ON_REPO = `repo=${encodeURIComponent(repoR)}`;
 const repoS = scratch('nemia-api-fills-s-');
 const STORE = path.join(root, 'workflows');
 
@@ -63,8 +63,8 @@ hireAgent({ factory: 'hired', agent: 'ada', step: 'alpha/implement' });
 hireAgent({ factory: 'shadow', agent: 'max', step: 'delta/ship' });
 hireAgent({ factory: 'other', agent: 'zed', step: 'omega/step' });
 
-/** The agents of the namespace `ns`, every origin's, as the Agents page reads them. */
-const agents = (ns = 'default'): Promise<LibraryAgent[]> => everyOrigin<LibraryAgent>(app, 'agents', ns);
+/** The agents of the namespace `ns`, every origin's, as the Agents page reads them: in the default factory, on `repoR`. */
+const agents = (ns = 'default'): Promise<LibraryAgent[]> => everyOrigin<LibraryAgent>(app, 'agents', ns, ns === 'default' ? ON_REPO : '');
 const who = (listed: LibraryAgent[]): string[] => listed.map((a) => `${a.from}:${a.name}`);
 const one = (listed: LibraryAgent[], from: string, name: string): LibraryAgent => {
   const found = listed.find((a) => a.from === from && a.name === name);
@@ -137,7 +137,7 @@ test('?factory=default is the default factory for the Agents page: the same answ
 });
 
 test('a step of a folder the loader refuses still credits the agent it names', async () => {
-  const broken = (await workflowsListed<WorkflowListing>(app, '')).body.find((w) => w.name === 'broken');
+  const broken = (await workflowsListed<WorkflowListing>(app, ON_REPO)).body.find((w) => w.name === 'broken');
   assert.ok(broken?.error, 'the folder does not load');
   assert.deepEqual(one(await agents(), 'repo', 'bo').fills, [{ from: 'repo', workflow: 'broken', step: 'named', hired: false }]);
 });
@@ -151,7 +151,7 @@ test("the workflow listing's `hired` is the factory's hire into the step: null f
       ['review', null, 'iris'],
     ],
   );
-  const all = (await workflowsListed<WorkflowListing>(app, '')).body;
+  const all = (await workflowsListed<WorkflowListing>(app, ON_REPO)).body;
   assert.deepEqual(
     all.flatMap((w) => w.steps.map((s) => s.hired)),
     all.flatMap((w) => w.steps.map(() => null)),

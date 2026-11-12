@@ -16,9 +16,15 @@ import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
 import { Effect } from 'effect';
 import { StoreRoot, workflowVersion as versionIn } from 'agent-orchestrator';
+import { addFactory } from 'agent-orchestrator/testing';
+/**
+ * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which the factory `remover`, filed on it, lets the api
+ * read.
+ */
 const repo = scratch('nemia-api-remove-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+addFactory({ name: 'remover', repos: [repo] });
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 type WorkflowRemoved = { metadata: { name: string }; status: { dir: string; origin: string } };
 
@@ -56,15 +62,18 @@ const snapshot = (dir: string): Record<string, string> =>
 /** A DELETE at `version`: the folder's version as it is on disk now unless one is given, as a board that has just read it sends it. */
 const remove = (name: string, version?: string | null, from = 'yours', headers: Record<string, string> = json) => {
   const read = version === undefined ? versionOf(path.join(from === 'yours' ? STORE : path.join(repo, 'workflows'), name)) : version;
-  return app.request(`/api/namespaces/default/workflows/${name}${read === null ? '' : `?resourceVersion=${encodeURIComponent(read)}`}`, {
-    method: 'DELETE',
-    headers,
-  });
+  return app.request(
+    `/api/namespaces/default/workflows/${name}?${ON_REPO}${read === null ? '' : `&resourceVersion=${encodeURIComponent(read)}`}`,
+    {
+      method: 'DELETE',
+      headers,
+    },
+  );
 };
 
 /** Whether the namespace's workflows list `name` from `from`. */
 async function listed(name: string, from = 'yours'): Promise<boolean> {
-  const all = await listedIn<{ name: string; from: string }>(app, 'workflows', `origin=${from}`);
+  const all = await listedIn<{ name: string; from: string }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   return all.some((w) => w.name === name && w.from === from);
 }
 

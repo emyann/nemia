@@ -144,7 +144,8 @@ export const answeredWrite = answering(true);
 
 /**
  * `work` over the request's services placed in the factory `namespace` names and on the repository its `?repo=` names (`Served.placedIn`):
- * `default` the api's repository and your library. What a handler of a namespaced kind runs on that is answered in its namespace's place.
+ * `default` your library, and the repository a `?repo=` names. What a handler of a namespaced kind runs on that is answered in its
+ * namespace's place.
  */
 export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
   answered((s) => work({ ...s, ...s.placedIn(namespace) }));

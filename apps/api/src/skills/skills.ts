@@ -191,8 +191,8 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
  * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name, and listing the
  * agents of yours that give it where none does. The package's builtin place skill (`isBuiltinPlace`) and its builtin skills, which an
- * agent finds where no place has the name, are in neither of the first two. With no repository (an install, no factory named), no place
- * of the repository's is listed. A name both
+ * agent finds where no place has the name, are in neither of the first two. With no repository (the default factory with no `?repo=`),
+ * no place of the repository's is listed. A name both
  * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
  * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
  * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.

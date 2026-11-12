@@ -1,7 +1,9 @@
 /**
  * Yours on an install: an api with no repository of its own (`Running` of `kind: 'install'`, `HKB_REPO` unset) and no factory named
  * lists, reads, creates and replaces a workflow, an agent and a skill of yours in `default`, the layers read yours and the builtins; only
- * a request that reads the repository's own layer (`?origin=repo`) asks for a repository, and is refused, naming the fix.
+ * a request that reads the repository's own layer (`?origin=repo`) asks for a repository, and is refused, naming the fix. Every other
+ * route answers on it: a step's page of a workflow of yours, a template's workflows, the factories' list, a factory's proposals, listed
+ * and made, and its resolve.
  */
 import '../../test/harness.ts';
 import { test } from 'node:test';
@@ -10,14 +12,48 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import type { Running } from 'agent-orchestrator';
-import type { Agent, Skill, Workflow } from 'objects';
+import { TemplateRenders, type Running } from 'agent-orchestrator';
+import { BuiltinTemplates } from 'agent-orchestrator/testing';
+import type { Agent, FactoryList, ProposalList, Skill, Workflow, WorkflowStepPage } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ApiConfig } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
 
 const D = '/api/namespaces/default';
 const json = { 'content-type': 'application/json' };
+
+const write = (file: string, text: string): void => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+};
+
+/** A builtin folder holding the template `mill`: one workflow, `press`, of one step, `draft`. */
+const builtins = scratch('nemia-api-install-builtins-');
+write(
+  path.join(builtins, 'mill', 'nemia.yaml'),
+  'apiVersion: nemia.dev/v1alpha1\nkind: FactoryTemplate\nmetadata:\n  name: mill\n  description: A mill.\nspec:\n  version: 0.1.0\n  hires: {}\n',
+);
+write(
+  path.join(builtins, 'mill', 'workflows', 'press', 'workflow.yaml'),
+  'apiVersion: nemia.dev/v1alpha1\nkind: Workflow\nmetadata:\n  name: press\nspec:\n  steps:\n    - name: draft\n      place: folder\n',
+);
+write(path.join(builtins, 'mill', 'workflows', 'press', 'draft.md'), 'Draft the page.\n');
+
+/**
+ * The factory `pmill` filed by hand in the store `home`, as `nemia factory apply` files one: on a folder of its own, its tree one workflow
+ * `dev` with a step `plan`, attached.
+ */
+function pmillIn(home: string): void {
+  const repo = scratch('nemia-api-install-pmill-repo-');
+  write(
+    path.join(home, 'factories', 'pmill.json'),
+    JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
+  );
+  const tree = path.join(home, 'factories', 'pmill', 'tree');
+  write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
+  write(path.join(tree, 'workflows', 'dev', 'README.md'), '# dev\n\nPlan.\n');
+  write(path.join(tree, 'workflows', 'dev', 'plan.md'), '---\nplace: folder\n---\nPlan the change.\n');
+}
 
 /** An app as an install serves it: unpacked from an archive, its source an address, no repository of its own, over the store `home`. */
 function installed(home: string) {
@@ -31,7 +67,15 @@ function installed(home: string) {
     from: 'archive',
   };
   const { HKB_REPO: _noRepoOfItsOwn, ...env } = process.env;
-  return appOf(Layer.mergeAll(liveOf(env), ApiConfig.layer(env, running), Layer.succeed(StoreRoot)(home))).app;
+  return appOf(
+    Layer.mergeAll(
+      liveOf(env),
+      ApiConfig.layer(env, running),
+      Layer.succeed(StoreRoot)(home),
+      Layer.succeed(BuiltinTemplates)(builtins),
+      Layer.succeed(TemplateRenders)(scratch('nemia-api-install-renders-')),
+    ),
+  ).app;
 }
 
 test('an install with no repository and no factory named: yours is created, read back and replaced, and the repository is asked for only where read', async (t) => {
@@ -143,6 +187,50 @@ test('an install with no repository and no factory named: yours is created, read
     const origins = new Set(list.items.map((s) => s.status.origin));
     assert.ok(list.items.some((s) => s.metadata.name === 'short-notes' && s.status.origin === 'yours'));
     assert.deepEqual([...origins].sort(), ['builtin', 'yours'], 'yours and the builtins, no repository');
+  });
+
+  await t.test("a step's page of a workflow of yours", async () => {
+    const page = await got<WorkflowStepPage>(`${D}/workflows/notes/steps/write`);
+    assert.equal(page.factory, null, 'in the default factory');
+    assert.deepEqual([page.from, page.body.trim()], ['yours', 'Write the notes again.'], 'read from yours');
+  });
+
+  await t.test("a template's workflows, read from its render", async () => {
+    const list = await got<{ items: Workflow[] }>('/api/templates/mill/workflows');
+    assert.deepEqual(
+      list.items.map((w) => [w.metadata.name, w.status.origin]),
+      [['press', 'builtin']],
+    );
+  });
+
+  await t.test("the factories' list, a factory's proposals listed and made, and its resolve", async () => {
+    pmillIn(home);
+    const factories = await got<FactoryList>('/api/factories');
+    assert.deepEqual(
+      factories.items.map((f) => [f.metadata.name, f.spec.repos.length]),
+      [
+        ['default', 0],
+        ['pmill', 1],
+      ],
+      'the default factory on no repository, then the one filed',
+    );
+    const proposals = await got<ProposalList>('/api/namespaces/pmill/proposals');
+    assert.deepEqual(proposals.items, []);
+    const dev = await got<Workflow>('/api/namespaces/pmill/workflows/dev');
+    const made = await send('POST', '/api/namespaces/pmill/proposals', {
+      objects: [
+        {
+          kind: 'Workflow',
+          metadata: { name: 'dev', resourceVersion: dev.metadata.resourceVersion },
+          spec: { ...dev.spec, steps: dev.spec.steps.map((step) => ({ ...step, body: 'Plan it twice.\n' })) },
+        },
+      ],
+    });
+    assert.equal(made.status, 201, await made.clone().text());
+    const resolve = await send('POST', '/api/factories/pmill/resolve', { conflict: 'nowhere.md', text: 'x' });
+    const said = (await resolve.json()) as { error?: string };
+    assert.notEqual(resolve.status, 422, `the resolve is judged, never refused for want of a repository: ${JSON.stringify(said)}`);
+    assert.ok(!said.error?.includes('?factory='), `no repository is asked for: ${said.error}`);
   });
 
   await t.test("REFUSED: a read of the repository's own layer, which this api has none of", async () => {

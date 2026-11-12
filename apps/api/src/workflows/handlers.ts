@@ -1,6 +1,7 @@
 /**
- * The workflows group's handlers (`objects`' `Api`): a namespace's workflows as objects. `default` is the api's repository and your
- * library; a factory's namespace is the workflows attached to it, its tree's first (origin `factory`) in one made from a template.
+ * The workflows group's handlers (`objects`' `Api`): a namespace's workflows as objects. `default` is your library, and the repository a
+ * `?repo=` names where a factory works on it; a factory's namespace is the workflows attached to it, its tree's first (origin `factory`)
+ * in one made from a template.
  *
  * Each folder is read where it is (`heldIn`, no folder loaded), the one served of each name chosen by `definitionServed` (served.ts), and
  * only those served are loaded, as a start on the repository loads them (`loadedOf`, with the factory's hires), into the object
@@ -156,10 +157,10 @@ const specRead = ({ steps, readme, description, files }: WorkflowFilesRead): Wor
 });
 
 /**
- * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the api's repository and yours, as a GET of
- * the same folder in yours reads it: its name and its spec, writing nothing. On an api with no repository (an install, no factory
- * named), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Refused `Invalid` without a
- * name, and as the reader refuses.
+ * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the request's repository and yours, as a GET
+ * of the same folder in yours reads it: its name and its spec, writing nothing. On a request that reads no repository (the default
+ * factory with no `?repo=`), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Refused
+ * `Invalid` without a name, and as the reader refuses.
  */
 async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
   if (name === undefined)

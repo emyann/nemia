@@ -29,17 +29,17 @@ import {
 import { ANSWER_MOST } from 'objects';
 import { McpAsker } from './capabilities/capabilities.ts';
 import { routeOf } from './request/request.ts';
-import { type Place, placeFor } from './factory/place.ts';
+import { type Place, type PlaceQuery, placeFor } from './factory/place.ts';
 import { QuotaAsker } from './gauges/quota.ts';
 import { Followings } from './steps/following.ts';
 import { Engine, type RequestTrace, StoreConfig, StoreRoot } from './store.ts';
 import type { StepRun } from './step/step.ts';
 
 /**
- * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`
- * (`maxRuns`), `WF_VERIFY_REST` (`verifiesRest`) and `HKB_QUOTA_*` (`makeQuota`), each refused, or defaulted, in its reader's words. The
- * live layer holds `process.env` itself, not a copy. Beside it, the code the api runs (`running`), where its repository is an install's
- * source (`repoOf`); none where a test gives no release.
+ * The environment the api reads its settings from, on each request, as it read `process.env` before: `WF_MAX_RUNS` (`maxRuns`),
+ * `WF_VERIFY_REST` (`verifiesRest`) and `HKB_QUOTA_*` (`makeQuota`), each refused, or defaulted, in its reader's words; no request is
+ * placed by `HKB_REPO`, which names the folder the daemon's pass ticks in (`repoOf`, main.ts) alone. The live layer holds `process.env`
+ * itself, not a copy. Beside it, the code the api runs (`running`); none where a test gives no release.
  */
 export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS.ProcessEnv; readonly running?: Running }>()(
   'api/ApiConfig',
@@ -176,7 +176,7 @@ export type Served = {
    */
   inRequest: <A, E>(program: Effect.Effect<A, E, Services | EngineService>) => Promise<A>;
   /**
-   * Where the request is answered for a kind in `namespace`: the factory the namespace names (`default` the api's own) and the repository
+   * Where the request is answered for a kind in `namespace`: the factory the namespace names (`default` none) and the repository
    * the request's `?repo=` names, resolved and refused as `placeFor` resolves and refuses them (factory/place.ts). What a handler of a
    * namespaced kind is placed by (`answeredIn`, objects/refused.ts), never a route of its own.
    */
@@ -204,6 +204,19 @@ const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
   typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined);
 
 /**
+ * The factory and the repository the request names, as `placeFor` reads them: its `?factory=` and `?repo=`; and, for a `?repo=` with no
+ * `?factory=` under a namespace's path (`/api/namespaces/<namespace>/…`), that namespace's factory, so the repository is judged against
+ * the factory the handler places the request in (`placedIn`) and not the default's, which reads only a factory's repository.
+ */
+function placeQueryOf(c: RequestContext<ApiEnv>): PlaceQuery {
+  const factory = c.req.query('factory');
+  const repo = c.req.query('repo');
+  if (factory !== undefined || repo === undefined) return { factory, repo };
+  const under = /^\/api\/namespaces\/([^/]+)(?:\/|$)/.exec(new URL(c.req.url).pathname)?.[1];
+  return { factory: under === undefined ? undefined : decodeURIComponent(under), repo };
+}
+
+/**
  * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
  * what it returns, or its rejection itself, so a refusal thrown inside it — the place's among them, before `handle` runs — reaches
  * `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded inside
@@ -222,7 +235,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         const inRequest = <A, E>(program: Effect.Effect<A, E, Services | EngineService>): Promise<A> =>
           Effect.runPromiseWith(context)(underRequest(c, Effect.provideService(program, EngineService, e)));
         const home = yield* StoreRoot;
-        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, env, home, running);
+        const placedIn = (namespace: string): Place => placeFor({ factory: namespace, repo: c.req.query('repo') }, home);
         const services = {
           env,
           running,
@@ -243,9 +256,7 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
           placedIn,
         };
         const before = yield* readsOf(services.e);
-        return yield* Effect.promise(async () =>
-          handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env, home, running) }),
-        ).pipe(
+        return yield* Effect.promise(async () => handle({ ...services, ...placeFor(placeQueryOf(c), home) })).pipe(
           Effect.ensuring(
             Effect.flatMap(readsOf(services.e), (after) =>
               before === undefined || after === undefined

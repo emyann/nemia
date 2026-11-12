@@ -16,7 +16,7 @@ import type { SkillsFound, StepSpec } from 'agent-orchestrator/workflow';
 import { DEFAULT_NAMESPACE, type WorkflowStepPage } from 'objects';
 import { foundInOf, sourceOf, type SkillSource } from '../skills/skills.ts';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
+import { repoLayer } from '../factory/place.ts';
 import { agentSkillsOf, keyRows, placesOf, stepSourceOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /** How many of a step's runs its page lists, newest first. */
@@ -24,7 +24,8 @@ export const RECENT_RUNS = 5;
 
 /**
  * Where a workflow's page is on the board, and a step's page under it: where the workflow is read from, its name, and the place it is read
- * in — the factory, null for the default, and the repository, null for the api's own or the factory's only one.
+ * in — the factory, null for the default, and the repository, null where the request names none: the factory's only one, or none in the
+ * default factory.
  */
 export type WorkflowPageAddress = { from: WorkflowSource; workflow: string; factory: string | null; repo: string | null };
 
@@ -54,13 +55,14 @@ export type RecentRun = { id: string; brief: string; createdAt: string; factory:
 const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_NAMESPACE ? factory : null);
 
 /**
- * The address of the page of the workflow `run` was started from, on the api serving `served` with the store at `home`, or null where the
- * board pages none: a folder of yours, in the run's factory on its repository; one of the run's repository, in its factory, or on the api's
- * own repository in the default factory; and no other folder — one given by path, a try's, or another repository's in the default factory.
+ * The address of the page of the workflow `run` was started from, read on the repository `served` (the request's, none where it reads
+ * none) with the store at `home`, or null where the board pages none: a folder of yours, in the run's factory on its repository; one of
+ * the run's repository, in its factory, or in the default factory on the repository the request reads; and no other folder — one given by
+ * path, a try's, or another repository's in the default factory.
  */
 export function workflowPageOf(
   run: { workflowDir: string; repo?: string | null; factory?: string | null },
-  served: string,
+  served: string | undefined,
   home: string,
 ): WorkflowPageAddress | null {
   const dir = path.resolve(run.workflowDir);
@@ -71,7 +73,7 @@ export function workflowPageOf(
   if (parent === path.join(path.resolve(home), 'workflows')) return { from: 'yours', workflow, factory, repo: factory ? repo : null };
   if (repo === null || parent !== path.join(repo, 'workflows')) return null;
   if (factory) return { from: 'repo', workflow, factory, repo };
-  return repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;
+  return served !== undefined && repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;
 }
 
 /** What a step's page reads of a run: its folder and factory, the steps it has, and what its row says. */
@@ -111,18 +113,19 @@ export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string
 
 /**
  * The factories in `factories` that hire an agent into the step `step` of `workflow`, each with the agent: those that read, attach the
- * workflow and hire into the step — for a workflow of the repository's (`from`), only those working on `repo`, which reads it.
+ * workflow and hire into the step — for a workflow of the repository's (`from`), only those working on `repo`, which reads it, and none
+ * where the request reads no repository.
  */
 export function hiredInOf(
   factories: readonly FactoryListing[],
   workflow: string,
   step: string,
   from: WorkflowSource,
-  repo: string,
+  repo: string | undefined,
 ): HiredIn[] {
   return factories.flatMap((factory) => {
     if ('error' in factory || !factory.workflows.includes(workflow)) return [];
-    if (from === 'repo' && !factory.repos.some((r) => path.resolve(r) === path.resolve(repo))) return [];
+    if (from === 'repo' && (repo === undefined || !factory.repos.some((r) => path.resolve(r) === path.resolve(repo)))) return [];
     const agent = fillsOf(factory.hires, workflow)[step];
     return agent === undefined ? [] : [{ factory: factory.name, agent }];
   });
@@ -161,7 +164,7 @@ export async function hiringOf(
 }
 
 /** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`). */
-export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string, home: string): SkillFrom[] {
+export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string | undefined, home: string): SkillFrom[] {
   return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
     const at = found.at.get(name);
     if (typeof at !== 'string') return { name, from: null, foundIn: null };
@@ -190,8 +193,8 @@ export async function stepPage(
   asked: string,
 ): Promise<WorkflowStepPage> {
   const { home, factory, memo } = s;
-  const repo = repoNeeded(s);
-  const input = { name, step: asked, dir, repo, ...(factory && { factory: factory.name }) };
+  const repo = repoLayer(s);
+  const input = { name, step: asked, dir, ...(repo !== undefined && { repo }), ...(factory && { factory: factory.name }) };
   const { step: found, steps } = await s.inRequest(WORKFLOWS_STEP.handler(input));
   if (!found) throw new Missing({ message: `No step '${asked}' in workflow ${name} (${dir}). Its steps are: ${steps.join(', ')}.` });
   const places = placesOf(repo, home);
@@ -203,7 +206,7 @@ export async function stepPage(
   );
   const layers = toldLayers(found, null);
   const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-  const agents = async () => (await s.inRequest(AGENTS.handler({ repo }))).agents;
+  const agents = async () => (await s.inRequest(AGENTS.handler(repo === undefined ? {} : { repo }))).agents;
   return {
     workflow: name,
     from,

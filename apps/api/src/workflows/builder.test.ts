@@ -15,7 +15,7 @@ import { TEAM } from '../../test/team.ts';
 import { story } from 'test-kit/checkpoints';
 import { Effect, Layer } from 'effect';
 import { AgentDoor, type AgentDoorShape } from 'agent-orchestrator';
-import { agentDoorMemory } from 'agent-orchestrator/testing';
+import { addFactory, agentDoorMemory } from 'agent-orchestrator/testing';
 import { app, appOf, liveOf } from '../app.ts';
 import { isRoleKey, putSchemasBack, stepsNamed } from './builder.ts';
 import { asWorkflowListing, listedIn } from '../../test/definitions.ts';
@@ -34,9 +34,14 @@ import {
   STEP_KEY_MEANINGS,
   STEP_KEYS,
 } from 'agent-orchestrator/workflow';
+/**
+ * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which the factory `builder`, filed on it, lets the api
+ * read.
+ */
 const repo = scratch('nemia-api-builder-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+addFactory({ name: 'builder', repos: [repo] });
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 /** A folder's version as the board reads it: its agents and skills looked for in the repository's `.claude/` and in yours too. */
 /** A program that reads the store, run over the harness's root (`WF_ROOT`), as a request's services give it. */
@@ -117,7 +122,7 @@ write(path.join(theirs, 'implement.md'), '---\nplace: git\nmodel: opus\n---\nImp
 
 /** A workflow's steps as GET /api/workflows lists them. */
 async function listedSteps(name: string, from = 'yours'): Promise<ListedStep[]> {
-  const all = await listedIn<{ name: string; from: string; steps: ListedStep[] }>(app, 'workflows', `origin=${from}`);
+  const all = await listedIn<{ name: string; from: string; steps: ListedStep[] }>(app, 'workflows', `origin=${from}&${ON_REPO}`);
   const found = all.find((w) => w.name === name && w.from === from);
   assert.ok(found, `${from} lists ${name}`);
   return found.steps;
@@ -133,10 +138,10 @@ const put = (name: string, body: unknown, from = 'yours', headers: Record<string
     typeof body === 'object' && body !== null && !Array.isArray(body) && !('version' in body)
       ? { version: versionOf(path.join(STORE, decodeURIComponent(name))), ...body }
       : body;
-  return sentTo('PUT', `/api/namespaces/default/workflows/${name}`, read, headers);
+  return sentTo('PUT', `/api/namespaces/default/workflows/${name}?${ON_REPO}`, read, headers);
 };
 const post = (body: unknown, _from = 'yours', headers: Record<string, string> = json) =>
-  sentTo('POST', '/api/namespaces/default/workflows', body, headers);
+  sentTo('POST', `/api/namespaces/default/workflows?${ON_REPO}`, body, headers);
 
 type SentStep = { name?: unknown; spec?: Record<string, unknown>; body?: unknown; own?: { keys: string[]; body: string } | null };
 
@@ -1027,7 +1032,7 @@ test('a former key on the board: listed and saved under the name it has now, and
     async () => {
       const dir = path.join(STORE, 'placed');
       write(path.join(dir, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nWrite the note.\n');
-      const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', 'origin=yours');
+      const listed = await listedIn<{ name: string; from: string; folderTeam: boolean }>(app, 'workflows', `origin=yours&${ON_REPO}`);
       const folder = listed.find((w) => w.name === 'placed' && w.from === 'yours');
       assert.equal(folder?.folderTeam, true, 'the former spelling is still a folder team');
       const [step] = (await listedSteps('placed')) as [ListedStep];

@@ -18,8 +18,9 @@
  * they hold once more before the process goes. With `--no-tick` it serves alone, holding nothing. It prints the port the server got:
  * the one asked for, or a free one for `PORT=0`. It keeps an idle connection past the longest its clients pool one (`SERVER_TIMEOUTS`,
  * port.ts), so a client's first call after a pause is answered rather than reset. Refused first (`Conflict`), binding nothing: a
- * checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the
- * folder it was built from, none for an address (`repoOf`), where the pass ticks in the folder it runs in.
+ * checkout's api on a store that runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`. The pass ticks in the api's own
+ * repository (`repoOf`) — an install's the folder it was built from, none for an address, where it ticks in the folder it runs in — which
+ * is the tick's folder alone: no request is placed on it.
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
@@ -110,7 +111,10 @@ const listening = Effect.acquireRelease(
     }),
 );
 
-/** The folder the pass ticks in: the api's repository, else, for an api with none (`repoOf`), where it runs, as `tickRun` given none. */
+/**
+ * The folder the pass ticks in: the api's repository, else, for an api with none (`repoOf`), where it runs, as `tickRun` given none. The
+ * tick's alone: a request is placed by its factory (`placeFor`).
+ */
 const tickedIn = repoOf(process.env, running) ?? process.cwd();
 
 const asked = args;

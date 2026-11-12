@@ -1,7 +1,8 @@
 /**
- * The Capabilities page per factory (`pageRead`, page.ts): one table of which repository it reads, or why none, and a story of an
- * install unpacked from a published archive, whose `release.json` gives the address it was downloaded from as its source — the page
- * reads no path built from it, says what to do while the store has no factory, and reads a factory's repository once one is filed.
+ * The Capabilities page per factory (`pageRead`, page.ts): one table of which repository it reads, or why none; the api's own repository
+ * (`HKB_REPO`) never read while no factory is filed; and a story of an install unpacked from a published archive, whose `release.json`
+ * gives the address it was downloaded from as its source — the page reads no path built from it, says what to do while the store has no
+ * factory, and reads a factory's repository once one is filed.
  */
 import '../../test/harness.ts';
 import { test } from 'node:test';
@@ -31,98 +32,79 @@ test('pageRead: the repository the page reads, or why none', async (t) => {
   const rows: Array<{
     name: string;
     place: Parameters<typeof pageRead>[0];
-    own: string | undefined;
     listings: FactoryListing[];
     read: string | { reason: string; factory?: string | null; repos?: string[] };
   }> = [
     {
       name: 'a factory named, on one repository: that one',
       place: { repo: '/r', factory: factoryOn('solo', ['/r']), named: true, repoNamed: false },
-      own: '/own',
       listings: [listedOn('solo', ['/r']), listedOn('other', ['/o'])],
       read: '/r',
     },
     {
       name: 'a factory named on several, none of them named: several-repositories, each named',
       place: { repo: undefined, factory: factoryOn('pair', ['/s', '/r']), named: true, repoNamed: false },
-      own: '/own',
       listings: [],
       read: { reason: 'several-repositories', factory: 'pair', repos: ['/r', '/s'] },
     },
     {
-      name: "the default factory, a ?repo= named that is not the api's own: that one",
+      name: "the default factory, a factory's ?repo= named: that one",
       place: { repo: '/r', factory: undefined, named: true, repoNamed: false },
-      own: '/own',
       listings: [listedOn('solo', ['/r']), listedOn('other', ['/o'])],
       read: '/r',
     },
     {
-      name: "the default factory named, ?factory=default: the api's own, though factories stand beside it",
-      place: { repo: '/own', factory: undefined, named: true, repoNamed: false },
-      own: '/own',
-      listings: [listedOn('solo', ['/r']), listedOn('other', ['/o'])],
-      read: '/own',
-    },
-    {
-      name: 'the default factory named on an api with no repository: read as with none named',
+      name: 'the default factory named, ?factory=default, no ?repo=: read as with none named, among the factories beside it',
       place: { repo: undefined, factory: undefined, named: true, repoNamed: false },
-      own: undefined,
+      listings: [listedOn('solo', ['/r']), listedOn('other', ['/o'])],
+      read: { reason: 'several-factories' },
+    },
+    {
+      name: 'the default factory named, one factory on one repository: that one',
+      place: { repo: undefined, factory: undefined, named: true, repoNamed: false },
       listings: [listedOn('solo', ['/r'])],
       read: '/r',
     },
     {
-      name: "nothing named, no factory filed, the api's own repository: its own",
-      place: { repo: '/own', factory: undefined, named: false, repoNamed: false },
-      own: '/own',
-      listings: [],
-      read: '/own',
-    },
-    {
-      name: 'nothing named, an api with no repository and one factory on one: that one',
+      name: 'nothing named, one factory on one: that one',
       place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
-      own: undefined,
       listings: [listedOn('solo', ['/r'])],
       read: '/r',
     },
     {
-      name: "nothing named, every factory and the api's own on one repository: that one",
-      place: { repo: '/r', factory: undefined, named: false, repoNamed: false },
-      own: '/r',
-      listings: [listedOn('solo', ['/r'])],
-      read: '/r',
-    },
-    {
-      name: 'nothing named, an api with no repository and one factory on several: several-repositories',
+      name: 'nothing named, every factory on one repository: that one',
       place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
-      own: undefined,
+      listings: [listedOn('solo', ['/r']), listedOn('other', ['/r'])],
+      read: '/r',
+    },
+    {
+      name: 'nothing named, one factory on several: several-repositories',
+      place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
       listings: [listedOn('pair', ['/r', '/s'])],
       read: { reason: 'several-repositories', factory: 'pair', repos: ['/r', '/s'] },
     },
     {
-      name: "nothing named, a factory beside the api's own on another repository: several-factories",
-      place: { repo: '/own', factory: undefined, named: false, repoNamed: false },
-      own: '/own',
-      listings: [listedOn('solo', ['/r'])],
+      name: 'nothing named, two factories on two repositories: several-factories',
+      place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
+      listings: [listedOn('solo', ['/r']), listedOn('other', ['/o'])],
       read: { reason: 'several-factories' },
     },
     {
-      name: 'nothing named, an api with no repository and no factory: no-factory',
+      name: 'nothing named and no factory: no-factory',
       place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
-      own: undefined,
       listings: [],
       read: { reason: 'no-factory' },
     },
     {
       name: 'a factory whose file does not read is no candidate',
       place: { repo: undefined, factory: undefined, named: false, repoNamed: false },
-      own: undefined,
       listings: [listedOn('solo', ['/r']), { name: 'broken', file: '/f', error: 'does not read' }],
       read: '/r',
     },
   ];
   for (const row of rows)
     await t.test(row.name, () => {
-      const read = pageRead(row.place, row.own, row.listings);
+      const read = pageRead(row.place, row.listings);
       if (typeof row.read === 'string') {
         assert.deepEqual(read, { repo: row.read });
         return;
@@ -153,6 +135,18 @@ const repoWithSkill = (name: string): string => {
   );
   return repo;
 };
+
+test("with no factory filed, the page reads no repository whatever the api's own is: no-factory, never HKB_REPO's skill", async () => {
+  const own = repoWithSkill('own');
+  const { WF_EXPOSED: _notExposed, ...env } = process.env;
+  const { app } = appOf(Layer.merge(liveOf(env), ApiConfig.layer({ ...env, HKB_REPO: own })));
+  const res = await app.request('/api/capabilities');
+  assert.equal(res.status, 200, await res.clone().text());
+  const answer = (await res.json()) as CapabilitiesWithSteps;
+  assert.equal(answer.repo, undefined, "the api's own is not read");
+  assert.equal(answer.unread?.reason, 'no-factory');
+  assert.ok(!(answer.skills as Array<{ name: string }>).some((skill) => skill.name === 'own-skill'), 'its skill is never listed');
+});
 
 test('an install unpacked from an archive, its source an address: the page reads no path built from it, and a factory once filed', async (t) => {
   const s = story(t);

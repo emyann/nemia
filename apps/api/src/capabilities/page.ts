@@ -1,7 +1,7 @@
 /**
  * Which repository the Capabilities page reads, or why it reads none and what to do (objects' `CapabilitiesUnread`). The page is read
  * per factory: in a factory the request names, its repository (`placeFor`); with none named, the one repository every factory of the
- * store — the default among them where the api has a repository of its own (`repoOf`) — works on, where they all work on one. Nothing
+ * store works on, where they all work on one. The default factory reads none, so the api's own repository is never a candidate. Nothing
  * here reads a repository or starts anything.
  */
 import path from 'node:path';
@@ -34,15 +34,14 @@ const pickRepository = (name: string, repos: readonly string[]): PageRead =>
   });
 
 /**
- * What the page reads in `place` (`placeFor`), the api's own repository being `own` (`repoOf`) and the store's factories `listings`
- * (`listedAtOnce`):
+ * What the page reads in `place` (`placeFor`), the store's factories being `listings` (`listedAtOnce`):
  *
  * - A factory named: its repository, or `several-repositories` where it works on several and the request names none.
- * - The default factory named (`?factory=default`), or a `?repo=` in it: that repository, where there is one.
- * - Else, every factory whose file reads, and the default where `own` is one: the one repository they all work on; `no-factory` where
- *   there is none of them; `several-repositories` where there is one, on several; `several-factories` otherwise.
+ * - A `?repo=` in the default factory: that repository, one a factory works on (`placeFor`).
+ * - Else, every factory whose file reads: the one repository they all work on; `no-factory` where there is none of them;
+ *   `several-repositories` where there is one, on several; `several-factories` otherwise.
  */
-export function pageRead(place: Place, own: string | undefined, listings: readonly FactoryListing[]): PageRead {
+export function pageRead(place: Place, listings: readonly FactoryListing[]): PageRead {
   if (place.factory !== undefined) {
     if (place.repo !== undefined) return { repo: place.repo };
     return pickRepository(
@@ -50,11 +49,10 @@ export function pageRead(place: Place, own: string | undefined, listings: readon
       place.factory.repos.map((r) => path.resolve(r)),
     );
   }
-  if (place.named && place.repo !== undefined) return { repo: place.repo };
-  const candidates: Candidate[] = [
-    ...(own === undefined ? [] : [{ name: 'default', repos: [own] }]),
-    ...listings.flatMap((l) => ('error' in l ? [] : [{ name: l.name, repos: l.repos.map((r) => path.resolve(r)) }])),
-  ];
+  if (place.repo !== undefined) return { repo: place.repo };
+  const candidates: Candidate[] = listings.flatMap((l) =>
+    'error' in l ? [] : [{ name: l.name, repos: l.repos.map((r) => path.resolve(r)) }],
+  );
   const repos = [...new Set(candidates.flatMap((c) => c.repos))];
   const [only, ...more] = repos;
   if (only !== undefined && !more.length) return { repo: only };
@@ -62,7 +60,7 @@ export function pageRead(place: Place, own: string | undefined, listings: readon
   if (one === undefined) {
     return unread(
       'no-factory',
-      'No factory is filed in this store, and this api has no repository of its own: file a factory, and the page reads its repository.',
+      'No factory is filed in this store, and the default factory reads no repository: file a factory, and the page reads its repository.',
       { commands: [...FILE_FACTORY] },
     );
   }

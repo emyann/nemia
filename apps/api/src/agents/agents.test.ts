@@ -25,9 +25,26 @@ import { StoreRoot } from '../store.ts';
 import { story } from 'test-kit/checkpoints';
 import { asAgentListing, everyOrigin } from '../../test/definitions.ts';
 import { TABLE_ACCEPT, tableLines, type AgentList, type Table } from 'objects';
+import { addFactory } from 'agent-orchestrator/testing';
+/**
+ * The scratch repository, read in the default factory by `?repo=` (`ON_REPO`), which a factory filed on it lets the api read
+ * (`onRepo`).
+ */
 const repo = scratch('nemia-api-agents-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
+
+/** The factory `bench` filed on the scratch repository in the store `home`, the harness's unless another is named. */
+const onRepo = (home = root): void => {
+  const was = process.env.WF_ROOT;
+  process.env.WF_ROOT = home;
+  try {
+    addFactory({ name: 'bench', repos: [repo] });
+  } finally {
+    process.env.WF_ROOT = was;
+  }
+};
+onRepo();
 
 type AgentListing = import('./agents.ts').AgentListing;
 /** What the board read of a write of an agent before the Agent object: the agent as it now reads, and its files. */
@@ -65,12 +82,12 @@ async function sentTo(
   const raw = typeof body === 'string' || Array.isArray(body) || body === null;
   const at =
     method === 'GET'
-      ? `${D}/${name}${card ?? ''}?origin=${from}`
+      ? `${D}/${name}${card ?? ''}?origin=${from}&${ON_REPO}`
       : method === 'POST'
-        ? D
+        ? `${D}?${ON_REPO}`
         : method === 'DELETE'
-          ? `${D}/${name}${version === undefined ? '' : `?resourceVersion=${encodeURIComponent(String(version))}`}`
-          : `${D}/${name}`;
+          ? `${D}/${name}?${ON_REPO}${version === undefined ? '' : `&resourceVersion=${encodeURIComponent(String(version))}`}`
+          : `${D}/${name}?${ON_REPO}`;
   const meta =
     method === 'POST'
       ? { name: named }
@@ -121,7 +138,7 @@ const scribe = {
 };
 
 async function listed(): Promise<AgentListing[]> {
-  return everyOrigin<AgentListing>(app, 'agents');
+  return everyOrigin<AgentListing>(app, 'agents', 'default', ON_REPO);
 }
 
 test('a person reads the agents: both places listed, one read by name, the card its skills make and the A2A card, what each skill costs a turn — as `nemia agents` reads them, under the app’s own root', async (t) => {
@@ -364,9 +381,10 @@ test('a person reads the agents: both places listed, one read by name, the card 
       const home = scratch('nemia-api-agents-home-');
       fs.mkdirSync(path.join(home, 'workflows', 'agents'), { recursive: true });
       fs.writeFileSync(path.join(home, 'workflows', 'agents', 'elsewhere.md'), '---\ndescription: Lives elsewhere.\n---\nDo it.\n');
+      onRepo(home);
       const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
       const yours = async (on: typeof app) =>
-        (await everyOrigin<AgentListing>(on, 'agents')).filter((a) => a.from === 'yours').map((a) => a.name);
+        (await everyOrigin<AgentListing>(on, 'agents', 'default', ON_REPO)).filter((a) => a.from === 'yours').map((a) => a.name);
       assert.deepEqual(await yours(own), ['elsewhere'], "yours, read under the layer's root");
       assert.equal((await yours(app)).includes('elsewhere'), false, "the process's app reads yours under its own root");
       const res = await readAt('/api/agents/yours/elsewhere/card', own);
@@ -903,7 +921,7 @@ const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown
   row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
 
 test('the agents asked as a Table answer the columns of an agent, a row per agent of the page with its metadata alone, and a line each', async () => {
-  const URL = '/api/namespaces/default/agents';
+  const URL = `/api/namespaces/default/agents?${ON_REPO}`;
   const res = await app.request(URL, { headers: { accept: TABLE_ACCEPT } });
   assert.equal(res.status, 200);
   const table = (await res.json()) as Table;

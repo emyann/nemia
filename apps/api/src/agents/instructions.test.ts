@@ -18,16 +18,20 @@ import { addFactory } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 import { story } from 'test-kit/checkpoints';
+/**
+ * The scratch repository, which the factory `elsewhere` works on: read in `default` by its `?repo=`, which that factory lets the api
+ * read.
+ */
 const repo = scratch('nemia-api-custom-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 addFactory({ name: 'elsewhere', repos: [repo] });
 
 type CustomInstructionsAnswer = import('objects').AgentInstructions;
 type CustomInstructionsCleared = import('objects').AgentInstructionsCleared;
 
-/** Where an agent's custom instructions are, in `namespace` (`default` unless said). */
-const at = (name: string, namespace = 'default') => `/api/namespaces/${namespace}/agents/${name}/instructions`;
+/** Where an agent's custom instructions are, in `namespace` (`default` unless said), read on the scratch repository. */
+const at = (name: string, namespace = 'default') =>
+  `/api/namespaces/${namespace}/agents/${name}/instructions?repo=${encodeURIComponent(repo)}`;
 
 const CUSTOM = path.join(root, 'custom-instructions');
 

@@ -5,8 +5,9 @@
  * <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
  *
  * A card started under a factory's namespace is placed in that factory (`placedIn`), as `nemia start <card> --factory <namespace>` is: its
- * workflow found in the factory's tree first, and the card's own `workflow:` where the start names none. One started under `default` is
- * placed by the request's own `?factory=`, as the board's start of a card that names no factory sends it.
+ * workflow, by its name, found in the factory's tree first, and the card's own `workflow:` where the start names none, on the repository
+ * the factory's wiring names for it — never one the card or the request names (`cardStart`). One started under `default` is placed by the
+ * request's own `?factory=`, as the board's start of a card that names no factory sends it. A card filed names no repository (`filingOf`).
  *
  * A card's namespace is its factory, `default` for one that names none: a card read, dropped, started, queued or labelled under a
  * namespace it is not in is `Missing`, as one no card has the name of; a card filed under `default` names no factory, under another the
@@ -118,7 +119,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           throw new Refused({
             message: "`workflow` is a workflow folder's name, with no `/`: send one, or leave it out. Nothing was filed.",
           });
-        const { text, ...keys } = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) });
+        const { text, ...keys } = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, s.home);
         const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));
         return cardIn(s, card.factory ?? DEFAULT_NAMESPACE, card.name);
       }),

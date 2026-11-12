@@ -8,28 +8,31 @@
  * Card's, served from `objects`' `Api` (src/objects/cards.ts). No route of the inbox's own is left: `GET /api/inbox/:name` and `PUT` and
  * `DELETE /api/inbox/:name/from` answer 404, as the others before them.
  */
-import { Invalid } from 'agent-orchestrator';
+import { readFactoryAtOnce } from 'agent-orchestrator';
 import type { CardFile } from 'objects';
 
-/** What a card filed hands the package: the idea, and the keys the card writes. */
-export type Filing = { text: string; workflow?: string; factory?: string; label?: string[] };
+/**
+ * What a card filed hands the package: the idea, and the keys the card writes. `repo` is retired, and handed on only for the package to
+ * refuse it in its own words (`addToInbox`), so the api says no second sentence of its own.
+ */
+export type Filing = { text: string; workflow?: string; repo?: string; factory?: string; label?: string[] };
 
 /**
  * What a card filed (`POST /api/namespaces/:namespace/cards`) files: its body, its workflow by name, its factory and its labels. A card
  * names its factory and its workflow, and nothing about repositories: the factory places its run (`nemia factory attach <factory>
  * <workflow> --repo <name>`), so no repository is read here and an api with none of its own files a card all the same.
  *
- * Refused, `Invalid`: a `repo`, retired, naming the attach. `from` is retired, read and ignored. Whether the workflow is a name the
- * factory offers, and whether the idea makes a card, is the package's to say (`addToInbox`).
+ * Refused: a `factory` the store `home` does not have, a 404 naming those it has, or a name that is no slug, a 422 (`readFactoryAtOnce`),
+ * before the package is asked. The package refuses, `Invalid`, before anything is written (`addToInbox`): a `repo`, retired, naming the
+ * attach; a workflow that is no name; and in a factory, a workflow it does not attach, naming the attach. `from` is retired, read and
+ * ignored.
  */
-export function filingOf(body: CardFile): Filing {
-  if (body.repo !== undefined)
-    throw new Invalid({
-      message: `\`repo\` is retired: a card names its factory and its workflow, and the factory places its run. Leave \`repo\` out, and name the workflow's repository with nemia factory attach <factory> <workflow> --repo <name>. Nothing was filed.`,
-    });
+export function filingOf(body: CardFile, home: string): Filing {
+  if (body.factory !== undefined) readFactoryAtOnce(home, body.factory, 'Nothing was filed.');
   return {
     text: body.body,
     ...(body.workflow !== undefined ? { workflow: body.workflow } : {}),
+    ...(body.repo !== undefined ? { repo: body.repo } : {}),
     ...(body.factory !== undefined ? { factory: body.factory } : {}),
     ...(body.label !== undefined ? { label: [...body.label] } : {}),
   };

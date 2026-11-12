@@ -29,7 +29,7 @@ export type PlaceQuery = { factory: string | undefined; repo: string | undefined
  * Every repository a request in the default factory may name, each as `path.resolve` spells it, named once: the api's own (`repoOf`),
  * where it has one, then those of each factory in the store whose file reads, in the order the Factory door lists them (`listedAtOnce`).
  */
-export function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): string[] {
+function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): string[] {
   const named = listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo))));
   const own = repoOf(env, running);
   return [...new Set([...(own === undefined ? [] : [own]), ...named])];

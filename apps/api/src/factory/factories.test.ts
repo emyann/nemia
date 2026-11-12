@@ -422,14 +422,19 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
   );
 
   await t.test(
-    'REFUSED: a card that names no factory is a 422 naming ?factory=, though one factory alone holds its repository; it stays',
+    'REFUSED: a card that names no factory is a 422 naming ?factory=, never placed in the factory a repository is in; with ?repo= a 422 naming the attach; it stays',
     async (t) => {
       const repoT = asShipped(t);
       const { card } = onStore(addToInbox({ text: 'Cache the trios' }));
       const before = runFiles();
-      const res = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta' });
+      const res = await post(`/api/namespaces/default/cards/${card.name}/start`, { workflow: 'delta' });
       assert.equal(res.status, 422);
       assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
+      const placed = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, {
+        workflow: 'delta',
+      });
+      assert.equal(placed.status, 422, "a card's run is placed by its factory's wiring, never by ?repo=");
+      saysAll(said(await placed.json()), [card.name, '--repo', 'nemia factory attach']);
       assert.ok(
         onStore(readInbox()).some((c) => c.name === card.name),
         'the card is still there',

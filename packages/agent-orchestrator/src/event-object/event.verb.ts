@@ -7,7 +7,9 @@
  * server to omit, and the last counts 0. An event is read by its name, the byte its line starts at: one read from that byte of its first
  * line alone, never the rest of the feed. A line's start is the cursor before it — the end of the line before, or the cursor the read
  * began at — so where a line nobody can read lies between two, the one after it is named by where the unreadable one starts, and read
- * from there all the same.
+ * from there all the same. Every page carries the feed's end as read before it (`metadata.resourceVersion`), the byte a watch of the
+ * events from now starts at (`?watch=true&resourceVersion=`): read before the page, so a reader that lists and then watches may be sent
+ * one event twice, never miss one.
  */
 import { Effect } from 'effect';
 import { type Event, type EventList, LIST_PAGE, type PageBounds } from 'objects';
@@ -80,6 +82,7 @@ export const eventList = Effect.fn('eventList')(function* (query: EventQuery, bo
     cursor = byte;
   }
   const door = yield* FeedDoor;
+  const end = String((yield* door.lines.end())?.cursor ?? 0);
   const events: Event[] = [];
   for (;;) {
     const wanted = size + 1 - events.length;
@@ -96,7 +99,9 @@ export const eventList = Effect.fn('eventList')(function* (query: EventQuery, bo
   const list: EventList = {
     ...listOf('Event', { remainingItemCount: 0 }, items),
     metadata:
-      events.length > size && last !== undefined ? { continue: continueToken(last.metadata.resourceVersion) } : { remainingItemCount: 0 },
+      events.length > size && last !== undefined
+        ? { continue: continueToken(last.metadata.resourceVersion), resourceVersion: end }
+        : { remainingItemCount: 0, resourceVersion: end },
   };
   return list;
 });

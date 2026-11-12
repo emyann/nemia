@@ -2,7 +2,9 @@
  * What a watch of a list sends (`?watch=true`), one event per server-sent `message`, its data the JSON of `watchEventOf(item)`: an
  * object ADDED, MODIFIED or DELETED, or a BOOKMARK whose object is the list's kind carrying a `resourceVersion` alone, as Kubernetes'
  * watch says them. A watch keeps nothing between connections: a reconnect is sent the state whole again, each object ADDED, then a
- * BOOKMARK, so a reader takes ADDED as an upsert and the first BOOKMARK as the end of the initial state.
+ * BOOKMARK, so a reader takes ADDED as an upsert and the first BOOKMARK as the end of the initial state. The Event lists, whose objects
+ * are the feed's lines, keep their old versions: a watch of one asked a `resourceVersion` (the last event's, a BOOKMARK's, or a page's
+ * `metadata`) is sent no state, only each event after it, so a reader resumes where it stopped and loses no line.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta } from './meta.ts';

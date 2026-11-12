@@ -131,11 +131,11 @@ const proposalReason = (reason: unknown): ProposalRefusal =>
   (PROPOSAL_REFUSALS as readonly unknown[]).includes(reason) ? (reason as ProposalRefusal) : 'person-only';
 
 /**
- * The refusal of the package's an answered status is, by the api's one map read backwards: 400 and 422 `Invalid`, 401 and 403
- * `Forbidden`, 404 `Missing`, 409 `Conflict`; none for any other.
+ * The refusal of the package's an answered status is, by the api's one map read backwards: 400 and 422 `Invalid`, and 413, a body past
+ * the api's bound, `Invalid` too, 401 and 403 `Forbidden`, 404 `Missing`, 409 `Conflict`; none for any other.
  */
 export const refusalOfStatus = (status: number, message: string): Refusal | undefined => {
-  if (status === 400 || status === 422) return new Invalid({ message });
+  if (status === 400 || status === 413 || status === 422) return new Invalid({ message });
   if (status === 401 || status === 403) return new Forbidden({ message, reason: 'person-only' });
   if (status === 404) return new Missing({ message });
   if (status === 409) return new Conflict({ message });
@@ -153,23 +153,45 @@ function refusalOfAnswer(failed: unknown): Refusal | undefined {
   return undefined;
 }
 
-/** A client's error of a forwarded call: a daemon not reached, naming the fix; else a status the `Api` does not declare, by its kind. */
-function clientFailure(failed: HttpClientError.HttpClientError, forwarded: Forwarded, verb: string): Refusal | Error {
+/**
+ * A client's error of a forwarded call: a daemon not reached, naming the fix; else a status the `Api` does not declare, by its kind, in
+ * the api's own words (`said`, its body's `error`) where it gave some — a body past its bound names the bound — else naming the release.
+ */
+function clientFailure(
+  failed: HttpClientError.HttpClientError,
+  forwarded: Forwarded,
+  verb: string,
+  words: string | undefined,
+): Refusal | Error {
   const { reason } = failed;
   if (reason._tag === 'TransportError')
     return new Error(
       `nemia ${verb} could not reach the daemon at ${forwarded.server} (NEMIA_SERVER): see the context it is forwarded under with \`nemia config\`, or run it on this machine's store with NEMIA_CONTEXT=local.`,
     );
   const status = 'response' in reason ? reason.response.status : undefined;
-  const said = `the daemon at ${forwarded.server} answered ${status ?? 'nothing'} to nemia ${verb}, which this nemia does not read: see that it is of this release (\`nemia version\` on both machines)`;
+  const said =
+    words ??
+    `the daemon at ${forwarded.server} answered ${status ?? 'nothing'} to nemia ${verb}, which this nemia does not read: see that it is of this release (\`nemia version\` on both machines)`;
   return (status === undefined ? undefined : refusalOfStatus(status, said)) ?? new Error(said);
 }
 
+/** The api's own words of an answer the `Api` declares no error for: its JSON body's `error`, where it has one. */
+const wordsOf = (failed: unknown): Effect.Effect<string | undefined> => {
+  if (!HttpClientError.isHttpClientError(failed) || !('response' in failed.reason)) return Effect.succeed(undefined);
+  return failed.reason.response.json.pipe(
+    Effect.map((body) => {
+      const error = (body as { error?: unknown } | null)?.error;
+      return typeof error === 'string' && error !== '' ? error : undefined;
+    }),
+    Effect.orElseSucceed(() => undefined),
+  );
+};
+
 /** What a forwarded call failed with, as the command line throws it: a refusal of the package's kind, or an `Error` naming the fix. */
-function thrownOf(failed: unknown, forwarded: Forwarded, verb: string): Refusal | Error {
+function thrownOf(failed: unknown, forwarded: Forwarded, verb: string, words: string | undefined): Refusal | Error {
   const refused = refusalOfAnswer(failed);
   if (refused !== undefined) return refused;
-  if (HttpClientError.isHttpClientError(failed)) return clientFailure(failed, forwarded, verb);
+  if (HttpClientError.isHttpClientError(failed)) return clientFailure(failed, forwarded, verb, words);
   const error = (failed as { error?: unknown } | null)?.error;
   if (typeof error === 'string') return new Error(error);
   return new Error(
@@ -206,7 +228,7 @@ export const forwardedCall = Effect.fn('forwardedCall')(function* (
       return namespaceFor(calls, link.endpoint, keys, request).pipe(Effect.flatMap((placed) => call(partsOf(keys, placed, link.query))));
     }),
     Effect.provide(FetchHttpClient.layer),
-    Effect.mapError((failed) => thrownOf(failed, forwarded, entry.name)),
+    Effect.catch((failed) => Effect.flatMap(wordsOf(failed), (words) => Effect.fail(thrownOf(failed, forwarded, entry.name, words)))),
   );
   return link.answer === undefined ? answer : link.answer(answer, input);
 });

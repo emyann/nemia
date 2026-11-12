@@ -2,14 +2,17 @@
  * The command line forwarded to another machine's api, as the table holds it: every key an entry's input says reaches the endpoint the
  * link it calls names — its path, its query or its payload — where the link sends the input as it is (`unsentOf`), so no word a person
  * typed is dropped on the way; which link an input calls (`linkOf`); how a request is split (`partsOf`); and where the environment
- * forwards it (`forwardedOf`).
+ * forwards it (`forwardedOf`); and a status the `Api` declares no error for refused in the api's own words (`forwardedCall`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { Effect, Exit } from 'effect';
 import { Schema } from 'effect';
 import { CLI_VERBS } from './command.ts';
 import { TABLE } from './commands.verb.ts';
-import { forwardedOf, linkOf, partsOf, refusalOfStatus, unsentOf } from './forward.verb.ts';
+import { forwardedCall, forwardedOf, linkOf, partsOf, refusalOfStatus, unsentOf } from './forward.verb.ts';
 import { Api, endpointKeysOf } from 'objects';
 
 /** The entries a command line runs, so forwards: every one but those the api alone serves, which no line reaches. */
@@ -66,4 +69,31 @@ test("an answered status is the package's refusal of its kind, exit 2, as the ap
   );
   for (const k of kinds) assert.equal(k?.exitCode, 2);
   assert.equal(refusalOfStatus(500, 'w'), undefined);
+});
+
+test("REFUSED: a body past the api's bound is Invalid, exit 2, in the api's words that name the bound, never told to compare releases", async () => {
+  const words = 'POST /api/factories: a body may be 1 MiB at most. Send a smaller one.';
+  const server = http.createServer((_req, res) => {
+    res.writeHead(413, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: words }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address() as AddressInfo;
+    const exit = await Effect.runPromiseExit(
+      forwardedCall(
+        { server: `http://127.0.0.1:${port}`, token: 't' },
+        { name: 'factory add', served: [{ endpoint: 'factories.create' }] },
+        { name: 'mill', repos: ['/srv/mill'] },
+      ),
+    );
+    assert.ok(Exit.isFailure(exit), 'the forwarded call is refused');
+    const refused = exit.cause.reasons.find((r) => r._tag === 'Fail');
+    const error = refused !== undefined && 'error' in refused ? refused.error : undefined;
+    assert.equal((error as { _tag?: string } | undefined)?._tag, 'Invalid', "a body past the bound is the caller's to change");
+    assert.equal((error as { exitCode?: number } | undefined)?.exitCode, 2);
+    assert.equal((error as { message?: string } | undefined)?.message, words, 'the api names the bound; the CLI hands its words on');
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

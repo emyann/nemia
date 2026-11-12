@@ -9,6 +9,8 @@ import { isMarkdown } from '../folder/folder.ts';
 import { frontmatterValues, MAP_KEYS, readFrontmatter } from '../frontmatter/frontmatter.ts';
 import { STEP_KEY_FORM } from 'objects';
 import { tokensOf } from '../keys/index.ts';
+import { isHarnessBlock } from '../former/former.ts';
+import { isMap } from '../template/index.ts';
 
 /** A text file directly in a workflow's folder: its name and its text. */
 export type FolderText = { readonly name: string; readonly text: string };
@@ -19,6 +21,22 @@ export type WorkflowSpecRead = {
   steps: { name: string; keys: Record<string, unknown>; body: string }[];
   files: { path: string; text: string }[];
 };
+
+/**
+ * `keys` with a harness's block, `<harness>: { fence: { … } }`, read into its fence keys as the parser reads it (`readKeys`), each at the
+ * top level, where a Workflow's spec carries a step's fence and from where its write puts it back under the block (`fencedPairs`). A
+ * block that holds anything but a fence map, or a fence key also set at the top level, is carried as it reads, for the write to refuse
+ * in the parser's words; so is a key that names no harness.
+ */
+const fenceRead = (keys: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(keys).flatMap(([key, value]): [string, unknown][] => {
+      if (!isHarnessBlock(key) || !isMap(value)) return [[key, value]];
+      const { fence, ...rest } = value;
+      if (Object.keys(rest).length > 0 || !isMap(fence) || Object.keys(fence).some((k) => Object.hasOwn(keys, k))) return [[key, value]];
+      return Object.entries(fence);
+    }),
+  );
 
 /** The frontmatter of a file's text as a record, and its body. */
 export const fileParts = (name: string, text: string): { keys: Record<string, unknown>; body: string } => {
@@ -72,7 +90,7 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
     .map((f) => {
       const name = f.name.slice(0, -'.md'.length);
       const { keys, body } = fileParts(name, f.text);
-      return { name, keys: { ...servedKeys(keys), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
+      return { name, keys: { ...servedKeys(fenceRead(keys)), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
     });
   const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
   return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };

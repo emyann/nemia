@@ -139,7 +139,7 @@ test('POST …/say: what it refuses — JSON that is not the words, words the pa
   });
 
   await t.test(
-    "REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a step not filed, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them",
+    "REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them",
     async () => {
       const cases: Array<[string, string, string, RegExp[]]> = [
         [R, 'implement', '', [/^say: `text` is empty\./]],
@@ -150,7 +150,6 @@ test('POST …/say: what it refuses — JSON that is not the words, words the pa
           'Widen the scope.',
           [/^settled is not running: try 1's task settled `succeeded`/, /: nemia retry r-say settled --message "<words>"\.$/],
         ],
-        [R, 'review', 'Look at the parser first.', [/^review has not been filed yet/]],
         [C, 'implement', 'Widen the scope.', [/^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z/, /not steered/]],
       ];
       for (const [run, step, text, facts] of cases) {
@@ -272,4 +271,25 @@ test('who says words to a step: a session by its token as its agent, framed; an 
       ['The agent operator writes, not the person: Cut it.', 'Widen it.'],
     );
   });
+});
+
+test("words to a step not filed yet are kept for its first try, not delivered: the answer says `kept`, the engine is told nothing, and the run's record is untouched", async () => {
+  const before = written();
+  const res = await sayTo('review', { text: 'Look at the parser first.' });
+  assert.equal(res.status, 202, await res.clone().text());
+  const answer = (await res.json()) as { kept?: true; text: string; attempt: number; after: unknown };
+  assert.deepEqual([answer.kept, answer.text, answer.attempt, answer.after], [true, 'Look at the parser first.', 1, null]);
+  assert.deepEqual([...standIn().said], before.said, 'no session was told anything');
+  assert.equal(
+    fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'),
+    before.files[`${R}.json`],
+    "the run's record untouched: the words are kept beside it",
+  );
+  assert.deepEqual(
+    runsAtOnce(root)
+      .runs.read(R)
+      .saidBefore?.review?.map((w) => w.text),
+    ['Look at the parser first.'],
+    'read back composed onto the run',
+  );
 });

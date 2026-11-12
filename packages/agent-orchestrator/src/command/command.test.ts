@@ -287,6 +287,8 @@ test("the table's help is today's, word for word", () => {
     helpOf(TABLE),
     [
       '  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
+      '                               start a run of a workflow from a brief, a text, a card of the inbox or a',
+      '                               folder of cards',
       '                               --after <runId>: file nothing of this run until nemia decide says that',
       '                               run has landed — finished, and its result branch on the base',
       '                               branch — and start from the base as it is then; once per run.',
@@ -520,6 +522,9 @@ test("the table's help is today's, word for word", () => {
       "                               engine journals the words on the step's task, nemia ls notes the step",
       '                               said to, and nemia decide prints them under it. A try that continues',
       '                               the session is handed them again, as ## Said to your session.',
+      '                               Words to a step not filed yet (waiting on --after, a hold or an',
+      '                               earlier step) are kept, not delivered: its first try is handed them,',
+      '                               as ## Said before you started, and no try after it.',
       "                               Words from a session its run filed are its agent's, by its token",
       '                               (WF_SESSION_TOKEN); an agent with none says --as <name> before its',
       "                               words, a name the person allowed with nemia chat allow. An agent's",

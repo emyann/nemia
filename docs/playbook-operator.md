@@ -187,7 +187,9 @@ rm "$S"/node_modules; git worktree remove "$S"
 - **Answer a round:** `nemia retry <run> <step> --message "…"`. Say who answered, and mark each answer as the person's words or the
   operator's reading of them.
 - **Tell a running session something:** `nemia say <run> <step> "…"`. It is handed over, not guaranteed read: a session about to sign off
-  may never see it. If the step signs off without it, send the step back with the same words.
+  may never see it. If the step signs off without it, send the step back with the same words. Words for a step not filed yet (waiting
+  on `--after`, a hold or an earlier step) are kept for its first try, whose brief carries them under *Said before you started*: say
+  them now rather than waiting for the step to run.
 - **Send a landing back:** the gate's send-back goes to review (`nemia retry <run> review --message`). Review is read-only, so tell it to
   sign off with `again: true` and the findings for implement, which files the next implement round. `nemia retry --round` is only for a loop out
   of rounds. Fold small findings and owed changes into a round that must happen anyway (a merge of main), never a round for them alone.

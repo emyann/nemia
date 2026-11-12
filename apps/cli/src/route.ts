@@ -32,6 +32,9 @@ export type ClientVerb = (typeof CLIENT_VERBS)[number];
  */
 export { MACHINE_VERBS, MOVED_COMMANDS };
 
+/** One of `MACHINE_VERBS`. */
+export type MachineVerb = (typeof MACHINE_VERBS)[number];
+
 /** One of `MOVED_COMMANDS`. */
 export type MovedName = MovedCommand;
 

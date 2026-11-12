@@ -2,7 +2,7 @@
  * Whether Claude Code is signed in on this machine, asked before a job's spawn (`claudePrepare`, `code.ts`): `<claude> auth status`,
  * which Claude Code documents as printing JSON with `loggedIn` and exiting 0 when logged in, 1 when not (`docs/harness.md`,
  * *`claude auth status`*). Signed out, or with no answer within its bound, the spawn is refused, so the attempt ends `unstartable`
- * before anything runs, in words naming the command that signs the machine in.
+ * before anything runs, in words naming the command that makes the machine's credential.
  *
  * What it cannot see: a credential that is there but no longer works. Measured at 2.1.322, a placeholder `CLAUDE_CODE_OAUTH_TOKEN` reads
  * `loggedIn: true`; a token expired, revoked or mistyped passes the check, and fails at the session's first request, in Claude Code's

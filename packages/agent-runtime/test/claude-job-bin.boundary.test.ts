@@ -12,7 +12,8 @@
  * - a session that ends with no result line leaves 1 and says so, rather than being read as a session that said nothing;
  * - a request `attachedOptions` refuses never starts Claude Code: the bin leaves 1 with the refusal's own words, which the worker
  *   records as an attempt that could not start;
- * - a SIGTERM aborts the session: the bin ends, and the Claude Code it started is gone with it.
+ * - a SIGTERM aborts the session: the bin ends, and the Claude Code it started is gone with it;
+ * - a `rate_limit_event` the session receives is kept on the heard file the runner named, as the store's newest (`keepHeard`).
  *
  * A boundary test: real processes, the bin's and the Claude Code the SDK spawns for it, and nothing of either stood in for.
  */
@@ -25,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
 import { sdkArgValue } from './sdk-argv.ts';
 import { until, WAITED } from '../src/waits/index.ts';
+import { claudeHeardFile, readHeard } from '../src/harness/claude/heard.ts';
 
 const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-claude-job.ts');
 
@@ -48,10 +50,10 @@ const standIn = (dir: string, after: string): string => {
   return at;
 };
 
-/** The spawn request `request` written where the bin reads one, as the runner writes it. */
-const requestFile = (dir: string, request: object): string => {
+/** The spawn request `request` written where the bin reads one, as the runner writes it, with the files it named (`io`). */
+const requestFile = (dir: string, request: object, io: object = {}): string => {
   const at = path.join(dir, 'spawn.request.json');
-  fs.writeFileSync(at, JSON.stringify({ request, io: {} }));
+  fs.writeFileSync(at, JSON.stringify({ request, io }));
   return at;
 };
 
@@ -111,6 +113,31 @@ test('the job bin, run as the worker runs it: denied by Claude Code, refused bef
     assert.match(err, /appendSystemPromptFile/, 'the refusal names the first flag');
     assert.match(err, /systemPromptFile/, 'and the second');
     assert.equal(fs.existsSync(path.join(dir, 'argv.json')), false, 'and no Claude Code was started');
+  });
+
+  await t.test('a rate_limit_event the session receives is kept on the heard file the runner named, read as its window', async () => {
+    const dir = scratch('ae-job-bin-');
+    const info = {
+      status: 'allowed',
+      resetsAt: 1794999600,
+      rateLimitType: 'seven_day',
+      unifiedWindows: { seven_day: { utilization: 0.4, resetsAt: 1794999600, status: 'allowed' } },
+    };
+    const lines = [
+      { type: 'rate_limit_event', rate_limit_info: info, uuid: '9460ea2c-df7e-4505-8060-efc3e8b2fb89', session_id: 's' },
+      { type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: 's' },
+    ].map((l) => JSON.stringify(l));
+    const claude = standIn(dir, `process.stdout.write(${JSON.stringify(`${lines.join('\n')}\n`)}, () => process.exit(0));`);
+    const heardFile = claudeHeardFile(dir);
+    const at = requestFile(dir, { name: 'ae/t/4', brief: 'b', cwd: dir, config: {} }, { heardFile });
+
+    const { code, err } = await ranBin(at, { AE_CLAUDE_EXECUTABLE: claude });
+
+    assert.equal(code, 0, err);
+    assert.deepEqual(
+      readHeard(heardFile)?.limits.map((l) => [l.key, l.usedPercentage, l.status]),
+      [['seven_day', 40, 'allowed']],
+    );
   });
 
   await t.test('a SIGTERM ends the session: the bin leaves, and the Claude Code it started is gone with it', async (t) => {

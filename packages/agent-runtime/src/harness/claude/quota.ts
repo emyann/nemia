@@ -10,7 +10,8 @@
 import os from 'node:os';
 import { query, type Options, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { Effect } from 'effect';
-import type { HarnessQuota, QuotaLimit } from '../seam.ts';
+import type { HarnessQuota, HeardQuota, QuotaLimit } from '../seam.ts';
+import { readHeard } from './heard.ts';
 import { claudeExecutableOf } from '../mcp-sign-in.ts';
 import { withoutTelemetry } from '../telemetry.ts';
 
@@ -146,14 +147,19 @@ export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
 
 /**
  * What the SDK's usage answer says, asked in `env`: the plan's limits and its subscription, no plan, a token that cannot read the plan
- * (`token`: no plan limits where `env` signs in by `TOKEN_VARIABLE`), a plan the usage service gave nothing for, or why it cannot be
- * read. Pure. The SDK resolves the control response's `response` — the usage itself — so this reads that and not the control
+ * (`token`: no plan limits where `env` signs in by `TOKEN_VARIABLE`, with what its sessions last `heard` of them), a plan the usage
+ * service gave nothing for, or why it cannot be read. Pure. The SDK resolves the control response's `response` — the usage itself — so this reads that and not the control
  * response around it, which only the SDK sees. A plan whose `rate_limits` are null is `unanswered`, as the SDK's type for this answer
  * says: "or null when unavailable".
  */
-export function quotaOfUsage(usage: unknown, env: NodeJS.ProcessEnv = {}, program: string | null = null): HarnessQuota {
+export function quotaOfUsage(
+  usage: unknown,
+  env: NodeJS.ProcessEnv = {},
+  program: string | null = null,
+  heard: HeardQuota | null = null,
+): HarnessQuota {
   if (!isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
-  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token', program } : { kind: 'no-plan', program };
+  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token', program, heard } : { kind: 'no-plan', program };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
   if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
   if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
@@ -228,14 +234,22 @@ class Unopened {
  * `claudeExecutableOf`, the one named, else the SDK's own bundled CLI, which on an install is the release's). The query is taken in the
  * ask's scope and closed as it closes, whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an
  * interruption. Never fails: every way it can go is a `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there,
- * or the SDK bundles none for this platform.
+ * or the SDK bundles none for this platform. A `token` answer carries the newest event the store's sessions heard, read off `heardFile`
+ * as the answer comes (`readHeard`), none where no file is named.
  */
 export const claudeQuota = ({
   command,
   timeoutMs = QUOTA_TIMEOUT_MS,
   env = process.env,
   ask = sdkUsageAsk(env),
-}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
+  heardFile,
+}: {
+  command?: string;
+  timeoutMs?: number;
+  env?: NodeJS.ProcessEnv;
+  ask?: OpenUsage;
+  heardFile?: string;
+} = {}): Effect.Effect<HarnessQuota> =>
   Effect.suspend(() => {
     const executable = quotaExecutable(command, env);
     const program = claudeExecutableOf(executable) ?? null;
@@ -244,7 +258,7 @@ export const claudeQuota = ({
     ).pipe(
       Effect.flatMap((open) => Effect.tryPromise({ try: () => open.usage({ skipBehaviors: true }), catch: (cause) => cause })),
       Effect.match({
-        onSuccess: (usage) => quotaOfUsage(usage, env, program),
+        onSuccess: (usage) => quotaOfUsage(usage, env, program, heardFile === undefined ? null : readHeard(heardFile)),
         onFailure: (cause) =>
           cause instanceof Unopened ? quotaOfUnopened(cause.cause, executable, program) : quotaOfRefusal(cause, program),
       }),

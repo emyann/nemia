@@ -112,6 +112,8 @@ export type {
   McpServer,
   Observation,
   QuotaLimit,
+  HeardLimit,
+  HeardQuota,
   RunnerOps,
   SpawnRequest,
   Transcript,

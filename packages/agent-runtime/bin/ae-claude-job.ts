@@ -38,6 +38,8 @@
  *   with the call it cut, then the SDK's `Query.interrupt()` and the end of its prompt (`inputOf`'s `close`), so Claude Code prints the
  *   turn it cut as a result and saves its running total as it exits, which a resume carries on — never a kill, which saves nothing. Absent
  *   either file, the job has no hooks and is never held. Parked or not, it leaves as its last result says: a cut turn's is an error.
+ * - Where the runner names the store's heard file (`io.heardFile`), each `rate_limit_event` the session receives is kept there, the
+ *   newest of every session's (`keepHeard`, `src/harness/claude/heard.ts`): what the plan's windows are at, which a token's quota reads.
  *
  * Leaves 0 when the session's last result is no error, and 1 — with the reason on stderr, which the worker tees into the run's log
  * — when it is one, when the messages end with no result at all, when the request cannot be read, and when the options cannot be
@@ -54,6 +56,7 @@ import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { bridgeDue, bridgeStateOf, enableBridge, type AttachedBridge } from '../src/harness/claude/session-bridge.ts';
 import { bridgeAsked } from '../src/harness/claude/vocabulary.ts';
 import { JOB_HOLD_MS, JOB_HOLD_POLL_MS } from '../src/harness/claude/job-hold.ts';
+import { keepHeard } from '../src/harness/claude/heard.ts';
 import { jobHoldOf, type HoldIO } from '../src/harness/claude/job-hooks.ts';
 import { replaceFile } from '../src/core/replace.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -117,14 +120,14 @@ const inputOf = () => {
 };
 
 /** What the runner wrote for this job at its spawn: the request whole, and the files it named for it (`HarnessIO`). */
-type Requested = { request: SpawnRequest; io: { bridgeFile?: string; hold?: HoldIO } };
+type Requested = { request: SpawnRequest; io: { bridgeFile?: string; heardFile?: string; hold?: HoldIO } };
 
 /** `value` where it is a whole number of milliseconds above 0; `otherwise` where it is absent or anything else. */
 const msOr = (value: unknown, otherwise: number): number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : otherwise;
 
 /**
- * The spawn request the runner wrote at `at`, whole, the bridge file it named, where it named one, and the hold, where it named both
+ * The spawn request the runner wrote at `at`, whole, the bridge file and the heard file it named, where it named them, and the hold, where it named both
  * a hold file and the sessions' drain: its bound and poll as the request gives them (`holdMs`, `holdPollMs`), the shipped ones otherwise.
  */
 const requestAt = (at: string | undefined): Requested => {
@@ -133,13 +136,14 @@ const requestAt = (at: string | undefined): Requested => {
   try {
     const read = JSON.parse(fs.readFileSync(at, 'utf8')) as {
       request: SpawnRequest;
-      io?: { bridgeFile?: unknown; holdFile?: unknown; drainFile?: unknown; holdMs?: unknown; holdPollMs?: unknown };
+      io?: { bridgeFile?: unknown; heardFile?: unknown; holdFile?: unknown; drainFile?: unknown; holdMs?: unknown; holdPollMs?: unknown };
     };
-    const { bridgeFile, holdFile, drainFile, holdMs, holdPollMs } = read.io ?? {};
+    const { bridgeFile, heardFile, holdFile, drainFile, holdMs, holdPollMs } = read.io ?? {};
     return {
       request: read.request,
       io: {
         ...(typeof bridgeFile === 'string' ? { bridgeFile } : {}),
+        ...(typeof heardFile === 'string' ? { heardFile } : {}),
         ...(typeof holdFile === 'string' && typeof drainFile === 'string'
           ? { hold: { holdFile, drainFile, holdMs: msOr(holdMs, JOB_HOLD_MS), holdPollMs: msOr(holdPollMs, JOB_HOLD_POLL_MS) } }
           : {}),
@@ -217,6 +221,7 @@ const ran = async ({ request, io }: Requested): Promise<boolean> => {
     for await (const m of session as AsyncIterable<SDKMessage>) {
       await flushed(process.stdout, `${JSON.stringify(m)}\n`);
       await bridged(session, m);
+      if (m.type === 'rate_limit_event' && io.heardFile) keepHeard(io.heardFile, m.rate_limit_info, Date.now());
       if (m.type === 'result') failed = m.is_error === true;
     }
   } catch (e) {

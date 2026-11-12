@@ -35,6 +35,7 @@ import type { SpawnRequest } from '../seam.ts';
 import type { AskOption, AskQuestion } from '../../core/index.ts';
 import { own } from '../../core/own.ts';
 import { cutWords } from '../../core/restart.ts';
+import { claudeHeardFile, keepHeard } from './heard.ts';
 import { cgroupMemoryOf } from '../cgroup.ts';
 import { scopeFor, type ScopeAt } from '../scope.ts';
 
@@ -495,7 +496,8 @@ const answered = (live: Live, m: SDKMessage): void => {
 };
 
 /**
- * One message of the session, taken: captured, its session id and its end written, the calls it ends cleared.
+ * One message of the session, taken: captured, its session id and its end written, the calls it ends cleared, and a `rate_limit_event`
+ * kept as the newest the store's sessions heard (`keepHeard`).
  *
  * A turn's end is not a session's end for a long-lived request (`live.open`): the calls clear, the run file is written `idle` with the
  * session id, and the input stays open so the next words said are heard in the same session. An `is_error` result — an interrupted
@@ -513,6 +515,7 @@ const answered = (live: Live, m: SDKMessage): void => {
 const took = (root: string, live: Live, m: SDKMessage): void => {
   live.pushed?.(m);
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live, m);
+  if (m.type === 'rate_limit_event') keepHeard(claudeHeardFile(root), m.rate_limit_info, Date.now());
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));
   const bridged = bridgeStateOf(m);
   if (m.type === 'system' && m.subtype === 'init' && m.session_id !== live.run.sessionId) rewrite(root, live, { sessionId: m.session_id });

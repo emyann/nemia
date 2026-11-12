@@ -1,6 +1,6 @@
 /**
- * The one reach of the orchestrator: its own CLI entry, spawned with the argv, never imported. Every verb this client has not moved, a
- * help, and a read typed with `--local` run there, exactly as they did before the client (docs/architecture.md: spawning a package's
+ * The one reach of the orchestrator: its own CLI entry, spawned with the argv, never imported. Every verb this client has not moved and a
+ * help of one run there, exactly as they did before the client (docs/architecture.md: spawning a package's
  * bin is using its CLI); under a remote context, a verb about the store is spawned there forwarded (`forwardedEnv`), to call the
  * daemon's endpoints.
  */
@@ -17,8 +17,8 @@ export type Entry = 'nemia' | 'wf';
 export const entryOf = (entry: Entry): string =>
   fileURLToPath(import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin'));
 
-/** `argv` without `--local`, which this client reads and the old path does not know. */
-export const unlocal = (argv: readonly string[]): string[] => argv.filter((word) => word !== '--local');
+/** Whether `--local` was typed among `argv`: refused by the route (`routeOf`), never passed on. */
+export const unlocal = (argv: readonly string[]): boolean => argv.includes('--local');
 
 /** How the child's stdout is taken: shown as this process's own, or kept and answered. */
 type Out = 'inherit' | 'pipe';

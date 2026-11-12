@@ -1,7 +1,7 @@
 /**
  * `nemia get` against a served store (`served.ts`): a resource's objects listed as a table, `-l` taking those its selector takes, one
  * read by its name, `-o yaml` read back by `nemia apply` as unchanged, and a word that names no resource refused exit 2 naming
- * `nemia explain`. The client's own verb: its help is its own and `--local` is refused naming `nemia service status`.
+ * `nemia explain`. The client's own verb: its help is its own, and `--local` is refused by the route, naming the command without it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,11 +73,11 @@ test('REFUSED: `-A` of a kind the api lists one namespace at a time exits 2 nami
   assert.match(refused.err, /-n <namespace>/);
 });
 
-test('`nemia get --help` is its own; `nemia get cards --local` is refused exit 2 naming `nemia service status`', async () => {
+test('`nemia get --help` is its own; `nemia get cards --local` is refused exit 2 by the route, naming the command without it', async () => {
   const help = await store.nemia(['get', '--help']);
   assert.equal(help.code, 0, help.err);
   assert.match(help.out, /^nemia get <resource>/);
   const local = await store.nemia(['get', 'cards', '--local']);
   assert.equal(local.code, 2, local.err);
-  assert.match(local.err, /nemia service status/);
+  assert.match(local.err, /`nemia get cards`/);
 });

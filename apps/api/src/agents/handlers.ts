@@ -36,15 +36,17 @@ import {
   untriedOf,
   type AgentReading,
 } from 'agent-orchestrator';
-import { AGENTS_FOLDER, agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, agentDraftOf as agentFileDraft, agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import {
   type Agent,
   type AgentInstructions,
+  type AgentDrafted,
   type AgentInstructionsCleared,
   type AgentSpec,
   Api,
   API_VERSION,
   BadRequest,
+  type DefinitionFiles,
   Invalid,
 } from 'objects';
 import type { Served } from '../layer.ts';
@@ -279,6 +281,40 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
   return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
 }
 
+const READ_ROUTE = 'POST /api/agents/read';
+
+/**
+ * An agent's files read into its spec, as a GET of the same files written to yours answers it, writing nothing: the first file the
+ * agent's, read by the package's reader (`agentDraftOf`), named `name`, else by its file without `.md`; the schema its `output:` names
+ * read from the files sent beside it. Refused `Invalid`, naming the file, for a file that does not read and for a schema named and not
+ * sent.
+ */
+export function agentReadOf({ name, files }: DefinitionFiles): AgentDrafted {
+  const [file, ...beside] = files;
+  if (file === undefined)
+    throw new Invalid({ error: `${READ_ROUTE} reads an agent's file: send it first in \`files\`, then the schema its output: names.` });
+  const agent = name ?? path.basename(file.path, '.md');
+  const wrong = agentNameRefusal(agent);
+  if (wrong !== undefined) throw new Invalid({ error: `${READ_ROUTE}: ${wrong}` });
+  const sent = (named: string) => beside.find((f) => f.path === named)?.text;
+  let draft: ReturnType<typeof agentFileDraft>;
+  try {
+    draft = agentFileDraft(agent, file.text, sent);
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    throw new Invalid({ error: `${READ_ROUTE}: ${file.path} does not read: ${err.message}` });
+  }
+  const named = draft.keys.output ?? null;
+  const text = named === null ? undefined : sent(named);
+  if (named !== null && text === undefined)
+    throw new Invalid({
+      error: `${READ_ROUTE}: ${file.path} names ${named} as its output:, which was not sent: send ${named} beside it in \`files\`.`,
+    });
+  const { role, description, keys, skills, harnessPrompt, mcp, body } = draft;
+  const output = named === null || text === undefined ? null : { file: named, text };
+  return { metadata: { name: agent }, spec: { role, description, keys, skills, harnessPrompt, mcp, output, instructions: body } };
+}
+
 export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
@@ -327,6 +363,7 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
       answeredWriteIn(namespace, (s) => triedIn(s, namespace, name, payload.brief)),
     )
     .handle('card', ({ params: { namespace, name }, query }) => answeredWriteIn(namespace, (s) => cardIn(s, namespace, name, query.origin)))
+    .handle('read', ({ payload }) => answered(async () => agentReadOf(payload)))
     .handle('sources', ({ query }) => answered((s) => s.inRequest(AGENTS_SOURCES.handler(query))))
     .handle('copy', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, (s) => {

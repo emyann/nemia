@@ -10,8 +10,8 @@
  * /api/readiness/fixes`), the answers its asks need given by `--answer` or, at a terminal, asked there, then follows its output
  * (`GET /api/readiness/fixes/:id/output`, server-sent `output` chunks and the `ended` Fix), printing it as it comes; a line that
  * holds the code the fix declares (`code`, a pattern: a device code) is shown again on its own, spaced, to be read across a room. It
- * exits 0 when the fix succeeded, 1 otherwise. With `--local` the orchestrator's own `doctor` reads this machine's store in process
- * (`routeOf`), and `nemia doctor carry`, which installs on this machine what an upgrade carries, runs there whatever context is in use.
+ * exits 0 when the fix succeeded, 1 otherwise. `--local` is refused by the route, as for every command (`routeOf`); `nemia doctor
+ * carry`, which installs on this machine what an upgrade carries, runs in process whatever context is in use.
  *
  * A met piece prints the fix that removes it (`kind: 'removes'`), how to take it off again; a fix typed by the person (`kind: 'typed'`,
  * a sign-in that asks at a terminal of its own) prints as the command to type, never started from here.
@@ -41,7 +41,6 @@ const USAGE = [
   'nemia doctor fix <need> [--factory <f>] [--workflow <w>] [--index <n>] [--answer <name>=<value>]…',
   '                                    start the fix of <need> on the server and follow its output',
   'nemia doctor carry                  install on this machine what an upgrade carries, in process',
-  'nemia doctor --local                read this machine’s store in process',
 ];
 
 /** A `nemia doctor` typed otherwise than its usage: refused, exit 2, naming it. */

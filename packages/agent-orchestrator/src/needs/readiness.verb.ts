@@ -265,6 +265,24 @@ const harnessesWanted = (memo: NeedsMemo, workflows: readonly FactoryWorkflow[])
 };
 
 /**
+ * The piece of a harness nobody activated and nothing runs on (`harnessesWanted`), `inactive`: its install with the fix a missing one
+ * offers, and its sign-in with none, since no sign-in runs before the install.
+ */
+const inactivePiece = (need: Need, of: NonNullable<ReturnType<typeof harnessOfNeed>>): ReadinessPiece => {
+  const harness = { harness: { name: of.name, part: of.part } };
+  if (of.part === 'install')
+    return piece(
+      need.name,
+      'harness',
+      'inactive',
+      `${of.needs.title} (${of.needs.program}) is not activated, and no factory's workflow runs on it: activate it when one does`,
+      needFixes(need, 'missing'),
+      harness,
+    );
+  return piece(need.name, 'harness', 'inactive', `${of.needs.title} is not activated, so its sign-in is not asked`, [], harness);
+};
+
+/**
  * Each harness the runtime declares needs for, as its two pieces off `memo` (`harnessNeeds`), area `harness`, each naming its harness and
  * which of its needs it is (`harness`): the install, its message saying the version found against the pin where it is in place
  * (`harnessVersionWord`); and the sign-in. The default harness's sign-in is missing, whatever its check says, while the token the store
@@ -279,13 +297,7 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts, wan
     const of = harnessOfNeed(need.name, HARNESS_DECLARATIONS);
     if (of === undefined) return [];
     const harness = { harness: { name: of.name, part: of.part } };
-    if (!wanted.has(of.name)) {
-      const said =
-        of.part === 'install'
-          ? `${of.needs.title} (${of.needs.program}) is not activated, and no factory's workflow runs on it: activate it when one does`
-          : `${of.needs.title} is not activated, so its sign-in is not asked`;
-      return [piece(need.name, 'harness', 'inactive', said, of.part === 'install' ? needFixes(need, 'missing') : [], harness)];
-    }
+    if (!wanted.has(of.name)) return [inactivePiece(need, of)];
     const read = memo.readings.get(checkKey(harnessCheckOf(need)));
     if (of.part === 'install') {
       if (read !== 'met') return [needPiece(need, 'harness', read, undefined, undefined, harness)];

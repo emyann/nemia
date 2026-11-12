@@ -39,7 +39,7 @@ export function tableAsked(args: readonly string[]): { rest: string[]; selector:
 export function tableOf<L extends object>(verb: string, listed: L | Table): Table {
   if ('columnDefinitions' in listed) return listed;
   throw new Refused(
-    `the daemon answered nemia ${verb} a list where this nemia asked for its table: it is older than this nemia. Restart it, \`nemia service restart\`, or read in process: \`nemia ${verb} … --local\``,
+    `the daemon answered nemia ${verb} a list where this nemia asked for its table: it is older than this nemia. Restart it, \`nemia service restart\`, then type \`nemia ${verb}\` again`,
   );
 }
 

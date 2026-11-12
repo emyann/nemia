@@ -9,6 +9,9 @@
  * spawns is given the service's environment alone (`daemonEnv`), so it listens on the daemon's port, 8787, whatever `PORT` says: where
  * another process holds that port — the person's own daemon — the test is skipped, saying so, rather than start one that cannot listen.
  * Run it where the port is free (CI), or in a network namespace of its own: `unshare -rn sh -c 'ip link set lo up && node --test <file>'`.
+ *
+ * With the start turned off (`NEMIA_DAEMON_START=off`), on a store of its own, the same read is refused, exit 2, naming the command that
+ * starts one here (`nemia up`) and the one that installs the service, and never `--local`, which is refused.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,9 +46,9 @@ const ENV: NodeJS.ProcessEnv = (() => {
   return { ...rest, WF_ROOT: ROOT, HOME, WF_VERIFY_REST: '1' };
 })();
 
-/** `nemia <argv>`, waited on for its exit: its code, and what it printed on each stream. */
-function nemia(argv: readonly string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  const child = spawn(process.execPath, [BIN, ...argv], { env: ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+/** `nemia <argv>` on `env`, waited on for its exit: its code, and what it printed on each stream. */
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  const child = spawn(process.execPath, [BIN, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '';
   let stderr = '';
   child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
@@ -117,4 +120,16 @@ test('nemia ls on a store no daemon serves starts one through nemia daemon, read
   assert.ok(stderr.includes(`kill ${String(held?.pid)}`), stderr);
   await stopStarted();
   assert.equal(alive(held?.pid as number), false);
+});
+
+test('REFUSED: with NEMIA_DAEMON_START=off no daemon is started: exit 2, naming `nemia up` and `nemia service install`, never --local', async () => {
+  const root = path.join(SCRATCH, 'off');
+  fs.mkdirSync(root, { recursive: true });
+  const { code, stdout, stderr } = await nemia(['ls'], { ...ENV, WF_ROOT: root, NEMIA_DAEMON_START: 'off' });
+  assert.equal(code, 2, stderr);
+  assert.equal(stdout, '');
+  assert.match(stderr, /`nemia up`/);
+  assert.match(stderr, /`nemia service install`/);
+  assert.doesNotMatch(stderr, /--local/);
+  assert.equal(fs.existsSync(path.join(root, 'daemon.json')), false, 'no daemon was started');
 });

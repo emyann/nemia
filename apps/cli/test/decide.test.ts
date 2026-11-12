@@ -2,7 +2,7 @@
  * `nemia decide`, a verb of the client's own, on a stub server that answers `GET /api/health` and `GET /api/runs/:runId/decision` as the
  * api does (`objects`' `RunDecision`): the screen printed off the read, the commands numbered; at a terminal the one picked run as the
  * client runs that verb, its placeholder asked first, a `git` one printed and never run; off a terminal nothing run; every diff asked
- * whole (`?diffs=*`). `--local` and `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit
+ * whole (`?diffs=*`). `--sensitive <globs>` sent as the read's `?sensitive=`, and refused with no glob or given twice, exit
  * 2, before any read.
  */
 import { after, test } from 'node:test';
@@ -161,9 +161,9 @@ test("--sensitive <globs> is sent as the read's ?sensitive=, as typed", async ()
   assert.equal(new URL(read ?? '', 'http://x').searchParams.get('sensitive'), 'src/**,*.json');
 });
 
-test('REFUSED: --local, --sensitive with no glob or twice, no run and an unknown run, each exit 2; all but the last before any read', async () => {
+test('REFUSED: --sensitive with no glob or twice, no run and an unknown run, each exit 2; all but the last before any read', async () => {
   const before = asked.length;
-  for (const args of [['r-1', '--local'], ['r-1', '--sensitive'], ['r-1', '--sensitive', 'a', '--sensitive=b'], []]) {
+  for (const args of [['r-1', '--sensitive'], ['r-1', '--sensitive', 'a', '--sensitive=b'], []]) {
     const { io } = ioOf(false);
     await assert.rejects(decide(args, io.run, io, env), (err: unknown) => err instanceof Refused && err.code === 2, args.join(' '));
   }

@@ -1,12 +1,13 @@
 /**
  * The workflow folders as entries of the command table, each through the Workflow door (`WorkflowDoor`, run at the store's root
  * (`StoreRoot`) its handler is given): a folder of yours written from its steps (`WORKFLOWS_WRITE`) and removed (`WORKFLOWS_REMOVE`), each
- * checked against the version it was read at, served on both sides — the command line reads a draft folder (`cli/writers.ts`), the builder
- * sends its steps; and one step of a folder (`WORKFLOWS_STEP`), on the api alone. The folders the board lists are loaded by the program the
- * api runs itself (`foldersLoaded`), handed its factory whole. The api resolves which folder a read names, and words the board's answer
- * around what each answers.
+ * checked against the version it was read at — the client (`apps/cli`) holds `workflows write`'s words (`objects`' `COMMAND_WORDS`) and
+ * sends the steps the api read off its draft folder, as the builder sends its own; and one step of a folder (`WORKFLOWS_STEP`), on the api
+ * alone. The folders the board lists are loaded by the program the api runs itself (`foldersLoaded`), handed its factory whole. The api
+ * resolves which folder a read names, and words the board's answer around what each answers.
  */
-import { fromPlace, givesNone, refusing, notSent } from '../command/requests.verb.ts';
+import { fromPlace, refusing } from '../command/requests.verb.ts';
+import { WORKFLOWS_WRITE_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
@@ -15,7 +16,7 @@ import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import { FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
@@ -142,45 +143,14 @@ export type WorkflowStepInput = typeof WorkflowStepInput.Type;
 /**
  * A folder of yours, `<home>/workflows/<name>`, or of the tree of the factory `--factory` names (the place `factory`), written from its
  * steps through the Workflow door, which judges the whole folder before a byte is written and checks it against the version it was read at
- * (`workflowVersionRefusal`): `draft`, the steps as JSON text, which the command line reads off `--folder`; `readme`, the folder's README
- * where one is given; `files`, the other files the draft folder carries — a script, a schema — which the command line reads off `--folder`
- * too, and a file the folder holds that the draft does not carry is left, but where `whole` says the files are the whole set of its other
- * text files, as the api's write of a Workflow's `spec.files` does: then a text file not carried is removed. Answers what was written, and
- * the version the folder is at now.
+ * (`workflowVersionRefusal`): `draft`, the steps as JSON text, which the api reads off the client's `--folder`; `readme`, the folder's
+ * README where one is given; `files`, the other files the draft folder carries — a script, a schema — read off `--folder` too, and a file
+ * the folder holds that the draft does not carry is left, but where `whole` says the files are the whole set of its other text files, as
+ * the api's write of a Workflow's `spec.files` does: then a text file not carried is removed. Answers what was written, and the version the
+ * folder is at now.
  */
 export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, WorkflowWriteInput> = {
-  name: 'workflows write',
-  served: [
-    { endpoint: 'workflows.create', takes: givesNone('version'), request: notSent('workflows write') },
-    { endpoint: 'workflows.replace', as: 'workflows_replace', request: notSent('workflows write') },
-  ],
-  usage: '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
-  help: [
-    'a workflow folder of yours, or of a templated --factory, written from',
-    'a draft folder, its steps, README, scripts and schemas, leaving a file',
-    'it does not carry; one there already, at the --version it was read at',
-  ],
-  spec: writerSpec(
-    'workflows write',
-    '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
-    [FROM, { key: 'name', takes: 'required', kind: 'name' }],
-    [
-      cliPath(
-        'workflows write',
-        'folder',
-        'the draft folder whose steps and README to write',
-        'the api is sent the steps themselves, never a folder to read',
-      ),
-      versionFlag('workflows write', 'the folder'),
-      factoryFlag('workflows write'),
-    ],
-  ),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Workflow's `create` and `replace` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
-  },
+  ...WORKFLOWS_WRITE_WORDS,
   input: WorkflowWriteInput,
   handler: ({ draft: steps, readme, files, whole, version, ...where }) =>
     Effect.flatMap(StoreRoot, (home) =>
@@ -203,10 +173,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, Wor
         );
       }),
     ),
-  print: ({ dir, version, written, kept, removed }) => [
-    `${path.basename(dir)} written in ${dir}, at version ${version}: ${[...written, ...kept].join(', ')}`,
-    ...(removed.length ? [`removed: ${removed.join(', ')}`] : []),
-  ],
+  print: () => [],
 };
 
 /**

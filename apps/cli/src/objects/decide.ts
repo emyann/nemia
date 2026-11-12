@@ -6,13 +6,13 @@
  * to run: a `nemia` command is run as this client runs that verb, the words a placeholder holds (`"<objection>"`) asked first; a `git`
  * command is printed and never run. Off a terminal it prints and runs nothing.
  *
- * It refuses `--local`, as every verb of the client's own; `--sensitive <globs>` is sent as the read's `?sensitive=`. It prints the diffs
+ * `--local` is refused by the route, as for every command; `--sensitive <globs>` is sent as the read's `?sensitive=`. It prints the diffs
  * the decision shows in full, so it asks for them whole (`?diffs=*`): the api answers none whole unless asked.
  */
 import readline from 'node:readline';
 import type { DecideCommand, Decidable, RunDecision } from 'objects';
 import { Refused } from '../refused.ts';
-import { asked, noLocal } from '../objects.ts';
+import { asked } from '../objects.ts';
 
 /** `nemia decide`'s help. */
 export const DECIDE_HELP = `nemia decide <runId>
@@ -199,7 +199,6 @@ export async function decide(
   io: DecideIo = terminal(run),
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<number> {
-  if (args.includes('--local')) throw noLocal('decide');
   if (args.includes('--help')) {
     io.output.write(`${DECIDE_HELP}\n`);
     return 0;

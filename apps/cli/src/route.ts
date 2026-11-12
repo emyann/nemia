@@ -1,11 +1,13 @@
 /**
- * Which way a command goes, pure: the api for a moved read (`READ_VERBS`) and for the client's own verbs (`CLIENT_VERBS`, whatever
- * else is typed), the orchestrator's own CLI for the rest and for a verb about this machine (`MACHINE_VERBS`), whatever context is in
- * use; forwarded, a verb about the store only the old path has, typed while the context names a remote daemon: that CLI spawned with
- * the context's server and token, calling the daemon's endpoints in place of its handlers (`contracts/route.contract.ts`). Each list
- * is spelled once, here, and read by the contract and the code: no file of `src` imports a value of a contract, which ships the
+ * Which way a command goes, pure: refused where `--local` is typed, which reads no store in process any more; the api for a moved read
+ * (`READ_VERBS`), for the client's own verbs (`CLIENT_VERBS`, whatever else is typed) and for a command whose words the client holds
+ * (`MOVED_COMMANDS`, its help included), the orchestrator's own CLI for the rest and for a verb about this machine (`MACHINE_VERBS`),
+ * whatever context is in use; forwarded, a verb about the store only the old path has, typed while the context names a remote daemon: that
+ * CLI spawned with the context's server and token, calling the daemon's endpoints in place of its handlers (`contracts/route.contract.ts`).
+ * Each list is spelled once, here, and read by the contract and the code: no file of `src` imports a value of a contract, which ships the
  * verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
+import { AGENTS_WRITE_WORDS, SKILLS_WRITE_WORDS, WORKFLOWS_WRITE_WORDS } from 'objects';
 import type { RouteOf } from '../contracts/route.contract.ts';
 
 /**
@@ -45,11 +47,21 @@ export const MACHINE_VERBS = [
 export type MachineVerb = (typeof MACHINE_VERBS)[number];
 
 /**
- * Where a command goes: the api, the orchestrator's CLI in a process of its own on this machine, or that CLI forwarded — a verb about
+ * The commands whose words this client holds (`objects`' `COMMAND_WORDS`, by name): each parsed, helped, run and printed here through
+ * the api, under every context.
+ */
+export const MOVED_COMMANDS = [WORKFLOWS_WRITE_WORDS.name, AGENTS_WRITE_WORDS.name, SKILLS_WRITE_WORDS.name] as const;
+
+/** One of `MOVED_COMMANDS`. */
+export type MovedName = (typeof MOVED_COMMANDS)[number];
+
+/**
+ * Where a command goes: refused (`--local`, which names what to type instead), the api, the orchestrator's CLI in a process of its own on
+ * this machine, or that CLI forwarded — a verb about
  * the store that only the old path has yet, typed while a context names a remote daemon: spawned with the context's server and token
  * (`forwardedEnv`, `src/context.ts`), it calls that daemon's endpoints and refuses in its own words a command none serves.
  */
-export type Route = 'api' | 'process' | 'forwarded';
+export type Route = 'api' | 'process' | 'forwarded' | 'refused';
 
 /**
  * A command as the route reads it: the name it opens with, whether `--local` was typed, whether it asks for its help, and whether the
@@ -61,14 +73,24 @@ const clients: readonly string[] = CLIENT_VERBS;
 const reads: readonly string[] = READ_VERBS;
 const machines: readonly string[] = MACHINE_VERBS;
 
+const moved: readonly string[] = MOVED_COMMANDS;
+
 export const routeOf: RouteOf = ({ name, local, help, remote }) => {
-  if (clients.includes(name)) return 'api';
-  if (reads.includes(name)) return local || help ? 'process' : 'api';
+  if (local) return 'refused';
+  if (clients.includes(name) || moved.includes(name)) return 'api';
+  if (reads.includes(name)) return help ? 'process' : 'api';
   return remote && !help && !machines.includes(name) ? 'forwarded' : 'process';
 };
 
 /**
- * The name `argv` opens with as the route reads it: its first word. A moved read typed with words it does not read (`inbox add`, a command
- * of its own on the old path) hands them to the old path itself, before it asks the api anything.
+ * The name `argv` opens with as the route reads it: the longest of `MOVED_COMMANDS` its words open with (`workflows write`), else its
+ * first word. A moved read typed with words it does not read (`inbox add`, a command of its own on the old path) hands them to the old
+ * path itself, before it asks the api anything.
  */
-export const nameOf = (argv: readonly string[]): string => argv[0] ?? '';
+export const nameOf = (argv: readonly string[]): string => {
+  const opens = moved.filter((name) => {
+    const words = name.split(' ');
+    return words.every((word, at) => argv[at] === word);
+  });
+  return opens.reduce((longest, name) => (name.split(' ').length > longest.split(' ').length ? name : longest), argv[0] ?? '');
+};

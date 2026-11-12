@@ -25,13 +25,28 @@ import {
   typedGraphOf,
   unattachedRefusal,
   WORKFLOWS_REMOVE,
+  workflowDraftOfFiles,
   workflowStale,
   workflowNeeds,
   workflowReadmeWith,
   workflowVersion,
   type FolderLoaded,
+  type WorkflowFilesRead,
 } from 'agent-orchestrator';
-import { Api, API_VERSION, Conflict, Invalid, Missing, type Need, type Workflow, type WorkflowFile, type WorkflowStep } from 'objects';
+import {
+  Api,
+  API_VERSION,
+  Conflict,
+  Invalid,
+  Missing,
+  type Need,
+  type DefinitionFiles,
+  type Workflow,
+  type WorkflowCreate,
+  type WorkflowFile,
+  type WorkflowSpec,
+  type WorkflowStep,
+} from 'objects';
 import type { Served } from '../layer.ts';
 import { repoNeeded } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
@@ -41,6 +56,7 @@ import { draftOf, isRoleKey, keyForm, schemasOf, write, yourAgentsRead, type Ste
 import { workflowNameRefusal } from './words.ts';
 import {
   listed as listingOf,
+  listedStep,
   loadedAt,
   loadedOf,
   placesOf,
@@ -130,6 +146,34 @@ const writtenStep = (step: ListedStep): WorkflowStep => {
   );
   return { name: step.name, keys, body: own ? own.body : step.body };
 };
+
+/**
+ * The spec of a folder read off the files sent (`workflowDraftOfFiles`), in the words a GET of the same folder answers it: each step as
+ * its file writes it (`writtenStep` over the listing's `listedStep`, in no factory), its description and README, and its other text
+ * files, left out where it has none.
+ */
+const specRead = ({ steps, readme, description, files }: WorkflowFilesRead): WorkflowSpec => ({
+  description,
+  readme,
+  steps: steps.map(listedStep(new Map())).map(writtenStep),
+  ...(files.length > 0 && { files: [...files] }),
+});
+
+/**
+ * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the api's repository and yours, as a GET of
+ * the same folder in yours reads it: its name and its spec, writing nothing. On an api with no repository (an install, no factory
+ * named), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Refused `Invalid` without a
+ * name, and as the reader refuses.
+ */
+async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
+  if (name === undefined)
+    throw new Invalid({
+      error:
+        'POST /api/workflows/read reads a folder under its name: send `{ "name": "<the folder\'s name>", "files": [{ "path", "text" }] }`.',
+    });
+  const read = await s.inRequest(workflowDraftOfFiles(name, files, s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home)));
+  return { metadata: { name }, spec: specRead(read) };
+}
 
 /** A step the object sends, as the builder takes it: `agent` among its keys makes every key its own, and its body its own note. */
 const stepBodyOf = (step: WorkflowStep): StepBody => ({
@@ -327,5 +371,6 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
         return stepPage(s, { name, ...item }, step);
       }),
     )
+    .handle('read', ({ payload }) => answered((s) => folderRead(s, payload)))
     .handle('keys', () => answered(async (s) => keyForm(await s.inRequest(yourAgentsRead(s.home)), s.home))),
 );

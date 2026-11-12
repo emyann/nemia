@@ -13,8 +13,8 @@
 import path from 'node:path';
 import { Effect } from 'effect';
 import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, skillTable, type SkillChange } from 'agent-orchestrator';
-import { SKILLS_FOLDER } from 'agent-orchestrator/workflow';
-import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
+import { frontmatterKey, SKILLS_FOLDER, skillDraftOf, skillNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
+import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
 import { repoNeeded } from '../factory/place.ts';
 import {
@@ -32,7 +32,7 @@ import {
   type SkillRow,
 } from './skills.ts';
 import { queryOf } from '../factory/parts/index.ts';
-import { answeredWriteIn, readerRefused } from '../objects/refused.ts';
+import { answered, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { filesUnder, skillFoldersIn, skillTextOf } from '../workflows/builder.ts';
 import {
@@ -175,6 +175,42 @@ const draftOf = (spec: SkillSpec, name: string, route: string): SkillChange => {
   return { ...draft, ...(files !== undefined && { files }) };
 };
 
+const READ_ROUTE = 'POST /api/skills/read';
+
+/**
+ * A skill's files read into its spec, as a GET of the same files written to yours answers it, writing nothing: the first file its
+ * SKILL.md, read by the package's reader (`skillDraftOf`), named by its `name:`, else by `name`; the files after it the folder's other
+ * text files (`spec.files`), left out where none is sent. Refused `Invalid`, naming the file, for a SKILL.md that does not read, and for
+ * one that names no skill where `name` is not sent.
+ */
+export function skillReadOf({ name, files }: DefinitionFiles): SkillDrafted {
+  const [file, ...others] = files;
+  if (file === undefined) throw new Invalid({ error: `${READ_ROUTE} reads a skill's SKILL.md: send it first in \`files\`.` });
+  const unread = (err: unknown): never => {
+    if (!(err instanceof WorkflowError)) throw err;
+    throw new Invalid({ error: `${READ_ROUTE}: ${file.path} does not read: ${err.message}` });
+  };
+  let skill: string | undefined;
+  try {
+    skill = frontmatterKey(file.text, 'name') ?? name;
+  } catch (err) {
+    return unread(err);
+  }
+  if (skill === undefined)
+    throw new Invalid({ error: `${READ_ROUTE}: ${file.path} says no name:, and none was sent: write its name: line, or send \`name\`.` });
+  const wrong = skillNameRefusal(skill);
+  if (wrong !== undefined) throw new Invalid({ error: `${READ_ROUTE}: ${file.path}: ${wrong}` });
+  let read: ReturnType<typeof skillDraftOf>;
+  try {
+    read = skillDraftOf(file.path, skill, file.text);
+  } catch (err) {
+    return unread(err);
+  }
+  const { name: _name, ...spec } = read;
+  const rest = [...others].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return { metadata: { name: skill }, spec: rest.length > 0 ? { ...spec, files: rest } : spec };
+}
+
 export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
@@ -225,6 +261,7 @@ export const skillsHandlers = readsBounded(Api, 'skills', (handlers) =>
         return skillAt(s, namespace, name, 'yours');
       }),
     )
+    .handle('read', ({ payload }) => answered(async () => skillReadOf(payload)))
     .handle('files', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, async (s) => ({
         paths: filesUnder(servedNamed(await heldIn(s), name, originAsked(query.origin), listPath(namespace)).item.dir),

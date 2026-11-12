@@ -116,11 +116,11 @@ test('REFUSED: a kind the api does not serve, and a namespace the file says othe
   assert.match(namespace.err, /-n default/);
 });
 
-test('`nemia apply --help` is its own; `--local` is refused exit 2 naming `nemia service status`', async () => {
+test('`nemia apply --help` is its own; `--local` is refused exit 2 by the route, naming the command without it', async () => {
   const help = await store.nemia(['apply', '--help']);
   assert.equal(help.code, 0, help.err);
   assert.match(help.out, /^nemia apply -f/);
   const local = await store.nemia(['apply', '-f', '-', '--local']);
   assert.equal(local.code, 2, local.err);
-  assert.match(local.err, /nemia service status/);
+  assert.match(local.err, /`nemia apply -f -`/);
 });

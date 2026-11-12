@@ -1,7 +1,7 @@
 /**
  * The daemon made ready before a read asks it (`daemon.ts`): a probe of `GET /api/health` tells a daemon that answers (any status), one
  * that took the connection and is silent, and none listening; a start's readiness is polled until the daemon answers, bounded, never a
- * read retried after a refused connection; a lease whose port takes no connection, with the start off, is refused naming `--local`.
+ * read retried after a refused connection; a lease whose port takes no connection, with the start off, is refused naming `nemia up`.
  */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -59,7 +59,7 @@ test('a start is waited for by its readiness: polled until the daemon at its url
   assert.equal(await readyAt(() => undefined, 200), undefined, 'no url yet is no daemon yet');
 });
 
-test('a lease whose daemon listens is served as it is; one whose port takes no connection, the start off, is refused naming --local', async () => {
+test('a lease whose daemon listens is served as it is; one whose port takes no connection, the start off, is refused naming nemia up', async () => {
   const root = path.join(scratch('nemia-ready-'), 'store');
   fs.mkdirSync(root, { recursive: true });
   const lease = (url: string) => fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url }));
@@ -70,7 +70,8 @@ test('a lease whose daemon listens is served as it is; one whose port takes no c
   await assert.rejects(served('ls', env), (err: unknown) => {
     assert.ok(err instanceof Refused, String(err));
     assert.equal(err.code, 2);
-    assert.match(err.message, /nemia ls --local/);
+    assert.match(err.message, /`nemia up`/);
+    assert.doesNotMatch(err.message, /--local/);
     return true;
   });
 });

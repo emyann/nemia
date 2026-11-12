@@ -14,7 +14,7 @@ import { scratch } from 'test-kit/scratch';
 import { testEngine, until, WAITED } from 'agent-runtime/testing';
 import { teamCopy } from '../../../test/team.ts';
 import { testPlace } from '../../../place/memory/index.ts';
-import { eachTest } from '../../../test/placed.ts';
+import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { steeredClock } from '../../../test/steered.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
@@ -30,6 +30,8 @@ import { FACTORY_APPLY } from './applied.verb.ts';
 import { FACTORY_UPGRADE } from '../upgrade/upgrade.verb.ts';
 import { runWith as runEngine } from '../../runtime-client.ts';
 import { withBuiltins } from '../../../test/templated.ts';
+import { agentDraftOf, skillDraftOf, type StepDraft } from '../../workflow.ts';
+import { AGENTS_WRITE, draftSteps, factoryDraftOf, SKILLS_WRITE, WORKFLOWS_WRITE } from '../../runner.ts';
 import type { Env } from '../../config/config.store.ts';
 
 const ROOT = scratch('wf-applied-');
@@ -45,6 +47,9 @@ heldUnasked(engine);
 
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
+
+/** A program — a writer's handler, as the api calls it — run at this test's store, on its place. */
+const runWith = runOver(runEngine, () => stand().layer, ENV);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Conflict' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
@@ -491,7 +496,7 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
     },
   );
   await t.test(
-    "the writers' place factory writes a templated factory's tree; refused without --factory, for an untemplated one, and before its render",
+    "the writers' place factory writes a templated factory's tree through each writer's handler; refused without a factory, for an untemplated one, and before its render",
     async (t) => {
       t.mock.method(console, 'log', () => {});
       const { dir, repo } = template();
@@ -504,31 +509,28 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
         fs.cpSync(path.join(repo, 'workflows', part), path.join(drafts, 'workflows', part), { recursive: true });
       const bare = path.join(scratch('wf-applied-bare-'), 'lean');
       fs.cpSync(path.join(repo, 'workflows', 'dev'), bare, { recursive: true });
-      const agent = path.join(drafts, 'scout.md');
-      fs.copyFileSync(path.join(repo, 'workflows', 'agents', 'implementer.md'), agent);
-      const skill = path.join(drafts, 'skills', 'tidy', 'SKILL.md');
-      fs.mkdirSync(path.dirname(skill), { recursive: true });
-      fs.writeFileSync(skill, '---\nname: tidy\ndescription: Tidy a folder.\n---\nTidy it.\n');
-      const writes = (folder: string) => [
-        ['workflows', 'write', 'factory', 'lean', '--folder', folder],
-        ['agents', 'write', 'factory', '--file', agent],
-        ['skills', 'write', 'factory', '--file', skill],
-      ];
-      for (const write of writes(beside)) {
-        await assert.rejects(main(write, noEngine()), refusedNaming('Invalid', '--factory <name>'));
-        await assert.rejects(main([...write, '--factory', 'written'], noEngine()), refusedNaming('Conflict', 'nemia up'));
-        await assert.rejects(
-          main([...write, '--factory', 'plain'], noEngine()),
-          refusedWith('Invalid', /plain is not made from a template/),
-        );
-        await assert.rejects(
-          main([...write.slice(0, 2), 'yours', ...write.slice(3), '--factory', 'written'], noEngine()),
-          refusedWith('Invalid', /yours is the store's, and --factory names a factory's tree/),
-        );
-      }
+      const agent = agentDraftOf('scout', fs.readFileSync(path.join(repo, 'workflows', 'agents', 'implementer.md'), 'utf8'));
+      const skill = skillDraftOf('tidy/SKILL.md', 'tidy', '---\nname: tidy\ndescription: Tidy a folder.\n---\nTidy it.\n');
+      const handled = <A, E>(program: Parameters<typeof runWith<A, E>>[1]) => runWith(noEngine(), program);
+      const besideDraft = await handled(draftSteps(beside, { home: ROOT }));
+      const writes = (draft: StepDraft[], factory?: string, from = 'factory') => {
+        const at = { from, ...(factory !== undefined && { factory }) };
+        return [
+          WORKFLOWS_WRITE.handler({ ...at, name: 'lean', draft }),
+          AGENTS_WRITE.handler({ ...at, draft: agent, schema: null }),
+          SKILLS_WRITE.handler({ ...at, change: skill }),
+        ] as Parameters<typeof runWith<unknown, unknown>>[1][];
+      };
+      for (const write of writes(besideDraft)) await assert.rejects(handled(write), refusedNaming('Invalid', '--factory <name>'));
+      for (const write of writes(besideDraft, 'written')) await assert.rejects(handled(write), refusedNaming('Conflict', 'nemia up'));
+      for (const write of writes(besideDraft, 'plain'))
+        await assert.rejects(handled(write), refusedWith('Invalid', /plain is not made from a template/));
+      for (const write of writes(besideDraft, 'written', 'yours'))
+        await assert.rejects(handled(write), refusedWith('Invalid', /yours is the store's, and --factory names a factory's tree/));
       assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
       reconciled(templated('written'));
-      for (const write of writes(bare)) await main([...write, '--factory', 'written'], noEngine());
+      const { places, fills } = factoryDraftOf(ROOT, 'written', 'lean');
+      for (const write of writes(await handled(draftSteps(bare, places, fills)), 'written')) await handled(write);
       const tree = path.join(treeDir(ROOT, 'written'), 'workflows');
       assert.ok(
         fs.existsSync(path.join(tree, 'lean', 'review.md')),

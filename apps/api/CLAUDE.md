@@ -61,7 +61,15 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   the write guard asks for. An answer fits what a host reads (`src/mcp/bound.ts`): a link's `query` gives the defaults a call is sent
   with, a list is asked a page of `PORT_PAGE`, a `Table` endpoint is asked for its Table and answered as its lines (`objects`'
   `tableLines`), and no answer passes `ANSWER_BOUND` (`answerFit`), a page past it asked again shorter and any other refused, never
-  cut. It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
+  cut. The feed is offered as resources besides (`src/mcp/resources.ts`, `views.ts`): its templates read off the
+  `Api` (`FEED_TEMPLATES`, every GET answering an `EventList`, `nemia:///api/events{?labelSelector*}` and its namespace's), declared
+  `resources.subscribe` on 2026-07-28 alone. The SDK's own listen router holds each `subscriptions/listen` stream (ack, filter,
+  teardown) and the port publishes through `handler.notify.resourceUpdated`; the port intercepts a listen only to refuse a URI that is
+  no view (-32602 naming the templates) and to hold a reference-counted view per URI (`feedViews`), the Event list's resumable watch
+  asked through the app's `fetch` with the holder's token, released when the SDK's response ends, is cancelled or its request aborts,
+  and closed with its streams when the api refuses it. A read answers the view's newest `PORT_PAGE` events within `ANSWER_BOUND`, and
+  an empty page at the feed's end for a URI no listen holds. A test waits for `liveViews()` to fall with `until`.
+  It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
   `src/mcp/instructions.ts`), every tool it names one the port lists. A store marked exposed (`WF_EXPOSED=1`) refuses a request with
   no token on every route of the api (`/api`, `/openapi`), and `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
@@ -76,7 +84,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   the mount with nothing to add (`src/objects/serve.ts`), which `src/watch/watch.test.ts` holds for every such endpoint of the `Api`; a
   watch asked for a `Table` is refused 406. A watch reads its list again, so each open one costs a list read per feed line (at most one
   per 500 ms) and per resync: a watch of runs on a busy feed reads the RunList about a third of the time (the measure below). The Event
-  lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`). A list whose objects
+  lists are the exception: their watch follows the feed (`eventsFollowed`, `src/feed-objects/events-watch.ts`), and resumes from a
+  `resourceVersion` (a page's `metadata.resourceVersion`, the feed's end, or the last event's), sending no state and a BOOKMARK once it
+  has caught up with the feed it opened on; any other list refuses one 400, and a byte the feed cannot be read from is 410
+  (`watchStartOf`, proved by `contracts/watch-start.contract.ts`). A list whose objects
   carry parts measured to the read hands `watchable` the version it compares them at (the runs' `runWatchVersion`, which leaves out a
   going run's `wallMs` and `clock`), or its watch sends a MODIFIED of each on every read. Discovery (`GET /api`,
   `src/discovery/discovery.ts`) is read off the `Api` by `objects`' `resourcesOf`. The feed and a step's stream are `StreamSse`

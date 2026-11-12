@@ -62,7 +62,12 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
   other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it. `agent-orchestrator` is in
   `dependencies` for that resolve alone.
-- **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`.
+- **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`. `nemia watch`
+  prints its lines; `nemia channel` (`src/watch/channel.ts`, a verb of `CLIENT_VERBS`) pushes them into a Claude Code session as its
+  notifications, a stdio MCP server Claude Code spawns. Its notifications are `objects`' Events, read off the Event list's watch
+  (`?watch=true&resourceVersion=`), each by `channelNotice` (proved by `contracts/channel-notice.contract.ts`), and its Claude Code words
+  (`claude/channel`, the notification's method, the instructions) stay in that file: no other file of the repository's layers says them
+  (`packages/agent-orchestrator/test/words.test.ts`). Its stdout is the MCP connection: it prints nothing there but its help.
 - **The printers it still has hold parity with the in-process reads until those retire**: `nemia show`, `nemia closeout` and `nemia
   watch`'s lines (`src/watch/lines.ts`: the feed has no server table) print what the old path prints for the same store, line for line,
   and their tests compare the two. A change to one of those outputs on either side changes both.

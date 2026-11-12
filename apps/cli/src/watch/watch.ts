@@ -55,14 +55,14 @@ function askedOf(args: readonly string[]): Asked | undefined {
 }
 
 /** The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no number. */
-function savedIn(file: string | undefined): number | undefined | 'refused' {
+export function savedIn(file: string | undefined): number | undefined | 'refused' {
   if (file === undefined || fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
   const text = fs.readFileSync(file, 'utf8').trim();
   return /^\d+$/.test(text) ? Number(text) : 'refused';
 }
 
 /** Writes `cursor` to the cursor file, whole: to a temp name beside it, then renamed over it, as the in-process watch writes it. */
-const kept = (file: string | undefined, cursor: number): void => {
+export const kept = (file: string | undefined, cursor: number): void => {
   if (file === undefined) return;
   const temp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temp, `${cursor}\n`);
@@ -290,7 +290,7 @@ const stretch = (asked: Asked, at: At, live: { state: 'up' | 'down'; base: strin
   });
 
 /** The signals that stop a followed watch, each with the code it exits with: 128 and the signal's number. */
-const SIGNALS = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((s) => [s, 128 + os.constants.signals[s]] as const);
+export const SIGNALS = (['SIGINT', 'SIGTERM', 'SIGHUP'] as const).map((s) => [s, 128 + os.constants.signals[s]] as const);
 
 /**
  * Runs `program`, which never ends of itself, until a signal interrupts it; resolves 128 and the signal's number once its finalizers

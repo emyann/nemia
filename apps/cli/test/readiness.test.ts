@@ -15,6 +15,7 @@ import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import type { Said } from './served.ts';
 import { configWritten } from '../src/context.ts';
+import { readinessLines } from '../src/readiness.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const GOOD = 'nm_good';
@@ -29,6 +30,7 @@ const FIX = {
 };
 const READ = {
   ready: false,
+  ran: true,
   pieces: [
     { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [] },
     { name: 'tool-auth', area: 'workflow', state: 'missing', message: 'not signed in', factory: 'f1', workflow: 'build', fixes: [FIX] },
@@ -139,6 +141,7 @@ test("`nemia readiness --json`: the server's pieces, and the laptop's own under 
     ['claude-token', 'tool-auth'],
   );
   assert.deepEqual(clientStates(said), { 'server-reached': 'met', 'token-accepted': 'met', 'local-bin-on-path': 'met' });
+  assert.equal((JSON.parse(said.out) as { ran?: boolean }).ran, true, 'whether the server ever ran a run is carried as it answered');
 });
 
 test('`nemia readiness`: a token the server refuses, and ~/.local/bin off PATH, are missing pieces of the client', async () => {
@@ -190,4 +193,21 @@ test('REFUSED: an ask with no `--answer` and no terminal to ask it on is a usage
   assert.equal(said.code, 2);
   assert.match(said.err, /--answer host=/);
   assert.equal(started.length, from, 'no fix started');
+});
+
+test('`nemia readiness`\'s last line says what the missing pieces cost, never "not ready", and "first run" only where none ran', async (t) => {
+  const linger = { name: 'linger', area: 'service', state: 'missing', message: 'stops at log out', fixes: [], cost: 'server' } as const;
+  const token = { name: 'claude-token', area: 'harness', state: 'missing', message: 'no token', fixes: [], cost: 'run' } as const;
+  const last = (read: Parameters<typeof readinessLines>[0]) => readinessLines(read).at(-1) ?? '';
+  await t.test('a server whose factories have run, missing only linger: no run waits on it', () => {
+    const said = last({ ready: false, ran: true, pieces: [linger] });
+    assert.match(said, /no run waits on/);
+    assert.doesNotMatch(said, /not ready|first run/);
+  });
+  await t.test('a server that never ran, missing a piece a run waits on: before its first run', () => {
+    assert.match(last({ ready: false, ran: false, pieces: [token] }), /first run/);
+  });
+  await t.test('every piece in place: ready', () => {
+    assert.equal(last({ ready: true, ran: true, pieces: [{ ...linger, state: 'met' }] }), 'ready');
+  });
 });

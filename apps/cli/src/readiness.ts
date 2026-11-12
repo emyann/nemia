@@ -4,7 +4,8 @@
  * `client`, which no server can see: under a remote context, whether its server takes a connection (`server-reached`) and whether it
  * takes the context's token (`token-accepted`); and whether `~/.local/bin`, where the installer puts `nemia`, is on PATH
  * (`local-bin-on-path`). A server that takes no connection is a missing piece, not a refusal: the read still prints what the laptop
- * knows. It exits 0 when no piece is missing, 1 otherwise, so a script can wait on it.
+ * knows. It exits 1 while a run waits on a missing piece (`runsWait`), 0 otherwise, a piece advised missing or not, so a script can
+ * wait on it.
  *
  * `nemia readiness fix <need> [--factory <f>] [--workflow <w>] [--index <n>] [--answer <name>=<value>]…` starts the fix (`POST
  * /api/readiness/fixes`), the answers its asks need given by `--answer` or, at a terminal, asked there, then follows its output
@@ -18,7 +19,17 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { Effect, Schema } from 'effect';
 import { HttpClientError } from 'effect/http';
-import { Fix, READINESS_AREAS, type Readiness, type ReadinessFix, type ReadinessPiece, Unauthorized } from 'objects';
+import {
+  Fix,
+  READINESS_AREAS,
+  readinessSaid,
+  runsWait,
+  type Readiness,
+  type ReadinessCost,
+  type ReadinessFix,
+  type ReadinessPiece,
+  Unauthorized,
+} from 'objects';
 import { sessionHeaders, urlOf } from './client.ts';
 import { chosenOf, unheld } from './context.ts';
 import { probe, served } from './daemon.ts';
@@ -28,7 +39,7 @@ import { blocksOf } from './watch/watch.ts';
 
 /** What `nemia readiness` says of itself. */
 const USAGE = [
-  'nemia readiness [--json]            what the server needs before a first run, and this laptop, each in place or missing',
+  'nemia readiness [--json]            what the server needs to run, and this laptop, each in place or missing',
   'nemia readiness fix <need> [--factory <f>] [--workflow <w>] [--index <n>] [--answer <name>=<value>]…',
   '                                    start the fix of <need> on the server and follow its output',
   'nemia readiness --local             read this machine’s store in process',
@@ -43,13 +54,24 @@ export const CLIENT_PIECES = ['server-reached', 'token-accepted', 'local-bin-on-
 /** One of `CLIENT_PIECES`. */
 export type ClientPiece = (typeof CLIENT_PIECES)[number];
 
-/** A piece of the area `client`. */
+/**
+ * What each of the client's pieces costs while missing: no run is started from here on a server it cannot reach or that refuses its
+ * token, and `nemia` off PATH is advised, since it runs by its whole path still.
+ */
+const CLIENT_COSTS: Record<ClientPiece, ReadinessCost> = {
+  'server-reached': 'run',
+  'token-accepted': 'run',
+  'local-bin-on-path': 'client',
+};
+
+/** A piece of the area `client`, its cost as `CLIENT_COSTS` declares it. */
 const piece = (name: ClientPiece, state: ReadinessPiece['state'], message: string, command?: string): ReadinessPiece => ({
   name,
   area: 'client',
   state,
   message,
   fixes: command === undefined ? [] : [{ message, command, startable: false }],
+  cost: CLIENT_COSTS[name],
 });
 
 /** Whether `~/.local/bin` of `env`'s home is a folder of its PATH. */
@@ -80,12 +102,16 @@ const serverRead = (env: NodeJS.ProcessEnv): Promise<Readiness | 'refused'> =>
     env,
   );
 
-/** The read as this client prints it: the server's pieces where it answered, then the client's, and `ready` over them all. */
+/**
+ * The read as this client prints it: the server's pieces where it answered, then the client's, `ready` over them all, and whether a
+ * run was ever started on the server, as it answered.
+ */
 export async function readinessRead(env: NodeJS.ProcessEnv = process.env): Promise<Readiness> {
   const chosen = chosenOf(env);
   if (chosen.kind === 'refused') throw unheld(chosen.name);
   const pieces: ReadinessPiece[] = [];
   const client: ReadinessPiece[] = [];
+  let ran: boolean | undefined;
   if (chosen.kind === 'remote') {
     const reached = (await probe(chosen.server, env)) !== 'refused';
     client.push(
@@ -112,6 +138,7 @@ export async function readinessRead(env: NodeJS.ProcessEnv = process.env): Promi
     else {
       client.push(piece('token-accepted', 'met', `${chosen.server} takes the token of the context ${chosen.name}`));
       pieces.push(...read.pieces);
+      ran = read.ran;
     }
   } else {
     const read = await serverRead(env);
@@ -124,11 +151,14 @@ export async function readinessRead(env: NodeJS.ProcessEnv = process.env): Promi
           'nemia config set-context local --token-file <file>',
         ),
       );
-    else pieces.push(...read.pieces);
+    else {
+      pieces.push(...read.pieces);
+      ran = read.ran;
+    }
   }
   client.push(localBinPiece(env));
   const all = [...pieces, ...client];
-  return { ready: all.every((p) => p.state !== 'missing'), pieces: all };
+  return { ready: all.every((p) => p.state !== 'missing'), pieces: all, ...(ran === undefined ? {} : { ran }) };
 }
 
 /** The command that starts a startable fix of `p` from this client. */
@@ -155,14 +185,13 @@ function pieceLines(p: ReadinessPiece): string[] {
   ];
 }
 
-/** The read's lines: each area holding a piece, its pieces (`pieceLines`), and last whether it is ready. */
+/** The read's lines: each area holding a piece, its pieces (`pieceLines`), and last whether a run waits on it (`readinessSaid`). */
 export function readinessLines(read: Readiness): string[] {
   const lines = READINESS_AREAS.flatMap((area) => {
     const ofArea = read.pieces.filter((p) => p.area === area);
     return ofArea.length === 0 ? [] : [area, ...ofArea.flatMap(pieceLines)];
   });
-  const missing = read.pieces.filter((p) => p.state === 'missing').length;
-  return [...lines, '', read.ready ? 'ready' : `not ready: ${missing} piece${missing === 1 ? '' : 's'} missing`];
+  return [...lines, '', readinessSaid(read)];
 }
 
 /** What `nemia readiness fix` was typed with. */
@@ -341,5 +370,5 @@ export async function readiness(args: readonly string[], env: NodeJS.ProcessEnv 
   if (unknown !== undefined) throw misused(`it reads no ${unknown}`);
   const read = await readinessRead(env);
   process.stdout.write(args.includes('--json') ? `${JSON.stringify(read, null, 2)}\n` : `${readinessLines(read).join('\n')}\n`);
-  return read.ready ? 0 : 1;
+  return runsWait(read) ? 1 : 0;
 }

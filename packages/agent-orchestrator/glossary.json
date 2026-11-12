@@ -1032,7 +1032,7 @@
     },
     {
       "term": "Readiness",
-      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there: the harness's sign-in, the service and its linger, the bind, the machine, the place's and each workflow's needs, a factory, a newer release (`readinessOf`, `nemia readiness`, `GET /api/readiness`)."
+      "meaning": "the one read of what this server needs to run its factories, each piece in place, missing or unknown with the command or fix that puts it there and what it costs while missing (a run waits on it, which makes it not ready, or it keeps the server up or open, advised), and whether a run was ever started here: the harness's sign-in, the service and its linger, the bind, the machine, the place's and each workflow's needs, a factory, a newer release (`readinessOf`, `nemia readiness`, `GET /api/readiness`)."
     },
     {
       "term": "Tools folder",

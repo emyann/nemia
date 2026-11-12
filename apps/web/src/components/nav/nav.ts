@@ -37,7 +37,7 @@ const ownDefinitionAt = (path: string): { kind: 'agent' | 'skill'; name: string 
 
 /**
  * The tabs of Settings, in their order: what is set for the whole store, what the repository offers a step, and what the server needs
- * before a factory's first run.
+ * to run its factories.
  */
 const SETTINGS_TABS = [
   { to: '/settings', label: 'Settings' },

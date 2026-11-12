@@ -649,8 +649,9 @@ test(
       const { builtEngine } = await import('./engine.ts');
       const e = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
       const signedInByPlaceholder = { CLAUDE_CODE_OAUTH_TOKEN: 'a-placeholder-token' };
-      const config = { env: signedInByPlaceholder, claude: { frobnicate: true } };
-      const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, config }));
+      const id = await Effect.runPromise(
+        e.file({ brief: 'b', cwd: dir, config: { env: signedInByPlaceholder, claude: { frobnicate: true } } }),
+      );
       await until(
         t,
         async () => {

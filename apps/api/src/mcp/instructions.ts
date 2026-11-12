@@ -1,13 +1,13 @@
 /**
  * What the port says of itself on `initialize` (`PORT_INSTRUCTIONS`): what Nemia is, when its tools are the ones to search, and which
- * reads and verbs come first. A host that defers a server's tools (Claude Code's tool search, the MCP spec's progressive discovery)
+ * reads and verbs come first. A host that defers a server's tools (a tool search, the MCP spec's progressive discovery)
  * shows a model these words and the tools' names alone, so they say what a search should ask for. Generic: they name no factory,
  * repository or agent, and no tool the port does not list (`port.test.ts` holds both, and the bound a host cuts them at,
  * `INSTRUCTIONS_BOUND`).
  */
 import { RUN_STATES } from 'objects';
 
-/** The longest instructions Claude Code keeps whole: it cuts a server's instructions past this many characters. */
+/** The longest instructions a host that defers its tools keeps whole: it cuts a server's instructions past this many characters. */
 export const INSTRUCTIONS_BOUND = 4_096;
 
 /** The states a run's list is selected by (`fieldSelector`), as a sentence says them. */

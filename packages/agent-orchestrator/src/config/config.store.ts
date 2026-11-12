@@ -223,6 +223,13 @@ export const cgroupParent = (env: Env): string | undefined =>
 export const defaultFactoryStarts = (env: Env): boolean => env.WF_DEFAULT_FACTORY_STARTS === '1';
 
 /**
+ * `WF_EXPOSED`, whether the store is marked exposed — reached from beyond this machine, through a bind, a proxy or a tunnel — so that the
+ * api refuses every request that presents no token (`callerGate`): only with `1`, which whoever exposes the store sets. Unset, by
+ * default, a request with no token is the person.
+ */
+export const exposedStore = (env: Env): boolean => env.WF_EXPOSED === '1';
+
+/**
  * `WF_SESSION_TOKEN`, the token of the session a command runs in, which says who calls a verb that proposes in its place
  * (`sessionCaller`; `nemia factory resolve`): undefined, the person, where it is unset or empty.
  */
@@ -246,6 +253,7 @@ export type Settings = {
   readonly cgroupParent: string | undefined;
   readonly defaultFactoryStarts: boolean;
   readonly sessionToken: string | undefined;
+  readonly exposed: boolean;
 };
 
 /**
@@ -282,6 +290,9 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get sessionToken() {
     return sessionToken(env);
+  },
+  get exposed() {
+    return exposedStore(env);
   },
 });
 

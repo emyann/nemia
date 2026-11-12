@@ -1,7 +1,8 @@
 /**
- * The guard on every write, read as the pure function it is (`writeRefused`): the near misses of each of its three headers. Which
- * refusal a request meets, and in what order, is the contract's (`apps/api/contracts/write-guard.contract.ts`), proved; which spellings
- * of a name or a media type the two patterns take (`loopback`, `saysJson`), which the contract declares and does not read, is held here.
+ * The guard on every write, read as the pure function it is (`writeRefused`): the near misses of each of its three headers, and a bearer
+ * token that passes the host. Which refusal a request meets, and in what order, is the contract's
+ * (`apps/api/contracts/write-guard.contract.ts`), proved; which spellings of a name or a media type the two patterns take (`loopback`,
+ * `saysJson`), which the contract declares and does not read, is held here.
  * The middleware that applies it to every write is held by `test/guarded.test.ts`, over every endpoint of the `Api`.
  */
 import '../test/harness.ts';
@@ -9,9 +10,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { writeRefused } from './guard.ts';
 
-/** `writeRefused` of a POST, as the board sends a write but for what each case names. */
-const refused = (host: string | undefined, site: string | undefined, type: string | undefined) =>
-  writeRefused({ method: 'POST', host, site, contentType: type });
+/** `writeRefused` of a POST, as the board sends a write but for what each case names, presenting a bearer token where `bearer` is. */
+const refused = (host: string | undefined, site: string | undefined, type: string | undefined, bearer = false) =>
+  writeRefused({ method: 'POST', host, site, contentType: type, bearer });
 
 test('writeRefused: which of its three headers refuses a write, and in what order', async (t) => {
   await t.test(
@@ -69,7 +70,19 @@ test('writeRefused: which of its three headers refuses a write, and in what orde
       assert.equal(refused('evil.example', 'cross-site', 'text/plain'), 'host');
       assert.equal(refused('127.0.0.1', 'cross-site', 'text/plain'), 'site');
       for (const method of ['GET', 'HEAD'])
-        assert.equal(writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined }), null, method);
+        assert.equal(
+          writeRefused({ method, host: 'evil.example', site: 'cross-site', contentType: undefined, bearer: false }),
+          null,
+          method,
+        );
+    },
+  );
+
+  await t.test(
+    'a write that presents a bearer token passes the host, as one behind a proxy or a tunnel is addressed; REFUSED 403 without one',
+    () => {
+      assert.equal(refused('nemia.example.com', undefined, 'application/json', true), null);
+      assert.equal(refused('nemia.example.com', undefined, 'application/json'), 'host');
     },
   );
 });

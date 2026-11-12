@@ -1033,6 +1033,8 @@ test("wait re-runs a red ci's failed jobs once, and a green second time passes t
   assert.match(r.out, /test x: success/);
   assert.match(r.out, /ci: success/);
   assert.match(r.out, /nemia ci: `ci` passed on/);
+  assert.equal(asked(r.calls, 'run', 'list').length, 0, "a red is re-run as before, and the head's runs are never listed to dispatch");
+  assert.equal(asked(r.calls, 'workflow', 'run').length, 0);
 });
 
 test("red twice is refused as today, the work's, with the re-run said and the second attempt's logs", () => {
@@ -1108,6 +1110,83 @@ test('REFUSED with no re-run, as today, where none can be asked', () => {
   assert.doesNotMatch(cancelled.err, TAGGED, 'a cancelled ci judged nothing, and stays the person');
   assert.ok(!cancelled.calls.some((call) => call.argv.join(' ').includes('actions/runs/1234')), 'its attempt is not read');
   assert.equal(reruns(cancelled.calls).length, 0);
+});
+
+/**
+ * A job's annotations as `gh api repos/{owner}/{repo}/check-runs/<id>/annotations` answered them, as read off public runs:
+ * a job GitHub cut off at its `timeout-minutes` (thomhurst/TUnit, job 127347565906, conclusion `cancelled`, no other field marking it),
+ * and a job cancelled by its workflow's concurrency (nodejs/node, job 130581766469), each as GitHub gave it, its blob address shortened.
+ */
+const annotation = (line: number, message: string) => ({
+  path: '.github',
+  blob_href: 'https://github.com/o/r/blob/07f7cd91643ac54904ee05c3f7d798b6bd1cd6ab/.github',
+  start_line: line,
+  start_column: null,
+  end_line: line,
+  end_column: null,
+  annotation_level: 'failure',
+  title: '',
+  message,
+  raw_details: '',
+});
+const TIMED_OUT_NOTES = JSON.stringify([annotation(1, 'The job has exceeded the maximum execution time of 45m0s')]);
+const CANCELLED_NOTES = JSON.stringify([
+  annotation(1, 'Canceling since a higher priority waiting request for Test Linux-aix_shared_patch exists'),
+  annotation(90, 'The operation was canceled.'),
+]);
+
+/** The CI context `ci` as the one job of run 1234, `id`, cancelled: GitHub's conclusion for a job it cut off at its time limit too. */
+const cancelledCi = (id: number, at = T1) => job('ci', id, at, { status: 'COMPLETED', conclusion: 'CANCELLED' });
+
+/** The wait on a head whose rollup reads `outs`, run 1234 on its first attempt, each job's annotations answered by `notes`, by job id. */
+function cutOffThen(outs: string[], notes: Record<number, string>) {
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs },
+    ...Object.entries(notes).map(([id, out]): Rule => ({ when: `check-runs/${id}/annotations`, out })),
+    { when: 'actions/runs/1234', out: JSON.stringify({ id: 1234, run_attempt: 1 }) },
+    { when: 'run rerun' },
+    { when: 'actions/jobs', out: stamped(['Error: a test hung', 'The operation was canceled.']) },
+  ]);
+  return pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+}
+
+test("a ci job GitHub cut off at its timeout-minutes is red, re-run once, and the work's; one cancelled otherwise stays a person's", () => {
+  const passed = cutOffThen([checks(cancelledCi(5678)), checks(cancelledCi(5678), job('ci', 6678, T2, PASSED_RUN))], {
+    5678: TIMED_OUT_NOTES,
+  });
+  assert.equal(passed.code, 0, passed.err);
+  assert.deepEqual(
+    reruns(passed.calls).map((call) => call.argv),
+    [['run', 'rerun', '1234', '--failed']],
+    'the timed-out job is re-run once, as any red',
+  );
+  assert.ok(
+    asked(passed.calls, 'api').some((call) => call.argv[1]?.startsWith('repos/{owner}/{repo}/check-runs/5678/annotations')),
+    "the mark is read off the job's annotations",
+  );
+
+  const twice = cutOffThen([checks(cancelledCi(5678)), checks(cancelledCi(5678), cancelledCi(6678, T2))], {
+    5678: TIMED_OUT_NOTES,
+    6678: TIMED_OUT_NOTES,
+  });
+  assert.equal(twice.code, 1, twice.out);
+  assert.equal(reruns(twice.calls).length, 1, 'never a second re-run');
+  assert.doesNotMatch(twice.err, TAGGED, 'the exit says whose it is, no line does');
+  assert.ok(
+    asked(twice.calls, 'api').some((call) => call.argv[1] === 'repos/{owner}/{repo}/actions/jobs/6678/logs'),
+    'its log is read',
+  );
+
+  const cancelled = cutOffThen([checks(cancelledCi(5678))], { 5678: CANCELLED_NOTES });
+  assert.equal(cancelled.code, PERSONS, cancelled.out);
+  assert.equal(reruns(cancelled.calls).length, 0, 'a job cancelled by concurrency or a person is not re-run');
+
+  for (const unread of [{ 5678: 'not json' }, {}] as Record<number, string>[]) {
+    const r = cutOffThen([checks(cancelledCi(5678))], unread);
+    assert.equal(r.code, PERSONS, `annotations that cannot be read mark nothing: ${r.out}`);
+  }
 });
 
 test("build's implement check, rendered on GitHub, pushes through the script before the round check, labelling by the rules it was set, waits last on the CI context it was set, and runs no suite and no e2e itself", async () => {
@@ -1310,4 +1389,141 @@ test("the wait's two bounds: the start within the whole, and both under a round 
       'probe, the push and the round check — have what is left, and 900 s is the least that is honest. Re-measure the ' +
       'deadline (CHECK_DEADLINE_SECONDS, agent-orchestrator/run) before you raise the wait.',
   );
+});
+
+/** The workflow run of the head that GitHub queued and never started, and the run a dispatch of its workflow made. */
+const STUCK = 4309;
+const DISPATCHED_URL = 'https://github.com/o/r/actions/runs/4400';
+
+/** The head's workflow runs as `gh run list --commit <sha> --json` gives them: `ci` queued, `release-label` over. */
+const HEAD_RUNS = [
+  { databaseId: STUCK, workflowName: 'ci', status: 'queued', event: 'pull_request' },
+  { databaseId: 4310, workflowName: 'release-label', status: 'completed', event: 'pull_request' },
+];
+
+/** The rollup entry of the dispatched run's `ci`, which links the run, not a job, as GitHub gives a `workflow_dispatch` run's. */
+const dispatched = (rest: Record<string, unknown>, startedAt = T2) => ({
+  name: 'ci',
+  workflowName: 'ci',
+  detailsUrl: DISPATCHED_URL,
+  startedAt,
+  ...rest,
+});
+
+/**
+ * The wait in a place whose rollup reads `outs`, whose head's runs are `runs` with run `STUCK`'s jobs `jobs`, and whose `rules` come
+ * first; the half of the start bound at which it looks for a stuck run is `stuck` seconds.
+ */
+function stuckThen(outs: string[], { runs = HEAD_RUNS, jobs = [] as unknown[], rules = [] as Rule[], stuck = '0' } = {}) {
+  const at = placed();
+  at.gh.answers([
+    ...rules,
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs },
+    { when: 'run list', out: JSON.stringify(runs) },
+    { when: `actions/runs/${STUCK}/jobs`, out: JSON.stringify({ total_count: jobs.length, jobs }) },
+    { when: `actions/runs/${STUCK}`, out: JSON.stringify({ id: STUCK, path: '.github/workflows/ci.yml', run_attempt: 1 }) },
+  ]);
+  const env = { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' };
+  return pr(at, 'wait', CI, stuck ? { ...env, WF_CI_STUCK_SECONDS: stuck } : env);
+}
+
+/** The calls that dispatched a workflow. */
+const dispatches = (calls: readonly Called[]): Called[] => asked(calls, 'workflow', 'run');
+
+test('a run GitHub queued and never started is dispatched once on the branch, and the check passes on the dispatched run', () => {
+  const r = stuckThen([checks(), checks(), checks(), checks(dispatched(PASSED_RUN))]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(
+    dispatches(r.calls).map((call) => call.argv),
+    [['workflow', 'run', 'ci.yml', '--ref', 'wf/r-1/run']],
+    "the stuck run's own workflow, by its file, once, though the context stayed absent after it; release-label, over, is not",
+  );
+  assert.match(r.out, new RegExp(`dispatched ci once .*${STUCK}`), 'the pass says what was dispatched');
+
+  const early = stuckThen([checks(), rollup(PASSED_RUN)], { stuck: '' });
+  assert.equal(early.code, 0, early.err);
+  assert.equal(asked(early.calls, 'run', 'list').length, 0, 'before half the start bound, no run is looked for');
+
+  const started = stuckThen([checks(), checks(), rollup(PASSED_RUN)], { jobs: [{ id: 1, name: 'test', status: 'in_progress' }] });
+  assert.equal(started.code, 0, started.err);
+  assert.equal(dispatches(started.calls).length, 0, 'a queued run with a job started is not stuck');
+
+  const runs = [...HEAD_RUNS, { databaseId: 4400, workflowName: 'ci', status: 'queued', event: 'workflow_dispatch' }];
+  const again = stuckThen([checks(), rollup(PASSED_RUN)], { runs });
+  assert.equal(again.code, 0, again.err);
+  assert.equal(dispatches(again.calls).length, 0, 'a workflow already dispatched on this head is never dispatched twice');
+});
+
+test("REFUSED, a person's: a dispatch GitHub refuses names the stuck run and the dispatch to type, with each required input, then the retry", () => {
+  const yaml = [
+    'name: ci',
+    'on:',
+    '  pull_request:',
+    '  workflow_dispatch:',
+    '    inputs:',
+    '      reason:',
+    '        description: why',
+    '        required: true',
+    '      dry:',
+    '        required: false',
+    'jobs:',
+    '  test:',
+    '    runs-on: ubuntu-latest',
+  ].join('\n');
+  const r = stuckThen([checks()], {
+    rules: [
+      { when: 'workflow run', status: 1, err: 'HTTP 422: Required input reason not provided' },
+      { when: 'workflow view', out: yaml },
+    ],
+  });
+  assert.equal(r.code, PERSONS, r.out);
+  assert.equal(dispatches(r.calls).length, 1);
+  assert.ok(r.err.includes(String(STUCK)), `the stuck run is named:\n${r.err}`);
+  assert.ok(r.err.includes('gh workflow run ci.yml --ref wf/r-1/run -f reason=<value>'), `the command, its required input:\n${r.err}`);
+  assert.ok(!r.err.includes('-f dry'), 'an input not required is not asked');
+  assert.ok(r.err.includes(RETRY), r.err);
+  assert.ok(r.err.indexOf('gh workflow run') < r.err.indexOf(RETRY), 'the dispatch comes before the retry');
+});
+
+test("a dispatched run's red, whose rollup entry links the run and not a job, is re-run once and refused with its failing jobs' lines", () => {
+  const jobUrl = (id: number) => `${DISPATCHED_URL}/job/${id}`;
+  const at = placed();
+  at.gh.answers([
+    ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
+    { when: 'pr view', outs: [checks(dispatched(FAILED, T1)), checks(dispatched(FAILED, T2))] },
+    {
+      when: 'actions/runs/4400/jobs',
+      out: JSON.stringify({
+        jobs: [
+          { id: 9901, name: 'test words', status: 'completed', conclusion: 'failure', html_url: jobUrl(9901) },
+          { id: 9902, name: 'lint', status: 'completed', conclusion: 'success', html_url: jobUrl(9902) },
+        ],
+      }),
+    },
+    { when: 'actions/runs/4400', out: JSON.stringify({ id: 4400, run_attempt: 1 }) },
+    {
+      when: 'actions/jobs/9901/logs',
+      out: stamped([
+        'templates:test: ✖ failing tests:',
+        'templates:test: test at test/words.test.ts:3:1',
+        'templates:test: ✖ no word of the repository (2ms)',
+        'templates:test:   AssertionError [ERR_ASSERTION]: a word',
+      ]),
+    },
+  ]);
+  const r = pr(at, 'wait', CI, { WF_CI_WAIT_SECONDS: '60', WF_CI_START_SECONDS: '60', WF_CI_POLL_SECONDS: '0' });
+  assert.equal(r.code, 1, r.out);
+  assert.deepEqual(
+    reruns(r.calls).map((call) => call.argv),
+    [['run', 'rerun', '4400', '--failed']],
+    'its run is re-run once, as a pull_request run is',
+  );
+  assert.doesNotMatch(r.err, /not re-run/);
+  assert.match(r.err, /re-ran .* run 4400/);
+  assert.match(r.err, /test words: FAILURE/, 'the failing job is listed, read from its run');
+  assert.ok(!r.err.includes('  lint: '), 'a job that passed is not');
+  assert.ok(r.err.includes('test words (job 9901)'), r.err);
+  assert.ok(r.err.includes('✖ no word of the repository'), `the failing test's lines:\n${r.err}`);
+  assert.ok(r.err.includes(RETRY), r.err);
 });

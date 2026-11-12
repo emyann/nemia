@@ -44,6 +44,7 @@ export const SAY: Command<
   SayInput
 > = {
   name: 'say',
+  served: [{ endpoint: 'runs.say' }],
   usage: '<runId> <step> [--as <name>] "<words>"',
   help: [
     "tell a step's running session something, through its harness: the",

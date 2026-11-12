@@ -25,6 +25,7 @@ import {
 } from './words.ts';
 import { SubscriptionScope } from './subscription.ts';
 import { SessionReleaseSchema } from './run.ts';
+import { Event } from './event.ts';
 
 /** A part of an answer said as JSON, typed by its own reader. */
 const Json = Schema.Unknown;
@@ -418,6 +419,33 @@ export const FeedQuery = {
   until: Schema.optionalKey(Schema.String),
 };
 
+/** Why a wait ended: `matched`, a line a label query takes was read; `bound`, its bound came with none. */
+export const FEED_WAIT_ENDS = ['matched', 'bound'] as const;
+
+/** One of `FEED_WAIT_ENDS`. */
+export type FeedWaitEnd = (typeof FEED_WAIT_ENDS)[number];
+
+/**
+ * What `GET /api/feed/wait` (`nemia wait`) answers: why it ended, the lines its label queries took (none at its bound), each an
+ * `Event`, and the cursor after the last line it read, from which the next wait starts and loses no line.
+ */
+export const FeedWait = Schema.Struct({
+  ended: Schema.Literals(FEED_WAIT_ENDS),
+  lines: Schema.Array(Event),
+  cursor: Schema.String,
+}).annotate({ identifier: 'FeedWait' });
+export type FeedWait = typeof FeedWait.Type;
+
+/**
+ * `GET /api/feed/wait`'s query: `labelSelector`, a label query given once or again (`-l`), each kept as `nemia watch -l` takes it;
+ * `from`, the cursor to read from (the feed's end when none); `for`, the bound as `nemia wait --for` takes it (`30s`, `4m`).
+ */
+export const FeedWaitQuery = {
+  labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
+  from: Schema.optionalKey(Schema.String),
+  for: Schema.optionalKey(Schema.String),
+};
+
 /** A query of the place a request is answered in, which a route of the server reads: the factory and the repository it names. */
 const placeQuery = { factory: Schema.optionalKey(Schema.String), repo: Schema.optionalKey(Schema.String) };
 
@@ -461,6 +489,7 @@ export class ServerGroup extends HttpApiGroup.make('server').add(
     error: [BadRequest, Conflict, Invalid, Failed],
   }),
   HttpApiEndpoint.delete('resume', '/api/pause', { success: Resumed, error: [Missing, Failed] }),
+  HttpApiEndpoint.get('wait', '/api/feed/wait', { query: FeedWaitQuery, success: FeedWait, error: [BadRequest, Invalid] }),
   HttpApiEndpoint.get('feed', '/api/feed/stream', {
     query: FeedQuery,
     headers: { 'last-event-id': Schema.optionalKey(Schema.String) },

@@ -11,6 +11,7 @@ import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from
 import { bodyOf, MOUNT, mount, noRoute, refusedAs, statusOf } from './objects/index.ts';
 import { writeGuard } from './guard.ts';
 import { openapi, REFERENCE_BUNDLE, referenceOf } from './openapi/index.ts';
+import { mcpPort } from './mcp/index.ts';
 import { saidRequest } from './request/request.ts';
 import { Followings } from './steps/index.ts';
 import { Engine } from './store.ts';
@@ -74,7 +75,8 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  * in the folder of its group (runs/, steps/, decide/, server/, nemia/, workflows/, agents/, skills/, factory/, proposals/, objects/),
  * each calling the package's verbs by type, and a GET answering a `…List` watched on `?watch=true` (watch/watch.ts) and a `Table` where
  * the request accepts one (objects/table.ts). Only the three OpenAPI routes stay outside it: the document, its page and the page's
- * script (openapi/). A path neither serves is the api's own 404 (`noRoute`).
+ * script (openapi/); and the MCP port, `/mcp` (`mcpPort`, mcp/port.ts), a protocol host whose tools call the `Api`'s endpoints through
+ * this app's own `fetch`, mounted before the `Api`. A path none serves is the api's own 404 (`noRoute`).
  *
  * Before any of them, every request says one line and is traced as a server span (`saidRequest`, request/request.ts); who it is from is
  * resolved (`callerGate`, caller/caller.ts: the person with no `Authorization`, an agent's session by the token it presents, a token
@@ -84,7 +86,7 @@ const viewerScript = () => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'));
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);
-  const app = new Hono<ApiEnv>()
+  const app: Hono<ApiEnv> = new Hono<ApiEnv>()
     .use(async (c, next) => {
       c.set('runtime', runtime);
       await next();
@@ -94,6 +96,10 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .use(writeGuard)
     .route('/', openapi)
     .route('/', referenceOf(viewerScript))
+    .all(
+      '/mcp',
+      mcpPort(() => app),
+    )
     .all(MOUNT, mount(runtime))
     .notFound(noRoute)
     .onError(answerError);

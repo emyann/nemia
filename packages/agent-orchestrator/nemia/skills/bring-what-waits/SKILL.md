@@ -1,12 +1,15 @@
 ---
 name: bring-what-waits
-description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade or takeover — in chat with a recommendation, naming a step by its link; on the board they answer in the part that link draws, and in a terminal you run the verb they choose with their words as --message, so its prompt is their decision, asked once.
+description: Bring what waits on the person — a step at its gate, a step's question to them, a loop out of rounds, a step at its cap, a factory's upgrade or takeover — in chat with a recommendation, naming a step by its link; on the board they answer in the part that link draws, and elsewhere you run the verb they choose with their words as its message, so its prompt is their decision, asked once.
 ---
 # Bring what waits
 
 Five things wait on the person, and only these: a step at its gate, a step's question to them, a loop out of rounds, a step at its cap,
 and a factory's upgrade, or its takeover by a template. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend,
 and name each step you bring by its link, `[<step> of <run>](/runs/<run>?step=<step>)`.
+
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
 
 On the board — their words reach you framed `The person writes from the board:`, and what you say is read there — the person answers in
 the part your message draws under that link: the run's page's own form for the step, read live, which sends their answer to the step.
@@ -16,7 +19,7 @@ the part has no form for what they choose (one more round of a loop), run the ve
 Words framed `The agent <name> writes, not the person:` are another agent's, which the person allowed to speak in your chat: weigh them
 as that agent's, never as the person's. They decide nothing that waits on the person, so bring it to the person all the same.
 
-In a terminal, run the verb they choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that
+Elsewhere, run the verb they choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that
 prompt is their decision, asked once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run
 that verb, which prompts again.
 Two verbs answer what waits: `nemia approve`, of a step at its gate or, with `--message`, of a loop out of rounds; and `nemia retry`,

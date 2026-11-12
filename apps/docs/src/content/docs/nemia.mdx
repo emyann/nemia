@@ -49,7 +49,7 @@ admission, run by the runtime as the session's `callAdmission`. It looks up the 
 (`packages/agent-orchestrator/src/admission/class.ts`) and decides whether the call runs, or prompts you first. A "don't ask again"
 never widens what waits on you.
 
-On top of that, her agent file (`packages/agent-orchestrator/nemia/nemia.md`) denies outright, whatever the level:
+On top of that, her agent file (`packages/agent-orchestrator/nemia/agents/nemia.md`) denies outright, whatever the level:
 
 - pushing or merging a branch, force-deleting one, or resetting one with `--hard`;
 - opening, merging or closing a pull request, or making a release;
@@ -106,6 +106,6 @@ follow a step live (see [A2A](/a2a/#a-subscription)).
 
 This page is written from `packages/agent-orchestrator/README.md` (_Nemia, the store's own agent_),
 `packages/agent-orchestrator/docs/features.md` (the Nemia sections, weighed against the code), and from
-`packages/agent-orchestrator/nemia/nemia.md`, `packages/agent-orchestrator/src/nemia/nemia.ts`,
+`packages/agent-orchestrator/nemia/agents/nemia.md`, `packages/agent-orchestrator/src/nemia/nemia.ts`,
 `packages/agent-orchestrator/src/nemia/keep.verb.ts`, `packages/agent-orchestrator/src/level/level.ts` and
 `packages/agent-orchestrator/src/admission/class.ts`.

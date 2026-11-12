@@ -684,3 +684,20 @@ export const Api = HttpApi.make('nemia')
   .add(DiscoveryGroup)
   .add(ServerGroup)
   .add(NemiaGroup);
+
+/** The groups `Api` holds. */
+type GroupsOf<A> = A extends HttpApi.HttpApi<string, infer G> ? G : never;
+
+/** Each endpoint of a group as `<group>.<endpoint>`. */
+type EndpointNamesOf<G> =
+  G extends HttpApiGroup.HttpApiGroup<infer Id extends string, infer E, boolean>
+    ? E extends { readonly identifier: infer N extends string }
+      ? `${Id}.${N}`
+      : never
+    : never;
+
+/**
+ * The name of an endpoint of `Api`, `<group>.<endpoint>` (`runs.hold`, `server.wait`): what a link to one is typed by, so that a name no
+ * endpoint has does not compile.
+ */
+export type ApiEndpointName = EndpointNamesOf<GroupsOf<typeof Api>>;

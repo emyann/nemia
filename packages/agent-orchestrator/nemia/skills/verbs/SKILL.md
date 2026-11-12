@@ -5,7 +5,8 @@ description: Every nemia verb you run, by who answers for it — a read, yours u
 # The verbs
 
 Every verb `nemia` serves you, by who answers for it, with its usage and help as `nemia --help` prints them. `nemia <verb> --help`
-says more of one that has a manual.
+says more of one that has a manual. With a shell, run `nemia <verb>`; on the MCP port, call the tool its `on the port` line names,
+whose schema says its arguments. A verb said `CLI only` runs at a shell alone, for the reason given.
 
 Generated from the command table, never edited by hand: from the repository's root, `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
 
@@ -16,17 +17,21 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 ```text
   nemia concluded <runId>
                                what a run started with --from <runId> would be handed of it, now
+                               on the port: concluded
   nemia inbox
                                the cards still in play: name, first line, workflow and repo when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
                                run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
                                their labels on each line
+                               on the port: inbox
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its
                                repositories (nemia factory --help)
+                               on the port: factory
   nemia factory ls
                                the same, by its name
+                               CLI only: the api lists the factories as the Factory's `listAll`: ls is the command line's second name for it
   nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; onto a template of another name, a switch
@@ -34,8 +39,10 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                template, and the plan nemia factory adopt takes; nothing is written.
                                To change a parameter alone: --to the version applied, and
                                --set <key>=<value> for each; it prints the line that files it
+                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
   nemia factory servers <factory>
                                a factory's own MCP servers, each with the state its harness reports
+                               on the port: factory_servers
   nemia factory rules <name> [--file <path>|- | --clear]
                                a factory's rules and policies: words told to every agent hired into
                                it, after its custom instructions and before the step's own note,
@@ -43,6 +50,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                them (- for stdin); --clear removes them. Words only: a frontmatter
                                block is refused. A run keeps the rules it was started with
                                reads bare; prompts the person given --file, --clear
+                               on the port: factory_rules, factory_rules_put, factory_rules_delete
   nemia factory instruction <name> [--path <path> | --store | --clear]
                                where a factory's instruction is kept, what Nemia is to know of the
                                factory (its agents are told its rules: nemia factory rules): bare,
@@ -50,9 +58,11 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                --store keeps it in the store, --clear reads NEMIA.md in the first
                                folder again
                                reads bare; prompts the person given --path, --store, --clear
+                               on the port: factory_instruction, factory_instruction_put, factory_instruction_delete
   nemia template lint <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
                                file and line
+                               CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
   nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
@@ -65,13 +75,17 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                the pause. -l: the runs whose labels a selector takes (team=core,
                                given again for another); --show-labels: each run with its labels;
                                -L <key>: that label beside each run, given again for another
+                               on the port: ls, ls_run
   nemia show <runId> [--raw]
                                the run as one object (nemia/v1 Run); --raw: its record, and
                                what each step was told
+                               on the port: show
   nemia closeout <runId> <step> [--try <n>]
                                what a step's try signed off with: its latest, or --try <n>
+                               on the port: closeout
   nemia logs <runId> <step>
                                that step's session output
+                               on the port: logs
   nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
@@ -80,30 +94,36 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                against the 14 before. A number nothing measured reads —, never 0.
                                --line: one line, for a recap; --json: the whole answer; -l: the
                                runs whose labels a selector takes, as nemia ls -l takes them
+                               on the port: stats
   nemia passes [--last <n>] [--json]
                                what the recent passes of the tick cost: their median and slowest
                                time, a histogram of their times, where the time went phase by
                                phase, and what the last saw — the runs in the store, its journal
                                reads, the sessions queued and admitted. --last <n>: the last n
                                passes only; --json: the whole answer
+                               on the port: passes
   nemia series [--range 24h|7d|30d|all] [--json]
                                the system's series over a range: a pass's time and its phases, its
                                journal reads, the runs in the store, the sessions queued and admitted
                                and the longest wait, the load, and the quota used. --range: 24h (a
                                point a minute, the default), 7d or 30d (an hour), all (a day);
                                --json: the whole answer
+                               on the port: series
   nemia agents [--repo .]
                                the agents a step may name, the repository's then yours: what each is
                                for, what it says it can do (an entry for each skill, read off its
                                SKILL.md), and the skills it is given (its skills:)
+                               on the port: agents
   nemia agents card <name> [--repo .] [--from repo|yours]
                                that agent in the shape of an A2A Agent Card, JSON on stdout and
                                nothing else — every field the protocol marks REQUIRED but
                                supportedInterfaces, which is left out because nothing here serves an
                                agent over A2A. The card describes; it is not an address
+                               on the port: agents_card
   nemia agents sources [--path <folder>]
                                the agent files the store knows of, to copy into your library:
                                each repository's, yours, and those of a --path <folder>
+                               on the port: agents_sources
   nemia agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told
@@ -112,6 +132,16 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                refused. A run keeps the words it was started with; nemia, the
                                store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
+                               on the port: agents_custom, agents_custom_put, agents_custom_delete, nemia_instructions, nemia_instructions_put, nemia_instructions_delete
+  nemia wait [-l <selector>]... [--from <cursor>] [--for <duration>]
+                               wait for the feed's next line a selector takes, and print it with the
+                               cursor after it: from --from (a cursor a wait or nemia watch printed),
+                               else from the feed's end now. It ends on the first lines a selector
+                               takes, or after --for (4m by default, at most 270s) with none, and
+                               prints the cursor either way: wait again from it and no line is lost.
+                               -l: as nemia watch -l takes it, given again for another; none takes
+                               every line.
+                               on the port: wait
   nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]
                                Nemia, the store's own agent: bare, where she is, each factory's level and
                                how to reach her; a level sets the store's, which every factory follows
@@ -126,29 +156,39 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                auto once it is off). A factory at manual is left alone, and her session
                                stops once none is above manual
                                reads bare; prompts the person given manual, semi-auto, auto, --factory, --for, --end
+                               on the port: level, level_set
   nemia memory [<fact>]
                                what Nemia keeps of the store: bare, her facts' names; given one, its
                                words. Read only: her session alone writes them
+                               on the port: memory, memory_fact
   nemia policy <agent>
                                the agent's rules at auto: the answers it may give unasked, in force once
                                you confirm them, and what it proposed from your custom instruction,
                                with the words the machinery cannot hold, kept as guidance
+                               on the port: policy
   nemia policy reach <agent> (--factory <name> | --run <runId>)
                                which steps at their gate the agent's rules in force could ever approve
                                unasked, in a factory or a run: why each other rule cannot (a step approved
                                before it runs has done nothing to recommend or check; one with no check
                                never passed one), what keeps a rule from a run now, and the rules that would
+                               CLI only: an agent reads it from its session; the board draws no part for it yet
   nemia chat speakers
                                the names an agent may speak under in her chat, each one you allowed
+                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
+                               CLI only: it writes or reads the person's login services, on the machine the command runs on
+  nemia token ls
+                               your tokens, by name, with when each was minted: never a token itself
+                               CLI only: a token is minted where the store is and printed once to the person there; a caller of the port holding one token mints and revokes no other
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;
                                the release the store's releases/current names; and the release the
                                daemon runs, from its lease, and whether it promises to keep a running
                                session on its files; and the sessions at work by release and harness
                                version, off their records. --json: the whole answer
+                               CLI only: it says which code the command runs from; the api answers its own at GET /api/version
   nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
                                the feed's lines, followed as the tick writes them, until ^C, and a
                                daemon down line when nothing ticks the store, daemon up when it does
@@ -166,14 +206,17 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                A line's reason is a step's code as the api gives the step (reason);
                                its word and message are for people: select on the reason, never on
                                the words.
+                               CLI only: it follows the feed on a terminal until ^C; the board reads what changed from the api
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
                                --at-least: deny a call acting on a run or a factory below the level;
                                --auto: let through, for a run of a factory at auto, an answer the agent's
                                rules you confirmed allow in the run as it stands (nemia policy <agent>)
+                               CLI only: a session's hook asks it before each call, on its own machine
   nemia decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (nemia decide --help)
+                               on the port: decide
 ```
 
 ## Yours
@@ -218,27 +261,34 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                inbox, listed as started: --workflows is its workflow:
                                unless given, --repo its repo:, --factory its factory:, and a card
                                that names no factory either way is refused
+                               on the port: start, inbox_start
   nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
+                               on the port: inbox_add
   nemia inbox queue <name> [--workflow <w>] [--off]
                                mark a card to start on its own: the tick starts the oldest queued
                                card once a run slot is free; --off takes the mark back
+                               on the port: inbox_queue, inbox_unqueue
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
+                               CLI only: the command line's alone: the api writes a card's `from:` with the rest of it, the Card's `update` of `objects`' Api (`replaceCard`), never through this handler
   nemia label run <runId> <key=value|key->... [--overwrite]
                                edit a run's labels: key=value sets a key, key- removes it; changing a
                                value takes --overwrite. nemia ls -l selects by them, and the feed's
                                lines written after carry them
+                               on the port: label_run
   nemia label inbox <name> <key=value|key->... [--overwrite]
                                edit an inbox card's labels: key=value sets a key, key- removes it;
                                changing a value takes --overwrite. nemia inbox -l selects by them, and
                                the run the card starts is created with them
+                               on the port: label_inbox
   nemia route <runId> <condition> <route>
                                route a condition by hand: the next tick takes your route over the
                                condition's own answer, for the try it is on, and files the nodes
                                whose when: names it. Refused once a node after it is filed or sent:
                                nemia cancel <runId>, and start again.
+                               CLI only: the board offers no route control yet: nemia route writes the file
   nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
@@ -253,6 +303,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                cleanly goes back to merge it, once, on the next tick, on the round it
                                is on, which the merge does not spend; the step is the one that closes
                                the loop, left out where the run has one loop
+                               on the port: refresh
   nemia say <runId> <step> [--as <name>] "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
@@ -262,9 +313,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                (WF_SESSION_TOKEN); an agent with none says --as <name> before its
                                words, a name the person allowed with nemia chat allow. An agent's
                                words reach the step under its name, never as yours
+                               on the port: say
   nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
                                capped at $1
+                               on the port: agents_run
   nemia hold <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
                                file nothing more of a run until other runs land, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
@@ -280,6 +333,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                said; --by: who puts the hold (default: your OS user).
                                nemia hold <runId> --off: lift the hold now, and the next tick goes on as
                                if it had never been put
+                               on the port: hold, unhold
   nemia pause [--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]
                                pause the store: no pass starts new work — no step, try, round or
                                check filed, no queued task admitted, no queued card started — and
@@ -302,9 +356,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                each check is asked to stop and run again. A pause that stands is kept.
                                --yes: with --now, act; without it, --now only says what it would
                                cut
+                               on the port: pause
   nemia resume
                                resume the store: each session parked goes on as the same try, and the
                                next pass files what waits
+                               on the port: resume
   nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
                                named <name>, from its end: a line one of its selectors takes is said to
@@ -315,16 +371,20 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                long-lived.
                                --at-least: only the lines of runs whose factory's level is at least
                                this (manual, semi-auto, auto), read as each line is delivered.
+                               on the port: subscribe
   nemia unsubscribe <name>
                                take the subscription <name> away: its task is told nothing more of the feed
+                               on the port: unsubscribe
   nemia policy propose <agent> --file <path>|-
                                the agent's proposal: rules from your custom instruction, as JSON,
                                with the words the machinery cannot hold kept as guidance; none is in
                                force until you confirm it (nemia policy confirm)
+                               CLI only: the agent proposes from its own session; the board shows the proposal and confirms its rules
   nemia daemon [--json]
                                the store's daemon, started where none ticks it (as any command that
                                ticks starts it, unless NEMIA_DAEMON_START=off): its state, its pid and
                                the url the api serves at, from its lease. --json: the whole answer
+                               CLI only: the api is the daemon: it answers where it stands at GET /api/daemon
 ```
 
 ## Prompts the person
@@ -334,20 +394,25 @@ Each asks the person at a prompt every time it runs: say what it does before you
 ```text
   nemia inbox rm <name>
                                drop a card without starting it
+                               on the port: inbox_rm
   nemia factory add <name> --repo <path> [--repo <path> ...] [--no-trust]
                                file a factory: a lowercase slug naming one or more directories,
                                each trusted for its steps unless --no-trust
+                               CLI only: the board files, attaches to and removes no factory: nemia factory does
   nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]
                                make a factory from a template that passes its check, its parameters
                                given with --set; the daemon renders its tree
+                               CLI only: a template is a folder on the machine nemia runs on; the board applies none
   nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
                                take a hand-made factory over by a template, in place, as nemia factory
                                diff previewed it: its name, cards, runs and stats stay
+                               CLI only: a template is a folder on the machine nemia runs on; the board takes over no factory
   nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]
                                upgrade a templated factory: its file wants --to, and the daemon merges
                                the template's change into its tree once each conflict is resolved;
                                with --to the version applied and --set, a change of its parameters
                                alone, filed with the --plan nemia factory diff printed for it
+                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
   nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>
                                choose for one conflict of a templated factory's upgrade or switch: your
                                tree, the template (none: drop the file), or the text of a file; once
@@ -355,76 +420,103 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                instruction has one, that object is proposed as they compose it, to
                                approve (nemia proposals approve <p> -n <name>); a carried file stays
                                a choice; the daemon merges once each has one and each proposal applied
+                               CLI only: a template is a folder on the machine nemia runs on; the board upgrades none
   nemia factory attach <factory> <workflow>
                                offer a workflow in a factory, by its folder's name: a factory offers
                                only the workflows attached to it
+                               CLI only: the board files, attaches to and removes no factory: nemia factory does
   nemia factory detach <factory> <workflow>
                                take a workflow back, once no hire fills its steps
+                               CLI only: the board files, attaches to and removes no factory: nemia factory does
   nemia factory hire <factory> <agent> --step <workflow>/<step>
                                hire an agent into a workflow's step: one a step, a second replaces it
+                               on the port: factory_hire
   nemia factory fire <factory> --step <workflow>/<step>
                                take a step's hire back
+                               on the port: factory_fire
   nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
                                start a run of an attached workflow at each fire of a cron, by the
                                daemon, at every level; a second replaces the first
+                               on the port: factory_schedule
   nemia factory unschedule <factory> <workflow>
                                take a workflow's schedule back: the daemon starts it no more
+                               on the port: factory_unschedule
   nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]
                                record a remote MCP server for a factory: its steps' sessions are
                                handed it, and an agent `mcp:` line names it
+                               on the port: factory_server_add
   nemia factory server rm <factory> <server>
                                take a server off a factory's record
+                               on the port: factory_server_rm
   nemia factory volume add <factory> <path>:ro|:rw
                                mount a folder of this machine for every local step of a factory's runs,
                                read-only (:ro) or writable (:rw); a writable one is not a run's workspace
+                               CLI only: the board lists volumes and writes none: nemia factory volume writes them
   nemia factory volume rm <factory> <path>
                                take a volume off a factory, by its path
+                               CLI only: the board lists volumes and writes none: nemia factory volume writes them
   nemia factory setting set <factory> <harness>.<key> <json>
                                give every session of a factory's runs on a harness one of its settings,
                                claude.attribution among them; its value is JSON
+                               CLI only: the board shows no harness setting yet: nemia factory setting writes them
   nemia factory setting rm <factory> <harness>.<key>
                                take a harness setting off a factory, by its key
+                               CLI only: the board shows no harness setting yet: nemia factory setting writes them
   nemia factory cost-line set <factory> <workflow> <usd>
                                set what a run of a workflow may cost before its gate says so, in dollars:
                                a gate whose caps pass it is said, and never approved unasked at auto
+                               on the port: factory_cost-line_set
   nemia factory cost-line rm <factory> <workflow>
                                take a workflow's cost line off a factory
+                               on the port: factory_cost-line_rm
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear
+                               on the port: factory_instruct, factory_instruct_delete
   nemia factory revisions <name> follow|pinned
                                whether a factory's runs follow merged revisions at each filing (follow)
                                or keep them until nemia refresh (pinned, the default)
+                               CLI only: the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it
   nemia factory trust <name>
                                trust a factory's places for the harnesses its steps run on, so each
                                place's own settings apply to them
+                               CLI only: the board trusts no place: it shows the line to type, and nemia factory trust does it
   nemia factory rm <name>
                                remove a factory's file, and the instruction and the rules the store
                                keeps for it
+                               CLI only: the board files, attaches to and removes no factory: nemia factory does
   nemia template export <folder> --from <repo> [--factory <name>]
                                write a template from a repository and a factory, and say where each
                                part came from
+                               CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
   nemia template pack <folder> [--out <file>]
                                pack a template's folder that passes its check into one archive, and print
                                the digest of its content
+                               CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
   nemia template unpack <archive> <dir>
                                write the folder a template's archive holds at <dir>/<name>, each file's
                                bytes and mode as packed
+                               CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
   nemia agents write (yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]
                                an agent of yours, or of a templated --factory, written from its file:
                                <name> is the agent it changes or renames, at the --version it was
                                read at; none, a new one
+                               on the port: agents_write, agents_replace
   nemia agents copy <file> [--as <name>] [--keep <part>]...
                                an agent file copied into your library, with its schema and skills;
                                a part your library holds otherwise stops it: --as or --keep
+                               on the port: agents_copy
   nemia agents rm yours <name> --version <v>
                                an agent of yours removed, at the --version it was read at
+                               on the port: agents_rm
   nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
                                a skill of yours, or of a templated --factory, written from its
                                SKILL.md: <name> is the skill it changes, at the --version it was
                                read at; none, a new one
+                               on the port: skills_write, skills_replace, skills_copy
   nemia cancel <runId>
                                stop what it has in flight; file nothing more
+                               on the port: cancel
   nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
                                forget runs that are over, a line each: a run's worktrees removed
                                through git, what one held uncommitted committed first, then its
@@ -435,6 +527,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                and --force-unmerged beside it the others, with their work. Then
                                the engine forgets the run's tasks: their journals and session
                                files; one not settled yet is forgotten by the next passes
+                               on the port: rm
   nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes]
                                free the space runs that are over hold: their worktrees, removed
                                through git, and nothing else — each run's record, branches and
@@ -448,26 +541,32 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a worktree held, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
+                               on the port: prune
   nemia pause-timeout [<d>]
                                the store's pause timeout: how long nemia pause, nemia service restart and
                                nemia upgrade give each tool call in flight to end before it is cut; bare,
                                the timeout in force (10m by default); given one, sets it: digits and s, m
                                or h, from 1s to 23h, as 90s, 10m or 2h. nemia pause --timeout <d> gives one
                                pause a timeout of its own
+                               CLI only: the board pauses with the store's timeout and sets none: nemia pause-timeout <d> sets it
   nemia policy confirm <agent> <id> --words '<words>'
                                put in force a rule the agent proposed, or the default again, as its
                                words read: from then on, at auto, the answer it names is given unasked
                                where it holds. Refused once the rule reads otherwise. Your first confirm
                                keeps the default beside it. Asked of you every time
+                               on the port: policy_confirm
   nemia policy rm <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
+                               on the port: policy_rm
   nemia chat allow <name>
                                let an agent speak in her chat under a name, and to a step's session
                                (nemia say --as <name>): its words reach her, the step and the board as
                                its own, never as yours. Asked of you every time
+                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
   nemia chat disallow <name>
                                take a name back: words under it are refused. Asked of you every time
+                               CLI only: the board shows no speaker list yet: nemia chat allow writes it
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this
@@ -478,9 +577,11 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                (checks and jobs run on, as nemia service restart --help says).
                                --name: the service
                                name (nemia; required for a store that is not the default)
+                               CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service uninstall [--name <name>]
                                stop the login service, disable it and remove its file; a daemon
                                started by hand is left alone
+                               CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service restart [--name <name>] [--timeout <d>]
                                restart the service's daemon on the code it runs: pause the store, give
                                the daemon's sessions up to the timeout to end their tool calls
@@ -495,6 +596,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                own ends with the command: killed, the next pass of the daemon lifts it.
                                Starts the service where nothing ticks; a daemon started by hand is
                                named with --take-over's line
+                               CLI only: it restarts the person's login service, on the machine the command runs on
   nemia upgrade <tag> [--repo <path>] [--name <name>] [--timeout <d>]
                                build the tag from a clean export into the store's releases/<tag>:
                                npm ci, npm run build and npm run release:check there, on a trial
@@ -510,21 +612,25 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                running nemia runs on, the folder of each build whose upgrade died,
                                and each build log older than 30 days, as the daemon does every five
                                minutes
+                               CLI only: builds for minutes and restarts the daemon that serves the api
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former
                                line form, under the folders given or the store's own. --check: write
                                nothing, and exit 1 where a rewrite is due
+                               CLI only: it rewrites files on the machine nemia runs on, folders a person names among them
   nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
                                a workflow folder of yours, or of a templated --factory, written from
                                a draft folder, its steps, README, scripts and schemas, leaving a file
                                it does not carry; one there already, at the --version it was read at
+                               on the port: workflows_write, workflows_replace
   nemia workflows rm yours <name> --version <v>
                                a workflow folder of yours removed, at the --version it was read at
+                               on the port: workflows_rm
 ```
 
 ## Answers what waits
 
-Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then, in a terminal, run the verb they choose with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.
+Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose, at a shell with their words as `--message`, or its tool on the port with them as its message: its prompt is their decision, asked once. `retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
   nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
@@ -548,6 +654,7 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
+                               on the port: retry
   nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
@@ -569,4 +676,5 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                Your approval makes the budgets the step proposed the caps of the
                                steps after the gate, and auto never approves unasked a cap above
                                a step's own budget
+                               on the port: approve
 ```

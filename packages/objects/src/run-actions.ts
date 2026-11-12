@@ -170,6 +170,24 @@ export const RunHeld = Schema.Struct({ id: Schema.String, lifted: Schema.Boolean
 });
 export type RunHeld = typeof RunHeld.Type;
 
+/** A task of a run's that a cancel asked to stop: its step's name and the engine's task. */
+const CancelStopped = Schema.Struct({ name: Schema.String, taskId: Schema.String });
+
+/**
+ * What a cancel did (`CancelPlan`, the orchestrator's): `cancel`, the run cancelled now and what was asked to stop; `already-cancelled`,
+ * when it was cancelled before; `finished`, a run already over, whose status it says.
+ */
+export const RunCancelPlan = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('cancel'), stop: Schema.Array(CancelStopped) }),
+  Schema.Struct({ kind: Schema.Literal('already-cancelled'), at: Schema.String, stop: Schema.Array(CancelStopped) }),
+  Schema.Struct({ kind: Schema.Literal('finished'), status: Schema.Literals(['succeeded', 'failed']) }),
+]);
+export type RunCancelPlan = typeof RunCancelPlan.Type;
+
+/** What a cancel answers: the run and the plan it followed (`nemia cancel`). */
+export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan }).annotate({ identifier: 'RunCancelled' });
+export type RunCancelled = typeof RunCancelled.Type;
+
 /** What the engine forgot of a removed run's tasks, and what waits to be forgotten until it settles (`EngineForgetting`). */
 const EngineForgetting = Schema.Struct({
   forgotten: Strings,

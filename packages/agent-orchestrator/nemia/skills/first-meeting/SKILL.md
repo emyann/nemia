@@ -6,6 +6,9 @@ description: Meet the person the first time they open you, while your memory hol
 
 The first time a person opens you, they do not know you yet. Meet them before anything else, once.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ## When
 
 The person writes to you, and your memory holds no fact named `met` (`nemia memory`). A line of the feed that wakes you is no meeting:

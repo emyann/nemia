@@ -29,6 +29,7 @@ const memoryLines = (data: NemiaMemory): string[] => {
  */
 export const MEMORY: Command<NemiaMemory, MemoryInput> = {
   name: 'memory',
+  served: [{ endpoint: 'nemia.memory' }, { endpoint: 'nemia.fact', as: 'memory_fact' }],
   usage: '[<fact>]',
   help: ["what Nemia keeps of the store: bare, her facts' names; given one, its", 'words. Read only: her session alone writes them'],
   spec: {

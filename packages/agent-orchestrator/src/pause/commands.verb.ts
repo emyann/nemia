@@ -91,6 +91,7 @@ export const pauseNowPreviewLines = ({ pause, interrupts }: PauseNowRead): reado
  */
 export const PAUSE: Command<PauseAnswer, PauseWrite> = {
   name: 'pause',
+  served: [{ endpoint: 'server.pause' }],
   usage: '[--why "<words>"] [--by <name>] [--timeout <d> | --now [--yes]]',
   help: [
     'pause the store: no pass starts new work — no step, try, round or',
@@ -144,6 +145,7 @@ type ResumeInput = typeof ResumeInput.Type;
  */
 export const RESUME: Command<{ pause: Pause }, ResumeInput> = {
   name: 'resume',
+  served: [{ endpoint: 'server.resume' }],
   usage: '',
   help: ['resume the store: each session parked goes on as the same try, and the', 'next pass files what waits'],
   spec: {
@@ -163,6 +165,7 @@ export const RESUME: Command<{ pause: Pause }, ResumeInput> = {
 /** The store's pause and the checks it holds, a landing with its merge staged among them (`pausedRead`), which the api alone serves. */
 export const PAUSED: Command<Paused> = {
   name: 'paused',
+  served: [{ endpoint: 'server.paused' }],
   usage: '',
   help: ["the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
@@ -179,6 +182,7 @@ export const PAUSED: Command<Paused> = {
 /** What a pause at once would stop (`nowRead`), and what it costs (`NOW_COST`): the board's confirm, which the api alone serves. */
 export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
   name: 'pause now',
+  served: [{ endpoint: 'server.pauseNow' }],
   usage: '',
   help: ['what a pause at once would stop, each task at work but a landing, and what that costs'],
   spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },

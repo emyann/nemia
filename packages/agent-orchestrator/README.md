@@ -3556,7 +3556,8 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 
-What she is is built into this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
+What she is is built into this package's `nemia/` folder, a plugin: her instruction (`agents/nemia.md`, with her fence), her skills, and
+the store's MCP port as its server (`.mcp.json`), so a coding agent that installs it is the same Nemia from outside. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
 board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
 session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its

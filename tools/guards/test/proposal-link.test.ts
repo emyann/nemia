@@ -12,7 +12,7 @@ import path from 'node:path';
 import { proposalLinkOf } from '../../../apps/web/src/lib/proposalLink.ts';
 import { REPO } from 'test-kit/repo';
 
-const AGENT = 'packages/agent-orchestrator/nemia/nemia.md';
+const AGENT = 'packages/agent-orchestrator/nemia/agents/nemia.md';
 
 /** Every markdown link of `text` whose address names the placeholder `<name>`: the proposal templates the agent teaches. */
 const templatesIn = (text: string): string[] => [...text.matchAll(/\]\(([^()\s]*<name>[^()\s]*)\)/g)].map((m) => m[1]);

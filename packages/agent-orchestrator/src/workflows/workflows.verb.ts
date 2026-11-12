@@ -149,6 +149,7 @@ export type WorkflowStepInput = typeof WorkflowStepInput.Type;
  */
 export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }, WorkflowWriteInput> = {
   name: 'workflows write',
+  served: [{ endpoint: 'workflows.create' }, { endpoint: 'workflows.replace', as: 'workflows_replace' }],
   usage: '(yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
   help: [
     'a workflow folder of yours, or of a templated --factory, written from',
@@ -236,6 +237,7 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
  */
 export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
   name: 'workflows rm',
+  served: [{ endpoint: 'workflows.delete' }],
   usage: 'yours <name> --version <v>',
   help: ['a workflow folder of yours removed, at the --version it was read at'],
   spec: writerSpec(
@@ -300,6 +302,7 @@ export const foldersLoaded = Effect.fn('foldersLoaded')(function* (
  */
 export const WORKFLOWS_STEP: Command<{ step: StepSpec | null; steps: string[] }, WorkflowStepInput> = {
   name: 'workflows step',
+  served: [{ endpoint: 'workflows.step' }],
   usage: '<from> <name> <step>',
   help: ['one step of a workflow folder, loaded'],
   spec: apiSpec(

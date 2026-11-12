@@ -8,6 +8,9 @@ Some workflows do no work in a repository: their agent reads the store — its s
 an inbox card or a closeout for the person to accept. You commission such a workflow; the agent in it stays its own worker, and you never
 do its reading for it.
 
+A line here written `nemia <verb> …` names the verb `<verb>`: at a shell, type it as written; on the MCP port, call its tool, whose
+schema says its arguments. The `verbs` skill names each verb's tools, and which run at a shell alone.
+
 ## Start it
 
 1. Read the factory's instruction (`nemia factory instruction <name>`): it names the workflow to commission and the brief it takes, when

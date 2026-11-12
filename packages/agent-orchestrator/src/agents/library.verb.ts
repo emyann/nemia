@@ -113,6 +113,7 @@ const writtenLines = ({ dir, agent, version, written, removed }: AgentWritten): 
  */
 export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
   name: 'agents write',
+  served: [{ endpoint: 'agents.create' }, { endpoint: 'agents.replace', as: 'agents_replace' }],
   usage: '(yours | factory) [<name>] --file <name>.md [--factory <name>] [--version <v>]',
   help: [
     'an agent of yours, or of a templated --factory, written from its file:',
@@ -163,6 +164,7 @@ export const AGENTS_WRITE: Command<AgentWritten, AgentWriteInput> = {
 /** An agent of yours removed through the Agent door, against the `version` it was read at, which a removal without it names. */
 export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
   name: 'agents rm',
+  served: [{ endpoint: 'agents.delete' }],
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
   spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent')]),
@@ -189,6 +191,7 @@ export const AGENTS_REMOVE: Command<AgentRemoved, AgentRemoveInput> = {
  */
 export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
   name: 'agents run',
+  served: [{ endpoint: 'agents.try' }],
   usage: 'yours <name> --brief <words>',
   help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_BUDGET}`],
   spec: writerSpec('agents run', 'yours <name> --brief <words>', PLACE_AND_NAME, [
@@ -219,6 +222,7 @@ export const AGENTS_TRY: Command<{ id: string }, AgentTryInput> = {
  */
 export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
   name: 'agents read',
+  served: [{ endpoint: 'agents.get' }],
   usage: '<from> <name>',
   help: ['one agent, read for its page'],
   spec: apiSpec(PLACE_AND_NAME, ['dir', 'repo']),

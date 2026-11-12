@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Need } from 'objects';
 import { firstPiece } from '../piece/piece.ts';
 import {
@@ -325,6 +325,38 @@ export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[
 
 /** The machine needs the workflow of the folder `dir` declares in its README's frontmatter (`workflowNeedsRead`), none where none read. */
 export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead(dir).needs;
+
+/** The keys of a frontmatter `block` other than its needs, none where it does not read as a map. */
+function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
+  let read: unknown;
+  try {
+    read = block === undefined ? undefined : parseYaml(block);
+  } catch {
+    read = undefined;
+  }
+  if (typeof read !== 'object' || read === null || Array.isArray(read)) return {};
+  const { needs: _needs, ...rest } = read as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * The README a writer of the workflow of the folder `dir` hands `writeWorkflow` as `readme` (`write.store.ts`), so that what a read gave
+ * — the instruction (`workflowReadme`) and the needs (`workflowNeeds`), apart — is written back whole: `body`, the instruction (the
+ * README's own where none is given), under a frontmatter whose `needs:` is `needs` (the README's own where none are given) beside the
+ * frontmatter's other keys. A `body` that carries a frontmatter of its own is read as the whole README, its frontmatter in place of the
+ * folder's. No frontmatter where it would hold nothing, and undefined where neither is given: the README is then left as it is.
+ */
+export function workflowReadmeWith(dir: string, body: string | undefined, needs: readonly Need[] | undefined): string | undefined {
+  if (body === undefined && needs === undefined) return undefined;
+  const given = body?.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const own = given === undefined ? undefined : FRONTMATTER.exec(given);
+  const onDisk = (readmeText(dir) ?? '').replace(/\r\n/g, '\n');
+  const block = own ?? FRONTMATTER.exec(onDisk);
+  const instruction = given === undefined ? onDisk.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
+  if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
+  const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
+  return Object.keys(keys).length === 0 ? instruction : `---\n${stringifyYaml(keys, { lineWidth: 0 })}---\n${instruction}`;
+}
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 

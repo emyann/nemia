@@ -9,7 +9,7 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { TokenNeed } from 'agent-orchestrator';
-import { MCP_PATH } from '../src/caller/caller.ts';
+import { MCP_PATH, PAIR_PATH } from '../src/caller/caller.ts';
 
 /** Whether `path` is `root` or a path under it. */
 const under = (path: string, root: string): boolean => path === root || path.startsWith(root + '/');
@@ -18,13 +18,9 @@ const under = (path: string, root: string): boolean => path === root || path.sta
 const onPort = (path: string): boolean => under(path, MCP_PATH);
 
 /**
- * The routes a client that holds no token yet is let through on: asking for a pairing, claiming it with the secret it was answered,
- * and opening a first-visit link (`/api/pair`). Each judges its own secret, and none answers with the store's data. Implement exports it
- * from src/caller/caller.ts beside `MCP_PATH` and this file imports it from there.
+ * Whether `path` is a pairing route's (`PAIR_PATH`, src/caller/caller.ts): asking for a pairing, claiming it with the secret it was
+ * answered, and opening a first-visit link. Each judges its own secret, and none answers with the store's data.
  */
-export const PAIR_PATH = '/api/pair';
-
-/** Whether `path` is a pairing route's. */
 const pairing = (path: string): boolean => under(path, PAIR_PATH);
 
 /** Whether `path` is one the api answers on with the store's data or its route table. */

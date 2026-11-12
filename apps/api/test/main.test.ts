@@ -129,8 +129,16 @@ test('REFUSED exit 2: NEMIA_BIND beyond the loopback on a store not marked expos
   assert.equal(fs.existsSync(path.join(api.root, 'daemon.json')), false, 'no lease taken');
 });
 
-test('NEMIA_BIND=0.0.0.0 on a store marked exposed listens on every interface, and the lease names the loopback', async (t) => {
-  const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '1' });
+test('REFUSED exit 2: NEMIA_BIND=0.0.0.0 on a store marked exposed, unacknowledged (no NEMIA_BIND_PUBLIC=1), nothing listening, no lease', async () => {
+  const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '1', NEMIA_BIND_PUBLIC: '' });
+  assert.equal(await api.ended, 2);
+  assert.match(api.output(), /NEMIA_BIND_PUBLIC=1/, 'the variable that acknowledges it is named');
+  assert.doesNotMatch(api.output(), /listening/);
+  assert.equal(fs.existsSync(path.join(api.root, 'daemon.json')), false, 'no lease taken');
+});
+
+test('NEMIA_BIND=0.0.0.0 on a store marked exposed and acknowledged listens on every interface, and the lease names the loopback', async (t) => {
+  const api = startApi('0', [], scratch('nemia-api-main-'), '', { NEMIA_BIND: '0.0.0.0', WF_EXPOSED: '1', NEMIA_BIND_PUBLIC: '1' });
   t.after(() => api.child.kill());
   const [, got] = await api.said(/api listening on http:\/\/0\.0\.0\.0:(\d+)/);
   await leaseSays(api.root, (l) => l.url === `http://127.0.0.1:${got}`);

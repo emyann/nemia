@@ -3,7 +3,16 @@ import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, informerLayer, runningRelease, storeConfigLayer, telemetryLayer } from 'agent-orchestrator';
+import {
+  feedHubLayer,
+  gitPlaceLayer,
+  informerLayer,
+  needsMemoryLayer,
+  runningRelease,
+  storeConfigLayer,
+  telemetryLayer,
+  wfRoot,
+} from 'agent-orchestrator';
 import { BOARD_ROUTE, type BoardFiles, boardOf } from './board/board.ts';
 import { callerGate } from './caller/caller.ts';
 import { McpAsker } from './capabilities/index.ts';
@@ -39,7 +48,9 @@ export const answerError: ErrorHandler = (err, c) => {
  * (`McpAsker`, `QuotaAsker`), reads that have kept nothing yet (`ReadMemo`), an informer of each run's judgement holding none, which the
  * daemon's passes fill and every request reads (`informerLayer`: one per app, so the store's daemon and the board's reads judge a run
  * once), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the process's daemon writes them
- * (`feedHubLayer`), and the git place (`gitPlaceLayer`).
+ * (`feedHubLayer`), the git place (`gitPlaceLayer`), and the memory of the store's machine needs (`needsMemoryLayer`): one per app, which
+ * the daemon's sweep fills (`up`, given the app's context in main.ts), its passes read to hold a run on a missing need, and the readiness
+ * read and its fixes read and refresh.
  *
  * And the process's telemetry (`telemetryLayer`): the line logger every log of the app goes through — each request's among them — and,
  * where `env` names an OTLP collector, the tracer, the exporters and their `Flusher` besides. Held here and not around the process's
@@ -59,6 +70,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
     Followings.live,
     feedHubLayer(),
     gitPlaceLayer,
+    needsMemoryLayer(wfRoot(env)),
     telemetryLayer(env),
   );
 

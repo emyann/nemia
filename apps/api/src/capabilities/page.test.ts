@@ -6,7 +6,6 @@
 import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
@@ -145,11 +144,9 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A git repository with one commit and one skill, `<name>-skill`. */
+/** A repository folder with one skill, `<name>-skill`. */
 const repoWithSkill = (name: string): string => {
   const repo = scratch(`nemia-api-page-${name}-`);
-  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
-  execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
   write(
     path.join(repo, '.claude', 'skills', `${name}-skill`, 'SKILL.md'),
     `---\nname: ${name}-skill\ndescription: ${name}'s\n---\nDo it.\n`,

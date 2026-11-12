@@ -2,7 +2,8 @@
  * The Card's update (`replaceCard`) over the Run and Card doors' memory: a card written whole — its workflow, gate, `from:`, body and
  * labels — its `queued:` and factory kept, a write that keeps every key leaving the file as it was, byte for byte, and each refusal by
  * its kind and exit code with the file left as it was: no card, a card in another namespace, a started card, a stale `resourceVersion`,
- * a changed `queued`, no body, a `from:` naming a run the store lacks, and a `repo:` that is no absolute path.
+ * a changed `queued`, no body, a `from:` naming a run the store lacks, a retired `repo:` set or changed, and a workflow changed to a path.
+ * An old card's `repo:` stays editable: written back as read it is kept, left out it is taken off.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -139,8 +140,13 @@ test('each refusal by its kind, and the file left as it was', async (t) => {
       says: ['Missing', 2],
     },
     {
-      name: 'a repo that is no absolute path is Invalid',
-      write: { ...asIs(), spec: { ...asIs().spec, repo: 'code/app' } },
+      name: 'a repo set on a card that has none is Invalid: it is retired',
+      write: { ...asIs(), spec: { ...asIs().spec, repo: '/code/app' } },
+      says: ['Invalid', 2],
+    },
+    {
+      name: 'a workflow changed to a path is Invalid',
+      write: { ...asIs(), spec: { ...asIs().spec, workflow: 'flows/dev' } },
       says: ['Invalid', 2],
     },
     {
@@ -158,4 +164,24 @@ test('each refusal by its kind, and the file left as it was', async (t) => {
       assert.equal(text, PLANTED, 'nothing written');
     });
   }
+});
+
+test("an old card's retired repo: written back as read is kept, changed is refused, left out is taken off", async (t) => {
+  const old = PLANTED.replace('workflow: build\n', 'workflow: build\nrepo: /x\n');
+  const withRepo = (repo?: string): CardWrite => ({ ...asIs(), spec: { ...asIs().spec, ...(repo !== undefined ? { repo } : {}) } });
+  await t.test('written back with the same repo: accepted, the file unchanged', () => {
+    const { exit, text } = over(replaceCard('cache-a1', 'alpha', withRepo('/x')), { text: old });
+    assert.equal(Exit.isSuccess(exit), true, String(exit));
+    assert.equal(text, old);
+  });
+  await t.test('written with another repo: Invalid, the file unchanged', () => {
+    const { exit, text } = over(replaceCard('cache-a1', 'alpha', withRepo('/y')), { text: old });
+    assert.deepEqual(refusal(exit), ['Invalid', 2]);
+    assert.equal(text, old);
+  });
+  await t.test('written without its repo: accepted, the line taken off', () => {
+    const { exit, text } = over(replaceCard('cache-a1', 'alpha', withRepo()), { text: old });
+    assert.equal(Exit.isSuccess(exit), true, String(exit));
+    assert.equal(text, PLANTED);
+  });
 });

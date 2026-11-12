@@ -5,6 +5,7 @@ export {
   cardInPlay,
   cardText,
   cardState,
+  cardWorkflowRefusal,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   cardLabels,
@@ -19,7 +20,6 @@ export {
   queueLine,
   queueOrder,
   startedRefusal,
-  workflowAt,
 } from './inbox.ts';
 export type { CardListing, CardRun, CardState, InboxCard, InboxListing, LabelsShown, QueueStarted, MissedStart } from './inbox.ts';
 export { queueFactoryRefusal } from './queue-factory.ts';

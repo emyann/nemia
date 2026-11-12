@@ -10,12 +10,32 @@
   "terms": [
     {
       "term": "Card",
-      "meaning": "an idea on its way to a run: a short markdown brief in the inbox, started as a run, and kept there after it starts.",
+      "meaning": "an idea on its way to a run: a short markdown brief in the inbox, started as a run, and kept there after it starts. It names its factory and its workflow, never a repository: the factory's wiring places its run (`nemia factory attach <factory> <workflow> --repo <name>`).",
       "type": "Card",
       "see": {
         "label": "From a card to a landing",
         "href": "/how-a-run-lives/#from-a-card-to-a-landing"
-      }
+      },
+      "retired": [
+        {
+          "spelling": "card.repo",
+          "card": "inbox: a card names its factory and workflow, never a repository",
+          "kept": [
+            {
+              "path": "packages/agent-orchestrator/src/inbox/inbox.ts",
+              "why": "an old card's `repo:` read as written, listed as retired and written back as it was, never to place a run"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/inbox/inbox.verb.ts",
+              "why": "an old card's `repo:` said as not read at its start (`ignoredRepo`), never to place its run"
+            },
+            {
+              "path": "packages/agent-orchestrator/src/inbox/commands.verb.ts",
+              "why": "`nemia inbox queue` prints an old card's `repo:` marked retired, as `nemia inbox` lists it"
+            }
+          ]
+        }
+      ]
     },
     {
       "term": "Card name",

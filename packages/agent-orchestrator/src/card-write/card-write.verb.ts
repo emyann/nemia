@@ -10,13 +10,20 @@ import { type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import type { CardWriteRefusal } from '../../contracts/card-write.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
-import { isDirectory } from '../record/record.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { tried } from '../runtime-client.ts';
 import { contextRefusal } from '../start/index.ts';
 import { cardWriteRefusal } from './card-write.ts';
 import { CardName } from '../inbox/inbox.model.ts';
-import { cardText, fromLine, inboxNameRefusal, parseInboxCard, startedRefusal, type InboxCard } from '../inbox/index.ts';
+import {
+  cardText,
+  cardWorkflowRefusal,
+  fromLine,
+  inboxNameRefusal,
+  parseInboxCard,
+  startedRefusal,
+  type InboxCard,
+} from '../inbox/index.ts';
 
 /** The digest of a card's text, its `resourceVersion`: changed by every write of the file, and by nothing else. */
 export const cardVersion = versionDigest;
@@ -49,17 +56,26 @@ const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, sta
 };
 
 /**
+ * A `spec.workflow` changed to what is no workflow's name (`cardWorkflowRefusal`); none sent, or the card's own sent back, is no
+ * change.
+ */
+const workflowWriteRefusal = (sent: string | undefined, now: string | undefined): string | undefined =>
+  sent === undefined || sent === now ? undefined : cardWorkflowRefusal('spec.workflow', sent, 'Nothing was written.');
+
+/**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written whole from `write` (the Card's
- * update): its `workflow:`, `repo:`, `gate:`, `model:`, `from:` and body as `write.spec` says — a key it leaves out taken off — its labels
- * as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept. Written
+ * update): its `workflow:`, `gate:`, `model:`, `from:` and body as `write.spec` says — a key it leaves out taken off — its labels
+ * as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept, and an old
+ * card's retired `repo:` written back only where `spec.repo` sends it as read, taken off where it is left out. Written
  * through the Card door as `nemia inbox from` writes one (`cardText`), and not written at all where the file would read the same, so a
  * write of every key as it is leaves the file and its `resourceVersion` as they were.
  *
  * Refused before anything is written, exit 2: a name that is not a card's (`inboxNameRefusal`), no card of that name in the namespace
  * (`Missing`), a card that does not read, and what `cardWriteRefusal` refuses — a started card and a stale `resourceVersion` (`Conflict`,
- * the version compared with the digest of the file as it reads now, which `cardObject` serves), a `queued` changed and no body
- * (`Invalid`) — then what `contextRefusal` refuses of `spec.from` (a run the store does not have, `Missing`), and what `parseInboxCard`
- * refuses of the card it would write (`Invalid`): a `repo:` that is no absolute path or, where it changes, names no directory, a bad label.
+ * the version compared with the digest of the file as it reads now, which `cardObject` serves), a `queued` changed, a retired `repo` set
+ * or changed, and no body (`Invalid`) — then a `spec.workflow` changed to what is no workflow's name (`cardWorkflowRefusal`; an old
+ * card's path sent back as read is kept), what `contextRefusal` refuses of `spec.from` (a run the store does not have, `Missing`), and
+ * what `parseInboxCard` refuses of the card it would write (`Invalid`): a bad label, say.
  */
 export const replaceCard = Effect.fn('replaceCard')(function* (name: string, namespace: string, write: CardWrite) {
   const refused = inboxNameRefusal(name);
@@ -69,7 +85,7 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
   const card$ = CardName.read(name);
   const file = yield* door.cards.where(card$);
   const text = yield* door.cards.read(card$);
-  const card = text === null ? null : yield* tried(() => parseInboxCard(`${name}.md`, text, () => true));
+  const card = text === null ? null : yield* tried(() => parseInboxCard(`${name}.md`, text));
   if (text === null || card === null || (card.factory ?? DEFAULT_NAMESPACE) !== namespace)
     return yield* Effect.fail(
       new Missing({
@@ -89,11 +105,12 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
     ...(spec.body !== undefined ? { body: spec.body } : {}),
   });
   if (refusal !== null) return yield* Effect.fail(refusalOf(refusal, card, file, started));
+  const refusedWorkflow = workflowWriteRefusal(spec.workflow, card.workflow);
+  if (refusedWorkflow !== undefined) return yield* Effect.fail(new Invalid({ message: refusedWorkflow }));
   const ids = new Set(yield* runDoor.runs.ids());
   const refusedRuns = contextRefusal(spec.from ?? [], [], (id) => ids.has(id), undefined, 'spec.from');
   if (refusedRuns) return yield* Effect.fail(refusedRuns);
   const labels = metadata.labels ?? card.labels ?? {};
-  const isDirectoryNow = (at: string): boolean => (at === card.repo ? true : isDirectory(at));
   const written = yield* tried(() =>
     cardText(
       { ...card, body: spec.body ?? '' },
@@ -105,11 +122,10 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
         from: fromLine(spec.from),
         labels: { ...labels },
       },
-      isDirectoryNow,
     ),
   );
-  const same = written === (yield* tried(() => cardText(card, {}, () => true)));
+  const same = written === (yield* tried(() => cardText(card, {})));
   if (!same) yield* door.cards.rewrite(card$, written);
-  const out: CardReplaced = { card: parseInboxCard(`${name}.md`, written, () => true), file, written: !same };
+  const out: CardReplaced = { card: parseInboxCard(`${name}.md`, written), file, written: !same };
   return out;
 });

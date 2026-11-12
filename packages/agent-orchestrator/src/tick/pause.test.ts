@@ -230,7 +230,7 @@ test('while the store is paused nothing new starts and the work goes on; the pas
   const born = begun(ONE);
   await runWith(h.e, retryRun(refused.id, 'work', { mode: 'fresh' }));
   await runWith(h.e, approveRun(gated.id, 'plan'));
-  const { card } = addToInbox({ text: 'an idea queued meanwhile', workflow: ONE, repo: REPO });
+  const { card } = addToInbox({ text: 'an idea queued meanwhile', workflow: path.basename(ONE) });
   queueInInbox(card.name);
   const before = h.spawned.length;
   staged(LANDS);

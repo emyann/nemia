@@ -9,9 +9,14 @@ import { CLAUDE_RULES } from './rules.ts';
 
 /**
  * Claude Code's long-lived token, for a machine with no browser: the subscription token `claude setup-token` prints (`maker`), which
- * Claude Code reads from `CLAUDE_CODE_OAUTH_TOKEN` (`variable`). The default harness's (`DEFAULT_SIGN_IN`, declaration.ts).
+ * Claude Code reads from `CLAUDE_CODE_OAUTH_TOKEN` (`variable`); on a machine with one, the browser sign-in (`login`). The default
+ * harness's (`DEFAULT_SIGN_IN`, declaration.ts).
  */
-export const CLAUDE_SIGN_IN = { variable: 'CLAUDE_CODE_OAUTH_TOKEN', maker: 'claude setup-token' } as const;
+export const CLAUDE_SIGN_IN = {
+  variable: 'CLAUDE_CODE_OAUTH_TOKEN',
+  maker: 'claude setup-token',
+  login: 'claude auth login',
+} as const;
 
 /**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that

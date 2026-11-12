@@ -50,6 +50,7 @@ import { projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
 import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
 import type { Attached } from './attached.ts';
+import { claudeSignedOutRefusal } from './sign-in.ts';
 
 /** What Claude Code's runner is built from (`claudeCodeOps`). */
 export type ClaudeOptions = {
@@ -67,6 +68,8 @@ export type ClaudeOptions = {
   holdMs?: number;
   /** How often a job's own process reads the sessions' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
   holdPollMs?: number;
+  /** How long `claude auth status` is given before a job's spawn, in milliseconds: a test's shortening. Absent: `CLAUDE_SIGN_IN_MS`. */
+  signInMs?: number;
   /** The slice a job under a memory limit has its scope made in (`EngineOptions.cgroupParent`). Absent: the user manager's own. */
   cgroupParent?: string;
 };
@@ -95,8 +98,19 @@ const HOLD_END = 'hold';
  * run, a former attempt's under the name cleared first so a look never reads its bridge as this one's. Where it is handed the store a
  * job is held by (`hold`), the job's hold file beside its run (`holdFile`), cleared the same way, the store's sessions' drain
  * (`drainFile`), and the bounds a test shortened (`holdMs`, `holdPollMs`), each only where given.
+ *
+ * Before any of it, the Claude Code the session would run (`executable`) is asked whether this machine is signed in, within `signInMs`
+ * (`claudeSignedOutRefusal`): signed out, or with no answer, the spawn is refused, before anything runs.
  */
-const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string, hold?: JobHoldOptions): Partial<HarnessIO> => {
+const claudePrepare = (
+  r: SpawnRequest,
+  beside?: (end: string) => string,
+  hold?: JobHoldOptions,
+  executable?: string,
+  signInMs?: number,
+): Partial<HarnessIO> => {
+  const signedOut = claudeSignedOutRefusal(r, executable, signInMs);
+  if (signedOut) throw new Error(signedOut);
   const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
   const io: Partial<HarnessIO> = { ...(found ? { projectMcpConfig: found } : {}), ...(beside ? holdIo(beside, hold) : {}) };
   if (!bridgeAsked(r) || beside === undefined) return io;
@@ -154,15 +168,18 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  *   `claudePartials`).
  * - `keepOutput`: once the job has ended, its capture keeps only what the readers read (`claudeStreamKept`); the conversation is
  *   Claude Code's own transcript's (`transcript`).
- * - `prepare`: for the bridge file it names where the task asks for one, and the hold file and the sessions' drain where it is handed a
- *   store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
+ * - `prepare`: first, whether this machine's Claude Code is signed in (`claude auth status`, bounded by `signInMs`, `CLAUDE_SIGN_IN_MS`
+ *   unless a test shortens it): signed out, or with no answer in time, the spawn is refused and the attempt ends `unstartable`, in words
+ *   naming how to sign in. It sees a credential's presence, never its validity: an expired or revoked token passes, and fails at the
+ *   session's first request. Then, for the bridge file it names where the task asks for one, and the hold file and the sessions'
+ *   drain where it is handed a store to be held by (`hold`, `claudePrepare`), and for what it throws — the servers ride
  *   `Options.mcpServers`, read by `everyMcpServer` inside the bin, and a job writes no MCP config file: a checkout whose `.mcp.json`
  *   is not JSON refuses the spawn here, before the worker starts, so the attempt ends `unstartable` in those words rather than
  *   failing inside the bin.
  * - `refuses`: what Claude Code cannot be asked for (`claudeRefuses`); a bridge it opens itself.
  * Exported only for the tests that import it.
  */
-export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): HarnessSpec => ({
+export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number): HarnessSpec => ({
   name: 'claude',
   command: (_r, io) => {
     const requestFile = io?.requestFile;
@@ -185,7 +202,7 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions): Harne
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   streams: true,
   partials: claudePartials,
-  prepare: (r, beside) => claudePrepare(r, beside, hold),
+  prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs),
   refuses: claudeRefuses,
   bridgeAsked,
   can: CLAUDE_DECLARATION.can,
@@ -311,11 +328,15 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
   const { holdMs, holdPollMs } = options;
-  const spec = claudeJobSpec(options.claudeExecutable, {
-    root,
-    ...(holdMs !== undefined ? { holdMs } : {}),
-    ...(holdPollMs !== undefined ? { holdPollMs } : {}),
-  });
+  const spec = claudeJobSpec(
+    options.claudeExecutable,
+    {
+      root,
+      ...(holdMs !== undefined ? { holdMs } : {}),
+      ...(holdPollMs !== undefined ? { holdPollMs } : {}),
+    },
+    options.signInMs,
+  );
   const scoped = options.cgroupParent ? { cgroupParent: options.cgroupParent } : {};
   const plain = withHoldFiles(withBridgeFiles(detachedOps(spec, root, scoped), root), spec, root);
   const job = attached ? withAttached(plain, attached) : plain;

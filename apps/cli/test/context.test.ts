@@ -202,3 +202,33 @@ test("on an exposed store's own machine, a token kept for `local` lets its reads
     'local takes no server: it is always this machine',
   );
 });
+
+test("`nemia config headers`: NEMIA_TOKEN's header when set, else the context's (named or in use), else the local token, else {}", async () => {
+  const { env } = aLaptop('nemia-headers-');
+  const header = (token: string) => `${JSON.stringify({ Authorization: `Bearer ${token}` })}\n`;
+  const none = await nemia(['config', 'headers'], env);
+  assert.equal(none.code, 0, none.err);
+  assert.equal(none.out, '{}\n');
+  configWritten({ contexts: [], current: undefined, localToken: 'nm_local' }, env);
+  assert.equal((await nemia(['config', 'headers'], env)).out, header('nm_local'));
+  configWritten(
+    {
+      contexts: [
+        { name: 'vps', server: 'http://vps:7777', token: 'nm_vps' },
+        { name: 'box', server: 'http://box:7777', token: 'nm_box' },
+      ],
+      current: 'vps',
+      localToken: 'nm_local',
+    },
+    env,
+  );
+  assert.equal((await nemia(['config', 'headers'], env)).out, header('nm_vps'));
+  assert.equal((await nemia(['config', 'headers', '--context', 'box'], env)).out, header('nm_box'));
+  assert.equal((await nemia(['config', 'headers', '--context', 'local'], env)).out, header('nm_local'));
+  assert.equal((await nemia(['config', 'headers'], { ...env, NEMIA_CONTEXT: 'box' })).out, header('nm_box'));
+  assert.equal((await nemia(['config', 'headers'], { ...env, NEMIA_TOKEN: 'nm_env' })).out, header('nm_env'));
+  assert.equal((await nemia(['config', 'headers', '--context', 'box'], { ...env, NEMIA_TOKEN: 'nm_env' })).out, header('nm_env'));
+  const unheld = await nemia(['config', 'headers', '--context', 'gone'], env);
+  assert.equal(unheld.code, 2);
+  assert.match(unheld.err, /nemia config get-contexts/);
+});

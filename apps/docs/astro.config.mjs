@@ -52,6 +52,7 @@ export default defineConfig({
         { label: 'Glossary', link: '/glossary/' },
         { label: 'Getting started', link: '/getting-started/' },
         { label: 'Install', link: '/install/' },
+        { label: 'Self-hosting', link: '/self-hosting/' },
       ],
       plugins: [starlightLinksValidator()],
     }),

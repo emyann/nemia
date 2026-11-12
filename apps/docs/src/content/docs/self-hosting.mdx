@@ -1,0 +1,72 @@
+---
+title: Self-hosting
+description: Run Nemia on a server of your own — a small VPS — from a fresh machine to a factory's first run, reached privately from your laptop.
+---
+
+Nemia runs on a machine you own and reach: a small VPS is the first place it is made for. This page walks from a fresh server to a
+factory's first run. What Nemia cannot do for you — the machine, the user, the network, the firewall — is said here; the rest is four
+answers, each given on the server.
+
+## The machine
+
+A VPS running Ubuntu 24.04 with 2 vCPU and 4 GB of memory runs a few sessions at once; more memory runs more (`nemia service install
+--size auto` sizes the daemon by it). It needs git, tar and curl, systemd's user manager and cgroup v2, which Ubuntu has.
+
+Make a user of your own for Nemia rather than running it as root: Nemia needs no root, and its sessions run as the user that runs it.
+
+```bash
+sudo adduser nemia
+sudo loginctl enable-linger nemia
+```
+
+`enable-linger` lets the user's services run while nobody is logged in; it is the one command that needs an administrator, and the
+installer tries it and says so where it cannot.
+
+## The network
+
+Keep the board and the api off the public internet. Join the server and your laptop to a private network — Tailscale is the simplest:
+both get an address in 100.64.0.0/10 that only your own machines reach, and the traffic between them is encrypted — and bind Nemia to
+the server's address on it. The installer offers the server's private addresses by number; a public address, or every interface
+(`0.0.0.0`), is refused unless you pass `--public`, and the daemon refuses to start on one without `NEMIA_BIND_PUBLIC=1`.
+
+Then close everything else at the firewall but SSH:
+
+```bash
+sudo ufw default deny incoming
+sudo ufw allow OpenSSH
+sudo ufw enable
+```
+
+Tailscale's own traffic passes; the board's port is reached over Tailscale alone. Nemia speaks plain HTTP: where you put it behind a
+reverse proxy instead, that proxy holds the TLS.
+
+## The four answers
+
+As the Nemia user, on the server:
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
+```
+
+1. **Your Claude token.** Make it with `claude setup-token` on any machine with a browser, and paste it when the installer asks: it
+   is read without echo and kept by the server alone (_Install_, _Your Claude token_).
+2. **The address.** Pick the Tailscale address from the list. The installer mints the server's own token into its local context and
+   prints a first-visit link: open it in your laptop's browser within ten minutes, and the board signs you in.
+3. **A sign-in a workflow needs.** The installer ends on `nemia readiness`, and the board's Setup page shows the same read. A factory of
+   the `sdlc` template that lands on GitHub needs the GitHub CLI signed in: `nemia readiness fix gh` installs it without root, and
+   `nemia readiness fix gh-sign-in` shows a device code, large, with the link to type it at, from your phone or your laptop. The git
+   identity is filled from that account.
+4. **The repository.** `nemia factory add <name> --template sdlc --repo <url>` clones it on the server with the server's own
+   credentials, and files the factory.
+
+## Your laptop
+
+```bash
+curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --client --server http://100.100.1.2:8787
+```
+
+It shows a short code; approve it on the server with `nemia pairings approve <code>`, or on the board's Setup page. A token named for
+your laptop lands in its context, never shown, and `nemia token rm <name>` on the server revokes it. Put the `NEMIA_URL` line it
+prints in your shell profile, and Claude Code's nemia plugin asks the server with the same token.
+
+`nemia readiness` on the laptop reads the server's pieces and its own: whether its context reaches the server and its token is taken.

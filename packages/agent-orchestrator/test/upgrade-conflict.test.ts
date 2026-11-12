@@ -595,12 +595,15 @@ const PICTURES = 'workflows/dev/pictures.ts';
 const OWN = 'export const pictures = true;\n';
 const OWN_CHECK = 'check: npm test && npm run typecheck\nskills: look';
 
+/** The factory's own edit of dev's implement with a harness's block besides, as the nemia factory's tree fences its steps. */
+const OWN_FENCE = `${OWN_CHECK}\nclaude:\n  fence:\n    disallowedTools: Bash(*:4318*), Bash(*:4317*)`;
+
 /**
  * A factory `name` applied from the tests' team at 0.1.0, then edited in its tree as `nemia workflows write factory` edits it: a file
- * added to dev, and dev's implement given another check and a skill only the factory's repository holds, as the nemia factory's
+ * added to dev, and dev's implement given `own`, another check and a skill only the factory's repository holds, as the nemia factory's
  * overlays give one; the person and the template's 0.2.0 each changing a line of dev's script, the upgrade filed: its conflicts.
  */
-async function editedAfterApply(t: { mock: { method: Function } }, name: string): Promise<string[]> {
+async function editedAfterApply(t: { mock: { method: Function } }, name: string, own = OWN_CHECK): Promise<string[]> {
   const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
   fs.mkdirSync(path.join(repo, '.claude/skills/look'), { recursive: true });
@@ -614,7 +617,7 @@ async function editedAfterApply(t: { mock: { method: Function } }, name: string)
   reconciled(factory(name));
   const tree = treeDir(ROOT, name);
   fs.writeFileSync(path.join(tree, PICTURES), OWN);
-  rewrite(tree, IMPLEMENT, 'check: npm test && npm run typecheck && npm run lint', OWN_CHECK);
+  rewrite(tree, IMPLEMENT, 'check: npm test && npm run typecheck && npm run lint', own);
   fs.writeFileSync(path.join(tree, SCRIPT), SCRIPT_AT.ours);
   edit(at, 'nemia.yaml', (spec) => {
     spec.version = '0.2.0';
@@ -681,4 +684,32 @@ test('a tree written between the resolve and the approval: the approval is refus
       assert.equal(reconciled(factory(name)).version, '0.1.0');
     },
   );
+});
+
+test("a tree whose step carries a harness's block: the resolution's proposal is approved, and the applied step keeps its block", async (t) => {
+  const s = story(t);
+  const name = 'fenced';
+  let proposed = '';
+
+  await s.test("dev's implement given a `claude: fence:` block in the factory's tree, and one conflict in dev", async (t) => {
+    assert.deepEqual(await editedAfterApply(t, name, OWN_FENCE), [SCRIPT_LINE]);
+  });
+
+  await s.test('resolved with a file, the workflow is proposed with the block read as its fence', async (t) => {
+    await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
+    proposed = recordedFor(name, 'Workflow/dev') ?? '';
+    const spec = proposalIn(name, proposed).spec.objects[0].spec;
+    const implement = spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.deepEqual(implement.keys.disallowedTools, ['Bash(*:4318*)', 'Bash(*:4317*)']);
+  });
+
+  await s.test('approved, the upgrade applies, and the applied implement keeps its block', async () => {
+    const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
+    assert.equal(approved.status.phase, 'applied', approved.status.message);
+    const merged = reconciled(factory(name));
+    assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
+    const tree = treeDir(ROOT, name);
+    assert.equal(textIn(tree, SCRIPT), SCRIPT_AT.composed);
+    assert.match(textIn(tree, IMPLEMENT), /^claude:\n {2}fence:\n {4}disallowedTools: Bash\(\*:4318\*\), Bash\(\*:4317\*\)$/m);
+  });
 });

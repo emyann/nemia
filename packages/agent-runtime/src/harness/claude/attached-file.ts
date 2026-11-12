@@ -15,7 +15,7 @@ import { BridgeFactsSchema } from './session-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
 import { IMAGE } from '../image.ts';
-import { alive } from '../../process/alive.ts';
+import { alive, processStart } from '../../process/alive.ts';
 import {
   DRAIN_FILE,
   SESSION_DRAIN_FILE,
@@ -34,22 +34,6 @@ import {
 export type AttachedState = 'working' | 'idle' | 'parked' | 'completed' | 'failed' | 'canceled';
 
 export type { AttachedBridge } from './session-bridge.ts';
-
-/**
- * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what a run file names its holder and its Claude Code by,
- * so a pid another process has taken since is not read as either. `undefined` where there is no `/proc`. The second field is the
- * command's name in parentheses, which may hold spaces and parentheses, so the fields are counted from the last `)`.
- * Exported only for the tests that import it.
- */
-export const processStart = (pid: number): string | undefined => {
-  let stat: string;
-  try {
-    stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-  } catch {
-    return undefined;
-  }
-  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-};
 
 const RunFileSchema = Schema.StructWithRest(
   Schema.Struct({

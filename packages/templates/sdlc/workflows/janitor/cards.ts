@@ -3,9 +3,9 @@
  *
  * Takes the path of Argus's closeout, flat (`WF_CLOSEOUT`): its `period` and `against`, each a `from` and a `to` day, and its `cards`,
  * each a `title`, a `kind`, a `correction`, its `evidence`, the `agent` it is about, and the `factory` and `workflow` it is started with
- * (the repository is the factory's, wired to the workflow). It checks the whole closeout first, then reads the first line of every card in `${WF_ROOT:-~/.agent-workflows}/inbox`, and files
- * each card whose title none has, compared without case or spacing, with `nemia inbox add` run in `WF_WORKSPACE`. It starts,
- * queues and drops nothing, and never writes in the inbox itself.
+ * (the repository is the factory's, wired to the workflow). It checks the whole closeout first, then reads the first line of every
+ * card in `${WF_ROOT:-~/.agent-workflows}/inbox`, and files each card whose title none has, compared without case or spacing, with
+ * `nemia inbox add` run in `WF_WORKSPACE`. It starts, queues and drops nothing, and never writes in the inbox itself.
  *
  * Prints a line per card, filed or already there, and exits 0. Exits 1, naming the fix on stderr and filing nothing, when no closeout
  * reached it, a card is not text where text is due, names no factory or workflow, two cards share a

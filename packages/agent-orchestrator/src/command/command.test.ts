@@ -1,12 +1,26 @@
 /**
- * The command table's parser, help and rules: a command line read against a spec and refused in its own words, the line a refusal
- * shows, the help the table prints, where a table breaks its rules (one table, `BREAKS`), and what each command of the CLI refuses
+ * The command table's parser, help and rules: `objects`' parser (its rows in `packages/objects/test/command.test.ts`) refusing as the
+ * package's own `Invalid`, the table's command lines read and refused in their own words, the line a refusal shows, the help the table
+ * prints, where a table breaks its rules (one table, `BREAKS`), and what each command of the CLI refuses
  * of its command line before anything is read (one table, `REFUSALS`), matched by the command, flag and fix each names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, renamedValues, type Spec, toolsOf } from './command.ts';
+import { COMMAND_WORDS, CommandRefused, parseArgv as parseArgvOf } from 'objects';
+import {
+  amountOf,
+  commandBreaks,
+  commandLine,
+  helpOf,
+  leftOut,
+  parseArgv,
+  RENAMED,
+  renamedIn,
+  renamedValues,
+  type Spec,
+  toolsOf,
+} from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -65,102 +79,22 @@ function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]): st
   }
 }
 
-test('a command line is read into its arguments, the defaults under what it gives', () => {
-  assert.deepEqual(parseArgv(SPEC, ['r-1']), { mode: 'fast', runId: 'r-1' });
-  assert.deepEqual(parseArgv(SPEC, ['r-1', 'impl', '--slow', '--note', 'hi', '--budget', '2.50', '--who', 'ada']), {
-    mode: 'slow',
-    runId: 'r-1',
-    step: 'impl',
-    note: 'hi',
-    budget: 2.5,
-    who: 'ada',
-  });
-  assert.deepEqual(parseArgv(SPEC, ['r-1', '--note=--slow']), { mode: 'fast', runId: 'r-1', note: '--slow' });
-  assert.deepEqual(parseArgv(SPEC, ['r-1', '--note', '']), { mode: 'fast', runId: 'r-1', note: '' });
+test("objects' refusal of a command line is the package's own: Invalid, exit 2", () => {
+  assert.throws(() => parseArgvOf(SPEC, ['r-1', '--fast', '--slow']), CommandRefused);
+  assert.equal(refusalOf(['r-1', '--fast', '--slow']), 'ONE WAY', 'parseArgv: throw asInvalid(err)');
+  assert.throws(
+    () => amountOf('0', 'the cap', 'x'),
+    (err) => (err as { _tag?: string })._tag === 'Invalid',
+  );
+  assert.equal(parseArgv(SPEC, ['r-1'])?.runId, 'r-1', 'what is read is returned as it is');
 });
 
-test('a command line given too little is no refusal: the CLI prints its help', () => {
-  assert.equal(parseArgv(SPEC, []), undefined);
-  assert.equal(parseArgv(SPEC, ['']), undefined);
-  assert.equal(parseArgv(SPEC, ['--fast']), undefined);
+test('no command the client holds is named by a former name', () => {
+  for (const command of COMMAND_WORDS) assert.equal(RENAMED.has(command.name), false, `${command.name} is a key of RENAMED`);
 });
 
-test('a flag the command has none of, given where a required argument stands, is refused in its words; --help and its own print the help', () => {
-  assert.equal(refusalOf(['--nope']), 'UNKNOWN --nope');
-  assert.equal(refusalOf(['--nope=r-1']), 'UNKNOWN --nope=r-1');
-  assert.equal(parseArgv(SPEC, ['--help']), undefined);
-  assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
-  assert.equal(refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }), 'MISSING', 'a spec says its own refusal of a missing argument');
-  assert.equal(refusalOf(['-n'], { ...SPEC, missing: 'MISSING' }), 'MISSING');
-});
-
-test('an argument the command does not take is refused in its words', () => {
-  assert.equal(refusalOf(['r-1', '--loud']), 'UNKNOWN --loud');
-  assert.equal(refusalOf(['r-1', 'impl', 'extra']), 'UNKNOWN extra');
-  assert.equal(refusalOf(['r-1', '--fast=yes']), 'UNKNOWN --fast=yes');
-  assert.equal(refusalOf(['r-1', '--who=ada']), 'UNKNOWN --who=ada');
-});
-
-test('a value flag with no value is refused, saying what it takes', () => {
-  assert.equal(refusalOf(['r-1', '--note']), 'NOTE TAKES');
-  assert.equal(refusalOf(['r-1', '--who']), 'WHO TAKES');
-  assert.equal(refusalOf(['r-1', '--who', '--fast']), 'WHO TAKES');
-  names(refusalOf(['r-1', '--budget', '0']), '--budget takes the cap', 'above zero', '0 is not one', 'x <runId> --budget <amount>');
-});
-
-test('a value flag given twice is refused, in its own words or as an argument not taken', () => {
-  assert.equal(refusalOf(['r-1', '--note', 'a', '--note', 'b']), 'NOTE TWICE');
-  assert.equal(refusalOf(['r-1', '--who', 'a', '--who', 'b']), 'UNKNOWN --who');
-});
-
-test('two ways are refused, and one way given twice counts as two', () => {
-  assert.equal(refusalOf(['r-1', '--fast', '--slow']), 'ONE WAY');
-  assert.equal(refusalOf(['r-1', '--slow', '--slow']), 'ONE WAY');
-  assert.deepEqual(parseArgv(SPEC, ['r-1', '--slow']), { mode: 'slow', runId: 'r-1' });
-});
-
-test("a text flag's value given apart that is one of the command's flags is refused; joined, it is the value", () => {
-  assert.equal(refusalOf(['r-1', '--note', '--slow']), 'APART --slow');
-  assert.deepEqual(parseArgv(SPEC, ['r-1', '--note=--slow']), { mode: 'fast', runId: 'r-1', note: '--slow' });
-});
-
-const HOLDING: Spec = {
-  positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-  flags: [
-    { flag: '--until', kind: 'text', key: 'until', takes: 'UNTIL TAKES', many: true },
-    { flag: '--off', kind: 'switch', key: 'off' },
-  ],
-  unknown: (arg) => `UNKNOWN ${arg}`,
-  missing: 'MISSING',
-};
-
-test('a flag given once for each value collects them in order, never refused as given twice', () => {
-  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a', '--until=b']), { runId: 'r-1', until: ['a', 'b'] });
-  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a']), { runId: 'r-1', until: ['a'] });
-  assert.equal(refusalOf(['r-1', '--until'], HOLDING), 'UNTIL TAKES');
+test("watch's -l is given once for each label, collected in order", () => {
   assert.deepEqual(parseArgv(entry('watch').spec, ['-l', 'agent=ada', '-l', 'kind=Step']), { selector: ['agent=ada', 'kind=Step'] });
-});
-
-test('a switch with a key sets it to true, given once or more', () => {
-  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--off']), { runId: 'r-1', off: true });
-  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--off', '--off']), { runId: 'r-1', off: true });
-  assert.equal(refusalOf(['r-1', '--off=yes'], HOLDING), 'UNKNOWN --off=yes');
-});
-
-test('a spec that says its refusal of a required argument left out says it where the CLI would print its help', () => {
-  assert.equal(refusalOf([], HOLDING), 'MISSING');
-  assert.equal(refusalOf([''], HOLDING), 'MISSING');
-  assert.equal(refusalOf(['--off'], HOLDING), 'MISSING');
-  assert.equal(refusalOf(['-x'], HOLDING), 'MISSING');
-  assert.equal(parseArgv(SPEC, ['-x'])?.runId, '-x');
-});
-
-test('an empty text where a spec says its refusal is given to the handler, which refuses it in its own words; an empty name is not', () => {
-  const idea: Spec = { ...HOLDING, positionals: [{ key: 'idea', takes: 'required', kind: 'text' }] };
-  assert.deepEqual(parseArgv(idea, ['']), { idea: '' });
-  assert.equal(refusalOf(['-x'], idea), 'MISSING');
-  assert.equal(refusalOf([''], HOLDING), 'MISSING');
-  assert.equal(parseArgv({ ...idea, missing: undefined }, ['']), undefined);
 });
 
 test("a text flag's value left out — empty, or a word starting -- — is refused in its own takes", () => {
@@ -199,12 +133,8 @@ test("say's words are every argument after its step, joined", () => {
   assert.equal(parseArgv(SAY.spec, ['r-1']), undefined);
 });
 
-test('a flag is read wherever it stands among the positionals: a switch, a valued flag and a repeated flag, before them as after', async (t) => {
+test("a table command's flag is read wherever it stands among the positionals, before them as after", async (t) => {
   const rows: readonly (readonly [row: string, spec: Spec, after: readonly string[], before: readonly string[]])[] = [
-    ['a switch', HOLDING, ['r-1', '--off'], ['--off', 'r-1']],
-    ['a valued flag', SPEC, ['r-1', 'impl', '--who', 'bo'], ['--who', 'bo', 'r-1', 'impl']],
-    ['a valued flag between the positionals', SPEC, ['r-1', 'impl', '--note=hi'], ['r-1', '--note=hi', 'impl']],
-    ['a repeated flag', HOLDING, ['r-1', '--until', 'a', '--until', 'b'], ['--until', 'a', 'r-1', '--until', 'b']],
     ['show --raw', entry('show').spec, ['r-1', '--raw'], ['--raw', 'r-1']],
     ['closeout --try', entry('closeout').spec, ['r-1', 'impl', '--try', '1'], ['--try', '1', 'r-1', 'impl']],
     ['retry --budget', RETRY.spec, ['r-1', '--budget', '5'], ['--budget', '5', 'r-1']],
@@ -217,67 +147,13 @@ test('a flag is read wherever it stands among the positionals: a switch, a value
     });
 });
 
-test('-- ends the flags: each word after it is a positional, whatever it starts with', () => {
-  assert.deepEqual(parseArgv(SPEC, ['--who', 'bo', '--', '--slow']), { mode: 'fast', runId: '--slow', who: 'bo' });
-  assert.deepEqual(parseArgv(SPEC, ['r-1', '--', '--slow']), { mode: 'fast', runId: 'r-1', step: '--slow' });
-  assert.deepEqual(
-    parseArgv(HOLDING, ['--', '-x']),
-    { runId: '-x' },
-    'an operand is no argument left out, though the spec says its refusal',
-  );
-  assert.equal(refusalOf(['r-1', 'impl', '--', 'extra']), 'UNKNOWN extra');
-});
-
-test('a flag the command has none of, or a positional past those it takes, is refused before its arguments as after them', () => {
-  assert.equal(refusalOf(['--loud', 'r-1']), 'UNKNOWN --loud');
-  assert.equal(refusalOf(['--fast=yes', 'r-1']), 'UNKNOWN --fast=yes');
-  assert.equal(refusalOf(['--nope', 'r-1'], HOLDING), 'UNKNOWN --nope', 'its run given, the flag is what it does not take');
-  assert.equal(refusalOf(['--who', 'bo', 'r-1', 'impl', 'extra']), 'UNKNOWN extra');
+test("show refuses a positional past its run, before its flag as after, in its spec's words", () => {
   assert.equal(refusalOf(['--raw', 'r-1', 'r-2'], entry('show').spec), entry('show').spec.unknown('r-2'));
 });
 
-test('the command line a refusal shows names what was given and the usage of what was not', () => {
+test('the command line a table command shows names what was given', () => {
   assert.equal(commandLine(RETRY, { runId: 'r-1', step: 'impl' }), 'nemia retry r-1 impl');
-  assert.equal(commandLine({ name: 'x', spec: SPEC }, { runId: 'r-1' }), 'nemia x r-1 [<step>]');
-  assert.equal(commandLine({ name: 'x', spec: SPEC }, {}), 'nemia x <runId> [<step>]');
   assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
-});
-
-test("a rest takes the command's own flags given between its required arguments and its words, and every word after them as said", () => {
-  const spec: Spec = {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'text', takes: 'rest', kind: 'text' },
-    ],
-    flags: [{ flag: '--as', kind: 'name', key: 'as' }],
-    unknown: (arg) => `no ${arg}`,
-  };
-  assert.deepEqual(parseArgv(spec, ['r-1', '--as', 'operator', 'cut', 'it']), { runId: 'r-1', as: 'operator', text: 'cut it' });
-  assert.deepEqual(
-    parseArgv(spec, ['r-1', 'cut', '--as', 'operator']),
-    { runId: 'r-1', text: 'cut --as operator' },
-    'after the words, words',
-  );
-  assert.deepEqual(parseArgv(spec, ['r-1', '--other', 'x']), { runId: 'r-1', text: '--other x' }, 'a flag it has none of, words');
-});
-
-test('a command line says the flags it is given after its positionals, in the order its spec lists them', () => {
-  const two: Spec = {
-    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [
-      { flag: '--repo', kind: 'text', key: 'repos', many: true },
-      { flag: '--fresh', kind: 'switch', key: 'fresh' },
-      { flag: '--model', kind: 'name', key: 'model' },
-    ],
-    unknown: (arg) => arg,
-  };
-  const x = { name: 'x', spec: two };
-  assert.equal(
-    commandLine(x, { runId: 'r-1' }, { model: 'm', repos: ['a', 'b'], fresh: true }),
-    'nemia x r-1 --repo a --repo b --fresh --model m',
-  );
-  assert.equal(commandLine(x, {}, { repos: '<path>' }), 'nemia x <runId> --repo <path>');
-  assert.equal(commandLine(x, { runId: 'r-1' }, { fresh: false, other: 'y' }), 'nemia x r-1');
   const add = COMMANDS.find((c) => c.name === 'factory add')!;
   assert.equal(commandLine(add, {}, { repos: '<path>' }), 'nemia factory add <name> --repo <path>');
 });
@@ -884,19 +760,6 @@ test("the table's help is today's, word for word", () => {
   );
 });
 
-test('the help prints no command the CLI does not serve', () => {
-  const entry = (name: string, only?: { side: 'cli' | 'api'; why: string }) => ({
-    name,
-    usage: '<runId>',
-    help: ['h'],
-    ...(only ? { only } : {}),
-  });
-  assert.equal(
-    helpOf([entry('a'), entry('b', { side: 'api', why: 'w' }), entry('c', { side: 'cli', why: 'w' })]),
-    ['  nemia a <runId>', `${' '.repeat(31)}h`, '  nemia c <runId>', `${' '.repeat(31)}h`].join('\n'),
-  );
-});
-
 /** A spec that takes a card's `name`, and a file the CLI alone reads. */
 const CARD: Spec = {
   positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
@@ -1372,12 +1235,6 @@ test('REFUSED at shipped defaults: what each command refuses of its command line
       'and any label a person put',
     ]);
   });
-});
-
-test('a command line refuses a flag its spec does not have, as one the command does not take, and reads one the CLI alone takes', () => {
-  assert.equal(refusalOf(['x', '--words', 'hi'], CARD), 'UNKNOWN --words');
-  assert.equal(refusalOf(['x', '--words=hi'], CARD), 'UNKNOWN --words=hi');
-  assert.deepEqual(parseArgv(CARD, ['x', '--file', 'f.md']), { name: 'x', file: 'f.md' });
 });
 
 test('a former word or flag is run as what it became, with a hint, and a line in the new words is left as given', async (t) => {

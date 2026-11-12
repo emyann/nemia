@@ -68,11 +68,8 @@ Install as the Nemia user, over `ssh -t`, because the installer asks its questio
 ssh -t nemia@<address> 'curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh -s -- --bind <address>'
 ```
 
-It asks three things ([Install](/install/#install) explains each one):
-
-- **The Claude token.** Make the token with `claude setup-token` on a machine that has a browser and a signed-in Claude Code, then
-  paste it at the prompt, which asks it outright. It is not shown as you paste. [Your Claude token](/install/#your-claude-token)
-  explains whose token a server may run on.
+It asks two things ([Install](/install/#install) explains each one), and nothing of a harness: you activate one afterwards
+([Activate a harness](/install/#activate-a-harness)).
 - **Start at login.** Answer yes. The installer sizes the service to the machine. The 8 vCPU, 16 GB server read as about 15.2 GiB and
   was sized to 6 sessions at once, each limited to 7.6 GiB: the limit is half the machine, a ceiling on one session and not its share.
 - **The address to bind.** `--bind` already gave it the Tailscale address, so it does not ask
@@ -80,7 +77,7 @@ It asks three things ([Install](/install/#install) explains each one):
   addresses by number; a public one, or every interface, is refused unless you pass `--public`.
 
 Because the store is bound beyond the machine, every caller needs a person token. The installer prints none: it mints the server's own
-straight into its local context, and prints a first-visit link for the board (step 4). It ends on `nemia readiness`, which lists what
+straight into its local context, and prints a first-visit link for the board (step 4). It ends on `nemia doctor`, which lists what
 is in place and the command that fixes each piece that is not; the board's Setup page shows the same read.
 
 You can still mint a token straight into a file on your laptop, without it ever being shown:
@@ -118,9 +115,9 @@ The `sdlc` template's `build` and `quick` declare these as needs, each with its 
 one is missing, naming it, and starts by itself once it is met. On the board's Setup page, or on the server:
 
 ```bash
-nemia readiness fix gh --factory <factory> --workflow build
-nemia readiness fix gh-sign-in --factory <factory> --workflow build
-nemia readiness fix git-identity --factory <factory> --workflow build
+nemia doctor fix gh --factory <factory> --workflow build
+nemia doctor fix gh-sign-in --factory <factory> --workflow build
+nemia doctor fix git-identity --factory <factory> --workflow build
 ```
 
 The first installs the GitHub CLI into `~/.agent-workflows/tools`, without root. The second signs it in with the `workflow` scope and

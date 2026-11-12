@@ -3718,10 +3718,34 @@ factory trust <factory>`; each with the tools folder's
 reads missing (`needsHolding`, `contracts/needs.contract.ts`), listed `waiting on <need>: <fix>`, takes no slot, and its first step is
 filed on the pass after the need reads met. A run that has filed a step is never held by a need.
 
-`nemia readiness` reads every piece the machine needs before a factory's first run, each with its fix, and `nemia readiness fix <need>`
+`nemia doctor` reads every piece the machine needs before a factory's first run, each with its fix, and `nemia doctor fix <need>`
 starts one: filed on the runtime as a `command` task, its output followed to its end. A workflow's fix runs only where its factory's
 places are trusted (`fixRefusal`, `nemia factory trust <factory>`). A fix installs into the tools folder, `<WF_ROOT>/tools`, which the
-daemon puts first on its own PATH as it starts.
+daemon puts first on its own PATH as it starts, the places' `toolsPath` folders after it and the daemon's own Node's folder last, with
+the places' `toolsEnv` set under it. `nemia readiness`, the read's former name, is refused, naming `nemia doctor`.
+
+A fix says its kind (objects' `FIX_KINDS`): one the server runs (`puts`, a fix that says none); one a person types on the server
+(`typed`), offered not startable and refused `Invalid` by `startFix`, naming its command, since it asks for what a task cannot read, a
+code pasted back; and one that takes a met need away (`removes`), offered on a met piece alone and refused `Conflict` while an unfinished
+run needs it (`runsHoldingRemoval`, `contracts/harness-needs.contract.ts`), naming `nemia cancel <run>` for each.
+
+**A harness is two needs** its runtime adapter declares (`HarnessDeclaration.needs`, `harnessNeedsOf` in `src/needs/harness.ts`):
+`<harness>`, its program installed at the version the release was tested with into `<tools>/harnesses/<harness>/<pin>` and linked into
+the tools folder's `bin` (the install, then its removal), and `<harness>-sign-in`, its sign-in. A run needs the harnesses its frozen
+steps run a session on (`harnessesOfRun`), the default where a step names none, so a template that wants Codex says nothing beyond its
+`harness:` lines. The default harness's sign-in check runs with the token the store keeps. The read says a harness at its pin `tested`,
+any other version `untested` (it still runs), and none `unread` (`harnessVersionWord`). The engine is told the tools folder's `bin` as
+`harnessBin`, which the runtime looks in first at every spawn, so a harness activated after the daemon started is run.
+
+**A repository need** (`scope: repository`) is checked and fixed in each trusted factory's repository, read per factory in the area
+`repository` and fixed with `nemia doctor fix <need> --factory <factory>`: the git place's `repository-toolchain`, whose check is
+mise's `mise install --dry-run-code` and whose fix is `mise install`, beside its machine need `mise`. A repository says its tools in
+mise's own file (`.tool-versions`, `mise.toml`); one where mise reads none is met, and says so.
+
+**The carry.** `nemia doctor carry` installs, at this release's pins, each harness the tools folder holds activated and each a release
+of the store carries in its own tree (`upgradeCarries`, `src/release/carry.ts`). `nemia upgrade` runs the new release's before it
+switches, a carry that fails refusing the upgrade with nothing switched; and the daemon, at its start, adopts the Claude Code an older
+release carried into the tools folder where it holds none (`adoptBundled`), then files each carried install as a fix.
 
 ## One daemon per store: `daemon.json`
 

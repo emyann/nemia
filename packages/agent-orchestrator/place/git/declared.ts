@@ -9,9 +9,11 @@
  * From mise's documentation: the installer `curl -fsSL https://mise.run | sh` takes `MISE_INSTALL_PATH`, the executable's path, and
  * `MISE_VERSION`, the release (https://mise.jdx.dev/installing-mise.html); `MISE_DATA_DIR` holds tool installations, plugins and shims, the
  * shims in its `shims/` (https://mise.jdx.dev/directories.html); `mise install --dry-run-code` exits 1 when anything the config requests
- * needs installing, and `mise install` with no arguments installs each one (https://mise.jdx.dev/cli/install.html), trusting its active
+ * needs installing, and 0 where the config requests nothing (its source at `v2026.11.5`, `src/cli/install.rs`), and `mise install` with no
+ * arguments installs each one (https://mise.jdx.dev/cli/install.html), trusting its active
  * config itself (https://mise.jdx.dev/cli/trust.html); `.tool-versions` loads without trust outside paranoid mode
- * (https://mise.jdx.dev/paranoid.html).
+ * (https://mise.jdx.dev/paranoid.html). Each is read, none measured: `packages/agent-runtime/docs/harness.md`, *mise*, says how to confirm
+ * them on a machine with mise.
  */
 import type { PlaceDeclared } from '../../src/place/place.ts';
 

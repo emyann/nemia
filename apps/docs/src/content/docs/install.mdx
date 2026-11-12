@@ -25,11 +25,9 @@ lays the release down:
 - the command, `~/.local/bin/nemia`, a link to the release's own launcher. Put `~/.local/bin` on your PATH if the installer says it is
   not.
 
-Then it asks three things, on the server, each of which you can also answer by a flag with `--yes`, for a machine you set up by
+Then it asks two things, on the server, each of which you can also answer by a flag with `--yes`, for a machine you set up by
 script:
 
-- **Your Claude token** (below), asked outright and read without echo, which it hands to `nemia claude-token set` on its standard
-  input. With `--yes`, pass it as a file: `--claude-token-file <file>`; without one, it warns and goes on.
 - **Starting at login.** Yes runs `nemia service install --size auto`: a systemd user unit on Linux, or a launchd agent on macOS,
   with as many concurrent sessions and as much memory each as the machine's size allows. On Linux it also runs
   `loginctl enable-linger`, so Nemia keeps running after you log out. `--no-service` skips it; `nemia up` runs the daemon by hand.
@@ -39,8 +37,9 @@ script:
 Other flags: `--version <tag>` installs that release instead of the latest, `--base <url>` downloads from another place laid out
 as GitHub lays out a release, and `--board-base <url>` is the address the first-visit link is printed under (below).
 
-The installer prints no token. It ends on `nemia readiness` (below): what is in place, and the command that fixes each piece that is
-not.
+The installer prints no token, and installs no harness and asks for no harness's credential: a release carries no Claude Code and no
+Codex. It ends on `nemia doctor` (below): what is in place, and the command that fixes each piece that is not. You activate the
+harness your factories run on when you need it ([Activate a harness](#activate-a-harness)).
 
 ## Bind it to a private network
 
@@ -112,24 +111,49 @@ address `NEMIA_URL` names: `nemia pair` prints the line to put in your shell pro
 ## What is in place
 
 ```bash
-nemia readiness
-nemia readiness fix <need>
+nemia doctor
+nemia doctor fix <need>
 ```
 
 One read lists every piece a server needs before a factory's first run, each in place, missing or unknown, with the command or fix
-that puts it there: the Claude token, or Claude Code's own sign-in where none is set (set and loading; a wrong or expired token shows
-only when a session is refused), the service and
-its linger, the bind, cgroup v2 and `systemd --user`, the git identity, the needs each factory's workflows declare, a factory, and a
-newer release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
+that puts it there: each harness installed and signed in, the service and its linger, the bind, cgroup v2 and `systemd --user`, the
+git identity, mise and each factory's repository's toolchain, the needs each factory's workflows declare, a factory, and a newer
+release. On a laptop it adds whether its context reaches the server and its token is taken. The board's Setup page shows the
 same read, and a banner on every page while a piece is missing.
 
 A workflow declares the machine needs it has, and a fix for each: sdlc's `build` and `quick`, where the factory lands on GitHub, need
 the GitHub CLI signed in with the `workflow` scope. A run of such a workflow waits before its first session while a need is missing,
-naming it and its fix, and starts by itself once the need is met. `nemia readiness fix <need>` (or its button on Setup) runs the fix on
+naming it and its fix, and starts by itself once the need is met. `nemia doctor fix <need>` (or its button on Setup) runs the fix on
 the server and shows its output as it runs, a sign-in's device code set apart: open the link it shows on any device and type the
 code. A fix installs a tool into `~/.agent-workflows/tools`, never as root, and the daemon puts its `bin` first on its PATH. A
 factory's fix runs only once you trusted its places (`nemia factory trust <factory>`), and so does its check: an untrusted factory's
 needs read unknown, with that command.
+
+A repository says the tools it builds with in mise's own file, `.tool-versions` (or `mise.toml`), as `node 24.16.0`. The git place
+needs [mise](https://mise.jdx.dev), which its fix installs into the tools folder, and checks each factory's repository: where mise
+reads a tool that is not installed, the piece is missing and `nemia doctor fix repository-toolchain --factory <factory>` runs
+`mise install` there. Where mise reads no version file, the piece is in place and says `.tool-versions` is the file to add if the
+repository needs a toolchain. Nemia names no language.
+
+## Activate a harness
+
+A session runs on a harness, Claude Code or Codex, and a release installs none. Each is two pieces of the read, named by the harness:
+its install, by its own name (`claude`, `codex`), and its sign-in, by that name and -sign-in after it. On a first visit the board's Setup page asks which to activate,
+and you can skip it; or on the server:
+
+```bash
+nemia doctor fix claude
+```
+
+It installs the version this release was tested with into `~/.agent-workflows/tools/harnesses/<harness>/<version>`, its program linked
+into the tools folder's `bin`, which sessions find first, without root. Then sign it in, as the user the daemon runs as: the read names
+each way, and a sign-in that asks you for a code pasted back (`claude auth login`) is one you type on the server yourself; Codex's
+device sign-in runs from the board and shows its code set apart. A run that has filed nothing waits on whichever harness its steps
+run on, and starts by itself once it is installed and signed in. The read says a harness at another version untested: it still runs.
+
+A met harness's second fix takes it away (`nemia doctor fix claude --index 1`, Deactivate on Setup). It is refused while a run that has
+not finished needs it, naming `nemia cancel <run>` for each. `nemia upgrade` installs each activated harness at the new release's
+version before it switches, and the daemon of a new release adopts the Claude Code an older release carried, so nothing that ran stops.
 
 ## Your Claude token
 
@@ -158,9 +182,8 @@ may not make your Account available to anyone else."
 A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
 connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
 itself still work. Nor can it read the plan's usage, so the board's quota shows no limits on such a server, and says why. For the
-quota, sign in on the server with the Claude Code the sessions run — the board names it by its path; on a server with only the
-release, it is the one the release carries, `~/.agent-workflows/releases/current/node_modules/@anthropic-ai/claude-agent-sdk-<platform>-<arch>/claude`
-— then `/login`, and take the token away (`nemia claude-token rm`).
+quota, sign in on the server with the Claude Code the sessions run — the board names it by its path; activated, it is
+`~/.agent-workflows/tools/bin/claude` — then `/login`, and take the token away (`nemia claude-token rm`).
 
 ## A repository by its URL
 

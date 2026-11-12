@@ -401,6 +401,27 @@ install run as declared, by `bash -c`, under an environment of `HOME`, `NEMIA_TO
 Codex's device-code line at 0.154.0 (what `codex login --device-auth` prints, which its fix's `code` pattern reads) is unmeasured
 here: no sign-in is run by a step.
 
+### mise, which a repository's toolchain is installed by
+
+Not a harness, but installed by the same road (a need's fix into the tools folder), so its facts sit here. Each value the git place
+relies on (`packages/agent-orchestrator/place/git/declared.ts`), pinned at **mise v2026.11.5** (`MISE_PIN`), and where it was taken
+from. **None of it is measured**: running mise's installer on this machine was refused to the implement step, so each is read from mise's
+documentation or its source at that tag, read 2026-11-12.
+
+| Value | Relied on by | Read from | Measured |
+| --- | --- | --- | --- |
+| The installer takes `MISE_INSTALL_PATH` (the executable's path) and `MISE_VERSION` (the release) | the `mise` need's fix | https://mise.jdx.dev/installing-mise.html | no |
+| The release `v2026.11.5` exists, with Linux x64 and arm64 assets | `MISE_PIN` | https://github.com/jdx/mise/releases/tag/v2026.11.5 | no |
+| `MISE_DATA_DIR` holds installed tools, plugins and shims, the shims in its `shims/` | `toolsEnv: {MISE_DATA_DIR: 'mise'}`, `toolsPath: ['mise/shims']` | https://mise.jdx.dev/directories.html | no |
+| `mise install --dry-run-code` exits 1 where a tool the config requests is not installed, and 0 where all are, or where the config requests none | the `repository-toolchain` check, and a checkout with no version file reading met | https://mise.jdx.dev/cli/install.html, and the source `src/cli/install.rs` at `v2026.11.5` (`install_missing_runtimes`: `has_work = !requests.is_empty()`, exit 1 only with work) | no |
+| A bare `mise install` installs every tool the config requests that is missing, and trusts its active config itself | the `repository-toolchain` fix | https://mise.jdx.dev/cli/install.html, https://mise.jdx.dev/cli/trust.html | no |
+| `.tool-versions` loads with no `mise trust` outside paranoid mode | the fix is `mise install`, not `mise trust --yes && mise install` | https://mise.jdx.dev/paranoid.html | no |
+| mise reads `.nvmrc` and other tools' files only once a language is enabled (`idiomatic_version_file_enable_tools`) | a repository says its tools in `.tool-versions` or `mise.toml` | https://mise.jdx.dev/configuration.html | no |
+
+A machine with mise confirms them by: the installer's fix into a scratch `NEMIA_TOOLS`, then `mise --version`; `ls
+"$MISE_DATA_DIR/shims"` after a `mise install` of a `.tool-versions` holding `node 24.16.0`; `mise install --dry-run-code; echo $?` in
+that folder before the install (1), after it (0), and in a folder with no version file (0).
+
 ## `claude auth status`
 
 What tells, without starting a session, whether this machine's Claude Code holds a credential: what a job's spawn asks

@@ -38,6 +38,7 @@ export { latestRelease, runningRelease } from './release/version.verb.ts';
 export { claudeTokenFile, claudeTokenStatus, loadClaudeToken, tokenWarningLine, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
 export { readinessOf, liveFacts, type ReadinessFacts, type CommandRead } from './needs/readiness.verb.ts';
 export { startFix, fixOf, followFix, type FixFollowed } from './needs/fix.verb.ts';
+export { startUpgrade, upgradeOf, followUpgrade, upgradesRead, RunningCode, type UpgradeFollowed } from './release/upgrade-job.verb.ts';
 export { NeedsMemory, needsMemoryLayer, type NeedsMemo } from './needs/needs.verb.ts';
 export { toolsDir } from './config/root.store.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';

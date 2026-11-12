@@ -36,8 +36,9 @@ export function runningRelease(): Running {
 }
 
 /**
- * The newest release the release check of the store at `home` last read (`releases/latest.json`), and whether it is newer than the
- * install `running` runs; undefined for a checkout, which no check reads for, and where none was read.
+ * The newest release the release check of the store at `home` last read (`releases/latest.json`): its version, its tag, whether it is
+ * newer than the install `running` runs, and the address of its notes where the check kept one; undefined for a checkout, which no
+ * check reads for, and where none was read.
  */
 export function latestRelease(home: string, running: Running): Latest | undefined {
   if (running.kind !== 'install') return undefined;
@@ -45,7 +46,8 @@ export function latestRelease(home: string, running: Running): Latest | undefine
   if (latest === undefined) return undefined;
   const newest = parseVersion(latest.tag);
   const own = parseVersion(running.tag);
-  return { version: latest.version, newer: newest !== null && own !== null && olderThan(own, newest) };
+  const newer = newest !== null && own !== null && olderThan(own, newest);
+  return { version: latest.version, tag: latest.tag, newer, ...(latest.notes === undefined ? {} : { notes: latest.notes }) };
 }
 
 /**

@@ -47,8 +47,23 @@ test('the newest release the check read is newer than an install below it, not n
   });
   assert.equal(latestRelease(home, install('v1.2.0')), undefined, 'none read yet');
   writeLatest(home, { tag: 'v1.3.0', version: '1.3.0' });
-  assert.deepEqual(latestRelease(home, install('v1.2.0')), { version: '1.3.0', newer: true });
-  assert.deepEqual(latestRelease(home, install('v1.3.0')), { version: '1.3.0', newer: false });
-  assert.deepEqual(latestRelease(home, install('v1.10.0')), { version: '1.3.0', newer: false });
+  assert.deepEqual(latestRelease(home, install('v1.2.0')), { version: '1.3.0', tag: 'v1.3.0', newer: true });
+  assert.deepEqual(latestRelease(home, install('v1.3.0')), { version: '1.3.0', tag: 'v1.3.0', newer: false });
+  assert.deepEqual(latestRelease(home, install('v1.10.0')), { version: '1.3.0', tag: 'v1.3.0', newer: false });
   assert.equal(latestRelease(home, { kind: 'checkout', root: '/r' }), undefined);
+});
+
+test('the newest release answers its tag and the address of its notes where the check kept one', () => {
+  const home = scratch('wf-version-notes-');
+  const install: Running = {
+    kind: 'install',
+    root: '/r/v1.2.0',
+    tag: 'v1.2.0',
+    commit: 'c0ffee',
+    source: 'https://example.org',
+    builtAt: '',
+  };
+  const notes = 'https://example.org/releases/tag/v1.3.0';
+  writeLatest(home, { tag: 'v1.3.0', version: '1.3.0', notes });
+  assert.deepEqual(latestRelease(home, install), { version: '1.3.0', tag: 'v1.3.0', newer: true, notes });
 });

@@ -16,7 +16,8 @@ import { leftOut, type Args, type Flag, type Spec } from '../../command/command.
 import type { Command } from '../../command/entry.verb.ts';
 import { Invalid, type Refusal } from '../../refusal/refusal.ts';
 import type { FeedConflicts } from '../../feed/index.ts';
-import { FactoryDoor, factoryRepos, refuseName } from '../door/factories.store.ts';
+import { FactoryDoor, factoryRepos, originsOf, refuseName } from '../door/factories.store.ts';
+import { cloned } from '../clones/clones.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
 import { openedTree, packageSkillNames, problemLine, type OpenTemplate } from '../../template/template.store.ts';
@@ -647,7 +648,7 @@ const APPLY_SPEC: Spec = {
       key: 'repos',
       many: true,
       takes:
-        "--repo takes a repository's directory: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--repo <path> ...]",
+        "--repo takes a repository's directory or its git URL: nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...]",
     },
     {
       flag: '--set',
@@ -660,7 +661,7 @@ const APPLY_SPEC: Spec = {
   ],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --repo <path> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
+      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --repo <path|url> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
       : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <name|folder|archive> --repo <path>.`,
   missing:
     "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--set <key>=<value> ...].",
@@ -686,9 +687,10 @@ const applied = Effect.fn('applied')(function* (args: Args) {
         message: `nemia factory apply makes a factory from a template: name a builtin template, or a template's folder or archive, with --template <name|folder|archive>. Nothing was filed.`,
       }),
     );
-  const repos = yield* tried(() => {
+  const home = yield* StoreRoot;
+  const { repos, origins } = yield* tried(() => {
     refuseName(name, 'add');
-    return factoryRepos(name, manyOf(args, 'repos'));
+    return factoryRepos(home, name, manyOf(args, 'repos'));
   });
   const source = sourceGiven(given);
   const read = yield* renderedAt(source, manyOf(args, 'sets'));
@@ -699,8 +701,9 @@ const applied = Effect.fn('applied')(function* (args: Args) {
       }),
     );
   const template = { source, version: read.version, params: read.params };
-  const tree = treeDir(yield* StoreRoot, name);
-  const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, template, tree };
+  const tree = treeDir(home, name);
+  yield* cloned(origins);
+  const factory: Factory = { name, repos, workflows: [], hires: {}, schedules: {}, template, tree, ...originsOf(origins) };
   const file = yield* (yield* FactoryDoor).factories.create(factory);
   const place = builtinPlace(source, yield* BuiltinTemplates);
   return { name, repos, file, template, place, tree } satisfies Applied;
@@ -713,7 +716,7 @@ const applied = Effect.fn('applied')(function* (args: Args) {
 export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
   name: 'factory apply',
   served: [{ endpoint: 'factories.apply', request: templatePacked }],
-  usage: '<name> --template <name|folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
+  usage: '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]',
   help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),

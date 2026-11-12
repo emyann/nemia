@@ -1253,6 +1253,60 @@ const SEAL: readonly Walk[] = [
   },
 ];
 
+const CLONE: readonly Walk[] = [
+  {
+    name: "a repository's URL is cloned into a folder not there yet, which opens on the origin's commit, and asked again is found, not made",
+    walk: (side, area) => {
+      const { root, base } = repoIn(side, area);
+      const into = path.join(area, 'clones', 'here', 'repo');
+      const url = `file://${root}`;
+      const first = side.place.askNow('clone', { url, into });
+      const opening = opened(side, into);
+      const files = filesIn(into);
+      const again = side.place.askNow('clone', { url, into });
+      return { base, first, opened: opening, files, again, beside: fs.readdirSync(path.dirname(into)) };
+    },
+    says: {
+      again: { answer: { made: false, repo: '<area>/clones/here/repo' } },
+      base: 'commit-1',
+      beside: ['repo'],
+      files: { 'a.txt': 'one\n' },
+      first: { answer: { made: true, repo: '<area>/clones/here/repo' } },
+      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/clones/here/repo', inProgressFile: false },
+    },
+  },
+  {
+    name: 'REFUSED: a URL that names no repository, a folder that holds a file but no repository, and a file, each left as it was',
+    walk: (side, area) => {
+      const { root } = repoIn(side, area);
+      const held = path.join(area, 'held');
+      fs.mkdirSync(held);
+      fs.writeFileSync(path.join(held, 'note.txt'), 'kept\n');
+      fs.writeFileSync(path.join(area, 'file'), 'plain\n');
+      const ask = (url: string, into: string) => side.place.askNow('clone', { url, into });
+      const outcomes = [
+        ask(`file://${path.join(area, 'none')}`, path.join(area, 'out')),
+        ask(`file://${root}`, held),
+        ask(`file://${root}`, path.join(area, 'file')),
+      ];
+      return {
+        outcomes,
+        held: filesIn(held),
+        file: fs.readFileSync(path.join(area, 'file'), 'utf8'),
+        left: fs.readdirSync(area).sort(),
+        heldLeft: fs.readdirSync(held),
+      };
+    },
+    says: {
+      file: 'plain\n',
+      held: { 'note.txt': 'kept\n' },
+      heldLeft: ['note.txt'],
+      left: ['file', 'held', 'repo'],
+      outcomes: [{ refused: true }, { refused: true }, { refused: true }],
+    },
+  },
+];
+
 /** The contract: every verb's walks. A verb of `PLACE_VERBS` with no entry does not compile, and one with none fails `unwalked`. */
 export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
   root: ROOT,
@@ -1268,6 +1322,7 @@ export const WALKS: { readonly [V in PlaceVerb]: readonly Walk[] } = {
   remove: REMOVE,
   export: EXPORT,
   seal: SEAL,
+  clone: CLONE,
 };
 
 /** The verbs of `verbs` that `walks` holds no walk for. */

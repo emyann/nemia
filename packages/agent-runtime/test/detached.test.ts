@@ -70,6 +70,7 @@ import {
   SKILLS_STREAM,
   stream,
   MODE_STREAM,
+  SETTLED_STREAM,
   VERSIONED_STREAM,
 } from './reader-streams.ts';
 import { IMAGE } from '../src/harness/image.ts';
@@ -1502,14 +1503,22 @@ const repoWithWorktree = (trust: boolean) => {
   return { repo, wt, home };
 };
 
+/**
+ * `f` run under the Codex home `home`, with a `codex` first on PATH that answers `login status` signed in, as `prepare` asks before
+ * it reads the home: a Codex installed on the machine, asked under a home with no sign-in, would refuse every spawn.
+ */
 const inCodexHome = <T>(home: string, f: () => T): T => {
-  const prev = process.env.CODEX_HOME;
+  const prev = { CODEX_HOME: process.env.CODEX_HOME, PATH: process.env.PATH };
+  const bin = scratch('ae-codex-signed-in-');
+  fs.writeFileSync(path.join(bin, 'codex'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   process.env.CODEX_HOME = home;
+  process.env.PATH = `${bin}:${prev.PATH}`;
   try {
     return f();
   } finally {
-    if (prev === undefined) delete process.env.CODEX_HOME;
-    else process.env.CODEX_HOME = prev;
+    process.env.PATH = prev.PATH;
+    if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = prev.CODEX_HOME;
   }
 };
 
@@ -2474,6 +2483,22 @@ test("claudeStreamOutput: what claude -p's stream says as it happens — its den
       assert.equal('ranIn' in claudeStreamOutput(resultLine({})), false, 'no init line: nothing said');
       assert.equal('ranIn' in claudeResultOutput(MODE_STREAM), false, 'json output has no events');
       assert.equal(claudeStreamOutput(claudeStreamKept(MODE_STREAM)).ranIn, 'default', 'a kept capture reads the same');
+    },
+  );
+
+  await t.test(
+    "claude -p's stream says the mode a `status` line settles after its `init` line named another, and a kept capture keeps it once",
+    () => {
+      assert.equal(claudeStreamOutput(SETTLED_STREAM).ranIn, 'default', 'the init line said `auto`; the status line, the mode it ran in');
+      const lines = SETTLED_STREAM.split('\n');
+      assert.equal(claudeStreamOutput([lines[0], lines[1], lines.at(-1)].join('\n')).ranIn, 'auto', 'a status line naming no mode');
+      const kept = claudeStreamKept(SETTLED_STREAM);
+      assert.equal(claudeStreamOutput(kept).ranIn, 'default', 'a kept capture reads the same');
+      assert.deepEqual(
+        kept.split('\n').filter((l) => l.includes('"status"')),
+        [JSON.stringify({ type: 'system', subtype: 'status', permissionMode: 'default' })],
+        'the one status line that changes the mode, cut to it',
+      );
     },
   );
 

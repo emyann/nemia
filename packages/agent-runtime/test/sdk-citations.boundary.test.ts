@@ -48,6 +48,7 @@ const CLAIMS: Record<string, string> = {
   '4762': 'appendSystemPrompt',
   '5677': 'SDKMessageOrigin',
   '6182-6185': 'total_cost_usd',
+  '6326': 'SDKStatusMessage',
   '6354': 'claude_code_version',
   '6369': 'permissionMode',
   '9538': 'autoCompactWindow',

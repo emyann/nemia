@@ -386,6 +386,8 @@ const PINNED: Record<string, string[]> = {
     'latestRelease',
     'loadAgents',
     'loadClaudeToken',
+    'claudeTokenStatus',
+    'tokenWarningLine',
     'readinessOf',
     'BIND_PUBLIC_VARIABLE',
     'LINK_TTL_MS',

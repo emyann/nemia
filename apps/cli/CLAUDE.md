@@ -25,7 +25,9 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
   `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
   the runs' Table, from server reads that serve no Table: the pause first, how old where the branches stand is (`Daemon.branchesLine`), a
-  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path.
+  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path on this machine's context;
+  under a remote one it is refused, exit 2, naming `nemia show <run>` (`oneRunAway`): forwarded, the old path would print the Run
+  `GET /api/runs/:name` answers with its in-process listing's printer.
 - **Which daemon, in `src/context.ts`**: kubectl's contexts, the client's own config (`${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml`,
   0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
   remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` forwards a
@@ -48,7 +50,9 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   `COMMAND_WORDS`, and its old path's runner is deleted with the move.
 - **A client and a daemon of two releases are refused** (`src/release.ts`, `releaseMet`, proved by `contracts/release.contract.ts`): the
   client's release is its install's `release.json` `tag`, the daemon's `GET /api/health`'s `release`, either null for a checkout;
-  `served` refuses one that `differs`, exit 2, naming `nemia version`.
+  `served` refuses one that `differs`, exit 2, naming `nemia version`. One `unsaid` is let through, and the decode guards it: an answer
+  that does not decode by its `Api` Schema is refused in `answerOf`, exit 2, naming the verb, both releases as known (`servedWith` hands
+  the daemon's on) and `nemia version` (`undecoded`, `src/objects.ts`), never a JavaScript error.
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
   live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds

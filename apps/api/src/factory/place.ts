@@ -96,3 +96,12 @@ export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
       'this api has no repository of its own: it runs a release whose source is no folder. Name a factory to read in, ?factory=<name>, or file one: nemia factory add <name> --repo <path>.',
   });
 }
+
+/**
+ * The repository whose layer a read or a write of definitions takes beside yours: the place's own; none where the request names no factory
+ * and the api has no repository (an install), which reads yours and the builtins alone; and, for a factory named whose repository the
+ * request leaves open, refused as `repoNeeded` refuses it, naming the `?repo=` that picks one, rather than read without a word.
+ */
+export function repoLayer(place: Pick<Place, 'repo' | 'factory'>): string | undefined {
+  return place.repo !== undefined || place.factory === undefined ? place.repo : repoNeeded(place);
+}

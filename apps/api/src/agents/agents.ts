@@ -48,7 +48,7 @@ export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: strin
  */
 export const listingOf = Effect.fnUntraced(function* (
   { custom: _custom, ...read }: AgentReading,
-  repo: string,
+  repo: string | undefined,
   home: string,
   tree?: string,
 ) {

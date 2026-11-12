@@ -65,7 +65,8 @@ export const AGENTS: Command<AgentsRead, AgentsInput> = {
     why: "the api serves it as the Agent's `list` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentsInput,
-  handler: ({ repo = '.' }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
+  /** None given, no repository's read: the command line's runner gives the folder it is typed in (`agentsRun`). */
+  handler: ({ repo }) => Effect.flatMap(StoreRoot, (root) => agentsRead({ repo, home: root })),
   print: agentsLines,
 };
 
@@ -89,7 +90,8 @@ export const AGENT_CARD: Command<CardRead, AgentCardInput> = {
     why: "the api serves it as the Agent's `card` verb of `objects`' Api (`/api/namespaces/:namespace/agents`), which calls this entry's handler: no route of its own",
   },
   input: AgentCardInput,
-  handler: ({ name, repo = '.', from }) =>
+  /** None given, no repository's read: the command line's runner gives the folder it is typed in (`agentsCardRun`). */
+  handler: ({ name, repo, from }) =>
     Effect.flatMap(StoreRoot, (root) => agentCardRead(name, { repo, home: root, ...(from !== undefined && { from }) })),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
   note: (data, { name }) => cardNote(data, name),

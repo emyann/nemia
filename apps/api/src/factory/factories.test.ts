@@ -179,6 +179,16 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       assert.equal(fallen.status, 422, 'two repositories: none is filled in, and the api own is not one of them');
       saysAll(said(fallen.body), [...sorted, `?factory=pair&repo=${sorted[0]}`]);
       assert.ok(!said(fallen.body).includes(own), 'the api own, which is not one of them, is not offered');
+      for (const kind of ['workflows', 'agents', 'skills']) {
+        const plain = await app.request(`/api/namespaces/pair/${kind}`);
+        const body = (await plain.json()) as { error?: string };
+        assert.equal(
+          plain.status,
+          422,
+          `a plain list of ${kind}, no ?origin=, is refused as the repository's read is: ${JSON.stringify(body)}`,
+        );
+        assert.ok(body.error?.includes(`?factory=pair&repo=${sorted[0]}`), `${kind}: names the ?repo= that picks one`);
+      }
       const inside = await workflowsListed<WorkflowListing>(app, `factory=pair&repo=${encodeURIComponent(repoS)}`);
       assert.equal(inside.status, 200, 'one of its repositories is served');
     },

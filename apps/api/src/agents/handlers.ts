@@ -50,23 +50,13 @@ import {
   Invalid,
 } from 'objects';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
+import { repoLayer } from '../factory/place.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
-import {
-  listed,
-  originAsked,
-  servedNamed,
-  servedOf,
-  thereOf,
-  writeGoes,
-  writtenAt,
-  type Held,
-  type Origin,
-} from '../definitions/served.ts';
+import { listed, originIn, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** The agents of the factory's tree, read as the repository's are, then told apart by their origin. */
@@ -77,7 +67,7 @@ const treeAgents = (s: Served) =>
     const dir = path.join(tree, 'workflows', AGENTS_FOLDER);
     const read: AgentReading[] = [];
     for (const name of markdownNamesIn(dir)) {
-      const one = yield* agentRead('repo', dir, name, { repo: repoNeeded(s), home: s.home });
+      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home });
       if (one) read.push(one);
     }
     return read;
@@ -85,7 +75,7 @@ const treeAgents = (s: Served) =>
 
 /** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
 const fillsIn = (s: Served) => ({
-  filled: stepsFilled(repoNeeded(s), s.home, s.factory),
+  filled: stepsFilled(repoLayer(s), s.home, s.factory),
   byFile: factoriesFilling(listedAtOnce(s.home), s.home),
 });
 
@@ -96,7 +86,7 @@ const fillsIn = (s: Served) => ({
  */
 export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
   const tree = await s.inRequest(treeAgents(s));
-  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoNeeded(s), s.home, s.factory?.tree)));
+  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoLayer(s), s.home, s.factory?.tree)));
   return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item }));
 }
 
@@ -105,14 +95,15 @@ export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(
  * other only where it fills a step there (`inFactory`).
  */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
-  const { agents } = await s.inRequest(AGENTS.handler({ repo: s.repo }));
+  const repo = repoLayer(s);
+  const { agents } = await s.inRequest(AGENTS.handler({ repo }));
   const fills = fillsIn(s);
   const own = await treeAgentsHeld(s, 'factory', fills);
   const trees = new Set(own.map(({ item }) => item.file));
   const listings = await s.inRequest(
     Effect.forEach(
       agents.filter((one) => !trees.has(one.file)),
-      (one) => listingOf(one, repoNeeded(s), s.home),
+      (one) => listingOf(one, repo, s.home),
     ),
   );
   const elsewhere = inFactory(listings, fills.filled, fills.byFile, s.factory);
@@ -270,7 +261,7 @@ async function triedIn(s: Served, namespace: string, name: string, brief: string
 
 /** The A2A card of the agent `name` from `origin` (`nemia agents card`'s entry), beside why nothing serves it over A2A. */
 async function cardIn(s: Served, namespace: string, name: string, origin: string | undefined) {
-  const served = servedNamed(await heldIn(s), name, originAsked(origin), listPath(namespace));
+  const served = servedNamed(await heldIn(s), name, originIn(s, origin), listPath(namespace));
   if (served.item.error !== null) throw new Invalid({ error: served.item.error });
   if (served.origin === 'factory')
     throw new Invalid({
@@ -321,13 +312,13 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
       Effect.flatMap(wantsTable, (table) =>
         answeredWriteIn(namespace, async (s) => {
           const { origin, ...page } = query;
-          const list = listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
+          const list = listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originIn(s, origin)), namespace), queryOf(page));
           return table ? agentTable(list) : list;
         }),
       ),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
-      answeredWriteIn(namespace, (s) => agentAt(s, namespace, name, originAsked(query.origin))),
+      answeredWriteIn(namespace, (s) => agentAt(s, namespace, name, originIn(s, query.origin))),
     )
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, async (s) => {

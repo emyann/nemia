@@ -86,6 +86,8 @@ import { decideVerb } from './decide/decide.ts';
 import {
   admitRun,
   agentsCustomRun,
+  agentsRun,
+  agentsCardRun,
   policyProposeRun,
   factoryInstructRun,
   factoryRulesRun,
@@ -428,6 +430,8 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['inbox from', inboxFromRun],
+  ['agents', agentsRun],
+  ['agents card', agentsCardRun],
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],

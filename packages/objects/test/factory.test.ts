@@ -23,6 +23,7 @@ const templated = {
     template: { source: 'sdlc', version: '1.2.0', params: { repo: '/repo', strict: true, cap: 3 } },
     level: 'semi-auto',
     costLines: { build: 80 },
+    origins: { '/repo': 'https://example.com/o/r.git' },
   },
   status: {
     observedGeneration: 3,

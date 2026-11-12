@@ -114,7 +114,7 @@ test('REFUSED: two adds of one name, the second while the first is between its w
 test('REFUSED: `nemia factory add`, nothing filed', async (t) => {
   await t.test('no --repo is Invalid, naming the flag', async () => {
     fresh();
-    await assert.rejects(main(['factory', 'add', 'pipao'], noEngine()), refused('Invalid', 'nemia factory add pipao --repo <path>'));
+    await assert.rejects(main(['factory', 'add', 'pipao'], noEngine()), refused('Invalid', 'nemia factory add pipao --repo <path|url>'));
     assert.deepEqual(filed(), []);
   });
   await t.test('a --repo missing, or a file, is Invalid, naming each', async () => {

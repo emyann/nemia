@@ -12,13 +12,32 @@
  * Refused besides: another scheme, a host left empty, and a path that is empty or would climb or step aside (`.` or `..` or an empty
  * segment), or that holds a space, a `%`, a backslash, a colon or an `@`.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
+import { lowerHost } from '../src/factory/clones/host.ts';
 
-/** What a `--repo` value names. Declared here until implement moves it into `src/factory/clones/clones.ts`. */
+/** What a `--repo` value names, which `src/factory/clones/clones.ts` re-exports. */
 export type CloneTarget =
   | { readonly kind: 'path' }
   | { readonly kind: 'url'; readonly folder: string }
   | { readonly kind: 'refused'; readonly message: string };
+
+/**
+ * A host lower-cased, which the verifier does not read: of the same length, and holding a `/`, a space, a `%`, a backslash, a colon or
+ * an `@` only where the host does.
+ */
+export const lowerHostAssumed = assume(lowerHost, {
+  pure: true,
+  ensures: {
+    sameLength: ({ input: [host], output }) => output.length === host.length,
+    nothingAdded: ({ input: [host], output }) =>
+      (host.includes('/') || !output.includes('/')) &&
+      (host.includes(' ') || !output.includes(' ')) &&
+      (host.includes('%') || !output.includes('%')) &&
+      (host.includes('\\') || !output.includes('\\')) &&
+      (host.includes(':') || !output.includes(':')) &&
+      (host.includes('@') || !output.includes('@')),
+  },
+});
 
 /** Whether git reads `given` as a local path: no colon, or a slash before the first colon. */
 const isPath = (given: string): boolean => {
@@ -47,11 +66,14 @@ const authorityOf = (given: string): string => {
   return slash < 0 ? rest : rest.slice(0, slash);
 };
 
-/** Whether the scheme form carries a password: a colon in the user part, before the authority's last `@`. */
+/**
+ * Whether the scheme form carries a password: a colon in the user part, before the authority's last `@` — said as an `@` after the
+ * authority's first colon, which is the same.
+ */
 const holdsPassword = (given: string): boolean => {
   const authority = authorityOf(given);
-  const at = authority.lastIndexOf('@');
-  return at >= 0 && authority.slice(0, at).includes(':');
+  const colon = authority.indexOf(':');
+  return colon >= 0 && authority.slice(colon).includes('@');
 };
 
 /** Whether a clone's folder stays under `clones/`: relative, a host and a path at least, no segment empty, `.` or `..`. */
@@ -138,7 +160,7 @@ const cloneTargetSpec = spec<(given: string) => CloneTarget>({
         const rest = given.slice(8);
         if (!plainHttpsRest(rest)) return true;
         const host = rest.slice(0, rest.indexOf('/'));
-        return output.kind === 'url' && output.folder.startsWith(`${host.toLowerCase()}/`);
+        return output.kind === 'url' && output.folder.startsWith(`${lowerHost(host)}/`);
       },
     },
     plainScpCloned: {
@@ -146,7 +168,7 @@ const cloneTargetSpec = spec<(given: string) => CloneTarget>({
       condition: ({ input: [given], output }) => {
         if (!plainScp(given)) return true;
         const host = given.slice(4, given.indexOf(':'));
-        return output.kind === 'url' && output.folder.startsWith(`${host.toLowerCase()}/`);
+        return output.kind === 'url' && output.folder.startsWith(`${lowerHost(host)}/`);
       },
     },
   },

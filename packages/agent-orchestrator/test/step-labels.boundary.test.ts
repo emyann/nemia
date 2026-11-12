@@ -80,12 +80,14 @@ const stoppedAfter = (t: TestContext, e: ClientEngine, id: string) =>
  * The variables the client's engine hands a job of the shipped `claude` harness, with `NEMIA_TOOL_DETAILS` set to `details` (or unset):
  * a stub `claude` writes the telemetry variables it was started with and exits, and the engine is ticked until it has. A job runs on
  * the Agent SDK, which spawns the Claude Code `AE_CLAUDE_EXECUTABLE` names (`bin/ae-claude-job.ts`), so the stub is named there as
- * well as put first on PATH: what it is started with is what the job's own process handed the SDK (`Options.env`).
+ * well as put first on PATH: what it is started with is what the job's own process handed the SDK (`Options.env`). It answers the
+ * runtime's `auth status` before the spawn signed in, and writes nothing then.
  */
 const jobTelemetry = async (t: TestContext, details: string | undefined) => {
   const bin = scratch('wf-step-labels-bin-');
   const seen = path.join(bin, 'env.json');
   const script = `#!${process.execPath}
+if (process.argv[2] === 'auth') { console.log('{"loggedIn":true}'); process.exit(0); }
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('OTEL_')));
 require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
 `;

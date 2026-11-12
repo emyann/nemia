@@ -171,6 +171,11 @@ test('REFUSED: `nemia factory` typed with a subcommand, a flag or an argument it
     ],
     [['add', 'pipao', '--rep', '/x'], ['--rep']],
     [
+      ['add', 'acme', '--template', 'mill', '--repo', '/x'],
+      ['--template', 'nemia factory apply <name> --template <name|folder|archive> --repo <path|url>', '--set <key>=<value>'],
+    ],
+    [['add', 'acme', '--template=mill', '--repo', '/x'], ['nemia factory apply <name> --template']],
+    [
       ['hire', 'pipao', 'ada'],
       ['nemia factory hire', '--step'],
     ],

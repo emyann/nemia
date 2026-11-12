@@ -183,18 +183,19 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       assert.equal(detail.status.pruned, null, 'a run never pruned says so with a null, not a missing field');
     },
   );
-  await s.test("a decision asked with diffs answers each check-affecting file's path and counts, its lines on ask by path", async () => {
+  await s.test("a decision answers each check-affecting file's path and counts, its lines asked with diffs, by path or `*`", async () => {
     const files = async (query: string) => {
       const res = await app.request(`/api/runs/r-d1/decision${query}`);
       assert.equal(res.status, 200);
       return ((await res.json()) as Decidable).sensitive.flatMap((b) => b.files);
     };
-    const whole = await files('');
+    const whole = await files('?diffs=*');
     assert.ok(
       whole.some((f) => f.lines.length > 0),
-      'read whole, the diffs are answered',
+      'asked with diffs=*, the diffs are answered whole',
     );
-    const narrow = await files('?diffs=');
+    assert.deepEqual(await files('?diffs='), await files(''), 'asked with none, as asked for no diff');
+    const narrow = await files('');
     assert.deepEqual(
       narrow.map((f) => [f.path, f.lines.length, f.linesLeftOut, f.added]),
       whole.map((f) => [f.path, 0, true, f.added]),

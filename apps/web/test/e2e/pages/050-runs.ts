@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import type { RunList } from 'objects';
+import { LIST_PAGE, type RunList } from 'objects';
 import {
   FINISHED_SELECTOR,
   FINISHED_SIZE,
@@ -84,15 +84,19 @@ async function asksOf(page: Page): Promise<string[]> {
   return asked;
 }
 
-/** The two reads of the page: the RunList of the runs not finished, and the first page of the finished, nine of them. */
-const TWO_READS = [`/api/runs?fieldSelector=${OPEN_SELECTOR}`, `/api/runs?limit=${FINISHED_SIZE}&fieldSelector=${FINISHED_SELECTOR}`];
+/** The two reads of the page: the RunList of the runs not finished, every page of it, and the first page of the finished, nine of them. */
+const TWO_READS = [
+  `/api/runs?limit=${LIST_PAGE.most}&fieldSelector=${OPEN_SELECTOR}`,
+  `/api/runs?limit=${FINISHED_SIZE}&fieldSelector=${FINISHED_SELECTOR}`,
+];
 
 /** The page asks its two reads of the RunList by state, and never the whole list. */
 async function twoReads(page: Page): Promise<void> {
   const asked = await asksOf(page);
   for (const read of TWO_READS)
     if (!asked.includes(read)) throw new Refused(`the Runs page asks GET ${read} — it asked ${[...new Set(asked)].join(', ')}`);
-  if (asked.includes('/api/runs')) throw new Refused('the Runs page never asks GET /api/runs, the whole list — it did');
+  if (asked.includes(`/api/runs?limit=${LIST_PAGE.most}`))
+    throw new Refused('the Runs page never asks GET /api/runs, the whole list — it did');
 }
 
 /** The three sections, by their names. */

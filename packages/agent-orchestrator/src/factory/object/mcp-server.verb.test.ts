@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { HEADER_MASK, McpServer, McpServerList } from 'objects';
 import { builtinServerList, mcpServerOf } from './mcp-server.verb.ts';
 
@@ -24,11 +24,27 @@ test("a server's headers are masked, its state carried, and why the states are u
 });
 
 test('the builtin servers are a McpServerList whose items carry a spec alone and no namespace', () => {
-  const list = builtinServerList();
+  const list = Effect.runSync(builtinServerList({}));
   assert.ok(Schema.is(McpServerList)(list));
   assert.ok(list.items.length > 0, 'the package holds builtin servers');
   for (const s of list.items) {
     assert.equal(s.metadata.namespace, undefined);
     assert.equal(s.status, undefined);
   }
+});
+
+test('the builtin servers are sorted by name and paged by limit and continue, each once', () => {
+  const whole = Effect.runSync(builtinServerList({}));
+  const names = whole.items.map((s) => s.metadata.name);
+  assert.deepEqual(names, [...names].sort());
+  const walked: string[] = [];
+  let next: string | undefined;
+  do {
+    const page = Effect.runSync(builtinServerList({ limit: 1, ...(next === undefined ? {} : { continue: next }) }));
+    assert.ok(page.items.length <= 1);
+    walked.push(...page.items.map((s) => s.metadata.name));
+    next = page.metadata.continue;
+  } while (next !== undefined);
+  assert.deepEqual(walked, names);
+  assert.equal(Effect.runSync(Effect.result(builtinServerList({ limit: 0 })))._tag, 'Failure', 'a limit of 0 is refused');
 });

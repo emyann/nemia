@@ -10,7 +10,6 @@
  * since the store holds none of a template's, so each of its hires fills its step as in a factory applied from it. Each program runs over
  * the request's own services (`inRequest`), so the builtin folder and the folder of renders are the app's.
  */
-import { HttpApiBuilder } from 'effect/http-api';
 import { templateList, templateObject, templateTree, type Factory } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
@@ -20,6 +19,7 @@ import { skillObjectsOf, treeSkillsHeld } from '../skills/index.ts';
 import { treeWorkflowsHeld, workflowObjectsOf } from '../workflows/index.ts';
 import { queryOf } from '../factory/parts/parts.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /**
  * The request's services placed in the template `name`'s render, as a factory made from it is: its workflows and hires the render's
@@ -48,7 +48,7 @@ const theOne = <T>([one]: readonly T[], doc: string): T => {
   return one;
 };
 
-export const templatesHandlers = HttpApiBuilder.group(Api, 'templates', (handlers) =>
+export const templatesHandlers = readsBounded(Api, 'templates', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => answered((s) => s.inRequest(templateList(queryOf(query)))))
     .handle('get', ({ params: { name } }) => answered((s) => s.inRequest(templateObject(name))))

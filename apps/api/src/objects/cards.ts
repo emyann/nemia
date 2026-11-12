@@ -15,7 +15,6 @@
  * (`cardTable`): the columns `nemia inbox` prints, never words of the api's own. Each entry is called by its `input`, through `inRequest`.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   cardList,
   cardObject,
@@ -39,6 +38,7 @@ import type { Served } from '../layer.ts';
 import { cardStart } from '../runs/start.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 import { wantsTable } from './table.ts';
+import { readsBounded } from './answer-bound.ts';
 
 /** How a read of the cards judges a started card's run: off the app's informer, verified as the env says. */
 const howOf = (s: Served): SummaryHow => ({
@@ -95,7 +95,7 @@ const queued = (namespace: string, name: string, off: boolean) =>
     return cardIn(s, namespace, name);
   });
 
-export const cardsHandlers = HttpApiBuilder.group(Api, 'cards', (handlers) =>
+export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => page(undefined, query))
     .handle('list', ({ params: { namespace }, query }) => page(namespace, query))

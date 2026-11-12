@@ -1,10 +1,10 @@
 /**
  * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: the RunList (`runListOf`) answers
  * every other run as it would, and leaves the run whose task does not read unjudged, saying why in the runtime's words (its `unjudged`
- * entry) — in flight on a list asked by state, as the tick leaves such a run where it is and counts it; `nemia ls` lists it off its
- * record. So does a run waiting on it, whose parent's task is read to see if it landed. A run's own page refuses in those words, and the
- * cap on runs in flight counts both, unjudged, as the tick counts them. A pass has read where the runs' branches stand (`passStanding`),
- * which the list reads off `standing.json`.
+ * entry) — in flight on a list asked by state, as the tick leaves such a run where it is and counts it. So does a run waiting on it,
+ * whose parent's task is read to see if it landed. A run's own page refuses in those words, and the cap on runs in flight counts both,
+ * unjudged, as the tick counts them. A pass has read where the runs' branches stand (`passStanding`), which the list reads off
+ * `standing.json`.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -19,7 +19,7 @@ import type { Ceilings } from '../gauges/ceilings.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runsAtOnce } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
-import { lsOf, runListOf } from '../../test/run-reads.ts';
+import { runListOf } from '../../test/run-reads.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -137,12 +137,6 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
       );
       assert.ok(bad.unreadable.includes('the tick does not advance it, until that journal reads again'), bad.unreadable);
       assert.equal(bad.namespace, 'pipao', 'its factory among it');
-      const ls = await lsOf(app, 'r-bad');
-      assert.equal(ls.run.brief, 'The brief of r-bad', 'what its record says, as `nemia ls` lists it');
-      assert.deepEqual(
-        ls.listed.steps.map((s) => [s.name, ls.run.steps[s.name]?.taskId, s.message]),
-        [['implement', 'r-bad-implement', 'unreadable']],
-      );
       const byState = await runListOf(app, 'fieldSelector=status.state!%3Dfinished');
       assert.deepEqual(
         byState.unjudged?.map((entry) => [entry.name, entry.state]).sort(),
@@ -160,7 +154,6 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
         ),
         child.unreadable,
       );
-      assert.deepEqual((await lsOf(app, 'r-child')).run.after, ['r-bad']);
     },
   );
   await s.test(

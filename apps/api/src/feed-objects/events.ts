@@ -4,14 +4,14 @@
  * names no factory read at `/api/events/<name>` alone. Read through the package's Feed door (`eventList`, `eventObject`), at the app's
  * `StoreRoot`.
  */
-import { HttpApiBuilder } from 'effect/http-api';
 import { eventList, eventObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import { factoryNamed, queryOf } from '../factory/parts/parts.ts';
 import { runPlaced } from '../store.ts';
 import { answered } from '../objects/refused.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
-export const eventsHandlers = HttpApiBuilder.group(Api, 'events', (handlers) =>
+export const eventsHandlers = readsBounded(Api, 'events', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => answered((s) => runPlaced(s, s.e, eventList(queryOf(query)))))
     .handle('list', ({ params: { namespace }, query }) =>

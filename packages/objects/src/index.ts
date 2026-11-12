@@ -14,6 +14,7 @@ export {
   StepCost,
   StepCheck,
   StepCloseout,
+  type BodyPage,
   closeoutNarrowed,
   fieldsNamed,
   StepRaise,
@@ -98,6 +99,7 @@ export {
   RUNS_IN_BY,
   type RunsInBy,
   SAID_AFTER,
+  READ_SHAPES,
   type SaidAfter,
   SETTING_ORIGINS,
   SIGN_IN_STATES,
@@ -228,12 +230,14 @@ export {
   keysOfEndpoint,
   streamsOf,
 } from './endpoint-keys.ts';
+export { jsonBodied } from './write-body.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';
 export {
   Api,
   type ApiEndpointName,
+  type ApiGetName,
   BadRequest,
   Conflict,
   Failed,
@@ -336,7 +340,7 @@ export {
 } from './words.ts';
 export { UnsupportedMediaType } from './api-errors.ts';
 export { Table, TABLE_ACCEPT, TableColumnDefinition, TableRow, tableLines, type TableAsked } from './table.ts';
-export { Concluded, RunLines, RunRecord, RunsListed, StepCommands, WorkflowPageAddress } from './run-reads.ts';
+export { Concluded, RunLines, RunRecord, StepCommands, WorkflowPageAddress } from './run-reads.ts';
 export { Gone, ReadFailed } from './api-errors.ts';
 export {
   LifecycleEdge,
@@ -512,3 +516,16 @@ export {
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
 export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
+export {
+  ANSWER_MOST,
+  BODY_PAGE,
+  LIST_PAGE,
+  LOG_TAIL,
+  type PageBounds,
+  READS,
+  type ReadBound,
+  type ReadShape,
+  readsUnbounded,
+  SHORT_FIELD,
+  TRANSCRIPT_PAGE,
+} from './reads.ts';

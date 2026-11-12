@@ -17,6 +17,7 @@ import { TABLE_ACCEPT, WatchedObject, watchEventOf } from 'objects';
 import { appOf, liveOf } from '../app.ts';
 import { ENDPOINTS } from '../objects/endpoints.ts';
 import { Beats } from '../layer.ts';
+import { WatchPage } from './watch.ts';
 import { until, type Waiter } from '../../test/waits.ts';
 
 /** Waits for `ok`, read every 20 ms, said as `what` if it never comes. */
@@ -40,9 +41,9 @@ card('w-1', { team: 'core' });
 card('w-2', { team: 'infra' });
 
 /** A watch opened on `url`: each event as it arrives, read off the stream, and the abort that ends it. */
-async function watch(t: Waiter, url: string) {
+async function watch(t: Waiter, url: string, over: { request: typeof app.request } = app) {
   const gone = new AbortController();
-  const res = await app.request(url, { signal: gone.signal });
+  const res = await over.request(url, { signal: gone.signal });
   assert.equal(res.status, 200, url);
   assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/, `${url} answers a stream`);
   const events: WatchEvent[] = [];
@@ -102,6 +103,28 @@ test('a watch of cards sends each as ADDED, then a BOOKMARK; then a card filed A
     assert.equal(deleted?.type !== 'BOOKMARK' && deleted?.object.metadata.labels?.team, 'docs', 'DELETED carries the last object sent');
     assert.deepEqual(changes(w.events, 'w-3'), ['ADDED', 'MODIFIED', 'DELETED'], 'an unchanged re-read sends nothing');
     assert.deepEqual(changes(w.events, 'w-1'), ['ADDED'], 'a card that did not change is sent once');
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch reads its list through every page: over more cards than a page holds, each is sent ADDED once', async (t) => {
+  const paged = appOf(
+    Layer.mergeAll(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), watch: '50 millis' }), Layer.succeed(WatchPage)(2)),
+  );
+  const names = ['wp-1', 'wp-2', 'wp-3', 'wp-4', 'wp-5'];
+  for (const name of names) card(name, { pages: 'yes' });
+  t.after(() => {
+    for (const name of names) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+  });
+  const w = await watch(t, '/api/namespaces/default/cards?watch=true&labelSelector=pages%3Dyes', paged.app);
+  try {
+    const initial = await w.initial();
+    assert.deepEqual(initial.map(named).sort(), names, 'every card of three pages of two, once each');
+    card('wp-6', { pages: 'yes' });
+    names.push('wp-6');
+    await waitFor(t, () => changes(w.events, 'wp-6').includes('ADDED'), 'a card filed after, on the third page, ADDED');
+    assert.deepEqual(changes(w.events, 'wp-1'), ['ADDED'], 'a card on the first page is not sent DELETED by a read again of later pages');
   } finally {
     await w.stop();
   }

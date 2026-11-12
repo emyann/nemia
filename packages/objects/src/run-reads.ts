@@ -46,11 +46,3 @@ export type Concluded = typeof Concluded.Type;
 /** A run's record as `nemia show --raw` prints it: its brief cut at 120 characters and each frozen step's body at 60. */
 export const RunRecord = Schema.Record(Schema.String, Schema.Unknown).annotate({ identifier: 'RunRecord' });
 export type RunRecord = typeof RunRecord.Type;
-
-/**
- * What `nemia ls` lists, every run or the one named: each run with its record, judged or left unjudged, and its result branches; the
- * daemon's standing; where the branches stand; the pause; and the factories' schedules — the orchestrator's `RunsListed`, which `nemia`
- * prints with its lines.
- */
-export const RunsListed = Schema.Record(Schema.String, Schema.Unknown).annotate({ identifier: 'RunsListed' });
-export type RunsListed = typeof RunsListed.Type;

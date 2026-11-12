@@ -1,14 +1,14 @@
 /**
  * `nemia inbox [--all] [-l <selector>]... [--show-labels] [-L <key>]... [-o wide]`, read from the api: the cards, as the server prints them
- * — the cards list (`GET /api/cards`, `labelSelector` given again for another selector) asked for its `Table` (`TABLE_ACCEPT`), printed
- * by `tableLines` — then how to start, queue or drop one, or why none is listed. The cards in play are those the api says are (each row's
- * card, `status.inPlay`); `--all` keeps every card. The last line names a card by its name, never a path of this machine's store. Any
+ * — the cards list (`GET /api/cards`, `labelSelector` given again for another selector) asked for its `Table` (`TABLE_ACCEPT`), every page
+ * read (`everyPage`), printed by `tableLines` — then how to start, queue or drop one, or why none is listed. The cards in play are those
+ * the api says are (each row's card, `status.inPlay`); `--all` keeps every card. The last line names a card by its name, never a path. Any
  * other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
 import { Schema } from 'effect';
 import { type Table, tableLines } from 'objects';
 import { handedOn } from '../local.ts';
-import { asked, READ_BOUND_MS } from '../objects.ts';
+import { asked, everyPage, READ_BOUND_MS } from '../objects.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What a row's card says of its play: whether the api counts it in play. */
@@ -41,7 +41,7 @@ export async function inbox(args: readonly string[]): Promise<number> {
   const { selector } = read;
   const listed = await asked(
     'inbox',
-    (client) => client.cards.listAll({ query: selector.length ? { labelSelector: selector } : {} }),
+    (client) => everyPage((page) => client.cards.listAll({ query: selector.length ? { ...page, labelSelector: selector } : page })),
     process.env,
     READ_BOUND_MS,
     AS_TABLE,

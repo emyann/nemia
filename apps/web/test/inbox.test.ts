@@ -943,7 +943,7 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
       await (inboxAllQuery('team=core').queryFn as unknown as () => Promise<InboxEntry[]>)();
       assert.deepEqual(
         sent.map((r) => r.url),
-        ['/api/cards', '/api/cards?labelSelector=team%3Dcore'],
+        ['/api/cards?limit=500', '/api/cards?limit=500&labelSelector=team%3Dcore'],
         "a selected read is one read: each queued place is the api's, among every card",
       );
       assert.equal(all.queryKey[0], inboxQuery.queryKey[0], "under ['inbox'], so every write and the feed read it again");

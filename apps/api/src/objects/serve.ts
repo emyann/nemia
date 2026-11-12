@@ -15,7 +15,8 @@
  *
  * What HttpApi answers on its own is said in the api's words, as every other refusal of the api: a request its decoding refuses — a path's
  * name, a query or a body its endpoint's Schema does not take — is a 400 `BadRequest` naming the refused key (`field`,
- * `payload.spec.steps`) and pointing at the document (`decodeRefused`); a body over `OBJECT_BODY_LIMIT` a 413 naming the limit; and a path
+ * `payload.spec.steps`) and pointing at the document (`decodeRefused`); an answer past the app's bound a 422 saying how to narrow it
+ * (`answerRefused`); a body over `OBJECT_BODY_LIMIT` a 413 naming the limit; and a path
  * no endpoint serves the api's own 404 (`noRoute`), whatever router missed it.
  */
 import { ByteSize, Context, Effect, Layer, SchemaIssue } from 'effect';
@@ -38,6 +39,7 @@ import { agentsHandlers } from '../agents/index.ts';
 import { skillsHandlers } from '../skills/index.ts';
 import { workflowsHandlers } from '../workflows/index.ts';
 import { delegationsHandlers, proposalsHandlers } from '../proposals/index.ts';
+import { AnswerPastBound } from './answer-bound.ts';
 import { endpointOf } from './endpoints.ts';
 import { ServedNow } from './refused.ts';
 import { runsHandlers } from './runs.ts';
@@ -113,6 +115,20 @@ const decodeRefused = HttpRouter.middleware(
   { global: true },
 );
 
+/**
+ * An answer its handler measured past the app's bound (`AnswerPastBound`, `readHandled` in answer-bound.ts), never encoded: answered 422
+ * with the words that say how to narrow the read (its keys in `READS`).
+ */
+const answerRefused = HttpRouter.middleware(
+  (httpEffect) =>
+    Effect.catchDefect(httpEffect, (defect) =>
+      defect instanceof AnswerPastBound
+        ? Effect.succeed(HttpServerResponse.jsonUnsafe({ error: defect.message }, { status: 422 }))
+        : Effect.die(defect),
+    ),
+  { global: true },
+);
+
 /** Whether `response` already says a refusal of the api's: a JSON object whose `error` is a sentence. */
 const saysError = async (response: Response): Promise<boolean> => {
   try {
@@ -172,6 +188,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         nemiaHandlers,
       ]),
       Layer.provide(decodeRefused),
+      Layer.provide(answerRefused),
       Layer.provide(HttpServer.layerServices),
       Layer.provideMerge(Layer.succeed(HttpIncomingMessage.MaxBodySize, OBJECT_BODY_LIMIT)),
     ),

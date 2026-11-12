@@ -2,7 +2,17 @@
  * The face of `harness/claude/`: Claude Code's runners and the words it takes, as the doors take them.
  */
 export { claudeCodeOps, type ClaudeOptions } from './code.ts';
-export { claudeQuota, QUOTA_COMMAND, quotaOfRefusal, quotaOfUsage, QUOTA_TIMEOUT_MS, usageEnv, usageOptions } from './quota.ts';
+export {
+  claudeQuota,
+  EXECUTABLE_VARIABLE,
+  quotaExecutable,
+  quotaOfRefusal,
+  quotaOfUsage,
+  QUOTA_TIMEOUT_MS,
+  TOKEN_VARIABLE,
+  usageEnv,
+  usageOptions,
+} from './quota.ts';
 export type { OpenUsage, UsageAsk } from './quota.ts';
 export {
   CLAUDE_AUTO_DROPPED,

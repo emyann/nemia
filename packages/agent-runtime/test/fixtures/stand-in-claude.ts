@@ -6,7 +6,8 @@
  * writes into `STANDIN_DIR`: `argv.jsonl` (each start's arguments), `initialize.jsonl` (each `initialize` request's payload, the
  * system prompt the SDK sends included), `said.jsonl` (each user message's text), `asked.jsonl` (each hook it asked, as it asks),
  * `answers.jsonl` (each answer to a control request it sent), `taken.jsonl` (each control request the SDK sent it, by subtype, with
- * what it carried), `env.json` (the environment it was started with, whole) and `pid` (its own, on each start).
+ * what it carried), `env.json` (the environment it was started with, whole) and `pid` (its own, on each start). It answers
+ * `auth status` first, as `STANDIN_AUTH` says, before any of it (`auth.jsonl`).
  *
  * `STANDIN_POST_LOG` has it post one `api_request` log to the collector its own environment names, before its result, as Claude
  * Code exports from the environment it is given (`postLog`).
@@ -84,6 +85,23 @@ type Plan = {
   cost?: number;
   turns?: 'one' | 'many';
 };
+
+/**
+ * `auth status`, as Claude Code answers it (`docs/harness.md`), before the SDK's protocol: `STANDIN_AUTH` unset or `in` signed in,
+ * exit 0; `out` signed out, exit 1; `hang` nothing, until it is killed. Each ask is recorded in `auth.jsonl` of `STANDIN_DIR`, where
+ * one is named, never in `argv.jsonl`.
+ */
+const answerAuth = async (): Promise<never> => {
+  if (process.env.STANDIN_DIR) {
+    fs.appendFileSync(path.join(process.env.STANDIN_DIR, 'auth.jsonl'), `${JSON.stringify(process.argv.slice(2))}\n`);
+  }
+  const auth = process.env.STANDIN_AUTH ?? 'in';
+  if (auth === 'hang') return new Promise<never>(() => setInterval(() => {}, 60_000));
+  const loggedIn = auth !== 'out';
+  process.stdout.write(`${JSON.stringify({ loggedIn, authMethod: loggedIn ? 'oauth_token' : 'none' })}\n`);
+  return process.exit(loggedIn ? 0 : 1);
+};
+if (process.argv[2] === 'auth') await answerAuth();
 
 const dir = process.env.STANDIN_DIR!;
 const plan = JSON.parse(process.env.STANDIN_PLAN ?? '{}') as Plan;

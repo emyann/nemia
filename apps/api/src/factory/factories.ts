@@ -19,7 +19,6 @@
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import {
   cloneTarget,
   factoryTable,
@@ -65,6 +64,7 @@ import type { Served } from '../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
 /** The rules of the factory `name`, read, written (`words`) or cleared, as `nemia factory rules` does it. */
 const rules = (method: string, name: string, args: { words?: string; clear?: boolean }) =>
@@ -244,7 +244,7 @@ const resolved = (factory: string, { conflict, ours, theirs, text }: FactoryReso
     return s.inRequest(proposing(FACTORY_RESOLVE.handler({ factory, conflict, ours, theirs, text })));
   });
 
-export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handlers) =>
+export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
   handlers
     .handle('listAll', ({ query }) =>
       Effect.flatMap(wantsTable, (table) =>

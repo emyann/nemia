@@ -11,7 +11,6 @@ import {
   linesOf,
   listedOf,
   listedRuns,
-  lsOf,
   objectOf,
   runListOf,
   specOf,
@@ -129,8 +128,8 @@ const workflowDir = workflowFolder({
 const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] };
 
 /**
- * `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. `raw` is the
- * statement as the engine recorded it.
+ * `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. `raw` is never
+ * answered (`objects`' `closeoutNarrowed`, as every read of a closeout is), and no output field is left out.
  */
 const blockedCloseout = {
   apiVersion: null,
@@ -146,7 +145,8 @@ const blockedCloseout = {
   replies: null,
   schema: {},
   questions: [],
-  raw: blocked,
+  raw: null,
+  outputLeftOut: [],
 };
 
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
@@ -866,18 +866,10 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         assert.ok(said.includes(`does not load: no workflow folder at ${gone}`), said);
         const byState = await runListOf(app, 'fieldSelector=status.state!%3Dfinished');
         assert.equal(byState.unjudged?.find((entry) => entry.name === 'r-3')?.state, 'inFlight', why);
-        assert.deepEqual(
-          (await lsOf(app, 'r-3')).listed.steps.map((s) => [s.name, s.message]),
-          [
-            ['implement', 'succeeded'],
-            ['review', 'pending'],
-          ],
-          why,
-        );
       };
       let withFolder = await listed('r-2');
       assert.deepEqual(withFolder.waitingOnYou, ['implement']);
-      await unjudged('the list says it as the tick leaves it, unjudged and in flight, its steps off its record');
+      await unjudged('the list says it as the tick leaves it, unjudged and in flight');
 
       fs.writeFileSync(path.join(root, 'runs', 'r-2.cancelled'), '2026-09-12T03:00:00.000Z');
       fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
@@ -2219,7 +2211,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         replies: null,
         schema: {},
         questions: [],
-        raw,
+        raw: null,
+        outputLeftOut: [],
         ...more,
       });
       const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: { result: 'passed', exit: 0 }, refused: null });
@@ -2290,7 +2283,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             answer: null,
           },
         ],
-        "each closeout keeps what was recorded, untouched, as raw: replies is read into the api's shape, and the statement is not",
+        "each closeout answers its replies read into the api's shape, and never the statement as recorded",
       );
       assert.deepEqual(
         [implement.check, (await closeoutOf(app, 'r-50', 'implement'))?.closeout],
@@ -2344,7 +2337,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
     },
   );
   await s.test(
-    "a closeout carries each declared field's schema off the workflow the run froze — given or missing — and the statement as it was recorded",
+    "a closeout carries each declared field's schema off the workflow the run froze — given or missing — and never the statement as it was recorded",
     async () => {
       const schema = {
         type: 'object',
@@ -2383,7 +2376,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         schema.properties,
         "the folder is gone: the schema is the record's, a field's own, files among them though it was not given",
       );
-      assert.deepEqual(closeout.raw, said, 'and kept as said');
+      assert.equal(closeout.raw, null, 'and never the statement as said, which may be any length (`closeoutNarrowed`)');
     },
   );
   await s.test(

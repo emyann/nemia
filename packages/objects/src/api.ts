@@ -442,7 +442,7 @@ export class McpServersGroup extends HttpApiGroup.make('mcpservers').add(
 
 /** The MCP servers Nemia offers a factory: a page whose items carry their spec alone, in no namespace. */
 export class BuiltinGroup extends HttpApiGroup.make('builtin').add(
-  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', { success: McpServerListObject, error: objectErrors }),
+  HttpApiEndpoint.get('mcpservers', '/api/builtin/mcpservers', { query: listQuery, success: McpServerListObject, error: objectErrors }),
 ) {}
 
 /** A factory's schedules, in its namespace, each named by its workflow. */
@@ -835,3 +835,17 @@ type EndpointNamesOf<G> =
  * endpoint has does not compile.
  */
 export type ApiEndpointName = EndpointNamesOf<GroupsOf<typeof Api>>;
+
+/** Each GET endpoint of a group as `<group>.<endpoint>`. */
+type GetNamesOf<G> =
+  G extends HttpApiGroup.HttpApiGroup<infer Id extends string, infer E, boolean>
+    ? E extends { readonly identifier: infer N extends string; readonly method: 'GET' }
+      ? `${Id}.${N}`
+      : never
+    : never;
+
+/**
+ * The name of a GET endpoint of `Api`, a read: what the table of how each read is bounded (`READS`) is keyed by, so that a read the `Api`
+ * gains with no word on its bound does not compile.
+ */
+export type ApiGetName = GetNamesOf<GroupsOf<typeof Api>>;

@@ -25,6 +25,16 @@ import type { ChatMode } from './chat/ChatHeader';
 /** How wide her docked face is drawn, in pixels. */
 const DOCK_FACE = 60;
 
+/** How far her docked face stands from the window's edges, in pixels. */
+const DOCK_GAP = 28;
+
+/**
+ * The room the frame leaves under every page her face is docked over, in pixels: her face and its gap to the window's foot, so a page
+ * scrolled to its end shows its last line above her (`__root.tsx`). Her cues stand centred beside her face, no taller than it, and her
+ * face's button is a flex box, so no line box adds a descender's room under it.
+ */
+export const DOCK_ROOM = DOCK_FACE + DOCK_GAP;
+
 /**
  * Her face at the bottom right of the page at `path` with `search`, its cues, and the panel over it, open as the person last left it on
  * this page. Her face alone takes a press: the cues beside it are words, and a page's own control under one is still reached, as the
@@ -43,7 +53,8 @@ export function NemiaDock({ path, search }: { path: string; search: Record<strin
   return (
     <div
       data-nemia-dock={mode ?? 'closed'}
-      className="pointer-events-none fixed inset-0 z-30 flex flex-col items-end justify-end gap-3 p-7"
+      style={{ padding: DOCK_GAP }}
+      className="pointer-events-none fixed inset-0 z-30 flex flex-col items-end justify-end gap-3"
     >
       {mode !== null && (
         <div
@@ -75,7 +86,7 @@ export function NemiaDock({ path, search }: { path: string; search: Record<strin
           data-nemia-dock-face
           aria-label={dockWords(presence, mode !== null)}
           onPress={() => setMode((at) => (at === null ? 'float' : null))}
-          className="pointer-events-auto cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="pointer-events-auto flex cursor-pointer rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <NemiaFace presence={presence} size={DOCK_FACE} />
         </Button>

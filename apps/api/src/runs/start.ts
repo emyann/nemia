@@ -9,7 +9,7 @@
  * request is served in: never a path sent.
  */
 import { START, startFactoryAtOnce, type StartInput } from 'agent-orchestrator';
-import { Conflict, Invalid, Missing, type RunStart } from 'objects';
+import { type CardStart, Conflict, Invalid, Missing, type RunStart } from 'objects';
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
@@ -21,99 +21,77 @@ const START_REFUSALS = [Missing, Conflict, Invalid] as const;
 /** Why a start with no card and no brief is not one (422). */
 const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
 
-/**
- * What a start starts: a workflow's folder, with a brief — or, for an inbox card, the card and the brief given in place of its
- * body.
- */
-export type Asked =
-  | {
-      dir: string;
-      brief: string;
-      after: string[] | undefined;
-      context: string[] | undefined;
-      cards: string[] | undefined;
-      label: string[] | undefined;
-      card?: undefined;
-    }
-  | {
-      dir: string;
-      brief: string | undefined;
-      after: string[] | undefined;
-      context: string[] | undefined;
-      cards: string[] | undefined;
-      label: string[] | undefined;
-      card: string;
-    };
+/** What a start of a run from a brief starts: a workflow's folder, with a brief. */
+export type Asked = {
+  dir: string;
+  brief: string;
+  after: string[] | undefined;
+  context: string[] | undefined;
+  cards: string[] | undefined;
+  label: string[] | undefined;
+};
+
+/** The lists a body hands the run, copied: what `startRun` judges, in its words. */
+const handedOf = (body: {
+  after?: readonly string[];
+  context?: readonly string[];
+  cards?: readonly string[];
+  label?: readonly string[];
+}) => ({
+  after: body.after && [...body.after],
+  context: body.context && [...body.context],
+  cards: body.cards && [...body.cards],
+  label: body.label && [...body.label],
+});
 
 /**
  * What a start starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
  * own, since `startRun` takes any string and `nemia start` prints its help for none. The body's shape (400) is its endpoint's.
  *
  * `after`, `context`, `cards` and `label` are only shaped by the body: whether this run may wait on each run, be handed each run or card,
- * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words. With a
- * `card` the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to
- * refuse, as `nemia start <card> --brief ""` is.
+ * or take each label is `startRun`'s to say (`afterRefusal`, `contextRefusal`, `cardsRefusal`, `parseLabelEdits`), in its words.
  */
-function startOf(body: Omit<RunStart, 'card'> & { card?: string }, repo: string, home: string, tree?: string): Asked | Refusal {
-  const { workflow, brief, from, after, context, cards, card, label } = body;
-  const folder = folderOf(workflow, from, repo, home, tree);
+function startOf(body: RunStart, repo: string, home: string, tree?: string): Asked | Refusal {
+  const folder = folderOf(body.workflow, body.from, repo, home, tree);
   if ('status' in folder) return folder;
-  const handed = {
-    after: after && [...after],
-    context: context && [...context],
-    cards: cards && [...cards],
-    label: label && [...label],
-  };
-  if (card !== undefined) return { dir: folder.dir, brief, ...handed, card };
-  if (brief === undefined || !brief.trim()) return { status: 422, error: NO_BRIEF };
-  return { dir: folder.dir, brief: brief.trim(), ...handed };
+  if (body.brief === undefined || !body.brief.trim()) return { status: 422, error: NO_BRIEF };
+  return { dir: folder.dir, brief: body.brief.trim(), ...handedOf(body) };
 }
 
 /**
- * The card `card` started on the workflow `body` names (`startOf`, `cardStarted`), in the factory `factory` where one is named over the
- * card's own: what the Card's `start` verb runs (src/objects). The workflow not found is its refusal, by its status. A card whose `repo:`
- * the run looked at none of carries it as `ignoredRepo`, as `nemia start` prints it.
+ * The card `card` started as `nemia start <card> --factory <namespace>` starts it: what the Card's `start` verb runs (src/objects), the
+ * request placed in its namespace's factory. On the workflow `body` names, found among the folders a start finds one in (`folderOf`), the
+ * factory's tree first — the workflow not found its refusal, by its status — or, where it names none, the card's own `workflow:`, which
+ * the package finds as `nemia start` does (`startFromInbox`). In the factory `factory` where one is named over the card's own: one that
+ * names none either way is refused, its fix `?factory=<name>`. With the request's repository as the caller's, `instead` the brief given in
+ * place of the card's body, which may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card>
+ * --brief ""` is. Answered with the run's id and the card's name — the card kept in the inbox, listed as started — and the card's `repo:`
+ * the run did not look at, as `ignoredRepo`, as `nemia start` prints it.
  */
 export async function cardStart(
   s: Served,
   card: string,
-  body: RunStart,
+  body: CardStart,
   factory: string | undefined,
 ): Promise<{ id: string; card: string; ignoredRepo?: string } | Refusal> {
-  const asked = startOf({ ...body, card }, s.repo, s.home, s.factory?.tree);
-  if ('status' in asked) return asked;
-  if (asked.card === undefined) return { status: 422, error: NO_BRIEF };
-  const started = await cardStarted(s, { ...asked, card: asked.card }, factory);
-  return {
-    id: started.id,
-    card: started.card ?? card,
-    ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-  };
-}
-
-/**
- * The inbox card `asked` names, started by `nemia start`'s entry (`START`) with the request's repository as the caller's and in the
- * factory `factory` when one is named, over the card's `factory:` — one that names none either way is refused, its fix
- * `?factory=<name>` — and what the Card's `start` answers: the run's id and the card's name — the card kept in the inbox, listed as
- * started — and the card's `repo:` the run did not look at.
- */
-async function cardStarted(s: Served, asked: Extract<Asked, { card: string }>, factory: string | undefined) {
+  const folder = body.workflow === undefined ? undefined : folderOf(body.workflow, body.from, s.repo, s.home, s.factory?.tree);
+  if (folder !== undefined && 'status' in folder) return folder;
+  const handed = handedOf(body);
   const given: StartInput = {
-    card: asked.card,
+    card,
     at: s.repo,
     factory,
     fix: '?factory=<name>',
-    workflows: asked.dir,
-    instead: asked.brief,
-    after: asked.after,
-    context: asked.context,
-    cards: asked.cards,
-    label: asked.label,
+    workflows: folder?.dir,
+    instead: body.brief,
+    after: handed.after,
+    context: handed.context,
+    label: handed.label,
   };
   const started = await s.inRequest(START.handler(given));
   return {
     id: started.id,
-    card: started.card,
+    card: started.card ?? card,
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
   };
 }

@@ -4,8 +4,9 @@
  * through the request's services (`inRequest`), every refusal answered by the one map (`answered`, objects/refused.ts).
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
- * - `GET /api/version` — `{ version, release }`, the orchestrator's package version (`VERSION`) and the code the api runs (`RELEASE`), a
- *   checkout or an install: what the board's bottom bar says.
+ * - `GET /api/version` — `{ version, release, latest? }`, the orchestrator's package version (`VERSION`), the code the api runs (`RELEASE`),
+ *   a checkout or an install: what the board's bottom bar says; and the newest release the daemon's release check read, where it read
+ *   one (`latestRelease`), which the board says when it is newer.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -55,6 +56,7 @@ import { HttpApiBuilder } from 'effect/http-api';
 import type { HttpServerRequest } from 'effect/http';
 import {
   eventKept,
+  latestRelease,
   leaseRelease,
   PASSES,
   PAUSE,
@@ -84,7 +86,8 @@ import { yourStore } from '../workflows/index.ts';
 const answered = answeredWrite;
 
 /** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
-const RELEASE = leaseRelease(runningRelease());
+const RUNNING = runningRelease();
+const RELEASE = leaseRelease(RUNNING);
 
 /**
  * Each `?selector=` of `request`, in order: the label queries of `GET /api/stats` and `GET /api/feed/stream`, read off the request since
@@ -112,7 +115,12 @@ const waitSent = ({ ended, lines, cursor }: WaitAnswer): FeedWait => {
 export const serverHandlers = HttpApiBuilder.group(Api, 'server', (handlers) =>
   handlers
     .handle('health', () => Effect.succeed({ ok: true } as const))
-    .handle('version', () => Effect.succeed({ version: VERSION, release: RELEASE }))
+    .handle('version', () =>
+      answered(async ({ home }) => {
+        const latest = latestRelease(home, RUNNING);
+        return latest === undefined ? { version: VERSION, release: RELEASE } : { version: VERSION, release: RELEASE, latest };
+      }),
+    )
     .handle('capabilities', () =>
       answered(({ e, placeService, config, env, repo, home, mcp, inRequest, trace }) =>
         capabilitiesWithSteps(repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest }),

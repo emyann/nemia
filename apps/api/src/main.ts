@@ -1,5 +1,6 @@
 /**
- * The api's process: its arguments read (`argsOf`: none, a pass interval `[ms]`, or `--no-tick`), `PORT` read (`portOf`), the app's
+ * The api's process: its arguments read (`argsOf`: none, a pass interval `[ms]`, or `--no-tick`), `PORT` read (`portOf`), the person's
+ * sign-in token file loaded into the environment its sessions inherit where `CLAUDE_CODE_OAUTH_TOKEN` is unset (`loadClaudeToken`), the app's
  * runtime built from its live layer (`runtime.context()`), and where it listens read off `NEMIA_BIND` and the store's settings (`hostOf`,
  * port.ts: the loopback where unset, another address only on a store marked exposed, `WF_EXPOSED=1`) — each refusal printed and exited
  * with its code. Without `--no-tick` it is the store's daemon, ticking at the interval given or `DEFAULT_EVERY_MS`: it takes the store's
@@ -19,7 +20,7 @@
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
-import { Conflict, currentRelease, holdUrl, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
+import { Conflict, currentRelease, holdUrl, loadClaudeToken, runMain, runningRelease, trialRefusal, up, wfRoot } from 'agent-orchestrator';
 import { app, runtime } from './app.ts';
 import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
@@ -46,6 +47,7 @@ try {
   if (trial !== null) throw new Conflict({ message: trial });
   args = argsOf(process.argv.slice(2));
   port = portOf(process.env.PORT, args.ticks);
+  loadClaudeToken(process.env);
   services = await runtime.context();
   host = hostOf(process.env.NEMIA_BIND, Context.get(services, StoreConfig).exposed);
   e = Context.get(services, Engine);

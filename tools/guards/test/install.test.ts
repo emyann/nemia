@@ -130,3 +130,25 @@ test('REFUSED: an argument the installer does not take exits 2, and a flag with 
   assert.equal(install(home, root, ['--yes', '--version']).status, 2);
   assert.equal(fs.existsSync(root), false, 'nothing is written before the arguments are read');
 });
+
+test(
+  'REFUSED: a client install with no token for its server exits 1 under --yes; given one by file, it names the context with it',
+  {
+    skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}`,
+  },
+  () => {
+    const base = fs.realpathSync(scratch('install-base-'));
+    publish(base, 'v1.2.3', HOST as Platform);
+    const client = ['--yes', '--client', '--server', 'http://100.64.0.1:8787', '--base', `file://${base}`];
+    const bare = machine();
+    assert.equal(install(bare.home, bare.root, client).status, 1);
+
+    const given = machine();
+    const tokenFile = path.join(given.home, 'token');
+    fs.writeFileSync(tokenFile, 'a-token\n', { mode: 0o600 });
+    const ran = install(given.home, given.root, [...client, '--token-file', tokenFile]);
+    assert.equal(ran.status, 0, ran.out);
+    assert.match(ran.out, /--token-file/, 'set-context is handed the token by its file');
+    assert.doesNotMatch(ran.out, /a-token/, 'the token itself is never printed');
+  },
+);

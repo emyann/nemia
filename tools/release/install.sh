@@ -208,11 +208,22 @@ if [ "$client" = 1 ]; then
     server=$answer
   }
   [ -n "$server" ] || fail "a client install needs its server: pass --server <url>"
-  if [ -n "$token_file" ]; then
-    "$nemia" config set-context "$context" --server "$server" --token-file "$token_file"
-  else
-    "$nemia" config set-context "$context" --server "$server"
+  # A context holds a token of the person's for its server, read from a file and never typed on a command line: pasted here, it is
+  # written to a 0600 file in the install's own temporary folder, removed as the script ends.
+  if [ -z "$token_file" ]; then
+    [ "$interactive" = 1 ] ||
+      fail "a client install needs a token of yours for $server: mint one there with nemia token add <name>, write it to a file and pass --token-file <file>"
+    printf 'Paste a token of yours for %s (nemia token add <name> on its machine mints one; it is not shown): ' "$server" >/dev/tty
+    stty -echo </dev/tty
+    read -r server_token </dev/tty || server_token=
+    stty echo </dev/tty
+    printf '\n' >/dev/tty
+    [ -n "$server_token" ] || fail "no token pasted: run this again, or pass --token-file <file>"
+    token_file=$work/server-token
+    (umask 077 && printf '%s\n' "$server_token" >"$token_file")
+    server_token=
   fi
+  "$nemia" config set-context "$context" --server "$server" --token-file "$token_file"
   "$nemia" config use-context "$context"
   say "nemia now talks to $server (context $context); no service was installed"
   exit 0

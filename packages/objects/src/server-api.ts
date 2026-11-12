@@ -52,7 +52,7 @@ export type Release = typeof Release.Type;
 
 /**
  * The newest release the daemon's release check last read (`$WF_ROOT/releases/latest.json`): its version, and whether it is newer than
- * the one the api runs. Absent where no check has read one: a checkout, a store whose check is off, or one not yet made.
+ * the one the api runs. Absent where no check has read one: code run from a repository, a store whose check is off, or one not yet made.
  */
 export const LatestRelease = Schema.Struct({ version: Schema.String, newer: Schema.Boolean });
 export type LatestRelease = typeof LatestRelease.Type;
@@ -478,7 +478,7 @@ const readErrors = [Invalid, Failed];
 /** The server, the machine, the store's pause and the feed followed. */
 export class ServerGroup extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.get('health', '/api/health', { success: Health }),
-  HttpApiEndpoint.get('version', '/api/version', { success: VersionAnswer }),
+  HttpApiEndpoint.get('version', '/api/version', { success: VersionAnswer, error: readErrors }),
   HttpApiEndpoint.post('signIn', '/api/session', { success: SessionAnswer, error: [BadRequest] }),
   HttpApiEndpoint.delete('signOut', '/api/session', { success: SessionAnswer }),
   HttpApiEndpoint.get('capabilities', '/api/capabilities', {

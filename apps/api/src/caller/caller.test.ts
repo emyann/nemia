@@ -117,12 +117,17 @@ test("a store marked exposed: the board's cookie holding a token of the person's
   assert.equal((await byCookie(exposed, '/api/runs', personToken)).status, 200);
 });
 
-test('REFUSED 401 unknown-token: a forged cookie is judged as a forged bearer is, exposed or not', async () => {
+test('REFUSED 401 unknown-token: a forged cookie is judged as a forged bearer is, exposed or not, and the refusal clears it', async () => {
   for (const on of [exposed, app]) {
     const res = await byCookie(on, '/api/runs', 'never-minted');
     assert.equal(res.status, 401);
     assert.equal(await reasonOf(res), 'unknown-token');
+    const cleared = setCookieOf(res);
+    assert.equal(cleared[0], `${TOKEN_COOKIE}=`);
+    assert.ok(cleared.includes('max-age=0'), 'the stale cookie is cleared');
   }
+  const byBearer = await exposed().request('/api/runs', { headers: { authorization: 'Bearer never-minted' } });
+  assert.equal(byBearer.headers.get('set-cookie'), null, 'a refused bearer clears nothing');
 });
 
 test('a bearer is judged before the cookie: a live bearer passes beside a forged cookie', async () => {

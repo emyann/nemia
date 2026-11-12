@@ -17,8 +17,9 @@
 import { Effect } from 'effect';
 import { TaggedError } from 'effect/Data';
 import type { MiddlewareHandler } from 'hono';
+import { deleteCookie } from 'hono/cookie';
 import { PERSON, PlaceService, sessionCaller, type ProposalCaller, type TokenNeed } from 'agent-orchestrator';
-import type { TokenRefusal } from 'objects';
+import { TOKEN_COOKIE, type TokenRefusal } from 'objects';
 import type { NeedOf } from '../../contracts/token-need.contract.ts';
 import { bearerOf, cookieTokenOf } from '../guard.ts';
 import { type ApiEnv, traceOf } from '../layer.ts';
@@ -97,7 +98,8 @@ const exposedOf = (c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Promise<boolean
 /**
  * The middleware that puts the request's caller on it (`c.var.caller`), or refuses it 401 before any router is reached: the need its
  * route has of a token (`needOf`) judged with the token it presents. A refusal on the MCP port says `WWW-Authenticate: Bearer`, as a
- * client of the port reads it.
+ * client of the port reads it; a refusal of a token presented by the board's cookie alone clears the cookie, so a browser holding one
+ * gone stale (its token removed with `nemia token rm`) sends none after, and the board's token page asks for another.
  */
 export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
   let caller: ProposalCaller;
@@ -105,6 +107,8 @@ export const callerGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
     caller = await callerOfRequest(c);
   } catch (err) {
     if (err instanceof Unauthorized && onPort(c.req.path)) c.header('WWW-Authenticate', 'Bearer');
+    if (err instanceof Unauthorized && bearerOf(c.req.header('authorization')) === undefined && cookieTokenOf(c) !== undefined)
+      deleteCookie(c, TOKEN_COOKIE, { path: '/', httpOnly: true, sameSite: 'Strict' });
     throw err;
   }
   c.set('caller', caller);

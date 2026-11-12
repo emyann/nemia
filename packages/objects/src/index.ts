@@ -646,3 +646,18 @@ export { FACTORY_WORDS } from './commands-factories.ts';
 export { DEFINITION_WORDS } from './commands-definitions.ts';
 export { READ_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
+export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
+export {
+  CHAT_ALLOW_WORDS,
+  CHAT_DISALLOW_WORDS,
+  CHAT_SPEAKERS_WORDS,
+  LEVEL_FORM,
+  LEVEL_WORDS,
+  SUBSCRIBE_FORM,
+  SUBSCRIBE_WORDS,
+  UNSUBSCRIBE_WORDS,
+  levelWritten,
+} from './commands-rest-nemia.ts';
+export { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
+export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
+export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';

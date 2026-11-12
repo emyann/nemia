@@ -8,18 +8,16 @@
  * the subscription's news starts.
  */
 import { Effect, Schema } from 'effect';
-import { SubscriptionWrite } from 'objects';
-import type { Command } from '../command/entry.verb.ts';
+import { SUBSCRIBE_WORDS, SubscriptionWrite, UNSUBSCRIBE_WORDS } from 'objects';
+import type { Served } from '../command/entry.verb.ts';
 import { FeedDoor } from '../feed/feed.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import { SubscriptionDoor } from './subscription.store.ts';
 import { SubscriptionName } from '../feed/feed.model.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
-import { LEVELS, type Level } from '../level/level.ts';
-import { SELECTOR_FORM } from '../watch/selector.ts';
+import type { Level } from '../level/level.ts';
 import { formerHints } from '../former-reason/former-reason.ts';
-import { retiredWakeRefusal } from './former-wake.ts';
 import {
   DEFAULT_DIGEST_EVERY,
   DEFAULT_SELECTORS,
@@ -29,11 +27,11 @@ import {
   type Subscription,
 } from './subscription.ts';
 
-/** The refusal of a `-l` given no selector, or one of the command's own flags for it. */
-const SUBSCRIBE_SELECTOR_TAKES = `nemia subscribe -l takes a selector of the feed's lines: ${SELECTOR_FORM}`;
-
-/** What `nemia subscribe` answers: the subscription put, under its name. */
-export type Subscribed = { name: string; subscription: Subscription };
+/**
+ * What `nemia subscribe` answers: the subscription put, under its name, and a sentence for each former word one of its selectors still
+ * says (`formerHints`), none where none does.
+ */
+export type Subscribed = { name: string; subscription: Subscription; hints?: string[] };
 
 /**
  * What `nemia subscribe`'s handler takes: the subscription's name, and the body `POST /api/subscriptions/:name` takes (objects'
@@ -115,88 +113,32 @@ const subscribe = Effect.fn('subscribe')(function* (input: SubscribeInput) {
     ...(atLeast === undefined ? {} : { scope: { atLeast: atLeast as Level } }),
   };
   yield* (yield* SubscriptionDoor).subscriptions.put(SubscriptionName.read(name), subscription);
-  return { name, subscription } satisfies Subscribed;
+  const hints = selectors.flatMap(formerHints);
+  return { name, subscription, ...(hints.length ? { hints } : {}) } satisfies Subscribed;
 });
 
 /** `nemia subscribe`: a long-lived task given a subscription to the feed (`subscribe`). */
-export const SUBSCRIBE: Command<Subscribed, SubscribeInput> = {
-  name: 'subscribe',
-  served: [{ endpoint: 'subscriptions.subscribe' }],
-  usage: '<name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]',
-  help: [
-    "give the engine's long-lived task <task> a subscription to the feed,",
-    'named <name>, from its end: a line one of its selectors takes is said to',
-    'it at once, and the rest folded into a digest said with the next wake,',
-    'or after --digest-every minutes (default 60) with none.',
-    '-l: the lines a selector takes, given again for another (default:',
-    'waits=person, the lines that wait on a person). Refused for a task not',
-    'long-lived.',
-    "--at-least: only the lines of runs whose factory's level is at least",
-    `this (${LEVELS.join(', ')}), read as each line is delivered.`,
-  ],
-  spec: {
-    positionals: [
-      { key: 'name', takes: 'required', kind: 'name' },
-      { key: 'task', takes: 'required', kind: 'name' },
-    ],
-    flags: [
-      { flag: '-l', kind: 'text', key: 'selectors', many: true, takes: SUBSCRIBE_SELECTOR_TAKES },
-      { flag: '--digest-every', kind: 'amount', key: 'digestEvery', takes: 'the minutes a digest waits for a wake', form: SUBSCRIBE_FORM },
-      {
-        flag: '--at-least',
-        kind: 'name',
-        key: 'atLeast',
-        takes: `--at-least takes a level, one of ${LEVELS.join(', ')}: ${SUBSCRIBE_FORM}.`,
-      },
-    ],
-    unknown: (arg) => retiredWakeRefusal('nemia subscribe', arg) ?? `nemia subscribe does not take ${arg}: ${SUBSCRIBE_FORM}.`,
-    missing: `nemia subscribe takes the subscription's name and the task it tells: ${SUBSCRIBE_FORM}.`,
-  },
-  check: (args) =>
-    subscribeRefusalOf(
-      askedOf({
-        name: typeof args.name === 'string' ? args.name : '',
-        task: typeof args.task === 'string' ? args.task : '',
-        ...(Array.isArray(args.selectors) ? { selectors: args.selectors } : {}),
-        ...(typeof args.digestEvery === 'number' ? { digestEvery: args.digestEvery } : {}),
-        ...(typeof args.atLeast === 'string' ? { atLeast: args.atLeast } : {}),
-      }),
-    ) ?? null,
-  writes: true,
-  class: 'act',
+export const SUBSCRIBE: Served<Subscribed, SubscribeInput> = {
+  ...SUBSCRIBE_WORDS,
   input: SubscribeInput,
   handler: (input) => subscribe(input),
-  note: ({ subscription: s }) => s.selectors.flatMap(formerHints).map((hint) => `nemia subscribe: ${hint}`),
-  print: ({ name, subscription: s }) => [
-    `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
-      `${s.digestEvery} minute${s.digestEvery === 1 ? '' : 's'} with no wake.`,
-  ],
 };
 
 /**
  * `nemia unsubscribe`: a subscription taken away, its file removed alone (`subscriptions.drop`); the deliverer's next read of the
- * subscriptions stops it and removes its `<name>.state.json` (`reconcile` in `deliver.verb.ts`).
+ * subscriptions stops it and removes its `<name>.state.json` (`reconcile` in `deliver.verb.ts`). Refused (`Invalid`): a name that is no
+ * subscription's, whoever asks.
  */
-export const UNSUBSCRIBE: Command<{ name: string }, UnsubscribeInput> = {
-  name: 'unsubscribe',
-  served: [{ endpoint: 'subscriptions.unsubscribe' }],
-  usage: '<name>',
-  help: ['take the subscription <name> away: its task is told nothing more of the feed'],
-  spec: {
-    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia unsubscribe takes no ${arg}: nemia unsubscribe <name>.`,
-  },
-  check: (args) => subscriptionNameRefusal(String(args.name ?? '')) ?? null,
-  writes: true,
-  class: 'act',
+export const UNSUBSCRIBE: Served<{ name: string }, UnsubscribeInput> = {
+  ...UNSUBSCRIBE_WORDS,
   input: UnsubscribeInput,
   handler: ({ name }) =>
     Effect.gen(function* () {
+      const unnamed = subscriptionNameRefusal(name);
+      if (unnamed !== undefined) return yield* Effect.fail(new Invalid({ message: unnamed }));
       const reserved = reservedRefusal(name);
       if (reserved) return yield* Effect.fail(reserved);
       yield* (yield* SubscriptionDoor).subscriptions.drop(SubscriptionName.read(name));
       return { name };
     }),
-  print: ({ name }) => [`unsubscribed ${name}: its task is told nothing more of the feed.`],
 };

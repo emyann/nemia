@@ -1,14 +1,15 @@
 /**
  * `nemia stats` as a person reads it, told as three stories on the stage (`story.ts`), over a store of seeded records and the engine's
- * stand-in, each task's facts planted on the attempt it ended (`settle(id, phase, end)`): the numbers `--json` answers and the words it
- * prints over a store, a check that refused told from one that did not finish, the deadline a landing check was filed with read off the
- * engine; every try nothing measured — on codex, in the background, a recheck, filed before steps ran as jobs, a session whose ends do
- * not say — read as null and printed —, never 0, and left out of every mean; and a change to what a workflow's runs froze marked once,
- * on the later run of its workflow folder and factory.
+ * stand-in, each task's facts planted on the attempt it ended (`settle(id, phase, end)`): the numbers its handler answers over a store,
+ * read through its words (`typed.ts`), a check that refused told from one that did not finish, the deadline a landing check was filed
+ * with read off the engine; every try nothing measured — on codex, in the background, a recheck, filed before steps ran as jobs, a
+ * session whose ends do not say — read as null, never 0, and left out of every mean; and a change to what a workflow's runs froze
+ * marked once, on the later run of its workflow folder and factory.
  *
  * Every story plants its runs in the one store and takes them out once it ends, so the next reads none of them. What `factsOf` and
  * `statsOf` decide off hand-built timelines is the tables of `src/stats/stats.test.ts`; the memo over the runtime's feed,
- * `src/stats/stats-memo.test.ts`. Its store is its own at `ROOT`, given as `ENV`.
+ * `src/stats/stats-memo.test.ts`; the words the client prints of them, `apps/cli`'s `rest-lines.test.ts`. Its store is its own at `ROOT`,
+ * given as `ENV`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ import type { TestEnd } from 'agent-runtime/testing';
 import type { Stats } from '../src/runner.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
-import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import { Invalid } from '../src/refusal/refusal.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -27,7 +28,7 @@ import type { Env } from '../src/config/config.store.ts';
 const ROOT = scratch('wf-stats-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 const DAY = '2026-09-28';
 const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
@@ -140,20 +141,8 @@ function rendered(
   if (more.rules !== undefined) fs.writeFileSync(path.join(dir, 'rules.json'), more.rules);
 }
 
-/** What `nemia argv` printed, over the stage's engine. */
-const printedBy = async (t: TestContext, argv: string[]) => {
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return out.join('\n');
-};
-
-/** What `nemia stats --json argv` answered. */
-const answered = async (t: TestContext, argv: string[]) => JSON.parse(await printedBy(t, ['stats', '--json', ...argv])) as Stats;
+/** What `nemia stats argv` answered, over the stage's engine. */
+const answered = async (argv: string[]) => JSON.parse(JSON.stringify(await stage.main(['stats', ...argv]))) as Stats;
 
 /** A run of three steps that landed on its first try, its implement checked, its review accepting the first round. */
 function aLanding() {
@@ -248,8 +237,8 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
 
   await s.test(
     '--json answers a landing on its first try, its cost and rounds, and each check by its verdict; a run whose check did not finish has not finished',
-    async (sub) => {
-      const all = await answered(sub, ['--from', DAY, '--to', DAY]);
+    async () => {
+      const all = await answered(['--from', DAY, '--to', DAY]);
       assert.deepEqual(
         [
           all.all.total.runs,
@@ -270,9 +259,9 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
     },
   );
 
-  await s.test('--by factory answers a group per factory, and --factory keeps one', async (sub) => {
+  await s.test('--by factory answers a group per factory, and --factory keeps one', async () => {
     assert.deepEqual(
-      (await answered(sub, ['--by', 'factory'])).groups.map((g) => [g.key, g.total.tries]),
+      (await answered(['--by', 'factory'])).groups.map((g) => [g.key, g.total.tries]),
       [
         ['default', 3],
         ['landings', 2],
@@ -280,43 +269,31 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
         ['touched', 2],
       ],
     );
-    assert.equal((await answered(sub, ['--factory', 'other'])).all.total.tries, 2);
+    assert.equal((await answered(['--factory', 'other'])).all.total.tries, 2);
   });
 
-  await s.test('--line prints one line, and nemia stats prints the tiles and the day', async (sub) => {
-    const line = await printedBy(sub, ['stats', '--line']);
-    assert.equal(line.split('\n').length, 1, line);
-    assert.match(line, /^stats, last 14 days/);
-    const words = await printedBy(sub, ['stats', '--from', DAY, '--to', DAY]);
-    assert.match(words, /^last 14 days \(/);
-    assert.match(words, new RegExp(`^${DAY}\\s+1\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
-    assert.doesNotMatch(words, /^day\s+changed\s+run\s+since$/m, 'no run changed what it froze: no changed row');
+  await s.test("the tiles span the last 14 days and the 14 before; the day's row is what it landed, and no change is marked", async () => {
+    const { all } = await answered(['--from', DAY, '--to', DAY]);
+    assert.ok(all.tiles.before.to < all.tiles.last.from, 'the 14 days before end before the last 14 begin');
+    const day = all.days.find((d) => d.day === DAY);
+    assert.deepEqual(
+      [day?.runs, day?.landed, day?.rounds, day?.firstTry, day?.costPerLanded, day?.timePerLanded],
+      [1, 1, 1, 1, 3.5, 4 * 3_600_000],
+    );
+    assert.deepEqual(all.marks, [], 'no run changed what it froze');
   });
 
-  await s.test('--help prints each flag and what it takes, and is refused nothing', async (sub) => {
-    const help = await printedBy(sub, ['stats', '--help']);
-    assert.match(help, /^nemia stats \[--from <day>\]/);
-    for (const flag of ['from', 'to', 'by', 'agent', 'step', 'factory', 'workflow', 'repo', 'line', 'json'])
-      assert.match(help, new RegExp(`^\\s+--${flag}\\s+\\S`, 'm'), `--${flag} is said with what it takes`);
-    assert.match(help, /what the rows go by: agent, step, factory, workflow, repo/);
-    assert.match(help, /never 0/);
-  });
-
-  await s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async (sub) => {
+  await s.test('REFUSED: a key to go by it does not know, and a day that is not one, as Invalid with exit 2', async () => {
     for (const argv of [
       ['--by', 'colour'],
       ['--from', '2026-13-40'],
     ])
-      await assert.rejects(
-        printedBy(sub, ['stats', ...argv]),
-        (err: unknown) => err instanceof Invalid && err.exitCode === 2,
-        argv.join(' '),
-      );
+      await assert.rejects(stage.main(['stats', ...argv]), (err: unknown) => err instanceof Invalid && err.exitCode === 2, argv.join(' '));
   });
 
-  await s.test('a landing check is judged against the deadline its task was filed with, read off the engine', async (sub) => {
+  await s.test('a landing check is judged against the deadline its task was filed with, read off the engine', async () => {
     assert.deepEqual(
-      (await answered(sub, ['--factory', 'landings'])).all.slowLandings.map((x) => [
+      (await answered(['--factory', 'landings'])).all.slowLandings.map((x) => [
         x.run,
         x.step,
         x.checkMs,
@@ -330,10 +307,10 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
 
   await s.test(
     "the tries that touched a frozen skill's paths, and how many of them loaded it, are read off the sessions' ends",
-    async (sub) => {
+    async () => {
       const range = ['--factory', 'touched', '--from', TOUCHED_DAY, '--to', TOUCHED_DAY];
       assert.deepEqual(
-        (await answered(sub, range)).all.steps.find((r) => r.step === 'design')?.skills,
+        (await answered(range)).all.steps.find((r) => r.step === 'design')?.skills,
         [
           { skill: 'app:y', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
           { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
@@ -341,9 +318,6 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
         ],
         'both tries touched apps/web and one loaded change-the-board; shadcn declares no path; a skill named with its folder, frozen and loaded as `y`, is counted as its line writes it',
       );
-      const words = await printedBy(sub, ['stats', ...range]);
-      assert.match(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/m);
-      assert.match(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/m);
     },
   );
 });
@@ -480,8 +454,8 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
 
   await s.test(
     'each call a session was refused counts per measured try; a codex, background, recheck or pre-jobs try is unmeasured',
-    async (sub) => {
-      const all = (await answered(sub, denials)).all;
+    async () => {
+      const all = (await answered(denials)).all;
       assert.deepEqual(
         Object.fromEntries(all.days.map((d) => [d.day, d.deniedPerTry])),
         { [BG_DAY]: null, [QUIET_DAY]: 0, [UNMEASURED_DAY]: null, [DENIED_DAY]: 2 },
@@ -501,21 +475,27 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
     },
   );
 
-  await s.test('the words read — where nothing was measured, 0/try where nothing was refused', async (sub) => {
-    const words = await printedBy(sub, ['stats', ...denials]);
-    assert.match(words, new RegExp(`^${BG_DAY}\\s.*\\s—\\s+—$`, 'm'), 'the last column is the skills loaded, unmeasured here');
-    assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try\\s+—$`, 'm'));
-    assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—\\s+—$`, 'm'));
-    assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try\\s+—$`, 'm'));
-    assert.match(words, /^write\s+implementer\s+3\s.*\s4 \(2 of 3\)\s+—$/m, 'the step row says how many of its tries were measured');
-    assert.match(words, /^write\s+implementer\s+Write\(\/x\)\s+2$/m);
-    assert.match(await printedBy(sub, ['stats', '--line', '--factory', 'denials']), /, \S+ \(\S+\) calls denied, /);
+  await s.test('null where nothing was measured, 0 a try where nothing was refused', async () => {
+    const { all } = await answered(denials);
+    const day = (d: string) => all.days.find((x) => x.day === d);
+    assert.deepEqual(
+      [BG_DAY, DENIED_DAY, UNMEASURED_DAY, QUIET_DAY].map((d) => [day(d)?.deniedPerTry, day(d)?.skillsPerTry]),
+      [
+        [null, null],
+        [2, null],
+        [null, null],
+        [0, null],
+      ],
+      'the skills loaded unmeasured here',
+    );
+    const write = all.steps.find((row) => row.step === 'write');
+    assert.deepEqual([write?.skillLoads, write?.skillTries], [null, 0]);
   });
 
   await s.test(
     "each rule a step's frozen skills declare is kept or broken per measured try; rules that do not read count none",
-    async (sub) => {
-      const all = (await answered(sub, denials)).all;
+    async () => {
+      const all = (await answered(denials)).all;
       assert.deepEqual(
         all.steps.find((row) => row.step === 'write')?.rules,
         [
@@ -527,54 +507,34 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
         "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read; a skill named with its folder, frozen as `y`, has its rules said as its line writes it",
       );
       assert.deepEqual(all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
-      const words = await printedBy(sub, ['stats', ...denials]);
-      assert.match(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/m);
-      assert.match(words, new RegExp(`^write\\s+implementer\\s+${RULED}\\s+no-write\\s+1\\s+1$`, 'm'));
-      assert.match(words, new RegExp(`^write\\s+implementer\\s+${RULED}\\s+no-curl\\s+2\\s+0$`, 'm'));
     },
   );
 
-  await s.test(
-    'each skill a session loaded counts per try whose ends all say; a recheck, or one end unsaid, is unmeasured',
-    async (sub) => {
-      const range = ['--factory', 'skills', '--from', SKILLS_DAY, '--to', UNSAID_DAY];
-      const all = (await answered(sub, range)).all;
-      assert.deepEqual(
-        Object.fromEntries(all.days.map((d) => [d.day, d.skillsPerTry])),
-        { [SKILLS_DAY]: 3, [NO_SKILL_DAY]: 0, [UNSAID_DAY]: null },
-        "three loads over spec's first try: its second has an end that does not say, and its recheck has no session of its own",
-      );
-      const row = (name: string) => all.steps.find((r) => r.step === name);
-      const spec = row('spec');
-      assert.deepEqual([spec?.tries, spec?.skillLoads, spec?.skillTries], [3, 3, 1]);
-      assert.deepEqual(spec?.skills, [
-        { skill: 'write-a-spec', count: 2, tries: 1, touched: null, loadedWhenTouched: null },
-        { skill: 'look', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
-      ]);
-      assert.deepEqual([row('quiet')?.skillLoads, row('quiet')?.skillTries, row('quiet')?.skills], [0, 1, []], 'a measured empty list');
-      assert.deepEqual([row('old')?.skillLoads, row('old')?.skillTries, row('old')?.skills], [null, 0, []], 'an end that does not say');
-      const words = await printedBy(sub, ['stats', ...range]);
-      assert.match(words, /^ {2}skills\s+\S+\s+\(\S+\)$/m, 'a tile');
-      assert.match(words, new RegExp(`^${SKILLS_DAY}\\s.*\\s3/try$`, 'm'));
-      assert.match(words, new RegExp(`^${NO_SKILL_DAY}\\s.*\\s0/try$`, 'm'));
-      assert.match(words, new RegExp(`^${UNSAID_DAY}\\s.*\\s—$`, 'm'));
-      assert.match(words, /^spec\s+planner\s+3\s.*\s3 \(1 of 3\)$/m, 'the step row says how many of its tries were measured');
-      assert.match(words, /^old\s+—\s+1\s.*\s—$/m);
-      assert.match(words, /^spec\s+planner\s+write-a-spec\s+2\s+1\s+—$/m);
-      assert.match(words, /^spec\s+planner\s+look\s+1\s+1\s+—$/m);
-      assert.match(
-        await printedBy(sub, ['stats', '--line', '--factory', 'skills']),
-        /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/,
-      );
-    },
-  );
+  await s.test('each skill a session loaded counts per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async () => {
+    const range = ['--factory', 'skills', '--from', SKILLS_DAY, '--to', UNSAID_DAY];
+    const all = (await answered(range)).all;
+    assert.deepEqual(
+      Object.fromEntries(all.days.map((d) => [d.day, d.skillsPerTry])),
+      { [SKILLS_DAY]: 3, [NO_SKILL_DAY]: 0, [UNSAID_DAY]: null },
+      "three loads over spec's first try: its second has an end that does not say, and its recheck has no session of its own",
+    );
+    const row = (name: string) => all.steps.find((r) => r.step === name);
+    const spec = row('spec');
+    assert.deepEqual([spec?.tries, spec?.skillLoads, spec?.skillTries], [3, 3, 1]);
+    assert.deepEqual(spec?.skills, [
+      { skill: 'write-a-spec', count: 2, tries: 1, touched: null, loadedWhenTouched: null },
+      { skill: 'look', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+    ]);
+    assert.deepEqual([row('quiet')?.skillLoads, row('quiet')?.skillTries, row('quiet')?.skills], [0, 1, []], 'a measured empty list');
+    assert.deepEqual([row('old')?.skillLoads, row('old')?.skillTries, row('old')?.skills], [null, 0, []], 'an end that does not say');
+  });
 
   await s.test(
     "each tally a step froze totals over its closeouts, per day and over the range; a day with no closeout's value is —",
-    async (sub) => {
+    async () => {
       const range = ['--factory', 'tallies', '--from', TALLY_DAY, '--to', UNTALLIED_DAY];
       assert.deepEqual(
-        (await answered(sub, range)).all.tallies.map((row) => [row.step, row.tally, row.total, row.days]),
+        (await answered(range)).all.tallies.map((row) => [row.step, row.tally, row.total, row.days]),
         [
           [
             'triage',
@@ -597,11 +557,6 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
         ],
         'the session that signed no issues measured none',
       );
-      const words = await printedBy(sub, ['stats', ...range]);
-      assert.match(words, /^day\s+step\s+tally\s+sum\s+tries$/m);
-      assert.match(words, new RegExp(`^${TALLY_DAY}\\s+triage\\s+issues\\.open\\s+1\\s+1$`, 'm'));
-      assert.match(words, new RegExp(`^${UNTALLIED_DAY}\\s+triage\\s+issues\\s+—\\s+0$`, 'm'));
-      assert.match(words, /^all\s+triage\s+issues\s+2\s+1$/m);
     },
   );
 });
@@ -638,13 +593,13 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
 
   await s.test(
     'a skill whose rendered copy changed is marked once, on the later run, since the run before; the same copy again is not',
-    async (sub) => {
+    async () => {
       ran('marks-2-review', { from: 9, to: 10, day: '2026-09-21' });
       reviewRun('marks-1', '2026-09-20', reviewBy(), before);
       reviewRun('marks-2', '2026-09-21', reviewBy(), after, { taskId: 'marks-2-review' });
       reviewRun('marks-3', '2026-09-22', reviewBy(), after);
       reviewRun('marks-4', '2026-09-22', reviewBy());
-      assert.deepEqual((await answered(sub, ['--workflow', 'review'])).all.marks, [
+      assert.deepEqual((await answered(['--workflow', 'review'])).all.marks, [
         {
           run: 'marks-2',
           factory: 'default',
@@ -661,13 +616,13 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
     },
   );
 
-  await s.test("an agent's instructions changed are marked once, on the agent; a hire changed once, on the step", async (sub) => {
+  await s.test("an agent's instructions changed are marked once, on the agent; a hire changed once, on the step", async () => {
     reviewRun('marks-5', '2026-09-23', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
     reviewRun('marks-6', '2026-09-24', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
     reviewRun('marks-7', '2026-09-25', reviewBy('intaker', 'You are Intaker.'), after);
     reviewRun('marks-8', '2026-09-26', reviewBy('intaker', 'You are Intaker.'), after);
     assert.deepEqual(
-      (await answered(sub, ['--workflow', 'review'])).all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
+      (await answered(['--workflow', 'review'])).all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
       [
         ['2026-09-21', 'marks-2', 'skill', SKILL, 'marks-1'],
         ['2026-09-23', 'marks-5', 'agent', 'reviewer', 'marks-4'],
@@ -677,22 +632,25 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
     );
   });
 
-  await s.test('a run of another factory, between them in the same folder, is compared within its own factory alone', async (sub) => {
+  await s.test('a run of another factory, between them in the same folder, is compared within its own factory alone', async () => {
     reviewRun('pipao-1', '2026-09-22', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
     reviewRun('pipao-2', '2026-09-24', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
-    const marks = (await answered(sub, ['--workflow', 'review'])).all.marks;
+    const marks = (await answered(['--workflow', 'review'])).all.marks;
     assert.deepEqual(
       marks.map((m) => m.run),
       ['marks-2', 'marks-5', 'marks-7'],
     );
-    assert.deepEqual((await answered(sub, ['--workflow', 'review', '--factory', 'pipao'])).all.marks, []);
+    assert.deepEqual((await answered(['--workflow', 'review', '--factory', 'pipao'])).all.marks, []);
   });
 
-  await s.test('nemia stats prints a changed row per mark', async (sub) => {
-    const words = await printedBy(sub, ['stats', '--workflow', 'review']);
-    assert.match(words, /^day\s+changed\s+run\s+since$/m);
-    assert.match(words, new RegExp(`^2026-09-21\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
-    assert.match(words, /^2026-09-23\s+agent reviewer\s+marks-5\s+marks-4$/m);
-    assert.match(words, /^2026-09-25\s+step review\s+marks-7\s+marks-6$/m);
+  await s.test('each mark says its day, what changed, its run and the run it is compared with', async () => {
+    assert.deepEqual(
+      (await answered(['--workflow', 'review'])).all.marks.map((m) => [m.day, `${m.kind} ${m.name}`, m.run, m.since]),
+      [
+        ['2026-09-21', `skill ${SKILL}`, 'marks-2', 'marks-1'],
+        ['2026-09-23', 'agent reviewer', 'marks-5', 'marks-4'],
+        ['2026-09-25', 'step review', 'marks-7', 'marks-6'],
+      ],
+    );
   });
 });

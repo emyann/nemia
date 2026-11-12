@@ -35,7 +35,7 @@ import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { everyTryOf, taskPhasesRead } from '../src/views/views.verb.ts';
 import { clockOf, gateWaitOf, timeline, timelineRows } from '../src/timeline/index.ts';
 import { readDay } from '../src/series/series.store.ts';
-import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-measured-run-');
@@ -50,7 +50,7 @@ const ENV: Env = {
 };
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 const MIN = 60_000;
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -436,14 +436,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
   await s.test(
     "`nemia stats --json`: landed on its first try, two rounds, the gate waits from the answer's end, the calls refused, the skills, the tally",
     async () => {
-      const printed: string[] = [];
-      const log = t.mock.method(console, 'log', (...args: unknown[]) => void printed.push(args.map(String).join(' ')));
-      try {
-        await stage.main(['stats', '--json']);
-      } finally {
-        log.mock.restore();
-      }
-      const stats = JSON.parse(printed.join('\n')) as Stats;
+      const stats = JSON.parse(JSON.stringify(await stage.main(['stats', '--json']))) as Stats;
       const { total } = stats.all;
       assert.deepEqual(
         [total.runs, total.landed, total.firstTry, total.rounds, total.refused],

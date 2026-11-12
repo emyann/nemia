@@ -510,7 +510,7 @@ export { freeingMany, judgingMany, prune, type Listed, type Turned } from './for
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo } from './stats/stats.verb.ts';
 export { seriesMemo, type Health, type SeriesMemo, type SeriesRead } from './series/series.ts';
-export { statsLine, statsLines, statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
+export { statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, listReading, pausedRead, unjudgedOf, type ListReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { ListedStanding, RunsListed, Unjudged } from './list/list.ts';

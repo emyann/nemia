@@ -51,7 +51,7 @@ import { CHAT_SPEAKER_ENTRIES } from '../chat/speakers.verb.ts';
 import { POLICY_REACH } from '../reach/reach.verb.ts';
 
 /** The reads of the store, in the order `nemia`'s help lists them. */
-const READS: readonly Command[] = [tableEntry(SHOW), CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];
+const READS: readonly (Command | Served)[] = [tableEntry(SHOW), CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];
 
 /** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
 export const RAN: readonly Ran[] = [TICK, UP, WATCH];

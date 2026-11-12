@@ -4,7 +4,7 @@
  */
 import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
-import { Run as RunObject } from 'objects';
+import { LOGS_WORDS, Run as RunObject } from 'objects';
 import { EngineService, asked, tried } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -15,7 +15,7 @@ import { runObject, stepCloseout, stepTold, stepTries, stepTry, type TryCloseout
 import { runsAtOnce } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import type { Args } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Command, Served } from '../command/entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -192,22 +192,8 @@ export const TOLD: Command<Effect.Success<ReturnType<typeof stepTold>>, StepInpu
  * `nemia logs`: the session output of a step's current task, read from the engine whole, or nothing for a step with no task filed — one not
  * run yet, or one the run does not have. The api's `steps` group serves its end (`log`), calling this handler.
  */
-export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
-  name: 'logs',
-  served: [{ endpoint: 'steps.log' }],
-  usage: '<runId> <step>',
-  help: ["that step's session output"],
-  spec: {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'step', takes: 'required', kind: 'name' },
-    ],
-    flags: [],
-    unknown: takesNo('logs', "one run's id and one step's name"),
-  },
-  writes: false,
-  class: 'read',
-  only: { side: 'cli', why: "the api serves its end as the `log` of `objects`' steps group, calling this handler" },
+export const LOGS: Served<{ taskId?: string; output?: string }, StepInput> = {
+  ...LOGS_WORDS,
   input: StepInput,
   handler: Effect.fnUntraced(function* ({ runId, step }: StepInput) {
     const e = yield* EngineService;
@@ -215,5 +201,4 @@ export const LOGS: Command<{ taskId?: string; output?: string }, StepInput> = {
     const taskId = runsAtOnce(home).runs.read(runId).steps[step]?.taskId;
     return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
   }),
-  print: ({ output }, { step }) => [output ?? `${step} has not run yet`],
 };

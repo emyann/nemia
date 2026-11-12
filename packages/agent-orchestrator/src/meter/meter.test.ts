@@ -10,7 +10,6 @@ import {
   heaviest,
   PASS_BOUNDS,
   passCost,
-  passesLines,
   passesRead,
   passHistogram,
   passParts,
@@ -227,12 +226,19 @@ row('the summary is the median and slowest pass, and what the latest saw; none f
   assert.equal(passSummary([]), null);
 });
 
-row("`nemia passes`' lines: the summary, a row a bucket from the first with passes to the last, and the parts", () => {
-  const lines = passesLines(passesRead([recent(30, { act: 30 }), recent(80, { place: 80 })]));
-  assert.match(lines[0], /^2 passes since .*: 55\.0 ms a pass \(median\), slowest 80\.0$/);
-  assert.equal(lines.filter((l) => /^ +≤ \d+ ms /.test(l)).length, 2, lines.join('\n'));
-  assert.ok(lines.includes('  place       40.0 ms  73%'), lines.join('\n'));
-  assert.match(passesLines(passesRead([]))[0], /^no pass is kept yet/);
+row("`nemia passes`' answer: the summary, the histogram's buckets with passes, and the parts, each phase's time a pass and share", () => {
+  const read = passesRead([recent(30, { act: 30 }), recent(80, { place: 80 })]);
+  assert.deepEqual(
+    { passes: read.summary?.passes, medianMs: read.summary?.medianMs, slowestMs: read.summary?.slowestMs },
+    { passes: 2, medianMs: 55, slowestMs: 80 },
+  );
+  assert.equal(read.histogram.filter((b) => b.count > 0).length, 2);
+  assert.deepEqual(
+    read.parts.find((p) => p.phase === 'place'),
+    { phase: 'place', ms: 40, share: 80 / 110 },
+  );
+  assert.deepEqual(read.bounds, PASS_BOUNDS);
+  assert.deepEqual(passesRead([]).summary, null);
 });
 
 test("the meter's math: what a pass costs, in words, a row a claim", async (t) => {

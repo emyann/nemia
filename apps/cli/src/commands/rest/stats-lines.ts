@@ -1,15 +1,23 @@
 /**
- * The stats in words (`Stats`, `stats.ts`): the tiles, a row per landing check that passed in more than half its deadline, a row per
- * day, a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step loaded, a row
- * per rule a step's skills declare, a row per day and count a step declares (`tally:`), and the one line the morning recap quotes. A
- * number with nothing measured under it reads `—`, never 0. Pure.
+ * The stats in words, off `GET /api/stats`' answer, its groups read by `objects`' `StatsGroup` and its health by `StatsHealth`: the
+ * tiles, a row per landing check that passed in more than half its deadline, a row per day, a row per change to what the runs froze, a
+ * row per step, a row per call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day
+ * and count a step declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`,
+ * never 0. Pure.
  */
-import { dollars } from '../money/money.ts';
-import { durationWord } from '../usage/usage.ts';
-import type { Health } from '../series/series.ts';
-import type { Group, Headline, SlowLanding, Stats, StepRow } from './stats.ts';
-import type { Mark } from './marks.ts';
-import type { TallyCell } from '../tally/tally.ts';
+import type { StatsGroup, StatsHeadline, StatsHealth, StatsStepRow } from 'objects';
+
+/** The stats as this file reads them: the answer's keys, its groups and health decoded. */
+export type StatsRead = {
+  readonly from: string | null;
+  readonly to: string;
+  readonly by: string | null;
+  readonly filters: Readonly<Record<string, string>>;
+  readonly all: StatsGroup;
+  readonly groups: readonly (StatsGroup & { readonly key: string | null })[];
+  readonly unreadable: readonly string[];
+  readonly health: StatsHealth;
+};
 
 const NONE = '—';
 
@@ -18,9 +26,23 @@ const percent = (share: number): string => `${Math.round(share * 100)}%`;
 const oneDecimal = (n: number): string => (Math.round(n * 10) / 10).toString();
 /** A rate per try to two decimals, or to one significant figure under 0.01, so a rate above 0 never reads as 0. */
 const perTry = (n: number): string => `${n > 0 && n < 0.01 ? Number(n.toPrecision(1)) : Math.round(n * 100) / 100}/try`;
+/** Dollars as a person reads them: `$0.42`, and three figures under a cent. */
+const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+
+/** A span of time in its two largest units: `45s`, `3m05s`, `2h07m`, `1d03h`. */
+export function durationWord(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m${two(s % 60)}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${two(m % 60)}m`;
+  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
+}
 
 /** A headline's numbers in words, by the name each is printed under. */
-const wordsOf = (h: Headline): Record<string, string> => ({
+const wordsOf = (h: StatsHeadline): Record<string, string> => ({
   runs: String(h.runs),
   landed: or(h.landed, String),
   rounds: or(h.rounds, oneDecimal),
@@ -46,7 +68,7 @@ function table(rows: readonly string[][]): string[] {
 }
 
 /** The tiles: each headline number over the last 14 days, beside the same over the 14 before. */
-function tileLines(g: Group): string[] {
+function tileLines(g: StatsGroup): string[] {
   const { last, before } = g.tiles;
   const now = wordsOf(last);
   const then = wordsOf(before);
@@ -56,11 +78,8 @@ function tileLines(g: Group): string[] {
   ];
 }
 
-/**
- * A row per landing check that passed in more than half the deadline its task was filed with (`SlowLanding`), under a line saying what
- * to do: its day, run, step and try, its run time, that deadline and the share; none where no check did.
- */
-function slowLandingLines(slow: readonly SlowLanding[]): string[] {
+/** A row per landing check that passed in more than half its deadline, under a line saying what to do; none where no check did. */
+function slowLandingLines(slow: StatsGroup['slowLandings']): string[] {
   if (!slow.length) return [];
   return [
     'landing checks over half their deadline: measure the passing landing checks again, then change LANDING_CHECK_DEADLINE_SECONDS and ' +
@@ -73,39 +92,25 @@ function slowLandingLines(slow: readonly SlowLanding[]): string[] {
 }
 
 /** A row per day, under a header: a day with nothing that happened on it is left out of the words. */
-function dayLines(g: Group, label?: string): string[] {
+function dayLines(g: StatsGroup): string[] {
   const days = g.days.filter((d) => d.tries || d.runs);
   if (!days.length) return [];
   const names = Object.keys(wordsOf(g.total));
-  return table([
-    ['day', ...(label === undefined ? [] : ['']), ...names],
-    ...days.map((d) => [d.day, ...(label === undefined ? [] : [label]), ...Object.values(wordsOf(d))]),
-  ]);
+  return table([['day', ...names], ...days.map((d) => [d.day, ...Object.values(wordsOf(d))])]);
 }
 
-/** A row per change (`Mark`): its day, what changed, the run that changed it and the run it is compared with; none without a change. */
-function markLines(marks: readonly Mark[]): string[] {
+/** A row per change: its day, what changed, the run that changed it and the run it is compared with; none without a change. */
+function markLines(marks: StatsGroup['marks']): string[] {
   if (!marks.length) return [];
   return table([['day', 'changed', 'run', 'since'], ...marks.map((m) => [m.day, `${m.kind} ${m.name}`, m.run, m.since])]);
 }
 
-/** A step's cost in words: the sum of its measured tries, and how many were, where not all. */
-const costWord = (s: StepRow): string =>
-  s.costUsd === null ? NONE : s.costTries === s.tries ? dollars(s.costUsd) : `${dollars(s.costUsd)} (${s.costTries} of ${s.tries})`;
+/** A count over a step's measured tries in words, and how many were, where not all. */
+const ofTries = (count: number | null, measured: number, tries: number, word: (n: number) => string = String): string =>
+  count === null ? NONE : measured === tries ? word(count) : `${word(count)} (${measured} of ${tries})`;
 
-/** The calls a step was refused in words: their count over its measured tries, and how many were, where not all. */
-const deniedWord = (s: StepRow): string =>
-  s.deniedCalls === null ? NONE : s.deniedTries === s.tries ? String(s.deniedCalls) : `${s.deniedCalls} (${s.deniedTries} of ${s.tries})`;
-
-/** The skills a step loaded in words: their count over its measured tries, and how many were, where not all. */
-const skillsWord = (s: StepRow): string =>
-  s.skillLoads === null ? NONE : s.skillTries === s.tries ? String(s.skillLoads) : `${s.skillLoads} (${s.skillTries} of ${s.tries})`;
-
-/**
- * A row per step and agent: its tries, their run time, its checks' run time and cost, its checks' verdicts, its mean gate wait, the calls
- * it was refused, the skills it loaded.
- */
-function stepLines(steps: readonly StepRow[]): string[] {
+/** A row per step and agent: its tries, run time, checks' time and cost, verdicts, gate wait, calls refused and skills loaded. */
+function stepLines(steps: readonly StatsStepRow[]): string[] {
   if (!steps.length) return [];
   return table([
     ['step', 'agent', 'tries', 'ran', 'checks', 'cost', 'passed', 'refused', 'unfinished', 'gate wait', 'denied', 'skills'],
@@ -115,28 +120,25 @@ function stepLines(steps: readonly StepRow[]): string[] {
       String(s.tries),
       or(s.ranMs, durationWord),
       or(s.checkMs, durationWord),
-      costWord(s),
+      ofTries(s.costUsd, s.costTries, s.tries, dollars),
       String(s.checks.passed),
       String(s.checks.refused),
       String(s.checks.unfinished),
       or(s.gateWaitMs, durationWord),
-      deniedWord(s),
-      skillsWord(s),
+      ofTries(s.deniedCalls, s.deniedTries, s.tries),
+      ofTries(s.skillLoads, s.skillTries, s.tries),
     ]),
   ]);
 }
 
 /** A row per call each step and agent was refused, with how many times; none where no step was refused a call. */
-function denialLines(steps: readonly StepRow[]): string[] {
+function denialLines(steps: readonly StatsStepRow[]): string[] {
   const rows = steps.flatMap((s) => s.denials.map((d) => [s.step, s.agent ?? NONE, d.call, String(d.count)]));
   return rows.length ? table([['step', 'agent', 'denied', 'calls'], ...rows]) : [];
 }
 
-/**
- * A row per skill each step and agent loaded or touched the paths of: its loads, the tries that loaded it, and, of the tries that touched
- * its paths, how many loaded it (`3 of 7`), `—` where it declares none; none where no step loaded or touched a skill.
- */
-function skillLines(steps: readonly StepRow[]): string[] {
+/** A row per skill each step and agent loaded or touched the paths of; none where no step loaded or touched a skill. */
+function skillLines(steps: readonly StatsStepRow[]): string[] {
   const rows = steps.flatMap((s) =>
     s.skills.map((k) => [
       s.step,
@@ -151,19 +153,19 @@ function skillLines(steps: readonly StepRow[]): string[] {
 }
 
 /** A row per rule each step and agent's skills declare, kept and broken over its measured tries; none where no step has one. */
-function ruleLines(steps: readonly StepRow[]): string[] {
+function ruleLines(steps: readonly StatsStepRow[]): string[] {
   const rows = steps.flatMap((s) => s.rules.map((r) => [s.step, s.agent ?? NONE, r.skill, r.rule, String(r.kept), String(r.broken)]));
   return rows.length ? table([['step', 'agent', 'skill', 'rule', 'kept', 'broken'], ...rows]) : [];
 }
 
 /** A tally's cell in words: its sum, to two decimals, `—` where no try was measured; and how many were. */
-const tallyCells = (c: TallyCell): string[] => [or(c.sum, (n) => String(Math.round(n * 100) / 100)), String(c.tries)];
+const tallyCells = (c: { readonly sum: number | null; readonly tries: number }): string[] => [
+  or(c.sum, (n) => String(Math.round(n * 100) / 100)),
+  String(c.tries),
+];
 
-/**
- * A row per day something happened on and count a step declares (`tally:`), then a row per count over the whole range (`all`); none
- * where no step declares one.
- */
-function tallyLines(g: Group): string[] {
+/** A row per day something happened on and count a step declares, then a row per count over the whole range; none where none. */
+function tallyLines(g: StatsGroup): string[] {
   if (!g.tallies.length) return [];
   const days = g.days.filter((d) => d.tries || d.runs).map((d) => d.day);
   return table([
@@ -178,11 +180,8 @@ function tallyLines(g: Group): string[] {
 /** A load in words, to two decimals: the share of the cores at work. */
 const loadWord = (n: number): string => (Math.round(n * 100) / 100).toString();
 
-/**
- * The system's health over the days in words, a line each — a pass's time, the store, the queue, the load, each quota window — or none
- * where the series kept nothing over them.
- */
-export function healthLines(h: Health): string[] {
+/** The system's health over the days in words, a line each, or none where the series kept nothing over them. */
+export function healthLines(h: StatsHealth): string[] {
   const lines = [
     h.pass.p50 === null ? null : `a pass: ${h.pass.p50.toFixed(1)} ms (p50), ${or(h.pass.p95, (n) => n.toFixed(1))} ms (p95)`,
     h.runs === null ? null : `runs in the store: ${h.runs} at most; journal reads a pass: ${or(h.reads, oneDecimal)} (p95)`,
@@ -195,35 +194,33 @@ export function healthLines(h: Health): string[] {
   return lines.length ? ['system', ...lines.map((line) => `  ${line}`)] : [];
 }
 
-/**
- * What `nemia stats` prints: the tiles, a row per landing check that passed in more than half its deadline, a row per day — per group,
- * with a key — then a row per change to what the runs froze, a row per step, a row per call a step was refused, a row per skill a step
- * loaded, a row per rule its skills declare, a row per day and count a step declares, the system's health over the days, and the runs
- * left out.
- */
-export function statsLines(s: Stats): string[] {
+/** `lines` after a blank line, or nothing where there are none. */
+const block = (lines: readonly string[]): string[] => (lines.length ? ['', ...lines] : []);
+
+/** What `nemia stats` prints, in the order its help says, the runs left out last. */
+export function statsLines(s: StatsRead): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
   const groups = s.by ? s.groups.flatMap((g) => ['', `${s.by} ${g.key ?? NONE}`, ...dayLines(g)]) : ['', ...dayLines(s.all)];
   return [
     ...(filtered.length ? [`only ${filtered.join(', ')}`] : []),
     ...tileLines(s.all),
-    ...(s.all.slowLandings.length ? ['', ...slowLandingLines(s.all.slowLandings)] : []),
+    ...block(slowLandingLines(s.all.slowLandings)),
     '',
     s.from ? `${s.from} → ${s.to}` : 'no try has ended, and no run has finished',
     ...groups,
-    ...(s.all.marks.length ? ['', ...markLines(s.all.marks)] : []),
-    ...(s.all.steps.length ? ['', ...stepLines(s.all.steps)] : []),
-    ...(denialLines(s.all.steps).length ? ['', ...denialLines(s.all.steps)] : []),
-    ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
-    ...(ruleLines(s.all.steps).length ? ['', ...ruleLines(s.all.steps)] : []),
-    ...(s.all.tallies.length ? ['', ...tallyLines(s.all)] : []),
-    ...(healthLines(s.health).length ? ['', ...healthLines(s.health)] : []),
+    ...block(markLines(s.all.marks)),
+    ...block(stepLines(s.all.steps)),
+    ...block(denialLines(s.all.steps)),
+    ...block(skillLines(s.all.steps)),
+    ...block(ruleLines(s.all.steps)),
+    ...block(tallyLines(s.all)),
+    ...block(healthLines(s.health)),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (nemia ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }
 
 /** How many landing checks of the last 14 days passed in more than half their deadline, in words; none where none did. */
-function slowLandingWord(s: Stats): string {
+function slowLandingWord(s: StatsRead): string {
   const { from, to } = s.all.tiles.last;
   const n = s.all.slowLandings.filter((x) => x.day >= from && x.day <= to).length;
   if (!n) return '';
@@ -232,11 +229,8 @@ function slowLandingWord(s: Stats): string {
     : `, ${n} landing checks over half their deadline: measure again`;
 }
 
-/**
- * The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and how many landing checks
- * of the last 14 days passed in more than half their deadline, where any did.
- */
-export function statsLine(s: Stats): string {
+/** The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets, and the slow landings. */
+export function statsLine(s: StatsRead): string {
   const now = wordsOf(s.all.tiles.last);
   const then = wordsOf(s.all.tiles.before);
   const was = (name: string) => `${now[name]} (${then[name]})`;

@@ -25,6 +25,7 @@ import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { keep, keepOnce } from '../src/nemia/keep.verb.ts';
 import { LEVEL } from '../src/nemia/level.verb.ts';
+import { typed } from './typed.ts';
 import { MEMORY } from '../src/nemia/memory.verb.ts';
 import { appendOutbox, chatDir, stopsFile } from '../src/chat/chat.store.ts';
 import { framedFor } from '../src/chat/chat.ts';
@@ -49,9 +50,7 @@ const ROOT = scratch('wf-nemia-keeper-');
 const CONFIG = scratch('wf-nemia-keeper-config-');
 process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-/** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
-const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 /** The board's engine, its `view` saying when a task was filed, whether a stop was asked of it and what it spent, as a fold does. */
 const viewed = () => {
@@ -145,11 +144,7 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       const set = await level({ level: 'semi-auto' });
       assert.equal(set.level, 'semi-auto');
       assert.ok(set.task !== null && readLevel(ROOT)?.task === set.task, 'her task named, for the keeper');
-      assert.equal(set.trust, words);
-      assert.ok(
-        LEVEL.print(set, {}).some((line) => line.includes(words) && line.includes('accept the prompt')),
-        'nemia level says the command',
-      );
+      assert.equal(set.trust, words, 'nemia level says the command');
       const b = stage.board();
       const filings = b.filings.length;
       assert.deepEqual(await beat(), [], 'her session waits for her folder to be trusted');
@@ -303,7 +298,6 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       assert.equal(status.level, 'semi-auto');
       assert.deepEqual(status.allows, ['Bash(nemia cancel:*)', 'Bash(nemia approve:*)'], 'what the person allowed in her folder, shown');
       assert.deepEqual(status.spend, { usd: 0.42, measured: 1, unmeasured: 0 });
-      assert.ok(LEVEL.print(status, {}).includes('spent $0.42 over 1 session ended; her open one counts once it ends'));
       assert.equal(status.reach[0], `${DEFAULT_HARNESS} attach 01234567`);
       const again = (await level({ level: 'semi-auto' })) as { task: string };
       assert.equal(again.task, first, 'semi-auto again keeps her open task');
@@ -334,11 +328,11 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
     fs.mkdirSync(memoryDir(ROOT), { recursive: true });
     fs.writeFileSync(path.join(memoryDir(ROOT), 'feed-cursor'), '1234\n');
     fs.writeFileSync(path.join(memoryDir(ROOT), '.hidden'), 'no fact');
-    assert.deepEqual(MEMORY.print((await stage.runWith(viewed(), MEMORY.handler({}))) as never, {}), [
-      `Nemia keeps 1 fact in ${memoryDir(ROOT)}:`,
-      '  feed-cursor',
-    ]);
-    assert.deepEqual(MEMORY.print((await stage.runWith(viewed(), MEMORY.handler({ fact: 'feed-cursor' }))) as never, {}), ['1234']);
+    assert.deepEqual(await stage.runWith(viewed(), MEMORY.handler({})), { dir: memoryDir(ROOT), facts: ['feed-cursor'], fact: null });
+    assert.deepEqual((await stage.runWith(viewed(), MEMORY.handler({ fact: 'feed-cursor' }))).fact, {
+      name: 'feed-cursor',
+      text: '1234\n',
+    });
     names(
       await refusal(() => stage.runWith(viewed(), MEMORY.handler({ fact: '../level.json' }))),
       'no fact named ../level.json',
@@ -358,7 +352,7 @@ test('A factory raised for a stretch keeps her, the store at manual; its end pas
     assert.equal(pipao?.level, 'semi-auto');
     assert.equal(pipao.default, 'manual');
     assert.equal(pipao.raise?.until, '2026-10-06T09:00:00.000Z', 'raised for an hour');
-    assert.ok(LEVEL.print(raised, {}).includes(`  pipao: semi-auto until 2026-10-06T09:00:00.000Z, then manual (the store's)`));
+    assert.equal(pipao.own, null, "it follows the store's level once its raise ends");
     assert.deepEqual(await beat(), ['file']);
     assert.deepEqual(await beat(), ['subscribe']);
     assert.deepEqual(await beat(), []);

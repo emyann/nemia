@@ -24,13 +24,13 @@ import { advanceRun, approveRun, retryRun, startRun, runWith } from '../src/runn
 import { runRecord } from '../src/record/record.store.ts';
 import { RECENT_RUNS } from '../src/costs/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-costs-brief-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const SECTION = '## What runs of this workflow cost';

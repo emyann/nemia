@@ -1,8 +1,8 @@
 /**
- * The flow numbers (`factsOf`, `statsOf`, `stats.ts`) and their words (`stats-words.ts`), off a real timeline (`timeline`) of hand-built
- * views, as one table per function: each number is keyed on a workflow's structure — `loop:` for rounds, `workspace: base` for
- * landings — never on a step's name, and absent, null, never 0, where nothing measured it. `nemia stats` over a store, and its null
- * read through the engine, are the stories of `test/stats.test.ts`.
+ * The flow numbers (`factsOf`, `statsOf`, `stats.ts`), off a real timeline (`timeline`) of hand-built views, as one table per function:
+ * each number is keyed on a workflow's structure — `loop:` for rounds, `workspace: base` for landings — never on a step's name, and
+ * absent, null, never 0, where nothing measured it. Their words are the client's (`apps/cli/test/rest-lines.test.ts`). `nemia stats`
+ * over a store, and its null read through the engine, are the stories of `test/stats.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,7 +24,6 @@ import {
   type CheckVerdict,
   type Facts,
 } from './stats.ts';
-import { statsLine, statsLines } from './stats-words.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { deniedCallsOf } from './discipline.ts';
 
@@ -233,8 +232,6 @@ const landingAt = (id: string, check: CheckVerdict, checkRan: number, deadline?:
     review: [{ end: at(3) }],
     land: [{ end: at(7), check, checkRan, ...(deadline === undefined ? {} : { deadline }) }],
   });
-
-const SLOW_HEADER = /^landing checks over half their deadline: measure .* LANDING_CHECK_DEADLINE_SECONDS/;
 
 /** A row whose body is its claim: the name says it, `check` asserts it. */
 type Row = { name: string; check: () => void };
@@ -1226,164 +1223,130 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
   ]);
 });
 
-/** The words of the stats of `reads`, as of `now`, line by line. */
-const wordsOf = (reads: ReturnType<typeof readOf>[], query = {}, now = NOW) => statsLines(statsOf(factsOfAll(...reads), query, now));
-/** Whether a line of `words` reads as `line`. */
-const hasLine = (words: string[], line: RegExp) =>
-  assert.ok(
-    words.some((l) => line.test(l)),
-    words.join('\n'),
-  );
+/** The stats of `reads`, as of `now`. */
+const statsOfReads = (reads: ReturnType<typeof readOf>[], query = {}, now = NOW) => statsOf(factsOfAll(...reads), query, now);
+/** The row of `name` of the steps of `s`'s every run. */
+const stepRowOf = (s: ReturnType<typeof statsOf>, name: string) => s.all.steps.find((r) => r.step === name);
 
-test('`statsLines` and `statsLine`: the stats in words, — where nothing was measured', async (t) => {
-  const empty = statsLine(statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW));
+test('what `nemia stats` prints is made of: null where nothing was measured, each row the client words', async (t) => {
+  const empty = statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW);
   await rowsOf(t, [
-    { name: 'the recap line is one line', check: () => assert.equal(empty.split('\n').length, 1) },
-    { name: 'it says — where no round was measured', check: () => assert.match(empty, /— \(—\) rounds/) },
-    { name: 'a fortnight with no run finished recorded no landing', check: () => assert.match(empty, /— \(—\) landed/) },
     {
-      name: 'the day row reads — under landed where no run recorded it, not 0',
+      name: 'a fortnight with no run finished measured no round and recorded no landing',
       check: () => {
-        const old = (id: string) =>
-          readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
-        hasLine(wordsOf([old('old-1'), old('old-2')], { by: 'workflow' }), new RegExp(`^${DAY}\\s+2\\s+—\\s`));
+        for (const tile of [empty.all.tiles.last, empty.all.tiles.before]) assert.deepEqual([tile.rounds, tile.landed], [null, null]);
       },
     },
     {
-      name: 'refused calls: — where none were measured, a measured 0 as 0/try, a small rate keeps a significant figure',
+      name: "a day's landed is null where no run recorded it, not 0",
+      check: () => {
+        const old = (id: string) =>
+          readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
+        const day = statsOfReads([old('old-1'), old('old-2')], { by: 'workflow' }).groups[0]?.days.find((d) => d.day === DAY);
+        assert.deepEqual([day?.runs, day?.landed], [2, null]);
+      },
+    },
+    {
+      name: 'refused calls: null where none were measured, a measured none 0',
       check: () => {
         const codex = statsOf(
           factsOfAll(readOf('codex', [step('implement', [], { harness: 'codex' })], { implement: [{ end: at(3, JOBS_DAY) }] })),
           {},
           JOBS_NOW,
         );
-        assert.match(statsLine(codex), /— \(—\) calls denied/);
+        assert.equal(codex.all.tiles.last.deniedPerTry, null);
         const none = statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1, JOBS_DAY), denied: [] }] })), {}, JOBS_NOW);
-        assert.match(statsLine(none), /0\/try \(—\) calls denied/);
-        none.all.tiles.last.deniedPerTry = 1 / 300;
-        assert.match(statsLine(none), / 0\.003\/try \(—\) calls denied/);
+        assert.equal(none.all.tiles.last.deniedPerTry, 0);
       },
     },
     {
-      name: 'skills loaded: — where none were measured, 0/try for a measured none',
+      name: 'skills loaded: null where none were measured, 0 for a measured none',
       check: () => {
-        assert.match(
-          statsLine(statsOf(factsOfAll(readOf('unsaid', planner, { design: [{ end: at(1) }] })), {}, NOW)),
-          /— \(—\) skills loaded$/,
+        assert.equal(statsOfReads([readOf('unsaid', planner, { design: [{ end: at(1) }] })]).all.tiles.last.skillsPerTry, null);
+        assert.equal(statsOfReads([readOf('none', planner, { design: [{ end: at(1), skills: [] }] })]).all.tiles.last.skillsPerTry, 0);
+      },
+    },
+    {
+      name: 'the step row counts its skills loaded over the tries that had them measured, and a row per skill',
+      check: () => {
+        const design = stepRowOf(statsOfReads([readOf('by-skill', planner, skillsBy)]), 'design');
+        assert.deepEqual([design?.skillLoads, design?.skillTries, design?.tries], [4, 2, 3]);
+        const spec = design?.skills.find((k) => k.skill === 'write-a-spec');
+        assert.deepEqual([spec?.count, spec?.tries, spec?.touched], [2, 2, null]);
+      },
+    },
+    {
+      name: "a skill's row counts the touched tries that loaded it, and null where it declares no path",
+      check: () => {
+        const skills = stepRowOf(statsOfReads([touched()]), 'design')?.skills ?? [];
+        const board = skills.find((k) => k.skill === 'change-the-board');
+        assert.deepEqual([board?.count, board?.tries, board?.loadedWhenTouched, board?.touched], [1, 1, 1, 2]);
+        assert.equal(skills.find((k) => k.skill === 'shadcn')?.touched, null);
+      },
+    },
+    {
+      name: 'a rule row counts kept and broken; a step with no rule measured has none',
+      check: () => {
+        const rules = stepRowOf(statsOfReads([ruled()], {}, JOBS_NOW), 'design')?.rules ?? [];
+        assert.deepEqual(
+          rules.map((r) => [r.skill, r.rule, r.kept, r.broken]),
+          [
+            ['write-a-spec', 'read-with-read', 0, 1],
+            ['write-a-spec', 'checks-bare', 1, 0],
+          ],
         );
-        assert.match(
-          statsLine(statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1), skills: [] }] })), {}, NOW)),
-          /0\/try \(—\) skills loaded$/,
+        const undeclared = statsOfReads([readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] })], {}, JOBS_NOW);
+        assert.ok(undeclared.all.steps.every((r) => r.rules.length === 0));
+      },
+    },
+    {
+      name: "a tally's sum per day and over the range, null on a day with a try and no closeout that measured it",
+      check: () => {
+        const tallies = statsOfReads([tallied()], { from: TWO_BEFORE }).all.tallies;
+        const issues = tallies.find((r) => r.tally === 'issues');
+        assert.deepEqual(issues?.total, { sum: 3, tries: 2 });
+        assert.deepEqual(
+          issues?.days.find((d) => d.day === '2026-09-08'),
+          { day: '2026-09-08', sum: 3, tries: 2 },
         );
+        const open = tallies.find((r) => r.tally === 'issues.open')?.days.find((d) => d.day === '2026-09-09');
+        assert.deepEqual([open?.sum ?? null, open?.tries ?? 0], [null, 0]);
       },
     },
     {
-      name: 'the step row says how many of its tries had their skills measured, and a skill row under its header',
+      name: 'a step row carries its tries, its time, its check time and its cost',
       check: () => {
-        const words = wordsOf([readOf('by-skill', planner, skillsBy)]);
-        hasLine(words, /^design .*\s4 \(2 of 3\)$/);
-        hasLine(words, /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/);
-        hasLine(words, /^design\s+planner\s+write-a-spec\s+2\s+2\s+—$/);
-      },
-    },
-    {
-      name: "a skill's row says how many touched tries loaded it, and — where it declares no path",
-      check: () => {
-        const words = wordsOf([touched()]);
-        hasLine(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/);
-        hasLine(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/);
-      },
-    },
-    {
-      name: 'a rule row says kept and broken under its header',
-      check: () => {
-        const words = wordsOf([ruled()], {}, JOBS_NOW);
-        hasLine(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/);
-        hasLine(words, /^design\s+planner\s+write-a-spec\s+read-with-read\s+0\s+1$/);
-        hasLine(words, /^design\s+planner\s+write-a-spec\s+checks-bare\s+1\s+0$/);
-      },
-    },
-    {
-      name: 'no rule measured: no rule header',
-      check: () =>
-        assert.ok(
-          !wordsOf([readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] })], {}, JOBS_NOW).some((l) =>
-            /^step\s+agent\s+skill\s+rule/.test(l),
-          ),
-        ),
-    },
-    {
-      name: "a tally's rows per day and over the range: — on a day with a try and no closeout, a day nothing happened on left out",
-      check: () => {
-        const words = wordsOf([tallied()], { from: TWO_BEFORE });
-        assert.ok(words.includes('day         step    tally        sum  tries'), words.join('\n'));
-        hasLine(words, /^2026-09-08\s+triage\s+issues\s+3\s+2$/);
-        hasLine(words, /^2026-09-09\s+triage\s+issues\.open\s+—\s+0$/);
-        assert.ok(!words.some((l) => l.startsWith(`${DAY}  triage`)));
-        hasLine(words, /^all\s+triage\s+issues\s+3\s+2$/);
-      },
-    },
-    {
-      name: 'a step row says its tries, its time, its check time and its cost',
-      check: () => hasLine(wordsOf([twoRounds('c1')]), /^implement\s+implementer\s+2\s+4h00m\s+2h00m\s+\$2\.00\s/),
-    },
-    {
-      name: "the system's health is said under `system` where the series kept some, and nothing where none",
-      check: () => {
-        const lines = statsLines(statsOf(factsOfAll(twoRounds('h1')), { from: '2026-09-01' }, NOW, [], () => HEALTH));
-        assert.deepEqual(lines.slice(lines.indexOf('system')), [
-          'system',
-          '  a pass: 12.3 ms (p50), 80.0 ms (p95)',
-          '  runs in the store: 40 at most; journal reads a pass: 3 (p95)',
-          '  sessions queued: 2 at most, waiting 1m30s at longest',
-          '  load: 0.5 (p95), 1.25 at most; checks filed at 0.4 (p50)',
-          '  quota h week: 42% used, 50% at most',
-        ]);
-        assert.ok(!wordsOf([twoRounds('h1')]).includes('system'));
-      },
-    },
-    {
-      name: 'a slow landing is said under its header with its time, the deadline and the share',
-      check: () => {
-        const words = wordsOf([landingAt('slow', 'passed', 1377, 2700)]);
-        hasLine(words, SLOW_HEADER);
-        hasLine(words, /\bslow\s+land\s+1\s+22m57s\s+45m00s\s+51%/);
-      },
-    },
-    {
-      name: 'no slow landing: no header',
-      check: () => assert.ok(!wordsOf([landingAt('quick', 'passed', 1323, 2700)]).some((line) => SLOW_HEADER.test(line))),
-    },
-    {
-      name: 'the recap line counts the slow landings of the last 14 days where there are any',
-      check: () => {
-        assert.match(
-          statsLine(statsOf(factsOfAll(landingAt('slow', 'passed', 1377, 2700)), {}, NOW)),
-          /, 1 landing check over half its deadline: measure again$/,
-        );
-        assert.match(
-          statsLine(statsOf(factsOfAll(landingAt('a', 'passed', 1377, 2700), landingAt('b', 'passed', 2000, 2700)), {}, NOW)),
-          /, 2 landing checks over half their deadline: measure again$/,
+        const implement = stepRowOf(statsOfReads([twoRounds('c1')]), 'implement');
+        assert.deepEqual(
+          [implement?.agent, implement?.tries, implement?.ranMs, implement?.checkMs, implement?.costUsd],
+          ['implementer', 2, 4 * 3_600_000, 2 * 3_600_000, 2],
         );
       },
     },
     {
-      name: 'and says nothing of them where none, nor of one older than 14 days',
+      name: 'a slow landing carries its time, the deadline and the share; a quick one is none',
       check: () => {
-        const quick = statsLine(statsOf(factsOfAll(landingAt('quick', 'passed', 1323, 2700)), {}, NOW));
-        assert.doesNotMatch(quick, /over half/);
-        assert.match(quick, /skills loaded$/);
+        const [slow] = statsOfReads([landingAt('slow', 'passed', 1377, 2700)]).all.slowLandings;
+        assert.deepEqual(
+          [slow?.run, slow?.step, slow?.try, slow?.checkMs, slow?.deadlineMs, slow?.share],
+          ['slow', 'land', 1, 1_377_000, 2_700_000, 1377 / 2700],
+        );
+        assert.deepEqual(statsOfReads([landingAt('quick', 'passed', 1323, 2700)]).all.slowLandings, []);
+        assert.equal(statsOfReads([landingAt('a', 'passed', 1377, 2700), landingAt('b', 'passed', 2000, 2700)]).all.slowLandings.length, 2);
+      },
+    },
+    {
+      name: "one older than the last 14 days falls before the tiles' range, which the recap counts within",
+      check: () => {
         const later = new Date(Date.parse(NOW.toISOString()) + 20 * 86_400_000);
-        assert.doesNotMatch(statsLine(statsOf(factsOfAll(landingAt('slow', 'passed', 1377, 2700)), {}, later)), /over half/);
+        const s = statsOfReads([landingAt('slow', 'passed', 1377, 2700)], {}, later);
+        assert.ok((s.all.slowLandings[0]?.day ?? '') < s.all.tiles.last.from, JSON.stringify(s.all.tiles.last));
       },
     },
     {
       name: 'a run left out because a journal of it does not read is named',
-      check: () => {
-        const words = statsLines(statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW, ['marks-2', 'spoilt'])).join('\n');
-        assert.ok(words.includes('left out, a journal of each not reading'), words);
-        assert.ok(words.includes('(nemia ls says why): marks-2, spoilt'), words);
-      },
+      check: () =>
+        assert.deepEqual(statsOf({ tries: [], runs: [], frozen: [] }, {}, NOW, ['marks-2', 'spoilt']).unreadable, ['marks-2', 'spoilt']),
     },
   ]);
 });

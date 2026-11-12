@@ -86,14 +86,14 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia logs <runId> <step>
                                that step's session output
                                on the port: logs
-  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]
+  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
                                and on which try, cost and time per landed run, and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
                                --line: one line, for a recap; --json: the whole answer; -l: the
-                               runs whose labels a selector takes, as nemia ls -l takes them
+                               runs whose labels it takes, as nemia ls -l takes them
                                on the port: stats
   nemia passes [--last <n>] [--json]
                                what the recent passes of the tick cost: their median and slowest
@@ -398,12 +398,12 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                resume the store: each session parked goes on as the same try, and the
                                next pass files what waits
                                on the port: resume
-  nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]
+  nemia subscribe <name> <task> [-l <key>=<value>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
                                named <name>, from its end: a line one of its selectors takes is said to
                                it at once, and the rest folded into a digest said with the next wake,
                                or after --digest-every minutes (default 60) with none.
-                               -l: the lines a selector takes, given again for another (default:
+                               -l: the lines it takes, given again for another (default:
                                waits=person, the lines that wait on a person). Refused for a task not
                                long-lived.
                                --at-least: only the lines of runs whose factory's level is at least

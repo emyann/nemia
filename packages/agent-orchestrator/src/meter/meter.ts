@@ -361,27 +361,3 @@ export const passesRead = (recent: RecentPass[]): PassesRead => ({
   summary: passSummary(recent),
   bounds: PASS_BOUNDS,
 });
-
-/** A bucket's bound as a person reads it: `≤ 100 ms`, and `> 5000 ms` for the last. */
-const bucketWord = (b: PassBucket, bounds: readonly number[]): string => (b.le === null ? `> ${bounds.at(-1)} ms` : `≤ ${b.le} ms`);
-
-/** `nemia passes`' lines: the summary, the histogram a row a bucket from the first to the last with passes, and the parts. */
-export const passesLines = ({ recent, histogram, parts, summary, bounds }: PassesRead): string[] => {
-  const [oldest] = recent;
-  if (!summary || !oldest) return ['no pass is kept yet: nemia up, or the api, ticks the store and keeps its last passes'];
-  const first = histogram.findIndex((b) => b.count > 0);
-  const last = histogram.length - 1 - [...histogram].reverse().findIndex((b) => b.count > 0);
-  const most = Math.max(...histogram.map((b) => b.count));
-  const width = Math.max(...histogram.map((b) => bucketWord(b, bounds).length));
-  return [
-    `${plural(summary.passes, 'pass', 'passes')} since ${oldest.at}: ${msWord(summary.medianMs)} ms a pass (median), slowest ${msWord(summary.slowestMs)}`,
-    `the last pass: ${plural(summary.runs, 'run')} in the store, ${plural(summary.reads, 'journal read')}, ` +
-      `${plural(summary.tasks, 'task')} not settled, ${summary.queued} queued, ${summary.admitted} admitted`,
-    'passes by time:',
-    ...histogram
-      .slice(first, last + 1)
-      .map((b) => `  ${bucketWord(b, bounds).padStart(width)}  ${'#'.repeat(Math.ceil((b.count / most) * 30))} ${b.count}`),
-    'where the time went, a pass on average:',
-    ...parts.map((p) => `  ${p.phase.padEnd(8)} ${msWord(p.ms).padStart(7)} ms  ${Math.round(p.share * 100)}%`),
-  ];
-};

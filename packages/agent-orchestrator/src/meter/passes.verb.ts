@@ -2,14 +2,14 @@
  * `nemia passes`, and `GET /api/passes`: what the recent passes of the tick cost (`PassesRead`), read off the store's `tick-recent.json`
  * (`recentPasses`), so the command line and the api answer the same, whichever process ticks. A controller: an entry of the command table.
  */
-import { renamed } from '../command/requests.verb.ts';
+import { LAST_TAKES, PASSES_WORDS } from 'objects';
 import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { recentPasses } from '../daemon/daemon.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { Args } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
-import { passesLines, passesRead, type PassesRead } from './meter.ts';
+import type { Served } from '../command/entry.verb.ts';
+import { passesRead, type PassesRead } from './meter.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** A text argument's value, or undefined where it was not given. */
@@ -17,9 +17,6 @@ const textOf = (args: Args, key: string): string | undefined => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
-
-/** What `--last` takes, as its refusal says it. */
-const LAST_TAKES = '--last takes how many of the recent passes to read, a whole number from 1: nemia passes --last <n>';
 
 /**
  * How many of the recent passes `args` asks for: every one kept with no `--last`. Refuses as `Invalid` a `--last` that is not a whole
@@ -40,34 +37,13 @@ export const passesOf = (home: string, args: Args): PassesRead => {
   return passesRead(Number.isFinite(n) ? recent.slice(-n) : recent);
 };
 
-/** What `nemia passes`' handler takes: `--last`, as the text given, and `--json`, the CLI's. */
+/** What `nemia passes`' handler takes: `--last`, as the text given; `--json` is the client's, which the api never reads. */
 export const PassesInput = Schema.Struct({ last: Schema.optionalKey(Schema.String), json: Schema.optionalKey(Schema.Boolean) });
 export type PassesInput = typeof PassesInput.Type;
 
 /** `nemia passes`: the recent passes of the tick, a histogram of their times and where it went, phase by phase. */
-export const PASSES: Command<PassesRead, PassesInput> = {
-  name: 'passes',
-  served: [{ endpoint: 'server.passes', request: renamed({}, ['json']) }],
-  usage: '[--last <n>] [--json]',
-  help: [
-    'what the recent passes of the tick cost: their median and slowest',
-    'time, a histogram of their times, where the time went phase by',
-    'phase, and what the last saw — the runs in the store, its journal',
-    'reads, the sessions queued and admitted. --last <n>: the last n',
-    'passes only; --json: the whole answer',
-  ],
-  spec: {
-    positionals: [],
-    flags: [
-      { flag: '--last', kind: 'text', key: 'last', takes: LAST_TAKES, twice: 'nemia passes takes --last once.' },
-      { flag: '--json', kind: 'switch', key: 'json', only: { side: 'cli', why: 'the api answers the whole answer, as JSON' } },
-    ],
-    unknown: (arg) => `nemia passes does not take ${arg}. It takes --last <n> and --json.`,
-    apart: () => LAST_TAKES,
-  },
-  writes: false,
-  class: 'read',
+export const PASSES: Served<PassesRead, PassesInput> = {
+  ...PASSES_WORDS,
   input: PassesInput,
   handler: (input) => Effect.flatMap(StoreRoot, (home) => tried(() => passesOf(home, input))),
-  print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : passesLines(read)),
 };

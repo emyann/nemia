@@ -1,0 +1,50 @@
+/**
+ * What a request needs of a token, by its path and whether the store is marked exposed (apps/api, src/caller/caller.ts, `needOf`): the
+ * MCP port always one of the person's tokens; a route the api serves its answers on (`/api`, `/openapi`), a token of any live kind where
+ * the store is exposed; and the board's own pages — every other path, which the daemon serves from the board's built files and which
+ * carry no data of the store — none, so that a browser reaching an exposed store can load the page that asks for a token.
+ *
+ * A request that presents a token is judged whatever its route needs (`callerBy`): this function says only what a route needs when none
+ * is presented.
+ */
+import { type Implementation, spec } from '@emyann/tsverify';
+import type { TokenNeed } from 'agent-orchestrator';
+
+/** The MCP port's path: it and every path under it need one of the person's tokens. */
+export const MCP_PATH = '/mcp';
+
+/** The paths the api answers on, each with every path under it: the objects' routes and the OpenAPI document and its page. */
+export const API_PATHS = ['/api', '/openapi'] as const;
+
+/** Whether `path` is `root` or a path under it. */
+const under = (path: string, root: string): boolean => path === root || path.startsWith(`${root}/`);
+
+/** Whether `path` is the MCP port's. */
+const onPort = (path: string): boolean => under(path, MCP_PATH);
+
+/** Whether `path` is one the api answers on with the store's data or its route table. */
+const answered = (path: string): boolean => under(path, '/api') || under(path, '/openapi');
+
+const needOfSpec = spec<(path: string, exposed: boolean) => TokenNeed>({
+  ensures: {
+    thePortNeedsThePerson: {
+      description: 'The MCP port needs one of the person’s tokens, exposed or not',
+      condition: ({ input: [path], output }) => !onPort(path) || output === 'person',
+    },
+    anExposedStoreNeedsATokenForItsData: {
+      description: 'On a store marked exposed, a route the api answers with the store’s data or its route table needs a token',
+      condition: ({ input: [path, exposed], output }) => !exposed || !answered(path) || output === 'token',
+    },
+    aBoardPageNeedsNone: {
+      description: 'A page of the board, any path neither the port nor the api’s, needs no token, exposed or not',
+      condition: ({ input: [path], output }) => onPort(path) || answered(path) || output === 'none',
+    },
+    anUnexposedStoreNeedsNoneButThePort: {
+      description: 'On a store not marked exposed, nothing but the MCP port needs a token: a request with none is the person',
+      condition: ({ input: [path, exposed], output }) => exposed || onPort(path) || output === 'none',
+    },
+  },
+});
+
+/** `needOf`'s type, which `src/caller/caller.ts` takes: it then imports nothing of tsverify. */
+export type NeedOf = Implementation<typeof needOfSpec>;

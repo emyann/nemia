@@ -23,11 +23,29 @@ export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 
 /** One of `CLIENT_VERBS`. */
 export type ClientVerb = (typeof CLIENT_VERBS)[number];
 
-/** Where a command goes: the api, or the orchestrator's CLI in a process of its own. */
-export type Route = 'api' | 'process';
+/**
+ * The verbs about the machine this client runs on, never a remote daemon's (the distribution intent's Q6): its login service, its
+ * releases, a daemon of its own, what it runs, the person's tokens of its store and its Claude token. Each runs on the old path,
+ * whatever context is in use.
+ */
+export const MACHINE_VERBS = ['service', 'upgrade', 'up', 'tick', 'version', 'token', 'claude-token'] as const;
 
-/** A command as the route reads it: the name it opens with, whether `--local` was typed, and whether it asks for its help. */
-export type Routed = { readonly name: string; readonly local: boolean; readonly help: boolean };
+/** One of `MACHINE_VERBS`. */
+export type MachineVerb = (typeof MACHINE_VERBS)[number];
+
+/**
+ * Where a command goes: the api, the orchestrator's CLI in a process of its own, or refused — a verb about the store that only the
+ * old path has yet, typed while a context names a remote daemon, which that path cannot reach (refused naming the context to leave,
+ * `nemia config use-context`, or the machine to run it on).
+ */
+export type Route = 'api' | 'process' | 'refused';
+
+/**
+ * A command as the route reads it: the name it opens with, whether `--local` was typed, whether it asks for its help, and whether the
+ * context in use names a remote daemon (`remote`; absent, none: the store of this machine). Implement makes `remote` required once
+ * `src/main.ts` reads the context.
+ */
+export type Routed = { readonly name: string; readonly local: boolean; readonly help: boolean; readonly remote?: boolean };
 
 /** Whether `name` is one of `READ_VERBS`. */
 const reads: readonly string[] = READ_VERBS;
@@ -37,11 +55,37 @@ const moved = (name: string): boolean => reads.includes(name);
 const clients: readonly string[] = CLIENT_VERBS;
 const own = (name: string): boolean => clients.includes(name);
 
+/** Whether `name` is one of `MACHINE_VERBS`. */
+const machines: readonly string[] = MACHINE_VERBS;
+const ofTheMachine = (name: string): boolean => machines.includes(name);
+
+/** Whether the context in use names a remote daemon. */
+const remote = (command: Routed): boolean => command.remote === true;
+
+/** Whether `command` is a verb about the store that only the old path has, typed against a remote daemon, asking no help. */
+const unreachable = (command: Routed): boolean =>
+  remote(command) && !moved(command.name) && !own(command.name) && !ofTheMachine(command.name) && !command.help;
+
 const routeSpec = spec<(command: Routed) => Route>({
   ensures: {
     writesStayInProcess: {
-      description: 'A verb that is neither a moved read nor one of the client’s own runs on the old path, in a process of its own',
-      condition: ({ input: [command], output }) => moved(command.name) || own(command.name) || output === 'process',
+      description:
+        'A verb that is neither a moved read nor one of the client’s own runs on the old path, in a process of its own, unless it is about the store and the context is remote',
+      condition: ({ input: [command], output }) =>
+        moved(command.name) || own(command.name) || unreachable(command) || output === 'process',
+    },
+    machineVerbsStayHere: {
+      description: 'A verb about this machine runs on the old path here, whatever context is in use',
+      condition: ({ input: [command], output }) => !ofTheMachine(command.name) || output === 'process',
+    },
+    remoteStoreVerbsAreRefused: {
+      description:
+        'A verb about the store only the old path has, typed while the context names a remote daemon, is refused rather than run on this machine’s store',
+      condition: ({ input: [command], output }) => !unreachable(command) || output === 'refused',
+    },
+    onlyARemoteStoreVerbIsRefused: {
+      description: 'Nothing else is refused: a command on this machine’s store always goes somewhere',
+      condition: ({ input: [command], output }) => unreachable(command) || output !== 'refused',
     },
     localReadsInProcess: {
       description: 'A moved read typed with --local reads the store in process, never the api',

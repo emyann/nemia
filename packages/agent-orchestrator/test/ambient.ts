@@ -81,7 +81,7 @@ export const GIT_IDENTITY = { name: 'nemia test', email: 'test@nemia.invalid' };
 
 fs.writeFileSync(path.join(AWAY, '.gitconfig'), `[user]\n\tname = ${GIT_IDENTITY.name}\n\temail = ${GIT_IDENTITY.email}\n`);
 
-/** The folder first on every test's PATH, holding a stand-in for each program a machine need checks for: each exits 0, whatever it is asked. */
+/** The folder first on every test's PATH: a stand-in for each program a machine need checks for, each exiting 0 to whatever it is asked. */
 export const PROGRAMS = scratch('wf-ambient-programs-');
 for (const program of [...Object.values(HARNESS_DECLARATIONS).flatMap((d) => (d.needs === undefined ? [] : [d.needs.program])), 'mise'])
   fs.writeFileSync(path.join(PROGRAMS, program), '#!/bin/sh\nexit 0\n', { mode: 0o755 });

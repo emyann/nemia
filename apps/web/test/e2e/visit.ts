@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { expectTheme, facesLoaded, idle, Refused, settled, track, watch } from './checks.ts';
-import { photograph } from './board.ts';
+import { bannerShown, photograph } from './board.ts';
 import { photographing, setMeasuring, setPhotographing } from './world.ts';
 import { costLine, PHASES, type PageTiming, type Phase } from './timing.ts';
 
@@ -140,6 +140,7 @@ export async function visitAll(
       `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
     );
     context.on('page', track);
+    await bannerShown(context);
     try {
       for (const spec of pages) {
         if (store !== undefined && !fs.existsSync(store)) throw new Error(`before ${where(spec, theme)}: ${storeGone(store)}`);

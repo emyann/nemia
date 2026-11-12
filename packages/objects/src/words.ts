@@ -761,6 +761,17 @@ export const READINESS_AREAS = ['harness', 'service', 'bind', 'machine', 'place'
 export type ReadinessArea = (typeof READINESS_AREAS)[number];
 
 /**
+ * What a missing piece of the readiness read costs, which the piece declares (`cost`): a run waits on it (`run`: a harness not signed
+ * in, a place's or a workflow's need, no factory, a server the client cannot reach), which makes the server not ready and raises the
+ * board's banner; or it is advised, no run waiting on it, listed with its fix and raising no banner — it keeps the server up, open or
+ * current (`server`: the service, its linger, the bind), or it is the client's own comfort (`client`: `nemia` on PATH).
+ */
+export const READINESS_COSTS = ['run', 'server', 'client'] as const;
+
+/** One of `READINESS_COSTS`. */
+export type ReadinessCost = (typeof READINESS_COSTS)[number];
+
+/**
  * Where a fix stands, as the runtime's task that runs it says: filed and not yet started (`pending`), running, or ended — `succeeded`
  * on exit 0, `failed` on any other end.
  */

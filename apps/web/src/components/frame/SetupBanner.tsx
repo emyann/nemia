@@ -22,7 +22,7 @@ export function SetupBanner({ path }: { path: string }) {
     <div
       role="status"
       data-setup-banner={missing}
-      className="flex items-center gap-2 border-b border-outline-variant py-1 pr-1 pl-4 text-body-small text-on-surface"
+      className="flex items-center gap-2 overflow-hidden border-b border-outline-variant py-1 pr-2 pl-4 text-body-small text-on-surface"
     >
       <CircleAlert aria-hidden className="size-3.5 shrink-0 text-yours" />
       <span className="min-w-0 flex-1">

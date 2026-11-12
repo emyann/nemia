@@ -6,13 +6,12 @@
  * `linesOf` is the lines read beside the object (`…/lines`, `RunLinesAnswer`), for what the object leaves out on purpose — the lines a
  * person types (`decide`, `refresh`, each step's `approve`, `retry` and `say`), `fromNote` and `workflowPage`.
  *
- * `runListOf` is the RunList (`GET /api/runs`), plain and whole unless a query says otherwise: its items are `Run` objects, a run
- * read by `metadata.name`, `spec.*` and `status.*`, and beside them the runs it leaves unjudged (`unjudged`, each with why). `listedOf`
- * is one run of the plain list, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list asked by state has it,
- * with the board's frame parts (`status.state`, `wallMs`, `clock`, …). `lsOf` is one run as `nemia ls` lists it (`GET
- * /api/listing/:runId`), its record and its steps' words whether judged or not: what the RunList leaves out of a run it cannot judge.
+ * `runListOf` is the RunList (`GET /api/runs`), plain and its first page (`LIST_PAGE`) unless a query says otherwise: its items are
+ * `Run` objects, a run read by `metadata.name`, `spec.*` and `status.*`, and beside them the runs it leaves unjudged (`unjudged`, each
+ * with why). `listedOf` is one run of the plain list, `unjudgedOf` why the list leaves one unjudged, and `framedOf` one run as a list
+ * asked by state has it, with the board's frame parts (`status.state`, `wallMs`, `clock`, …).
  */
-import type { RunObject, RunsListed } from 'agent-orchestrator';
+import type { RunObject } from 'agent-orchestrator';
 import type { Run, RunList } from 'objects';
 import type { Run as RunAnswer, RunLines as RunLinesAnswer } from 'objects';
 
@@ -74,8 +73,8 @@ export const linesOf = async (app: Asked, id: string): Promise<RunLinesAnswer> =
   (await ok(app, `/api/runs/${encodeURIComponent(id)}/lines`)) as RunLinesAnswer;
 
 /**
- * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): every run where it says no
- * limit.
+ * The RunList `GET /api/runs` answers with `query` (`labelSelector=`, `fieldSelector=`, … without its `?`): its first page, a hundred
+ * runs, where it says no limit.
  */
 export const runListOf = async (app: Asked, query = ''): Promise<RunList> =>
   (await ok(app, `/api/runs${query === '' ? '' : `?${query.replace(/^\?/, '')}`}`)) as RunList;
@@ -106,21 +105,4 @@ export async function framedOf(app: Asked, name: string): Promise<Run> {
     if (run) return run;
   }
   throw new Error(`no list asked by state holds the run '${name}' judged`);
-}
-
-/**
- * The run `id` as `nemia ls` lists it (`GET /api/listing/:runId`): its record, and its judgement or why it is left unjudged. `ls` reads the
- * daemon's two ceilings, which the harness sets to a word it refuses: the read is made with neither set (no cap), each put back after.
- */
-export async function lsOf(app: Asked, id: string): Promise<RunsListed['runs'][number]> {
-  const ceilings = { WF_MAX_RUNS: process.env.WF_MAX_RUNS, WF_MAX_CONCURRENT: process.env.WF_MAX_CONCURRENT };
-  delete process.env.WF_MAX_RUNS;
-  delete process.env.WF_MAX_CONCURRENT;
-  try {
-    const [run] = ((await ok(app, `/api/listing/${encodeURIComponent(id)}`)) as RunsListed).runs;
-    if (!run) throw new Error(`GET /api/listing/${id} lists no run`);
-    return run;
-  } finally {
-    for (const [key, value] of Object.entries(ceilings)) if (value !== undefined) process.env[key] = value;
-  }
 }

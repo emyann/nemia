@@ -206,7 +206,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     /** `tail`, how many of its last lines to answer (`LOG_TAIL`). */
     query: { tail: Schema.optionalKey(Schema.String) },
     success: StepLog,
-    error: [Missing, ReadFailed],
+    error: [Missing, Invalid, ReadFailed],
   }),
   HttpApiEndpoint.get('artifact', '/api/runs/:runId/steps/:step/artifacts/:file', {
     params: fileParams,
@@ -228,7 +228,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
     params: stepParams,
     query: transcriptQuery,
     success: StepTranscript,
-    error: engineReadErrors,
+    error: [...engineReadErrors, Invalid],
   }),
   HttpApiEndpoint.get('transcriptStream', '/api/runs/:runId/steps/:step/transcript/stream', {
     params: stepParams,

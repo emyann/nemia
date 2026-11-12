@@ -3,17 +3,17 @@
  * `<workflow>.<step>` — a page of them (`hireList`), one (`hireObject`) — an agent hired into the step (`nemia factory hire`) and fired
  * from it (`factory fire`). A name two steps join to is read and written by neither: `Conflict`, naming both and the fix.
  */
-import { HttpApiBuilder } from 'effect/http-api';
 import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
+import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The Hire `name` of `namespace`, read now. */
 const hireIn = (s: Served, namespace: string, name: string) => s.inRequest(hireObject(s.home, defaultRepo(s), namespace, name));
 
-export const hiresHandlers = HttpApiBuilder.group(Api, 'hires', (handlers) =>
+export const hiresHandlers = readsBounded(Api, 'hires', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {

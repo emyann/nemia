@@ -5,14 +5,14 @@
  * the caller judged first: an agent is refused whether or not one is there, the person told `Missing` where none is.
  */
 import { Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
 import { delegationGet, delegationPut, delegationRemove, delegationsList } from 'agent-orchestrator';
 import { Api } from 'objects';
 import { queryOf } from '../factory/parts/index.ts';
 import { listed } from '../definitions/served.ts';
 import { answeredWriteIn } from '../objects/refused.ts';
+import { readsBounded } from '../objects/answer-bound.ts';
 
-export const delegationsHandlers = HttpApiBuilder.group(Api, 'delegations', (handlers) =>
+export const delegationsHandlers = readsBounded(Api, 'delegations', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answeredWriteIn(namespace, async (s) => listed('Delegation', await s.inRequest(delegationsList(namespace)), queryOf(query))),

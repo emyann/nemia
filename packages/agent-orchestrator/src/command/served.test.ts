@@ -29,8 +29,6 @@ const LEFT_OUT = [
   'template export',
   'template pack',
   'template unpack',
-  'route',
-  'pause-timeout',
   'policy propose',
   'policy reach',
   'chat speakers',

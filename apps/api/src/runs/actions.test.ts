@@ -411,3 +411,55 @@ test('POST …/cancel stops a run as `nemia cancel` does, so a seat that started
     assert.equal(fs.existsSync(path.join(root, 'runs', 'r-no-such.json')), false);
   });
 });
+
+/** A run of `plan → triage → build | docs`, `triage` a condition of `routes: [build, docs]` whose route no follower has taken yet. */
+const conditionRun = (id: string) => {
+  runRecord(
+    id,
+    [
+      { name: 'plan', after: [], body: 'Plan it.' },
+      { name: 'triage', after: ['plan'], body: '', routes: ['build', 'docs'], route: { kind: 'judge' } },
+      { name: 'build', after: ['triage'], body: 'Build it.', when: ['build'] },
+      { name: 'docs', after: ['triage'], body: 'Write the docs.', when: ['docs'] },
+    ],
+    { plan: { taskId: `${id}-plan`, branch: `wf/${id}/plan` }, triage: { taskId: null }, build: { taskId: null }, docs: { taskId: null } },
+  );
+  signedOff(`${id}-plan`, DONE);
+};
+
+test('POST …/steps/:step/route routes a condition as `nemia route` does, writing what the same entry writes; a route off its list, a step that is no condition and a run the store has not are refused, nothing written', async (t) => {
+  await t.test('a condition routed by hand: the route written for its try, as the command line writes it', async () => {
+    conditionRun('r-cli-route');
+    conditionRun('r-api-route');
+    const typed = await asTyped('route', ['r-cli-route', 'triage', 'docs']);
+    const res = await post('/api/namespaces/default/runs/r-api-route/steps/triage/route', { route: 'docs' });
+    assert.equal(res.status, 200, await res.clone().text());
+    const answered = (await res.json()) as { step: string; try: number; route: string; at: string; file: string };
+    assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'route', 'step', 'try']);
+    assert.deepEqual([answered.step, answered.try, answered.route], ['triage', typed.try, 'docs']);
+    assert.deepEqual(written(answered.file), written(String(typed.file)));
+    assert.deepEqual(asked('r-api-route'), asked('r-cli-route'));
+  });
+
+  await t.test('REFUSED: a route not in the condition’s routes: is a 422, nothing written', async () => {
+    conditionRun('r-route-off');
+    const res = await post('/api/namespaces/default/runs/r-route-off/steps/triage/route', { route: 'nope' });
+    assert.equal(res.status, 422);
+    assert.deepEqual(asked('r-route-off'), []);
+  });
+
+  await t.test('REFUSED: a step that is no condition is a 422, a run of another namespace and one the store has not a 404', async () => {
+    conditionRun('r-route-plan');
+    assert.equal((await post('/api/namespaces/default/runs/r-route-plan/steps/plan/route', { route: 'build' })).status, 422);
+    assert.equal((await post('/api/namespaces/mill/runs/r-route-plan/steps/triage/route', { route: 'build' })).status, 404);
+    assert.deepEqual(asked('r-route-plan'), []);
+    assert.equal((await post('/api/namespaces/default/runs/r-no-such/steps/triage/route', { route: 'build' })).status, 404);
+    assert.equal(fs.existsSync(path.join(root, 'runs', 'r-no-such.asks')), false);
+  });
+
+  await t.test('REFUSED: a body with no route is a 400', async () => {
+    conditionRun('r-route-none');
+    assert.equal((await post('/api/namespaces/default/runs/r-route-none/steps/triage/route', {})).status, 400);
+    assert.deepEqual(asked('r-route-none'), []);
+  });
+});

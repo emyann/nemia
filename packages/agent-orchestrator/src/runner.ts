@@ -387,6 +387,7 @@ export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { CANCEL } from './cancel/commands.verb.ts';
+export { ROUTE } from './gate/route.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
 export { WAIT, type WaitInput } from './await/commands.verb.ts';
 export type { WaitAnswer, Waited } from './await/await.verb.ts';
@@ -532,6 +533,7 @@ export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from '.
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
 export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
+export { TIMEOUT as PAUSE_TIMEOUT } from './pause/pause-timeout.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';
 export { SUBSCRIBE, UNSUBSCRIBE } from './subscription/subscription.verb.ts';

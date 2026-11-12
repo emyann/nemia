@@ -1,11 +1,11 @@
 /**
  * `nemia route <run> <condition> <route>`, an entry of the command table: a person's route for a condition's try, written to the run's asks
- * folder (`routeAsk`), which wins over the condition's own answer on the next pass (`answeredRoute`). A controller.
+ * folder (`routeAsk`), which wins over the condition's own answer on the next pass (`answeredRoute`). A controller, served on both sides:
+ * the api's Run `route` (`POST /api/namespaces/:namespace/runs/:name/steps/:step/route`) calls it with its typed input (`RouteInput`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
-import type { Args } from '../command/command.ts';
+import { Effect, Schema } from 'effect';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { WorkflowError, type StepSpec } from '../step/step.ts';
@@ -15,7 +15,6 @@ import { asksDir } from '../record/record.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { routeAsk } from '../route/index.ts';
-import { writerText as textOf } from '../yours/yours.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
@@ -55,9 +54,14 @@ export function routeRefused(
   return undefined;
 }
 
+/** What `nemia route` takes: the run's id, the condition by its step's name, and the route, which the api reads off its path and body. */
+export const RouteInput = Schema.Struct({ runId: Schema.String, step: Schema.String, route: Schema.String });
+export type RouteInput = typeof RouteInput.Type;
+
 /** `nemia route`: the route written for the try the condition is on, and the file it is in. */
-export const ROUTE: Command<{ step: string; try: number; route: string; at: string; file: string }> = {
+export const ROUTE: Command<{ step: string; try: number; route: string; at: string; file: string }, RouteInput> = {
   name: 'route',
+  served: [{ endpoint: 'runs.route' }],
   usage: '<runId> <condition> <route>',
   help: [
     'route a condition by hand: the next tick takes your route over the',
@@ -78,12 +82,9 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
   writes: true,
   ticks: true,
   class: 'act',
-  only: { side: 'cli', why: 'the board offers no route control yet: nemia route writes the file' },
-  handler: Effect.fnUntraced(function* (args: Args) {
+  input: RouteInput,
+  handler: Effect.fnUntraced(function* ({ runId: id, step, route }: RouteInput) {
     const home = yield* StoreRoot;
-    const id = textOf(args, 'runId') ?? '';
-    const step = textOf(args, 'step') ?? '';
-    const route = textOf(args, 'route') ?? '';
     const door = (yield* RunDoor).runs;
     if (!(yield* door.exists(RunId.read(id))))
       return yield* Effect.fail(new Missing({ message: `no such run: ${id}. nemia route takes a run by its id, as nemia ls lists it.` }));
@@ -97,8 +98,8 @@ export const ROUTE: Command<{ step: string; try: number; route: string; at: stri
     writeWhole(file, `${JSON.stringify({ route, at })}\n`);
     return { step, try: n, route, at, file };
   }),
-  print: ({ step, try: n, route, file }, args) => [
-    `${textOf(args, 'runId') ?? ''}  routed: try ${n} of ${step} takes ${route} — the next tick files what its when: names`,
+  print: ({ step, try: n, route, file }, { runId }) => [
+    `${runId}  routed: try ${n} of ${step} takes ${route} — the next tick files what its when: names`,
     `   ${file}`,
   ],
 };

@@ -89,11 +89,35 @@ export const YourStore = Schema.Struct({
 export type YourStore = typeof YourStore.Type;
 
 /**
+ * Why the Capabilities page reads no repository: `several-factories`, the store has several and the request names none of them;
+ * `several-repositories`, the factory it is read in works on several and the request names none of them; `no-factory`, the store has no
+ * factory and the api no repository of its own.
+ */
+export const CAPABILITIES_UNREAD = ['several-factories', 'several-repositories', 'no-factory'] as const;
+export type CapabilitiesUnreadReason = (typeof CAPABILITIES_UNREAD)[number];
+
+/**
+ * The Capabilities page's answer where it reads no repository: why (`reason`), in a sentence (`message`), the factory whose repositories
+ * are `repos` for `several-repositories` (each read with `?factory=<factory>&repo=<repo>`), and the lines that file a factory for
+ * `no-factory` (`commands`); empty where they say nothing.
+ */
+export const CapabilitiesUnread = Schema.Struct({
+  reason: Schema.Literals(CAPABILITIES_UNREAD),
+  message: Schema.String,
+  factory: Schema.NullOr(Schema.String),
+  repos: Schema.Array(Schema.String),
+  commands: Schema.Array(Schema.String),
+});
+export type CapabilitiesUnread = typeof CapabilitiesUnread.Type;
+
+/**
  * `GET /api/capabilities`: what the repository offers a step — its skills, agents, MCP servers and permission rules, each a list read by
- * the Capabilities page — the measured set and the read-only commands, and what each step of each workflow gets.
+ * the Capabilities page — the measured set and the read-only commands, and what each step of each workflow gets. Where no repository is
+ * read, `repo` is left out, every list is empty and `unread` says why and what to do.
  */
 export const CapabilitiesWithSteps = Schema.Struct({
-  repo: Schema.String,
+  repo: Schema.optionalKey(Schema.String),
+  unread: Schema.optionalKey(CapabilitiesUnread),
   skills: Schema.Array(Json),
   agents: Schema.Array(Json),
   mcp: Schema.Array(Json),

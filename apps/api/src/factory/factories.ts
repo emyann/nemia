@@ -61,6 +61,7 @@ import {
   type TemplateGiven,
 } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from './place.ts';
 import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
@@ -240,7 +241,7 @@ const upgraded = (factory: string, { to, template, sets, plan, downgrade }: Fact
 const resolved = (factory: string, { conflict, ours, theirs, text }: FactoryResolveWrite) =>
   answeredWrite(async (s: Served) => {
     factoryNamed(`POST /api/factories/${factory}/resolve`, factory);
-    const proposing = withResolutionProposerAs(s.caller, { home: s.home, repo: s.repo });
+    const proposing = withResolutionProposerAs(s.caller, { home: s.home, repo: repoNeeded(s) });
     return s.inRequest(proposing(FACTORY_RESOLVE.handler({ factory, conflict, ours, theirs, text })));
   });
 

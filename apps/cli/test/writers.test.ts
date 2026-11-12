@@ -45,11 +45,15 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
 /** The version a write printed, `at version <v>`. */
 const versionIn = (said: string): string => /at version (\S+)$/m.exec(said)?.[1] ?? assert.fail(`no version in: ${said}`);
 
-/** A draft workflow folder `name`: one step, a script it carries, and the files of `more`. */
+/**
+ * A draft workflow folder `name`: one step, a script it carries, a subfolder with a file in it, which a write never reads (`folderFiles`
+ * reads the files directly in the folder), and the files of `more`.
+ */
 function draftFolder(name: string, more: Readonly<Record<string, string>> = {}): string {
   const folder = path.join(DRAFTS, 'workflows', name);
   write(path.join(folder, 'only.md'), '---\nplace: git\n---\nDo it.\n');
   write(path.join(folder, 'pictures.ts'), 'process.exit(0);\n');
+  write(path.join(folder, 'notes', 'aside.md'), '---\nplace: git\n---\nNever read.\n');
   for (const [file, text] of Object.entries(more)) write(path.join(folder, file), text);
   return folder;
 }
@@ -152,13 +156,17 @@ test('`nemia workflows write factory <name> --factory <f>` proposes the workflow
   const said = await nemia(['workflows', 'write', 'factory', 'hired', '--folder', draftFolder('hired'), '--factory', 'shop'], env);
   assert.equal(said.code, 0, said.err);
   const read = asked.find((r) => r.path === '/api/workflows/read');
-  assert.deepEqual(read?.body, {
-    name: 'hired',
-    files: [
-      { path: 'only.md', text: '---\nplace: git\n---\nDo it.\n' },
-      { path: 'pictures.ts', text: 'process.exit(0);\n' },
-    ],
-  });
+  assert.deepEqual(
+    read?.body,
+    {
+      name: 'hired',
+      files: [
+        { path: 'only.md', text: '---\nplace: git\n---\nDo it.\n' },
+        { path: 'pictures.ts', text: 'process.exit(0);\n' },
+      ],
+    },
+    'the files directly in the folder, its subfolder notes/ and the file in it never read',
+  );
   const proposed = asked.find((r) => r.method === 'POST' && r.path === '/api/namespaces/shop/proposals');
   assert.deepEqual(proposed?.body, {
     objects: [

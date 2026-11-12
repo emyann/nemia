@@ -388,6 +388,9 @@ export {
 } from './decide.ts';
 export {
   Ceilings,
+  CAPABILITIES_UNREAD,
+  CapabilitiesUnread,
+  type CapabilitiesUnreadReason,
   CapabilitiesWithSteps,
   Daemon,
   FeedQuery,

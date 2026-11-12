@@ -145,7 +145,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * four pure, importing nothing but pure files and their contracts' types, and none touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 203, effect: 15 },
+  'agent-orchestrator/run': { all: 204, effect: 15 },
   'agent-orchestrator/workflow': { all: 151, effect: 15 },
 };
 

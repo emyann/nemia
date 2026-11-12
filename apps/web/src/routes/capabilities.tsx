@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import type { CapabilitiesUnread } from 'objects';
 import { when } from '../components/step/Facts';
+import { FactoryPicker } from '../components/factory/FactoryPicker';
 import { ServerState } from '../components/factory/FactoryServers';
 import { AllowedReach, ASKS, CHIP, PLAIN, Reach, STRUCK } from '../components/step/Reach';
 import {
@@ -13,10 +15,14 @@ import {
   type ReadOnlyCommands,
   type StepReach,
 } from '../lib/api/capabilities.ts';
+import { pagePlaceOf } from '../lib/factories';
+import { repoName } from '../lib/factory';
 import { container, hairline } from '../lib/meaning';
 
 export const Route = createFileRoute('/capabilities')({
-  loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search }) => ({ factory: search.factory, repo: search.repo }),
+  loader: ({ context, deps }) => context.queryClient.ensureQueryData(capabilitiesQuery(pagePlaceOf(deps))),
   component: CapabilitiesPage,
   pendingComponent: () => (
     <p className="text-body-medium text-muted-foreground">Reading the repository, and asking each MCP server it enables for its tools…</p>
@@ -29,10 +35,15 @@ export const Route = createFileRoute('/capabilities')({
   ),
 });
 
-/** What the repository offers a step, section by section, each thing with the file it was read from. */
+/**
+ * What the repository of the address's place offers a step (`?factory=`, `?repo=`), section by section, each thing with the file it was
+ * read from; where the api reads none, why and what to do (`Unread`), and no section.
+ */
 function CapabilitiesPage() {
-  const { data } = useSuspenseQuery(capabilitiesQuery);
-  const { repo, skills, agents, mcp, denied, asked, warnings, measured, readOnly, steps } = data;
+  const search = Route.useSearch();
+  const { data } = useSuspenseQuery(capabilitiesQuery(pagePlaceOf(search)));
+  const { repo, unread, skills, agents, mcp, denied, asked, warnings, measured, readOnly, steps } = data;
+  if (unread !== undefined || repo === undefined) return <Unread unread={unread} search={search} />;
 
   return (
     <article className="space-y-8">
@@ -132,6 +143,50 @@ function CapabilitiesPage() {
           <StepRow key={`${step.from}:${step.workflow}/${step.step}`} step={step} measured={measured} readOnly={readOnly} />
         ))}
       </Section>
+    </article>
+  );
+}
+
+const LINK = 'underline underline-offset-2';
+
+/**
+ * Why the page reads no repository, and what to do, as the api says it (`CapabilitiesUnread`): for several factories, the factory picker
+ * beside the sentence, a pick reading this page in the factory picked; for a factory on several repositories, each a link to this page on
+ * it (`?repo=`); for no factory, the lines that file one. An answer with neither a repository nor a reason says only that it read none.
+ */
+function Unread({ unread, search }: { unread: CapabilitiesUnread | undefined; search: Record<string, unknown> }) {
+  return (
+    <article data-unread={unread?.reason ?? 'none'} className="flex flex-col gap-4">
+      <p className="text-body-medium text-muted-foreground">{unread?.message ?? 'The api read no repository for this page.'}</p>
+      {unread?.reason === 'several-factories' && <FactoryPicker path="/capabilities" search={search} picked={undefined} />}
+      {unread?.reason === 'several-repositories' && unread.factory !== null && (
+        <ul className="flex flex-col gap-1">
+          {unread.repos.map((repo) => (
+            <li key={repo} title={repo}>
+              <Link
+                to="/capabilities"
+                search={{ factory: unread.factory ?? undefined, repo }}
+                data-pick-repo={repo}
+                className={`font-mono text-body-medium ${LINK}`}
+              >
+                {repoName(repo)}
+              </Link>{' '}
+              <span className="font-mono text-body-small text-muted-foreground">{repo}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {unread?.reason === 'no-factory' && (
+        <ul className="flex flex-col gap-1">
+          {unread.commands.map((line) => (
+            <li key={line}>
+              <code data-command className="font-mono text-body-small">
+                {line}
+              </code>
+            </li>
+          ))}
+        </ul>
+      )}
     </article>
   );
 }

@@ -166,8 +166,15 @@ const labelsText = (labels: Readonly<Record<string, string>>): string | null => 
   return keys.length === 0 ? null : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
 };
 
+/** A card's models as it writes them, `implement=fable, review=opus`, as the orchestrator's `modelsText` does; null for none. */
+const modelsText = (models: Readonly<Record<string, string>>): string | null =>
+  Object.entries(models)
+    .map(([step, model]) => `${step}=${model}`)
+    .join(', ') || null;
+
 /**
- * The value a card's page shows for `key` of `card`: when it was queued, the runs its `from:` names, comma-joined, its labels as
+ * The value a card's page shows for `key` of `card`: when it was queued, the runs its `from:` names, comma-joined, its models as
+ * `<step>=<model>`, comma-joined, its labels as
  * `a=b,c=d`, its factory (its namespace, none for `default`), or what the card writes; null for a key it does not set.
  */
 const keyValue = (card: Card, key: CardKey): string | null => {
@@ -175,6 +182,7 @@ const keyValue = (card: Card, key: CardKey): string | null => {
   if (key === 'queued') return entry.queued?.at ?? null;
   if (key === 'from') return entry.from.join(', ') || null;
   if (key === 'labels') return labelsText(entry.labels);
+  if (key === 'model') return modelsText(card.spec.model ?? {});
   return entry[key] ?? null;
 };
 

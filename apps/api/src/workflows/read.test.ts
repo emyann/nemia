@@ -10,7 +10,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TEAM } from '../../test/team.ts';
 import type { Workflow, WorkflowCreate } from 'objects';
-import { app } from '../app.ts';
+import { Layer } from 'effect';
+import { scratch } from 'test-kit/scratch';
+import type { Running } from 'agent-orchestrator';
+import { app, appOf, liveOf } from '../app.ts';
+import { ApiConfig } from '../layer.ts';
 
 const STORE = path.join(root, 'workflows');
 fs.cpSync(path.join(TEAM, 'agents'), path.join(STORE, 'agents'), { recursive: true });
@@ -67,4 +71,27 @@ test('REFUSED: a step file whose frontmatter does not read, named; a folder sent
     assert.ok(error.includes(names), `${what}: ${JSON.stringify(error)} names ${names}`);
     assert.deepEqual(storeNow(), before, `${what}: a refused read writes nothing`);
   }
+});
+
+test('an install with no repository of its own and no factory named reads a folder sent, its agents found in yours alone', async () => {
+  const release = scratch('nemia-api-read-install-');
+  const running: Running = {
+    kind: 'install',
+    root: release,
+    tag: 'v1.0.0',
+    commit: 'abc',
+    source: 'https://example.invalid/releases',
+    builtAt: '2026-11-12T00:00:00.000Z',
+    from: 'archive',
+  };
+  const { HKB_REPO: _noRepoOfItsOwn, WF_EXPOSED: _notExposed, ...env } = process.env;
+  const { app: installed } = appOf(Layer.merge(liveOf(env), ApiConfig.layer(env, running)));
+  const res = await installed.request('/api/workflows/read', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'readback', files: filesIn(path.join(TEAM, 'dev')) }),
+  });
+  const answer = (await res.json()) as WorkflowCreate;
+  assert.equal(res.status, 200, JSON.stringify(answer));
+  assert.ok(answer.spec.steps.length > 0, 'its steps are read');
 });

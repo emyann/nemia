@@ -56,7 +56,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 
 const readInbox = inboxAllQuery(undefined).queryFn as unknown as () => Promise<InboxEntry[]>;
 const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPage>;
-const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<Capabilities>;
+const readCapabilities = capabilitiesQuery({}).queryFn as unknown as () => Promise<Capabilities>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
 
 /** A factory's rules as the api answers them: kept in its file, with words. */

@@ -13,6 +13,7 @@
 import { templateList, templateObject, templateTree, type Factory } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { agentObjectsOf, treeAgentsHeld } from '../agents/index.ts';
 import { listed, servedNamed, servedOf } from '../definitions/served.ts';
 import { skillObjectsOf, treeSkillsHeld } from '../skills/index.ts';
@@ -30,7 +31,7 @@ async function renderedIn(s: Served, name: string): Promise<Served> {
   const tree = await s.inRequest(templateTree(name));
   const factory: Factory = {
     name: tree.name,
-    repos: [s.repo],
+    repos: [repoNeeded(s)],
     workflows: tree.workflows,
     hires: tree.hires,
     schedules: {},

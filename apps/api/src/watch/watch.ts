@@ -14,17 +14,20 @@
  * A BOOKMARK is sent every `BOOKMARK_EVERY`, its `resourceVersion` the feed's size at the last read.
  *
  * Level-triggered: a watch keeps nothing between connections. A read again that is no 2xx, or a feed truncated under the reader, ends the
- * stream, and the reader opens it again and is sent the state whole: no `Last-Event-ID` resume, since nothing keeps a list's old versions.
+ * stream, and the reader opens it again and is sent the state whole: no `Last-Event-ID` resume, since nothing keeps a list's old versions
+ * but the feed's own: a watch of the Event lists asked a `resourceVersion` (`watchStartOf`) is sent no state and follows the feed from
+ * that byte, so a reader that kept the last one it was sent resumes there.
  * The feed's reader is held in the stream's scope, which the request's abort interrupts, and let go with it.
  */
 import { type Context as RequestContext } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { Context, Data, type Duration, Effect, Schema, Stream } from 'effect';
-import { BOOKMARK_EVERY, feedSize, followFeed, watchChanges, type Versioned } from 'agent-orchestrator';
+import { BOOKMARK_EVERY, feedCursorRefusal, feedSize, followFeed, watchChanges, type Versioned } from 'agent-orchestrator';
 import { API_VERSION, AnyObjectList, LIST_PAGE, TABLE_ACCEPT, type WatchedObject, watchEventOf } from 'objects';
 import { acceptsTable } from '../objects/table.ts';
 import { type ApiEnv, Beats } from '../layer.ts';
 import { StoreRoot } from '../store.ts';
+import type { WatchStart, WatchStartOf, WatchStartRefusal } from '../../contracts/watch-start.contract.ts';
 
 /** The least time between two reads again of a watched list, however many feed lines arrive. */
 export const WATCH_SETTLE: Duration.Input = '500 millis';
@@ -40,7 +43,7 @@ const WatchEvent = watchEventOf(Schema.Unknown);
 
 /** What the query of a watch takes, said in every refusal of one. */
 const WATCH_TAKES =
-  '`?watch=true` follows the list as server-sent events, with `labelSelector` if you like; `limit` and `continue` page a list and are left out of a watch';
+  '`?watch=true` follows the list as server-sent events, with `labelSelector` if you like, and on the Event lists `resourceVersion` to resume from; `limit` and `continue` page a list and are left out of a watch';
 
 /** Why `c`'s query cannot be watched, or null where it asks a watch rightly. */
 const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; readonly error: string } | null => {
@@ -49,6 +52,8 @@ const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; rea
     return { status: 400, error: `watch=${watch.join(',')} is not a watch this list takes: ${WATCH_TAKES}.` };
   if (c.req.query('limit') !== undefined || c.req.query('continue') !== undefined)
     return { status: 400, error: `a watch is sent the whole list, so it takes no page: ${WATCH_TAKES}. Send it again without them.` };
+  if ((c.req.queries('resourceVersion') ?? []).length > 1)
+    return { status: 400, error: `a watch resumes from one resourceVersion: send it once. ${WATCH_TAKES}.` };
   if (acceptsTable(c.req.header('accept')))
     return {
       status: 406,
@@ -56,6 +61,22 @@ const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; rea
     };
   return null;
 };
+
+/**
+ * Where a watch starts, from the `resourceVersion` its query asks (`asked`), whether its list follows the feed (`follows`) and the byte
+ * the asked word reads as (`byte`, `byteOf`): the list's state whole where none is asked, the feed from that byte for a list that
+ * follows it, or refused before anything is read (`watch-start.contract.ts`).
+ */
+export const watchStartOf: WatchStartOf = (asked, follows, byte): WatchStart => {
+  if (asked === undefined || asked === '') return { kind: 'state' };
+  if (!follows) return { kind: 'refused', reason: 'not-followed' };
+  if (byte === undefined) return { kind: 'refused', reason: 'not-a-cursor' };
+  return { kind: 'from', cursor: byte };
+};
+
+/** A byte of the feed as an event's `resourceVersion` writes it: a decimal with no sign and no leading zero, else none. */
+export const byteOf = (text: string | undefined): number | undefined =>
+  text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined;
 
 /** A read of the list: its objects by key, and the objects themselves. */
 type Read = { readonly kind: string; readonly versions: Versioned[]; readonly objects: Map<string, WatchedObject>; readonly at: number };
@@ -134,12 +155,58 @@ export type Follow = (
   beat: Duration.Input | undefined,
 ) => Stream.Stream<{ readonly object: WatchedObject | undefined; readonly at: number }, unknown>;
 
+/** What a watch refused before anything is read answers in `error`: what to send instead. */
+const startRefusal = (reason: WatchStartRefusal, asked: string): string =>
+  reason === 'not-followed'
+    ? `this list is read again on each change and keeps no old versions, so its watch takes no resourceVersion (${JSON.stringify(asked)}): send it again without resourceVersion, and the state is sent whole`
+    : `resourceVersion ${JSON.stringify(asked)} is no byte of the feed: send the resourceVersion of the last event or BOOKMARK a watch sent, or the metadata.resourceVersion of a page of GET /api/events, as it is`;
+
+/** The kind and the empty state of a list a watch follows from a byte, read off a first page of one (its refusal answered as it is). */
+async function firstPage(list: Listed, c: RequestContext<ApiEnv>, url: URL, at: number) {
+  const asked = new URL(url);
+  asked.searchParams.delete('resourceVersion');
+  asked.searchParams.set('limit', '1');
+  const answer = await list(c, new Request(asked, { headers: c.req.raw.headers }));
+  if (!answer.ok) return answer;
+  const read = Schema.decodeUnknownSync(AnyObjectList)(await answer.json());
+  return { kind: read.kind.replace(/List$/, ''), versions: [], objects: new Map(), at } satisfies Read;
+}
+
+/**
+ * Where a watch of `list` starts and what it holds there (`watchStartOf`): the state read whole, or a list that follows the feed's first
+ * page from the byte asked; or the answer that refuses it before any stream (400, 410, or the list's own).
+ */
+async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: VersionOf, follows: boolean) {
+  const resourceVersion = c.req.query('resourceVersion');
+  const start = watchStartOf(resourceVersion, follows, byteOf(resourceVersion));
+  if (start.kind === 'refused') return c.json({ error: startRefusal(start.reason, resourceVersion ?? '') }, 400);
+  const url = new URL(c.req.url);
+  url.searchParams.delete('watch');
+  const home = await c.var.runtime.runPromise(StoreRoot);
+  if (start.kind === 'from') {
+    const expired = feedCursorRefusal(home, start.cursor);
+    if (expired !== undefined)
+      return c.json(
+        { error: `resourceVersion ${start.cursor} cannot be read on: ${expired}. Watch again without resourceVersion for the state whole` },
+        410,
+      );
+  }
+  const page = await c.var.runtime.runPromise(WatchPage);
+  const initial =
+    start.kind === 'from' ? await firstPage(list, c, url, start.cursor) : await readAll(list, c, url, page, feedSize(home), versionOf);
+  if (initial instanceof Response) return initial;
+  return { start, initial, home, url, page };
+}
+
 /**
  * `list` watched: without `watch` (or with `watch=false`) the request handed on as it is; with `watch=true` the stream above; any other
  * `watch`, or `limit` or `continue` beside it, refused 400 `{ error }` before anything is read. Given `follow`, a list whose objects are
  * the feed's own lines: after the initial state each line the list keeps is sent ADDED as it is followed, once, and the list is never
  * read again. Given `versionOf`, the list's objects are compared at it between reads rather than as served: a list whose objects carry
- * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read.
+ * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read. A `resourceVersion` asked is read by
+ * `watchStartOf`: of a list that follows the feed, the watch starts at that byte and sends no state (a byte the feed cannot be read from,
+ * inside a line or past its end, refused 410, Kubernetes' expired one; the list's own refusals answered from a first page of one); of
+ * any other list, or a word that is no byte, refused 400.
  */
 export const watchable =
   (list: Listed, { follow, versionOf = JSON.stringify }: { readonly follow?: Follow; readonly versionOf?: VersionOf } = {}) =>
@@ -148,20 +215,19 @@ export const watchable =
     if (asked === undefined || asked === 'false') return list(c);
     const refused = refusalOf(c);
     if (refused !== null) return c.json({ error: refused.error }, refused.status);
-    const url = new URL(c.req.url);
-    url.searchParams.delete('watch');
-    const home = await c.var.runtime.runPromise(StoreRoot);
-    const page = await c.var.runtime.runPromise(WatchPage);
-    const initial = await readAll(list, c, url, page, feedSize(home), versionOf);
-    if (initial instanceof Response) return initial;
+    const opened = await openedAt(c, list, versionOf, follow !== undefined);
+    if (opened instanceof Response) return opened;
+    const { start, initial, home, url, page } = opened;
     return streamSSE(c, async (stream: SSEStreamingApi) => {
       const gone = new AbortController();
       stream.onAbort(() => gone.abort());
       if (stream.aborted) gone.abort();
       const write = (frame: { data: string }) => Effect.promise(() => stream.writeSSE(frame));
       const state = { sent: initial, at: initial.at };
-      for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
-      await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
+      if (start.kind === 'state') {
+        for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
+        await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
+      }
       const again = Effect.gen(function* () {
         const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
         if (now instanceof Response) return yield* new ListRefused({ status: now.status });

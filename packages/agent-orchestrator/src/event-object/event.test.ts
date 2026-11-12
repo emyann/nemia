@@ -150,7 +150,12 @@ test('a page of 2 reads on by continue in feed order, the last counting nothing 
 
 test("a page's resourceVersion is the feed's end as read, on a page with a continue too, and 0 for no feed", () => {
   const lines = ['r-c', 'r-a', 'r-d'].map(inMill);
-  const end = value(over(lines, Effect.flatMap(FeedDoor, (door) => door.lines.end())))?.cursor;
+  const end = value(
+    over(
+      lines,
+      Effect.flatMap(FeedDoor, (door) => door.lines.end()),
+    ),
+  )?.cursor;
   assert.ok(end !== undefined && end > 0);
   const first = value(over(lines, eventList({ limit: 1 })));
   assert.ok(first.metadata.continue !== undefined);

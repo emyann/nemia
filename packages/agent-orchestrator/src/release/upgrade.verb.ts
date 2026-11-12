@@ -37,6 +37,8 @@ import { goingBackRefused, parseVersion, versionTag } from './floor.ts';
 import {
   buildingOf,
   placeRelease,
+  lastLineFrom,
+  logSize,
   ranInto,
   releaseDir,
   releaseFileOf,
@@ -98,18 +100,22 @@ function checked(tag: string, building: Building, env: NodeJS.ProcessEnv): void 
 }
 
 /**
- * The new tree's own `nemia doctor carry --local` run on the store at `root` (`ranInto`, its output into the build's log): it installs,
- * at the new release's pins, each harness the store holds activated or a release carries (`carryHarnesses`), so nothing that ran stops
- * after the switch. Refused (`Invalid`, naming the log) where it exits non-zero: nothing is switched. `archive` says where the tree's
- * `nemia` is: an archive's `bin/nemia`, a build's npm bin.
+ * The new tree's own `nemia doctor carry` run on the store at `root` (`ranInto`, its output into the build's log): it installs, at the
+ * new release's pins, each harness the store holds activated or a release carries (`carryHarnesses`), so nothing that ran stops after
+ * the switch. Typed without `--local`, which a release's cli refuses on every verb but this one. Refused (`Invalid`, naming the last
+ * line the carry printed and the log) where it exits non-zero: nothing is switched. `archive` says where the tree's `nemia` is: an
+ * archive's `bin/nemia`, a build's npm bin.
  */
 function carried(tag: string, building: Building, archive: boolean, root: string, env: NodeJS.ProcessEnv): void {
   const nemia = archive ? path.join(building.tree, 'bin', 'nemia') : path.join(building.tree, 'node_modules', '.bin', 'nemia');
-  const exit = ranInto([nemia, 'doctor', 'carry', '--local'], building.tree, { ...env, WF_ROOT: root }, building.log);
-  if (exit !== 0)
+  const from = logSize(building.log);
+  const exit = ranInto([nemia, 'doctor', 'carry'], building.tree, { ...env, WF_ROOT: root }, building.log);
+  if (exit !== 0) {
+    const last = lastLineFrom(building.log, from);
     throw new Invalid({
-      message: `${BY} ${tag}: its nemia doctor carry, which installs this store's harnesses at ${tag}'s pins, exited ${exit}, so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}, then run the upgrade again.`,
+      message: `${BY} ${tag}: its nemia doctor carry, which installs this store's harnesses at ${tag}'s pins, exited ${exit}${last === undefined ? '' : `, its last line: ${last}`}; so nothing changed and releases/${CURRENT} stays where it was: read ${building.log}, then run the upgrade again.`,
     });
+  }
 }
 
 /**

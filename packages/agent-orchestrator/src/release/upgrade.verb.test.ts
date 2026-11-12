@@ -90,14 +90,17 @@ const CARRIED = path.join(scratch('wf-upgrade-carried-'), 'carried.txt');
  * The readiness read the fixture's `nemia doctor --json` prints, as the new release's daemon would answer it: every piece in place
  * unless a test writes another (`readAs`).
  */
+/** The last line the fixture's carry prints when it fails, which the upgrade's refusal names. */
+const CARRY_FAILED = 'Claude Code 9.9.9 did not install (exit 1)';
+
 const READ = path.join(scratch('wf-upgrade-read-'), 'readiness.json');
 const readAs = (read: Readiness): void => fs.writeFileSync(READ, JSON.stringify(read));
 readAs({ ready: true, pieces: [] });
 
 /**
- * Commits a fixture package with `scripts` and `marker` in it, and a `nemia.sh` that appends its arguments and `WF_ROOT` to `CARRIED`
- * and exits `carry` — or, asked `doctor --json`, prints `READ` and exits 1, as `nemia doctor` exits while a run waits —, tags it `tag`,
- * and answers the commit.
+ * Commits a fixture package with `scripts` and `marker` in it, and a `nemia.sh` that appends its arguments and `WF_ROOT` to `CARRIED`,
+ * refuses `--local` with exit 2 on every verb as a release's cli does, and exits `carry`, its last line `CARRY_FAILED` where not 0 — or,
+ * asked `doctor --json`, prints `READ` and exits 1, as `nemia doctor` exits while a run waits —, tags it `tag`, and answers the commit.
  */
 function tagged(tag: string, marker: string, given: Record<string, string> = scripts(), carry = 0): string {
   fs.writeFileSync(
@@ -107,7 +110,7 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
   fs.writeFileSync(path.join(REPO, 'marker.txt'), `${marker}\n`);
   fs.writeFileSync(
     path.join(REPO, 'nemia.sh'),
-    `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nif [ "$1 $2" = "doctor --json" ]; then echo "context $NEMIA_CONTEXT" >> '${CARRIED}'; cat '${READ}'; exit 1; fi\nexit ${carry}\n`,
+    `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nfor word in "$@"; do if [ "$word" = --local ]; then echo '--local reads no store in process any more' >&2; exit 2; fi; done\nif [ "$1 $2" = "doctor --json" ]; then echo "context $NEMIA_CONTEXT" >> '${CARRIED}'; cat '${READ}'; exit 1; fi\necho 'carrying the harnesses'\nif [ ${carry} -ne 0 ]; then echo '${CARRY_FAILED}' >&2; fi\nexit ${carry}\n`,
   );
   const commit = stand().world.commit(REPO, marker);
   stand().world.tag(REPO, tag, commit);
@@ -513,21 +516,22 @@ test("the new tree's nemia doctor carry runs on the store before the switch: its
   await s.test('a carry that exits 1 is Invalid, and releases/current stays where it was with no release placed', async () => {
     tagged('v10', 'ten', scripts(), 1);
     fs.rmSync(CARRIED, { force: true });
-    const { tag } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
+    const { tag, message } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
     assert.equal(tag, 'Invalid');
+    assert.ok(message.includes(CARRY_FAILED), `the carry's last line is said beside the log: ${message}`);
     assert.equal(currentRelease(ROOT)?.tag, before);
     assert.equal(fs.existsSync(releaseDir('v10', ROOT)), false);
     assert.deepEqual(leftovers(), []);
-    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`], 'run once, on the store');
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry ${ROOT}`], 'run once, on the store');
   });
 
-  await s.test('a carry that exits 0 lets the upgrade switch to the new release', async () => {
+  await s.test('a carry that exits 0, from a tree whose cli refuses --local on every verb, lets the upgrade switch to it', async () => {
     tagged('v11', 'eleven');
     fs.rmSync(CARRIED, { force: true });
     const done = await run({ tag: 'v11', repo: REPO }, idle().host);
     assert.equal(done.built, true);
     assert.equal(currentRelease(ROOT)?.tag, 'v11');
-    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`]);
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry ${ROOT}`]);
   });
 });
 

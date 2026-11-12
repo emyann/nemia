@@ -4,9 +4,11 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
-import { StoreRoot } from '../config/root.store.ts';
+import fs from 'node:fs';
+import { pathLedByTools, StoreRoot, toolsBinDir } from '../config/root.store.ts';
 import { type Settings, StoreConfig } from '../config/config.store.ts';
-import type { PlaceService } from '../place/place.store.ts';
+import { PlaceService } from '../place/place.store.ts';
+import { needs, NeedsMemory, needsMemo } from '../needs/needs.verb.ts';
 import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../factory/schedule/schedule.ts';
@@ -297,7 +299,10 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * it removes the installed releases no one needs (`retain`), pinning the one this process runs: by then each session it adopted has
  * recorded what it runs on. On a ninth, once the first pass has answered, an archive install asks for the newest release every six hours
  * (`releaseCheck`), unless `NEMIA_RELEASE_CHECK=off`. As it takes the store it raises the store's floor to the oldest release that reads
- * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it.
+ * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it. Before the engine holds
+ * anything it puts the store's tools folder first on its own PATH (`toolsOnPath`); on a tenth it reads the machine's needs every
+ * `NEEDS_EVERY` (`needs`), into the memory the process gives (`NeedsMemory`) or one of its own, its place's needs among them, and every
+ * pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`).
  */
 export const up = (
   e: Engine,
@@ -316,6 +321,9 @@ export const up = (
       ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
     yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
+    yield* Effect.try({ try: () => toolsOnPath(home, process.env), catch: (err) => err });
+    const memo = (yield* NeedsMemory) ?? needsMemo(home);
+    memo.placeNeeds = (yield* PlaceService).declared.needs ?? [];
     const served = yield* e.hold();
     if (served) yield* Effect.sync(() => heldServes(home, served.cards));
     yield* seriesBorn([...DAEMON_SERIES, ...series]);
@@ -333,6 +341,7 @@ export const up = (
     yield* Effect.forkScoped(over(e)(keep()));
     yield* Effect.forkScoped(reconcile());
     yield* Effect.forkScoped(clones());
+    yield* Effect.forkScoped(needs(memo));
     let rested: Pass['runs'] = [];
     yield* Effect.forkScoped(over(e)(free(() => rested)));
     const answered = yield* Deferred.make<void>();
@@ -356,7 +365,10 @@ export const up = (
     for (;;) {
       const by = stillHeld(home, taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, home, holder)));
-      const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured })).pipe(over(e));
+      const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured })).pipe(
+        Effect.provideService(NeedsMemory, memo),
+        over(e),
+      );
       passed(home, taken.held);
       rested = pass.runs;
       yield* Deferred.succeed(answered, undefined);
@@ -364,6 +376,18 @@ export const up = (
       yield* Effect.sleep(every);
     }
   });
+
+/**
+ * The tools folder's `bin/` of the store at `home` made (`toolsBinDir`) and put first on `env`'s PATH (`pathLedByTools`), once: what the
+ * daemon does to its own environment as it starts, so every session, check and fix it starts — whether the service or a person started
+ * it — finds a tool a fix installed there with no profile edited. Answers the folder.
+ */
+export const toolsOnPath = (home: string, env: Record<string, string | undefined>): string => {
+  const bin = toolsBinDir(home);
+  fs.mkdirSync(bin, { recursive: true });
+  env.PATH = pathLedByTools(home, env.PATH);
+  return bin;
+};
 
 /**
  * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds at the store `home`, so

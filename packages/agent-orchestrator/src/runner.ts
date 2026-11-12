@@ -36,6 +36,10 @@ export type { SessionHarness, SessionRelease } from './release/index.ts';
 export { currentRelease } from './release/release.store.ts';
 export { latestRelease, runningRelease } from './release/version.verb.ts';
 export { claudeTokenFile, loadClaudeToken, type ClaudeTokenLoad } from './sign-in/sign-in.store.ts';
+export { readinessOf, liveFacts, type ReadinessFacts, type CommandRead } from './needs/readiness.verb.ts';
+export { startFix, fixOf, followFix, type FixFollowed } from './needs/fix.verb.ts';
+export { NeedsMemory, needsMemoryLayer, type NeedsMemo } from './needs/needs.verb.ts';
+export { toolsDir } from './config/root.store.ts';
 export { Conflict, Forbidden, Invalid, isRefusal, Missing, type Refusal } from './refusal/refusal.ts';
 export {
   type Env,

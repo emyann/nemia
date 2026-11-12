@@ -32,6 +32,7 @@ import { followedFeed } from './rest.verb.ts';
 import { evictedBy, informedOf, type Watch } from './rest.ts';
 import type { Run as RunObject } from '../object/run.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
+import { NeedsMemory, needsVersionOf } from '../needs/needs.verb.ts';
 
 /**
  * One run's kept value and what it was judged on: the run as it was read, which `given` hands back in place of its record; whether it was
@@ -43,6 +44,11 @@ type Entry<T, O = unknown> = {
   tips: Readonly<Record<string, string | null>>;
   atRest: boolean;
   pass: number | undefined;
+  /**
+   * Where this process's memory of its needs' readings stood when a run that had filed nothing was judged (`needsVersionOf`): such a run is
+   * held on those readings, so a reading changed since is judged again. None for any other run.
+   */
+  needs?: number | undefined;
   value: T;
   /**
    * The run's listed object built on `value` (`keepObject`), before its disk parts (`runObjectCore`, its core `resourceVersion` on it),
@@ -172,8 +178,16 @@ const committed = <T, O>(e: Engine, memo: InformerMemo<T, O>, held: ReadonlyMap<
   });
 
 /**
+ * Whether `entry` was judged on `run` as it is now: the run's `stamp`, the run itself, and, for a run that has filed nothing, where the
+ * needs' readings stand (`needs`, `needsVersionOf`).
+ */
+const judgedOn = <T, O>(entry: Entry<T, O>, run: Run, stamp: string | undefined, needs: number | undefined): boolean =>
+  entry.stamp === stamp && (entry.run === run || JSON.stringify(entry.run) === JSON.stringify(run)) && entry.needs === needs;
+
+/**
  * What the informer checks before it serves a run from memory, by each watch of `RUN_INPUTS` but `request`: the run's stamp
- * (`stampHeld`), the feed (`quiet`) and the tips (`tipsHeld`). A watch added there fails the typecheck here until the informer checks it.
+ * (`stampHeld`), with, for a run that has filed nothing, where the needs' readings stood (`needsVersionOf`), the feed (`quiet`) and the
+ * tips (`tipsHeld`). A watch added there fails the typecheck here until the informer checks it.
  */
 const INFORMER_CHECKS = { stamp: 'stampHeld', feed: 'quiet', tips: 'tipsHeld' } as const satisfies Record<
   Exclude<Watch, 'request'>,
@@ -194,6 +208,7 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
   same: (kept: T, fresh: T) => boolean = isDeepStrictEqual,
 ) {
   const home = yield* StoreRoot;
+  const needsMemo = yield* NeedsMemory;
   const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
   const stamps = runsAtOnce(home).runs.stamps();
@@ -214,8 +229,7 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
       const entry = memo.runs.get(run.id);
       if (!entry) return undefined;
       const verdict = informedOf({
-        [INFORMER_CHECKS.stamp]:
-          entry.stamp === stamps.get(run.id) && (entry.run === run || JSON.stringify(entry.run) === JSON.stringify(run)),
+        [INFORMER_CHECKS.stamp]: judgedOn(entry, run, stamps.get(run.id), needsVersionOf(needsMemo, run)),
         [INFORMER_CHECKS.feed]: fed,
         [INFORMER_CHECKS.tips]: isDeepStrictEqual(tipsOf(run, Object.keys(entry.tips), now), entry.tips),
         atRest: entry.atRest,
@@ -243,7 +257,8 @@ export const informerRead = Effect.fn('informerRead')(function* <T, O = unknown>
         memo.runs.delete(run.id);
         return;
       }
-      held.set(run.id, { stamp, run, tips: tipsOf(run, branches, heads), atRest, pass: memo.pass, value });
+      const needs = needsVersionOf(needsMemo, run);
+      held.set(run.id, { stamp, run, tips: tipsOf(run, branches, heads), atRest, pass: memo.pass, needs, value });
     },
     commit: () => committed(e, memo, held, readTo),
     drop(run) {

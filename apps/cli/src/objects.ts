@@ -7,8 +7,10 @@
  * but a `Conflict`, a stale version, exit 1. Every request carries the token this client calls with (`callerToken`). A 404 whose
  * body is no refusal is a daemon older than this client, refused naming the restart; another status the `Api` declares no
  * error for is said in the api's words where it gave some (`Answered`); an answer that does not decode as the `Api` says is one too,
- * the daemon and this client being of two builds. A call the api takes and does not answer within `READ_BOUND_MS` gives up, refused
- * naming the service's status and its restart: it starts no daemon, since one holds the port and took the request.
+ * the daemon and this client being of two builds, exit 2, naming both releases as known and `nemia version` (`undecoded`): a release
+ * check that let the call through as `unsaid` leaves the decode to guard what is read back. A call the api takes and does not answer
+ * within `READ_BOUND_MS` gives up, refused naming the service's status and its restart: it starts no daemon, since one holds the port
+ * and took the request.
  */
 import { Cause, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClientError } from 'effect/http';
@@ -29,7 +31,8 @@ import {
   Unjudged,
 } from 'objects';
 import { callerToken, olderThanThis, Refused, unanswered } from './client.ts';
-import { served } from './daemon.ts';
+import { servedWith } from './daemon.ts';
+import { clientRelease } from './release.ts';
 import { resourceNamed } from './objects/resource.ts';
 
 /** What a read asks of: every group of the `Api`, each endpoint a method. */
@@ -77,10 +80,31 @@ const notInTime = (verb: string, base: string, boundMs: number): Refused =>
   );
 
 /**
- * The answer of `exit`, or the refusal it is as a person reads it, for the read `verb` names, of the daemon at `base`, which had `boundMs`
- * to answer.
+ * The releases a read was asked between, as far as they are known: the daemon's (`Health.release`; null where its health says none,
+ * undefined where it was not read, as for a server a pairing asks) and this client's (`clientRelease`; null for a checkout).
  */
-function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, boundMs: number): A {
+export type Releases = { readonly daemon: string | null | undefined; readonly client: string | null };
+
+/** How `releases` say each side: the daemon's release or that it says none, this client's tag or that it is a checkout. */
+const sidesOf = ({ daemon, client }: Releases): string =>
+  `the daemon ${daemon === undefined ? 'was not asked its release' : daemon === null ? 'says no release (GET /api/health)' : `runs ${daemon}`}, and this nemia is ${client ?? 'a checkout'}`;
+
+/**
+ * An answer of the daemon at `base` to `nemia <verb>` that does not decode by the `Api`'s Schema (`failed`, what the decode said): a
+ * daemon of another build than this client's, which may say no release at all, so `releaseMet`'s `unsaid` let it through. Refused, exit
+ * 2, naming both releases as `releases` know them and `nemia version` on both machines.
+ */
+export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases): Refused =>
+  new Refused(
+    `nemia ${verb}: the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): ${sidesOf(releases)}. ` +
+      "Type `nemia version` on both machines, then upgrade the older to the other's release (`nemia upgrade <tag>`), or run this command with the nemia of the daemon's release",
+  );
+
+/**
+ * The answer of `exit`, or the refusal it is as a person reads it, for the read `verb` names, of the daemon at `base`, which had `boundMs`
+ * to answer, the two sides being of `releases`.
+ */
+function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, boundMs: number, releases: Releases): A {
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = failureOf(exit);
   if (failed === undefined) throw Cause.squash(exit.cause);
@@ -94,9 +118,7 @@ function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, bound
     );
   }
   if (HttpClientError.isHttpClientError(failed) && failed.reason._tag === 'TransportError') throw unanswered(verb, base, failed);
-  throw new Refused(
-    `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\``,
-  );
+  throw undecoded(verb, base, failed, releases);
 }
 
 /** A refusal in the api's own words, exited with `code`: 1 for a `Conflict` (a stale version), as the old path exits; else 2. */
@@ -115,8 +137,8 @@ export async function asked<A, E>(
   boundMs: number = READ_BOUND_MS,
   headers: Readonly<Record<string, string>> = {},
 ): Promise<A> {
-  const base = await served(verb, env);
-  return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs);
+  const { base, release } = await servedWith(verb, env);
+  return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs, { daemon: release, client: clientRelease() });
 }
 
 /**
@@ -130,7 +152,7 @@ export async function askedBare<A, E>(
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
   boundMs: number = READ_BOUND_MS,
 ): Promise<A> {
-  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs);
+  return answerOf(await attempt(base, call, boundMs, {}, {}, false), verb, base, boundMs, { daemon: undefined, client: clientRelease() });
 }
 
 /**

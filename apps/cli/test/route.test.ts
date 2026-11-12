@@ -147,14 +147,13 @@ async function nemia(
   return { code, said, out };
 }
 
-test('under a remote context `inbox rm`, `inbox add`, `start` and `ls <run>` are forwarded: the old path, with the server and token, no WF_ROOT', async () => {
+test('under a remote context `inbox rm`, `inbox add` and `start` are forwarded: the old path, with the server and token, no WF_ROOT', async () => {
   const { env, root } = remoteLaptop('nemia-route-remote-');
   const hook = plantedEntry('nemia-route-planted-');
   for (const argv of [
     ['inbox', 'rm', 'x'],
     ['inbox', 'add', 'an idea'],
     ['start', 'card.md'],
-    ['ls', 'some-run'],
   ]) {
     const { code, said, out } = await nemia(argv, env, hook);
     assert.equal(code, 0, `nemia ${argv.join(' ')}: ${said}`);
@@ -165,6 +164,25 @@ test('under a remote context `inbox rm`, `inbox add`, `start` and `ls <run>` are
     );
   }
   assert.equal(fs.existsSync(root), false, "nothing wrote this machine's store");
+});
+
+test("REFUSED: under a remote context `nemia ls <run>`, exit 2 naming `nemia show <run>`, the old path never run to print a Run as its listing; under this machine's, it runs there", async () => {
+  const { env, root } = remoteLaptop('nemia-route-ls-run-');
+  const hook = plantedEntry('nemia-route-ls-run-planted-');
+  for (const argv of [
+    ['ls', 'some-run'],
+    ['ls', '-l', 'team=core', 'some-run'],
+  ]) {
+    const { code, said, out } = await nemia(argv, env, hook);
+    assert.equal(code, 2, `nemia ${argv.join(' ')}: ${said}`);
+    assert.match(said, /`nemia show some-run`/, argv.join(' '));
+    assert.equal(out, '', 'the old path never ran');
+  }
+  assert.equal(fs.existsSync(root), false, "nothing wrote this machine's store");
+  const local = localLaptop('nemia-route-ls-run-local-');
+  const here = await nemia(['ls', 'some-run'], local.env, hook);
+  assert.equal(here.code, 0, `under this machine's context the old path lists the run in process: ${here.said}`);
+  assert.deepEqual(JSON.parse(here.out), { argv: ['ls', 'some-run'], NEMIA_SERVER: null, NEMIA_SERVER_TOKEN: null, WF_ROOT: local.root });
 });
 
 test('under a remote context `template lint` runs here, unforwarded; `template export --factory` is refused, exit 2, naming NEMIA_CONTEXT=local', async () => {

@@ -157,13 +157,16 @@ const ONE_SHOTS: readonly Case[] = [
 ];
 
 /**
- * The three words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
- * moment the pause was put as its note, and `level changed`, a factory's level in force in words as its note.
+ * The five words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
+ * moment the pause was put as its note, `level changed`, a factory's level in force in words as its note, and `not ready` and `ready`,
+ * the store's readiness, the first with each missing piece a run waits on and its fix as its note.
  */
 const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'store paused', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StorePaused' },
   { kind: 'Store', word: 'store resumed', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StoreResumed' },
   { kind: 'Store', word: 'level changed', note: 'acme is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
+  { kind: 'Store', word: 'not ready', note: 'mise: nemia doctor fix mise', reason: 'NotReady' },
+  { kind: 'Store', word: 'ready', note: 'every piece a run waits on is in place', reason: 'Ready' },
 ];
 
 /** The two words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
@@ -253,8 +256,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 49, 'the table the owner named has 49 entries');
-    assert.equal(REASON_CODES.length, 38, 'of 38 distinct codes');
+    assert.equal(entries.length, 51, 'the table the owner named has 51 entries');
+    assert.equal(REASON_CODES.length, 40, 'of 40 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -382,8 +385,10 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
         ['person', true, 'Normal', false],
         ['person', true, 'Normal', false],
         ['person', false, 'Normal', false],
+        ['tick', false, 'Warning', false],
+        ['tick', false, 'Normal', false],
       ],
-      "the store's pause and resume are a person's verbs, said once each, and a factory's level a person's word that stands until it changes; none waits on anybody",
+      "the store's pause and resume are a person's verbs, said once each, a factory's level a person's word that stands until it changes, and the store's readiness the tick's word that stands until it changes, a Warning while a run waits on a missing piece; none waits on anybody",
     );
     assert.equal(sourceOf('Running'), 'tick', "a word the tick judged is the tick's, which is what a reason naming no source is");
   });

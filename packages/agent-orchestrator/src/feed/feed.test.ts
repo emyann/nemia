@@ -32,11 +32,13 @@ import {
   type FeedConflicts,
   type FeedLine,
   type FeedPause,
+  type FeedReadiness,
   type FeedWords,
   type Reason,
   type RunLine,
   type StoreLine,
 } from './feed.ts';
+import type { ReadinessPiece } from 'objects';
 import { scratch } from 'test-kit/scratch';
 import { listing as coded, listingInput, type ListedInput } from '../../test/assessed.ts';
 import { reasonOf } from './reason.ts';
@@ -475,6 +477,82 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
         assert.deepEqual([...fold.said.keys()], ['Conflicts/acme']);
         assert.ok(factoryLines().every((l) => !isRunLine(l) && !isStoreLine(l)));
       });
+    },
+  );
+  await t.test(
+    "the store's readiness is one NotReady line while a piece a run waits on is missing and one Ready line once it is met, read off the feed",
+    async (t) => {
+      emptyStore();
+      const memo = freshFeedMemo();
+      const pass = (readiness: FeedReadiness, m = memo) => recordFeed(ROOT, new Map(), { at: AT, memo: m, readiness });
+      const said = () => storeLines().map((l) => l.reason);
+      const fix = (need: string) => ({ message: `start ${need}`, command: `nemia doctor fix ${need} --factory nemia`, startable: true });
+      const mise: ReadinessPiece = {
+        name: 'mise',
+        area: 'workflow',
+        state: 'missing',
+        message: 'mise is not installed',
+        fixes: [fix('mise')],
+        factory: 'nemia',
+        workflow: 'quick',
+        cost: 'run',
+      };
+      const toolchain: ReadinessPiece = { ...mise, name: 'repository-toolchain', fixes: [fix('repository-toolchain')] };
+      const linger: ReadinessPiece = {
+        name: 'linger',
+        area: 'service',
+        state: 'missing',
+        message: 'stops at logout',
+        fixes: [],
+        cost: 'server',
+      };
+      const met = (piece: ReadinessPiece): ReadinessPiece => ({ ...piece, state: 'met', fixes: [] });
+      await t.test(
+        'a read with a missing piece a run waits on writes one NotReady line, naming each piece and its fix; a second pass none',
+        () => {
+          pass({ pieces: [mise, toolchain, linger] });
+          pass({ pieces: [mise, toolchain, linger] });
+          assert.deepEqual(said(), ['NotReady']);
+          const [line] = storeLines();
+          assert.deepEqual(
+            [line.involved, line.type, line.source, line.waits, line.labels],
+            [{ kind: 'Store', name: 'store' }, 'Warning', 'tick', undefined, {}],
+          );
+          for (const named of [
+            'mise',
+            'repository-toolchain',
+            'nemia doctor fix mise --factory nemia',
+            'nemia doctor fix repository-toolchain',
+          ])
+            assert.ok(line.message?.includes(named), `${named} in ${line.message}`);
+          assert.ok(!line.message?.includes('linger'), 'a piece that keeps the server alone holds no run, and is not named');
+        },
+      );
+      await t.test('a daemon with no fold says it no second time while it still holds', () => {
+        pass({ pieces: [mise, toolchain] }, freshFeedMemo());
+        assert.deepEqual(said(), ['NotReady']);
+      });
+      await t.test('one of the two met moves what is missing, and is said again, naming the one left', () => {
+        pass({ pieces: [met(mise), toolchain] });
+        assert.deepEqual(said(), ['NotReady', 'NotReady']);
+        assert.ok(!storeLines()[1].message?.includes('mise:'), storeLines()[1].message);
+      });
+      await t.test('every piece a run waits on met writes one Ready line, a missing server piece notwithstanding, and no second', () => {
+        pass({ pieces: [met(mise), met(toolchain), linger] });
+        pass({ pieces: [met(mise), met(toolchain), linger] });
+        pass({ pieces: [met(mise), met(toolchain)] }, freshFeedMemo());
+        assert.deepEqual(said(), ['NotReady', 'NotReady', 'Ready']);
+        assert.equal(storeLines()[2].type, 'Normal');
+      });
+      await t.test(
+        'a caller that read no readiness says nothing of it, and a store the feed never called not ready is never said ready',
+        () => {
+          recordFeed(ROOT, new Map(), { at: AT, memo });
+          emptyStore();
+          pass({ pieces: [met(mise)] }, freshFeedMemo());
+          assert.deepEqual(said(), []);
+        },
+      );
     },
   );
   await t.test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {

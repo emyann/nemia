@@ -54,7 +54,7 @@ import {
 } from './reason.ts';
 import { currentOf } from '../former-reason/former-reason.ts';
 import type { FactoryLevel } from '../level/level.ts';
-import type { EventWaits } from 'objects';
+import type { EventWaits, Readiness } from 'objects';
 import type { ConflictsDue } from '../../contracts/conflicts-said.contract.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
@@ -123,8 +123,9 @@ export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_START
 export const STORE = 'store';
 
 /**
- * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`), or a factory's level in
- * force (`levelLines`) — and the note beside it: the moment the pause was put, or the factory's level in words. A put carries who put the
+ * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`), a factory's level in
+ * force (`levelLines`), or its readiness (`readinessLines`) — and the note beside it: the moment the pause was put, the factory's level
+ * in words, or each missing piece a run waits on with its fix. A put carries who put the
  * pause (`by`) and the person's words for why (`why`), each where the pause's file says it, never in the note, which pairs the put with
  * its lift. Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`) — and a subscription
  * scoped to a factory is handed it as it is handed a daemon's.
@@ -305,6 +306,9 @@ const levelKey = (factory: string): string => `Level/${factory}`;
  */
 const conflictsKey = (factory: string): string => `Conflicts/${factory}`;
 
+/** Where the fold keeps the store's readiness last said: no `Run/` or `Step/` key, as `levelKey`, so no `removed` forgets it. */
+const READINESS_KEY = 'Readiness/store';
+
 /**
  * Where the fold counts one occurrence of a one-shot: the reason its word names, what the line is about (`foldKey`'s shape, so `forget`
  * reads the run off it), the try it belongs to, and the note that tells one occurrence from another — the note last, so `holdOnce` reads
@@ -379,6 +383,7 @@ function foldStore(fold: FeedFold, l: StoreLine): void {
   if (isOnce(reason)) counted(fold, l, involved, reason);
   const factory = l.labels?.factory;
   if (reason === 'LevelChanged' && factory !== undefined) fold.said.set(levelKey(factory), saidOf(l));
+  if (reason === 'NotReady' || reason === 'Ready') fold.said.set(READINESS_KEY, { ...saidOf(l), reason });
 }
 
 /** A factory's line `l` folded: its conflicts pending or settled kept as the last word said of them, with its reason; any other passed. */
@@ -593,6 +598,56 @@ function levelLines(fold: FeedFold, at: string, levels: FeedLevels): StoreLine[]
 }
 
 /**
+/**
+ * The store's readiness as the daemon last read it (`readinessOf`, swept beside the passes): the read's pieces, of which the feed says
+ * those a run waits on that are missing. A caller that did not read it passes nothing, and the feed then says nothing of it.
+ */
+export type FeedReadiness = Pick<Readiness, 'pieces'>;
+
+/** The read's pieces a run waits on that are missing: `missing`, of cost `run` (a piece that declares no cost is read as `run`). */
+const waitedOn = (read: FeedReadiness): Readiness['pieces'] =>
+  read.pieces.filter((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run');
+
+/**
+ * What a `not ready` line says of the missing pieces a run waits on: each by its name, where it is of a factory that factory and its
+ * workflow, and the command of its first fix, else its message where it offers none — `mise (nemia/quick): nemia doctor fix mise
+ * --factory nemia --workflow quick; …`. Pure.
+ */
+const missingNote = (missing: Readiness['pieces']): string =>
+  missing
+    .map((piece) => {
+      const where = piece.factory === undefined ? '' : ` (${[piece.factory, piece.workflow].filter((w) => w !== undefined).join('/')})`;
+      return `${piece.name}${where}: ${piece.fixes[0]?.command ?? piece.message}`;
+    })
+    .join('; ');
+
+/** The note of a `ready` line. */
+const READY_NOTE = 'every piece a run waits on is in place';
+
+/**
+ * The line the store's readiness owes the feed: `not ready`, its note each missing piece a run waits on and its fix (`missingNote`),
+ * where one is missing and the feed did not last say so in those words; `ready` where none is and the feed last said `not ready`; else
+ * none. A standing word, kept in the fold under a key of its own (`READINESS_KEY`), as a factory's level is: read off the feed's own
+ * lines, never remembered, so a restarted daemon, whose fold is the whole feed, says it again exactly where the read moved, and a store
+ * the feed never called not ready is never said ready. A second piece missing, or one of two put back, moves the note, and is said.
+ * The tick's judgement of the daemon's read. Pure.
+ */
+function readinessLines(fold: FeedFold, at: string, read: FeedReadiness): StoreLine[] {
+  const said = fold.said.get(READINESS_KEY);
+  const missing = waitedOn(read);
+  const due: FeedSaid | undefined =
+    missing.length > 0
+      ? said?.reason === 'NotReady' && said.note === missingNote(missing)
+        ? undefined
+        : { word: LINE_WORDS.NotReady, note: missingNote(missing), reason: 'NotReady' }
+      : said?.reason === 'NotReady'
+        ? { word: LINE_WORDS.Ready, note: READY_NOTE, reason: 'Ready' }
+        : undefined;
+  if (due === undefined) return [];
+  return [upgraded({ at, store: STORE, ...saidKeys(due), involved: STORE_INVOLVED, labels: {}, reason: due.reason }) as StoreLine];
+}
+
+/**
  * Each templated factory's `ConflictsPending` condition as a pass read it (`conflictsNow`): whether it is `True`, and its message. A
  * factory with no such condition is left out; a caller that did not read them passes nothing, and the feed says nothing of any factory.
  */
@@ -687,7 +742,8 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
  * for each run the feed still names that the store no longer has, the store's pause put or lifted (`storeLines`) where the pass read
  * it (`pause`; nothing of the store where it is not given), and each factory's level that changed (`levelLines`) where the pass read the
  * levels (`levels`; nothing of them where they are not given), and each factory's conflicts that turned (`conflictLines`) where it read
- * them (`conflicts`). Pure.
+ * them (`conflicts`), and the store's readiness where it moved (`readinessLines`) where it was handed the daemon's read (`readiness`).
+ * Pure.
  *
  * A run the pass found at rest (`FeedWords.atRest`) owes a line only where a word moved: a note that moved alone, as a new wording of
  * the listing moves every finished run's, is not news of the run, and the feed keeps the note it said last.
@@ -703,6 +759,7 @@ export function feedChanges(
   pause?: FeedPause,
   levels?: FeedLevels,
   conflicts?: FeedConflicts,
+  readiness?: FeedReadiness,
 ): Array<RunLine | StoreLine | FactoryLine> {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels): RunLine =>
     upgraded({
@@ -730,7 +787,12 @@ export function feedChanges(
     const id = key.startsWith('Run/') ? key.slice('Run/'.length) : undefined;
     if (id !== undefined && !now.has(id) && !unjudged.has(id)) out.push(line(id, undefined, { word: REMOVED }, { run: id }));
   }
-  return [...out, ...storeChanges(fold, at, pause, levels), ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts))];
+  return [
+    ...out,
+    ...storeChanges(fold, at, pause, levels),
+    ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
+    ...(readiness === undefined ? [] : readinessLines(fold, at, readiness)),
+  ];
 }
 
 /** The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them. Pure. */

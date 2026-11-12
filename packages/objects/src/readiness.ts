@@ -1,13 +1,22 @@
 /**
- * The readiness read (`GET /api/readiness`, `nemia readiness`): every piece a person's server needs before a factory's first run, each in
- * place or missing, with the fix that puts it there — a command to type, or a fix the server runs itself (`POST /api/readiness/fixes`),
- * its output followed as it runs (`GET /api/readiness/fixes/:id/output`). The group that serves them is `ReadinessGroup`.
+ * The readiness read (`GET /api/readiness`, `nemia readiness`): every piece a person's server needs to run its factories, each in
+ * place or missing and what it costs while missing (`cost`), with the fix that puts it there — a command to type, or a fix the server
+ * runs itself (`POST /api/readiness/fixes`), its output followed as it runs (`GET /api/readiness/fixes/:id/output`). The group that
+ * serves them is `ReadinessGroup`.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { NeedAsk } from './workflow.ts';
-import { ADDRESS_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, NEED_STATES, READINESS_AREAS } from './words.ts';
+import {
+  ADDRESS_KINDS,
+  FIX_PHASES,
+  FIX_STREAM_EVENTS,
+  NEED_STATES,
+  READINESS_AREAS,
+  READINESS_COSTS,
+  type ReadinessCost,
+} from './words.ts';
 
 /**
  * A way to put a piece in place: what it does in words and its command — typed by the person where `startable` is false (`nemia
@@ -26,7 +35,8 @@ export type ReadinessFix = typeof ReadinessFix.Type;
 
 /**
  * One piece of the read: its name (a need's name for a declared need), its area, its state, a sentence of what it is or why it is not in
- * place, its fixes, the factory and workflow of a workflow's need, and the kind of the bind's address for the `bind` piece.
+ * place, its fixes, the factory and workflow of a workflow's need, the kind of the bind's address for the `bind` piece, and what it
+ * costs while it is missing (`cost`, one of `READINESS_COSTS`; a server that declares none is read as `run`).
  */
 export const ReadinessPiece = Schema.Struct({
   name: Schema.String,
@@ -37,12 +47,66 @@ export const ReadinessPiece = Schema.Struct({
   factory: Schema.optionalKey(Schema.String),
   workflow: Schema.optionalKey(Schema.String),
   addressKind: Schema.optionalKey(Schema.Literals(ADDRESS_KINDS)),
+  cost: Schema.optionalKey(Schema.Literals(READINESS_COSTS)),
 });
 export type ReadinessPiece = typeof ReadinessPiece.Type;
 
-/** `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`), and the pieces, in the read's order. */
-export const Readiness = Schema.Struct({ ready: Schema.Boolean, pieces: Schema.Array(ReadinessPiece) });
+/**
+ * `GET /api/readiness`: whether every piece is in place (`ready`: none is `missing`), the pieces, in the read's order, and whether a run
+ * was ever started on this server (`ran`; not known where it is left out).
+ */
+export const Readiness = Schema.Struct({
+  ready: Schema.Boolean,
+  pieces: Schema.Array(ReadinessPiece),
+  ran: Schema.optionalKey(Schema.Boolean),
+});
 export type Readiness = typeof Readiness.Type;
+
+/** `n` pieces, as a sentence counts them. */
+const counted = (n: number): string => (n === 1 ? 'a piece' : `${n} pieces`);
+
+/** The read's missing pieces. */
+const missingOf = (read: Readiness): Readiness['pieces'] => read.pieces.filter((piece) => piece.state === 'missing');
+
+/** A piece's cost, a piece that declares none (an older server's) read as `run`. */
+const costOf = (piece: Readiness['pieces'][number]): ReadinessCost => piece.cost ?? 'run';
+
+/**
+ * Whether a run waits on the read: a missing piece costs `run`. Only then is the server not ready to run, and the board's banner
+ * raised; a missing piece of another cost is advised, listed on Setup and by `nemia readiness` with its fix.
+ */
+export const runsWait = (read: Readiness): boolean => missingOf(read).some((piece) => costOf(piece) === 'run');
+
+/** What `n` missing pieces of `cost` cost, as a phrase; `firstRun` where no run was ever started on the server. */
+const phraseOf = (cost: ReadinessCost, n: number, firstRun: boolean): string => {
+  if (cost === 'run') return firstRun ? `${counted(n)} the server needs before a factory's first run` : `${counted(n)} a run waits on`;
+  if (cost === 'server') return `${counted(n)} that ${n === 1 ? 'keeps' : 'keep'} the server up or open, which no run waits on`;
+  return `${counted(n)} of this client's own, which no run waits on`;
+};
+
+/**
+ * What the read's missing pieces cost, said after `missing:`, each cost of `READINESS_COSTS` a phrase of its own as its pieces declare
+ * it, "before a factory's first run" only where the read says no run was ever started (`ran: false`); none where no piece is missing.
+ */
+export function missingSaid(read: Readiness): string | undefined {
+  const missing = missingOf(read);
+  const phrases = READINESS_COSTS.flatMap((cost) => {
+    const n = missing.filter((piece) => costOf(piece) === cost).length;
+    return n === 0 ? [] : [phraseOf(cost, n, read.ran === false)];
+  });
+  return phrases.length === 0 ? undefined : phrases.join(', and ');
+}
+
+/**
+ * The read's last line, as `nemia readiness` says it: `not ready` while a run waits on a missing piece (`runsWait`), else `ready`,
+ * with the pieces advised counted; what the missing pieces cost after either (`missingSaid`).
+ */
+export function readinessSaid(read: Readiness): string {
+  const said = missingSaid(read);
+  if (said === undefined) return 'ready';
+  if (runsWait(read)) return `not ready: missing ${said}`;
+  return `ready, ${counted(missingOf(read).length)} advised: missing ${said}`;
+}
 
 /**
  * `POST /api/readiness/fixes`' body: the need whose fix to start, the factory and workflow of a workflow's need (none for a place's),

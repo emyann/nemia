@@ -9,7 +9,9 @@
  *
  * It scrolls on its own, its bar drawn by `markScrolls`, and follows the latest while the person is at its foot — by `drawnCount`,
  * which counts a turn by its lines, since a turn grows a line at a time and the items it is one of do not: read back, it stays
- * where they left it. It takes the room its panel gives it and no more — the panel is bounded by the window — so a long talk scrolls
+ * where they left it. A box resized under a person at its foot (a line the frame draws over the page once the page is drawn, a window
+ * made shorter) keeps them at the latest (`followingLatest`, by `useFrameSize`): a resize scrolls nothing, so only a scroll that leaves
+ * the foot lets it go. It takes the room its panel gives it and no more — the panel is bounded by the window — so a long talk scrolls
  * inside it rather than growing the panel past the screen, and on a page of its own it fills the frame down to the composer.
  *
  * `TalkEmpty` is the same scrolling shell for a conversation with nothing said yet, which its caller's own greeting stands in. Every
@@ -25,6 +27,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { drawnCount, mark, newWords, type ConversationItem } from '@/lib/conversation';
+import { useFrameSize } from '@/lib/useFrameSize';
 import { markScrolls } from '@/lib/useScrollMark';
 import { cn } from '@/lib/utils';
 import { Jump } from './Jump';
@@ -58,6 +61,9 @@ type Props<Own> = {
   writing?: string | null;
 };
 
+/** How near its foot, in pixels, a talk scrolled by the person still counts as at its foot: a fraction a zoomed page rounds to. */
+const FOOT_PX = 2;
+
 /** The talk: what `items` holds, with the new line, the jump pill, the read mark's sentinel, and the caller's own items drawn. */
 export function Talk<Own>({
   items,
@@ -75,6 +81,8 @@ export function Talk<Own>({
   const box = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
+  const followingLatest = useRef(true);
+  const height = useFrameSize(box, true).height;
 
   useEffect(() => (box.current ? markScrolls(box.current) : undefined), []);
 
@@ -84,7 +92,14 @@ export function Talk<Own>({
     if (!target || !root) return;
     const seen = new IntersectionObserver((entries) => setAtEnd(entries.some((entry) => entry.isIntersecting)), { root });
     seen.observe(target);
-    return () => seen.disconnect();
+    const scrolled = () => {
+      followingLatest.current = root.scrollHeight - root.scrollTop - root.clientHeight <= FOOT_PX;
+    };
+    root.addEventListener('scroll', scrolled, { passive: true });
+    return () => {
+      seen.disconnect();
+      root.removeEventListener('scroll', scrolled);
+    };
   }, []);
 
   useEffect(() => {
@@ -93,8 +108,8 @@ export function Talk<Own>({
 
   const drawn = drawnCount(items);
   useEffect(() => {
-    if (atEnd) end.current?.scrollIntoView({ block: 'end' });
-  }, [atEnd, drawn, writing]);
+    if (atEnd || followingLatest.current) end.current?.scrollIntoView({ block: 'end' });
+  }, [atEnd, drawn, writing, height]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">

@@ -14,7 +14,7 @@ import { renderAgent, type AgentDraft } from '../../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../../harness/harness.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { frontmatterOfValues, frontmatterValues } from '../../frontmatter/frontmatter.ts';
 import { AGENTS_FOLDER, CARRIED_FOLDER, FRONTMATTER, SKILLS_FOLDER, type RouteEval } from '../../step/step.ts';
 import { isMap, listItemsOf, withSharedLines, type ReadFolder } from '../../template/index.ts';
 import { renderStep } from '../../workflow/index.ts';
@@ -264,10 +264,10 @@ function readmeWithNeeds(folder: string, needs: readonly unknown[], read: Templa
           .replace(/^\uFEFF/, '')
           .replace(/\r\n/g, '\n');
   const block = FRONTMATTER.exec(text);
-  const kept: unknown = block?.[1] === undefined ? {} : parseYaml(block[1]);
+  const kept: unknown = block?.[1] === undefined ? {} : frontmatterValues(block[1]);
   const keys = isMap(kept) ? kept : {};
   const body = block ? text.slice(block[0].length) : text;
-  return `---\n${stringifyYaml({ ...keys, needs }, { lineWidth: 0 })}---\n${body}`;
+  return `---\n${frontmatterOfValues({ ...keys, needs })}---\n${body}`;
 }
 
 /** The agent `name` as its file, and its output schema beside it, into `out`. */

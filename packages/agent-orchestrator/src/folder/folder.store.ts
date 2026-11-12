@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
 import { Need } from 'objects';
 import { firstPiece } from '../piece/piece.ts';
 import {
@@ -312,7 +312,7 @@ export function workflowNeedsRead(dir: string): { readonly needs: readonly Need[
   const block = FRONTMATTER.exec(text.replace(/\r\n/g, '\n'))?.[1];
   if (block === undefined) return { needs: [] };
   try {
-    const declared = Schema.decodeUnknownSync(NeedsDeclared)(parseYaml(block) ?? {});
+    const declared = Schema.decodeUnknownSync(NeedsDeclared)(frontmatterValues(block) ?? {});
     return { needs: declared.needs ?? [] };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -330,7 +330,7 @@ export const workflowNeeds = (dir: string): readonly Need[] => workflowNeedsRead
 function frontmatterKeysBeside(block: string | undefined): Record<string, unknown> {
   let read: unknown;
   try {
-    read = block === undefined ? undefined : parseYaml(block);
+    read = block === undefined ? undefined : frontmatterValues(block);
   } catch {
     read = undefined;
   }
@@ -355,7 +355,7 @@ export function workflowReadmeWith(dir: string, body: string | undefined, needs:
   const instruction = given === undefined ? onDisk.slice(block?.[0].length ?? 0) : given.slice(own?.[0].length ?? 0);
   if (needs === undefined) return `${block?.[0] ?? ''}${instruction}`;
   const keys = { ...frontmatterKeysBeside(block?.[1]), ...(needs.length > 0 && { needs }) };
-  return Object.keys(keys).length === 0 ? instruction : `---\n${stringifyYaml(keys, { lineWidth: 0 })}---\n${instruction}`;
+  return Object.keys(keys).length === 0 ? instruction : `---\n${frontmatterOfValues(keys)}---\n${instruction}`;
 }
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;

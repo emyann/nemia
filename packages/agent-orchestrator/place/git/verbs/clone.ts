@@ -29,14 +29,14 @@ function hostOf(url: string): string | undefined {
   }
 }
 
-/** What to set up on this machine so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything else. */
+/** What to set up on the machine Nemia's daemon runs on so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything else. */
 export function setupFor(url: string): string {
   const host = hostOf(url) ?? 'its host';
   if (/^ssh:\/\//i.test(url) || /^[^/:@\s]+@[^/:\s]+:/.test(url))
-    return `give this machine an SSH key that ${host} accepts, and add ${host}'s host key to ~/.ssh/known_hosts (ssh -T <user>@${host} once checks both), then ask again`;
+    return `give the machine Nemia's daemon runs on an SSH key that ${host} accepts, and add ${host}'s host key to ~/.ssh/known_hosts (ssh -T <user>@${host} once checks both), then ask again`;
   if (/^https?:\/\//i.test(url))
-    return `set up a git credential helper for ${host} (git config --global credential.helper <helper>) that holds a credential it accepts, then ask again`;
-  return `check that ${withoutPassword(url)} names a repository this machine can read, then ask again`;
+    return `set up a git credential helper for ${host} on the machine Nemia's daemon runs on (git config --global credential.helper <helper>) that holds a credential it accepts, then ask again`;
+  return `check that ${withoutPassword(url)} names a repository the machine Nemia's daemon runs on can read, then ask again`;
 }
 
 /** Whether `dir` is the top of a repository of its own, and not a folder inside another one. */

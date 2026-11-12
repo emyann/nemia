@@ -170,7 +170,8 @@ factory: line or --factory. The default factory holds the history of runs and ca
 agent's try; no start names it.
 
 Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
-with a --repo that is not a directory, an add of a name already filed, an rm, trust, attach, detach, hire or fire of a
+with a --repo that is neither a directory nor a git URL Nemia clones, an add of a name already filed, an rm, trust,
+attach, detach, hire or fire of a
 name with no factory, rules or an instruction of the default factory, rules that are blank or open with a
 frontmatter block, two of --path, --store and --clear, a --path
 that is empty, absolute or climbs out of the folder, an instruct of an instruction kept in a folder or of blank
@@ -191,7 +192,7 @@ refused, naming the attach.`;
 /** Why the command line takes a filing by its arguments: the api serves it as the Factory's `create`, calling its handler. */
 const WRITTEN_HERE = {
   side: 'cli',
-  why: "the api serves it as the Factory's `create` of `objects`' Api, calling this handler: its places are directories of the machine the store runs on, which it names and checks",
+  why: "the api serves it as the Factory's `create` of `objects`' Api, calling this handler: its places are directories of the machine the store runs on, which it names and checks, or git URLs that machine clones",
 } as const;
 
 /** The text under `key`: what the spec read there. */

@@ -5,13 +5,15 @@
  * over (`nemia factory diff`, `adopt`), a templated one previewed and upgraded by the plan's digest (`nemia factory diff`, `upgrade`), and
  * a conflict's choice sent as its text (`nemia factory resolve`). Each is a story in the harness's store whose answer is read back from
  * disk, then its refusals by status, each leaving the factory's file as it was; an archive sent is kept under the store where a factory
- * is made from it, and gone after a preview or a refusal. Over the stand-ins (`appOver`), a scratch builtin folder given to the app.
+ * is made from it, and gone after a preview or a refusal. A factory filed or applied on a repository's git URL is cloned by the place
+ * under the store, and refused with nothing filed where it cannot be. Over the stand-ins (`appOver`), a scratch builtin folder given to the app.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { addFactory, BuiltinTemplates, testPlace } from 'agent-orchestrator/testing';
@@ -146,6 +148,57 @@ test('a person files a factory over the api, then mounts a volume and takes it o
       404,
     );
   });
+});
+
+/** A repository of this test's place at a folder of its own, one commit on it, its `file://` URL and where the store keeps its clone. */
+function origin(): { url: string; head: string; into: string } {
+  const dir = path.join(scratch('nemia-api-templated-origin-'), 'o', 'r');
+  fs.mkdirSync(dir, { recursive: true });
+  stand().world.repository(dir, { 'a.txt': 'one\n' });
+  const into = path.join(root, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
+  return { url: pathToFileURL(dir).href, head: stand().world.head(dir), into };
+}
+
+test('a person on another machine files a factory by its git URL over the api; the api clones it, and refuses with nothing filed what it cannot clone', async (t) => {
+  const s = story(t);
+  const { url, head, into } = origin();
+
+  await s.test('a POST naming the repository by its URL clones it under the store and files the factory with its origin', async () => {
+    const body = await answered<FactoryCreated>(send('POST', '/api/factories', { name: 'quarry', repos: [url], noTrust: true }));
+    assert.deepEqual(body.repos, [into]);
+    const file = JSON.parse(fileOf('quarry') ?? '{}');
+    assert.deepEqual([file.repos, file.origins], [[into], { [into]: url }]);
+    assert.equal(stand().world.head(into), head);
+  });
+
+  await s.test('an apply naming the repository by its URL files the factory on the same clone, with its origin', async () => {
+    const body = await answered<FactoryApplied>(
+      send('POST', '/api/factories/kiln/apply', { template: { name: 'mill' }, repos: [url], noTrust: true }),
+    );
+    assert.deepEqual(body.repos, [into]);
+    const file = JSON.parse(fileOf('kiln') ?? '{}');
+    assert.deepEqual([file.repos, file.origins], [[into], { [into]: url }]);
+  });
+
+  await s.test(
+    'REFUSED: a URL with a password, one naming no repository, and a relative path are 422s, nothing filed or cloned',
+    async () => {
+      await refused(
+        'secret',
+        () => send('POST', '/api/factories', { name: 'secret', repos: ['https://u:p@host/o/r'], noTrust: true }),
+        422,
+      );
+      const none = path.join(scratch('nemia-api-templated-none-'), 'none');
+      await refused('none', () => send('POST', '/api/factories', { name: 'none', repos: [pathToFileURL(none).href], noTrust: true }), 422);
+      assert.equal(fs.existsSync(path.join(root, 'clones', 'localhost', ...none.split(path.sep).filter(Boolean))), false);
+      await refused('relative', () => send('POST', '/api/factories', { name: 'relative', repos: ['repo'], noTrust: true }), 422);
+      await refused(
+        'relative',
+        () => send('POST', '/api/factories/relative/apply', { template: { name: 'mill' }, repos: ['repo'], noTrust: true }),
+        422,
+      );
+    },
+  );
 });
 
 test('a person applies a template sent packed, and a builtin by its name; the archive is kept where the factory names it', async (t) => {

@@ -201,7 +201,7 @@ export function checkoutPromiseLine(release: LeaseRelease | Running): string | n
 export type Latest = { readonly version: string; readonly newer: boolean };
 
 /**
- * What `nemia version` says: the package's version, this `nemia`'s release, the store's pointer, the release the daemon runs — and, where
+ * What `nemia version` says: the release's version, this `nemia`'s release, the store's pointer, the release the daemon runs — and, where
  * that is a checkout, that it makes no promise to keep a session on its files (`checkoutPromiseLine`) — the sessions at work, by
  * release and harness version (`sessions`, as `sessionCounts` counts them), and the newer release where the check read one (`latest`).
  */

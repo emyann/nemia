@@ -300,7 +300,7 @@ const withVersion = (obj: Record<string, unknown>, version: string): Record<stri
 const writeJson = (file: string, value: unknown): void => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
 
 /** Writes `version` into the root `package.json` and the lockfile's root, in the working tree at `root`. */
-const writeVersion = (root: string, version: string): void => {
+export const writeVersion = (root: string, version: string): void => {
   const pkg = path.join(root, 'package.json');
   writeJson(pkg, withVersion(JSON.parse(fs.readFileSync(pkg, 'utf8')) as Record<string, unknown>, version));
   const lock = path.join(root, 'package-lock.json');

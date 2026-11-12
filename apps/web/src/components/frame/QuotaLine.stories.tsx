@@ -51,7 +51,7 @@ const NONE_YET: Quota = {
   subscription: null,
   windows: [],
   heard: null,
-  said: "No plan limits to show yet: the Claude Code the sessions run is signed in by a long-lived token (CLAUDE_CODE_OAUTH_TOKEN), which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. For the quota on demand, run claude, then /login, under the api's CLAUDE_CONFIG_DIR, take the token away (nemia claude-token rm) and restart the api. Asked again in 8 min.",
+  said: "No plan limits to show yet: the sessions are signed in by a long-lived token, which can make model requests but not read the plan's usage, and no session has reported the plan's utilization with a turn yet. It shows once one has. Asked again in 8 min.",
 };
 
 export const Asked: StoryObj = {

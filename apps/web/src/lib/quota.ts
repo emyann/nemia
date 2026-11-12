@@ -66,7 +66,7 @@ export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
       ? `asked again at ${clockWord(new Date(q.againAt), now, timeZone)} at the soonest, and less often each time the usage service gives nothing`
       : every;
   const from = q.heard
-    ? `Claude Code here is signed in by a token, whose get_usage gives no plan limits: these are the newest the sessions' own turns were told (rate_limit_event), at ${clockWord(new Date(q.heard.at), now, timeZone)}; ${how}.`
+    ? `This machine is signed in by a token, whose get_usage gives no plan limits: these are the newest the sessions' own turns were told (rate_limit_event), at ${clockWord(new Date(q.heard.at), now, timeZone)}; ${how}.`
     : q.state === 'fresh' && q.askedAt
       ? `Asked of Claude Code (get_usage${q.subscription ? `, ${q.subscription} plan` : ''}) at ${clockWord(new Date(q.askedAt), now, timeZone)}; ${how}.`
       : `Asked of Claude Code (get_usage); ${how}.`;

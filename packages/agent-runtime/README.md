@@ -1689,7 +1689,9 @@ engine's `claudeExecutable` where it names one, else the `AE_CLAUDE_EXECUTABLE` 
 else the SDK's own bundled CLI, as a job runs it (`quotaExecutable`), never a `claude` on PATH — with no prompt (`claudeQuota`,
 `harness/claude/quota.ts`), so no model is called and no token spent. On a machine with only a release, that is the Claude Code the
 release carries. A Claude Code signed in by `CLAUDE_CODE_OAUTH_TOKEN` alone, a token of `claude setup-token`, answers no plan limits
-without asking the usage service, and the quota reads it as `token`, not `no-plan` (`docs/harness.md`, *The quota of a token*). Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
+without asking the usage service, and the quota reads it as `token`, not `no-plan` (`docs/harness.md`, *The quota of a token*), carrying
+as `heard` the newest `rate_limit_event` the store's sessions received with a model turn, which does say the plan's windows
+(`harness/claude/heard.ts`; *The plan's utilization a session hears*), or null while none has. Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
 before it returns, whatever ended it — an answer, the timeout, an interruption — and no `claude` is left behind by the time it does
 (`test/quota.boundary.test.ts`). Through the engine the ask runs behind the A2A seam, which an interruption does not cross: a caller
 that interrupts `quota()` gets control back at once, and the ask it left ends at its own timeout at the latest (`QUOTA_TIMEOUT_MS`,
@@ -2154,6 +2156,7 @@ of pure code sits beside it.
 | `src/harness/claude/session-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
 | `src/harness/claude/sign-in.ts` | whether this machine's Claude Code is signed in, asked before a job's spawn: `claude auth status` run bounded by `CLAUDE_SIGN_IN_MS` (`claudeSignedOutRefusal`), its answer judged by `claudeSignInOf` |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the Claude Code the sessions run (`quotaExecutable`) with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
+| `src/harness/claude/heard.ts` | the plan's utilization as the sessions heard it: the newest `rate_limit_event` any session of the store received, decoded (`heardOf`), kept in one file of the store (`claudeHeardFile`, `keepHeard`) by a job's process and a held session, and read (`readHeard`) onto a token's quota |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/stream.ts` | the lines of a Claude Code job's stream the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |

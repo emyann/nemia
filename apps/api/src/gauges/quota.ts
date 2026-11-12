@@ -74,7 +74,7 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
  *   failed     Claude Code ended before it answered, or the engine would not ask it (`rejected`), each said in its own words
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
  *
- * Where Claude Code is signed in by a long-lived token, whose `get_usage` has no limits, the plan's windows are those the newest
+ * Where the sessions' harness is signed in by a long-lived token, whose `get_usage` has no limits, the plan's windows are those the newest
  * `rate_limit_event` of the engine's sessions said (`HarnessQuota`'s `heard`): `fresh`, with `heard` saying when a session's turn
  * received them and how long ago (`at`, `ageMs`); `no-plan` with `heard` null while no session has reported one yet. `heard` is left out
  * wherever the windows are `get_usage`'s own, as on a `/login` sign-in, and for every other answer.

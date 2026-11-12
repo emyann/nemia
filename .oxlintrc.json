@@ -534,7 +534,7 @@
     {
       "files": ["apps/web/src/components/run/StartRun.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 95, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -635,12 +635,6 @@
         "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 38 }],
         "sonarjs/cognitive-complexity": ["error", 50]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/inbox/inbox.store.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

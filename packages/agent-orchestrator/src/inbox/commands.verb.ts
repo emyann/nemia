@@ -23,7 +23,7 @@ import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
 
 export const INBOX_HELP = `nemia inbox [--all]
 nemia inbox -l <selector>... [--all] [--show-labels] [-L <key>]...
-nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
+nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
 nemia inbox queue <name> [--workflow <w>] [--off]
 nemia inbox from <name> <run>... | --off
 nemia inbox rm <name>
@@ -33,8 +33,7 @@ runs/. A card is a plan's card with two differences — its keys optional, and n
 is said at start:
 
     ---
-    workflow: dev              # what runs it, chosen at start when the card does not say
-    repo: /home/me/code/app    # the repository it is about, as an absolute path
+    workflow: dev              # what runs it, by name, chosen at start when the card does not say
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: nemia inbox queue writes it
     gate: review               # the step whose closeout waits for nemia approve in the run it starts
     factory: acme              # the factory it is started in (nemia factory --help); required to start
@@ -43,35 +42,39 @@ is said at start:
     ---
     Cache the engine's views between passes.
 
-  nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow and repo when
-                 set, and started as <runId>, <phase> for a card a run's record says it was started as, the phase
+A card names its factory and its workflow, never a repository: its run works on the repository the factory's
+wiring names for the workflow, else on its only one (nemia factory attach <factory> <workflow> --repo <name>).
+An old card's repo: is retired: it still reads and lists, and no start reads it.
+
+  nemia inbox       lists the cards still in play: its name, the first line of its body, its workflow when set,
+                 and started as <runId>, <phase> for a card a run's record says it was started as, the phase
                  its run is in now (waiting on you where it waits on a person): a started card stays in the inbox,
                  and is not started again. A card whose run ended (succeeded, failed, stopped, cancelled) is listed
                  with --all. An entry that does not read as a card is listed with why. -l keeps the cards a selector takes
                  (key=v, key!=v, "key in (a,b)", "key notin (a,b)", key), over its labels, workflow and factory,
                  given again for another; --show-labels adds its labels to its line, -L <key> that key's value.
   nemia inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
-                 all; --workflow, --repo and --factory write the keys, over a file's own; --label key=value (or
+                 all; --workflow and --factory write the keys, over a file's own; --label key=value (or
                  key-) edits its labels:, over a file's own and what the runs of its from: agree on.
   nemia inbox queue marks a card to start on its own: each pass, once every run has been advanced and a run slot is
                  free (WF_MAX_RUNS; always, with no cap), the tick starts the oldest queued card, one per pass, on its
-                 workflow:, in its factory:, on its repo:, else its factory's one repository, else the directory nemia up
-                 runs in. --workflow writes the key too; --off, or nemia inbox rm, takes the card back. nemia inbox says
-                 queued and its place; a start the package refused is said there and on nemia up's line, and the card is
-                 not tried again until it is edited or queued again (or, with no repository named by the card or its
-                 factory, nemia up runs in another repository); a start that failed otherwise is said once, and tried
-                 again on the next pass.
+                 workflow:, in its factory:, on the repository its wiring names for the workflow (a card of no factory
+                 on the directory nemia up runs in). --workflow writes the key too; --off, or nemia inbox rm, takes the
+                 card back. nemia inbox says queued and its place; a start the package refused is said there and on nemia
+                 up's line, and the card is not tried again until it is edited or queued again, or its factory's wiring
+                 names it another repository; a start that failed otherwise is said once, and tried again on the next
+                 pass.
   nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, landed or still in
                  flight: what each concluded is read when the run's steps are filed, and none is waited on.
                  --off takes the key off.
   nemia inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
-Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
-directory, a queued: that is not a time or is on a card with no workflow:, a gate: naming more than one step or
-saying true, a factory: that is not a factory's name — and, at start, a gate: naming no step of the workflow, a
-card that names no factory and is started with no --factory, never one taken from its folder or its repo:, a
-factory: the store does not have, default, or one that does not offer the workflow — an add with no idea, and a name that would
-leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
+Refused by name: a key a card does not have, a key set to nothing, a queued: that is not a time or is on a card
+with no workflow:, a gate: naming more than one step or saying true, a factory: that is not a factory's name — and,
+at start, a gate: naming no step of the workflow, a card that names no factory and is started with no --factory,
+never one taken from its folder, a factory: the store does not have, default, one that does not offer the workflow
+or names it no repository — an add with no idea, with --repo or a repo: line, with a workflow that is a path or one
+its factory does not attach, and a name that would leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
 already queued, of one a run was started from, and of one that names no factory, or default; a from: naming a run the store does not have, or one twice.`;
 
 /** The text under `key`, or undefined where none was given. */
@@ -108,7 +111,7 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStart
   name: 'inbox',
   usage: '',
   help: [
-    'the cards still in play: name, first line, workflow and repo when set,',
+    'the cards still in play: name, first line, workflow when set,',
     'and started as <runId>, <phase> (nemia inbox --help); --all: those whose',
     'run ended too; -l: the cards a selector takes; --show-labels, -L <key>:',
     'their labels on each line',
@@ -156,7 +159,7 @@ export const INBOX: Command<{ cards: InboxListing[]; ended: number; defaultStart
             showLabels: args.showLabels === true,
             columns: listOf(args, 'labelColumns'),
           }),
-          `\nstart one: nemia start <name> [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
+          `\nstart one: nemia start <name> [--workflows <w>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
         ]
       : ended
         ? [`no card in play${inboxSelected(args)}, and ${ended} whose run ended — list them with nemia inbox --all`]
@@ -170,7 +173,7 @@ const inboxSelected = (args: Args): string =>
   listOf(args, 'selector').length ? ` matches -l ${listOf(args, 'selector').join(' -l ')}` : '';
 
 /** What one of `nemia inbox add`'s flags names, once per card. */
-const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--repo': 'repository', '--factory': 'factory' };
+const ADD_NAMES: Readonly<Record<string, string>> = { '--workflow': 'workflow', '--factory': 'factory' };
 
 /** One of `nemia inbox add`'s value flags, keyed by its name, taking what `takes` says, once. */
 const addFlag = (flag: string, takes: string): Flag => ({
@@ -181,12 +184,17 @@ const addFlag = (flag: string, takes: string): Flag => ({
   twice: `nemia inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag]}.`,
 });
 
-/** `nemia inbox add`'s spec: the idea, then `--workflow`, `--repo` and `--factory`, once each. */
+/**
+ * Why `nemia inbox add` takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run.
+ */
+const ADD_REPO_REFUSAL =
+  'nemia inbox add does not take --repo: a card names its factory and its workflow, never a repository, and its run works on the repository the factory names for the workflow. File the idea with --factory <factory> --workflow <workflow>, and name the repository on the factory: nemia factory attach <factory> <workflow> --repo <name>. Nothing was filed.';
+
+/** `nemia inbox add`'s spec: the idea, then `--workflow` and `--factory`, once each; `--repo` refused (`ADD_REPO_REFUSAL`). */
 const ADD_SPEC: Spec = {
   positionals: [{ key: 'idea', takes: 'required', kind: 'text' }],
   flags: [
-    addFlag('--workflow', 'the workflow to start the card on, by name or as a path: nemia inbox add "<idea>" --workflow <name>'),
-    addFlag('--repo', 'the repository the idea is about: nemia inbox add "<idea>" --repo <path>'),
+    addFlag('--workflow', 'the workflow to start the card on, by its name: nemia inbox add "<idea>" --workflow <name>'),
     addFlag('--factory', 'the factory that processes the card: nemia inbox add "<idea>" --factory <name>'),
     {
       flag: '--label',
@@ -198,22 +206,23 @@ const ADD_SPEC: Spec = {
     },
   ],
   unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --repo <path>, --factory <name> and --label <key=value> once per label.`
-      : `nemia inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — nemia inbox add "<idea>" — or give it as a file: nemia inbox add ./idea.md.`,
+    arg === '--repo' || arg.startsWith('--repo=')
+      ? ADD_REPO_REFUSAL
+      : arg.startsWith('-')
+        ? `nemia inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --factory <name> and --label <key=value> once per label.`
+        : `nemia inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — nemia inbox add "<idea>" — or give it as a file: nemia inbox add ./idea.md.`,
   apart: (_value, flag) => ADD_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
   missing:
-    'nemia inbox add takes the idea, first: nemia inbox add "<idea>" [--workflow <name>] [--repo <path>] [--factory <name>], or a file: nemia inbox add ./idea.md. Nothing was filed.',
+    'nemia inbox add takes the idea, first: nemia inbox add "<idea>" [--workflow <name>] [--factory <name>], or a file: nemia inbox add ./idea.md. Nothing was filed.',
 };
 
 /**
- * What `nemia inbox add`'s handler takes: the idea's text, the file it was read from and that file's folder (`from`, `dir`), and the keys
- * the card writes. Its own, not `objects`' `CardFile`: a body's `from` is where a workflow is read from, and the api finds the folder.
+ * What `nemia inbox add`'s handler takes: the idea's text, the file it was read from (`from`, what a refusal calls it), and the keys the
+ * card writes; `repo`, retired, refused whenever given (`addToInbox`). Its own, not `objects`' `CardFile`.
  */
 export const InboxAddInput = Schema.Struct({
   idea: Schema.String,
   from: Schema.optionalKey(Schema.String),
-  dir: Schema.optionalKey(Schema.String),
   workflow: Schema.optionalKey(Schema.String),
   repo: Schema.optionalKey(Schema.String),
   factory: Schema.optionalKey(Schema.String),
@@ -253,13 +262,12 @@ const filedThere = (answer: unknown): { card: InboxCard; file: string } => {
 
 /**
  * `nemia inbox add`: an idea filed as a card. Its handler is handed the idea's text under `idea`, and, for an idea read from a file, the
- * file under `from` and its folder under `dir`, the folder a workflow's path is read from: the CLI's runner reads the file, and the api's
- * route finds the workflow among the folders a start finds one in, so neither a path nor a file reaches the handler from a body.
+ * file under `from`: the CLI's runner reads the file, so no file reaches the handler from a body.
  */
 export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] }, InboxAddInput> = {
   name: 'inbox add',
-  served: [{ endpoint: 'cards.create', request: renamed({ idea: 'body' }, ['dir', 'from']), answer: filedThere }],
-  usage: '"<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...',
+  served: [{ endpoint: 'cards.create', request: renamed({ idea: 'body' }, ['from']), answer: filedThere }],
+  usage: '"<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...',
   help: ['park an idea as a card in the inbox, named from its first line'],
   spec: ADD_SPEC,
   check: (args) => leftOut(ADD_SPEC, args),
@@ -272,15 +280,14 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string; labelsLeftOut?:
   input: InboxAddInput,
   handler: ({ idea, label, ...keys }) => Effect.suspend(() => addToInbox({ text: idea, ...keys, labels: [...(label ?? [])] })),
   print: ({ card, file, labelsLeftOut }) => [
-    `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}${card.labels ? `  labels: ${labelsText(card.labels)}` : ''}`,
+    `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}${card.labels ? `  labels: ${labelsText(card.labels)}` : ''}`,
     ...leftOutLines(card.name, labelsLeftOut ?? []),
     `filed: ${file} — start it with nemia start ${card.name}${card.workflow ? '' : ' --workflows <w>'}`,
   ],
 };
 
 /** What `--workflow` of `nemia inbox queue` takes, said where it is missing and where it stands apart from its value. */
-const QUEUE_WORKFLOW_TAKES =
-  '--workflow takes the workflow the card starts on, by name or as a path: nemia inbox queue <name> --workflow <w>';
+const QUEUE_WORKFLOW_TAKES = '--workflow takes the workflow the card starts on, by its name: nemia inbox queue <name> --workflow <w>';
 
 /** `--workflow <w>`, which `nemia inbox queue` writes on the card with the mark. */
 const QUEUE_WORKFLOW: Flag = {
@@ -307,6 +314,17 @@ const QUEUE_SPEC: Spec = {
   missing:
     'nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> [--workflow <w>] [--off].',
 };
+
+/**
+ * Where `nemia inbox queue` says a queued card starts: on the repository its factory names for its workflow (`factoryRepo`), on the
+ * daemon's for a card of no factory, and nothing where its factory names none, or another machine's api did not say.
+ */
+const queuedOn = (card: Pick<InboxCard, 'factory'>, factoryRepo: string | null): string =>
+  factoryRepo !== null
+    ? `, on ${factoryRepo}, its factory's repository for its workflow`
+    : card.factory === undefined
+      ? ', on the repository nemia up runs in'
+      : '';
 
 /** What `nemia inbox queue` did, as the api answers it, and the card as it now reads. */
 type Queued = {
@@ -396,8 +414,8 @@ export const INBOX_QUEUE: Command<Queued, InboxQueueInput> = {
     if (was === 'not queued') return [`${name}  not queued — nothing to take back`];
     if (was === 'taken back') return [`${name}  taken back: it no longer starts on its own — start it with nemia start ${name}`];
     return [
-      `${name}  queued at ${card.queued}, ${of === null ? `${place} in the queue` : `${place} of ${of}`}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
-      `the tick starts it on its own once its turn comes and a run slot is free${card.repo ? '' : factoryRepo ? `, on ${factoryRepo}, its factory's one repository` : ', on the repository nemia up runs in'} — take it back with nemia inbox queue ${name} --off`,
+      `${name}  queued at ${card.queued}, ${of === null ? `${place} in the queue` : `${place} of ${of}`}  workflow: ${card.workflow}${card.repo ? `  repo: ${card.repo} (retired)` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
+      `the tick starts it on its own once its turn comes and a run slot is free${queuedOn(card, factoryRepo)} — take it back with nemia inbox queue ${name} --off`,
     ];
   },
 };

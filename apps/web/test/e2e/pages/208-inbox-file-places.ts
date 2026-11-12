@@ -7,10 +7,10 @@ import { FACTORIES, hiringStarts, noFactories, onSeveralRepos, WORKFLOWS } from 
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
-/** The idea filed in a factory on several repositories with none picked. */
-const NOWHERE = 'File an idea in a factory on two repositories\n\nIts repository is chosen at start.';
-/** The idea filed there with a repository and its workflow picked. */
-const SOMEWHERE = 'File an idea on one of its repositories\n\nPicked from the list, with a workflow read there.';
+/** The idea filed in a factory on several repositories with no workflow picked. */
+const NOWHERE = 'File an idea in a factory on two repositories\n\nIts workflow, and so its repository, is chosen at start.';
+/** The idea filed there with its workflow picked, which the factory wires to one of them. */
+const SOMEWHERE = 'File an idea on a workflow its factory wires\n\nThe factory says where it runs; the card names no repository.';
 
 /** Open `route` of the board `page` shows, and wait for its reads. */
 async function open(page: Page, route: string): Promise<void> {
@@ -50,33 +50,31 @@ function expectFiled(filed: { sent: unknown; file: string }, expected: Record<st
 }
 
 /**
- * The box under a factory on several repositories: a Repository list with none chosen, no workflow to pick until one is, and a filing
- * that sends no repository; then, a repository picked, its workflows read there, and a filing that sends it. Both cards are taken back.
+ * The box under a factory on several repositories: no Repository list, ever; its workflows offered by name with none picked, and the
+ * repository said as the workflow's to decide; a filing that sends the factory alone. Then its workflow picked while the factory wires it
+ * to none: the box says it is not wired, naming the attach; wired to the checkout's folder, the box says the checkout as text, and a filing
+ * sends the factory and the workflow, never a repository nor an origin. Both cards and the factory's file are taken back.
  */
 async function severalRepos(page: Page, theme: string): Promise<void> {
   const factory = FACTORIES.hiring.name;
   const checkout = path.join(store!, 'checkout');
   const unhire = hiringStarts(store!);
-  const { second, back } = onSeveralRepos(store!);
+  const { back } = onSeveralRepos(store!);
+  const file = path.join(store!, 'factories', `${factory}.json`);
   const written: string[] = [];
   try {
     await open(page, `/inbox?factory=${factory}`);
     const box = page.locator('form[aria-label="File a card"]');
-    const repos = box.getByRole('combobox', { name: 'Repository' });
     const workflows = box.getByRole('combobox', { name: 'Workflow' });
+    await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, `${factory}, on two repositories, offers no list of them`);
     await expectTexts(
-      repos.locator('option'),
-      ['None: chosen at start', checkout, second],
-      `${factory}, on two repositories, offers them in a list, none first`,
+      workflows.locator('option'),
+      ['None: chosen at start', WORKFLOWS.good.name],
+      `and its workflows by name, none picked, with no repository to pick first`,
     );
-    if ((await repos.inputValue()) !== '')
-      throw new Refused(`no repository is chosen until a person picks — it held ${await repos.inputValue()}`);
-    await expectCount(box.locator('[data-factory-repo]'), 0, 'and says none as text');
-    await expectVisible(
-      box.locator('[data-needs-repo]', { hasText: `Pick a repository to choose among the workflows ${factory} offers on it.` }),
-      'the box says a repository comes before a workflow',
-    );
-    if (await workflows.isEnabled()) throw new Refused('the Workflow list waits for a repository — it was enabled with none picked');
+    if (!(await workflows.isEnabled())) throw new Refused('the Workflow list waits for nothing — it was disabled');
+    await expectCount(box.locator('[data-needs-repo]'), 0, 'and never asks for a repository');
+    await expectCount(box.locator('[data-factory-repo]'), 1, "the repository is said as text, the workflow's to decide");
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-none-${theme}.png`));
     const nowhere = await fileFrom(page, NOWHERE);
@@ -85,17 +83,24 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
       nowhere,
       { body: NOWHERE, factory },
       `---\nfactory: ${factory}\n---\n${NOWHERE}\n`,
-      'with no repository picked the box sends the factory alone, and the card names no repo:',
+      'with no workflow picked the box sends the factory alone, and the card names no repo:',
     );
 
-    await repos.selectOption(checkout);
-    await expectCount(box.locator('[data-needs-repo]'), 0, 'a repository picked, the line asking for one goes');
-    await expectTexts(
-      workflows.locator('option'),
-      ['None: chosen at start', WORKFLOWS.good.name],
-      `and the workflows ${factory} offers on it are read`,
-    );
     await workflows.selectOption({ label: WORKFLOWS.good.name });
+    const unwired = box.locator('[data-unwired="unwired"]');
+    await expectVisible(unwired, `${WORKFLOWS.good.name} picked, wired to neither, the box says it is not wired`);
+    const said = ((await unwired.textContent()) ?? '').trim();
+    if (!said.includes(`${factory} ${WORKFLOWS.good.name} --repo`))
+      throw new Refused(`naming the attach that wires it — it said ${JSON.stringify(said)}`);
+    await settled(page);
+    await photograph(box, path.join(OUT, `inbox-file-places-unwired-${theme}.png`));
+
+    const found = JSON.parse(fs.readFileSync(file, 'utf8')) as object;
+    fs.writeFileSync(file, JSON.stringify({ ...found, workflowRepos: { [WORKFLOWS.good.name]: 'checkout' } }, null, 2));
+    await open(page, `/inbox?factory=${factory}`);
+    await workflows.selectOption({ label: WORKFLOWS.good.name });
+    await expectTexts(box.locator('[data-factory-repo]'), [checkout], `wired to checkout, the box says ${checkout} as text`);
+    await expectCount(box.getByRole('combobox', { name: 'Repository' }), 0, 'never a list of the two');
     await box.getByRole('textbox', { name: 'An idea' }).fill(SOMEWHERE);
     await settled(page);
     await photograph(box, path.join(OUT, `inbox-file-places-picked-${theme}.png`));
@@ -103,12 +108,12 @@ async function severalRepos(page: Page, theme: string): Promise<void> {
     written.push(somewhere.file);
     expectFiled(
       somewhere,
-      { body: SOMEWHERE, factory, workflow: WORKFLOWS.good.name, from: 'repo', repo: checkout },
-      `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${checkout}\nfactory: ${factory}\n---\n${SOMEWHERE}\n`,
-      'with a repository picked the box sends it, and the card names it',
+      { body: SOMEWHERE, factory, workflow: WORKFLOWS.good.name },
+      `---\nworkflow: ${WORKFLOWS.good.name}\nfactory: ${factory}\n---\n${SOMEWHERE}\n`,
+      'a workflow picked, the box sends it by its name, never a repository nor an origin, and the card names no repo:',
     );
   } finally {
-    for (const file of written) fs.rmSync(file, { force: true });
+    for (const card of written) fs.rmSync(card, { force: true });
     back();
     unhire();
   }

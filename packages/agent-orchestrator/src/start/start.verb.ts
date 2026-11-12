@@ -55,6 +55,7 @@ import {
   writableMountRefusal,
   writableRefusal,
   factoryRepo,
+  wiredRepo,
   outsideRefusal,
   unattachedRefusal,
   unfilledRefusal,
@@ -629,12 +630,26 @@ const factoryNamed = (home: string, name: string | undefined): Factory | undefin
   name === undefined ? undefined : filedAtOnce(home, name);
 
 /**
- * The repository a run started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository, else
- * `fallback`. What `nemia start` resolves its workflow folder against, before `start` judges it. Refused as `start` refuses the factory:
- * none by that name, or one whose file does not read (`readFactory`).
+ * The repository a run of a schedule started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository,
+ * else `fallback`. Kept for schedules alone: a card and a brief are placed by the factory's wiring (`wiredRepoFor`). Refused as `start`
+ * refuses the factory: none by that name, or one whose file does not read (`readFactory`).
  */
 export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string): string =>
   factoryRepo(factoryNamed(home, name), named, fallback);
+
+/**
+ * The repository a run of the workflow named `workflow` works on in the factory `name` (`wiredRepo`): the one its wiring names by folder
+ * name, else its only one; none for the default factory, which is no file and has no wiring. Refused, `Invalid`, in
+ * `workflowRepoRefusal`'s words naming `nemia factory attach <factory> <workflow> --repo <name>`: a
+ * factory of several repositories that names none for it, or a name none or two of them have; and as `start` refuses the factory.
+ */
+export const wiredRepoFor = (home: string, name: string, workflow: string): string | undefined => {
+  const factory = filedAtOnce(home, name);
+  if (factory === undefined) return undefined;
+  const of = wiredRepo(factory, workflow);
+  if ('repo' in of) return of.repo;
+  throw new Invalid({ message: of.message });
+};
 
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.

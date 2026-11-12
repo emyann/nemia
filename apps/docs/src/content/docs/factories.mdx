@@ -113,6 +113,16 @@ A factory offers only the workflows attached to it, and none until one is. Attac
 factory's file (`"workflows"`); detaching takes it back. Starting a workflow a factory has not attached is refused, naming the attach that
 would add it (`unattachedRefusal`).
 
+Each workflow it attaches works on one of its repositories, named by the repository's folder name: `nemia factory attach pipao build
+--repo pipao`. A factory of one repository needs no name: its workflows work on that one. A factory of several refuses to start a
+workflow it names none for, and says the attach that names one (`workflowRepo`). Attaching an attached workflow again with `--repo`
+changes its repository. The name is kept in the factory's own file, or in its tree's wiring where it was applied from a template, so an
+upgrade keeps it.
+
+A card names its factory and its workflow, never a repository: its run, and a brief's, works on the repository the factory names for the
+workflow, whatever folder the start is typed in. A brief's `--repo` only finds the factory, and the start says so when the run works on
+another. A card's `repo:` is retired: a card filed with one is refused, and an older card that has one keeps it, read and never used.
+
 ## Hires
 
 A step need not name its agent: a factory hires one into it. A hire maps a step, written `<workflow>/<step>`, to an agent

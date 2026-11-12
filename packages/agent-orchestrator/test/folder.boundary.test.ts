@@ -92,6 +92,9 @@ fs.writeFileSync(path.join(GIVEN_FILES, 'brief notes.md'), '# what the tides do\
 const GIT_TEAM = path.join(ROOT, 'workflows', 'change');
 fs.mkdirSync(GIT_TEAM, { recursive: true });
 fs.writeFileSync(path.join(GIT_TEAM, 'implement.md'), '---\nplace: git\n---\nmake the change\n');
+/** The teams by name where a card started from `NOT_A_REPO` looks: a card names its workflow, never its folder's path. */
+const BY_NAME = path.join(NOT_A_REPO, 'workflows');
+fs.symlinkSync(path.join(ROOT, 'workflows'), BY_NAME);
 
 /** Where a `git` that refuses and says so is put, first on PATH: anything that reaches for git during a folder run is written down. */
 const BIN = path.join(ROOT, 'bin');
@@ -197,15 +200,6 @@ const board = () => {
     tasks.set(id, { ...tasks.get(id)!, phase, closeout });
   };
   return { e, tasks, settle };
-};
-
-const refusal = (fn: () => unknown): { message: string; exitCode: unknown } => {
-  try {
-    fn();
-  } catch (err) {
-    return { message: (err as Error).message, exitCode: (err as { exitCode?: unknown }).exitCode };
-  }
-  assert.fail('it was not refused');
 };
 
 const rejection = async (fn: () => Promise<unknown>): Promise<{ message: string; exitCode: unknown }> => {
@@ -394,42 +388,38 @@ test('nemia start from a directory that is no repository: a folder team starts, 
   assert.deepEqual(gitAsked(), []);
 });
 
-test('REFUSED: a card filed for a folder team with a repository — the card names what no run of it will look at', async () => {
+test('REFUSED: a card filed with a repository, whatever its team — repo: is retired, and a card names its workflow alone', async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
-    assert.throws(
-      () => addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO }),
-      (err: Error & { exitCode?: number }) =>
-        err.exitCode === 2 &&
-        err.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``) &&
-        err.message.includes('File the card without a repository') &&
-        err.message.includes('or name a workflow'),
-    );
+    for (const workflow of ['note', 'change'])
+      assert.throws(
+        () => addToInbox({ text: 'a note on tides', workflow, repo: NOT_A_REPO }),
+        (err: Error & { exitCode?: number; _tag?: string }) =>
+          err._tag === 'Invalid' && err.exitCode === 2 && err.message.includes(NOT_A_REPO),
+        workflow,
+      );
     const inbox = path.join(ROOT, 'inbox');
     assert.deepEqual(fs.existsSync(inbox) ? fs.readdirSync(inbox) : [], [], 'refused before the card is written');
-    assert.ok(addToInbox({ text: 'a note on tides', workflow: TEAM }).card.name, 'a folder team with no repository is filed');
-    assert.ok(
-      addToInbox({ text: 'a change to make', workflow: GIT_TEAM, repo: NOT_A_REPO }).card.repo,
-      'a team that works on a repository keeps its repository',
-    );
+    const filed = addToInbox({ text: 'a note on tides', workflow: 'note' }).card;
+    assert.deepEqual([filed.workflow, filed.repo], ['note', undefined], 'a folder team by its name, with no repository, is filed');
+    fs.rmSync(path.join(inbox, `${filed.name}.md`));
   } finally {
     process.chdir(cwd);
   }
   assert.deepEqual(gitAsked(), []);
 });
 
-test('an inbox card of a folder team: --repo named at its start is refused, as on a brief, and a repo: already on the card is not looked at, and said', async () => {
+test('an old inbox card of a folder team: --repo at its start is refused, as on any card, and its retired repo: is not read, and said', async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
     const file = path.join(ROOT, 'inbox', 'a-note-on-tides-old.md');
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `---\nworkflow: ${TEAM}\nrepo: ${NOT_A_REPO}\n---\na note on tides\n`);
+    fs.writeFileSync(file, `---\nworkflow: note\nrepo: ${NOT_A_REPO}\n---\na note on tides\n`);
     await assert.rejects(
       main(['start', file, '--repo', '.'], undefined, undefined, undefined, ENV),
-      (err: Error & { exitCode?: number }) =>
-        err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
+      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes('--repo'),
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
     const out = await printed(['start', file]);
@@ -440,10 +430,7 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
       'the repository is ignored: the record has none',
     );
     assert.ok(
-      out.some(
-        (line) =>
-          line === `the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository`,
-      ),
+      out.some((line) => line.includes(`repo: ${NOT_A_REPO}`) && line.includes('retired')),
       `the start says so, rather than leaving a person to look for the work in it:\n${out.join('\n')}`,
     );
     assert.ok(fs.existsSync(file), 'started, the card stays in the inbox');
@@ -453,14 +440,14 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
   assert.deepEqual(gitAsked(), []);
 });
 
-test("a queued card of a folder team, started by a tick: its repo: is not looked at, and the tick's own line says so", async () => {
+test("a queued old card of a folder team, started by a tick: its retired repo: is not read, and the tick's own line says so", async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
     const card = (name: string, lines: string): string => {
       const file = path.join(ROOT, 'inbox', `${name}.md`);
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `---\nworkflow: ${TEAM}\n${lines}---\na note on tides\n`);
+      fs.writeFileSync(file, `---\nworkflow: note\n${lines}---\na note on tides\n`);
       queueInInbox(name);
       return name;
     };
@@ -469,10 +456,9 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
     assert.ok('run' in started, JSON.stringify(started));
     const run = runRecord(ROOT, started.run);
     assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', named, false], 'the run looked at no repository');
-    assert.equal(started.ignoredRepo, NOT_A_REPO, "the tick's start carries the card's repo, which the run looked at none of");
-    assert.equal(
-      queueLine(started),
-      `started ${named} as ${started.run} (the card's repo: ${NOT_A_REPO} was not looked at — this workflow's steps work in folders, with no git repository)`,
+    assert.equal(started.ignoredRepo, NOT_A_REPO, "the tick's start carries the card's repo, which the run read none of");
+    assert.ok(
+      queueLine(started).startsWith(`started ${named} as ${started.run} (`) && queueLine(started).includes(`repo: ${NOT_A_REPO}`),
       "and the line a daemon prints says it, in the sentence nemia start prints: a daemon's log is the only place a tick's start is read",
     );
 
@@ -603,58 +589,18 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   assert.deepEqual(gitAsked(), []);
 });
 
-test("REFUSED: a card with a repository queued onto a folder team — `--workflow` writes that key, so it is judged as the card's own writer is", async () => {
+test('an old card with a repository queued onto a folder team is queued: its retired repo: is not read, and stays as written', async () => {
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
     const file = path.join(ROOT, 'inbox', 'a-card-with-a-repo.md');
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const text = `---\nworkflow: ${GIT_TEAM}\nrepo: ${NOT_A_REPO}\n---\na change to make\n`;
-    fs.writeFileSync(file, text);
-    const refused = refusal(() => queueInInbox('a-card-with-a-repo', { workflow: TEAM }));
-    assert.equal(refused.exitCode, 2);
-    assert.ok(
-      refused.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``),
-      refused.message,
-    );
-    assert.ok(refused.message.includes('File the card without a repository'), refused.message);
-    assert.ok(refused.message.includes('or name a workflow'), refused.message);
-    assert.equal(
-      fs.readFileSync(file, 'utf8'),
-      text,
-      'refused before anything is written: the card is unqueued, and its workflow is its own',
-    );
-    assert.equal(
-      queueInInbox('a-card-with-a-repo').was,
-      'queued',
-      'queued first, on the team it names: an unqueued card taken off the queue is left alone, whatever was passed',
-    );
+    fs.writeFileSync(file, `---\nworkflow: change\nrepo: ${NOT_A_REPO}\n---\na change to make\n`);
+    assert.equal(queueInInbox('a-card-with-a-repo', { workflow: 'note' }).was, 'queued');
     const queued = fs.readFileSync(file, 'utf8');
-    const off = refusal(() => queueInInbox('a-card-with-a-repo', { off: true, workflow: TEAM }));
-    assert.equal(off.exitCode, 2, 'taken off the queue with --workflow writes the key just the same, so it is refused just the same');
-    assert.ok(off.message.startsWith(`--repo ${NOT_A_REPO}: this card's workflow has steps that say \`place: folder\``), off.message);
-    assert.equal(fs.readFileSync(file, 'utf8'), queued, 'and again nothing is written: the card is still queued, on its own team');
+    assert.ok(queued.includes('workflow: note') && queued.includes(`repo: ${NOT_A_REPO}`), queued);
     assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
-
-    assert.equal(
-      queueInInbox('a-card-with-a-repo').was,
-      'queued',
-      "a re-queue with no --workflow writes nobody's choice of team, and refusing it would strand the card",
-    );
-    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
-    assert.equal(
-      queueInInbox('a-card-with-a-repo', { workflow: GIT_TEAM }).was,
-      'queued',
-      'a card queued onto a team that works on a repository keeps on as before',
-    );
-    assert.equal(queueInInbox('a-card-with-a-repo', { off: true }).was, 'taken back');
-    fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card-with-none.md'), 'a note on tides\n');
-    assert.equal(
-      queueInInbox('a-card-with-none', { workflow: TEAM }).was,
-      'queued',
-      'a card with no repository is queued onto the folder team, which is the whole point of the key',
-    );
-    assert.equal(queueInInbox('a-card-with-none', { off: true }).was, 'taken back');
+    fs.rmSync(file);
   } finally {
     process.chdir(cwd);
   }

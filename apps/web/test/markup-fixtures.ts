@@ -528,6 +528,7 @@ export const filed = (
   untrusted: [],
   volumes: [],
   costLines: {},
+  workflowRepos: {},
   template: null,
   ...extra,
 });
@@ -575,6 +576,7 @@ export const listedFactory = (name: string, repos: string[], error: string | nul
   error,
   schedules: [],
   commands: { attach: '', rm: '', add: '', schedule: '' },
+  workflowRepos: {},
   template: null,
 });
 

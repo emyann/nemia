@@ -278,7 +278,7 @@ export const runs = {
     ),
   /** The run object (`GET /api/runs/:name`). */
   show: (name: string): Promise<Run> => call((c) => c.runs.show({ params: { name } }), read(Run)),
-  /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */
+  /** A run started in `namespace`, `?repo=` finding the factory: the api places it on the repository its wiring gives. Its name. */
   create: (namespace: string, start: RunStart, may: string, repo?: string): Promise<RunStarted> =>
     call(
       (c) => c.runs.create({ params: { namespace }, query: repo === undefined ? {} : { repo }, payload: start }),
@@ -390,21 +390,16 @@ export const cards = {
       write(Card, 'The card may be dropped: look in the inbox before dropping it again.'),
     ),
   /**
-   * A card started: its new run's id and the card's name. `place` starts it in a factory on one of its repositories, which the Card's
-   * start says nothing of: sent as `?factory=&repo=`, as every start of the board's says a place, and read by the api off any request.
+   * A card started: its new run's id and the card's name. `factory` starts a card of no factory in that one, which the Card's start says
+   * nothing of: sent as `?factory=`, read by the api off any request. Never a `?repo=`: the factory places the run by its wiring.
    */
-  start: (
-    namespace: string,
-    name: string,
-    start: CardStart,
-    place?: { factory: string; repo: string },
-  ): Promise<{ id: string; card: string }> =>
+  start: (namespace: string, name: string, start: CardStart, factory?: string): Promise<{ id: string; card: string }> =>
     call(
       (c) => c.cards.start({ params: { namespace, name }, payload: start }),
       write(
         Started,
         'The run may have started: look on the Runs page before starting it again.',
-        place ? { factory: place.factory, repo: place.repo } : undefined,
+        factory === undefined ? undefined : { factory },
       ),
     ),
   /** A card queued to start on its own: answers the card as it now reads. */

@@ -143,6 +143,8 @@ export type Served = {
   factory: Factory | undefined;
   /** Whether the request named its factory or its repository (`placeFor`). */
   named: boolean;
+  /** Whether the request named `?repo=` (`placeFor`): a card's start refuses one, its factory placing the run. */
+  repoNamed: boolean;
   e: Engine['Service'];
   placeService: PlaceService['Service'];
   home: string;

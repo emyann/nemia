@@ -53,7 +53,7 @@ const over = <A, E>(cards: Readonly<Record<string, string>>, program: Effect.Eff
 /** The inbox as the listing reads it now, through the door: no run started from any card. */
 const listed = Effect.gen(function* () {
   const door = yield* CardDoor;
-  return inboxListing(yield* door.cards.entries(), [], () => true);
+  return inboxListing(yield* door.cards.entries(), []);
 });
 
 const list = (query: CardQuery) => Effect.flatMap(listed, (l) => cardListOf(l, query));
@@ -323,7 +323,7 @@ test('a card the listing read and that no longer parses when its text is read is
   const inbox = path.join(home, 'inbox');
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'alpha.md'), '---\nnot-a-key: 1\n---\nAlpha\n');
-  const read = inboxListing([{ file: 'alpha.md', text: aCard('Alpha') }], [], () => true);
+  const read = inboxListing([{ file: 'alpha.md', text: aCard('Alpha') }], []);
   const page = valueOf(Effect.runSyncExit(cardListOf(read, {}).pipe(Effect.provide(cardDoorFiles(home)), Effect.provide(stand().layer))));
   const [alpha] = page.items;
   assert.equal(alpha?.metadata.name, 'alpha');

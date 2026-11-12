@@ -15,6 +15,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { dollars } from '../money/money.ts';
 import { settingLines, type SettingsAsRead } from '../harness-settings/harness-settings.ts';
+import type { NamedRepo, WorkflowRepo, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
 import type {
   ConditionStatus,
   DEFAULT_NAMESPACE as OBJECTS_DEFAULT,
@@ -82,7 +83,10 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * offers, in dollars, by the workflow's folder name (`nemia factory cost-line set`), when it sets any: frozen on a run of that workflow at
  * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `origins`: each of its
  * repositories it was given by git URL, its folder (`clones/<host>/<path>` in the store, `cloneTarget`) to that URL, which the daemon
- * clones again when the folder is gone (`clonesOnce`), when it was given any. `generation`: the count of
+ * clones again when the folder is gone (`clonesOnce`), when it was given any. `workflowRepos`: the repository each workflow it attaches
+ * works on, by the workflow's folder name to the repository's folder name (`nemia factory attach <factory> <workflow> --repo <name>`,
+ * `workflowRepo`), when it names any; kept, as an attach writes it, in its own file, or in its tree's wiring (`factory.json`) where it is
+ * made from a template, so an upgrade keeps it; never in the template, which knows no person's folders. `generation`: the count of
  * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
  * its file holds one; a file written before the counter reads as 1 (`generationOf`).
  */
@@ -100,6 +104,7 @@ export type Factory = {
   harnessSettings?: SettingsAsRead;
   costLines?: Readonly<Record<string, number>>;
   origins?: Readonly<Record<string, string>>;
+  workflowRepos?: Readonly<Record<string, string>>;
   generation?: number;
 };
 
@@ -393,7 +398,8 @@ export function hireRefusalOf(
 }
 
 /**
- * The repository a run in `factory` works on: `named` when a person named one, else the factory's repository when it has only one, else
+ * A schedule's repository, kept for schedules alone (a card and a brief are placed by `workflowRepo`): the repository a run in `factory`
+ * works on: `named` when a person named one, else the factory's repository when it has only one, else
  * `fallback` — where `nemia start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
  * `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.
  */
@@ -402,6 +408,89 @@ export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: 
   const [only, ...more] = factory?.repos ?? [];
   if (only !== undefined && !more.length) return only;
   return fallback;
+}
+
+/** A workflow's repository in a factory, as `contracts/workflow-repo.contract.ts` words it. */
+export type { NamedRepo, WorkflowRepoOf, WorkflowRepoRefusal } from '../../contracts/workflow-repo.contract.ts';
+
+/**
+ * The repository a run of `workflow` works on in a factory of `repos`, each with its folder name: the one named `wired[workflow]`,
+ * else the only one; refused where the factory has several and names none (`unwired`), names one none has (`unknown`), or one two share
+ * (`shared`). A prototype's name (`constructor`) names no workflow's repository: the wiring is a person's file, read as JSON.
+ */
+export const workflowRepo: WorkflowRepo = (repos, wired, workflow) => {
+  const name = wired !== undefined && Object.hasOwn(wired, workflow) ? wired[workflow] : undefined;
+  if (name === undefined) {
+    const [only, ...more] = repos;
+    if (only === undefined || more.length) return { refused: 'unwired' };
+    return { repo: only.path };
+  }
+  const [one, ...others] = repos.filter((r) => r.name === name);
+  if (one === undefined) return { refused: 'unknown' };
+  if (others.length) return { refused: 'shared' };
+  return { repo: one.path };
+};
+
+/**
+ * The folder name of the repository `repo`, as the wiring names it: the last segment of its path, a trailing separator aside. A factory's
+ * file holds each repository as `path.resolve` spelled it (`factoryRepos`), so this reads the string alone, as `path.basename` would.
+ */
+export const folderName = (repo: string): string => {
+  const trimmed = repo.endsWith('/') && repo.length > 1 ? repo.slice(0, -1) : repo;
+  return trimmed.slice(trimmed.lastIndexOf('/') + 1);
+};
+
+/** How many of `factory`'s repositories have the folder name `name`: one where the wiring can name it. */
+export const reposNamed = (factory: Pick<Factory, 'repos'>, name: string): number =>
+  factory.repos.filter((r) => folderName(r) === name).length;
+
+/** Each repository of `factory`, as `path.resolve` spells it, with its folder's name: what `workflowRepo` is handed. */
+export const namedRepos = (factory: Pick<Factory, 'repos'>): NamedRepo[] =>
+  factory.repos.map((r) => ({ path: path.resolve(r), name: folderName(path.resolve(r)) }));
+
+/** The folder names of `factory`'s repositories, sorted, as a refusal offers them. */
+const repoNames = (factory: Pick<Factory, 'repos'>): string => [...new Set(namedRepos(factory).map((r) => r.name))].sort().join(', ');
+
+/**
+ * Why `factory` gives `workflow` no repository (`refused`, `workflowRepo`), with the `nemia factory attach … --repo` that fixes it, naming
+ * its repositories' folder names to choose from; then what was not done.
+ */
+export function workflowRepoRefusal(
+  factory: Pick<Factory, 'name' | 'repos'>,
+  workflow: string,
+  refused: WorkflowRepoRefusal,
+  notDone = 'Nothing was started.',
+): string {
+  const fix = `nemia factory attach ${factory.name} ${workflow} --repo <name>, one of ${repoNames(factory)}`;
+  if (refused === 'unwired')
+    return `the factory ${factory.name} works on several repositories and names none for ${workflow}: ${fix}. ${notDone}`;
+  if (refused === 'unknown')
+    return `the factory ${factory.name} names for ${workflow} a folder name none of its repositories has: ${fix}. ${notDone}`;
+  return `the factory ${factory.name} names for ${workflow} a folder name two of its repositories share, so it cannot tell which: file the factory on folders of distinct names, or ${fix}. ${notDone}`;
+}
+
+/**
+ * The repository a run of `workflow` works on in `factory` (`workflowRepo`, over its repositories as `namedRepos` names them), or why it
+ * has none, in `workflowRepoRefusal`'s words.
+ */
+export function wiredRepo(
+  factory: Pick<Factory, 'name' | 'repos' | 'workflowRepos'>,
+  workflow: string,
+): { repo: string } | { refused: WorkflowRepoRefusal; message: string } {
+  const of = workflowRepo(namedRepos(factory), factory.workflowRepos, workflow);
+  return 'repo' in of ? of : { refused: of.refused, message: workflowRepoRefusal(factory, workflow, of.refused) };
+}
+
+/**
+ * Why an attach of `workflow` to `factory` cannot name `name` its repository: `count` of its repositories have that folder name
+ * (`reposNamed`), none or several; then the attach that names one.
+ */
+export function repoNameRefusal(factory: Pick<Factory, 'name' | 'repos'>, workflow: string, name: string, count: number): string {
+  const why =
+    count === 0
+      ? `${name} is the folder name of none of the factory ${factory.name}'s repositories`
+      : `${name} is the folder name of ${count} of the factory ${factory.name}'s repositories, so it cannot tell which`;
+  return `${why}: nemia factory attach ${factory.name} ${workflow} --repo <name>, one of ${repoNames(factory)}. Nothing was attached.`;
 }
 
 /**

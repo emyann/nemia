@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { cardsPath, photograph, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store, takeBackRuns } from '../world.ts';
@@ -33,12 +33,51 @@ async function openStart(page: Page): Promise<Locator> {
   return item;
 }
 
+/**
+ * The card's start with the factory's file, as `factoryFile` holds it now, on two repositories — the checkout and FACTORIES.bare's folder
+ * — first wiring its workflow to none: the start says it is not wired, naming the attach and both folder names, with no repository and no
+ * Start; then wiring it to the checkout's folder name: the start says the checkout as text. Never a Repository list. The caller writes the
+ * file back.
+ */
+async function wiredOnTwo(page: Page, factoryFile: string, theme: string): Promise<void> {
+  const factory = FACTORIES.hiring.name;
+  const checkout = path.join(store!, 'checkout');
+  const second = path.join(store!, FACTORIES.bare);
+  const found = JSON.parse(fs.readFileSync(factoryFile, 'utf8')) as object;
+  const write = (workflowRepos: Record<string, string>) =>
+    fs.writeFileSync(factoryFile, JSON.stringify({ ...found, repos: [checkout, second], workflowRepos }, null, 2));
+
+  write({});
+  let item = await openStart(page);
+  const unwired = item.locator('[data-unwired="unwired"]');
+  await expectVisible(unwired, `on two repositories with ${WORKFLOWS.good.name} wired to none, the start says it is not wired`);
+  const said = ((await unwired.textContent()) ?? '').trim();
+  for (const fact of [`${factory} ${WORKFLOWS.good.name} --repo`, 'checkout', FACTORIES.bare])
+    if (!said.includes(fact))
+      throw new Refused(`naming the attach that wires it and the folder names (${fact}) — it said ${JSON.stringify(said)}`);
+  await expectCount(item.locator('[data-factory-repo]'), 0, 'with no repository to start on');
+  await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'and no list to pick one from');
+  await expectCount(item.locator(`form[aria-label="Start ${CARD}"]`), 0, 'and no Start: the api would refuse it');
+  await settled(page);
+  await photograph(page, path.join(OUT, `inbox-factory-unwired-${theme}.png`), { fullPage: true });
+
+  write({ [WORKFLOWS.good.name]: 'checkout' });
+  item = await openStart(page);
+  await expectTexts(item.locator('[data-factory-repo]'), [checkout], `wired to checkout, the start says ${checkout} as text`);
+  await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'never a list of the two');
+  await expectCount(item.locator('[data-unwired]'), 0, 'and no longer that it is not wired');
+  await settled(page);
+  await photograph(page, path.join(OUT, `inbox-factory-wired-${theme}.png`), { fullPage: true });
+}
+
 export default {
   /**
-   * An inbox card that names a factory (`factory:`) is started in it. Its start lists the workflows the factory offers on its one
-   * repository, read with its hires, the card's preset among them; a workflow whose step the factory hires no one into says so in the
-   * package's words, with no Start. Once the factory hires into it, the start sends `?factory=` and `?repo=`, the record names the factory,
-   * and the card stays in the inbox, started. The card, the hires, the agent hired and the run are taken back.
+   * An inbox card that names a factory (`factory:`) is started in it. Its start lists the workflows the factory offers, by name, the
+   * card's preset among them, and says as text the repository the factory gives it, never a list of them: its only one; on two
+   * repositories, that it is not wired, naming the attach, then, wired, the one its wiring names (`wiredOnTwo`). A workflow whose step
+   * the factory hires no one into says so in the package's words, with no Start. Once the factory hires into it, the start sends
+   * `?factory=` and no repository, the record names the factory and the repository its wiring gives, and the card stays in the inbox,
+   * started. The card, the hires, the factory's file, the agent hired and the run are taken back.
    */
   name: 'inbox-factory',
   route: '/inbox',
@@ -62,14 +101,12 @@ export default {
       let item = await openStart(other);
       const pick = item.getByRole('combobox', { name: 'Workflow' });
       await expectVisible(pick, `Start opens ${CARD}'s start form`);
-      if ((await pick.inputValue()) !== `repo:${WORKFLOWS.good.name}`)
+      if ((await pick.inputValue()) !== WORKFLOWS.good.name)
         throw new Refused(
           `the start is preset to the workflow the card names, among those ${factory} offers — it was ${JSON.stringify(await pick.inputValue())}`,
         );
-      await expectVisible(
-        item.getByText(`The workflows the factory ${factory} offers on ${checkout}, with its hires.`),
-        'and says whose workflows they are, and on which repository',
-      );
+      await expectTexts(item.locator('[data-factory-repo]'), [checkout], `and says the repository ${factory} gives it, its only one`);
+      await expectCount(item.getByRole('combobox', { name: 'Repository' }), 0, 'as text, never a list');
       await expectVisible(
         item.locator('[data-unfilled]', { hasText: `nemia factory hire ${factory} <agent> --step ${WORKFLOWS.good.name}/${UNFILLED}` }),
         `${WORKFLOWS.good.name}'s ${UNFILLED} has no agent in ${factory}: the start says so, and the hire that fills it`,
@@ -77,6 +114,8 @@ export default {
       await expectCount(item.locator(`form[aria-label="Start ${CARD}"]`), 0, 'with no Start: the api would refuse it');
       await settled(other);
       await photograph(other, path.join(OUT, `inbox-factory-unfilled-${theme}.png`), { fullPage: true });
+      await wiredOnTwo(other, factoryFile, theme);
+      fs.writeFileSync(factoryFile, withHires(factoryText, {}));
 
       unhire = hiringStarts(store!);
       item = await openStart(other);
@@ -95,8 +134,8 @@ export default {
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const sent = new URL(started.url()).searchParams;
-      if (sent.get('factory') !== factory || sent.get('repo') !== checkout)
-        throw new Refused(`the start names the factory and its repository in its query — it was sent to ${started.url()}`);
+      if (sent.get('factory') !== factory || sent.has('repo'))
+        throw new Refused(`the start names the factory in its query, and no repository — it was sent to ${started.url()}`);
       if (started.status() !== 201)
         throw new Refused(`the api starts the card in ${factory} — it answered ${started.status()}: ${await started.text()}`);
       const { id } = (await started.json()) as { id: string };

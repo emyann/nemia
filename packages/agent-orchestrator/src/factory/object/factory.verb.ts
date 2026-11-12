@@ -166,6 +166,9 @@ export const filedOf = (listing: FactoryListing, home: string): FiledFactory => 
     ...harnessSettingsOf(listing.harnessSettings),
     ...(listing.costLines === undefined || Object.keys(listing.costLines).length === 0 ? {} : { costLines: { ...listing.costLines } }),
     ...(listing.origins === undefined || Object.keys(listing.origins).length === 0 ? {} : { origins: { ...listing.origins } }),
+    ...(listing.workflowRepos === undefined || Object.keys(listing.workflowRepos).length === 0
+      ? {}
+      : { workflowRepos: { ...listing.workflowRepos } }),
     ...(listing.revisions === undefined ? {} : { revisions: listing.revisions }),
     ...(listing.template === undefined
       ? {}

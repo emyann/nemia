@@ -12,9 +12,10 @@ import { setting } from '../config/config.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Effect } from 'effect';
+import { Effect } from 'effect';
 import {
   cardsListed,
+  cardWorkflowRefusal,
   ideaCard,
   labelledText,
   inboxNameRefusal,
@@ -23,6 +24,7 @@ import {
   queueOrder,
   queuedText,
   queueRefusal,
+  retiredRepoRefusal,
   type InboxCard,
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
@@ -32,22 +34,18 @@ import { RunId } from '../record/record.model.ts';
 import { inheritedLabels, parseLabelEdits, type LeftOut } from '../labels/labels.ts';
 import { CardDoor, cardNameAt, inboxAt } from '../cards/cards.store.ts';
 import { CardName } from './inbox.model.ts';
-import { workRoot } from '../record/places.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError } from '../step/step.ts';
-import { isFolderTeam } from '../workflow/index.ts';
-import { workflowFolder } from '../folder/folder.store.ts';
-import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { FactoryDoor, factoryOrNone } from '../factory/door/factories.store.ts';
-import type { Factory } from '../factory/factory.ts';
-import { isDirectory, runId, runsDir } from '../record/record.store.ts';
+import { unattachedRefusal, type Factory } from '../factory/factory.ts';
+import { runId } from '../record/record.store.ts';
 import { keptRuns } from '../record/files.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
 export const inboxCards = Effect.fn('inboxCards')(function* () {
   const entries = yield* (yield* CardDoor).cards.entries();
-  return cardsListed(entries, [], () => true)
+  return cardsListed(entries, [])
     .filter((l) => l.file.endsWith('.md'))
     .map((l) => l.name);
 });
@@ -56,7 +54,8 @@ export const inboxCards = Effect.fn('inboxCards')(function* () {
  * Every card in the inbox, by name, with the runs a record says it was started as (`cardsListed`) — and every entry that does not read as
  * a card, with why — before any run's phase is read, so with no `state`: what the queue's writes and the workflows' users read. The run
  * records are read for their `from`, so a card a run was started from is out of the queue; the tick's tries, so a queued card whose start
- * was refused, or failed, says why; and the factories that read, so a card says the repository its factory picks for it (`factoryRepo`).
+ * was refused, or failed, says why; and the factories that read, so a card says the repository its factory works on for its workflow
+ * (`factoryRepo`).
  * `nemia inbox` lists the cards with their state through `inboxJudged` (inbox.verb.ts), which reads each run's phase.
  */
 export const readInbox = Effect.fn('readInbox')(function* () {
@@ -67,7 +66,6 @@ export const readInbox = Effect.fn('readInbox')(function* () {
   return cardsListed(
     entries,
     keptRuns(home, undefined, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) }), false),
-    isDirectory,
     tries,
     yield* readableFactories(),
   );
@@ -83,13 +81,6 @@ export const readableFactories = (): Effect.Effect<Map<string, Factory>, Refusal
     (listed) => new Map(listed.flatMap((f) => ('error' in f ? [] : [[f.name, f] as const]))),
   );
 
-/** The tree the factory `name` runs from, read through the door; none for no name, an untemplated one, and one that does not read. */
-const treeOfFactory = (name: string | undefined): Effect.Effect<string | undefined> =>
-  factoryOrNone(name).pipe(
-    Effect.map((factory) => factory?.tree),
-    Effect.catch(() => Effect.succeed(undefined)),
-  );
-
 /** The names of the factories filed, as the door lists them, the default left out: what a refusal names to choose from. */
 export const filedNames = (): Effect.Effect<string[], Refusal> =>
   Effect.map(
@@ -98,48 +89,15 @@ export const filedNames = (): Effect.Effect<string[], Refusal> =>
   );
 
 /**
- * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
- * step says `place: folder` works on none — the card would keep on disk a path no run of it will ever look at.
- *
- * Refused wherever a card's `workflow:` is written — `addToInbox` (`nemia inbox add`, and the board's Inbox) and `queueInInbox`
- * (`nemia inbox queue --workflow`, which writes that key over the card's own) — in the words `nemia start --repo` is refused in: the same
- * sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no way to edit one from the
- * board, and refusing its start, or its plain re-queue, would strand it — so its `repo:` is ignored and said
- * (`InboxStarted.ignoredRepo`).
- *
- * The workflow is looked for as its start would look: in the tree of the card's factory first, where it is made from a template. Silent
- * when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
- * names is the start's to refuse, in the start's words, and a folder that does not load says so there. Read through the Workflow door
- * the program is given, at the store's root.
- */
-const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
-  workflow?: string;
-  repo?: string;
-  dir?: string;
-  factory?: string;
-}) {
-  const home = yield* StoreRoot;
-  const { workflow, repo } = opts;
-  if (repo === undefined || workflow === undefined) return null;
-  const door = yield* WorkflowDoor;
-  const tree = yield* treeOfFactory(opts.factory);
-  const steps = yield* Effect.suspend(() =>
-    door.workflows.read(workflowFolder(workflow, opts.dir ?? process.cwd(), repo, tree), { repo, home: home }),
-  ).pipe(Effect.catchCause((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.succeed(null))));
-  if (steps === null || !isFolderTeam(steps)) return null;
-  return (
-    `--repo ${repo}: this card's workflow has steps that say \`place: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(home), '<run>')}, with no git repository, and would never look at ${repo}.\n` +
-    `File the card without a repository, or name a workflow whose steps work on one.`
-  );
-});
-
-/**
  * `nemia inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two
  * ideas alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is
- * what a refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
- * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
- * directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it, and `factory` a factory's name, whose
- * factory the start judges. The card is filed exclusively (`cards.add`): a name another card took meanwhile (`Conflict`) is drawn again.
+ * what a refusal calls it. `workflow` and `factory` are written as the card's keys, over the text's own: `workflow` a workflow's name, and
+ * `factory` a factory's name. The card is filed exclusively (`cards.add`): a name another card took meanwhile (`Conflict`) is drawn again.
+ *
+ * Refused `Invalid` before anything is written: a `repo` given, or a `repo:` in the text — retired: a card names its factory and its
+ * workflow, and the factory's wiring places its run (`retiredRepoRefusal`, naming `nemia factory attach`); a `workflow` that is no
+ * workflow's name (`cardWorkflowRefusal`); and in a factory filed, a workflow it does not attach (`unattachedRefusal`, naming the attach).
+ * A factory not filed is the start's to refuse.
  *
  * `labels` are label edits (`--label`, `key=value` / `key-`), refused `Invalid` before anything is written where one does not parse
  * (`parseLabelEdits`). The card is filed with the labels its `from:` runs agree on, its text's own `labels:` over them, and the edits over
@@ -148,20 +106,21 @@ const cardRepoRefusal = Effect.fn('cardRepoRefusal')(function* (opts: {
 export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   text: string;
   from?: string;
-  dir?: string;
   workflow?: string;
+  /** Retired: refused whenever given (`retiredRepoRefusal`). */
   repo?: string;
   factory?: string;
   labels?: readonly string[];
 }) {
   const edits = parseLabelEdits(opts.labels ?? []);
   if ('refused' in edits) return yield* Effect.fail(new Invalid({ message: `--label: ${edits.refused}. Nothing was filed.` }));
-  const refusedRepo = yield* cardRepoRefusal(opts);
-  if (refusedRepo) return yield* Effect.fail(new WorkflowError(refusedRepo));
-  const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
-  const idea = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
+  if (opts.repo !== undefined)
+    return yield* Effect.fail(new Invalid({ message: `repository ${opts.repo}: ${retiredRepoRefusal('Nothing was filed.')}` }));
+  const given = { workflow: opts.workflow, factory: opts.factory };
+  const idea = ideaCard(opts.from ?? 'the idea', opts.text, given);
   const { body } = idea;
-  const read = parseInboxCard(opts.from ?? 'the idea', idea.text, isDirectory);
+  const read = parseInboxCard(opts.from ?? 'the idea', idea.text);
+  yield* refuseUnattached(read, 'Nothing was filed.');
   const runDoor = yield* RunDoor;
   const parents = yield* Effect.forEach(read.from ?? [], (run) =>
     Effect.map(
@@ -171,7 +130,7 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
   );
   const inherited = inheritedLabels({ parents, ...(read.labels !== undefined ? { card: read.labels } : {}), edits: edits.edits });
   const labelled = parents.length > 0 || edits.edits.length > 0;
-  const text = labelled ? labelledText(read, inherited.labels, isDirectory) : idea.text;
+  const text = labelled ? labelledText(read, inherited.labels) : idea.text;
   const leftOut: readonly LeftOut[] = inherited.leftOut;
   const door = yield* CardDoor;
   for (;;) {
@@ -180,7 +139,7 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
     if (filed._tag === 'Failure' && filed.failure._tag === 'Conflict') continue;
     if (filed._tag === 'Failure') return yield* Effect.fail(filed.failure);
     const out: { card: InboxCard; file: string; labelsLeftOut?: readonly LeftOut[] } = {
-      card: parseInboxCard(`${name}.md`, text, isDirectory),
+      card: parseInboxCard(`${name}.md`, text),
       file: filed.success,
       ...(leftOut.length ? { labelsLeftOut: leftOut } : {}),
     };
@@ -189,8 +148,21 @@ export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
 });
 
 /**
+ * Refuses `Invalid` a card whose factory is filed and does not attach its workflow (`unattachedRefusal`, naming the attach), then what was
+ * not done. Silent for a card of the default factory, one with no workflow, and one whose factory is not filed or does not read: the
+ * start says that.
+ */
+const refuseUnattached = Effect.fn('refuseUnattached')(function* (card: Pick<InboxCard, 'workflow' | 'factory'>, notDone: string) {
+  const { workflow } = card;
+  if (workflow === undefined || card.factory === undefined || card.factory === DEFAULT_NAMESPACE) return;
+  const filed = yield* factoryOrNone(card.factory).pipe(Effect.orElseSucceed(() => undefined));
+  const refused = filed === undefined ? undefined : unattachedRefusal(filed, workflow);
+  if (refused !== undefined) return yield* Effect.fail(new Invalid({ message: refused.replace('Nothing was started.', notDone) }));
+});
+
+/**
  * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order, how many are in
- * it, and the repository its factory picks for it (`factoryRepo`), null when it picks none or the card is not queued.
+ * it, and the repository its factory works on for its workflow (`factoryRepo`), null when it names none or the card is not queued.
  */
 export type InboxQueued = {
   card: InboxCard;
@@ -234,8 +206,9 @@ const refuseQueue = Effect.fn('refuseQueue')(function* (card: InboxCard, file: s
  * naming the cards there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names and one already
  * queued (`Conflict`), and one with no workflow and none given; then a card that names no factory, unless `StoreConfig`'s
  * `defaultFactoryStarts`, or names the default one (`refuseQueue`), which `off` never asks. A `workflow` given, queued or taken back, is
- * written over the card's own, and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the
- * card's `repo:` is not judged. `off` on a card not queued writes nothing, and says so.
+ * written over the card's own, and refused where it is no workflow's name (`cardWorkflowRefusal`) or, in a factory filed, one it does
+ * not attach (`unattachedRefusal`). An old card's `repo:` is kept as it is, never judged. `off` on a card not queued writes nothing, and
+ * says so.
  */
 export const queueInInbox = Effect.fn('queueInInbox')(function* (name: string, how: { off?: boolean; workflow?: string } = {}) {
   const refused = inboxNameRefusal(name);
@@ -249,17 +222,20 @@ export const queueInInbox = Effect.fn('queueInInbox')(function* (name: string, h
       message: `${noCardLine(name, yield* inboxCards())} Queue one of those — nemia inbox queue <name> — or park the idea first: nemia inbox add "<idea>".`,
     });
   }
-  const exists = how.off ? () => true : isDirectory;
-  const card = parseInboxCard(`${name}.md`, text, exists);
+  const card = parseInboxCard(`${name}.md`, text);
   if (how.off && card.queued === undefined) return queued({ card, file, was: 'not queued', factoryRepo: null });
-  if (!how.off) yield* refuseQueue(card, file, how.workflow);
   if (how.workflow !== undefined) {
-    const refusedRepo = yield* cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
-    if (refusedRepo) throw new WorkflowError(refusedRepo);
+    const refusedWorkflow = cardWorkflowRefusal('--workflow', how.workflow, 'Nothing was queued.');
+    if (refusedWorkflow !== undefined) return yield* Effect.fail(new Invalid({ message: refusedWorkflow }));
+    yield* refuseUnattached(
+      { workflow: how.workflow, ...(card.factory !== undefined ? { factory: card.factory } : {}) },
+      'Nothing was queued.',
+    );
   }
-  const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
+  if (!how.off) yield* refuseQueue(card, file, how.workflow);
+  const written = queuedText(card, how.off ? null : new Date().toISOString(), how.workflow);
   yield* door.cards.rewrite(card$, written);
-  const now = parseInboxCard(`${name}.md`, written, exists);
+  const now = parseInboxCard(`${name}.md`, written);
   if (how.off) return queued({ card: now, file, was: 'taken back', factoryRepo: null });
   const order = queueOrder(yield* readInbox());
   const place = order.findIndex((l) => l.name === name) + 1;

@@ -183,7 +183,11 @@ test("a session's words, name by name: its journal and view words, the former wo
         ['toString', fresh, 'unknown', 'failed'],
       ];
       for (const [state, heartbeatAt, worker, name] of rows)
-        assert.equal(detachedStateOf({ state, heartbeatAt }, { at: now }, worker), name, `${state} at ${heartbeatAt}, its worker ${worker}`);
+        assert.equal(
+          detachedStateOf({ state, heartbeatAt }, { at: now }, worker),
+          name,
+          `${state} at ${heartbeatAt}, its worker ${worker}`,
+        );
     },
   );
 

@@ -158,7 +158,13 @@ test('slow is not dead: a stale beat is failed only once the worker the spawn la
     const name = 'ae/l3/1';
     fs.writeFileSync(
       fileOf(dir, name, '.json'),
-      JSON.stringify({ name, state: 'working', pid: 0, logFile: '/dev/null', heartbeatAt: new Date(Date.now() - STALE_MS - 60_000).toISOString() }),
+      JSON.stringify({
+        name,
+        state: 'working',
+        pid: 0,
+        logFile: '/dev/null',
+        heartbeatAt: new Date(Date.now() - STALE_MS - 60_000).toISOString(),
+      }),
     );
     const boot = monoNow()?.boot;
     const start = processStart(process.pid);

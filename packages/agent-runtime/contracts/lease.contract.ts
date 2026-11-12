@@ -29,7 +29,8 @@ const leaseWordSpec = spec<(state: string, beatAgeMs: number, leaseMs: number, w
         state === 'working' && fresh(beatAgeMs, leaseMs) ? output === 'working' : true,
     },
     slowIsNotDead: {
-      description: 'A working run whose beat is stale and whose worker is seen running is working: its first beat late, or a beat late under load',
+      description:
+        'A working run whose beat is stale and whose worker is seen running is working: its first beat late, or a beat late under load',
       condition: ({ input: [state, beatAgeMs, leaseMs, worker], output }) =>
         state === 'working' && !fresh(beatAgeMs, leaseMs) && worker === 'running' ? output === 'working' : true,
     },

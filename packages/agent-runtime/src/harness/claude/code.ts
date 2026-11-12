@@ -397,8 +397,7 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     },
     stop: (name) => to(name).stop(name),
     logs: (name) => to(name).logs(name),
-    release: (session, task) =>
-      attached.has(session.sessionId) || !job.release ? Effect.succeed(undefined) : job.release(session, task),
+    release: (session, task) => (attached.has(session.sessionId) || !job.release ? Effect.succeed(undefined) : job.release(session, task)),
     interrupt: (session) => interruptThrough(to(session.name), session),
     transcript: (name, after) => verbOf(to(name), 'transcript')(name, after),
     say: (session, text) => verbOf(to(session.name), 'say')(session, text),

@@ -31,9 +31,10 @@ import { quote } from '../../core/quote.ts';
 import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
-import { firstRunFile, leased, runFileIn, stateOfWord, type Carried, type Run, type RunFile } from './run-file.ts';
+import { firstRunFile, leased, runFileIn, stateOfWord, type Carried, type Run, type RunFile, type WorkerSeen } from './run-file.ts';
 import { workerSeen, writeLaunched } from './launched.ts';
 import { firstAsked, groupLeft, leftSignal } from './left.ts';
+import type { LeftSignal } from '../../../contracts/left.contract.ts';
 import { carriedOf, lessCarried } from './carried.ts';
 import { sightedOf } from './sighted.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
@@ -272,10 +273,10 @@ type Told = { read: HarnessOutput } | { wrong: string } | undefined;
 type RunLook = { as: 'read' | 'unread' | 'failed'; output?: { read: HarnessOutput }; warning?: string };
 
 /**
- * How the run under `name` is read, its word as of now `word` (`wordOf`) (`RunLook`), its output read through `told` and named by `log`. A run whose start
- * was refused is unread at work, its output not read, and once ended failed with what its output says, whose refusal, often of that
- * same start event, is read as nothing said (`startRefusalOf`). Any other run whose output is refused is unread at work, and once
- * ended failed with nothing its output says (`outputRefusalOf`). The harness's other runs are read either way.
+ * How the run under `name` is read (`RunLook`), its word as of now `word` (`wordOf`), its output read through `told` and named by
+ * `log`. A run whose start was refused is unread at work, its output not read, and once ended failed with what its output says,
+ * whose refusal, often of that same start event, is read as nothing said (`startRefusalOf`). Any other run whose output is refused
+ * is unread at work, and once ended failed with nothing its output says (`outputRefusalOf`). The harness's other runs are read either way.
  */
 const lookOf = (spec: HarnessSpec, name: string, run: RunFile, word: string, told: () => Told, log: string): RunLook => {
   const atWork = word === 'working';
@@ -589,7 +590,10 @@ const followOps = (spec: HarnessSpec, root: string, dir: string): Pick<RunnerOps
   const runOf = (name: string) => {
     const at = runAt(spec, root, name);
     if (!at || 'unread' in at) return at;
-    return { state: stateOfWord(wordOf(spec, root, name, at.run, instantNow())), ...(at.run.nativeId ? { nativeId: at.run.nativeId } : {}) };
+    return {
+      state: stateOfWord(wordOf(spec, root, name, at.run, instantNow())),
+      ...(at.run.nativeId ? { nativeId: at.run.nativeId } : {}),
+    };
   };
   return {
     follow: (name) =>
@@ -720,6 +724,73 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
 export const detachedOps = (spec: HarnessSpec, root: string, options: DetachedOptions = {}): RunnerOps =>
   runnerOf(spec, root, workerBoundsOf(options), options);
 
+/** SIGTERM to the worker of the run under `name`, its run file read again: one that says `working`, with a pid above 0. */
+const signalWorker = (spec: HarnessSpec, root: string, name: string): void => {
+  const again = runNamed(spec, root, name);
+  if (!again || again.run.state !== 'working' || again.run.pid <= 0) return;
+  try {
+    process.kill(again.run.pid, 'SIGTERM');
+  } catch {}
+};
+
+/** `signal` sent to the process group `group`; a group gone since it was looked for is no error. */
+const signalGroup = (group: number, signal: LeftSignal): void => {
+  if (signal === 'none') return;
+  try {
+    process.kill(-group, signal);
+  } catch {}
+};
+
+/**
+ * A stop of the run of `spec` under `name`, whatever its word, and whether it left a process behind, still to end (`stop`, `release`),
+ * its stop grace the run's own, else `graceMs`:
+ *
+ * 1. Nothing to do for no run, or a run whose worker can no longer run and whose harness's group is empty (`groupLeft`).
+ * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
+ *    the grace below is measured from the instant it holds.
+ * 3. A run file that says `working` whose word is too (a fresh beat: somebody beats it, a worker started again by hand that its
+ *    spawn's `.launched` does not name included), or whose worker is not seen gone: SIGTERM to the worker (`signalWorker`). The
+ *    worker ends its harness's group and writes `stopped`.
+ * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
+ *    sent what `leftSignal` picks, SIGTERM within the stop grace since the first ask and SIGKILL after.
+ */
+const stopRunOf =
+  (spec: HarnessSpec, root: string, graceMs: number) =>
+  (name: string): boolean => {
+    const hit = runNamed(spec, root, name);
+    if (!hit) return false;
+    const now = instantNow();
+    let seen: WorkerSeen | undefined;
+    const worker = () => (seen ??= workerSeen(besideRun(spec, root, name, LAUNCHED_END)));
+    const word = leased(hit.run, now, worker);
+    const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
+    const workerMayRun = hit.run.state === 'working' && (word === 'working' || worker() !== 'gone');
+    if (!workerMayRun && group === undefined) return false;
+    const asked = firstAsked(besideRun(spec, root, name, 'stop'), now);
+    if (workerMayRun) signalWorker(spec, root, name);
+    if (group === undefined) return false;
+    signalGroup(group, leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), hit.run.stopGraceMs ?? graceMs));
+    return true;
+  };
+
+/**
+ * A detached runner's `release`: nothing for a run still at work, whose worker's own exit writes what it cost; else its stop
+ * (`stopRunOf`), failing while its harness's group still holds a process, so the engine asks again on its next pass.
+ */
+const releaseOf =
+  (spec: HarnessSpec, root: string, graceMs: number): NonNullable<RunnerOps['release']> =>
+  (session) =>
+    Effect.try({
+      try: () => {
+        const name = session.sessionId;
+        const hit = runNamed(spec, root, name);
+        if (!hit || wordOf(spec, root, name, hit.run, instantNow()) === 'working') return;
+        if (stopRunOf(spec, root, graceMs)(name)) throw new Error(LEFT_RUNNING(name, hit.run.harness?.pid ?? 0));
+      },
+      catch: (cause) =>
+        new RunnerError({ verb: 'release', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+    });
+
 /** Why a release of the run under `name` is asked again: what its harness's group `group` left still runs, and has been signalled. */
 const LEFT_RUNNING = (name: string, group: number): string =>
   `\`${name}\` has ended, and its harness's process group ${group} still holds a process: it was sent SIGTERM, and SIGKILL once its` +
@@ -751,8 +822,6 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     }
     return out;
   };
-
-  const find = (name: string): Run | undefined => runNamed(spec, root, name);
 
   const statementOf = (name: string): Sighting['closeout'] => {
     let text: string;
@@ -789,48 +858,6 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     if (as === 'unread') return { warning };
     const usage = usageOf(run, output?.read, all);
     return { sighting: sightingOf(name, run, word, statementOf(name), output, usage, as === 'failed'), warning };
-  };
-
-  /**
-   * A stop of the run under `name`, whatever its word, and whether it left a process behind, still to end (`stop`, `release`):
-   *
-   * 1. Nothing to do for a run whose worker can no longer run and whose harness's group is empty (`groupLeft`), or for no run.
-   * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
-   *    the grace below is measured from the instant it holds.
-   * 3. A run file that says `working` whose word is too (a fresh beat: somebody beats it, even a worker started again by hand that its
- *    spawn's `.launched` does not name), or whose worker is not seen gone: SIGTERM to the worker, read again, whose pid is above 0
-   *    (`process.kill(0, …)` signals this process's entire group). The worker ends its harness's group and writes `stopped`.
-   * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
-   *    sent what `leftSignal` picks, SIGTERM within the run's stop grace since the first ask and SIGKILL after.
-   */
-  const stopRun = (name: string): boolean => {
-    const hit = find(name);
-    if (!hit) return false;
-    const now = instantNow();
-    let seen: ReturnType<typeof workerSeen> | undefined;
-    const worker = () => (seen ??= workerSeen(launchedFile(name)));
-    const word = leased(hit.run, now, worker);
-    const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
-    const workerMayRun = hit.run.state === 'working' && (word === 'working' || worker() !== 'gone');
-    if (!workerMayRun && group === undefined) return false;
-    const asked = firstAsked(stopFile(name), now);
-    if (workerMayRun) {
-      const again = find(name);
-      if (again && again.run.state === 'working' && again.run.pid > 0) {
-        try {
-          process.kill(again.run.pid, 'SIGTERM');
-        } catch {}
-      }
-    }
-    if (group === undefined) return false;
-    const grace = hit.run.stopGraceMs ?? bounds.stopGraceMs;
-    const signal = leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), grace);
-    if (signal !== 'none') {
-      try {
-        process.kill(-group, signal);
-      } catch {}
-    }
-    return true;
   };
 
   return {
@@ -913,21 +940,11 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
 
     stop: (sessionId) =>
       Effect.try({
-        try: () => void stopRun(sessionId),
+        try: () => void stopRunOf(spec, root, bounds.stopGraceMs)(sessionId),
         catch: (cause) => new RunnerError({ verb: 'stop', message: String(cause) }),
       }),
 
-    release: (session) =>
-      Effect.try({
-        try: () => {
-          const name = session.sessionId;
-          const hit = find(name);
-          if (!hit || wordOf(spec, root, name, hit.run, instantNow()) === 'working') return;
-          if (stopRun(name)) throw new Error(LEFT_RUNNING(name, hit.run.harness?.pid ?? 0));
-        },
-        catch: (cause) =>
-          new RunnerError({ verb: 'release', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
-      }),
+    release: releaseOf(spec, root, bounds.stopGraceMs),
 
     logs: (sessionId) =>
       Effect.try({

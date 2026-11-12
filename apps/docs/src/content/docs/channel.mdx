@@ -58,6 +58,7 @@ Enterprise organization, an administrator turns channels on first, with the chan
 
 Nemia's MCP port serves the Event lists as resources, for a client that is not Claude Code: `nemia:///api/events`, every Event, and
 `nemia:///api/namespaces/<namespace>/events`, one factory's. Each takes the selectors in its query, as the api's list does,
-`nemia:///api/events?labelSelector=waits%3Dperson`, given again for another. Reading one (resources/read) answers the Event list as
-JSON. A client of MCP's 2026-07-28 revision follows one with a subscriptions/listen request that names it among its resource
+`nemia:///api/events?labelSelector=waits%3Dperson`, given again for another. Reading one (resources/read) answers an Event list as
+JSON: the newest Events the port has seen of it while a client follows it, and its `metadata.resourceVersion`, the feed's position,
+from which `nemia watch --once <resourceVersion>` reads on. A client of MCP's 2026-07-28 revision follows one with a subscriptions/listen request that names it among its resource
 subscriptions: the port then tells it each time a line its selectors take is written, and the client reads the resource again.

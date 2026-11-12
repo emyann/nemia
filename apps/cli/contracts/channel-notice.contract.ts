@@ -61,7 +61,10 @@ const channelNoticeSpec = spec<(event: Event) => ChannelNotice>({
     itSaysEachQualifierExactlyWhenTheEventHasIt: {
       description: 'What a line waits on, where its answer is asked and the call it denied are said exactly when the event says them',
       condition: ({ input: [event], output }) =>
-        output.meta.waits === event.waits && output.meta.on === event.on && output.meta.via === event.via && output.meta.call === event.call,
+        output.meta.waits === event.waits &&
+        output.meta.on === event.on &&
+        output.meta.via === event.via &&
+        output.meta.call === event.call,
     },
     itSaysTheTryExactlyWhenTheEventHasOne: {
       description: 'The try of a denied call is said exactly when the event carries one',

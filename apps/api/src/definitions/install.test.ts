@@ -30,7 +30,7 @@ function installed(home: string) {
     builtAt: '2026-11-12T00:00:00.000Z',
     from: 'archive',
   };
-  const { HKB_REPO: _noRepoOfItsOwn, WF_EXPOSED: _notExposed, ...env } = process.env;
+  const { HKB_REPO: _noRepoOfItsOwn, ...env } = process.env;
   return appOf(Layer.mergeAll(liveOf(env), ApiConfig.layer(env, running), Layer.succeed(StoreRoot)(home))).app;
 }
 
@@ -101,6 +101,28 @@ test('an install with no repository and no factory named: yours is created, read
       [['scribe', 'yours']],
       'yours alone: no repository is read, nor an agent of the folder the api runs in (stray)',
     );
+    const carder = await send('POST', `${D}/agents`, {
+      metadata: { name: 'carder' },
+      spec: { description: 'Use this when cards are due.', keys: {}, skills: 'stray-skill', instructions: 'Card it.' },
+    });
+    assert.equal(carder.status, 201, await carder.text());
+    fs.mkdirSync(path.join(cwd, '.claude', 'skills', 'stray-skill'), { recursive: true });
+    fs.writeFileSync(
+      path.join(cwd, '.claude', 'skills', 'stray-skill', 'SKILL.md'),
+      '---\nname: stray-skill\ndescription: Found only in the folder the api runs in.\n---\nStray.\n',
+    );
+    process.chdir(cwd);
+    let card: Response;
+    let listed: Agent;
+    try {
+      card = await app.request(`${D}/agents/carder/card`);
+      listed = await got<Agent>(`${D}/agents/carder`);
+    } finally {
+      process.chdir(was);
+    }
+    const answer = await card.text();
+    assert.ok(!answer.includes('stray-skill') || card.status !== 200, `the card finds no skill in the folder the api runs in: ${answer}`);
+    assert.equal(listed.status.card, null, `nor does the agent's own card: ${JSON.stringify(listed.status.cardError)}`);
   });
 
   await t.test('a skill of yours, beside the builtins', async () => {

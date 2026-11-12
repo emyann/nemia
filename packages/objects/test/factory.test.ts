@@ -25,6 +25,7 @@ const templated = {
     level: 'semi-auto',
     costLines: { build: 80 },
     origins: { '/repo': 'https://example.com/o/r.git' },
+    workflowRepos: { build: 'repo' },
   },
   status: {
     observedGeneration: 3,
@@ -84,6 +85,12 @@ test("the factory's sub-resources as the Api's endpoints answer them and take th
   assert.notDeepEqual(answered('factories', 'rules', instruction), instruction, "the rules keep none of the instruction's own keys");
   assert.equal(answered('factories', 'instruction', rules), undefined);
   assert.equal(taken('factories', 'putRules', {}), undefined);
+});
+
+test("an attach takes the repository its workflow works on, by folder name, or none; REFUSED: a name that is no string", () => {
+  assert.deepEqual(taken('factories', 'attach', { repo: 'web' }), { repo: 'web' });
+  assert.deepEqual(taken('factories', 'attach', {}), {});
+  assert.equal(taken('factories', 'attach', { repo: 3 }), undefined);
 });
 
 test("a cost line's write takes its dollars and answers the factory; REFUSED: a write without them, or with them as words", () => {

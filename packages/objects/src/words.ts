@@ -450,6 +450,8 @@ export const EVENT_REASONS = [
   'StorePaused',
   'StoreResumed',
   'LevelChanged',
+  'NotReady',
+  'Ready',
   'ConflictsPending',
   'ConflictsSettled',
 ] as const;

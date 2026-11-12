@@ -33,7 +33,7 @@ import { hasStarted } from '../wait/wait.ts';
 import { ceilings, identify, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { type Settings, setting, StoreConfig } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
-import type { FeedConflicts } from '../feed/index.ts';
+import type { FeedConflicts, FeedReadiness } from '../feed/index.ts';
 import { emitFeed } from '../feed/feed.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { conflictsNow } from '../factory/applied/applied.verb.ts';
@@ -141,7 +141,7 @@ type TickReport = Effect.Success<ReturnType<Engine['tick']>>;
 /**
  * What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies.
  */
-type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
+type PassOptions = { repo: string; memo: RestMemo; verify: boolean; readiness?: () => FeedReadiness | undefined };
 
 /**
  * The series kept from the ring after a pass (`keepSeries`), and the time it took, which is measuring's. A failure costs the series, never
@@ -164,8 +164,9 @@ const loadNow = (): number => {
 };
 
 /**
- * What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, the quota the daemon last read, and
- * what its last sweep of the store's disk read (`disk`), which the pass keeps and never measures.
+ * What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, the quota the daemon last read, what
+ * its last sweep of the store's disk read (`disk`), which the pass keeps and never measures, and the store's readiness its last sweep
+ * read (`readiness`), whose moves the pass writes to the feed and never reads itself.
  */
 export type TickOptions = {
   repo?: string;
@@ -173,6 +174,7 @@ export type TickOptions = {
   verifyRest?: boolean;
   quota?: () => Reading | undefined;
   disk?: () => DiskReading | undefined;
+  readiness?: () => FeedReadiness | undefined;
 };
 
 /**
@@ -205,7 +207,7 @@ export type TickOptions = {
  *
  * Fails with the refusal a read threw (`Refusal`: the ceilings, `WF_VERIFY_REST`, a record); dies of anything else.
  */
-export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota, disk }: TickOptions = {}) {
+export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota, disk, readiness }: TickOptions = {}) {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
   const config = yield* StoreConfig;
@@ -213,6 +215,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
     repo: repo ?? process.cwd(),
     memo: memo ?? restMemo(e),
     verify: verifyRest ?? (yield* setting('verifyRest')),
+    ...(readiness ? { readiness } : {}),
   };
   const { io0, value, ms, tallies, io1 } = yield* talliedIn(
     e,
@@ -259,8 +262,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed, each factory's level in force and its conflicts pending among it, read beside
- *   the pause (`levelsNow`, `conflictsNow`): a feed that cannot be written costs the report (`feedError`), never the pass, and levels or
- *   conflicts that do not read cost their lines alone.
+ *   the pause (`levelsNow`, `conflictsNow`), and the store's readiness as the daemon's sweep last read it (`readiness`): a feed that
+ *   cannot be written costs the report (`feedError`), never the pass, and levels or conflicts that do not read cost their lines alone.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
  * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
@@ -269,7 +272,7 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  * Its span says how many runs the store listed (`runs`) and how many of them were answered from memory (`rested`), which make no span of
  * their own: a pass traces what it does, as many spans over many runs at rest as over few.
  */
-const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
+const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, readiness }: PassOptions) {
   const home = yield* StoreRoot;
   const informer = yield* Informer;
   if (informer) passStarted(informer);
@@ -306,7 +309,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts })),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, readiness })),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -457,15 +460,24 @@ const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [stri
 /**
  * Why the feed could not be written with what the pass judged (`emitFeed`), the store's pause it read at its start (`pause`, whose
  * put and lift the feed says), each factory's level in force it read beside it (`levels`, whose changes the feed says) and each
- * factory's `ConflictsPending` condition (`conflicts`, whose turns the feed says) — either undefined where it did not read, and nothing
- * is said of it — or undefined once it was: never the pass's failure.
+ * factory's `ConflictsPending` condition (`conflicts`, whose turns the feed says) and the store's readiness the daemon last read
+ * (`readiness`, whose moves the feed says) — each undefined where it was not read, and nothing is said of it — or undefined once it was:
+ * never the pass's failure.
  */
 const feedErrorOf = (
   home: string,
   runs: readonly Run[],
   { done, unjudged }: Judging,
   pause: Pause | null,
-  { levels, conflicts }: { levels: readonly FactoryLevel[] | undefined; conflicts: FeedConflicts | undefined },
+  {
+    levels,
+    conflicts,
+    readiness,
+  }: {
+    levels: readonly FactoryLevel[] | undefined;
+    conflicts: FeedConflicts | undefined;
+    readiness: (() => FeedReadiness | undefined) | undefined;
+  },
 ): Effect.Effect<string | undefined> =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
@@ -473,6 +485,7 @@ const feedErrorOf = (
       pause,
       ...(levels === undefined ? {} : { levels }),
       ...(conflicts === undefined ? {} : { conflicts }),
+      ...readOf(readiness?.()),
     }),
   ).pipe(
     Effect.map((written) =>
@@ -481,6 +494,9 @@ const feedErrorOf = (
         : `the feed (${feedFile(home)}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
     ),
   );
+
+/** The store's readiness as `emitFeed` takes it: none where the daemon has read none. */
+const readOf = (readiness: FeedReadiness | undefined): { readiness?: FeedReadiness } => (readiness === undefined ? {} : { readiness });
 
 /**
  * The pass as reported, with why the feed was not written (`feedErrorOf`): each run judged in the store's order, the queue's card, and

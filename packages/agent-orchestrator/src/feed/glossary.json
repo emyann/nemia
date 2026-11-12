@@ -105,6 +105,16 @@
       }
     },
     {
+      "term": "Not ready",
+      "meaning": "a Warning line about the store, `NotReady`: written by the tick while the daemon's readiness read has a piece a run waits on missing, its note each such piece and the command of its fix; again only where what is missing moves. The tick's judgement.",
+      "type": "Reason"
+    },
+    {
+      "term": "Ready",
+      "meaning": "a Normal line about the store, `Ready`: written by the tick once no piece a run waits on is missing, after the feed last said `not ready`; a store the feed never called not ready gets none. The tick's judgement.",
+      "type": "Reason"
+    },
+    {
       "term": "Reason",
       "meaning": "the code a machine selects a line on, computed from typed state, never from a word: an `Awaiting*` family for a wait on a person (`AwaitingAnswer` with `via`), and `Waiting` with `on` for a wait on a thing. A former code is still read, on a line on disk and in a stored selector (`FORMER_REASONS`).",
       "type": "Reason",

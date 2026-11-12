@@ -33,6 +33,7 @@ export type {
   FeedAppended,
   FeedCloseout,
   FeedConflicts,
+  FeedReadiness,
   FeedDenial,
   FeedFold,
   ClosedFeedLabels,

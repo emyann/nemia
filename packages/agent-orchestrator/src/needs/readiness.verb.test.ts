@@ -26,6 +26,7 @@ import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
 import { claudeTokenFile, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
 import { signInNeedOf } from './harness.ts';
 import { readinessOf, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
+import { sweptFacts } from './sweep.verb.ts';
 import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import { aRun } from '../../test/run-walks.ts';
@@ -348,4 +349,12 @@ test('cgroup v2 and the user manager cost a run only where the daemon files its 
   const limited = await read({ ...facts({ PATH: '/usr/bin', WF_MEMORY_LIMIT: '2Gi' }), exists: () => false }, identity('exit 0'));
   assert.equal(limited.pieces.find((p) => p.name === 'cgroup-v2')?.cost, 'run');
   assert.equal(limited.pieces.find((p) => p.name === 'systemd-user')?.cost, 'run');
+});
+
+test("the daemon's sweep reads the machine's facts with no command run, so it never blocks the loop it shares with the passes", () => {
+  const facts = sweptFacts();
+  const marker = path.join(scratch('wf-swept-facts-'), 'ran');
+  assert.equal(facts.run('sh', ['-c', `touch ${marker}`]), undefined, 'a command reads as not started');
+  assert.equal(fs.existsSync(marker), false, 'and nothing ran');
+  assert.equal(facts.env, process.env, "the rest are this process's own");
 });

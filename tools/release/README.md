@@ -43,7 +43,9 @@ operator's local `nemia-*` tags are never read. The bump of a release is the hig
 last release, those whose merge commit is in `<last tag>..origin/main` (`bump`); an unlabelled one counts for none and is listed apart
 in the pull request's body. The next version (`nextVersion`) is the last bumped, never below `FIRST`, `1.0.0`: the last tag today is
 `v0.3.0`, so the first release is `v1.0.0`. The version lives in the root `package.json` `version` and the lockfile's root (its
-`version` and `packages[""].version`), written as npm writes them.
+`version` and `packages[""].version`), written as npm writes them. It is the version a person reads: `nemia version`'s first line,
+`GET /api/version` and the board's bottom bar read the root `package.json` (`agent-orchestrator`'s `VERSION`), which the archive holds
+at the same place as a checkout, and `tools/guards/test/release.test.ts` holds that read to the file the bump writes.
 
 ## The verbs that write
 

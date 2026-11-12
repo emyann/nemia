@@ -4,9 +4,9 @@
  * through the request's services (`inRequest`), every refusal answered by the one map (`answered`, objects/refused.ts).
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
- * - `GET /api/version` — `{ version, release, latest? }`, the orchestrator's package version (`VERSION`), the code the api runs
- *   (`RELEASE`), a checkout or an install: what the board's bottom bar says; and the newest release the daemon's release check read,
- *   where it read one (`latestRelease`), which the board says when it is newer.
+ * - `GET /api/version` — `{ version, release, latest? }`, the release's version (`VERSION`, the root package.json's), the code the
+ *   api runs (`RELEASE`), a checkout or an install: what the board's bottom bar says; and the newest release the daemon's release check
+ *   read, where it read one (`latestRelease`), which the board says when it is newer.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.

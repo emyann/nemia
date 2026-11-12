@@ -25,9 +25,9 @@ Nemia runs as a user of its own, not root. Add one that accepts the same SSH key
 
 ```bash
 adduser --disabled-password --gecos '' nemia
-mkdir -p /home/nemia/.ssh
-cp ~/.ssh/authorized_keys /home/nemia/.ssh/
-chown -R nemia:nemia /home/nemia/.ssh && chmod 700 /home/nemia/.ssh && chmod 600 /home/nemia/.ssh/authorized_keys
+mkdir -p ~nemia/.ssh
+cp ~/.ssh/authorized_keys ~nemia/.ssh/
+chown -R nemia:nemia ~nemia/.ssh && chmod 700 ~nemia/.ssh && chmod 600 ~nemia/.ssh/authorized_keys
 loginctl enable-linger nemia
 ```
 

@@ -122,11 +122,11 @@ test("a step's page and a list of workflows are read in the place named, under a
       const asked = answering(t, listOfItems('Workflow', [workflowObject()]));
       const every = workflowsInQuery(null);
       await (every.queryFn as unknown as () => Promise<unknown>)();
-      assert.equal(asked.at(-1), '/api/namespaces/default/workflows');
+      assert.equal(asked.at(-1), '/api/namespaces/default/workflows?limit=500');
       assert.deepEqual([...every.queryKey], ['workflows']);
       const placed = workflowsInQuery({ factory: 'f', repo: '/code/app' });
       await (placed.queryFn as unknown as () => Promise<unknown>)();
-      assert.equal(asked.at(-1), '/api/namespaces/f/workflows?repo=%2Fcode%2Fapp');
+      assert.equal(asked.at(-1), '/api/namespaces/f/workflows?limit=500&repo=%2Fcode%2Fapp');
       assert.deepEqual([...placed.queryKey], ['factory-workflows', 'f', '/code/app']);
     },
   );
@@ -144,7 +144,7 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
       assert.deepEqual(more, [], "the repository's answered none");
       assert.deepEqual(
         [...asked].sort(),
-        ['/api/namespaces/default/agents?origin=repo', '/api/namespaces/default/agents?origin=yours'],
+        ['/api/namespaces/default/agents?limit=500&origin=repo', '/api/namespaces/default/agents?limit=500&origin=yours'],
         'each origin of the default namespace read whole, shadowed or not',
       );
       assert.equal(Object.hasOwn(read.card?.[0] ?? {}, 'examples'), false);

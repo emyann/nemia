@@ -132,10 +132,10 @@ test("runsMoved: a write that changes a run reads the frame's answer and each pa
       },
     );
     assert.deepEqual(asked.map(decodeURIComponent).sort(), [
-      '/api/namespaces/harbour/runs?fieldSelector=status.state!=finished',
-      '/api/namespaces/harbour/runs?fieldSelector=status.state!=finished',
-      '/api/runs?fieldSelector=status.state!=finished',
-      '/api/runs?fieldSelector=status.state!=finished',
+      '/api/namespaces/harbour/runs?limit=500&fieldSelector=status.state!=finished',
+      '/api/namespaces/harbour/runs?limit=500&fieldSelector=status.state!=finished',
+      '/api/runs?limit=500&fieldSelector=status.state!=finished',
+      '/api/runs?limit=500&fieldSelector=status.state!=finished',
     ]);
   });
 });

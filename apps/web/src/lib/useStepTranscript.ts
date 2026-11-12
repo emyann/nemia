@@ -10,7 +10,8 @@ export type { Following } from './following.ts';
  * A step's conversation: read once, and followed while the step has not finished. `taskId` is the session to read (`sessionToRead`):
  * null for a step with none, which reads nothing.
  *
- * The read gives the events so far, a cursor, and whether the task is live. A step whose task is not, and which waits on no person
+ * The read gives the events so far, every page of them read on at once while the api says `more` (`readTranscript`), a cursor, and
+ * whether the task is live. A step whose task is not, and which waits on no person
  * (`waiting`), is read that once (`followedFrom`). One whose task is live, or held open on a person's word, is followed by an EventSource
  * on the stream route, from that cursor, as `follow` says: the message being written as it comes, where the api pushes it, the next turn
  * and a try once they are filed (`moved`), and `settled` ends it; a dropped connection is the EventSource's to resume — it reconnects with

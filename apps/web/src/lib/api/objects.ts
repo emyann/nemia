@@ -7,6 +7,11 @@
  * change them and the delegations that may approve them (`proposals`, `delegations`). Each is a promise, as TanStack Query's functions
  * take one.
  *
+ * A list the board shows whole is read page by page (`everyPage`): the api answers a page of `LIST_PAGE.byDefault` to a list asked with
+ * no `limit`, and `continue` on every page but the last, so each list read here asks pages of `LIST_PAGE.most` and reads on until a page
+ * answers no `continue`. A step's tries are read with every output field of each closeout (`fields=*`) and each body read on from its
+ * `bodyNext` (`steps.tries`), as the board shows a closeout whole.
+ *
  * What a call rejects with is what the board's own reads and writes reject with (`read.ts`): a refusal in the api's words (its `error`)
  * and its status — a `ReadRefusal` for a read, so a run gone is still `readGone`, a `WriteRefusal` for a write — and an `UnreadAnswer`
  * where an answer does not decode, naming the first key that is wrong. So each call runs on a `fetch` of its own that keeps the status and
@@ -81,6 +86,10 @@ import {
   WorkflowStepPage,
   KeyForm,
   type DefinitionOrigin,
+  LIST_PAGE,
+  BODY_PAGE,
+  TryCloseout,
+  type StepTry,
 } from 'objects';
 import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read.ts';
 
@@ -200,6 +209,39 @@ const listed = <L>(answer: L | Table): Effect.Effect<L> =>
     ? Effect.die(new Error('The api answered a Table the board did not ask for: restart the api (npm run dev).'))
     : Effect.succeed(answer);
 
+/** The page of a list asked: the most a page holds, and past the first page the `continue` the page before answered, sent as it is. */
+type PageAsked = { limit: string; continue?: string };
+
+/** A page of a list: its items, where it stands, and, for the runs, each it could not judge. */
+type Paged = { metadata: { continue?: string }; items: readonly unknown[]; unjudged?: readonly unknown[] };
+
+/**
+ * Every page of a list read as one: `page` asked for a page of `LIST_PAGE.most`, and again with each `continue` its answer gives, until
+ * one gives none; the first page's shape, every page's items (and runs not judged) in order, the last page's metadata. A page that gives
+ * back the `continue` it was asked with is an api that would be asked forever, refused naming the restart.
+ */
+export async function everyPage<L extends Paged>(page: (asked: PageAsked) => Promise<L>): Promise<L> {
+  const limit = String(LIST_PAGE.most);
+  const first = await page({ limit });
+  const pages = [first];
+  let next = first.metadata.continue;
+  while (next !== undefined && next !== '') {
+    const answer = await page({ limit, continue: next });
+    pages.push(answer);
+    if (answer.metadata.continue === next)
+      throw new Error('The api answered a page the same `continue` it was asked with: restart the api (npm run dev).');
+    next = answer.metadata.continue;
+  }
+  const { metadata } = pages.at(-1) ?? first;
+  const unjudged = pages.flatMap((p) => p.unjudged ?? []);
+  return Object.assign(
+    {},
+    first,
+    { metadata, items: pages.flatMap((p) => p.items) },
+    first.unjudged === undefined && unjudged.length === 0 ? {} : { unjudged },
+  );
+}
+
 /** What a list of runs is asked by: its labels, its state (`status.state=<state>`, `==`, `!=`), and a page of it. */
 export type RunListQuery = { labelSelector?: string; fieldSelector?: string; limit?: number; continue?: string };
 
@@ -211,6 +253,12 @@ const runListQueryOf = (query: RunListQuery) => ({
   ...(query.continue === undefined ? {} : { continue: query.continue }),
 });
 
+/** A list of runs `page` reads: the one page `query` names by its `limit` or `continue`, else every page (`everyPage`). */
+const runPages = (query: RunListQuery, page: (asked: { limit?: number; continue?: string }) => Promise<RunList>): Promise<RunList> =>
+  query.limit !== undefined || query.continue !== undefined
+    ? page({})
+    : everyPage((asked) => page({ limit: Number(asked.limit), ...(asked.continue === undefined ? {} : { continue: asked.continue }) }));
+
 /**
  * The run object, its list and its sub-resources; and its named actions, each in the run's namespace (its factory, `default` for one that
  * names none, `namespaceOf`), each taking what it may have done (`may`), which the caller's words say.
@@ -219,13 +267,20 @@ export const runs = {
   /**
    * Every run, of every namespace, that the query keeps (`GET /api/runs`), with each it could not judge beside them (`unjudged`): by its
    * labels (`labelSelector`), by its state (`fieldSelector`, which brings the frame's parts and the counts), a page of `limit` runs from
-   * `continue`; with no `limit` the api answers them all.
+   * `continue`; with neither, every page of them (`everyPage`).
    */
   listAll: (query: RunListQuery = {}): Promise<RunList> =>
-    call((c) => c.runs.listAll({ query: runListQueryOf(query) }).pipe(Effect.flatMap(listed)), read(RunList)),
+    runPages(query, (asked) =>
+      call((c) => c.runs.listAll({ query: runListQueryOf({ ...query, ...asked }) }).pipe(Effect.flatMap(listed)), read(RunList)),
+    ),
   /** The runs of `namespace` the query keeps (`GET /api/namespaces/:namespace/runs`), as `listAll` asks them. */
   list: (namespace: string, query: RunListQuery = {}): Promise<RunList> =>
-    call((c) => c.runs.list({ params: { namespace }, query: runListQueryOf(query) }).pipe(Effect.flatMap(listed)), read(RunList)),
+    runPages(query, (asked) =>
+      call(
+        (c) => c.runs.list({ params: { namespace }, query: runListQueryOf({ ...query, ...asked }) }).pipe(Effect.flatMap(listed)),
+        read(RunList),
+      ),
+    ),
   /** The run object (`GET /api/runs/:name`). */
   show: (name: string): Promise<Run> => call((c) => c.runs.show({ params: { name } }), read(Run)),
   /** A run started in `namespace`, on its repository `repo` where the factory has several (`?repo=`): its name. */
@@ -260,10 +315,43 @@ export const runs = {
     call((c) => c.runs.say({ params: { namespace, name, step }, payload: { text } }), write(RunSaid, may)),
 };
 
+/**
+ * A try with its closeout's body whole: each page after the one it was answered with read from the `bodyNext` the page before gave, in
+ * pages of the most the api answers (`BODY_PAGE.most`), until a page gives none. A try whose body was answered whole is as it was.
+ */
+async function bodyWhole(runId: string, step: string, at: StepTry): Promise<StepTry> {
+  let closeout = at.closeout;
+  while (closeout?.bodyNext !== undefined) {
+    const { bodyNext: from, ...had } = closeout;
+    const next = await call(
+      (c) =>
+        c.steps.closeout({
+          params: { runId, step, try: String(at.try) },
+          query: { bodyFrom: String(from), bodyLimit: String(BODY_PAGE.most) },
+        }),
+      read(TryCloseout),
+    );
+    const page = next.closeout;
+    if (page === null) break;
+    closeout = {
+      ...had,
+      body: `${had.body ?? ''}${page.body ?? ''}`,
+      ...(page.bodyNext !== undefined && page.bodyNext > from ? { bodyNext: page.bodyNext } : {}),
+    };
+  }
+  return closeout === at.closeout ? at : { ...at, closeout };
+}
+
 /** A run's step's reads (`/api/runs/:runId/steps/:step/…`). */
 export const steps = {
-  /** Every try of a step, earliest first. */
-  tries: (runId: string, step: string): Promise<StepTries> => call((c) => c.steps.tries({ params: { runId, step } }), read(StepTries)),
+  /**
+   * Every try of a step, earliest first, each closeout whole: every output field (`fields=*`), and its body read on from each page's
+   * `bodyNext` (`bodyWhole`).
+   */
+  tries: async (runId: string, step: string): Promise<StepTries> => {
+    const listed = await call((c) => c.steps.tries({ params: { runId, step }, query: { fields: '*' } }), read(StepTries));
+    return { ...listed, tries: await Promise.all(listed.tries.map((t) => bodyWhole(runId, step, t))) };
+  },
   /** What a step was told. */
   told: (runId: string, step: string): Promise<StepTold> => call((c) => c.steps.told({ params: { runId, step } }), read(StepTold)),
 };
@@ -273,11 +361,13 @@ const Started = Schema.Struct({ id: Schema.String, card: Schema.String });
 
 /** The inbox's cards as objects: a card is named by its namespace (its factory, `default` for none) and its name. */
 export const cards = {
-  /** Every card, of every namespace, that `labelSelector` keeps by its labels, or every card for none (`GET /api/cards`). */
+  /** Every card, of every namespace, that `labelSelector` keeps by its labels, or every card for none (`GET /api/cards`), every page. */
   listAll: (labelSelector?: string): Promise<CardList> =>
-    call(
-      (c) => c.cards.listAll({ query: labelSelector === undefined ? {} : { labelSelector } }).pipe(Effect.flatMap(listed)),
-      read(CardList),
+    everyPage((asked) =>
+      call(
+        (c) => c.cards.listAll({ query: labelSelector === undefined ? asked : { ...asked, labelSelector } }).pipe(Effect.flatMap(listed)),
+        read(CardList),
+      ),
     ),
   /** A card, by its namespace and its name, with its file as written (`status.source`). */
   get: (namespace: string, name: string): Promise<Card> => call((c) => c.cards.get({ params: { namespace, name } }), read(Card)),
@@ -347,8 +437,9 @@ const SETTINGS_WRITTEN = "The factory's settings may be changed: read its settin
 
 /** A factory, its rules, its instruction and the lines a person types for it (`/api/factories`). */
 export const factories = {
-  /** Every factory, the default one among them (`GET /api/factories`). */
-  listAll: (): Promise<FactoryList> => call((c) => c.factories.listAll({ query: {} }).pipe(Effect.flatMap(listed)), read(FactoryList)),
+  /** Every factory, the default one among them (`GET /api/factories`), every page. */
+  listAll: (): Promise<FactoryList> =>
+    everyPage((asked) => call((c) => c.factories.listAll({ query: asked }).pipe(Effect.flatMap(listed)), read(FactoryList))),
   /** The factory `name`. */
   get: (name: string): Promise<Factory> => call((c) => c.factories.get({ params: { name } }), read(Factory)),
   /** The lines a person types for the factory `name`: attach, rm, add, schedule, trust, volume, and each unschedule and volume rm. */
@@ -392,9 +483,11 @@ const SIGN_IN_ASKED = "The sign-in may have changed: read the server's state aga
 
 /** A factory's MCP servers, in its namespace (the factory's name), each header's value served masked; and their sign-ins. */
 export const mcpServers = {
-  /** Every server the factory `namespace` records, with the state its harness reports of each. */
+  /** Every server the factory `namespace` records, with the state its harness reports of each, every page. */
   list: (namespace: string): Promise<McpServerList> =>
-    call((c) => c.mcpservers.list({ params: { namespace }, query: {} }).pipe(Effect.flatMap(listed)), read(McpServerList)),
+    everyPage((asked) =>
+      call((c) => c.mcpservers.list({ params: { namespace }, query: asked }).pipe(Effect.flatMap(listed)), read(McpServerList)),
+    ),
   /** The server `name` recorded as `server`; a header sent as the mask keeps the value stored. */
   put: (namespace: string, name: string, server: McpServerWrite): Promise<McpServer> =>
     call((c) => c.mcpservers.put({ params: { namespace, name }, payload: server }), write(McpServer, SERVER_WRITTEN)),
@@ -412,15 +505,16 @@ export const mcpServers = {
     call((c) => c.mcpservers.signOut({ params: { namespace, name } }), write(SignedOut, SIGN_IN_ASKED)),
 };
 
-/** Nemia's own servers, which a factory may record (`GET /api/builtin/mcpservers`). */
+/** Nemia's own servers, which a factory may record (`GET /api/builtin/mcpservers`), every page. */
 export const builtin = {
-  mcpServers: (): Promise<McpServerList> => call((c) => c.builtin.mcpservers({}), read(McpServerList)),
+  mcpServers: (): Promise<McpServerList> => everyPage((asked) => call((c) => c.builtin.mcpservers({ query: asked }), read(McpServerList))),
 };
 
 /** A factory's schedules, each named by its workflow. */
 export const schedules = {
+  /** Every schedule of the factory `namespace`, every page. */
   list: (namespace: string): Promise<ScheduleList> =>
-    call((c) => c.schedules.list({ params: { namespace }, query: {} }), read(ScheduleList)),
+    everyPage((asked) => call((c) => c.schedules.list({ params: { namespace }, query: asked }), read(ScheduleList))),
   get: (namespace: string, name: string): Promise<Schedule> =>
     call((c) => c.schedules.get({ params: { namespace, name } }), read(Schedule)),
   put: (namespace: string, name: string, schedule: ScheduleWrite): Promise<Schedule> =>
@@ -443,7 +537,9 @@ const HIRE_WRITTEN = "The factory's hires may be changed: read the step's page a
 
 /** A factory's hires, one per step of each workflow it offers, each named `<workflow>.<step>` (`hireName`). */
 export const hires = {
-  list: (namespace: string): Promise<HireList> => call((c) => c.hires.list({ params: { namespace }, query: {} }), read(HireList)),
+  /** Every hire of the factory `namespace`, every page. */
+  list: (namespace: string): Promise<HireList> =>
+    everyPage((asked) => call((c) => c.hires.list({ params: { namespace }, query: asked }), read(HireList))),
   get: (namespace: string, name: string): Promise<Hire> => call((c) => c.hires.get({ params: { namespace, name } }), read(Hire)),
   /** The agent `agent` hired into the step the hire `name` is of: answers the hire as it then reads. */
   put: (namespace: string, name: string, agent: string): Promise<Hire> =>
@@ -458,8 +554,9 @@ const PROPOSAL_JUDGED = 'The proposal may be judged: read it again on its page b
 
 /** A factory's proposals, each a change to its definitions waiting on, or judged by, an approval. */
 export const proposals = {
+  /** Every proposal of the factory `namespace`, every page. */
   list: (namespace: string): Promise<ProposalList> =>
-    call((c) => c.proposals.list({ params: { namespace }, query: {} }), read(ProposalList)),
+    everyPage((asked) => call((c) => c.proposals.list({ params: { namespace }, query: asked }), read(ProposalList))),
   get: (namespace: string, name: string): Promise<Proposal> =>
     call((c) => c.proposals.get({ params: { namespace, name } }), read(Proposal)),
   /** The proposal `name` approved, the person's: answers it as it then reads, applied where it applies at approval. */
@@ -475,8 +572,9 @@ const DELEGATION_WRITTEN = "The factory's delegations may be changed: read its s
 
 /** A factory's delegations, each named after the agent it lets approve proposals within its grants; written by the person alone. */
 export const delegations = {
+  /** Every delegation of the factory `namespace`, every page. */
   list: (namespace: string): Promise<DelegationList> =>
-    call((c) => c.delegations.list({ params: { namespace }, query: {} }), read(DelegationList)),
+    everyPage((asked) => call((c) => c.delegations.list({ params: { namespace }, query: asked }), read(DelegationList))),
   /** The delegation of the agent `name` written whole as `spec`: answers it as it then reads. */
   put: (namespace: string, name: string, spec: DelegationWrite): Promise<Delegation> =>
     call((c) => c.delegations.put({ params: { namespace, name }, payload: spec }), write(Delegation, DELEGATION_WRITTEN)),
@@ -497,18 +595,6 @@ const originOf = (at: DefinitionRead | undefined): { origin?: string } => (at?.o
 /** The `?repo=` of `at`, sent beside the keys the Api declares; none for none. */
 const repoOf = (at: DefinitionRead | undefined): Record<string, string> | undefined => (at?.repo ? { repo: at.repo } : undefined);
 
-/** Every item of a list read page by page: `page` asked again with each `continue` its answer gives, until one gives none. */
-async function everyPage<T>(page: (next: string | undefined) => Promise<{ metadata: { continue?: string }; items: readonly T[] }>) {
-  const items: T[] = [];
-  let next: string | undefined;
-  do {
-    const answer = await page(next);
-    items.push(...answer.items);
-    next = answer.metadata.continue;
-  } while (next !== undefined);
-  return items;
-}
-
 /** What a write of a workflow may have done, and what to look at before writing again. */
 const WORKFLOW_WRITTEN = 'The folder may be written: reload the Workflows page before writing it again.';
 
@@ -519,12 +605,9 @@ const WORKFLOW_WRITTEN = 'The folder may be written: reload the Workflows page b
 export const workflows = {
   /** Every workflow the namespace serves, every page of it. */
   list: (namespace: string, at?: DefinitionRead): Promise<Workflow[]> =>
-    everyPage((next) =>
-      call(
-        (c) => c.workflows.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
-        read(WorkflowList, repoOf(at)),
-      ),
-    ),
+    everyPage((asked) =>
+      call((c) => c.workflows.list({ params: { namespace }, query: { ...originOf(at), ...asked } }), read(WorkflowList, repoOf(at))),
+    ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Workflow> =>
     call((c) => c.workflows.get({ params: { namespace, name }, query: originOf(at) }), read(Workflow, repoOf(at))),
   create: (namespace: string, body: WorkflowCreate, refuse?: Refuse): Promise<Workflow> =>
@@ -550,15 +633,12 @@ const AGENT_WRITTEN = 'The agent may be written: read it again on its page befor
 /** A namespace's agents, as its workflows: yours made, written and removed in `default`; tried; and read as an A2A card. */
 export const agents = {
   list: (namespace: string, at?: DefinitionRead): Promise<Agent[]> =>
-    everyPage((next) =>
+    everyPage((asked) =>
       call(
-        (c) =>
-          c.agents
-            .list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } })
-            .pipe(Effect.flatMap(listed)),
+        (c) => c.agents.list({ params: { namespace }, query: { ...originOf(at), ...asked } }).pipe(Effect.flatMap(listed)),
         read(AgentList, repoOf(at)),
       ),
-    ),
+    ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Agent> =>
     call((c) => c.agents.get({ params: { namespace, name }, query: originOf(at) }), read(Agent, repoOf(at))),
   create: (namespace: string, body: AgentWrite, refuse?: Refuse): Promise<Agent> =>
@@ -586,15 +666,12 @@ const SKILL_WRITTEN = 'The skill may be written: read the skills again before wr
 /** A namespace's skills: yours made and written in `default`, a builtin one copied to yours, and a folder's files by path. */
 export const skills = {
   list: (namespace: string, at?: DefinitionRead): Promise<Skill[]> =>
-    everyPage((next) =>
+    everyPage((asked) =>
       call(
-        (c) =>
-          c.skills
-            .list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } })
-            .pipe(Effect.flatMap(listed)),
+        (c) => c.skills.list({ params: { namespace }, query: { ...originOf(at), ...asked } }).pipe(Effect.flatMap(listed)),
         read(SkillList, repoOf(at)),
       ),
-    ),
+    ).then((list) => [...list.items]),
   get: (namespace: string, name: string, at?: DefinitionRead): Promise<Skill> =>
     call((c) => c.skills.get({ params: { namespace, name }, query: originOf(at) }), read(Skill, repoOf(at))),
   create: (namespace: string, body: SkillWrite, refuse?: Refuse): Promise<Skill> =>

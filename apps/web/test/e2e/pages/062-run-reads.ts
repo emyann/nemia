@@ -34,7 +34,7 @@ export default {
     const asked: string[] = [];
     const heard = (request: Request) => {
       const url = new URL(request.url());
-      if (request.method() === 'GET' && url.pathname.startsWith(`/api/runs/${RUN}`)) asked.push(`${url.pathname}${url.search}`);
+      if (request.method() === 'GET' && url.pathname.startsWith(`/api/runs/${RUN}`)) asked.push(url.pathname);
     };
     const object = `/api/runs/${RUN}`;
     const lines = `/api/runs/${RUN}/lines`;

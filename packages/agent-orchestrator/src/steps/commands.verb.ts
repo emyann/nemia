@@ -12,7 +12,7 @@ import { RunId } from '../record/record.model.ts';
 import { isRepositoryRun } from '../record/record.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { transcriptAskedRead, transcriptCursorRead, transcriptPaged } from './transcript-page.ts';
+import { transcriptAskedRead, transcriptCursorRead, transcriptPaged } from '../transcript-page/transcript-page.ts';
 
 /** A text flag under `key`, as the api hands it. */
 const keyed = (key: string): Flag => ({ flag: `--${key}`, kind: 'text', key });

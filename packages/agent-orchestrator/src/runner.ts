@@ -406,7 +406,7 @@ export {
   type TranscriptAsked,
   type TranscriptAt,
   type TranscriptPaged,
-} from './steps/transcript-page.ts';
+} from './transcript-page/transcript-page.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
 export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';

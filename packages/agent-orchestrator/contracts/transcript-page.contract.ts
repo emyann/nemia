@@ -1,5 +1,5 @@
 /**
- * A page of a step's conversation (agent-orchestrator, src/steps/transcript-page.ts, to be written): where `?limit=` or `?last=` cut
+ * A page of a step's conversation (agent-orchestrator, src/transcript-page/transcript-page.ts, to be written): where `?limit=` or `?last=` cut
  * the `count` events a read holds after its cursor — those of the kinds asked (`?kinds=`), every one where none is — in the order they
  * were said. It answers the events `[from, to)` and whether any is left after them (`more`), which the door answers as the cursor to read
  * on from: the position after the event at `to - 1`, or the engine's own cursor where none is left. `limit` reads the first events after
@@ -87,5 +87,5 @@ const transcriptCutSpec = spec<
   },
 });
 
-/** `transcriptCut`'s type, which `src/steps/transcript-page.ts` takes. */
+/** `transcriptCut`'s type, which `src/transcript-page/transcript-page.ts` takes. */
 export type TranscriptCut = Implementation<typeof transcriptCutSpec>;

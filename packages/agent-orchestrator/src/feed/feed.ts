@@ -346,9 +346,9 @@ const counted = (fold: FeedFold, line: FeedLine, involved: Involved, reason: Rea
  * to the same state: the last word said of each run and step wins, a `removed` forgets a run and everything of it, and a one-shot goes to
  * its own count and never to a step's last word. The store's one-shots are counted as a run's are (`storeOnce` reads them back), and a
  * `removed` leaves them, being of no run; a factory's level line is the last word said of that factory (`levelKey`, `levelLines` reads it
- * back), and a readiness line the last said of the store's readiness (`READINESS_KEY`, `readinessLines` reads it back); any other store line — a code a newer `nemia` names — is no word the fold keeps. A factory's conflicts line is the last word
- * said of its conflicts (`conflictsKey`, `conflictLines` reads it back), and any other factory line is passed. A daemon's line is no
- * run's. Pure.
+ * back), and a readiness line the last said of the store's readiness (`READINESS_KEY`, `readinessLines` reads it back); any other
+ * store line — a code a newer `nemia` names — is no word the fold keeps. A factory's conflicts line is the last word said of its conflicts
+ * (`conflictsKey`, `conflictLines` reads it back), and any other factory line is passed. A daemon's line is no run's. Pure.
  */
 export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   for (const l of lines) {
@@ -792,16 +792,25 @@ export function feedChanges(
   }
   return [
     ...out,
-    ...storeChanges(fold, at, pause, levels),
+    ...storeChanges(fold, at, pause, levels, readiness),
     ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
-    ...(readiness === undefined ? [] : readinessLines(fold, at, readiness)),
   ];
 }
 
-/** The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them. Pure. */
-const storeChanges = (fold: FeedFold, at: string, pause: FeedPause | undefined, levels: FeedLevels | undefined): StoreLine[] => [
+/**
+ * The store's lines a pass owes: its pause's where the pass read it (`storeLines`), its factories' levels' where it read them, and its
+ * readiness where it was handed the daemon's read (`readinessLines`). Pure.
+ */
+const storeChanges = (
+  fold: FeedFold,
+  at: string,
+  pause: FeedPause | undefined,
+  levels: FeedLevels | undefined,
+  readiness: FeedReadiness | undefined,
+): StoreLine[] => [
   ...(pause === undefined ? [] : storeLines(fold, at, pause)),
   ...(levels === undefined ? [] : levelLines(fold, at, levels)),
+  ...(readiness === undefined ? [] : readinessLines(fold, at, readiness)),
 ];
 
 /**

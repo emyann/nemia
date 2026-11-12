@@ -262,8 +262,8 @@ export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, qu
  *   run is advanced, judges each as the api serves it and keeps it there (`informed`), so a request reads what the pass judged.
  * - then the tasks of runs `nemia rm` removed that had not settled are forgotten (`finishForgetting`), and what it says is the pass's.
  * - last, and apart, the feed is written where it changed, each factory's level in force and its conflicts pending among it, read beside
- *   the pause (`levelsNow`, `conflictsNow`), and the store's readiness as the daemon's sweep last read it (`readiness`): a feed that cannot be written costs the report (`feedError`), never the pass, and levels or
- *   conflicts that do not read cost their lines alone.
+ *   the pause (`levelsNow`, `conflictsNow`), and the store's readiness as the daemon's sweep last read it (`readiness`): a feed that
+ *   cannot be written costs the report (`feedError`), never the pass, and levels or conflicts that do not read cost their lines alone.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`), or that froze no workflow and whose folder does not load
  * (`unloadedFolder`), is left unjudged, out of the feed's `removed` and counted in flight (`judged`); a pause's reads leave it out
@@ -309,13 +309,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(
-      report,
-      runs,
-      judging,
-      queue,
-      yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, readiness: readiness?.() }),
-    ),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(home, runs, judging, pause, { levels, conflicts, readiness })),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -479,7 +473,11 @@ const feedErrorOf = (
     levels,
     conflicts,
     readiness,
-  }: { levels: readonly FactoryLevel[] | undefined; conflicts: FeedConflicts | undefined; readiness: FeedReadiness | undefined },
+  }: {
+    levels: readonly FactoryLevel[] | undefined;
+    conflicts: FeedConflicts | undefined;
+    readiness: (() => FeedReadiness | undefined) | undefined;
+  },
 ): Effect.Effect<string | undefined> =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
@@ -487,7 +485,7 @@ const feedErrorOf = (
       pause,
       ...(levels === undefined ? {} : { levels }),
       ...(conflicts === undefined ? {} : { conflicts }),
-      ...(readiness === undefined ? {} : { readiness }),
+      ...readOf(readiness?.()),
     }),
   ).pipe(
     Effect.map((written) =>
@@ -496,6 +494,9 @@ const feedErrorOf = (
         : `the feed (${feedFile(home)}) was not written on this pass: ${(Cause.squash(written.cause) as Error).message}`,
     ),
   );
+
+/** The store's readiness as `emitFeed` takes it: none where the daemon has read none. */
+const readOf = (readiness: FeedReadiness | undefined): { readiness?: FeedReadiness } => (readiness === undefined ? {} : { readiness });
 
 /**
  * The pass as reported, with why the feed was not written (`feedErrorOf`): each run judged in the store's order, the queue's card, and

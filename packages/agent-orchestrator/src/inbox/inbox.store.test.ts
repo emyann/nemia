@@ -25,7 +25,9 @@ import { inboxDir, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import * as verbs from '../runner.ts';
 import { runRecord } from '../record/record.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
-import { INBOX as INBOX_LIST } from './commands.verb.ts';
+import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
+import { inboxLines, type InboxListing } from './inbox.ts';
+import { handled, typed } from '../../test/typed.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
@@ -54,6 +56,21 @@ heldUnasked(engine);
 
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
+
+/** A store verb typed, run on its entry's handler as the api calls it (`typed`): its data, or its refusal thrown. */
+const verb = (...argv: string[]) => typed(argv, noEngine(), undefined, stand().place, ENV);
+
+/**
+ * `nemia inbox add` as the api calls its handler: the idea's text and the card's keys, as the client sends them — a file read where it is
+ * typed and its text sent, `--repo` resolved from where it is typed.
+ */
+const added = (input: InboxAddInput) => handled(INBOX_ADD, input, { e: noEngine(), place: stand().place, env: ENV });
+
+/** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry (`typed`), `-l`, `--show-labels` and `-L` as given. */
+const listedLines = async (argv: readonly string[] = [], show: { showLabels?: boolean; columns?: string[] } = {}): Promise<string[]> => {
+  const { cards, defaultStarts } = (await verb('inbox', ...argv)) as { cards: InboxListing[]; defaultStarts: boolean };
+  return inboxLines(cards, defaultStarts, show);
+};
 
 /** Every card as `nemia inbox --all` lists it, with its state, read through `memo` where one is given, as the api keeps one. */
 const judgedInbox = async (memo = informerMemo()) => (await runWith(noEngine(), INBOX_LIST.handler({ all: true }, { runs: memo }))).cards;
@@ -131,19 +148,16 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     emptyInbox();
     assert.equal(inboxDir(ROOT), path.join(ROOT, 'inbox'));
     assert.deepEqual(readInbox(), []);
-    assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
+    const empty = (await verb('inbox')) as { cards: unknown[]; ended: number };
+    assert.deepEqual([empty.cards, empty.ended], [[], 0], 'no card, and none ended');
     assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox \[--all\]$/);
-    assert.ok(
-      (await printedBy(t, 'help')).some((l) => l.startsWith('  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
-      'on the general help',
-    );
   });
   await s.test(
     '`nemia inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `nemia inbox` lists each, with started as for a card a record names',
-    async (t) => {
+    async () => {
       emptyInbox();
       const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-      const added = await printedBy(t, 'inbox', 'add', "Cache the engine's views between passes\n\nThe tick reads each task twice.");
+      const first = await added({ idea: "Cache the engine's views between passes\n\nThe tick reads each task twice." });
       const [name] = inInbox();
       assert.match(name, /^cache-the-engine-s-views-bet-[a-z0-9]{4}\.md$/, 'the slug runId makes of the first line, suffix included');
       const card = path.join(INBOX, name);
@@ -152,31 +166,24 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         "Cache the engine's views between passes\n\nThe tick reads each task twice.\n",
         'no keys, no frontmatter',
       );
-      assert.deepEqual(added, [
-        `${name.slice(0, -3)}  Cache the engine's views between passes`,
-        `filed: ${card} — start it with nemia start ${name.slice(0, -3)} --workflows <w>`,
-      ]);
-
-      await printedBy(
-        t,
-        'inbox',
-        'add',
-        "Cache the engine's views between passes",
-        '--workflow',
-        'dev',
-        `--repo=${path.relative(process.cwd(), repo)}`,
+      assert.deepEqual(
+        [first.card.name, first.card.body, first.card.workflow, first.file],
+        [name.slice(0, -3), "Cache the engine's views between passes\n\nThe tick reads each task twice.", undefined, card],
+        'the card filed, its file, and no workflow, which its start then asks for',
       );
+
+      await added({ idea: "Cache the engine's views between passes", workflow: 'dev', repo });
       const second = inInbox().find((f) => f !== name)!;
       assert.ok(second && second !== name, 'a second card, not the first written over');
       assert.equal(
         fs.readFileSync(path.join(INBOX, second), 'utf8'),
         `---\nworkflow: dev\nrepo: ${repo}\n---\nCache the engine's views between passes\n`,
-        '--repo written absolute',
+        '--repo, which the client resolves where it is typed (`pathSent`), written as sent',
       );
 
       const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
       fs.writeFileSync(given, `---\nworkflow: ui\nrepo: /nowhere/at/all\n---\nShow the flag on the settings page.\n`);
-      await printedBy(t, 'inbox', 'add', given, '--repo', repo);
+      await added({ idea: fs.readFileSync(given, 'utf8'), repo });
       const third = inInbox().find((f) => f.startsWith('show-the-flag'))!;
       assert.equal(
         fs.readFileSync(path.join(INBOX, third), 'utf8'),
@@ -186,16 +193,6 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.equal(fs.readFileSync(given, 'utf8').includes('/nowhere/at/all'), true, 'the file given is left as it was');
       const byPath = addToInbox({ text: 'Store the flag', workflow: path.join(repo, 'workflows', 'dev') });
       assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'), 'a workflow given as a path is kept absolute');
-      const relative = path.relative(process.cwd(), path.join(repo, 'workflows', 'ui'));
-      assert.match(relative, /\//, 'a path, not a name');
-      await printedBy(t, 'inbox', 'add', 'Store the flag by path', '--workflow', relative);
-      const fourth = inInbox().find((f) => f.startsWith('store-the-flag-by-path'))!;
-      assert.equal(
-        fs.readFileSync(path.join(INBOX, fourth), 'utf8'),
-        `---\nworkflow: ${path.join(repo, 'workflows', 'ui')}\n---\nStore the flag by path\n`,
-        '--workflow given as a path from here is written absolute, so the inbox reads the same folder',
-      );
-      fs.rmSync(path.join(INBOX, fourth));
 
       writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
       writeRecord('an-unrelated-run-yy88');
@@ -216,7 +213,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
         'started, broken and non-card listed; hidden and README not',
       );
-      const lines = await printedBy(t, 'inbox');
+      const lines = await listedLines();
       assert.ok(
         lines.some((l) =>
           new RegExp(
@@ -237,24 +234,20 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)),
         lines.join('\n'),
       );
-      assert.deepEqual(lines.slice(-2), [
-        '',
-        `start one: nemia start <name> [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
-      ]);
       fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
       fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
     },
   );
-  await s.test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it", async (t) => {
+  await s.test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it", async () => {
     emptyInbox();
     const { card, file } = addToInbox({ text: 'Build the page', factory: 'pipao' });
     assert.equal(card.factory, 'pipao');
     assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: pipao\n---\nBuild the page\n');
     const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
     fs.writeFileSync(idea, '---\nfactory: nemia\nworkflow: build\n---\nShip it\n');
-    const printed = await printedBy(t, 'inbox', 'add', idea, '--factory', 'pipao');
-    const [name] = printed[0].split('  ');
-    assert.equal(printed[0], `${name}  Ship it  workflow: build  factory: pipao`);
+    const filedThere = await added({ idea: fs.readFileSync(idea, 'utf8'), factory: 'pipao' });
+    const { name } = filedThere.card;
+    assert.deepEqual([filedThere.card.body, filedThere.card.workflow, filedThere.card.factory], ['Ship it', 'build', 'pipao']);
     assert.equal(fs.readFileSync(path.join(INBOX, `${name}.md`), 'utf8'), '---\nworkflow: build\nfactory: pipao\n---\nShip it\n');
     assert.equal(readInbox().find((l) => l.name === name)?.factory, 'pipao');
   });
@@ -270,7 +263,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const idea = path.join(repo, 'plans', 'idea.md');
       fs.writeFileSync(idea, `---\nworkflow: ../workflows/dev\nrepo: ${repo}\n---\nCache the views between passes\n`);
       try {
-        await printedBy(t, 'inbox', 'add', idea);
+        await added({ idea: fs.readFileSync(idea, 'utf8'), from: idea, dir: path.dirname(idea) });
         const [filed] = inInbox();
         assert.equal(
           fs.readFileSync(path.join(INBOX, filed), 'utf8'),
@@ -289,25 +282,19 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     },
   );
   await s.test(
-    '`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0',
-    async (t) => {
+    '`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are',
+    async () => {
       emptyInbox();
       const { card, file } = addToInbox({ text: 'Drop me' });
       const kept = addToInbox({ text: 'Keep me' });
-      assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [`${card.name}  dropped, and nothing started — ${file} removed`]);
+      assert.deepEqual(await verb('inbox', 'rm', card.name), { removed: true, file });
       assert.equal(fs.existsSync(file), false);
       assert.deepEqual(dropFromInbox(card.name), { removed: false, cards: [kept.card.name] });
-      assert.deepEqual(await printedBy(t, 'inbox', 'rm', card.name), [
-        `no card ${card.name} in the inbox. Its cards are: ${kept.card.name}. Nothing to drop.`,
-      ]);
-      assert.deepEqual(await printedBy(t, 'inbox', 'rm', `${kept.card.name}.md`), [
-        `no card ${kept.card.name}.md in the inbox. A card is named without its .md: \`${kept.card.name}\`. Its cards are: ${kept.card.name}. Nothing to drop.`,
-      ]);
+      assert.deepEqual(await verb('inbox', 'rm', card.name), { removed: false, cards: [kept.card.name] });
+      assert.deepEqual(await verb('inbox', 'rm', `${kept.card.name}.md`), { removed: false, cards: [kept.card.name] });
       assert.ok(fs.existsSync(kept.file), 'the other card is left');
       emptyInbox();
-      assert.deepEqual(await printedBy(t, 'inbox', 'rm', 'anything'), [
-        'no card anything in the inbox. The inbox is empty. Nothing to drop.',
-      ]);
+      assert.deepEqual(await verb('inbox', 'rm', 'anything'), { removed: false, cards: [] });
     },
   );
   await s.test(
@@ -350,7 +337,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         async () => await runPlaced(startFromInbox({ name: card.name, callerRepo: repo })),
         refusedWith('Conflict', card.file, id),
       );
-      await assert.rejects(main(['inbox', 'queue', card.name], noEngine()), refusedWith('Conflict', card.file, id));
+      await assert.rejects(verb('inbox', 'queue', card.name), refusedWith('Conflict', card.file, id));
       assert.equal(runsWritten(), before, 'a card is started once');
       const decided = await printedBy(t, 'decide', id);
       assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
@@ -469,20 +456,20 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
   );
   await s.test(
     "a card's `from:` is set and taken off by `nemia inbox from`, and its run is handed it as context before `--from`'s, a run both name once",
-    async (t) => {
+    async () => {
       emptyInbox();
       const repo = aRepoWith('dev');
       writeRecord('source-a1');
       writeRecord('source-b2');
       const card = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
-      const set = await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
-      assert.match(set[0], /from: source-a1 — its run is handed what each concluded, as context, and waits on none/);
+      const set = (await verb('inbox', 'from', card.card.name, 'source-a1')) as { from: string[]; was: string[] };
+      assert.deepEqual([set.from, set.was], [['source-a1'], []]);
       assert.match(fs.readFileSync(card.file, 'utf8'), /^from: source-a1$/m);
-      const off = await printedBy(t, 'inbox', 'from', card.card.name, '--off');
-      assert.match(off[0], /from: taken off \(was source-a1\)/);
+      const off = (await verb('inbox', 'from', card.card.name, '--off')) as { from: string[]; was: string[] };
+      assert.deepEqual([off.from, off.was], [[], ['source-a1']], 'taken off, and what it was');
       assert.doesNotMatch(fs.readFileSync(card.file, 'utf8'), /^from:/m);
 
-      await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
+      await verb('inbox', 'from', card.card.name, 'source-a1');
 
       const started = await runPlaced(
         startFromInbox({
@@ -565,8 +552,8 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
 
 test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm` — nothing filed, nothing removed', async (t) => {
   emptyInbox();
-  const add = (...argv: string[]) => main(['inbox', 'add', ...argv], noEngine());
-  const rm = (...argv: string[]) => main(['inbox', 'rm', ...argv], noEngine());
+  const add = (...argv: string[]) => verb('inbox', 'add', ...argv);
+  const rm = (...argv: string[]) => verb('inbox', 'rm', ...argv);
   const dir = fs.mkdtempSync(path.join(ROOT, 'given-'));
   const empty = path.join(dir, 'empty.md');
   fs.writeFileSync(empty, '\n');
@@ -574,13 +561,14 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm
   fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
   const gone = path.join(ROOT, 'no-such-repo');
   const adds: Record<string, [() => unknown, ...named: string[]]> = {
-    'no idea': [() => add(), 'takes the idea, first', 'nemia inbox add "<idea>"', '[--factory <name>]', 'nemia inbox add ./idea.md'],
-    'a flag and no idea': [() => add('--workflow', 'dev'), 'takes the idea, first', 'nemia inbox add "<idea>"'],
     'an empty idea': [() => add(''), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
     'an idea of spaces': [() => add('   '), 'the idea has nothing in it', 'nemia inbox add "<idea>"'],
-    'an empty file': [() => add(empty), `${empty} has nothing in it`, 'nemia inbox add ./idea.md'],
-    'a directory': [() => add(dir), `${dir} is a directory`, 'nemia inbox add ./idea.md'],
-    'a file whose card has `after:`': [() => add(waits), `${waits}: \`after\``, 'nemia start <inbox>/<name>.md --after <runId>'],
+    "an empty file's text": [() => added({ idea: fs.readFileSync(empty, 'utf8') }), 'the idea has nothing in it'],
+    'a file whose card has `after:`': [
+      () => added({ idea: fs.readFileSync(waits, 'utf8') }),
+      '`after`',
+      'nemia start <inbox>/<name>.md --after <runId>',
+    ],
     'a repo that is a file': [() => add('an idea', '--repo', empty), `\`repo: ${empty}\` names no directory`],
     'a repo that is not there': [() => add('an idea', '--repo', gone), `\`repo: ${gone}\` names no directory`],
     'a repo given not absolute, to addToInbox': [
@@ -588,24 +576,12 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm
       '`repo: code/app` is not an absolute path',
       '`repo: /home/me/code/app`',
     ],
-    '--workflow with no value': [() => add('an idea', '--workflow'), 'nemia inbox add "<idea>" --workflow <name>'],
-    '--workflow= empty': [() => add('an idea', '--workflow='), 'nemia inbox add "<idea>" --workflow <name>'],
-    '--repo twice': [() => add('an idea', '--repo', ROOT, '--repo', ROOT), 'nemia inbox add takes --repo once'],
-    '--workflows, a flag of nemia start': [
-      () => add('an idea', '--workflows', 'dev'),
-      'does not take --workflows',
-      '--workflow <name>',
-      '--repo <path>',
-      '--factory <name>',
-    ],
-    'two ideas': [() => add('an', 'idea'), 'idea is a second', 'nemia inbox add "<idea>"'],
     "a factory that is not a factory's name, to addToInbox": [
       () => addToInbox({ text: 'an idea', factory: 'Pipao' }),
       '`factory: Pipao`',
       'pipao, say',
       'nemia factory ls',
     ],
-    '--factory twice': [() => add('an idea', '--factory', 'pipao', '--factory', 'nemia'), 'nemia inbox add takes --factory once'],
   };
   for (const [name, [refused, ...named]] of Object.entries(adds))
     await t.test(`nemia inbox add: ${name}`, async () => {
@@ -613,15 +589,13 @@ test('REFUSED by name at shipped defaults: `nemia inbox add` and `nemia inbox rm
       assert.deepEqual(inInbox(), [], 'nothing filed');
     });
 
-  const { card, file } = addToInbox({ text: 'Stay where you are' });
+  const { file } = addToInbox({ text: 'Stay where you are' });
   writeRecord('r-outside');
   const rms: Record<string, [() => unknown, ...named: string[]]> = {
     '.hidden': [() => rm('.hidden'), "`.hidden` is not a card's name", 'hidden file'],
-    'no name': [() => rm(), 'nemia inbox rm <name>'],
-    'two names': [() => rm(card.name, 'another'), 'another is a second', 'nemia inbox rm <name>, once per card'],
     'a path under runs/, to dropFromInbox': [() => dropFromInbox('../runs/r-outside'), "`../runs/r-outside` is not a card's name"],
     'nemia inbox list, a form it does not have': [
-      () => main(['inbox', 'list'], noEngine()),
+      () => verb('inbox', 'list'),
       'does not take list',
       'nemia inbox add "<idea>"',
       'nemia inbox queue <name>',
@@ -649,7 +623,7 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
   const nope = addToInbox({ text: 'Store the flag', workflow: 'nope', repo });
   writeRecord('source-a1');
   const sourced = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
-  await printedBy(t, 'inbox', 'from', sourced.card.name, 'source-a1');
+  await verb('inbox', 'from', sourced.card.name, 'source-a1');
   fs.writeFileSync(
     path.join(INBOX, 'hand-written-a1b2.md'),
     `---\nworkflow: dev\nrepo: ${repo}\nafter: ${kept.card.name}\n---\nShow the flag\n`,
@@ -823,7 +797,7 @@ test(
     const listed = (await judgedInbox()).find((l) => l.name === 'left-c3d4')!;
     assert.deepEqual([listed.state, listed.queued], ['running', { at: '2026-09-16T10:00:00.000Z', place: null }]);
     assert.match(
-      (await printedBy(t, 'inbox')).find((line) => line.startsWith('left-c3d4'))!,
+      (await listedLines()).find((line) => line.startsWith('left-c3d4'))!,
       new RegExp(`started as ${escaped(id)}, running$`),
     );
   },
@@ -870,7 +844,7 @@ test("a warm read of the inbox, through the informer the api keeps, answers a co
   );
 });
 
-test("a card's labels: filed with --label, inherited from its from: runs, selected with -l, shown with --show-labels and -L, and copied to the run it starts", async (t) => {
+test("a card's labels: filed with --label, inherited from its from: runs, selected with -l, shown with --show-labels and -L, and copied to the run it starts", async () => {
   emptyInbox();
   const repo = aRepoWith('dev');
   const a = await runPlaced(startRun({ brief: 'parent a', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
@@ -892,14 +866,14 @@ test("a card's labels: filed with --label, inherited from its from: runs, select
   const bare = addToInbox({ text: 'Plain idea', workflow: 'dev', repo });
   assert.equal(fs.readFileSync(bare.file, 'utf8').includes('labels'), false, 'none given, none written');
 
-  const selected = await printedBy(t, 'inbox', '-l', 'team=core', '--show-labels', '-L', 'tier');
+  const selected = await listedLines(['-l', 'team=core', '--show-labels', '-L', 'tier'], { showLabels: true, columns: ['tier'] });
   const cards = selected.filter(
     (line) => line.includes('Cache the views') || line.includes('Show the flag') || line.includes('Plain idea'),
   );
   assert.equal(cards.length, 1, selected.join('\n'));
   assert.ok(cards[0]?.startsWith(typed.card.name), cards[0]);
   assert.ok(cards[0]?.endsWith('  labels: factory=default,team=core,tier=one,workflow=dev  tier: one'), cards[0]);
-  const plain = await printedBy(t, 'inbox');
+  const plain = await listedLines();
   assert.equal(
     plain.some((line) => line.includes('labels:')),
     false,

@@ -183,6 +183,61 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   assert.equal(fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8'), before, 'a started card keeps its file');
 });
 
+test("a card filed from runs that disagree on a label says the key it left out, each run with its value, on the filing's answer alone", async (t) => {
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  const run = (id: string, team: string) => {
+    fs.writeFileSync(
+      path.join(runs, `${id}.json`),
+      JSON.stringify({
+        id,
+        repo: '/code/app',
+        workspace: '/code/app',
+        baseRef: 'abc123',
+        branch: 'main',
+        isolate: true,
+        brief: 'A brief',
+        workflowDir: '/code/app/workflows',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+        steps: { implement: { taskId: null } },
+      }),
+    );
+    fs.writeFileSync(path.join(runs, `${id}.labels`), JSON.stringify({ team, area: 'inbox' }));
+  };
+  run('left-a1', 'core');
+  run('left-b2', 'infra');
+  const filedAs: string[] = [];
+  t.after(() => {
+    for (const name of filedAs) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    for (const id of ['left-a1', 'left-b2'])
+      for (const end of ['json', 'labels']) fs.rmSync(path.join(runs, `${id}.${end}`), { force: true });
+  });
+  const file = (body: string) => app.request('/api/namespaces/default/cards', { method: 'POST', headers, body: JSON.stringify({ body }) });
+
+  const filed = await file('---\nfrom: left-a1, left-b2\n---\nShow the flag\n');
+  assert.equal(filed.status, 201, await filed.clone().text());
+  const made = (await filed.json()) as Card;
+  filedAs.push(made.metadata.name);
+  assert.deepEqual(made.metadata.labels, { area: 'inbox' }, 'what its from: runs agree on');
+  assert.deepEqual(made.status.labelsLeftOut, [
+    {
+      key: 'team',
+      values: [
+        { run: 'left-a1', value: 'core' },
+        { run: 'left-b2', value: 'infra' },
+      ],
+    },
+  ]);
+  const read = (await (await app.request(`/api/namespaces/default/cards/${made.metadata.name}`)).json()) as Card;
+  assert.equal(read.status.labelsLeftOut, undefined, 'a read of the card says none');
+
+  const plain = (await (await file('Plain idea')).json()) as Card;
+  filedAs.push(plain.metadata.name);
+  assert.equal(plain.status.labelsLeftOut, undefined, 'none left out, none said');
+});
+
 test('a card file that does not parse is listed all the same, its status saying why, and read alone with that why', async (t) => {
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'y-broken.md'), '---\nnot-a-key: 1\n---\nDo it.\n');

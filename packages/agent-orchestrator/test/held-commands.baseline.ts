@@ -30,7 +30,7 @@ export const HELD_RUN: readonly string[] = [
 ];
 
 /** The inbox's writes and the labels. */
-export const HELD_INBOX: readonly string[] = ['inbox add', 'inbox queue', 'inbox from', 'inbox rm', 'label run', 'label inbox'];
+export const HELD_INBOX: readonly string[] = [];
 
 /** The factories' verbs. */
 export const HELD_FACTORY: readonly string[] = [

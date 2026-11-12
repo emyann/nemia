@@ -83,6 +83,13 @@ export const CardLastStart = Schema.Struct({
 });
 export type CardLastStart = typeof CardLastStart.Type;
 
+/** A label key a card was filed without, since the runs of its `from:` disagree on it: each run with its value. */
+export const CardLabelLeftOut = Schema.Struct({
+  key: Schema.String,
+  values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })),
+});
+export type CardLabelLeftOut = typeof CardLabelLeftOut.Type;
+
 /**
  * What Nemia read of the card: its `state`, the runs it was started as (`runs`), the tick's last missed start (`lastStart`), the first
  * line of its body (`title`, absent where it has none), and why the entry does not read as a card (`error`, absent on a card).
@@ -104,6 +111,15 @@ export const CardStatus = Schema.Struct({
   file: Schema.optionalKey(Schema.String),
   /** The card's file as written, frontmatter and body: on a read of one card alone, never on a list's items. */
   source: Schema.optionalKey(Schema.String),
+  /** The label keys the card was filed without, as the runs of its `from:` disagree on them: on the answer of a filing alone. */
+  labelsLeftOut: Schema.optionalKey(Schema.Array(CardLabelLeftOut)),
+  /** How many cards are queued and not started, every factory's, the card among them: on the answer of a queue alone. */
+  queueLength: Schema.optionalKey(Schema.Number),
+  /**
+   * The repository a queued card that names none starts on, its factory's one repository: on the answer of a queue alone, where it has
+   * one.
+   */
+  factoryRepo: Schema.optionalKey(Schema.String),
 });
 export type CardStatus = typeof CardStatus.Type;
 
@@ -163,3 +179,13 @@ export const CardWrite = Schema.Struct({
   spec: CardSpec,
 });
 export type CardWrite = typeof CardWrite.Type;
+
+/**
+ * A card queued (queue), in its query: the workflow it starts on, by its name, written over the card's own; absent, the card's own
+ * `workflow:`. A workflow is named, never sent as a path: the daemon finds it where a start of the card would. In the query, so a queue
+ * sent with no body, or a body the api does not read, queues as it did before the key.
+ */
+export const CardQueue = Schema.Struct({
+  workflow: Schema.optionalKey(Schema.String),
+});
+export type CardQueue = typeof CardQueue.Type;

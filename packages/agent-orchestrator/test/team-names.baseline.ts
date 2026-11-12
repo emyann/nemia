@@ -62,7 +62,7 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/src/feed/feed.test.ts': { count: 5, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/filed/filed.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/inbox/inbox.model.test.ts': { count: 1, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/src/inbox/inbox.store.test.ts': { count: 11, ...TEAM_MOVES.fixtures },
+  'packages/agent-orchestrator/src/inbox/inbox.store.test.ts': { count: 10, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/inbox/inbox.test.ts': { count: 27, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/level/level.store.test.ts': { count: 8, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/src/level/level.test.ts': { count: 13, ...TEAM_MOVES.fixtures },

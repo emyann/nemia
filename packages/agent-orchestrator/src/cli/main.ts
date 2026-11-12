@@ -97,7 +97,7 @@ import {
   rmVerb,
   sayRun,
 } from './runs.ts';
-import { inboxAddRun, inboxFromRun, inboxQueueRun, startRun } from './start.ts';
+import { startRun } from './start.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
 export const LIVENESS_EVERY: Duration.Input = '2 seconds';
@@ -413,10 +413,9 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
 
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
- * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
+ * whose runners walk the many runs a command line names through their handlers; and `nemia start`,
  * `nemia agents custom`, `nemia factory instruct` and `nemia policy propose`, whose runners read the files and folders a command line
- * names before their handlers; `nemia inbox from`,
- * whose runner reads the card first where the command line is forwarded; `nemia factory server
+ * names before their handlers; `nemia factory server
  * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
  * and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
@@ -428,9 +427,6 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['rm', rmVerb],
   ['prune', pruneVerb],
   ['start', startRun],
-  ['inbox add', inboxAddRun],
-  ['inbox queue', inboxQueueRun],
-  ['inbox from', inboxFromRun],
   ['agents', agentsRun],
   ['agents card', agentsCardRun],
   ['agents custom', agentsCustomRun],

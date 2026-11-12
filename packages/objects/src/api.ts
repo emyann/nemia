@@ -39,7 +39,7 @@
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
-import { Card, CardFile, CardList, CardStart, CardWrite } from './card.ts';
+import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite } from './card.ts';
 import { Table } from './table.ts';
 import {
   Factory,
@@ -232,6 +232,7 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   }),
   HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {
     params: cardParams,
+    query: CardQueue,
     success: CardObject,
     error: cardErrors,
   }),

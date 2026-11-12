@@ -24,10 +24,10 @@ import { WorkflowDoor } from '../../workflows/workflows.store.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
-/** A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository. */
+/** A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository, none for the default factory of an api with none. */
 export type HiringFactory = Pick<Factory, 'name' | 'hires' | 'tree'> & {
   readonly workflows?: readonly string[] | undefined;
-  readonly repo: string;
+  readonly repo: string | undefined;
   readonly harnessSettings?: Readonly<Record<string, Readonly<Record<string, unknown>>>> | undefined;
 };
 
@@ -86,7 +86,7 @@ const readOrWhy = <E extends { readonly message: string }>(read: Effect.Effect<r
 const workflowHires = Effect.fn('workflowHires')(function* (f: HiringFactory, home: string, workflow: string, dir: string) {
   const door = yield* WorkflowDoor;
   const at = workflowDirAt(dir);
-  const places = { repo: f.repo, home };
+  const places = { ...(f.repo === undefined ? {} : { repo: f.repo }), home };
   const own = yield* readOrWhy(door.workflows.read(at, places) as Effect.Effect<readonly StepRead[], { readonly message: string }>);
   const steps = own.why === undefined ? own.steps : stepFiles(dir);
   const hires = fillsOf(f.hires, workflow);
@@ -114,7 +114,9 @@ const NO_WORKFLOW: readonly string[] = ['agents', 'skills'];
 /** The workflows `f` offers, each by its name to its folder: its tree's first, then its repository's, then the store's, each once. */
 const offered = Effect.fn('offered')(function* (f: HiringFactory, home: string) {
   const door = yield* WorkflowDoor;
-  const holders = [...(f.tree === undefined ? [] : [f.tree]), f.repo, home].map((at) => path.join(at, 'workflows'));
+  const holders = [...(f.tree === undefined ? [] : [f.tree]), ...(f.repo === undefined ? [] : [f.repo]), home].map((at) =>
+    path.join(at, 'workflows'),
+  );
   const found = new Map<string, string>();
   for (const holder of holders)
     for (const name of yield* door.workflows.list(holder).pipe(Effect.orElseSucceed(() => [] as readonly string[])))
@@ -149,7 +151,7 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
 });
 
 /** The factory `namespace` as a Hire reads it, the default on `repo`; `Missing` where no factory has the name. */
-const hiringOf = Effect.fn('hiringOf')(function* (home: string, repo: string, namespace: string) {
+const hiringOf = Effect.fn('hiringOf')(function* (home: string, repo: string | undefined, namespace: string) {
   const { factory: object, listing } = yield* factoryFiled(home, repo, namespace);
   const tree = listing !== undefined && !('error' in listing) ? listing.tree : undefined;
   const factory: HiringFactory = {
@@ -164,7 +166,7 @@ const hiringOf = Effect.fn('hiringOf')(function* (home: string, repo: string, na
 });
 
 /** A page of the Hires of the factory `namespace` (`HireList`), read now at the store `home`. */
-export const hireList = Effect.fn('hireList')(function* (home: string, repo: string, namespace: string, query: ObjectQuery) {
+export const hireList = Effect.fn('hireList')(function* (home: string, repo: string | undefined, namespace: string, query: ObjectQuery) {
   const { factory, filedAt } = yield* hiringOf(home, repo, namespace);
   const listed: HireList = yield* objectsListed('Hire', yield* hiresOf(factory, home, filedAt), query, 'hire');
   return listed;
@@ -197,7 +199,7 @@ export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: str
 };
 
 /** The Hire `name` of the factory `namespace` as an object, read now; refused as `hireNamedIn` refuses. */
-export const hireObject = Effect.fn('hireObject')(function* (home: string, repo: string, namespace: string, name: string) {
+export const hireObject = Effect.fn('hireObject')(function* (home: string, repo: string | undefined, namespace: string, name: string) {
   const { factory, filedAt } = yield* hiringOf(home, repo, namespace);
   return yield* hireNamedIn(yield* hiresOf(factory, home, filedAt), namespace, name);
 });

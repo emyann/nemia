@@ -85,11 +85,27 @@ export type Capabilities = {
 export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /**
- * The repository the api serves: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — else, where the api runs an
- * install (`running`), the repository it was built from, and its own checkout otherwise.
+ * The repository the api serves of its own: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — else, where the api
+ * runs an install (`running`), the repository it was built from where that is a folder on disk, and its own checkout otherwise. None where
+ * the install's `source` is no folder — an install unpacked from a published archive, whose source is the address it was downloaded from:
+ * an address is never a folder, so it is never joined into one.
  */
-export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string =>
-  path.resolve(env.HKB_REPO?.trim() || (running?.kind === 'install' ? running.source : HOME_REPO));
+export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string | undefined => {
+  const given = env.HKB_REPO?.trim();
+  if (given) return path.resolve(given);
+  if (running?.kind !== 'install') return HOME_REPO;
+  return isFolder(running.source) ? path.resolve(running.source) : undefined;
+};
+
+/** Whether `at` is a folder on disk, as written: an address (`https://…`) is not. */
+const isFolder = (at: string): boolean => {
+  if (!path.isAbsolute(at)) return false;
+  try {
+    return fs.statSync(at).isDirectory();
+  } catch {
+    return false;
+  }
+};
 
 /** How long a server has to start and list its tools before it is reported as not answering. */
 export const ASK_MS = 15_000;

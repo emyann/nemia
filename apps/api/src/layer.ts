@@ -139,7 +139,7 @@ const underRequest = <A, E, R>(c: RequestContext<ApiEnv>, program: Effect.Effect
 export type Served = {
   env: NodeJS.ProcessEnv;
   running: Running | undefined;
-  repo: string;
+  repo: string | undefined;
   factory: Factory | undefined;
   e: Engine['Service'];
   placeService: PlaceService['Service'];

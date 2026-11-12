@@ -63,6 +63,7 @@ import {
   eventKept,
   latestRelease,
   leaseRelease,
+  listedAtOnce,
   PASSES,
   PAUSE,
   PAUSE_NOW,
@@ -77,7 +78,9 @@ import {
 } from 'agent-orchestrator';
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 import { Api, type Event, type FeedWait } from 'objects';
-import { capabilitiesWithSteps } from '../capabilities/index.ts';
+import { capabilitiesWithSteps, pageRead, unreadAnswer } from '../capabilities/index.ts';
+import { repoOf } from '../capabilities/capabilities.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
 import { statsOf } from '../stats/stats.ts';
@@ -129,11 +132,14 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
       }),
     )
     .handle('capabilities', () =>
-      answered(({ e, placeService, config, env, repo, home, mcp, inRequest, trace }) =>
-        capabilitiesWithSteps(repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest }),
-      ),
+      answered(async (s) => {
+        const { e, placeService, config, env, home, mcp, inRequest, trace } = s;
+        const read = pageRead(s, repoOf(env, s.running), listedAtOnce(home));
+        if ('unread' in read) return unreadAnswer(read.unread);
+        return capabilitiesWithSteps(read.repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest });
+      }),
     )
-    .handle('repository', () => answered(async ({ repo }) => ({ repo })))
+    .handle('repository', () => answered(async (s) => ({ repo: repoNeeded(s) })))
     .handle('store', () => answered(async ({ home }) => yourStore(home)))
     .handle('ceilings', () => answered(ceilingsOf))
     .handle('passes', ({ query: { last } }) => answered((s) => s.inRequest(PASSES.handler(last === undefined ? {} : { last }))))

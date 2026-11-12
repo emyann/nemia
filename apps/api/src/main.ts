@@ -17,7 +17,8 @@
  * before the process goes. With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a
  * free one for `PORT=0`. It keeps an idle connection past the longest its clients pool one (`SERVER_TIMEOUTS`, port.ts), so a client's
  * first call after a pause is answered rather than reset. Refused first (`Conflict`), binding nothing: a checkout's api on a store that
- * runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the one it was built from (`repoOf`).
+ * runs an install (`trialRefusal`), unless `NEMIA_ON_INSTALLED=1`; and an install's repository is the folder it was built from, none for an
+ * address (`repoOf`), where the pass ticks in the folder it runs in.
  */
 import { serve } from '@hono/node-server';
 import { Context, Effect } from 'effect';
@@ -109,7 +110,8 @@ else
   await runMain(
     up(e, {
       every: asked.every,
-      repo: repoOf(process.env, running),
+      // An api with no repository of its own (`repoOf`) ticks where it runs, as a pass given none does (`tickRun`).
+      repo: repoOf(process.env, running) ?? process.cwd(),
       holder: 'api',
       series: [STEP_FOLLOWS],
       quota: (name) => Effect.promise(() => daemonQuota(asker, name, () => engineRead('quota', e.quota(name)))()),

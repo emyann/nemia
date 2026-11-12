@@ -568,9 +568,13 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   assert.equal(repoOf({}), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: '  ' }), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }), path.resolve('elsewhere'));
-  const install = { kind: 'install', root: '/s/releases/v1', tag: 'v1', commit: 'abc', source: '/home/me/nemia', builtAt: '' } as const;
-  assert.equal(repoOf({}, install), '/home/me/nemia', 'an install serves the repository it was built from, not its own folder');
+  const built = scratch('nemia-api-built-from-');
+  const install = { kind: 'install', root: '/s/releases/v1', tag: 'v1', commit: 'abc', source: built, builtAt: '' } as const;
+  assert.equal(repoOf({}, install), built, 'an install built from a checkout serves that folder, not its own');
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }, install), path.resolve('elsewhere'), 'HKB_REPO first');
+  const archived = { ...install, source: 'https://github.com/emyann/nemia/releases', from: 'archive' } as const;
+  assert.equal(repoOf({}, archived), undefined, 'an install unpacked from an archive has none: its source is an address, never a folder');
+  assert.equal(repoOf({}, { ...install, source: path.join(built, 'gone') }), undefined, 'nor a folder that is not there');
   assert.equal(repoOf({}, { kind: 'checkout', root: '/elsewhere' }), HOME_REPO, 'a checkout serves its own');
   assert.ok(fs.existsSync(path.join(HOME_REPO, 'CLAUDE.md')), `${HOME_REPO} is the checkout`);
 

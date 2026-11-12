@@ -1502,14 +1502,22 @@ const repoWithWorktree = (trust: boolean) => {
   return { repo, wt, home };
 };
 
+/**
+ * `f` run under the Codex home `home`, with a `codex` first on PATH that answers `login status` signed in, as `prepare` asks before
+ * it reads the home: a Codex installed on the machine, asked under a home with no sign-in, would refuse every spawn.
+ */
 const inCodexHome = <T>(home: string, f: () => T): T => {
-  const prev = process.env.CODEX_HOME;
+  const prev = { CODEX_HOME: process.env.CODEX_HOME, PATH: process.env.PATH };
+  const bin = scratch('ae-codex-signed-in-');
+  fs.writeFileSync(path.join(bin, 'codex'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   process.env.CODEX_HOME = home;
+  process.env.PATH = `${bin}:${prev.PATH}`;
   try {
     return f();
   } finally {
-    if (prev === undefined) delete process.env.CODEX_HOME;
-    else process.env.CODEX_HOME = prev;
+    process.env.PATH = prev.PATH;
+    if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = prev.CODEX_HOME;
   }
 };
 

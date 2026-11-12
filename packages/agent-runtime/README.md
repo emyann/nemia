@@ -393,6 +393,12 @@ Three are wired:
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `command` | the process a task's `config.command` names, same worker — no agent at all | us |
 
+**A Codex spawn is refused while `codex login status` exits nonzero** (`prepare`, `signedOutRefusal` in `harness/codex/codex.ts`):
+the attempt ends `unstartable` in words quoting Codex's last line and naming `codex login --device-auth`, typed as the user the
+daemon runs as, after which the step is tried again; an answer past `CODEX_SIGN_IN_MS` (15s), or a `codex` that does not start,
+refuses nothing. Measured at codex-cli 0.154.0 (2026-11-11): signed in, it prints `Logged in using ChatGPT` on stderr and exits 0;
+under a `CODEX_HOME` with no sign-in, `Not logged in` on stderr, exit 1.
+
 **One mechanism for every local harness.** A Claude Code job, `codex exec` and a command each run in the foreground and exit, and
 none keeps a registry another process can ask. So we detach a worker per session and keep the registry ourselves
 (`bin/ae-worker.ts` writes it, `src/harness/detached/detached.ts` reads it). Until 2026-10-24 Claude Code's `--bg` sessions were

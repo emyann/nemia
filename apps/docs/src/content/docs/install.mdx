@@ -138,11 +138,11 @@ of an installed release reads the release list's newest entry every six hours, s
 Some sign-ins open a page in a browser that then calls back an address on the machine that asked, such as a factory's MCP server
 signing in. On a server, that address is the server's own 127.0.0.1, which your laptop's browser cannot reach.
 
-A factory's MCP server signs in from your own browser wherever the daemon runs. Press *Sign in* on the server's row of the board,
+A factory's MCP server signs in from your own browser wherever the daemon runs. Press _Sign in_ on the server's row of the board,
 open the page it gives and approve. Your browser is then sent back to an address like
 `http://localhost:8791/callback?code=…&state=…`, which does not load, since nothing listens for it on your laptop. Copy that address
-from the browser's address bar, paste it into the field the board shows under the waiting sign-in, *the address your browser landed
-on*, and press *Complete*. The daemon hands it to the sign-in waiting for it, and the server reads `connected`. The address carries a
+from the browser's address bar, paste it into the field the board shows under the waiting sign-in, _the address your browser landed
+on_, and press _Complete_. The daemon hands it to the sign-in waiting for it, and the server reads `connected`. The address carries a
 code used once: Nemia never logs or keeps it.
 
 Or, instead, forward the port over SSH and open the page on your laptop, so the call back reaches the server itself:

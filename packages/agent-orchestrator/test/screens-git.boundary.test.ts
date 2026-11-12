@@ -38,6 +38,8 @@ import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { main } from '../src/cli/main.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-screens-git-');
@@ -410,11 +412,9 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
         'each call once, and the status as it was',
       );
       assert.equal(review.note, undefined, 'a step denied nothing says nothing');
-      assert.match(
-        await printedBy('ls'),
-        /^ {3}implement +unverified · done +master {2}· denied: Skill\(look\), Bash\(pytest\)$/m,
-        '`nemia ls`: after the branch, unpadded',
-      );
+      const { runs } = (await typed(['ls'], b.e, undefined, undefined, ENV)) as RunsListed;
+      const listed = runs.find((one) => one.run.id === run.id)?.listed.steps.find((step) => step.name === 'implement');
+      assert.equal(listed && 'denied' in listed ? listed.denied : undefined, 'denied: Skill(look), Bash(pytest)', '`nemia ls` reads it so');
       const decided = await runWith(b.e, decideRun(run.id));
       assert.deepEqual(decided.denied, { implement: 'denied: Skill(look), Bash(pytest)' });
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
@@ -857,16 +857,11 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
     assert.doesNotMatch(lint.inFull as string, /add\.ts/, 'a file no glob names is not printed in full');
   });
 
-  await s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async (c) => {
+  await s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async () => {
     const { e, viewed, settle } = a.b;
     const ls = async () => {
       viewed.clear();
-      const log = c.mock.method(console, 'log', () => {});
-      try {
-        return (await metered(() => main(['ls'], e, undefined, undefined, ENV))).tallies!.kinds.place.spawned;
-      } finally {
-        log.mock.restore();
-      }
+      return (await metered(() => typed(['ls'], e, undefined, undefined, ENV))).tallies!.kinds.place.spawned;
     };
     const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(oneStep, 'work.md'), '---\nplace: git\n---\nwork it\n');

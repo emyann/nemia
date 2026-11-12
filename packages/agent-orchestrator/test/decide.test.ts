@@ -43,6 +43,8 @@ import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
+import { lsLines, type RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-decide-');
@@ -182,8 +184,9 @@ const printed = async (t: TestContext, ...argv: string[]): Promise<string[]> => 
 };
 /** What `nemia decide <argv>` prints, line by line. */
 const screen = (t: TestContext, ...argv: string[]) => printed(t, 'decide', ...argv);
-/** What `nemia ls <id>` prints, line by line. */
-const listed = (t: TestContext, id: string) => printed(t, 'ls', id);
+/** What `nemia ls <id>` reads of the run, in the lines the list's own words make of it (`lsLines`). */
+const listed = async (_t: TestContext, id: string): Promise<string[]> =>
+  lsLines((await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed, Date.now());
 
 /** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {

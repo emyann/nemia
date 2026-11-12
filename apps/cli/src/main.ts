@@ -22,24 +22,12 @@ import { decide } from './objects/decide.ts';
 import { explain } from './objects/explain.ts';
 import { get } from './objects/get.ts';
 import { propose, proposals } from './objects/propose.ts';
-import { closeout } from './reads/closeout.ts';
-import { inbox } from './reads/inbox.ts';
-import { ls } from './reads/ls.ts';
-import { show } from './reads/show.ts';
-import { watch } from './watch/watch.ts';
 
 /** What the `wf` alias says first, on stderr, the same words the orchestrator's alias says. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
 
-/** Each moved read's runner, on the words after its name: it prints, and answers its exit code. */
-const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<number>>> = {
-  show,
-  closeout,
-  ls,
-  inbox,
-  watch,
-  doctor,
-};
+/** Each read whose words the old path still holds, `doctor`, its runner on the words after its name: it prints, answering its code. */
+const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<number>>> = { doctor };
 
 /** Each of the client's own verbs' runner, on the words after its name. */
 const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]) => Promise<number>>> => ({

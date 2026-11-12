@@ -21,8 +21,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia inbox
                                the cards still in play: name, first line, workflow and repo when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-                               run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
-                               their labels on each line
+                               run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
+                               their labels on each line; -o wide: every column
                                on the port: inbox, inbox_card
   nemia factory
                                the store's factories: the default first — every run and card that
@@ -63,18 +63,19 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                check a template's folder or archive: every problem at once, each at its
                                file and line
                                CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
-  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]
+  nemia ls [<runId>] [-l <key>=<value>] [--show-labels] [-L <key>] [-o wide]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
                                last, whether a nemia up ticks the store and when its last pass was;
                                first, while the store is paused, Pausing: N finishing and each
                                session, check or landing at work, or Paused once none is, then each
-                               check it holds, a landing with its merge staged in the checkout
-                               (MERGE_HEAD) among them; a step whose check it holds says waiting on
-                               the pause. -l: the runs whose labels a selector takes (team=core,
+                               check it holds, a landing with its merge staged in the repository's
+                               own working tree (MERGE_HEAD) among them; a step whose check it holds
+                               says waiting on the pause. -l: the runs whose labels match (team=core,
                                given again for another); --show-labels: each run with its labels;
-                               -L <key>: that label beside each run, given again for another
+                               -L <key>: that label beside each run, given again for another; -o
+                               wide: every column, each step among them
                                on the port: ls, ls_run
   nemia show <runId> [--raw]
                                the run as one object (nemia/v1 Run); --raw: its record, and
@@ -216,24 +217,6 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                version, off their records; and a newer release, where the daemon's
                                release check read one. --json: the whole answer
                                CLI only: it says which code the command runs from; the api answers its own at GET /api/version
-  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
-                               the feed's lines, followed as the tick writes them, until ^C, and a
-                               daemon down line when nothing ticks the store, daemon up when it does
-                               again: a run's status, a step's word as nemia ls says it, and what a
-                               person's word changed. --once: read from the cursor to the feed's end,
-                               print cursor: <n> and stop; from the start with no cursor. -l: the
-                               lines a selector takes, given again for another (key=v, key!=v, "key in
-                               (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
-                               agent, kind, reason, on, via, type, waits and source. --cursor-file:
-                               keep the cursor read to in a file, and start from it where it is there.
-                               --json: one JSON object a line, a feed line with its cursor, and a
-                               cursor of its own every 30 seconds while the feed is still. With no -l,
-                               every line; -l waits=person takes the lines that wait on a person. A
-                               step with no agent carries agent: none, which -l agent!=none leaves out.
-                               A line's reason is a step's code as the api gives the step (reason);
-                               its word and message are for people: select on the reason, never on
-                               the words.
-                               CLI only: it follows the feed on a terminal until ^C; the board reads what changed from the api
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;

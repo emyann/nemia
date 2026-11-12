@@ -1,6 +1,7 @@
 /**
- * How the client asks for the server's `Table`: the words that ask for it wide, with labels or a column per label (`tableAsked`), and a
- * list answered where its table was asked (`tableOf`). The lines it prints are `objects`' `tableLines`, held in its own tests.
+ * How the client asks for the server's `Table`: the parsed words that ask for it wide, with labels or a column per label
+ * (`tableAsked`), and a list answered where its table was asked (`tableOf`). The lines it prints are `objects`' `tableLines`, held in its
+ * own tests.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,14 +25,12 @@ const table: Table = {
   ],
 };
 
-test('tableAsked reads -l, -L, --show-labels and -o wide, and leaves the rest; a flag with no word, or another output, is the old path’s', () => {
-  assert.deepEqual(tableAsked(['-l', 'team=core', '-l', 'team', '--show-labels', '-L', 'x', '-o', 'wide', 'r-1']), {
-    rest: ['r-1'],
+test('tableAsked reads the parsed -l, -L, --show-labels and -o wide: the label queries to send, and how the table prints', () => {
+  assert.deepEqual(tableAsked({ selector: ['team=core', 'team'], showLabels: true, labelColumns: ['x'], output: 'wide', runId: 'r-1' }), {
     selector: ['team=core', 'team'],
     asked: { wide: true, showLabels: true, columns: ['x'] },
   });
-  assert.equal(tableAsked(['-l']), null);
-  assert.equal(tableAsked(['-o', 'yaml']), null);
+  assert.deepEqual(tableAsked({}), { selector: [], asked: { wide: false, showLabels: false, columns: [] } });
 });
 
 test('REFUSED: a list answered where its table was asked is an api older than this client, exit 2, naming the restart', () => {

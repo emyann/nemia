@@ -673,7 +673,7 @@ export {
   AGENTS_SOURCES_WORDS,
   AGENTS_WORDS,
 } from './commands-definitions-agents.ts';
-export { READ_WORDS } from './commands-reads.ts';
+export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
 export {

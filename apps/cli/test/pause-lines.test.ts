@@ -1,10 +1,9 @@
 /**
- * The client's pause line (`nemia watch`) says what the orchestrator's `pausedWords` says of the same pause: a timed pause's count of
- * sessions finishing a call and when they are cut, and what the pause does.
+ * The client's pause line (`nemia watch`, `pausedWords`): a timed pause's count of sessions finishing a call and when they are cut, and
+ * what the pause does, in the words the in-process watch printed of the same pause before it was deleted.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { pausedWords as orchestratorWords } from 'agent-orchestrator';
 import { pausedWords } from '../src/watch/lines.ts';
 
 const at = '2026-11-03T10:00:00.000Z';
@@ -23,20 +22,26 @@ const paused = {
   held: [],
 };
 
-test("the client's pause line is the orchestrator's: the count of sessions finishing a call, and when they are cut", () => {
-  assert.equal(pausedWords(paused, now), orchestratorWords(paused, now));
+test('the pause line: the count of sessions finishing a call, and when they are cut', () => {
+  assert.equal(
+    pausedWords(paused, now),
+    'Pausing: 1 session finishing a tool call, cut in 9 min — the store is paused since 2026-11-03T10:00:00.000Z by ann; nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes; nemia resume resumes it',
+  );
   const cut = { ...paused, pause: { ...paused.pause, timeoutMs: 0 } };
-  assert.equal(pausedWords(cut, now), orchestratorWords(cut, now));
-  assert.match(pausedWords(cut, now) ?? '', /cut now/, 'a pause at once says its calls are being cut');
-  assert.match(pausedWords(cut, now) ?? '', /each working session is cut at once and parks/, 'and that each session is cut at once');
+  assert.equal(
+    pausedWords(cut, now),
+    'Pausing: 1 session finishing a tool call, cut now — the store is paused since 2026-11-03T10:00:00.000Z by ann; nothing new starts, and each working session is cut at once and parks; nemia resume resumes it',
+  );
   assert.doesNotMatch(pausedWords(cut, now) ?? '', /once the timeout passes/, 'never that it waits on a timeout');
-  const parked = { ...paused, finishing: [] };
-  assert.equal(pausedWords(parked, now), orchestratorWords(parked, now));
+  assert.equal(
+    pausedWords({ ...paused, finishing: [] }, now),
+    'Paused since 2026-11-03T10:00:00.000Z by ann — nothing runs and nothing new starts; nemia resume resumes it',
+  );
 });
 
-test("the client says what the orchestrator says a pause does: a timed one parks each session at its call's end, an untimed one lets it run on", () => {
-  const untimed = { ...paused, pause: { at, by: 'ann' } };
-  assert.equal(pausedWords(untimed, now), orchestratorWords(untimed, now));
-  assert.match(pausedWords(paused, now) ?? '', /each working session stops when its current tool call ends, cut once the timeout passes/);
-  assert.match(pausedWords(untimed, now) ?? '', /each working session runs on to its end/);
+test('what a pause does: a timed one parks each session at its call’s end, an untimed one lets it run on', () => {
+  assert.equal(
+    pausedWords({ ...paused, pause: { at, by: 'ann' } }, now),
+    'Pausing: 2 finishing — the store is paused since 2026-11-03T10:00:00.000Z by ann; nothing new starts, and each working session runs on to its end; nemia resume resumes it',
+  );
 });

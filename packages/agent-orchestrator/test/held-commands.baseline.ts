@@ -68,8 +68,8 @@ export const HELD_FACTORY: readonly string[] = [
 /** The policies and the rest of the agents' and workflows' verbs. */
 export const HELD_DEFINITION: readonly string[] = [];
 
-/** The moved reads, whose words and help are still here. */
-export const HELD_READ: readonly string[] = ['inbox', 'ls', 'show', 'closeout', 'watch'];
+/** The moved reads whose words and help are still here: none, each said in `objects`' `READ_WORDS`. */
+export const HELD_READ: readonly string[] = [];
 
 /**
  * The rest of the store's verbs: `daemon` alone, which the client's on-demand start (`apps/cli/src/daemon.ts`) still spawns here as

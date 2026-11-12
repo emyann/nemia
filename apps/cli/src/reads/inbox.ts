@@ -1,13 +1,14 @@
 /**
- * `nemia inbox [--all] [-l <selector>]... [--show-labels] [-L <key>]... [-o wide]`, read from the api: the cards, as the server prints them
- * — the cards list (`GET /api/cards`, `labelSelector` given again for another selector) asked for its `Table` (`TABLE_ACCEPT`), every page
- * read (`everyPage`), printed by `tableLines` — then how to start, queue or drop one, or why none is listed. The cards in play are those
- * the api says are (each row's card, `status.inPlay`); `--all` keeps every card. The last line names a card by its name, never a path. Any
- * other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
+ * `nemia inbox [--all] [-l <key>=<value>]... [--show-labels] [-L <key>]... [-o wide]`, its words parsed against `objects`'
+ * `INBOX_READ_WORDS`, read from the api: the cards, as the server prints them — the cards list (`GET /api/cards`, `labelSelector` given
+ * again for another label query) asked for its `Table` (`TABLE_ACCEPT`), every page read (`everyPage`), printed by `tableLines` — then
+ * how to start, queue or drop one, or why none is listed. The cards in play are those the api says are (each row's card,
+ * `status.inPlay`); `--all` keeps every card. The last line names a card by its name, never a path. A word the read does not take is
+ * refused by its words, naming the inbox's commands.
  */
 import { Schema } from 'effect';
-import { READ_BOUND_MS, type Table, tableLines } from 'objects';
-import { handedOn } from '../local.ts';
+import { type Args, READ_BOUND_MS, type Table, tableLines } from 'objects';
+import { switchArg } from '../commands/requests.ts';
 import { asked, everyPage } from '../objects.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
@@ -34,11 +35,11 @@ export const inboxSaid = (listed: number, selector: readonly string[], ended: nu
         ? `no card of the inbox matches -l ${selector.join(' -l ')} — see them all with nemia inbox --show-labels`
         : `the inbox is empty — park an idea with nemia inbox add "<idea>"`;
 
-export async function inbox(args: readonly string[]): Promise<number> {
-  const all = args.includes('--all');
-  const read = tableAsked(args.filter((word) => word !== '--all'));
-  if (read === null || read.rest.length) return handedOn(['inbox', ...args]);
-  const { selector } = read;
+/** Prints the cards `args` asks for, as the server prints their table, and how to start, queue or drop one; answers 0. */
+export async function inbox(args: Args): Promise<number> {
+  const all = switchArg(args, 'all');
+  const read = tableAsked(args);
+  const selector = [...read.selector];
   const listed = await asked(
     'inbox',
     (client) => everyPage((page) => client.cards.listAll({ query: selector.length ? { ...page, labelSelector: selector } : page })),

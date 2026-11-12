@@ -25,8 +25,9 @@ import { aliased, main, VERBS } from './main.ts';
 import { HELP, WF_HINT } from './flags.ts';
 import { offLine } from '../demand/demand.ts';
 import { FACTORY_HELP } from '../factory/factory.verb.ts';
-import { INBOX_HELP } from '../inbox/commands.verb.ts';
 import { START_HELP } from '../start/commands.verb.ts';
+import { SHOW } from '../object/commands.verb.ts';
+import { handled } from '../../test/typed.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-main-');
@@ -174,7 +175,7 @@ test('a read is run against the root the process names when it is typed, not one
   }
 });
 
-test('main reads the environment it is handed, not the process’s: `ls` lists the run planted under the WF_ROOT it is given', async (t) => {
+test('main reads the environment it is handed, not the process’s: `logs` reads the run planted under the WF_ROOT it is given', async (t) => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'planted elsewhere', repo: aRepo(), workflowDir: oneStep() }));
   const given = scratch('wf-main-given-');
@@ -187,17 +188,14 @@ test('main reads the environment it is handed, not the process’s: `ls` lists t
   const error = t.mock.method(console, 'error', () => {});
   try {
     process.env.WF_ROOT = elsewhere;
-    await main(['ls'], b.e, undefined, stand().place, { WF_ROOT: given });
+    await main(['logs', planted.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given });
+    await assert.rejects(main(['logs', run.id, 'implement'], b.e, undefined, stand().place, { WF_ROOT: given }));
   } finally {
     process.env.WF_ROOT = was;
     log.mock.restore();
     error.mock.restore();
   }
-  assert.ok(
-    out.some((line) => line.includes(planted.id)),
-    `the run under the root main was handed is listed: ${JSON.stringify(out)}`,
-  );
-  assert.ok(!out.some((line) => line.includes(`${run.id} `)), `and not the one under the test's own root: ${JSON.stringify(out)}`);
+  assert.deepEqual(out, ['implement has not run yet'], 'the run under the root main was handed is read, and not the one under its own');
 });
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
@@ -284,17 +282,15 @@ test('nemia cancel of a run with nothing filed yet says so, a line more', async 
   });
 });
 
-test('nemia show --raw prints the record as JSON, the brief and each step body cut short', async (t) => {
+test('nemia show --raw answers the record, the brief and each step body cut short', async () => {
   const b = board();
   const brief = `${'a long brief, '.repeat(12)}and more`;
   const run = await runPlaced(startRun({ brief, repo: aRepo(), workflowDir: oneStep() }));
-  const { out, err } = await typed(t, b.e, 'show', run.id, '--raw');
-  assert.deepEqual(err, []);
-  assert.equal(out.length, 1);
+  const raw = await handled(SHOW, { runId: run.id, raw: true }, { e: b.e, place: stand().place, env: ENV });
   const record = runRecord(ROOT, run.id);
   const workflow = record.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
-  assert.equal(out[0], JSON.stringify({ ...record, brief: `${brief.slice(0, 120)}…`, workflow }, null, 2));
-  assert.equal((JSON.parse(out[0]) as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
+  assert.deepEqual(raw, { ...record, brief: `${brief.slice(0, 120)}…`, workflow });
+  assert.equal((raw as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
 });
 
 test('nemia logs: a step that has not run, and the output of one that has, from the engine', async (t) => {
@@ -310,25 +306,15 @@ test('nemia logs: a step that has not run, and the output of one that has, from 
   );
 });
 
-test("nemia show --raw prints its record with the flag before the run's id as after it", async (t) => {
-  const b = board();
-  const run = await runPlaced(startRun({ brief: 'shown raw', repo: aRepo(), workflowDir: oneStep() }));
-  const after = await typed(t, b.e, 'show', run.id, '--raw');
-  assert.ok(after.out.length > 0, 'the record is printed');
-  assert.deepEqual(await typed(t, b.e, 'show', '--raw', run.id), after);
-});
-
 test('REFUSED at shipped defaults, through main: a word or a flag where a verb takes none, Invalid with exit 2, and nothing done', async (t) => {
   const b = board();
   const run = await runPlaced(startRun({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() }));
   const rows: Array<[string, string[], string[]]> = [
     ["cancel, a word after the run's id", ['cancel', run.id, 'extra'], ['nemia cancel', "one run's id", 'not extra.']],
     ["cancel, a flag after the run's id", ['cancel', run.id, '--now'], ['nemia cancel', "one run's id", 'not --now.']],
-    ['show, a flag where the run stands', ['show', '--x'], ['nemia show', "one run's id", 'not --x.']],
     ['logs, a flag where the run stands', ['logs', '--x', 'implement'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
     ['logs, a flag where the step stands', ['logs', 'r-1', '--x'], ['nemia logs', "one run's id and one step's name", 'not --x.']],
     ["cancel, a flag before the run's id", ['cancel', '--now', run.id], ['nemia cancel', "one run's id", 'not --now.']],
-    ["show, a flag of its own before the run's id, and a second run", ['show', '--raw', run.id, 'r-2'], ['nemia show', 'not r-2.']],
   ];
   for (const [row, argv, said] of rows)
     await t.test(row, (st) =>
@@ -342,10 +328,9 @@ test('REFUSED at shipped defaults, through main: a word or a flag where a verb t
   await t.test('nothing cancelled', () => assert.equal(runRecord(ROOT, run.id).cancelledAt, undefined));
 });
 
-test('nemia inbox --help, nemia factory --help and nemia start --help print their own help', async (t) => {
+test('nemia factory --help and nemia start --help print their own help', async (t) => {
   const { e } = board();
   for (const [argv, help] of [
-    [['inbox', '--help'], INBOX_HELP],
     [['factory', '--help'], FACTORY_HELP],
     [['start', '--help'], START_HELP],
   ] as const)

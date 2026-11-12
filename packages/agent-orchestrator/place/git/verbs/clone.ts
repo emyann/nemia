@@ -29,7 +29,10 @@ function hostOf(url: string): string | undefined {
   }
 }
 
-/** What to set up on the machine Nemia's daemon runs on so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything else. */
+/**
+ * What to set up on the machine Nemia's daemon runs on so that git can clone `url`, by its form: ssh and scp-like, http(s), or anything
+ * else.
+ */
 export function setupFor(url: string): string {
   const host = hostOf(url) ?? 'its host';
   if (/^ssh:\/\//i.test(url) || /^[^/:@\s]+@[^/:\s]+:/.test(url))

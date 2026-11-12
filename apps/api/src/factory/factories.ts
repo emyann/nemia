@@ -14,8 +14,8 @@
  * taken over (`nemia factory adopt`), either previewed (`nemia factory diff`), an upgrade filed (`nemia factory upgrade`) and a
  * conflict's choice, sent as its text (`nemia factory resolve`). A repository's or a volume's path names a folder of this machine by its
  * whole path, and a repository may be a git URL instead, which this machine clones under its store with its own git credentials
- * (`cloneTarget`, then the verb's clone, refused on the spot with the setup to do); a template sent packed is kept under the store while a factory is made from it (`withTemplateTaken`), and a preview's or a
- * refused request's is removed as the request ends.
+ * (`cloneTarget`, then the verb's clone, refused on the spot with the setup to do); a template sent packed is kept under the store
+ * while a factory is made from it (`withTemplateTaken`), and a preview's or a refused request's is removed as the request ends.
  */
 import path from 'node:path';
 import { Effect } from 'effect';

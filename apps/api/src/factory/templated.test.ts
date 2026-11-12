@@ -6,7 +6,8 @@
  * a conflict's choice sent as its text (`nemia factory resolve`). Each is a story in the harness's store whose answer is read back from
  * disk, then its refusals by status, each leaving the factory's file as it was; an archive sent is kept under the store where a factory
  * is made from it, and gone after a preview or a refusal. A factory filed or applied on a repository's git URL is cloned by the place
- * under the store, and refused with nothing filed where it cannot be. Over the stand-ins (`appOver`), a scratch builtin folder given to the app.
+ * under the store, and refused with nothing filed where it cannot be. Over the stand-ins (`appOver`), a scratch builtin folder given to
+ * the app.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';

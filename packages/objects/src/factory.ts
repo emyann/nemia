@@ -16,9 +16,8 @@
  * `FactoryApplied`), a hand-made one taken over by one (`FactoryAdoptWrite`, `FactoryAdopted`), the preview of either change
  * (`FactoryDiffWrite`, `FactoryPlan`), an upgrade filed (`FactoryUpgradeWrite`, `FactoryUpgraded`) and a conflict's choice
  * (`FactoryResolveWrite`, `FactoryResolved`). A template travels as `TemplateGiven`: a builtin template by its name, any other packed as
- * `nemia template pack` packs it; a repository's or a volume's path names a folder of the machine the api runs on, and a repository may be a
- * git URL instead, which that machine clones under its store. Plain Schemas of JSON,
- * as every object of this package is.
+ * `nemia template pack` packs it; a repository's or a volume's path names a folder of the machine the api runs on, and a repository may
+ * be a git URL instead, which that machine clones under its store. Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
@@ -264,7 +263,8 @@ export type TemplateGiven = typeof TemplateGiven.Type;
 
 /**
  * A factory filed (`POST /api/factories`): its name, its repositories, each a folder of the machine the api runs on by its whole path
- * or a git URL that machine clones under its store, and, with `noTrust`, its places left untrusted. A key left out is refused by the verb, in the command line's words.
+ * or a git URL that machine clones under its store, and, with `noTrust`, its places left untrusted. A key left out is refused by the
+ * verb, in the command line's words.
  */
 export const FactoryCreate = Schema.Struct({
   name: Schema.String,
@@ -299,8 +299,8 @@ export type VolumeRemoved = typeof VolumeRemoved.Type;
 
 /**
  * A factory made from a template (`POST /api/factories/<name>/apply`): the template, its repositories, each a folder of the machine the api
- * runs on or a git URL that machine clones under its store, its parameters as `--set` words (`<key>=<value>`), and, with `noTrust`, its places left untrusted. A template or the
- * repositories left out are refused by the verb, in the command line's words.
+ * runs on or a git URL that machine clones under its store, its parameters as `--set` words (`<key>=<value>`), and, with `noTrust`, its
+ * places left untrusted. A template or the repositories left out are refused by the verb, in the command line's words.
  */
 export const FactoryApplyWrite = Schema.Struct({
   template: Schema.optionalKey(TemplateGiven),

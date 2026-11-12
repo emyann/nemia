@@ -1,7 +1,7 @@
 /**
  * What an answer of the MCP port may be for a host to read it (`answerFit`, proved by `contracts/answer-fit.contract.ts`): the bound on
  * an answer's characters (`ANSWER_BOUND`), the text and any `structuredContent`'s JSON counted together, under the 50,000 characters
- * past which Claude Code saves a tool's result to a file in place of reading it; the page a list is asked for where its call gives none
+ * past which a host saves a tool's result to a file in place of reading it; the page a list is asked for where its call gives none
  * (`PORT_PAGE`); and what the port says of an answer past the bound that no smaller page can bring under it (`pastTheBound`), which
  * names the narrowings the tool takes, never a cut answer. Pure.
  */
@@ -9,7 +9,7 @@ import type { AnswerFitOf } from '../../contracts/answer-fit.contract.ts';
 
 export type { AnswerFit } from '../../contracts/answer-fit.contract.ts';
 
-/** The most characters an answer of the port holds: under Claude Code's 50,000-character threshold, with margin. */
+/** The most characters an answer of the port holds: under the 50,000 past which a host saves a result to a file, with margin. */
 export const ANSWER_BOUND = 40_000;
 
 /**

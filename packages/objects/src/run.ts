@@ -609,8 +609,40 @@ export const StepCloseout = Schema.Struct({
   schema: Fields,
   questions: List(Asked),
   raw: Schema.Unknown,
+  /**
+   * The names of the fields of `output` a narrowed read left out (`closeoutNarrowed`, asked with `?fields=`), each to be asked for by
+   * name; absent from a whole read.
+   */
+  outputLeftOut: Schema.optionalKey(Strings),
 }).annotate({ identifier: 'StepCloseout' });
 export type StepCloseout = typeof StepCloseout.Type;
+
+/**
+ * The names a narrowing query lists — `?fields=` of a closeout's `output`, `?diffs=` of a decision's paths — as JSON:API spells a sparse
+ * fieldset: comma-separated, each name trimmed, an empty one naming none. Pure.
+ */
+export const fieldsNamed = (fields: string): string[] =>
+  fields
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name !== '');
+
+/**
+ * `closeout` read narrowly, as `?fields=` asks it: what a person decides on — its outcome, summary, body, needs, files and values, its
+ * questions, replies, what it left out and was refused — whole, and of its `output` (and the `schema` it was read by) the fields
+ * `fields` names alone, those it left out named in `outputLeftOut`; the closeout as it came (`raw`) left out, as null. Pure.
+ */
+export const closeoutNarrowed = (closeout: StepCloseout, fields: readonly string[]): StepCloseout => {
+  const kept = <V>(record: Readonly<Record<string, V>>): Record<string, V> =>
+    Object.fromEntries(Object.entries(record).filter(([name]) => fields.includes(name)));
+  return {
+    ...closeout,
+    output: kept(closeout.output),
+    schema: kept(closeout.schema),
+    raw: null,
+    outputLeftOut: Object.keys(closeout.output).filter((name) => !fields.includes(name)),
+  };
+};
 
 /** Why a try's closeout does not read, and what it held (`StepUnreadable`, tries.verb.ts). */
 export const StepUnreadable = Schema.Struct({ error: Schema.String, raw: Schema.Unknown }).annotate({ identifier: 'StepUnreadable' });

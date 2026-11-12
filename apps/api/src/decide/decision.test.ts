@@ -183,6 +183,31 @@ test("a run's decision on the api, and the run object beside it: one reading of 
       assert.equal(detail.status.pruned, null, 'a run never pruned says so with a null, not a missing field');
     },
   );
+  await s.test("a decision asked with diffs answers each check-affecting file's path and counts, its lines on ask by path", async () => {
+    const files = async (query: string) => {
+      const res = await app.request(`/api/runs/r-d1/decision${query}`);
+      assert.equal(res.status, 200);
+      return ((await res.json()) as Decidable).sensitive.flatMap((b) => b.files);
+    };
+    const whole = await files('');
+    assert.ok(
+      whole.some((f) => f.lines.length > 0),
+      'read whole, the diffs are answered',
+    );
+    const narrow = await files('?diffs=');
+    assert.deepEqual(
+      narrow.map((f) => [f.path, f.lines.length, f.linesLeftOut, f.added]),
+      whole.map((f) => [f.path, 0, true, f.added]),
+      'every file named, its lines left out, its counts kept',
+    );
+    assert.ok(narrow.every((f) => typeof f.added === 'number' && typeof f.removed === 'number'));
+    const one = await files('?diffs=package.json');
+    assert.deepEqual(
+      one.map((f) => [f.path, f.lines.length > 0]),
+      whole.map((f) => [f.path, f.path === 'package.json']),
+      'a file asked by its path is answered whole',
+    );
+  });
   await s.test('a run still running is `running`, and a step of it not filed has consumed nothing on its object', async () => {
     journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
     writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });

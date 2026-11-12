@@ -52,6 +52,7 @@ type ListQuery = {
   readonly continue?: string;
   readonly labelSelector?: string | readonly string[];
   readonly selector?: string | readonly string[];
+  readonly fieldSelector?: string;
 };
 
 /** A page of the cards of `namespace` (every card for none) the query asks for: as a `Table` where the request asks for one. */
@@ -63,6 +64,7 @@ const page = (namespace: string | undefined, query: ListQuery) =>
         limit: query.limit === undefined ? null : Number(query.limit),
         continue: query.continue,
         labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
+        fieldSelector: query.fieldSelector,
       };
       return table ? s.inRequest(cardTable(s.e, howOf(s), asked)) : s.inRequest(cardList(s.e, howOf(s), asked));
     }),

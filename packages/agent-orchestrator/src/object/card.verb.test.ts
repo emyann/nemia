@@ -27,7 +27,7 @@ import { eachTest } from '../../test/placed.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { engineOf } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
-import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery, cardTable } from './card.verb.ts';
+import { cardList, cardListOf, cardObject, cardObjectOf, type CardQuery, cardTable, cardTableOf } from './card.verb.ts';
 
 const engine = eachTest(testEngine);
 const stand = eachTest(testPlace);
@@ -327,4 +327,50 @@ test('a card the listing read and that no longer parses when its text is read is
   assert.equal(alpha?.metadata.name, 'alpha');
   assert.equal(alpha?.spec.body, undefined, 'no body of a text that does not parse');
   assert.match(alpha?.status.error ?? '', /not-a-key/, 'why it does not parse, naming the key');
+});
+
+test('a field selector on status.inPlay keeps the cards in play, or those whose run ended, before the page is cut; empty keeps every card', () => {
+  const ended = new Set(['alpha', 'charlie']);
+  const page = (query: CardQuery) =>
+    valueOf(
+      over(
+        five,
+        Effect.flatMap(listed, (l) =>
+          cardListOf(
+            l.map((entry) => (ended.has(entry.name) ? { ...entry, state: 'succeeded' as const } : entry)),
+            query,
+          ),
+        ),
+      ),
+    );
+  const names = (query: CardQuery) => page(query).items.map((card) => card.metadata.name);
+  const first = page({ fieldSelector: 'status.inPlay=true', limit: 2 });
+  assert.deepEqual(
+    first.items.map((card) => card.metadata.name),
+    ['bravo', 'delta'],
+  );
+  assert.equal(first.metadata.remainingItemCount, 1, 'the cards in play alone are counted');
+  assert.deepEqual(names({ fieldSelector: 'status.inPlay=true', limit: 2, continue: first.metadata.continue }), ['echo']);
+  assert.deepEqual(names({ fieldSelector: 'status.inPlay!=true' }), ['alpha', 'charlie']);
+  assert.deepEqual(names({ fieldSelector: 'status.inPlay==false' }), ['alpha', 'charlie']);
+  assert.deepEqual(names({ fieldSelector: '' }), ['alpha', 'bravo', 'charlie', 'delta', 'echo']);
+  assert.deepEqual(names({}), ['alpha', 'bravo', 'charlie', 'delta', 'echo']);
+  const table = valueOf(
+    over(
+      five,
+      Effect.flatMap(listed, (l) =>
+        cardTableOf(
+          l.map((entry) => (ended.has(entry.name) ? { ...entry, state: 'succeeded' as const } : entry)),
+          { fieldSelector: 'status.inPlay=true' },
+          false,
+        ),
+      ),
+    ),
+  );
+  assert.equal(table.rows.length, 3, 'the table holds the rows of the same page');
+});
+
+test('REFUSED: a field selector that is no status.inPlay selector is Invalid', () => {
+  assert.equal(kindOf(over(five, list({ fieldSelector: 'status.inPlay=maybe' }))), 'Invalid');
+  assert.equal(kindOf(over(five, list({ fieldSelector: 'status.state=x' }))), 'Invalid');
 });

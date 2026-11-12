@@ -109,7 +109,7 @@ export const TRIES: Command<{ tries: StepTry[] }, StepInput> = {
 /** One try of a step (`StepTry`): the api's `steps` group serves it (`try`). */
 export const TRY: Command<StepTry, TryInput> = {
   name: 'try',
-  served: [{ endpoint: 'steps.try' }],
+  served: [{ endpoint: 'steps.try', query: { fields: '' } }],
   usage: '<runId> <step> <try>',
   help: ['one try of a step'],
   spec: {
@@ -153,7 +153,7 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
  */
 export const CLOSEOUT: Command<TryCloseout, CloseoutInput> = {
   name: 'closeout',
-  served: [{ endpoint: 'steps.closeout' }],
+  served: [{ endpoint: 'steps.closeout', query: { fields: '' } }],
   usage: '<runId> <step> [--try <n>]',
   help: ["what a step's try signed off with: its latest, or --try <n>"],
   spec: {

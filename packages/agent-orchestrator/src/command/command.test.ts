@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, renamedValues, type Spec } from './command.ts';
+import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, renamedValues, type Spec, toolsOf } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -1365,4 +1365,20 @@ test("a body's former value is read as what it became, with a hint naming what t
       assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former value was sent');
       if (now !== undefined) assert.ok(renamed.hint!.includes('"mode": "continue"'), 'the hint names the value to send now');
     });
+});
+
+test("a link's tool carries the query values its link sends where a call gives none, and none where the link names none", () => {
+  assert.deepEqual(
+    toolsOf({
+      name: 'inbox',
+      served: [
+        { endpoint: 'cards.listAll', query: { fieldSelector: 'status.inPlay=true' } },
+        { endpoint: 'cards.getAll', as: 'inbox_card' },
+      ],
+    }).map((t) => [t.tool, t.query]),
+    [
+      ['inbox', { fieldSelector: 'status.inPlay=true' }],
+      ['inbox_card', {}],
+    ],
+  );
 });

@@ -48,7 +48,16 @@ export const DecisionTouched = Schema.Struct({
 export type DecisionTouched = typeof DecisionTouched.Type;
 
 /** One file of a branch's check-affecting diff: its unified diff, cut at the read model's cap, and how many lines were cut. */
-export const DiffFile = Schema.Struct({ path: Schema.String, lines: Strings, cut: Schema.Finite }).annotate({ identifier: 'DiffFile' });
+export const DiffFile = Schema.Struct({
+  path: Schema.String,
+  lines: Strings,
+  cut: Schema.Finite,
+  /** The lines its hunks add and remove, counted over the whole diff before it is cut; absent from a decision read before them. */
+  added: Schema.optionalKey(Schema.Finite),
+  removed: Schema.optionalKey(Schema.Finite),
+  /** Whether a narrowed decision (`decisionNarrowed`, `?diffs=`) left its `lines` out, to be asked for by its path. */
+  linesLeftOut: Schema.optionalKey(Schema.Boolean),
+}).annotate({ identifier: 'DiffFile' });
 export type DiffFile = typeof DiffFile.Type;
 
 /** A branch's check-affecting diff, a file each; `error`, the sentence saying it is not known, when the place did not say. */
@@ -181,3 +190,19 @@ export const RunDecision = Schema.Union([
   Decidable,
 ]).annotate({ identifier: 'RunDecision' });
 export type RunDecision = typeof RunDecision.Type;
+
+/**
+ * `decision` read narrowly, as `?diffs=` asks it (comma-separated paths, an empty one naming none): each check-affecting file's diff
+ * answered whole where `diffs` names its path, every other with its lines left out (`linesLeftOut`), its path and its counts kept.
+ * Anything but a decidable run is answered as it is. Pure.
+ */
+export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[]): RunDecision =>
+  'sensitive' in decision
+    ? {
+        ...decision,
+        sensitive: decision.sensitive.map((branch) => ({
+          ...branch,
+          files: branch.files.map((file) => (diffs.includes(file.path) ? file : { ...file, lines: [], linesLeftOut: true })),
+        })),
+      }
+    : decision;

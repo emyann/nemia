@@ -32,9 +32,13 @@
  * Its control is the old SDK: the same job on 0.3.270 records `claude-opus-5`, which is the measurement the card was filed on.
  *
  * The third case measures, on the same process, which models Claude Code drops `auto` on: each model `CLAUDE_AUTO_DROPPED` lists and
- * each alias the refusals advise as keeping it, filed in `auto`, its `init` line's mode read by the reader the engine uses (`ranIn`).
- * The list is a measurement of one Claude Code, so it is made again at each bump by this case rather than carried; each `init` line
- * is handed over as `sdk-<version>-auto-<model>.json`.
+ * each alias the refusals advise as keeping it, filed in `auto`, its mode read by the reader the engine uses (`ranIn`): the last its
+ * `init` or `status` lines name. Not the `init` line's alone: Claude Code can print it before it settles the mode, and say the settled
+ * one on a `status` line after it — on 2.1.322, `claude-haiku-4-5` and `claude-sonnet-4-5` each printed `init` with
+ * `auto` and then `status` with `default` in 1 run of 10, and `default` on both in the other 9, so a case that read the `init` line
+ * failed on a coin flip. Both ran in `default` in all 10, and `haiku` and `sonnet` in `auto` in all 10. The list is a measurement of
+ * one Claude Code, so it is made again at each bump by this case rather than carried; each `init` line is handed over as
+ * `sdk-<version>-auto-<model>.json`.
  *
  * `OPUS_TODAY` in `sdk-pin.ts` is what this asserts, and the one constant of the three a bump cannot infer: an alias can move under a
  * version that did not.
@@ -120,7 +124,7 @@ test(
  * Each JSON line of a job's stdout. The `init` line is looked for rather than taken first: on 0.3.308 and 0.3.316 the SDK prints its
  * command lifecycle lines for the queued prompt ahead of it, and a `result` line does not open with its `type`.
  */
-type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string };
+type Line = { type?: string; subtype?: string; model?: string; claude_code_version?: string; permissionMode?: string };
 const linesOf = (out: string): Line[] =>
   out.split('\n').flatMap((text) => {
     try {
@@ -201,8 +205,9 @@ test(
       assert.equal(
         ranIn,
         dropped ? 'default' : 'auto',
-        `${model} (${init.model}) was filed in \`auto\` and its init line says ${ranIn}, on Claude Code ${init.claude_code_version}: ` +
-          `move CLAUDE_AUTO_DROPPED (src/harness/claude/vocabulary.ts) to what was measured, with the docs that repeat it`,
+        `${model} (${init.model}) was filed in \`auto\`, and ran in ${ranIn} (its init line said ${init.permissionMode}), on Claude Code ` +
+          `${init.claude_code_version}. Measure it 10 times as packages/agent-runtime/docs/harness.md says (\`auto\` on haiku) before ` +
+          `CLAUDE_AUTO_DROPPED (src/harness/claude/vocabulary.ts) moves, and move it, with the docs that repeat it, on a card of its own`,
       );
       assert.equal(code, 0, `and ${model} ran to a result: ${err}`);
     }

@@ -66,7 +66,8 @@ the failing jobs and the lines that failed each, which `pull-request.ts` reads s
 --message` listing the failures would have handed it. A refusal no change to the branch can answer exits 78: `pull-request.ts` does
 so for no `gh` or none logged in, no `origin`, two open pull requests, a draft or another base, the label rules, `WF_LABELS`, a run
 whose labels match none of the rules or the repository's labels, and a CI context never reported, still pending at the bound, or only
-cancelled, skipped or neutral (`PERSONS_EXIT`, `exec.ts`). The implement step's `checkFailurePolicy:` names that code (`FailStep`,
+cancelled, skipped or neutral (`PERSONS_EXIT`, `exec.ts`); a job GitHub cut off at its own `timeout-minutes` reads `cancelled` too, and
+the job's annotation that says it exceeded its maximum execution time makes it a red, the work's, re-run once as any red. The implement step's `checkFailurePolicy:` names that code (`FailStep`,
 `onExitCodes: In [78]`), so the run files no try on it: the step waits on the person, `failed (check)`, and `nemia decide` offers
 `nemia retry <run> implement --recheck` first, once the person has answered it. The implement step's note tells the try to change
 nothing on a failure it finds is not its change's (a flake, a failure the base has too), and to say so in `needs`. What the run can tell spends no try and waits on a person at once: a

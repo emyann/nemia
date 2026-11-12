@@ -45,9 +45,8 @@ export const READ_BOUND_MS = 30_000;
 
 /**
  * The typed client of the `Api` at `base`: each write with no body sent as `{}` in JSON (`jsonBodied`), as the api's write guard takes
- * it, and each request carrying the session's token where `env` holds one and `carried` is left on (`sessionHeaders`; a pairing turns it
- * off, since it asks for a token of its own) and `headers` beside it (an `Accept` that
- * asks a list for its `Table`).
+ * it, and each request carrying the session's token where `env` holds one and `carried` is left on (`sessionHeaders`; a pairing turns
+ * it off, since that token is another server's, `askedBare`) and `headers` beside it (an `Accept` that asks a list for its `Table`).
  */
 export const clientAt = (
   base: string,

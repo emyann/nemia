@@ -9,8 +9,9 @@
  *
  * The stand-in Node is also the stand-in `nemia` of the steps after the unpacking: given `STUB_LOG`, it logs each verb it is asked,
  * answers `service addresses` with one address of each kind, `token add` with a person token (on its `Authorization:` line and
- * another), `board link` with a link, `readiness` with a missing piece and exit 1, and keeps what `claude-token set` read and the
- * token file `config set-context` was handed beside the log. A person's answers are lines of a file named by `NEMIA_INSTALL_TTY`,
+ * another), `board link` with a link, `doctor` with a missing piece and exit 1, and keeps the token file `config set-context` was
+ * handed beside the log. A release carries no harness: an archive `pack` makes from a tree npm put the SDK's platform package in holds
+ * none, and the installer asks for no harness's credential. A person's answers are lines of a file named by `NEMIA_INSTALL_TTY`,
  * which the installer reads in place of its terminal; `loginctl` and `systemctl` are stand-ins first on PATH, so no test touches
  * the machine's own.
  *
@@ -22,7 +23,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { assetName, pack, PLATFORMS, type Platform } from '../../release/archive.ts';
+import { assetName, pack, PLATFORMS, SDK_PLATFORM_PREFIX, type Platform } from '../../release/archive.ts';
 
 const INSTALL = path.join(import.meta.dirname, '..', '..', 'release', 'install.sh');
 
@@ -42,10 +43,9 @@ const STUB = [
   '  "service addresses") printf "127.0.0.1 lo loopback\\n192.168.1.20 eth0 private\\n100.100.1.2 tailscale0 shared\\n" ;',
   '    printf "fd7a::1 tailscale0 unique-local\\n203.0.113.5 eth1 public\\n" ;;',
   '  "token add") printf "minted person-secret-1 for %s\\nAuthorization: Bearer person-secret-1\\n" "$3" ;;',
-  '  "claude-token set") cat >"$STUB_LOG.claude" ;;',
   '  "config set-context") if [ "$3" = local ]; then cat "$5" >"$STUB_LOG.local"; ls -l "$5" | cut -c1-10 >"$STUB_LOG.mode"; fi ;;',
   '  "board link") printf "%s/link/first-visit\\n" "${4:-http://127.0.0.1:8787}" ;;',
-  '  "readiness ") printf "harness missing: nemia claude-token set\\n"; exit 1 ;;',
+  '  "doctor ") printf "harness missing: nemia doctor fix <harness>\\n"; exit 1 ;;',
   'esac',
   '',
 ].join('\n');
@@ -192,16 +192,12 @@ const server = () => {
 const onHost = { skip: HOST === undefined && `no release is built for ${process.platform}-${process.arch}` };
 
 test(
-  'a person asked on the terminal: the Claude token with no y/N first, the bind picked from the private addresses, no token printed, a link, and readiness last',
+  'a person asked on the terminal: starting at login, the bind picked from the private addresses, no token printed, a link, and doctor last',
   onHost,
   () => {
     const run = server();
-    const ran = run([], ['claude-oat-secret', '', '2']);
+    const ran = run([], ['', '2']);
     assert.equal(ran.status, 0, ran.out);
-
-    assert.doesNotMatch(ran.out, /\[y\/N\]/, 'the Claude token is asked outright');
-    assert.equal(ran.kept('claude'), 'claude-oat-secret\n', 'the Claude token reaches claude-token set by its stdin');
-    assert.doesNotMatch(ran.out, /claude-oat-secret/, 'the Claude token is never printed');
 
     for (const offered of ['127.0.0.1', '192.168.1.20', '100.100.1.2', 'fd7a::1'])
       assert.match(ran.out, new RegExp(offered.replaceAll('.', '\\.')));
@@ -218,20 +214,20 @@ test(
 
     assert.ok(ran.asked.includes('board link --base http://192.168.1.20:8787'), ran.asked.join('\n'));
     assert.match(ran.out, /http:\/\/192\.168\.1\.20:8787\/link\/first-visit/, 'the first-visit link is printed');
-    assert.equal(ran.asked.at(-1), 'readiness', 'the install ends on the readiness read, its exit 1 no failure of the install');
+    assert.equal(ran.asked.at(-1), 'doctor', 'the install ends on the doctor read, its exit 1 no failure of the install');
   },
 );
 
 test('a typed address is taken, and the 1 of the offer binds this machine alone, with no token minted', onHost, () => {
   const run = server();
-  const typed = run([], ['claude-oat-secret', '', '10.0.0.7']);
+  const typed = run([], ['', '10.0.0.7']);
   assert.equal(typed.status, 0, typed.out);
   assert.ok(typed.asked.includes('service install --size auto --bind 10.0.0.7'), typed.asked.join('\n'));
   assert.ok(typed.asked.includes('board link --base http://10.0.0.7:8787'), 'the link is made under the bind, not the lease');
-  const v6 = run([], ['claude-oat-secret', '', 'fd7a::7']);
+  const v6 = run([], ['', 'fd7a::7']);
   assert.ok(v6.asked.includes('board link --base http://[fd7a::7]:8787'), v6.asked.join('\n'));
 
-  const alone = run([], ['claude-oat-secret', '', '1']);
+  const alone = run([], ['', '1']);
   assert.equal(alone.status, 0, alone.out);
   assert.ok(alone.asked.includes('service install --size auto'), alone.asked.join('\n'));
   assert.equal(
@@ -239,7 +235,7 @@ test('a typed address is taken, and the 1 of the offer binds this machine alone,
     false,
     alone.asked.join('\n'),
   );
-  assert.equal(alone.asked.at(-1), 'readiness');
+  assert.equal(alone.asked.at(-1), 'doctor');
 });
 
 test('REFUSED: a public or wildcard bind exits 1 with no service installed, unless --public, which is passed on', onHost, () => {
@@ -253,7 +249,7 @@ test('REFUSED: a public or wildcard bind exits 1 with no service installed, unle
       `${bind}: ${refused.asked.join('\n')}`,
     );
   }
-  const typed = run([], ['claude-oat-secret', '', '203.0.113.5']);
+  const typed = run([], ['', '203.0.113.5']);
   assert.equal(typed.status, 1, typed.out);
   assert.equal(
     typed.asked.some((line) => line.startsWith('service install')),
@@ -269,16 +265,53 @@ test('REFUSED: a public or wildcard bind exits 1 with no service installed, unle
   assert.doesNotMatch(acknowledged.out, /person-secret-1|Authorization:/);
 });
 
-test('under --yes with no --claude-token-file the Claude token is skipped, not asked, and the install goes on', onHost, () => {
-  const run = server();
-  const ran = run(['--yes', '--no-service']);
-  assert.equal(ran.status, 0, ran.out);
-  assert.equal(
-    ran.asked.some((line) => line.startsWith('claude-token set')),
-    false,
-    ran.asked.join('\n'),
+test('REFUSED: the installer asks for no harness credential: it names no token of one, and the flag that took one exits 2 as unknown', () => {
+  assert.doesNotMatch(fs.readFileSync(INSTALL, 'utf8'), /claude-token/);
+  const { home, root } = machine();
+  const file = path.join(home, 'token');
+  fs.writeFileSync(file, 'a-token\n', { mode: 0o600 });
+  assert.equal(install(home, root, ['--yes', '--claude-token-file', file]).status, 2);
+  assert.equal(fs.existsSync(root), false, 'nothing is written before the arguments are read');
+});
+
+test('an archive packed from a tree npm put the SDK platform packages in holds none of them, and keeps the SDK itself', () => {
+  const { tree, node } = fixture(scratch('install-tree-'));
+  const planted = [
+    `node_modules/@anthropic-ai/${SDK_PLATFORM_PREFIX}linux-x64`,
+    `node_modules/@anthropic-ai/${SDK_PLATFORM_PREFIX}darwin-arm64`,
+    `packages/agent-runtime/node_modules/@anthropic-ai/${SDK_PLATFORM_PREFIX}linux-arm64`,
+    'node_modules/@anthropic-ai/claude-agent-sdk',
+    'node_modules/@anthropic-ai/sdk',
+  ];
+  for (const folder of planted) {
+    fs.mkdirSync(path.join(tree, folder), { recursive: true });
+    fs.writeFileSync(path.join(tree, folder, 'package.json'), '{}\n');
+  }
+  const out = scratch('install-out-');
+  const archive = pack({
+    tree,
+    node,
+    platform: 'linux-x64',
+    tag: 'v1.2.3',
+    source: 'file:///nowhere',
+    commit: 'f'.repeat(40),
+    builtAt: '2026-11-11T00:00:00.000Z',
+    out,
+  });
+
+  const listed = spawnSync('tar', ['-tzf', archive], { encoding: 'utf8' });
+  assert.equal(listed.status, 0, listed.stderr);
+  const entries = listed.stdout.split('\n').filter(Boolean);
+  assert.deepEqual(
+    entries.filter((entry) => entry.includes(SDK_PLATFORM_PREFIX)),
+    [],
+    'no platform package of the SDK is packed',
   );
-  assert.equal(ran.asked.at(-1), 'readiness');
+  for (const kept of ['node_modules/@anthropic-ai/claude-agent-sdk/package.json', 'node_modules/@anthropic-ai/sdk/package.json'])
+    assert.ok(
+      entries.some((entry) => entry.replace(/^\.\//, '') === kept),
+      `${kept} is packed: ${entries.join('\n')}`,
+    );
 });
 
 test(
@@ -289,11 +322,11 @@ test(
     const client = ['--yes', '--client', '--server', 'http://100.64.0.1:8787'];
     const paired = run(client);
     assert.equal(paired.status, 0, paired.out);
-    assert.deepEqual(paired.asked, ['pair http://100.64.0.1:8787', 'readiness']);
+    assert.deepEqual(paired.asked, ['pair http://100.64.0.1:8787', 'doctor']);
 
     const named = run([...client, '--context', 'vps']);
     assert.equal(named.status, 0, named.out);
-    assert.deepEqual(named.asked, ['pair http://100.64.0.1:8787 --context vps', 'readiness']);
+    assert.deepEqual(named.asked, ['pair http://100.64.0.1:8787 --context vps', 'doctor']);
 
     const tokenFile = path.join(fs.realpathSync(scratch('install-token-')), 'token');
     fs.writeFileSync(tokenFile, 'a-token\n', { mode: 0o600 });
@@ -302,7 +335,7 @@ test(
     assert.deepEqual(given.asked, [
       `config set-context remote --server http://100.64.0.1:8787 --token-file ${tokenFile}`,
       'config use-context remote',
-      'readiness',
+      'doctor',
     ]);
     assert.doesNotMatch(given.out, /a-token/, 'the token itself is never printed');
   },

@@ -120,6 +120,40 @@ export type FenceReach = {
 export type OwnArgs = { readonly claude?: { readonly remoteControl: true }; readonly codex?: { readonly trustFrom: string } };
 
 /**
+ * A fix of a harness's sign-in: its command, what it does in words, the pattern of a code its output shows a person (a device code), and
+ * `typed` where a person types it on the server themselves, since it asks them for what a task cannot read (a code pasted back).
+ */
+export type HarnessSignInFix = {
+  readonly command: string;
+  readonly message: string;
+  readonly code?: string;
+  readonly typed?: true;
+};
+
+/**
+ * What a harness needs on a machine before a session runs on it, as plain shell a layer above runs with `NEMIA_TOOLS` set to its tools
+ * folder and that folder's `bin/` first on `PATH`:
+ * - `program`: the name its program is run by, found first in the engine's `harnessBin` (`EngineOptions`), the tools folder's `bin/`;
+ * - `title`: its name in words;
+ * - `pin`: the version this release was tested with, which `install` puts in place;
+ * - `version`: the command that prints the version found;
+ * - `check`: whether its program is found;
+ * - `install`: puts its program at `pin` into `$NEMIA_TOOLS/harnesses/<name>/<pin>/`, linked as `$NEMIA_TOOLS/bin/<program>`;
+ * - `remove`: takes what `install` put away;
+ * - `signIn`: the check whose exit 0 says it is signed in as the user that runs it, and the fixes that sign it in.
+ */
+export type HarnessNeeds = {
+  readonly program: string;
+  readonly title: string;
+  readonly pin: string;
+  readonly version: string;
+  readonly check: string;
+  readonly install: string;
+  readonly remove: string;
+  readonly signIn: { readonly check: string; readonly fixes: readonly HarnessSignInFix[] };
+};
+
+/**
  * What one harness declares. `can` is the whole list; the rest is the data a check reads beside it, each absent where the harness has
  * none:
  * - `ownKey`: the key of a task's config its own flags go under (`config.claude`, `config.codex`), carried whole;
@@ -131,7 +165,9 @@ export type OwnArgs = { readonly claude?: { readonly remoteControl: true }; read
  *   `remoteControl` — an ask it has none for being dropped;
  * - `runsBrief`: it runs a task's brief as an agent session, as a command or a remote agent does not;
  * - `recordsDenials`: a job of it records the calls its fence denied;
- * - `rules`: how its permission rules are matched and the tool sets measured on it (`ClaudeRules`), for a caller that shows a reach.
+ * - `rules`: how its permission rules are matched and the tool sets measured on it (`ClaudeRules`), for a caller that shows a reach;
+ * - `needs`: what it needs on a machine, installed and signed in (`HarnessNeeds`): a harness a person activates, as a command or a
+ *   remote agent, which need nothing of their own, is not.
  */
 export type HarnessDeclaration = {
   readonly can: readonly Capability[];
@@ -144,6 +180,7 @@ export type HarnessDeclaration = {
   readonly runsBrief?: true;
   readonly recordsDenials?: true;
   readonly rules?: ClaudeRules;
+  readonly needs?: HarnessNeeds;
 };
 
 /**

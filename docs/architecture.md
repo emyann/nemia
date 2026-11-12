@@ -60,7 +60,11 @@ inbox, factories, stats, agent definitions.
 holds a run is a meaning, decided in `assess` beside a person's hold (`needsHolding`), its checks run by a sweep beside the passes
 (`src/needs/needs.verb.ts`, `src/needs/sweep.verb.ts`) and handed to the pass level-triggered; a fix is filed on the runtime as a
 `command` task, whose output is the runtime's; a pairing or a first-visit link mints a person token at its claim through the token
-store. The runtime adds one read, Codex's sign-in (`codexSignIn`), which the spawn's refusal and the readiness read share. The api
+store. A harness's install and sign-in are needs too, declared by its runtime adapter (`HarnessDeclaration.needs`, on the vocabulary
+door) and read above it only through `HARNESS_DECLARATIONS` (`harnessNeedsOf`, `src/needs/harness.ts`): the orchestrator, the api, the
+client and the board name no harness. Where a harness's program is run from is the runtime's, by the Kubernetes test (a container's
+command): `EngineOptions.harnessBin`, the tools folder's `bin`, looked in first at every spawn. The runtime adds one read, Codex's
+sign-in (`codexSignIn`), which the spawn's refusal shares. The api
 serves them and lets `/api/pair` through with no token (`PAIR_PATH`, `needOf`), each of its routes judging its own secret; it refuses
 a public or wildcard bind at its start unless acknowledged (`NEMIA_BIND_PUBLIC=1`), as `nemia service install` does.
 

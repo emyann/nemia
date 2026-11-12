@@ -5,7 +5,8 @@ import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { serveSeat } from '../served.ts';
+import { apiEnv, OUT, store } from '../world.ts';
 
 /** A path as a regular expression matches it, character for character. */
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -25,6 +26,24 @@ const answered = (page: Page, method: 'POST' | 'DELETE', pathname: string) =>
 /** The removal of the run `id`, in whichever namespace it is. */
 const removal = (page: Page, id: string) =>
   page.waitForResponse((r) => r.request().method() === 'DELETE' && isRunAction(new URL(r.url()).pathname, id), { timeout: WAIT_MS });
+
+/**
+ * The store's own `claude` (`AE_CLAUDE_EXECUTABLE`, served.ts) put where an activated harness is, the tools folder's `bin`, so a seat
+ * started after it reads the harness installed and signed in: a fresh seed has none, and a try held on its harness is not moving.
+ * Answers what takes it back, the folders it made among it.
+ */
+function harnessPlanted(): () => void {
+  const program = apiEnv.AE_CLAUDE_EXECUTABLE;
+  if (!program) throw new Refused("the api's environment names the store's claude (AE_CLAUDE_EXECUTABLE) — it names none");
+  const tools = path.join(store!, 'tools');
+  const made = !fs.existsSync(tools);
+  const bin = path.join(tools, 'bin');
+  const at = path.join(bin, path.basename(program));
+  if (fs.existsSync(at)) throw new Refused(`a fresh seed has no harness in its tools folder — ${at} is there`);
+  fs.mkdirSync(bin, { recursive: true });
+  fs.symlinkSync(program, at);
+  return () => fs.rmSync(made ? tools : at, { recursive: true, force: true });
+}
 
 const goto = async (page: Page, to: string): Promise<void> => {
   await page.goto(new URL(to, page.url()).href, { waitUntil: 'load' });
@@ -94,8 +113,9 @@ export default {
    * until there is a brief, and starts the try: the store's hidden `tries/scribe` folder, written with the fence and a dollar, and a folder
    * run of it. While the try moves the button is held, and the Factory and Runs tag it `try`. Ran — as the tick and the harness would leave
    * it, said on the feed — the panel shows its state, what it spent of its dollar, the file it wrote and its run; that run's page tags it,
-   * links the agent, and removes it, asked twice. The page takes back the try's record, folders and journal, and `tries/`, so each visit
-   * reads the store as seeded.
+   * links the agent, and removes it, asked twice. The try is told on a seat of its own, started once the store's harness is put in place
+   * (`harnessPlanted`), so its first sweep reads it installed. The page takes back the try's record, folders and journal, `tries/` and the
+   * harness, so each visit reads the store as seeded.
    */
   name: 'agent-try',
   route: `/agents/repo/implementer`,
@@ -119,8 +139,12 @@ export default {
     await photograph(yours, path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`));
 
     let id: string | undefined;
+    const own = page.url();
+    const takeBack = harnessPlanted();
+    let seat: Awaited<ReturnType<typeof serveSeat>> | undefined;
     try {
-      await goto(page, `/agents/yours/${seeded.name}`);
+      seat = await serveSeat('harnessed');
+      await goto(page, new URL(`/agents/yours/${seeded.name}`, seat.base).href);
       const panel = page.locator('section[data-try-agent]');
       await expectVisible(
         panel.locator('[data-try-fence]', { hasText: "A rehearsal fenced to its own folder, not the agent's own permissions" }),
@@ -226,6 +250,11 @@ export default {
           fs.rmSync(at, { recursive: true, force: true });
       }
       fs.rmSync(tries, { recursive: true, force: true });
+      if (seat) {
+        await goto(page, own);
+        await seat.stop();
+      }
+      takeBack();
     }
   },
 } satisfies PageSpec;

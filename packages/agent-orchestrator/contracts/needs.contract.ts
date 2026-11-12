@@ -8,8 +8,9 @@
  * - `needsHolding`: the needs that hold a run before its first session. A run that has filed no task yet waits on every need of its
  *   workflow that is missing, and on none other; a run that has filed one is never held by a need, so a sign-in lapsing mid-run does not
  *   stop work in flight. Level-triggered: the pass hands the reading of this sweep, and a need met on the next starts the run.
- * - `fixRefusal`: whether a caller may start a need's fix. A place's fix (the builtin places) always; a workflow's only where the
- *   factory it came with has its places trusted (`nemia factory trust <factory>`), the trust command named otherwise.
+ * - `fixRefusal`: whether a caller may start a need's fix. A place's fix (the builtin places) and a harness's (declared by a runtime
+ *   adapter) always; a workflow's, or a repository need's, only where the factory it came with, or whose repository it runs in, has its
+ *   places trusted (`nemia factory trust <factory>`), the trust command named otherwise.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -65,8 +66,14 @@ const needsHoldingSpec = spec<(filedAny: boolean, needs: readonly NeedRead[]) =>
 /** `needsHolding`'s type, which src/needs/needs.ts takes. */
 export type NeedsHolding = Implementation<typeof needsHoldingSpec>;
 
-/** Where a fix was declared: a builtin place, or a workflow of a factory whose places are trusted or not. */
-export type FixOrigin = { readonly kind: 'place' } | { readonly kind: 'workflow'; readonly trusted: boolean };
+/**
+ * Where a fix was declared: a builtin place, a runtime adapter (a harness's install, removal or sign-in), or a workflow of a factory whose
+ * places are trusted or not — a repository need's fix, run in a factory's repository, is judged as that factory's workflow's is.
+ */
+export type FixOrigin =
+  | { readonly kind: 'place' }
+  | { readonly kind: 'harness' }
+  | { readonly kind: 'workflow'; readonly trusted: boolean };
 
 /** Whether a fix may be started, or why not. */
 export type FixRefusal = 'allowed' | 'untrusted';
@@ -76,6 +83,10 @@ const fixRefusalSpec = spec<(origin: FixOrigin) => FixRefusal>({
     aPlacesFixIsAllowed: {
       description: 'A fix a builtin place declares may be started by any caller with a person’s token',
       condition: ({ input: [origin], output }) => origin.kind !== 'place' || output === 'allowed',
+    },
+    aHarnessFixIsAllowed: {
+      description: 'A fix a runtime adapter declares for its harness may be started by any caller with a person’s token',
+      condition: ({ input: [origin], output }) => origin.kind !== 'harness' || output === 'allowed',
     },
     aTrustedWorkflowsFixIsAllowed: {
       description: 'A fix a workflow declares may be started where its factory’s places are trusted',

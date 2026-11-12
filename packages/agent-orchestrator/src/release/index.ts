@@ -16,3 +16,4 @@ export {
   type SessionRelease,
 } from './release.ts';
 export { STORE_READABLE_FROM } from './floor.ts';
+export { upgradeCarries } from './carry.ts';

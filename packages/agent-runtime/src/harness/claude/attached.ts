@@ -80,6 +80,7 @@ import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
 import { bridgeOf } from './session-bridge.ts';
+import { claudeExecutableOf } from '../mcp-sign-in.ts';
 
 /**
  * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and
@@ -390,7 +391,8 @@ const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, re
 };
 
 /**
- * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise);
+ * The attached sessions under `root`: `executable` the Claude Code they run (a test's stand-in), else the one `claudeExecutableOf` finds
+ * at each session's start, `options.harnessBin` first, so a Claude Code activated after the holder started is run by the next session;
  * a session under a memory limit runs in a scope made in `options.cgroupParent` by `options.scopeProgram` (`ScopeAt`).
  *
  * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
@@ -401,7 +403,7 @@ const interruptAsked = (root: string, at: Live | undefined, run: AttachedRun, re
 export const attachedSessions = (
   root: string,
   executable?: string,
-  options: { letGoMs?: number; callsShare?: number; holdPollMs?: number; gonePollMs?: number } & ScopeAt = {},
+  options: { letGoMs?: number; callsShare?: number; holdPollMs?: number; gonePollMs?: number; harnessBin?: string } & ScopeAt = {},
 ): Attached => {
   const live = new Map<string, Live>();
   const { letGoMs = LET_GO_MS, callsShare = LET_GO_CALLS_SHARE, holdPollMs = HELD_POLL_MS, gonePollMs = GONE_POLL_MS } = options;
@@ -411,12 +413,12 @@ export const attachedSessions = (
   const sessionsDrain = () => sessionDrainOf(sessionDrainFile(root));
   const held: Held = (l) => (draining || drainsThis(root) || sessionsDrain() !== null) && l.calls.size === 0;
   const pushes = pushesOf({ root, holds: (name) => live.has(name) });
-  const given = { held, holdPollMs, scope: options, ...(executable ? { executable } : {}) };
-  const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) =>
-    live.set(
-      run.name,
-      startSession(root, r, run, first, { ...given, pushed: (m) => pushes.push(run.name, m), ...(resume ? { resume } : {}) }),
-    );
+  const given = { held, holdPollMs, scope: options };
+  const start = (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => {
+    const found = claudeExecutableOf(executable, options.harnessBin);
+    const how = { ...given, ...(found ? { executable: found } : {}), ...(resume ? { resume } : {}) };
+    live.set(run.name, startSession(root, r, run, first, { ...how, pushed: (m) => pushes.push(run.name, m) }));
+  };
 
   const stopped = (run: AttachedRun) => fs.existsSync(filesOf(root, run.name).stop);
 

@@ -7,9 +7,11 @@
  *   listens under) and the app's memory of its needs (`needsMemoryLayer`, app.ts), which the daemon's sweep fills: none swept yet, the
  *   checks are run now.
  * - `POST /api/readiness/fixes` — a need's fix filed on the engine as a command task (`startFix`), answered as it is filed (`pending`).
- *   Refused 404 (`Missing`) for no such need, factory or workflow, and 422 (`Invalid`) for a factory named without its workflow, an index
- *   or an answer amiss, and a workflow's fix of a factory not trusted, naming `nemia factory trust <factory>`; 403 (`Forbidden`) for a
- *   session's token, since a fix acts on the machine outside a step's fence (`personOnly`).
+ *   Refused 404 (`Missing`) for no such need, factory or workflow; 422 (`Invalid`) for a workflow named without its factory, an index or
+ *   an answer amiss, a fix a person types on the server (naming its command), and a workflow's or a repository's fix of a factory not
+ *   trusted, naming `nemia factory trust <factory>`; 409 (`Conflict`) for a fix that takes a need away while an unfinished run needs it,
+ *   naming `nemia cancel <run>` for each; 403 (`Forbidden`) for a session's token, since a fix acts on the machine outside a step's fence
+ *   (`personOnly`).
  * - `GET /api/readiness/fixes/:id` — the fix as it stands (`fixOf`): its phase, the tail of what it printed, its exit code once settled.
  *   404 for an id no fix was started under.
  * - `GET /api/readiness/fixes/:id/output` — what the fix prints, followed, as server-sent events (`followFix`): an `output` event a chunk
@@ -40,7 +42,7 @@ export const readinessHandlers = readsBounded(Api, 'readiness', (handlers) =>
     .handle('read', () => answeredWrite((s) => s.inRequest(Effect.flatMap(Facts, (facts) => readinessOf(facts(s.env))))))
     .handle('fix', ({ payload }) =>
       answeredWrite((s) => {
-        personOnly(s, 'POST /api/readiness/fixes', `\`nemia readiness fix ${payload.need}\``);
+        personOnly(s, 'POST /api/readiness/fixes', `\`nemia doctor fix ${payload.need}\``);
         return s.inRequest(startFix(payload));
       }),
     )

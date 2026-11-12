@@ -56,7 +56,8 @@ or TanStack Start server.
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
 reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks the runtime's `claude` harness for its
 `quota`, which asks Claude Code itself its usage question through the Agent SDK, and serves the answer. It asks the Claude Code the
-sessions run — the one `AE_CLAUDE_EXECUTABLE` names in the api's environment, else the Agent SDK's own, installed with Nemia — never a
+sessions run — the one `AE_CLAUDE_EXECUTABLE` names in the api's environment, else the one activated in the tools folder
+(`nemia doctor fix claude`), else the Agent SDK's own where a checkout carries it — never a
 `claude` on PATH, at most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). A read is never answered by an ask that began more than the keep before it (with `0`, only by one that began after
 it), and a reading's age counts from when its ask began. A read waits 2 s for its ask before it says it is asking (`HKB_QUOTA_WAIT_MS`):

@@ -32,6 +32,7 @@ export const ROOTS = [
   'apps/cli/src',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/proposals.ts',
+  'apps/web/src/lib/setup.ts',
 ];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */

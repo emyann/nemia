@@ -24,6 +24,7 @@ import path from 'node:path';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { mcpServerOf } from './mcp.ts';
 import type { RemoteMcpServer } from './seam.ts';
+import { programIn, programOnPath } from './harness-bin.ts';
 import { withoutTelemetry } from './telemetry.ts';
 
 /** How long a sign-in waits for the person to approve in their browser before its session is ended and the sign-in is `expired`. */
@@ -61,14 +62,25 @@ export const claudeCli =
     });
 
 /**
- * The Claude Code a `claude mcp` child runs: the engine's own (`EngineOptions.claudeExecutable`), else the one the Agent SDK bundles
- * for this platform, `@anthropic-ai/claude-agent-sdk-<platform>-<arch>/claude`, resolved as the SDK resolves it — the same Claude
- * Code a held session runs, so the key it files a secret under is the key that session computes. `undefined` where neither is there.
+ * The Claude Code every road runs — a session, held or a job, its sign-in check, its quota, a `claude mcp` child — so the key a secret
+ * is filed under is the key a session computes, and the sign-in asked is the one the session meets. In order:
+ * 1. `executable`, the one named: the engine's own (`EngineOptions.claudeExecutable`), or `AE_CLAUDE_EXECUTABLE` where the caller reads it;
+ * 2. `<harnessBin>/claude` where it exists, read at every call (`programIn`): the one a person activated, after the engine started too;
+ * 3. the one the Agent SDK bundles for this platform, `@anthropic-ai/claude-agent-sdk-<platform>-<arch>/claude`, resolved as the SDK
+ *    resolves it from the file `sdkFrom` (this one, unless a test plants another tree): a checkout's, never a release's;
+ * 4. `claude` on PATH (`programOnPath`), last, so a checkout never silently runs a person's own Claude Code over the pinned one.
+ * `undefined` where none is there: each caller says what that means.
  */
-export const claudeExecutableOf = (executable: string | undefined): string | undefined => {
-  if (executable !== undefined) return executable;
+export const claudeExecutableOf = (
+  executable: string | undefined,
+  harnessBin?: string,
+  sdkFrom: string = import.meta.url,
+): string | undefined => executable || programIn(harnessBin, 'claude') || sdkBundledClaude(sdkFrom) || programOnPath('claude');
+
+/** The Claude Code the Agent SDK resolved from `from` bundles for this platform, or `undefined` where it bundles none. */
+const sdkBundledClaude = (from: string): string | undefined => {
   try {
-    const sdk = createRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk');
+    const sdk = createRequire(from).resolve('@anthropic-ai/claude-agent-sdk');
     const bundled = createRequire(sdk).resolve(`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/package.json`);
     return path.join(path.dirname(bundled), process.platform === 'win32' ? 'claude.exe' : 'claude');
   } catch {

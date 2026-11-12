@@ -4,9 +4,10 @@
  *
  * `node tools/release/archive.ts --platform <p> --tag <vX.Y.Z> --source <download base> --out <dir>`, run in a checkout at the tag on a
  * machine of that platform: `npm ci` and the board's build in the checkout, the tracked tree copied by `git archive` beside the built
- * board, production dependencies alone installed in the copy (`npm ci --omit=dev`, which takes the platform's own Claude binary), the
- * pinned Node of `node.json` fetched and verified into `node/`, then `pack`: `bin/nemia`, `release.json`, the tar.gz with its entries at
- * its root, and its `SHA256SUMS` line. Given `--tree <dir> --node <dir>` it packs that tree with that Node and builds nothing, which is
+ * board, production dependencies alone installed in the copy (`npm ci --omit=dev`), the pinned Node of `node.json` fetched and verified
+ * into `node/`, then `pack`: the SDK's platform packages taken out of the tree (`dropHarnessBinaries`: a release carries no harness, a
+ * person activates one with `nemia doctor fix`), `bin/nemia`, `release.json`, the tar.gz with its entries at its root, and its
+ * `SHA256SUMS` line. Given `--tree <dir> --node <dir>` it packs that tree with that Node and builds nothing, which is
  * how `tools/guards/test/install.test.ts` makes an archive with no network.
  *
  * Exit codes: 0 written, 1 refused or failed (the line says what to do), 2 an argument it does not take.
@@ -78,6 +79,54 @@ const run = (command: string, args: string[], cwd: string): void => {
     );
 };
 
+/**
+ * The name every platform package of the Agent SDK starts with, `@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, each holding the
+ * platform's own harness binary: the package the runtime's vocabulary installs a harness from (`claudeNeeds`,
+ * `packages/agent-runtime/src/harness/claude/vocabulary.ts`). Spelled here because this tool imports nothing installed.
+ */
+export const SDK_PLATFORM_PREFIX = 'claude-agent-sdk-';
+const SDK_SCOPE = '@anthropic-ai';
+
+/** The `node_modules` folders under `dir`'s own, each package's nested one too, `dir`'s first. */
+const nodeModulesUnder = (dir: string): string[] => {
+  const modules = path.join(dir, 'node_modules');
+  if (!fs.existsSync(modules)) return [];
+  const packages = fs
+    .readdirSync(modules, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+    .flatMap((entry) =>
+      entry.name.startsWith('@')
+        ? fs
+            .readdirSync(path.join(modules, entry.name), { withFileTypes: true })
+            .filter((inner) => inner.isDirectory())
+            .map((inner) => path.join(modules, entry.name, inner.name))
+        : [path.join(modules, entry.name)],
+    );
+  return [modules, ...packages.flatMap(nodeModulesUnder)];
+};
+
+/**
+ * Takes every platform package of the SDK out of `tree`, any platform, wherever npm put it (the root's `node_modules`, a workspace's, a
+ * package's nested one), and leaves the SDK itself: `npm ci --omit=dev` installs the one of the machine it runs on as the SDK's optional
+ * dependency, and `--omit=optional` would drop every package's. Returns the folders it took out, relative to `tree`.
+ */
+export const dropHarnessBinaries = (tree: string): string[] => {
+  const workspaces = ['packages', 'apps', 'tools']
+    .map((group) => path.join(tree, group))
+    .filter((group) => fs.existsSync(group))
+    .flatMap((group) => fs.readdirSync(group).map((name) => path.join(group, name)));
+  const dropped: string[] = [];
+  for (const modules of [tree, ...workspaces].flatMap(nodeModulesUnder)) {
+    const scope = path.join(modules, SDK_SCOPE);
+    if (!fs.existsSync(scope)) continue;
+    for (const name of fs.readdirSync(scope).filter((each) => each.startsWith(SDK_PLATFORM_PREFIX))) {
+      fs.rmSync(path.join(scope, name), { recursive: true, force: true });
+      dropped.push(path.relative(tree, path.join(scope, name)));
+    }
+  }
+  return dropped;
+};
+
 /** What `pack` writes into a tree and from it. */
 export type Packed = {
   tree: string;
@@ -91,11 +140,13 @@ export type Packed = {
 };
 
 /**
- * Packs `tree` as the release of `tag` for `platform`: `node` copied to `node/`, the launcher to `bin/nemia`, `release.json` written
+ * Packs `tree` as the release of `tag` for `platform`: the SDK's platform packages taken out (`dropHarnessBinaries`), `node` copied
+ * to `node/`, the launcher to `bin/nemia`, `release.json` written
  * last into the tree, then `<out>/nemia-<tag>-<platform>.tar.gz` with the tree's entries at its root and `<out>/SHA256SUMS` holding its
  * one line. Returns the archive's path.
  */
 export const pack = (given: Packed): string => {
+  dropHarnessBinaries(given.tree);
   fs.cpSync(given.node, path.join(given.tree, 'node'), { recursive: true, verbatimSymlinks: true });
   fs.mkdirSync(path.join(given.tree, 'bin'), { recursive: true });
   fs.writeFileSync(path.join(given.tree, 'bin', 'nemia'), LAUNCHER, { mode: 0o755 });
@@ -142,7 +193,10 @@ const commitOf = (): string => {
   return ran.stdout.trim();
 };
 
-/** Builds the release folder in `work`: the board built in the checkout, the tracked tree copied, production dependencies installed. */
+/**
+ * Builds the release folder in `work`: the board built in the checkout, the tracked tree copied, production dependencies installed;
+ * `pack` takes the SDK's platform package back out.
+ */
 const buildTree = (work: string): string => {
   run('npm', ['ci'], ROOT);
   run('npm', ['run', 'build', '--workspace', 'web'], ROOT);

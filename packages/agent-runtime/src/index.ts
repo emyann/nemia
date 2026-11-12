@@ -146,7 +146,7 @@ export { heldHarnessesOf } from './service/options.ts';
  * from a file of its own and words the refusal there.
  */
 export { remoteConfigRefusal } from './a2a/index.ts';
-export { codex, codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from './harness/codex/codex.ts';
+export { codex, codexProgramOf, codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from './harness/codex/codex.ts';
 export { claudeSignIn, CLAUDE_SIGN_IN_MS, type ClaudeSignIn } from './harness/claude/sign-in.ts';
 /** The harnesses an engine given none runs, by the name each is configured under: for a caller that hands the engine a map of its own. */
 export { DEFAULT_HARNESSES } from './service/default-harnesses.ts';
@@ -178,9 +178,10 @@ export { denialText, fold, nameFor } from './core/index.ts';
  */
 export { RuntimeModel };
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
+export { CLAUDE_PIN, CLAUDE_SDK_VERSION } from './harness/claude/vocabulary.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { CLAUDE_RULES, type ClaudeRules, type Dated } from './harness/claude/rules.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
+export { CODEX_EFFORTS, CODEX_PIN, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES, HARNESS_KNOBS } from './harness/choices.ts';
 export {
   CAPABILITIES,
@@ -195,6 +196,8 @@ export {
   type Capability,
   type HarnessDeclaration,
   type HarnessDeclared,
+  type HarnessNeeds,
+  type HarnessSignInFix,
   type OwnArgs,
   type VerbHarness,
 } from './harness/declaration.ts';

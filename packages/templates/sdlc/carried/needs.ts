@@ -119,7 +119,7 @@ function linked(target: string, link: string): void {
 /** `install-gh`: the latest gh for this machine into `$NEMIA_TOOLS/gh/<version>`, its sum checked, and `$NEMIA_TOOLS/bin/gh` linked. */
 async function installGh(): Promise<string[]> {
   const tools = process.env.NEMIA_TOOLS;
-  if (!tools) throw new Refusal("NEMIA_TOOLS is not set: run this as a need's fix, `nemia readiness fix gh`, which names the tools folder");
+  if (!tools) throw new Refusal("NEMIA_TOOLS is not set: run this as a need's fix, `nemia doctor fix gh`, which names the tools folder");
   const tail = archiveTail();
   const url = process.env.NEMIA_GH_RELEASE_URL || LATEST;
   let release: Release;

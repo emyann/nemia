@@ -1,7 +1,8 @@
 /**
  * The readiness routes: the read lists its pieces, the test place's need among them; a fix of that need, its answers given, is filed on
  * the engine, read back as it settles, and its output followed as server-sent events, `output` then `ended`; an unknown fix is a 404, on
- * its read and on its stream. Statuses, phases and event names are asserted, never a sentence.
+ * its read and on its stream; a fix a person types is refused as objects' `Invalid` and a removal a run still needs as its `Conflict`,
+ * nothing filed. Statuses, phases and event names are asserted, never a sentence.
  *
  * On the stand-ins: the runtime's test engine, which runs no command — the fix's task is settled by the test with what it printed — and
  * the test place, declaring one need here; the machine's facts the read asks are the test's own (`Facts`), so it runs no command.
@@ -12,9 +13,13 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { PlaceService, runningRelease, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
-import type { Fix, Need, Readiness } from 'objects';
-import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from 'test-kit/scratch';
+import { PlaceService, runningRelease, startRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { Conflict, Invalid, type Fix, type Need, type Readiness } from 'objects';
+import { Schema } from 'effect';
+import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { root } from '../../test/harness.ts';
 import { Facts } from './readiness.ts';
 
@@ -32,6 +37,8 @@ const IDENTITY: Need = {
         { name: 'email', message: 'your email' },
       ],
     },
+    { command: 'echo unset', message: 'take it away', kind: 'removes' },
+    { command: 'set-it-by-hand', message: 'set it on the server', kind: 'typed' },
   ],
 };
 
@@ -41,17 +48,15 @@ const facts = Layer.succeed(Facts, (env: NodeJS.ProcessEnv) => ({
   user: 'tester',
   exists: () => false,
   run: () => undefined,
-  signIn: () => ({ state: 'unknown' as const }),
-  ownSignIn: () => 'unknown' as const,
   running: runningRelease(),
 }));
 
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 /** The app over the stand-ins, its place declaring `IDENTITY`. */
-const app = eachTest(() =>
-  appOver(engine(), stand(), PlaceService.layer({ ...stand().place, declared: { ...stand().place.declared, needs: [IDENTITY] } }), facts),
-);
+/** The test place, declaring `IDENTITY`. */
+const placed = () => PlaceService.layer({ ...stand().place, declared: { ...stand().place.declared, needs: [IDENTITY] } });
+const app = eachTest(() => appOver(engine(), stand(), placed(), facts));
 
 /** A request of `method` to `url`, as a client sends one: JSON, from the board's own page. */
 const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: string) =>
@@ -119,4 +124,21 @@ test("a session's token starts no fix: 403, and nothing is filed", async () => {
   const res = await send('POST', '/api/readiness/fixes', { need: 'identity', answers: { name: 'x', email: 'y@example.com' } }, token);
   assert.equal(res.status, 403);
   assert.equal(Effect.runSync(engineFor(engine()).list()).views.length, before, 'no fix filed');
+});
+
+/** The status objects' error class `kind` answers with. */
+const statusOf = (kind: typeof Invalid | typeof Conflict): unknown => Schema.resolveAnnotations(kind)?.httpApiStatus;
+
+test("REFUSED: a fix a person types is objects' Invalid, and a removal a run still needs its Conflict, nothing filed", async () => {
+  const typed = await send('POST', '/api/readiness/fixes', { need: 'identity', index: 2 });
+  assert.equal(typed.status, statusOf(Invalid), await typed.clone().text());
+  const repo = scratch('nemia-api-readiness-repo-');
+  stand().world.repository(repo, { 'README.md': 'readme\n' });
+  const workflowDir = scratch('nemia-api-readiness-workflow-');
+  fs.writeFileSync(path.join(workflowDir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
+  const run = await runOver(placed)(engineFor(engine()), startRun({ brief: 'Build it.', repo, workflowDir }));
+  const held = await send('POST', '/api/readiness/fixes', { need: 'identity', index: 1 });
+  assert.equal(held.status, statusOf(Conflict), await held.clone().text());
+  assert.deepEqual(((await held.json()) as { users?: string[] }).users, [run.id]);
+  assert.deepEqual(engine().filings, [], 'no fix filed');
 });

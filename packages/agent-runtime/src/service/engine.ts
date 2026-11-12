@@ -765,7 +765,8 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
 /**
  * The verbs that ask a harness something in a session of their own, opened for the ask and let go with it: what is left of a plan's
  * usage (`quota`), the state of each server a caller hands (`mcpState`), and a server's sign-in and sign-out (`mcpSignIn`,
- * `mcpSignInState`, `mcpSignInCallback`, `mcpSignOut`), whose waiting sign-ins this engine holds.
+ * `mcpSignInState`, `mcpSignInCallback`, `mcpSignOut`), whose waiting sign-ins this engine holds. Each finds the Claude Code it runs at
+ * each ask, `executable` first, then the one in `harnessBin` (`claudeExecutableOf`).
  */
 const askedVerbsOf = (
   runners: Record<string, SeamOps>,
@@ -774,10 +775,11 @@ const askedVerbsOf = (
   fallback: string,
   root: string,
   executable: string | undefined,
+  harnessBin: string | undefined,
 ): Pick<EngineShape, 'quota' | 'mcpState' | 'mcpSignIn' | 'mcpSignInState' | 'mcpSignInCallback' | 'mcpSignOut'> => ({
   quota: quotaVerbOf(runners, declared, fallback),
-  mcpState: mcpStateVerbOf(harnesses, root, executable),
-  ...mcpSignInVerbsOf(harnesses, root, executable),
+  mcpState: mcpStateVerbOf(harnesses, root, executable, undefined, harnessBin),
+  ...mcpSignInVerbsOf(harnesses, root, executable, {}, harnessBin),
 });
 
 /**
@@ -848,9 +850,9 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const { credentials, missingCredential, telemetry, claudeExecutable, cgroupParent } = options;
-    const attached = attachedSessions(root, claudeExecutable, { cgroupParent });
-    const made = runnersOf(harnesses, { root, credentials, missingCredential, telemetry, attached, claudeExecutable, cgroupParent });
+    const { claudeExecutable, harnessBin, cgroupParent } = options;
+    const attached = attachedSessions(root, claudeExecutable, { cgroupParent, ...(harnessBin ? { harnessBin } : {}) });
+    const made = runnersOf(harnesses, { ...options, root, attached });
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const byName = harnessedOf(harnesses, runners);
     const declared = Object.values(byName);
@@ -957,7 +959,7 @@ const make = (options: EngineOptions) =>
       output: outputVerbOf(read, harnessOf),
       follow: followVerbOf(read, harnessOf),
       ...writtenVerbsOf(go, read, harnessOf),
-      ...askedVerbsOf(runners, harnesses, declared, fallback, root, options.claudeExecutable),
+      ...askedVerbsOf(runners, harnesses, declared, fallback, root, options.claudeExecutable, options.harnessBin),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

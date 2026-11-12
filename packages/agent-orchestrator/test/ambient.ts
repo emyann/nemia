@@ -37,11 +37,17 @@
  * So the throwaway home is given a `.gitconfig` of its own with a test identity (`GIT_IDENTITY`): a commit a test makes through a script
  * that names no `-c user.email` of its own — a landing's merge commit, the ship's — was signed with the person's name until now, and is
  * signed with this one instead. A test that needs something of the person's own `$HOME` reads it from `REAL_HOME`.
+ *
+ * In the same way the machine a test runs on has what a run needs before its first session: a stand-in program, exiting 0 to every
+ * question, for each harness the runtime declares needs for and for the git place's `mise`, in a folder first on PATH (`PROGRAMS`), so a
+ * daemon a test starts sweeps them met (installed, signed in, every tool of a repository in place) and a run is held by no need of the
+ * machine's. A test of a need missing sets a PATH of its own (`test/needs.test.ts`).
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
 import { FORWARD_VARIABLES, SERVING_VARIABLES, SESSION_VARIABLES } from '../src/config/config.store.ts';
 
 /** The value both ceilings start with in a test: not a count, so `maxRuns` and `maxConcurrent` refuse it with exit 2. */
@@ -78,3 +84,9 @@ process.env.HOME = AWAY;
 export const GIT_IDENTITY = { name: 'nemia test', email: 'test@nemia.invalid' };
 
 fs.writeFileSync(path.join(AWAY, '.gitconfig'), `[user]\n\tname = ${GIT_IDENTITY.name}\n\temail = ${GIT_IDENTITY.email}\n`);
+
+/** The folder first on every test's PATH: a stand-in for each program a machine need checks for, each exiting 0 to whatever it is asked. */
+export const PROGRAMS = scratch('wf-ambient-programs-');
+for (const program of [...Object.values(HARNESS_DECLARATIONS).flatMap((d) => (d.needs === undefined ? [] : [d.needs.program])), 'mise'])
+  fs.writeFileSync(path.join(PROGRAMS, program), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+process.env.PATH = [PROGRAMS, process.env.PATH ?? ''].join(path.delimiter);

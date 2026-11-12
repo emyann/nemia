@@ -48,6 +48,7 @@ import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords }
 import { CLAUDE_CONTEXT_TOKENS, CLAUDE_DECLARATION, bridgeAsked, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
 import { projectMcpConfig } from '../mcp.ts';
+import { programIn } from '../harness-bin.ts';
 import { RunnerError } from '../error.ts';
 import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './session-bridge.ts';
 import type { Attached } from './attached.ts';
@@ -65,6 +66,11 @@ export type ClaudeOptions = {
    * process as `AE_CLAUDE_EXECUTABLE` (`claudeJobSpec`). Absent: the SDK's own.
    */
   claudeExecutable?: string;
+  /**
+   * The folder a Claude Code is looked for in at each spawn where none is named here or by the engine's `AE_CLAUDE_EXECUTABLE`
+   * (`EngineOptions.harnessBin`): `<harnessBin>/claude`, handed to the job's process as `AE_CLAUDE_EXECUTABLE` where it exists.
+   */
+  harnessBin?: string;
   /** How long a job is held under the sessions' drain before it parks, in milliseconds: a test's shortening. Absent: `JOB_HOLD_MS`. */
   holdMs?: number;
   /** How often a job's own process reads the sessions' drain, in milliseconds: a test's shortening. Absent: `JOB_HOLD_POLL_MS`. */
@@ -101,7 +107,8 @@ const HOLD_END = 'hold';
  * (`drainFile`), and the bounds a test shortened (`holdMs`, `holdPollMs`), each only where given.
  *
  * Before any of it, the Claude Code the session would run (`executable`) is asked whether this machine is signed in, within `signInMs`
- * (`claudeSignedOutRefusal`): signed out, or with no answer, the spawn is refused, before anything runs.
+ * (`claudeSignedOutRefusal`): signed out, or with no answer, the spawn is refused, before anything runs. Where neither `executable` nor
+ * the engine's `AE_CLAUDE_EXECUTABLE` names one, `<harnessBin>/claude`, where it exists at this spawn, is the job's (`io.program`).
  */
 const claudePrepare = (
   r: SpawnRequest,
@@ -109,11 +116,17 @@ const claudePrepare = (
   hold?: JobHoldOptions,
   executable?: string,
   signInMs?: number,
+  harnessBin?: string,
 ): Partial<HarnessIO> => {
-  const signedOut = claudeSignedOutRefusal(r, executable, signInMs);
+  const signedOut = claudeSignedOutRefusal(r, executable, signInMs, harnessBin);
   if (signedOut) throw new Error(signedOut);
   const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
-  const io: Partial<HarnessIO> = { ...(found ? { projectMcpConfig: found } : {}), ...(beside ? holdIo(beside, hold) : {}) };
+  const program = executable || process.env.AE_CLAUDE_EXECUTABLE ? undefined : programIn(harnessBin, 'claude');
+  const io: Partial<HarnessIO> = {
+    ...(found ? { projectMcpConfig: found } : {}),
+    ...(program ? { program } : {}),
+    ...(beside ? holdIo(beside, hold) : {}),
+  };
   if (!bridgeAsked(r) || beside === undefined) return io;
   const bridgeFile = beside(BRIDGE_END);
   fs.rmSync(bridgeFile, { force: true });
@@ -161,9 +174,9 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  * first result, and the session ends with it.
  *
  * - `command`: this runtime's node running the bin, the request file its one argument. `AE_CLAUDE_EXECUTABLE` where the engine
- *   names a Claude Code (`claudeJobSpec`'s `executable`), and nothing else: the session's own environment —
- *   the task's `env`, `CLAUDE_JOB_ENV` and its telemetry — is laid by `attachedOptions` on `Options.env` inside the bin, and
- *   leaving it here would stamp the engine's own child with the session's telemetry.
+ *   names a Claude Code (`claudeJobSpec`'s `executable`) or its `prepare` found one in `harnessBin` (`io.program`), and nothing
+ *   else: the session's own environment — the task's `env`, `CLAUDE_JOB_ENV` and its telemetry — is laid by `attachedOptions` on
+ *   `Options.env` inside the bin, and leaving it here would stamp the engine's own child with the session's telemetry.
  * - `needsRequest`: the bin is handed the spawn request whole, which no argv could carry.
  * - `input.line`: a user message; the session is the job's own, so it names none.
  * - `input.closesOn`: its result, the line after which the bin reads nothing more; a producer prints its `type` far
@@ -185,16 +198,17 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  * - `refuses`: what Claude Code cannot be asked for (`claudeRefuses`); a bridge it opens itself.
  * Exported only for the tests that import it.
  */
-export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number): HarnessSpec => ({
+export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signInMs?: number, harnessBin?: string): HarnessSpec => ({
   name: 'claude',
   command: (_r, io) => {
     const requestFile = io?.requestFile;
     if (requestFile === undefined)
       throw new Error('a Claude Code job starts on its spawn request file, and none was given: its runner writes one for `needsRequest`');
+    const named = executable || io?.program;
     return {
       cmd: process.execPath,
       args: [CLAUDE_JOB_BIN, requestFile],
-      ...(executable ? { env: { AE_CLAUDE_EXECUTABLE: executable } } : {}),
+      ...(named ? { env: { AE_CLAUDE_EXECUTABLE: named } } : {}),
     };
   },
   needsRequest: true,
@@ -208,7 +222,7 @@ export const claudeJobSpec = (executable?: string, hold?: JobHoldOptions, signIn
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents, records: claudeTranscriptRecords },
   streams: true,
   partials: claudePartials,
-  prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs),
+  prepare: (r, beside) => claudePrepare(r, beside, hold, executable, signInMs, harnessBin),
   refuses: claudeRefuses,
   bridgeAsked,
   can: CLAUDE_DECLARATION.can,
@@ -343,6 +357,7 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
       ...(holdPollMs !== undefined ? { holdPollMs } : {}),
     },
     options.signInMs,
+    options.harnessBin,
   );
   const scoped = options.cgroupParent ? { cgroupParent: options.cgroupParent } : {};
   const plain = withHoldFiles(withBridgeFiles(detachedOps(spec, root, scoped), root), spec, root);
@@ -362,6 +377,7 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
     quota: claudeQuota({
       heardFile: claudeHeardFile(root),
       ...(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
+      ...(options.harnessBin === undefined ? {} : { harnessBin: options.harnessBin }),
     }),
   };
 };

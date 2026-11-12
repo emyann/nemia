@@ -20,8 +20,8 @@
  *   readers count as a denial. `canUseTool` is never called, so no decision of this process can be left in flight when it dies.
  * - The SDK is given no `spawnClaudeCodeProcess`: unlike a holder, which detaches its children so a let-go leaves a group to kill,
  *   this process must leave Claude Code in its own process group, which is the group the worker kills on a stop.
- * - `AE_CLAUDE_EXECUTABLE` is the Claude Code to run, where the engine names one (`EngineOptions.claudeExecutable`); absent, the
- *   SDK's own.
+ * - `AE_CLAUDE_EXECUTABLE` is the Claude Code to run, where the engine names one (`EngineOptions.claudeExecutable`, or the
+ *   `<harnessBin>/claude` its spawn found); absent, the SDK's own bundled one, else the `claude` on PATH (`claudeExecutableOf`).
  * - Where the task asks for a bridge to claude.ai (`claude.remoteControl`), it is opened on the session's `system`/`init` message
  *   (`bridgeDue`), through the one door to the SDK's undeclared control request (`enableBridge`), with `keepSessionOnExit: false`:
  *   the job's claude.ai session ends with it. What it came to — the link and its facts, or why there is none — is written to the
@@ -59,6 +59,7 @@ import { JOB_HOLD_MS, JOB_HOLD_POLL_MS } from '../src/harness/claude/job-hold.ts
 import { keepHeard } from '../src/harness/claude/heard.ts';
 import { jobHoldOf, type HoldIO } from '../src/harness/claude/job-hooks.ts';
 import { replaceFile } from '../src/core/replace.ts';
+import { claudeExecutableOf } from '../src/harness/mcp-sign-in.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 
 /** Why the session cannot go on, thrown so that whatever is printed is flushed before the process leaves. */
@@ -196,7 +197,7 @@ const heardBy =
 const ran = async ({ request, io }: Requested): Promise<boolean> => {
   const abort = new AbortController();
   for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => abort.abort());
-  const executable = process.env.AE_CLAUDE_EXECUTABLE;
+  const executable = claudeExecutableOf(process.env.AE_CLAUDE_EXECUTABLE);
   let given;
   try {
     given = attachedOptions(request);

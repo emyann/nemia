@@ -3,7 +3,7 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 3.4.1
+  version: 3.5.0
   rules:
     path: RULES.md
   parameters:

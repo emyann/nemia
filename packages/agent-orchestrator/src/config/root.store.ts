@@ -39,9 +39,13 @@ export const toolsDir = (home: string): string => path.join(home, 'tools');
 /** The folder of the tools folder whose programs the daemon finds first on its PATH: `<home>/tools/bin`. */
 export const toolsBinDir = (home: string): string => path.join(toolsDir(home), 'bin');
 
-/** `pathValue` (a PATH) led by the tools folder's `bin/` of the store at `home`, once: an entry already first is not put again. */
+/**
+ * `pathValue` (a PATH) led by the tools folder's `bin/` of the store at `home` and ended by the folder of the Node this process runs, each
+ * once: a release's Node is on nobody's PATH, and a harness's install runs its `npm` and `node`. Every other entry keeps its order.
+ */
 export const pathLedByTools = (home: string, pathValue: string | undefined): string => {
   const bin = toolsBinDir(home);
-  const rest = (pathValue ?? '').split(path.delimiter).filter((entry) => entry !== '' && entry !== bin);
-  return [bin, ...rest].join(path.delimiter);
+  const node = path.dirname(process.execPath);
+  const rest = (pathValue ?? '').split(path.delimiter).filter((entry) => entry !== '' && entry !== bin && entry !== node);
+  return [bin, ...rest, node].join(path.delimiter);
 };

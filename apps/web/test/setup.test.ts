@@ -1,11 +1,24 @@
 /**
  * The Setup page's own judgements (src/lib/setup.ts): the URLs a fix's output links, the code it shows by its need's pattern, the answers
- * a fix is started with, the name a browser pairs under, the pieces grouped by area, and the first-visit link taken off an address.
+ * a fix is started with, the name a browser pairs under, the pieces grouped by area, the first-visit link taken off an address, the
+ * harnesses the first visit offers, and the fixes a piece shows by its state.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { READINESS_AREAS } from 'objects';
-import { answered, answersOf, clientNameOf, codeIn, linkedParts, linkSecretOf, piecesByArea, withoutLink } from '../src/lib/setup.ts';
+import type { ReadinessFix, ReadinessPiece } from 'objects';
+import {
+  answered,
+  answersOf,
+  clientNameOf,
+  codeIn,
+  harnessChoices,
+  linkedParts,
+  linkSecretOf,
+  piecesByArea,
+  shownFixes,
+  withoutLink,
+} from '../src/lib/setup.ts';
 
 test('linkedParts: every URL of the output a link, the sentence around it text, and the whole said back', async (t) => {
   await t.test('a device sign-in: the URL is a link, the full stop after it text', () => {
@@ -108,4 +121,76 @@ test('linkSecretOf and withoutLink: the secret a first-visit link carries, and t
   assert.equal(withoutLink('http://10.0.0.2:8787/?link=s3cr3t'), '/', 'the bare address');
   assert.equal(linkSecretOf('http://10.0.0.2:8787/?link='), undefined, 'an empty link is none');
   assert.equal(linkSecretOf('http://10.0.0.2:8787/runs'), undefined);
+});
+
+test("harnessChoices: one row per harness the read names, in the read's order, its install and sign-in pieces", async (t) => {
+  type P = { id: string; harness?: { name: string; part: 'install' | 'sign-in' } };
+  const rows: Array<{ why: string; pieces: P[]; want: Array<[string, string, string | undefined]> }> = [
+    {
+      why: "two harnesses, each its two pieces, in the read's order, a piece of no harness left out",
+      pieces: [
+        { id: 'a', harness: { name: 'one', part: 'install' } },
+        { id: 'b', harness: { name: 'one', part: 'sign-in' } },
+        { id: 'svc' },
+        { id: 'c', harness: { name: 'two', part: 'install' } },
+        { id: 'd', harness: { name: 'two', part: 'sign-in' } },
+      ],
+      want: [
+        ['one', 'a', 'b'],
+        ['two', 'c', 'd'],
+      ],
+    },
+    {
+      why: 'a sign-in read before its install: the harness is named where its first piece is',
+      pieces: [
+        { id: 'b', harness: { name: 'one', part: 'sign-in' } },
+        { id: 'a', harness: { name: 'one', part: 'install' } },
+      ],
+      want: [['one', 'a', 'b']],
+    },
+    {
+      why: 'an install with no sign-in piece: a row, its sign-in none',
+      pieces: [{ id: 'a', harness: { name: 'one', part: 'install' } }],
+      want: [['one', 'a', undefined]],
+    },
+    {
+      why: 'a sign-in with no install piece: no row, since nothing activates it',
+      pieces: [{ id: 'b', harness: { name: 'one', part: 'sign-in' } }],
+      want: [],
+    },
+    { why: 'no harness at all: no row', pieces: [{ id: 'svc' }], want: [] },
+  ];
+  for (const row of rows)
+    await t.test(row.why, () => {
+      assert.deepEqual(
+        harnessChoices(row.pieces).map((c) => [c.name, c.install.id, c.signIn?.id]),
+        row.want,
+      );
+    });
+});
+
+test('shownFixes: a piece in place shows only what takes it away, any other every fix but that, each with its index', async (t) => {
+  const puts: ReadinessFix = { message: 'install it', command: 'x', startable: true, index: 0 };
+  const removes: ReadinessFix = { message: 'deactivate it', command: 'y', startable: true, index: 1, kind: 'removes' };
+  const typed: ReadinessFix = { message: 'type it', command: 'z', startable: false, kind: 'typed' };
+  const piece = (state: ReadinessPiece['state'], fixes: ReadinessFix[]): ReadinessPiece => ({
+    name: 'n',
+    area: 'harness',
+    state,
+    message: 'm',
+    fixes,
+  });
+  const rows: Array<{ why: string; piece: ReadinessPiece; want: Array<[string, number]> }> = [
+    { why: 'in place: its removal alone, at its index', piece: piece('met', [puts, removes]), want: [['deactivate it', 1]] },
+    { why: 'missing: what puts it there, never the removal', piece: piece('missing', [puts, removes]), want: [['install it', 0]] },
+    { why: 'unknown: as missing', piece: piece('unknown', [typed, removes]), want: [['type it', 0]] },
+    { why: 'in place with nothing to take it away: none', piece: piece('met', [puts]), want: [] },
+  ];
+  for (const row of rows)
+    await t.test(row.why, () => {
+      assert.deepEqual(
+        shownFixes(row.piece).map(({ fix, i }) => [fix.message, i]),
+        row.want,
+      );
+    });
 });

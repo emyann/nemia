@@ -1,9 +1,11 @@
 /**
  * A need's fix, started by the server (`startFix`) and read back (`fixOf`, `followFix`), on the runtime's stand-in (`testEngine`) and the
- * test place given a need of its own: a place's fix is filed as a command task in the store's folder, the tools folder first on its PATH,
- * each answer as its variable; an answer left out, a need no place declares and a fix of a workflow of a factory whose places are not
- * trusted are refused, nothing filed; and the fix's phase, output and exit code are read off its task as it settles. The test's store is
- * its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of its own, so no place is trusted.
+ * test place given a need of its own and a repository need: a place's fix is filed as a command task in the store's folder, the tools
+ * folder first on its PATH, each answer as its variable; a harness's install is found by its name alone and filed, and its typed sign-in
+ * refused (`Invalid`); an answer left out, a need no place declares and a fix of a workflow of a factory whose places are not trusted are
+ * refused, nothing filed; a repository need named by its factory alone is filed in that factory's repository once its places are trusted,
+ * and refused, naming the trust, before; and the fix's phase, output and exit code are read off its task as it settles. The test's store
+ * is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of its own, so no place is trusted until a test trusts it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +23,9 @@ import { PlaceService } from '../place/place.store.ts';
 import { createFactoryAt } from '../factory/factory.store.ts';
 import { toolsDir, type StoreRoot } from '../config/root.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
+import { trustPlaces } from '../trust/trust.verb.ts';
+import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
+import { signInNeedOf } from './harness.ts';
 import { answerVariable, fixOf, followFix, startFix } from './fix.verb.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -45,6 +50,15 @@ const IDENTITY: Need = {
   ],
 };
 
+/** The repository need the test place declares here: a toolchain, checked and fixed in each factory's repository. */
+const TOOLCHAIN: Need = {
+  name: 'toolchain',
+  message: 'the toolchain is installed',
+  check: 'exit 1',
+  scope: 'repository',
+  fixes: [{ command: 'echo installed', message: 'install it' }],
+};
+
 /** What the programs here ask. */
 type Needs = PlaceService | StoreRoot | EngineService;
 
@@ -54,7 +68,7 @@ const engine = eachTest(testEngine);
 const run = <A, E>(program: Effect.Effect<A, E, Needs>) =>
   runOver(
     runWith,
-    () => PlaceService.layer({ ...stand().place, declared: { ...declared, needs: [IDENTITY] } }),
+    () => PlaceService.layer({ ...stand().place, declared: { ...declared, needs: [IDENTITY, TOOLCHAIN] } }),
     ENV,
   )(engineOf(engine().layer), program);
 
@@ -124,4 +138,31 @@ test("a workflow's fix of a factory whose places are not trusted is refused, nam
   assert.ok(refused instanceof Invalid);
   assert.match(refused.message, /nemia factory trust acme/);
   assert.deepEqual(engine().filings, []);
+});
+
+test("a harness's install is found by its name and filed; a fix a person types is refused, naming it, and nothing is filed", async () => {
+  const typed = await refusedBy(startFix({ need: signInNeedOf(DEFAULT_HARNESS) }));
+  assert.ok(typed instanceof Invalid);
+  assert.equal(typed.exitCode, 2);
+  assert.deepEqual(engine().filings, []);
+  const fix = await run(startFix({ need: DEFAULT_HARNESS }));
+  assert.equal(engine().tasks.get(fix.id)?.spec.harness, 'command');
+  assert.equal(engine().tasks.get(fix.id)?.spec.cwd, ROOT);
+});
+
+test("a repository need named by its factory alone runs in the factory's repository once trusted, and is refused, naming the trust, before", async () => {
+  const repo = scratch('wf-fix-toolchain-');
+  stand().world.repository(repo, { 'a.txt': 'one\n' });
+  createFactoryAt(ROOT, { name: 'tooled', repos: [repo], workflows: [], hires: {}, schedules: {} });
+  const refused = await refusedBy(startFix({ need: 'toolchain', factory: 'tooled' }));
+  assert.ok(refused instanceof Invalid);
+  assert.match(refused.message, /nemia factory trust tooled/);
+  assert.deepEqual(engine().filings, []);
+  await run(trustPlaces([repo]));
+  const fix = await run(startFix({ need: 'toolchain', factory: 'tooled' }));
+  assert.equal(engine().tasks.get(fix.id)?.spec.cwd, repo);
+  assert.equal(fix.factory, 'tooled');
+  assert.equal(fix.workflow, undefined);
+  const machine = await refusedBy(startFix({ need: 'toolchain' }));
+  assert.ok(machine instanceof Missing, 'a repository need is no need of the machine alone');
 });

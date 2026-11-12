@@ -9,9 +9,9 @@
  * and `nemia pair <url>` writes one a pairing minted the token of (`pair.ts`), whatever context is in use.
  */
 import { CONFIG_VERB, chosenOf, config, factoryNotHere, unheld } from './context.ts';
+import { doctor, RETIRED_VERB, retiredVerb } from './doctor.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
 import { PAIR_VERB, pair } from './pair.ts';
-import { readiness } from './readiness.ts';
 import { type ClientVerb, MACHINE_VERBS, MOVED_COMMANDS, type MovedName, nameOf, type ReadVerb, routeOf } from './route.ts';
 import { Refused } from './refused.ts';
 import { commanded } from './commands/commanded.ts';
@@ -37,7 +37,7 @@ const READS: Readonly<Record<ReadVerb, (args: readonly string[]) => Promise<numb
   ls,
   inbox,
   watch,
-  readiness,
+  doctor,
 };
 
 /** Each of the client's own verbs' runner, on the words after its name. */
@@ -76,15 +76,26 @@ const exportsAFactory = (words: readonly string[]): boolean =>
   words[0] === 'template' && words[1] === 'export' && words.some((word) => word === '--factory' || word.startsWith('--factory='));
 
 /**
+ * The verbs answered before any context or route is read: `nemia config` and `nemia pair`, about the client's own config, and the
+ * retired word `readiness`, refused naming `nemia doctor`.
+ */
+const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number>>> = {
+  [CONFIG_VERB]: config,
+  [PAIR_VERB]: pair,
+  [RETIRED_VERB]: () => Promise.reject(retiredVerb()),
+};
+
+/**
  * Runs `argv` and answers the exit code: on the api for a moved read, a verb of the client's own and a command whose words it holds,
  * else on the old path under `entry`, forwarded to the daemon a remote context names for a verb about the store only that path has;
- * refused, exit 2, where `--local` is typed (`localRefused`), under a context the config does not hold, and for a `template export
- * --factory` under a remote one, which would read this machine's store (`factoryNotHere`).
+ * refused, exit 2, where `--local` is typed (`localRefused`), under a context the config does not hold, for a `template export
+ * --factory` under a remote one, which would read this machine's store (`factoryNotHere`), and for the retired word `readiness`
+ * (`RETIRED_VERB`), naming `nemia doctor` (`retiredVerb`).
  */
 export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const name = nameOf(argv);
-  if (name === CONFIG_VERB) return config(argv.slice(1));
-  if (name === PAIR_VERB) return pair(argv.slice(1));
+  const first = Object.entries(FIRST).find(([word]) => word === name)?.[1];
+  if (first !== undefined) return first(argv.slice(1));
   const chosen = chosenOf();
   const help = argv.includes('--help') || name === '';
   const route = routeOf({ name, local: unlocal(argv), help, remote: chosen.kind === 'remote' });

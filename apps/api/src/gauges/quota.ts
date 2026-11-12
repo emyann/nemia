@@ -14,6 +14,7 @@
  */
 import { Context, Layer } from 'effect';
 import type { HarnessQuota, HeardQuota, QuotaLimit } from 'agent-orchestrator';
+import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 
 /**
  * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The
@@ -188,7 +189,7 @@ export function readOf(asked: Asked, now: number): Read {
       return {
         ...none,
         state: 'no-claude',
-        said: "The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the one installed with Nemia. Reinstall Nemia, or set AE_CLAUDE_EXECUTABLE in the api's environment to one that is there.",
+        said: `The quota cannot be asked for: the Claude Code the sessions run is not there — the one the engine names, or the one in the store's tools folder. Put it there with nemia doctor fix ${DEFAULT_HARNESS}, or set AE_CLAUDE_EXECUTABLE in the api's environment to one that is there.`,
       };
     case 'timeout':
       return {

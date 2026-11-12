@@ -4,7 +4,7 @@
  */
 import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type RunSlot } from '../cap/cap.ts';
-import { waitingOnNeedsWord, type NeedWaited } from '../needs/needs.ts';
+import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';

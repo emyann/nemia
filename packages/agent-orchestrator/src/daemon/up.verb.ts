@@ -5,9 +5,11 @@
  */
 import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
 import fs from 'node:fs';
-import { pathLedByTools, StoreRoot, toolsBinDir } from '../config/root.store.ts';
+import path from 'node:path';
+import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
 import { type Settings, StoreConfig } from '../config/config.store.ts';
 import { PlaceService } from '../place/place.store.ts';
+import type { PlaceDeclared } from '../place/place.ts';
 import { NeedsMemory, needsMemo } from '../needs/needs.verb.ts';
 import { needs } from '../needs/sweep.verb.ts';
 import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
@@ -36,6 +38,10 @@ import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
 import { raiseStoreFloor } from '../release/archive.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
+import { upgradeCarries, type Running } from '../release/index.ts';
+import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
+import { startFix, FIX_DEADLINE_SECONDS } from '../needs/fix.verb.ts';
+import { fixesDir, readFixRecord } from '../needs/fix.store.ts';
 
 /**
  * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
@@ -301,9 +307,11 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * recorded what it runs on. On a ninth, once the first pass has answered, an archive install asks for the newest release every six hours
  * (`releaseCheck`), unless `NEMIA_RELEASE_CHECK=off`. As it takes the store it raises the store's floor to the oldest release that reads
  * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it. Before the engine holds
- * anything it puts the store's tools folder first on its own PATH (`toolsOnPath`); on a tenth it reads the machine's needs every
- * `NEEDS_EVERY` (`needs`), into the memory the process gives (`NeedsMemory`) or one of its own, its place's needs among them, and every
- * pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`).
+ * anything it puts the store's tools folder first on its own PATH, its place's tools after it and their variables set
+ * (`toolsOnPath`), and adopts each harness a release carries that the tools folder lacks (`adoptedAtStart`); once the engine
+ * holds, it files the install of each harness an upgrade carries that is not at its pin (`carriedFiled`); on a tenth it reads the
+ * machine's needs every `NEEDS_EVERY` (`needs`), into the memory the process gives (`NeedsMemory`) or one of its own, its place's needs
+ * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`).
  */
 export const up = (
   e: Engine,
@@ -322,11 +330,14 @@ export const up = (
       ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
     yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
-    yield* Effect.try({ try: () => toolsOnPath(home, process.env), catch: (err) => err });
+    const declared = (yield* PlaceService).declared;
+    yield* Effect.try({ try: () => toolsOnPath(home, process.env, declared), catch: (err) => err });
+    yield* adoptedAtStart(home, runningRelease());
     const memo = (yield* NeedsMemory) ?? needsMemo(home);
-    memo.placeNeeds = (yield* PlaceService).declared.needs ?? [];
+    memo.placeNeeds = declared.needs ?? [];
     const served = yield* e.hold();
     if (served) yield* Effect.sync(() => heldServes(home, served.cards));
+    yield* over(e)(carriedFiled(home, runningRelease()));
     yield* seriesBorn([...DAEMON_SERIES, ...series]);
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(home, taken.held))))));
     let reading: Reading = {};
@@ -379,16 +390,91 @@ export const up = (
   });
 
 /**
- * The tools folder's `bin/` of the store at `home` made (`toolsBinDir`) and put first on `env`'s PATH (`pathLedByTools`), once: what the
- * daemon does to its own environment as it starts, so every session, check and fix it starts — whether the service or a person started
- * it — finds a tool a fix installed there with no profile edited. Answers the folder.
+ * The tools folder's `bin/` of the store at `home` made (`toolsBinDir`) and put first on `env`'s PATH (`pathLedByTools`, which ends it
+ * with the folder of the Node this process runs), then the place's `toolsPath` folders right after it, and its `toolsEnv` set, each
+ * made absolute under the tools folder, all once: what the daemon does to its own environment as it starts, so every session, check
+ * and fix it starts — whether the service or a person started it — finds a tool a fix installed there, and the tools mise installs, with
+ * no profile edited. Answers the folder.
  */
-export const toolsOnPath = (home: string, env: Record<string, string | undefined>): string => {
+export const toolsOnPath = (
+  home: string,
+  env: Record<string, string | undefined>,
+  declared: Pick<PlaceDeclared, 'toolsEnv' | 'toolsPath'> = {},
+): string => {
   const bin = toolsBinDir(home);
   fs.mkdirSync(bin, { recursive: true });
-  env.PATH = pathLedByTools(home, env.PATH);
+  const placed = (declared.toolsPath ?? []).map((folder) => path.join(toolsDir(home), folder));
+  const [first = bin, ...rest] = pathLedByTools(home, env.PATH).split(path.delimiter);
+  env.PATH = [first, ...placed, ...rest.filter((entry) => !placed.includes(entry))].join(path.delimiter);
+  for (const [name, folder] of Object.entries(declared.toolsEnv ?? {})) env[name] = path.join(toolsDir(home), folder);
   return bin;
 };
+
+/**
+ * The trees a harness may be carried in: the release `running` runs, where it is an install (a checkout's is its own), and each
+ * installed release.
+ */
+export const carryTrees = (home: string, running: Running): string[] => [
+  ...(running.kind === 'install' ? [running.root] : []),
+  ...releaseTrees(home),
+];
+
+/**
+ * Before the daemon's first pass: each harness a release carries in its own tree and the tools folder has no program of, adopted into
+ * it (`adoptBundled`), so a session runs on it at once. Said once each; an adoption that fails is a warning, and the daemon starts.
+ */
+export const adoptedAtStart = (home: string, running: Running): Effect.Effect<readonly Adopted[]> =>
+  Effect.try({ try: () => adoptBundled(home, carryTrees(home, running)), catch: (err) => err }).pipe(
+    Effect.tap((adopted) =>
+      Effect.forEach(adopted, (a) =>
+        Effect.logInfo(`adopted the ${a.name} harness ${a.version} a release carried (${a.from}) into the tools folder`),
+      ),
+    ),
+    Effect.catch((err) =>
+      Effect.as(Effect.logWarning(`no harness a release carries was adopted: ${err instanceof Error ? err.message : String(err)}`), []),
+    ),
+  );
+
+/** Whether a fix of `need` was started in the store at `home` within a fix's deadline: one an earlier start filed may still run. */
+const fixUnderWay = (home: string, need: string, now: number): boolean => {
+  let ids: string[];
+  try {
+    ids = fs.readdirSync(fixesDir(home)).flatMap((file) => (file.endsWith('.json') ? [file.slice(0, -'.json'.length)] : []));
+  } catch {
+    return false;
+  }
+  return ids.some((id) => {
+    const record = readFixRecord(home, id);
+    return record?.need === need && now - Date.parse(record.startedAt) < FIX_DEADLINE_SECONDS * 1000;
+  });
+};
+
+/**
+ * Once at the daemon's start: each harness an upgrade carries (`upgradeCarries`, over what the tools folder holds activated and the
+ * releases carry) that is not at this release's pin (`atPin`) has its install filed as a fix (`startFix`, the need's first fix), unless
+ * one of it was started within a fix's deadline. A fix refused is a warning: `nemia doctor` lists the need with its fix.
+ */
+export const carriedFiled = Effect.fn('carriedFiled')(function* (home: string, running: Running) {
+  const pinned = pinnedHarnesses();
+  const carried = upgradeCarries(
+    harnessesHeld(home, carryTrees(home, running), pinned),
+    pinned.map((h) => h.name),
+  );
+  const now = Date.now();
+  for (const harness of pinned.filter((h) => carried.includes(h.name) && !atPin(home, h) && !fixUnderWay(home, h.name, now))) {
+    yield* startFix({ need: harness.name, index: 0 }).pipe(
+      Effect.andThen(() =>
+        Effect.logInfo(`filed the install of the ${harness.name} harness at ${harness.needs.pin}, which an upgrade carries`),
+      ),
+      Effect.catchCause((cause) =>
+        Effect.logWarning(
+          `the install of the ${harness.name} harness at ${harness.needs.pin} was not filed: nemia doctor lists it with its fix`,
+          cause,
+        ),
+      ),
+    );
+  }
+});
 
 /**
  * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds at the store `home`, so

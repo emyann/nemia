@@ -96,9 +96,10 @@ node tools/release/archive.ts --platform linux-x64 --tag v1.3.0 --source https:/
 ```
 
 It runs `npm ci` and the board's build in the checkout, copies the tracked tree (`git archive`) with the built `apps/web/dist`, installs
-production dependencies alone in the copy (`npm ci --omit=dev`, which takes that platform's Claude binary), fetches the Node pinned in
+production dependencies alone in the copy (`npm ci --omit=dev`), fetches the Node pinned in
 `node.json` and refuses it unless its sha256 is the one pinned there (copied from Node's own `SHASUMS256.txt` for that version), and
-packs: `node/`, `bin/nemia` (sh: it follows its own symlinks to the release folder and runs `node/bin/node apps/cli/bin/nemia.ts`),
+packs: the SDK's platform packages taken out of the tree (`node_modules/@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, any
+platform, wherever npm put one; the SDK itself stays), `node/`, `bin/nemia` (sh: it follows its own symlinks to the release folder and runs `node/bin/node apps/cli/bin/nemia.ts`),
 `release.json` (`tag`, `commit`, `source`, `builtAt`, `from: "archive"`, `platform`), the tar.gz and its `SHA256SUMS` line. A machine
 of another platform is refused: `npm ci` takes the binaries of the machine it runs on. Given `--tree <dir> --node <dir>`, it packs that
 tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. The `upload` job merges the
@@ -112,11 +113,18 @@ and `SHA256SUMS` (the tag from `latest.json` unless `--version`, refused before 
 three numbers, digits and dots alone, as `nemia upgrade` reads a published one, so no tag reaches above `releases/` and no pre-release
 is taken), refuses an archive whose sum differs, unpacks it into
 `$WF_ROOT/releases/<tag>` through a hidden folder renamed into place, points `releases/current` at it by a relative link renamed over
-the old one, and links `~/.local/bin/nemia`. Then it asks, or with `--yes` reads its flags: the Claude token (`--claude-token-file`,
-given to `nemia claude-token set` on its stdin), starting at login (`nemia service install --size auto`, `--no-service` to skip,
+the old one, and links `~/.local/bin/nemia`. Then it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
 `loginctl enable-linger` on Linux), and the address to bind (`--bind`, after which `nemia token add` prints the first person token).
 `--client --server <url> [--context <name>] [--token-file <file>]` makes a client-only install (`nemia config set-context`, then
-`use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token.
+`use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token. It ends, on either side, on
+`nemia doctor`, the read of what is in place and what is missing, whose exit fails no install.
+
+**No harness comes with a release.** The archive holds no harness's binary (`npm ci --omit=optional` would have dropped every package's
+optional dependencies, so the archive takes the SDK's platform package out by name instead), and the installer asks for no harness's
+credential. A person activates the harness their sessions run on after the install, on the board's Setup page or by `nemia doctor fix
+<harness>`, which installs it at the version the release pins under the tools folder; `nemia doctor` then names its sign-in, a command
+the person types on the server. `nemia doctor fix <harness> --index 1` removes it again. An upgrade carries the harnesses activated
+before it to the new release's pins (`nemia doctor carry`); it never runs the installer.
 
 ## The settings it needs
 

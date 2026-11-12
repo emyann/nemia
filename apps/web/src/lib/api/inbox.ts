@@ -166,7 +166,7 @@ const labelsText = (labels: Readonly<Record<string, string>>): string | null => 
   return keys.length === 0 ? null : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
 };
 
-/** A card's models as it writes them, `implement=fable, review=opus` in its order, as the orchestrator's `modelsText` does; null for none. */
+/** A card's models as it writes them, `implement=fable, review=opus`, as the orchestrator's `modelsText` does; null for none. */
 const modelsText = (models: Readonly<Record<string, string>>): string | null =>
   Object.entries(models)
     .map(([step, model]) => `${step}=${model}`)

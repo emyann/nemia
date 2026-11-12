@@ -467,6 +467,10 @@ function leftOut(home: string, run: Run): { mounts: string[]; volumes: string[] 
   };
 }
 
+/** The models a run is started with, as its record freezes them: none where it names none. */
+const frozenModels = (models: RunModels | undefined): Pick<Told, 'models'> =>
+  models !== undefined && Object.keys(models).length ? { models: { ...models } } : {};
+
 /**
  * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, `mounts`
  * the folders it gives each local step, `volumes` the factory's volumes, and `harnessSettings` its harness settings, and the cost line
@@ -488,7 +492,6 @@ function toldOf(
   const after = opts.after ?? [];
   const context = opts.context ?? [];
   const gates = opts.gates ?? [];
-  const models = Object.entries(opts.models ?? {});
   const costLine = factory?.costLines?.[path.basename(opts.workflowDir)];
   return {
     brief: opts.brief,
@@ -503,7 +506,7 @@ function toldOf(
       ? { scheduled: { factory: opts.scheduled.factory, workflow: opts.scheduled.workflow, due: opts.scheduled.due } }
       : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
-    ...(models.length ? { models: Object.fromEntries(models) } : {}),
+    ...frozenModels(opts.models),
     ...(factory ? { factory: factory.name } : {}),
     ...(mounts.length ? { mounts } : {}),
     ...(volumes.length ? { volumes } : {}),

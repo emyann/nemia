@@ -200,7 +200,6 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const gates = yield* cardGates(card, opts.gates ?? [], workflowDir, repo);
   const ids = new Set(yield* runs.runs.ids());
   const context = cardContext(card, opts, (id) => ids.has(id));
-  const models = { ...card.model, ...opts.models };
 
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
@@ -214,7 +213,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     cards: opts.cards,
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
-    ...(Object.keys(models).length ? { models, modelSaid: (step: string) => modelSaid(card, opts.models, step) } : {}),
+    ...cardModels(card, opts.models),
     ...(factory !== undefined ? { factory } : {}),
     labels: { ...(card.labels !== undefined ? { card: card.labels } : {}), edits: opts.labels ?? [] },
   });
@@ -256,6 +255,15 @@ const cardGates = Effect.fn('cardGates')(function* (card: InboxCard, flags: read
   }
   return [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
 });
+
+/**
+ * The models a card's run is started with: its `model:`, and `flags` (`--model`) over it for the same step, each said where it was
+ * (`modelSaid`); none where neither names one.
+ */
+const cardModels = (card: InboxCard, flags: RunModels | undefined): { models?: RunModels; modelSaid?: (step: string) => string } => {
+  const models = { ...card.model, ...flags };
+  return Object.keys(models).length ? { models, modelSaid: (step) => modelSaid(card, flags, step) } : {};
+};
 
 /** Where a card's run was told a step's model: the card's `model:` line, unless the start's `--model` names that step too. */
 const modelSaid = (card: InboxCard, flags: RunModels | undefined, step: string): string =>

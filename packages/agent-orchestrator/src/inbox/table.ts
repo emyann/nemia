@@ -1,7 +1,8 @@
 /**
  * The inbox as a table (`objects`' `Table`, Kubernetes' server-side printing): the columns `nemia inbox` prints of each entry and a row's
  * cells, in their order, from the same judgement as its lines (`inboxLines`): the name, the first line of the card or why the entry does
- * not read as one, its workflow, repository, gate, models and factory, its place in the queue, the tick's last missed start of it, its state as a
+ * not read as one, its workflow, repository, gate, models and factory, its place in the queue, the tick's last missed start of it, its
+ * state as a
  * person reads it beside its run, the runs it was started as, and its labels. A client prints the cells and keeps no printer of its own.
  * Pure.
  */

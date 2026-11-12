@@ -48,6 +48,7 @@ export default defineConfig({
         { label: 'Proposals', link: '/proposals/' },
         { label: 'sdlc, the builtin template', link: '/sdlc/' },
         { label: 'How a run lives', link: '/how-a-run-lives/' },
+        { label: 'Follow the feed from an agent', link: '/channel/' },
         { label: 'Nemia', link: '/nemia/' },
         { label: 'Glossary', link: '/glossary/' },
         { label: 'Getting started', link: '/getting-started/' },

@@ -40,13 +40,7 @@ const ofTheMachine = (name: string): boolean => machines.includes(name);
 const forwardable = (command: Routed): boolean =>
   command.remote && !moved(command.name) && !own(command.name) && !ofTheMachine(command.name) && !command.help;
 
-/**
- * Where a command goes, `forwarded` among the words: `src/route.ts`'s `Route` gains it and loses `refused` in this change, and then
- * this union is that `Route` alone (implement narrows it, which changes no law).
- */
-type Routes = Route | 'forwarded';
-
-const routeSpec = spec<(command: Routed) => Routes>({
+const routeSpec = spec<(command: Routed) => Route>({
   ensures: {
     writesStayOnTheOldPath: {
       description:

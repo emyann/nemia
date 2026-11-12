@@ -44,7 +44,7 @@ const hostOf = (authUrl: string): string => {
 };
 
 /** What a waiting sign-in's paste field holds, and what it does: the text typed, its change, and the press that hands it on. */
-export type Pasting = {
+type Pasting = {
   readonly pasted: string;
   readonly onPasted: (text: string) => void;
   readonly onComplete: () => void;

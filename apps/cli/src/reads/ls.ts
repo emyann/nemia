@@ -9,14 +9,14 @@
 import { Effect } from 'effect';
 import { tableLines } from 'objects';
 import { handedOn } from '../local.ts';
-import { asked, type ObjectsClient, READ_BOUND_MS } from '../objects.ts';
+import { asked, type ObjectsClient, pageOf, READ_BOUND_MS } from '../objects.ts';
 import { pausedLines, scheduleLines } from './standing.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What `nemia ls` says beside the runs: the pause, each factory's schedules, and the daemon. */
 const standing = (client: ObjectsClient) =>
   Effect.all(
-    { paused: client.server.paused(), daemon: client.server.daemon(), factories: client.factories.listAll({ query: {} }) },
+    { paused: client.server.paused(), daemon: client.server.daemon(), factories: pageOf(client.factories.listAll({ query: {} })) },
     { concurrency: 'unbounded' },
   ).pipe(
     Effect.flatMap(({ paused, daemon, factories }) =>

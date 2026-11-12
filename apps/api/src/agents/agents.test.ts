@@ -24,6 +24,7 @@ import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 import { story } from 'test-kit/checkpoints';
 import { asAgentListing, everyOrigin } from '../../test/definitions.ts';
+import { TABLE_ACCEPT, tableLines, type AgentList, type Table } from 'objects';
 const repo = scratch('nemia-api-agents-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -895,4 +896,38 @@ test('a write of an agent the api or the package refuses — the repository’s,
       }
     },
   );
+});
+
+/** The cell of `row` under the column `name` of `table`. */
+const cellOf = (table: Table, row: Table['rows'][number], name: string): unknown =>
+  row.cells[table.columnDefinitions.findIndex((c) => c.name === name)];
+
+test('the agents asked as a Table answer the columns of an agent, a row per agent of the page with its metadata alone, and a line each', async () => {
+  const URL = '/api/namespaces/default/agents';
+  const res = await app.request(URL, { headers: { accept: TABLE_ACCEPT } });
+  assert.equal(res.status, 200);
+  const table = (await res.json()) as Table;
+  assert.equal(table.kind, 'Table');
+  assert.deepEqual(
+    table.columnDefinitions.filter((c) => c.priority === 0).map((c) => c.name),
+    ['Name', 'Origin', 'Description', 'Note'],
+  );
+  const plain = await app.request(URL);
+  const list = (await plain.json()) as AgentList;
+  assert.equal(list.kind, 'AgentList', 'a list asked for no Table is the AgentList');
+  assert.ok(list.items.length > 0, 'the team planted agents');
+  assert.deepEqual(
+    table.rows.map((row) => cellOf(table, row, 'Name')),
+    list.items.map((a) => a.metadata.name),
+  );
+  const [first] = list.items;
+  assert.deepEqual(table.rows[0]?.object, { kind: 'PartialObjectMetadata', apiVersion: 'meta.k8s.io/v1', metadata: first?.metadata });
+  const lines = tableLines(table, { wide: false, showLabels: false, columns: [] });
+  assert.equal(lines.length, list.items.length + 1, 'a header, then a line per agent');
+  assert.match(lines[0] ?? '', /^NAME\s+ORIGIN\s+DESCRIPTION\s+NOTE/);
+  const described = list.items.find((a) => a.spec.description);
+  assert.ok(described, 'an agent of the team says what it does');
+  const line = lines.find((l) => l.startsWith(`${described.metadata.name} `));
+  assert.ok(line?.includes(described.status.origin));
+  assert.ok(line?.includes((described.spec.description ?? '').split('\n')[0] ?? ''));
 });

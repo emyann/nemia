@@ -348,7 +348,7 @@ const SETTINGS_WRITTEN = "The factory's settings may be changed: read its settin
 /** A factory, its rules, its instruction and the lines a person types for it (`/api/factories`). */
 export const factories = {
   /** Every factory, the default one among them (`GET /api/factories`). */
-  listAll: (): Promise<FactoryList> => call((c) => c.factories.listAll({ query: {} }), read(FactoryList)),
+  listAll: (): Promise<FactoryList> => call((c) => c.factories.listAll({ query: {} }).pipe(Effect.flatMap(listed)), read(FactoryList)),
   /** The factory `name`. */
   get: (name: string): Promise<Factory> => call((c) => c.factories.get({ params: { name } }), read(Factory)),
   /** The lines a person types for the factory `name`: attach, rm, add, schedule, trust, volume, and each unschedule and volume rm. */
@@ -394,7 +394,7 @@ const SIGN_IN_ASKED = "The sign-in may have changed: read the server's state aga
 export const mcpServers = {
   /** Every server the factory `namespace` records, with the state its harness reports of each. */
   list: (namespace: string): Promise<McpServerList> =>
-    call((c) => c.mcpservers.list({ params: { namespace }, query: {} }), read(McpServerList)),
+    call((c) => c.mcpservers.list({ params: { namespace }, query: {} }).pipe(Effect.flatMap(listed)), read(McpServerList)),
   /** The server `name` recorded as `server`; a header sent as the mask keeps the value stored. */
   put: (namespace: string, name: string, server: McpServerWrite): Promise<McpServer> =>
     call((c) => c.mcpservers.put({ params: { namespace, name }, payload: server }), write(McpServer, SERVER_WRITTEN)),
@@ -552,7 +552,10 @@ export const agents = {
   list: (namespace: string, at?: DefinitionRead): Promise<Agent[]> =>
     everyPage((next) =>
       call(
-        (c) => c.agents.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
+        (c) =>
+          c.agents
+            .list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } })
+            .pipe(Effect.flatMap(listed)),
         read(AgentList, repoOf(at)),
       ),
     ),
@@ -585,7 +588,10 @@ export const skills = {
   list: (namespace: string, at?: DefinitionRead): Promise<Skill[]> =>
     everyPage((next) =>
       call(
-        (c) => c.skills.list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } }),
+        (c) =>
+          c.skills
+            .list({ params: { namespace }, query: { ...originOf(at), ...(next === undefined ? {} : { continue: next }) } })
+            .pipe(Effect.flatMap(listed)),
         read(SkillList, repoOf(at)),
       ),
     ),

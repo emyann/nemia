@@ -8,8 +8,16 @@
  * The workflow a body names is found among the folders a start finds one in (`folderOf`, workflows/workflows.ts), in the factory the
  * request is served in: never a path sent.
  */
-import { START, startFactoryAtOnce, type StartInput } from 'agent-orchestrator';
-import { type CardStart, Conflict, Invalid, Missing, type RunStart } from 'objects';
+import {
+  START,
+  sentInputRefusal,
+  sentInputsRemoved,
+  sentInputsWritten,
+  startedLines,
+  startFactoryAtOnce,
+  type StartInput,
+} from 'agent-orchestrator';
+import { type CardStart, type CardStarted, Conflict, Invalid, Missing, type RunStart, type RunStarted } from 'objects';
 import { declaredAs } from '../objects/refused.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
@@ -31,6 +39,46 @@ export type Asked = {
   cards: string[] | undefined;
   label: string[] | undefined;
 };
+
+/** What a start of a brief and of a card both take beside: each step's model, as `<step>=<model>`, the gates, and no worktree. */
+const extrasOf = (body: Pick<RunStart, 'models' | 'gates' | 'noWorktree'>) => ({
+  ...(body.models !== undefined ? { models: Object.entries(body.models).map(([step, model]) => `${step}=${model}`) } : {}),
+  ...(body.gates !== undefined ? { gates: [...body.gates] } : {}),
+  ...(body.noWorktree === true ? { noWorktree: true } : {}),
+});
+
+/**
+ * `start` handed the files `inputs` names, written where it reads them (`sentInputsWritten`) and removed once it has: refused (422)
+ * naming `--input` where one cannot be handed (`sentInputRefusal`), before anything is written.
+ */
+async function withInputs<A>(inputs: RunStart['inputs'], start: (files: string[] | undefined) => Promise<A>): Promise<A> {
+  if (inputs === undefined || !inputs.length) return start(undefined);
+  const refused = sentInputRefusal(inputs);
+  if (refused !== null) throw declaredAs(START_REFUSALS, { status: 422, error: refused });
+  const here = sentInputsWritten(inputs);
+  try {
+    return await start(here.files);
+  } finally {
+    sentInputsRemoved(here.dir);
+  }
+}
+
+/** What a start answers beside the run's id, off what `START` answered: what `nemia start` prints of it, its lines among them. */
+const startedOf = (started: Awaited<ReturnType<typeof runStarted>>): RunStarted => ({
+  id: started.id,
+  ...(started.card !== undefined ? { card: started.card } : {}),
+  ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
+  ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+  ...(started.paused !== undefined ? { paused: started.paused } : {}),
+  ...(started.landed !== undefined ? { landed: [...started.landed] } : {}),
+  ...(started.hints !== undefined ? { hints: [...started.hints] } : {}),
+  ...(started.notMounted !== undefined ? { notMounted: [...started.notMounted] } : {}),
+  ...(started.notVolumes !== undefined ? { notVolumes: [...started.notVolumes] } : {}),
+  lines: startedLines(started),
+});
+
+/** `START`'s handler on `given`, in the request `s` serves. */
+const runStarted = (s: Served, given: StartInput) => s.inRequest(START.handler(given));
 
 /** The lists a body hands the run, copied: what `startRun` judges, in its words. */
 const handedOf = (body: {
@@ -66,15 +114,10 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
  * the package finds as `nemia start` does (`startFromInbox`). In the factory `factory` where one is named over the card's own: one that
  * names none either way is refused, its fix `?factory=<name>`. With the request's repository as the caller's, `instead` the brief given in
  * place of the card's body, which may be left out, for the body as it is; a blank one is the package's to refuse, as `nemia start <card>
- * --brief ""` is. Answered with the run's id and the card's name — the card kept in the inbox, listed as started — and the card's `repo:`
- * the run did not look at, as `ignoredRepo`, as `nemia start` prints it.
+ * --brief ""` is. Answered with the run's id, what `nemia start` prints of it, and the card's name — the card kept in the inbox, listed
+ * as started — and the card's `repo:` the run did not look at, as `ignoredRepo`, as `nemia start` prints it.
  */
-export async function cardStart(
-  s: Served,
-  card: string,
-  body: CardStart,
-  factory: string | undefined,
-): Promise<{ id: string; card: string; ignoredRepo?: string } | Refusal> {
+export async function cardStart(s: Served, card: string, body: CardStart, factory: string | undefined): Promise<CardStarted | Refusal> {
   const repo = repoNeeded(s);
   const folder = body.workflow === undefined ? undefined : folderOf(body.workflow, body.from, repo, s.home, s.factory?.tree);
   if (folder !== undefined && 'status' in folder) return folder;
@@ -88,21 +131,21 @@ export async function cardStart(
     instead: body.brief,
     after: handed.after,
     context: handed.context,
+    cards: handed.cards,
     label: handed.label,
+    ...(body.repo !== undefined ? { repo: body.repo } : {}),
+    ...extrasOf(body),
   };
-  const started = await s.inRequest(START.handler(given));
-  return {
-    id: started.id,
-    card: started.card ?? card,
-    ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-  };
+  const started = await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) }));
+  return { ...startedOf(started), card: started.card ?? card };
 }
 
 /**
  * A run started in the request's namespace off its decoded body, as `nemia start <brief> --workflows <folder> --repo <repo> --after
  * <runId> --from <runId>` starts one: what the Run's `create` runs (objects/runs.ts), the request placed in the namespace's factory and on
  * its `?repo=` (`placedIn`). Through the entry's handler (`START`); refused as `startOf` says, by its status (`START_REFUSALS`). Its
- * answer is the run's id.
+ * answer is the run's id, and what `nemia start` prints of it (`startedOf`). Its models, gates, no worktree and the files handed to its
+ * steps are the body's (`extrasOf`, `withInputs`).
  *
  * A refusal of the package's is thrown, and answered by its kind, word for word: `nemia start`'s refusal is an `Invalid`, 422 — a folder
  * that does not read as a workflow, a step named for another's check or try, a `.worktreeinclude` it cannot use, or a run this one cannot
@@ -113,7 +156,7 @@ export async function cardStart(
  * the api's repository, or `?repo=`, on that repository (`startFactoryAtOnce`, as `nemia start` finds it), and is refused, `Invalid`, where
  * none or two do, naming the namespace to start it in.
  */
-export async function runStart(s: Served, body: RunStart): Promise<{ id: string }> {
+export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
   const { home, factory } = s;
   const repo = repoNeeded(s);
   const asked = startOf(body, repo, home, factory?.tree);
@@ -130,7 +173,7 @@ export async function runStart(s: Served, body: RunStart): Promise<{ id: string 
     cards: asked.cards,
     label: asked.label,
     factory: found.factory?.name,
+    ...extrasOf(body),
   };
-  const { id } = await s.inRequest(START.handler(given));
-  return { id };
+  return startedOf(await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) })));
 }

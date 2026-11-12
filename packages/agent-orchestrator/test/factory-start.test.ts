@@ -39,12 +39,26 @@ import { nemiaDefinition } from '../src/nemia/level.store.ts';
 import { FACTORY_HELP } from '../src/factory/factory.verb.ts';
 import { writeRules } from '../src/factory/rules/rules.store.ts';
 import { writeInstructionText } from '../src/factory/instruction.store.ts';
+import { typed } from './typed.ts';
+import { startedLines, startFactoryAtOnce, type StartInput } from '../src/runner.ts';
+import { inboxNameAt } from '../src/inbox/inbox.store.ts';
+import { settingsOf } from '../src/config/config.store.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-start-');
 const FACTORIES = path.join(ROOT, 'factories');
 /** The test's store and its settings: `asShipped` takes the default factory's switch out of it, for a checkpoint's scope. */
 const ENV: Record<string, string | undefined> = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `cli`.
+ */
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
 /** The test place of this test, as the focused test below reads it. */
 const stand = stage.place;
 const { runPlaced } = stage;
@@ -122,6 +136,7 @@ function filed(name: string, ...repos: string[]): void {
 
 /** What `nemia <argv>` prints, typed from `cwd`, a line each. */
 async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
+  if (argv[0] === 'start') return startTypedFrom(cwd, argv);
   const lines: string[] = [];
   const log = console.log;
   const was = process.cwd();
@@ -136,6 +151,39 @@ async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
     console.log = log;
   }
   return lines.join('\n').split('\n');
+}
+
+/**
+ * `nemia start <argv>` typed in `cwd`, as the client and the api run it together: a file there read as the brief; else an inbox card, by
+ * its path or its name, started as the
+ * Card's `start` starts it (`START` given the `card`, from `cwd`); any other brief in the factory `--factory` names, else the one whose
+ * repository holds `--repo` or `cwd`, as the Run's `create` finds it (`startFactoryAtOnce`). The lines the client prints of the answer.
+ */
+async function startTypedFrom(cwd: string, argv: string[]): Promise<string[]> {
+  const args = parseArgv(START.spec, argv.slice(1)) ?? {};
+  const text = (key: string) => (typeof args[key] === 'string' ? args[key] : undefined);
+  const named = text('repo') === undefined ? undefined : path.resolve(cwd, text('repo') ?? '');
+  const file = path.resolve(cwd, text('brief') ?? '');
+  const was = process.cwd();
+  process.chdir(cwd);
+  try {
+    const card = inboxNameAt(ROOT, text('brief') ?? '');
+    const here = fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true;
+    if (card !== null)
+      return startedLines(
+        await stage.runWith(
+          stage.board().e,
+          START.handler({ ...args, brief: undefined, card, at: cwd, fix: '--factory <name>', repo: named }),
+        ),
+      );
+    const found = startFactoryAtOnce(ROOT, text('factory'), named ?? cwd, '--factory <name>', settingsOf(ENV).defaultFactoryStarts);
+    const repo = found.repo ?? repoFor(ROOT, found.factory?.name, named, cwd);
+    const brief = here ? fs.readFileSync(file, 'utf8').trim() : text('brief');
+    const given = { ...args, brief, repo, repoNamed: named !== undefined, factory: found.factory?.name } as StartInput;
+    return startedLines(await stage.runWith(stage.board().e, START.handler(given)));
+  } finally {
+    process.chdir(was);
+  }
 }
 
 /** The id of the run `nemia start` printed first. */
@@ -170,12 +218,6 @@ function aPlanOf(build: string): string {
   fs.writeFileSync(path.join(dir, 'b.md'), `---\nworkflow: ${build}\nafter: a\n---\nThe second.\n`);
   return dir;
 }
-
-/** The runs `nemia start <folder>` started: the records written since `before`. */
-const plannedRuns = (before: readonly string[]) =>
-  runsWritten()
-    .filter((f) => f.endsWith('.json') && !before.includes(f))
-    .map((f) => runRecord(ROOT, f.slice(0, -'.json'.length)));
 
 /** A card filed in the inbox as `<name>.md`, with `text` whole: its path. */
 function aCard(name: string, text: string): string {
@@ -556,23 +598,6 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const typed = runRecord(ROOT, startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
       assert.deepEqual(['factory' in typed, typed.repo], [false, loose]);
       fs.rmSync(path.join(FACTORIES, 'default.json'));
-    },
-  );
-
-  await s.test(
-    'as shipped, `nemia start <folder>` runs every card in the factory alone holding its folder, or in --factory',
-    async (sub) => {
-      asShipped(sub);
-      const before = runsWritten();
-      await typedFrom(a, ['start', aPlanOf(build)]);
-      const found = plannedRuns(before);
-      assert.equal(found.length, 2);
-      for (const r of found) assert.deepEqual([r.factory, r.repo], ['pipao', a]);
-      const between = runsWritten();
-      await typedFrom(ROOT, ['start', aPlanOf(build), '--factory', 'mono']);
-      const named = plannedRuns(between);
-      assert.equal(named.length, 2);
-      for (const r of named) assert.deepEqual([r.factory, r.repo], ['mono', readFactoryAt(ROOT, 'mono').repos[0]]);
     },
   );
 

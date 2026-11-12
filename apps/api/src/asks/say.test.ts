@@ -20,6 +20,7 @@ import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
+import type { RunSaid } from 'objects';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { listedOf, objectOf, type ObjectStep } from '../../test/run-reads.ts';
 import { list, PERSON, runsAtOnce, sayRun, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
@@ -183,11 +184,18 @@ test("a person's words to a working session: the package's `sayRun` hands them t
       records = written().files;
       const res = await sayTo('implement', { text: words });
       assert.equal(res.status, 202, await res.clone().text());
-      said = (await res.json()) as Said;
-      assert.deepEqual(Object.keys(said).sort(), ['after', 'at', 'attempt', 'text']);
-      assert.deepEqual([said.attempt, said.text, said.after], [1, words, null], 'no transcript planted: no event to stand after');
-      assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
+      const answer = (await res.json()) as RunSaid;
+      assert.deepEqual(Object.keys(answer).sort(), ['after', 'at', 'attempt', 'taskId', 'text', 'try']);
+      assert.deepEqual([answer.attempt, answer.text, answer.after], [1, words, null], 'no transcript planted: no event to stand after');
+      assert.deepEqual(
+        [answer.taskId, answer.try],
+        ['t-implement', 1],
+        'the task and the try the words went to, as `nemia say` prints them',
+      );
+      assert.equal(new Date(answer.at).toISOString(), answer.at, 'the time the package recorded, an ISO time');
       assert.deepEqual(standIn().said, [{ taskId: 't-implement', text: words }], "the words handed to the engine's say, as given, once");
+      const { taskId: _task, try: _try, kept: _kept, ...entry } = answer;
+      said = entry;
       assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's record of the task");
     },
   );
@@ -263,7 +271,7 @@ test('who says words to a step: a session by its token as its agent, framed; an 
       allow([]);
     }
     const person = await sayTo('implement', { text: 'Widen it.' });
-    assert.deepEqual(Object.keys((await person.json()) as object).sort(), ['after', 'at', 'attempt', 'text']);
+    assert.deepEqual(Object.keys((await person.json()) as object).sort(), ['after', 'at', 'attempt', 'taskId', 'text', 'try']);
     assert.deepEqual(
       standIn()
         .said.slice(1)

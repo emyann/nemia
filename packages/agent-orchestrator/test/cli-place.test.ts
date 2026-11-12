@@ -1,6 +1,7 @@
 /**
- * A command of the CLI asks the place `main` is handed, as it talks to the engine it is handed: `nemia start`, `nemia decide` and
- * `nemia rm`, typed in this process over the test place, on a repository git never made. No file of `src/cli` names the git place but
+ * A command asks the place it is handed, as it talks to the engine it is handed: `nemia start` and `nemia rm` on their entries'
+ * handlers, as the api calls them, and `nemia decide` typed through `main`, in this process over the test place, on a repository git
+ * never made. No file of `src/cli` names the git place but
  * `main`, once, as the place it takes when it is handed none (`placeNamed`), which holds the commands this file does not type.
  *
  * The test's store is its own, at `ROOT`, given as `ENV`. The file sets what its starts depend on itself: a run on a
@@ -15,6 +16,8 @@ import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import { scratch } from 'test-kit/scratch';
 import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
+import { forgetTyped } from './forgetting.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { advanceRun, runWith as runEngine } from '../src/runner.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
@@ -66,12 +69,18 @@ function oneStep(): string {
   return dir;
 }
 
-test('a run started, read once a pass has read where its branch stands, and removed through `main` is answered by the place `main` was handed, on a repository git never made', async (t) => {
+test('a run started, read once a pass has read where its branch stands, and removed is answered by the place it was handed, on a repository git never made', async (t) => {
   const { world } = stand();
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const base = world.repository(repo, { 'a.txt': 'one\n' });
 
-  const id = (await typed(t, 'start', 'add a flag', '--workflows', oneStep(), '--repo', repo))[0].split(' ')[0];
+  const { id } = (await onHandler(
+    ['start', 'add a flag', '--workflows', oneStep(), '--repo', repo],
+    engineOf(engine().layer),
+    undefined,
+    stand().place,
+    ENV,
+  )) as { id: string };
   assert.equal(runRecord(ROOT, id).baseRef, base, 'nemia start opened the place it was handed, which answered the commit the handle made');
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'and git made nothing there');
 
@@ -92,7 +101,8 @@ test('a run started, read once a pass has read where its branch stands, and remo
   );
   assert.ok(decided.includes(`  wf/${id}/${LINE_NAME}  — 1 file: +1 −0`), `and what it changed is too\n${decided.join('\n')}`);
 
-  await typed(t, 'rm', id);
+  const forgot = await forgetTyped((effect) => runWith(engineOf(engine().layer), effect), ROOT, ['rm', id]);
+  assert.equal(forgot.error, undefined, forgot.printed.join('\n'));
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false, 'nemia rm forgot the run');
   assert.equal(fs.existsSync(workspace), false, 'its workspace removed by the place it was handed');
   assert.notEqual(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'what the step left handed off on its branch first');

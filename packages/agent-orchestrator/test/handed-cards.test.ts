@@ -7,7 +7,7 @@
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +20,12 @@ import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { readsAt, writesAt, type Filed } from './mounted.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-handed-cards-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -32,7 +38,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   NEMIA_DAEMON_START: 'off',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -56,16 +68,7 @@ const fileCard = (name: string, text: string): void => {
 };
 
 /** What `nemia <argv>` printed. */
-const printedBy = async (t: TestContext, argv: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => void printed.push(args.join(' ')));
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n');
-};
+const printedBy = async (argv: string[]) => startedLines((await stage.main(argv)) as Started).join('\n');
 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
@@ -89,8 +92,8 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
   const repo = aRepo();
   let id = '';
 
-  await s.test("the cards are copied into the run's inputs/cards byte for byte, their names frozen on the record", async (sub) => {
-    const printed = await printedBy(sub, [
+  await s.test("the cards are copied into the run's inputs/cards byte for byte, their names frozen on the record", async () => {
+    const printed = await printedBy([
       'start',
       'untangle the lists',
       '--workflows',
@@ -160,17 +163,6 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
         flags.join(' '),
       );
     }
-    assert.deepEqual(runsNow(), before, 'no run is written');
-  });
-
-  await s.test('nemia start <folder> refuses --card, as it refuses --input', async () => {
-    const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-    fs.writeFileSync(path.join(plan, 'one.md'), `---\nworkflow: ${twoSteps()}\n---\nbuild it\n`);
-    const before = runsNow();
-    await assert.rejects(stage.main(['start', plan, '--repo', repo, '--card', 'rows-qeyh']), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      return true;
-    });
     assert.deepEqual(runsNow(), before, 'no run is written');
   });
 });

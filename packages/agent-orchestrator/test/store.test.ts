@@ -49,6 +49,7 @@ import {
   runWith as runEngine,
 } from '../src/runner.ts';
 import { main as cli } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
 import { inputsDir, listRuns, markCancelled, readAnswers, readAsks, runRecord, runsDir } from '../src/record/record.store.ts';
 import { sayRun } from '../src/say/say.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
@@ -880,7 +881,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
   t.mock.method(console, 'log', () => {});
-  await main(['retry', run.id, 'implement'], b.e);
+  await onHandler(['retry', run.id, 'implement'], b.e, undefined, stand().place, ENV);
   assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
 
   const refusing: Engine = {

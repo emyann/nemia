@@ -12,22 +12,7 @@
 export const KEPT: readonly string[] = ['doctor', 'doctor fix', 'doctor carry', 'readiness'];
 
 /** The run's verbs. */
-export const HELD_RUN: readonly string[] = [
-  'start',
-  'retry',
-  'approve',
-  'route',
-  'refresh',
-  'say',
-  'cancel',
-  'hold',
-  'wait',
-  'rm',
-  'prune',
-  'pause',
-  'pause-timeout',
-  'resume',
-];
+export const HELD_RUN: readonly string[] = [];
 
 /** The inbox's writes and the labels. */
 export const HELD_INBOX: readonly string[] = [];

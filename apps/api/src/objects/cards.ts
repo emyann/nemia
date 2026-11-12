@@ -171,8 +171,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           const placed = factory === undefined ? s : { ...s, ...s.placedIn(namespace) };
           const started = await cardStart(placed, name, payload, factory ?? s.factory?.name);
           if ('status' in started) throw readerRefused(started);
-          const { id, card, ignoredRepo } = started;
-          return { id, card, ...(ignoredRepo !== undefined ? { ignoredRepo } : {}) };
+          return started;
         }),
       ).pipe(Effect.tap((started) => ('id' in started ? locatedAt(started.id) : Effect.void))),
     )

@@ -134,12 +134,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
                                on the port: agents_custom, agents_custom_put, agents_custom_delete, nemia_instructions, nemia_instructions_put, nemia_instructions_delete
-  nemia wait [-l <selector>]... [--from <cursor>] [--for <duration>]
-                               wait for the feed's next line a selector takes, and print it with the
+  nemia wait [-l <key>=<value>]... [--from <cursor>] [--for <duration>]
+                               wait for the feed's next line -l takes, and print it with the
                                cursor after it: from --from (a cursor a wait or nemia watch printed),
-                               else from the feed's end now. It ends on the first lines a selector
-                               takes, or after --for (4m by default, at most 270s) with none, and
-                               prints the cursor either way: wait again from it and no line is lost.
+                               else from the feed's end now. It ends on the first lines -l takes, or
+                               after --for (4m by default, at most 270s) with none, and prints the
+                               cursor either way: wait again from it and no line is lost.
                                -l: as nemia watch -l takes it, given again for another; none takes
                                every line.
                                on the port: wait
@@ -234,9 +234,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]
-                               start a run of a workflow from a brief, a text, a card of the inbox or a
-                               folder of cards
+  nemia start <brief.md|card|"text"> --workflows <name> [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]
+                               start a run of a workflow from a brief, a text, or a card of the inbox
+                               --workflows <name>: the workflow, by its name, as its factory offers
+                               it (nemia workflows lists them); a card's own workflow: where it names
+                               one. A path to a workflow folder, and a folder of cards, are refused:
+                               file each card (nemia inbox add <card>) and start it by its name
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -252,13 +255,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                per step, over an inbox card's model: for the same step. Refused, naming
                                the models that keep it, where the step's harness refuses the model or
                                its permission mode is dropped on it
-                               --workflows takes a folder, or a name under <repo>/workflows/: dev
-                               a folder of cards starts a plan, a run per card, parents first, at
-                               the command line alone (nemia start --help)
-                               a card of a plan (nemia start --help) starts its body: --workflows is its
-                               workflow: unless given, and its after: needs an --after for each
-                               a frontmatter block of keys a plan's card lacks is refused by its key,
-                               never taken as the brief: file an inbox card with nemia inbox add <file>
+                               a file that opens with a frontmatter block of workflow: and after: starts
+                               its body, on its workflow: unless --workflows is given; its after: needs
+                               an --after for each. Any other key is refused by its name, never taken
+                               as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
                                --card <name>: an inbox card, as nemia inbox lists it, copied as it
@@ -273,11 +273,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                holds --repo, else where nemia start is typed, on that repository, when
                                one factory alone does; none, or two, is refused, naming the fix.
                                The default factory is history only: --factory default is refused
-                               a card of the inbox (nemia inbox --help), by its path or its name,
-                               starts its body, or --brief "<brief>" in its place, and stays in the
-                               inbox, listed as started: --workflows is its workflow:
-                               unless given, --repo its repo:, --factory its factory:, and a card
-                               that names no factory either way is refused
+                               a card of the inbox (nemia inbox --help), by its name, starts its body,
+                               or --brief "<brief>" in its place, and stays in the inbox, listed as
+                               started: --workflows is its workflow: unless given, --factory its
+                               factory:, and a card that names no factory either way is refused
                                on the port: start, inbox_start
   nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
@@ -696,7 +695,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                where it has one loop — enough: the loop ends on your words, with its
                                findings open, --message "<why>" required. What waits on the looping
                                step is filed as if it had said again: false, and every step after
-                               the loop is handed your words and those findings under ## Accepted.
+                               the loop is handed your words and those findings, under the heading
+                               of a loop ended as it stands.
                                To go round once more instead: nemia retry <runId> [<step>] --round
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each

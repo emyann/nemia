@@ -5,6 +5,26 @@
  */
 import type { RunCommand } from 'objects';
 import type { Runner } from '../runner.ts';
+import { cancel, hold, refresh, route, wait } from './act.ts';
+import { approve, retry, say } from './answer.ts';
+import { prune, rm } from './forget.ts';
+import { pause, pauseTimeout, resume } from './pause.ts';
+import { start } from './start.ts';
 
 /** Each of the group's commands' runner. */
-export const RUN_RUNNERS: Readonly<Record<RunCommand, Runner>> = {};
+export const RUN_RUNNERS: Readonly<Record<RunCommand, Runner>> = {
+  start,
+  retry,
+  approve,
+  route,
+  refresh,
+  say,
+  cancel,
+  hold,
+  wait,
+  rm,
+  prune,
+  pause,
+  'pause-timeout': pauseTimeout,
+  resume,
+};

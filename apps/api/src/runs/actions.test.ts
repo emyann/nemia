@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, forgetLine, parseArgv, RM, triesDir } from 'agent-orchestrator';
 import { runWith } from '../../test/builtin-place.ts';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
@@ -186,9 +186,10 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       const typed = await asTyped('approve', ['r-cli-gate', 'plan', '--message', 'Go.']);
       const res = await post('/api/namespaces/default/runs/r-api-gate/steps/plan/approve', { message: 'Go.' });
       assert.equal(res.status, 202);
-      const answered = (await res.json()) as { try: number; at: string; message: string; file: string };
-      assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'message', 'step', 'try']);
+      const answered = (await res.json()) as { try: number; at: string; message: string; file: string; loop: boolean; next: string };
+      assert.deepEqual(Object.keys(answered).sort(), ['at', 'caps', 'file', 'loop', 'message', 'next', 'step', 'try']);
       assert.equal(answered.try, typed.try);
+      assert.deepEqual([answered.loop, answered.next], [typed.loop, typed.next], 'what `nemia approve` prints of what is filed next');
       assert.equal(answered.file, approvalFile(root, 'r-api-gate', 'plan', 1));
       assert.equal(typed.file, approvalFile(root, 'r-cli-gate', 'plan', 1));
       assert.deepEqual(written(answered.file), written(String(typed.file)));
@@ -292,7 +293,12 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       const answered = (await res.json()) as Record<string, unknown>;
       assert.deepEqual(
         answered,
-        JSON.parse(JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine }).replaceAll('r-cli-rm', 'r-api-rm')),
+        JSON.parse(
+          JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine, line: forgetLine(typed.forgot) }).replaceAll(
+            'r-cli-rm',
+            'r-api-rm',
+          ),
+        ),
       );
       assert.equal(answered.removed, true);
       assert.ok(!fs.existsSync(cli) && !fs.existsSync(api), 'both worktrees are gone');

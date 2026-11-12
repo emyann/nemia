@@ -44,6 +44,16 @@ import { recordMemo } from '../src/rest/index.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
+import { pauseNowPreview, pauseNowPreviewLines, startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+
+/** What `nemia pause --now --yes` answers: whether the pause stood as it was, and the tasks it cut and left at work. */
+type PausedNow = { kept: boolean; interrupted: { run: string; kind: string }[]; skipped: unknown[] };
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
+import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-pause-story-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -56,7 +66,13 @@ const ENV: Record<string, string | undefined> = {
   WF_DEFAULT_FACTORY_STARTS: '1',
   WF_MAX_CONCURRENT: undefined,
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view — every task is read off the stand-in. */
@@ -166,9 +182,8 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
     async (sub) => {
       assert.deepEqual([readPause(ROOT), listRuns(ROOT).flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
-      const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping));
-      names(said[0], 'paused at once', 'by ann: quiet', 'nemia resume');
-      names(said[1], 'nothing was stopped');
+      const said = (await stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping)) as PausedNow;
+      assert.deepEqual([said.kept, said.interrupted, said.skipped], [false, [], []], 'paused at once, nothing stopped');
       assert.deepEqual([readPause(ROOT)?.why, readPause(ROOT)?.by, readPause(ROOT)?.timeoutMs, stops], ['quiet', 'ann', 0, []]);
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout: every call in flight is cut");
       const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -184,7 +199,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
       assert.equal(feed[0], pausedWords(standing), feed.join('\n'));
       markCancelled(ROOT, loose.id);
-      assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
+      await stage.main(['resume']);
       assert.equal(readPause(ROOT), null);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted");
     },
@@ -218,7 +233,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   });
   await s.test(
     '`nemia pause --now` alone says what it would stop, at what cost, and the line that acts — and writes and stops nothing',
-    async (sub) => {
+    async () => {
       const read = await stage.runWith(b.e, nowRead());
       assert.deepEqual(
         read.map((i) => `${i.run} ${i.step} ${i.kind}`).sort(),
@@ -230,7 +245,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
         ].sort(),
         'the landing is not among what it would stop, nor a run called off whose session still works',
       );
-      const preview = await printedBy(sub, () => stage.main(['pause', '--now'], stopping));
+      const preview = pauseNowPreviewLines(await stage.runWith(stopping, pauseNowPreview()));
       assert.match(preview[0], /^nemia pause --now would pause the store and cut 4 at work/);
       assert.ok(preview.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), preview.join('\n'));
       assert.ok(preview.includes(`   ${runs.checking.id}'s work: its check, run again`), preview.join('\n'));
@@ -241,8 +256,8 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   );
   await s.test(
     "`nemia pause --yes` pauses as a plain pause does, stopping nothing and parking every session within the store's timeout; a plain pause again is refused, naming --now",
-    async (sub) => {
-      await printedBy(sub, () => stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping));
+    async () => {
+      await stage.main(['pause', '--yes', '--why', 'lunch', '--by', 'ann'], stopping);
       assert.deepEqual([readPause(ROOT)?.why, readPause(ROOT)?.by, readPause(ROOT)?.timeoutMs, stops], ['lunch', 'ann', 600_000, []]);
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 600_000 }, "the sessions' drain put at the store's timeout, 10m by default");
       await assert.rejects(stage.main(['pause', '--why', 'other'], stopping), (err: Error & { exitCode?: number; _tag?: string }) => {
@@ -278,8 +293,8 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(feed[0], standing, feed.join('\n'));
       const free = fs.mkdtempSync(path.join(ROOT, 'free-'));
       world().repository(free, {});
-      const started = await printedBy(sub, () =>
-        stage.main(['start', 'a paused start', '--workflows', ONE, '--repo', free, '--no-worktree']),
+      const started = startedLines(
+        (await stage.main(['start', 'a paused start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started,
       );
       const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
       assert.ok(at > 0, started.join('\n'));
@@ -288,13 +303,16 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
   );
   await s.test(
     "`nemia pause --now --yes` keeps the pause as it was put, its timeout cut to 0, and asks each check at work to stop, its ask on disk first; a session is asked no try and no stop, the sessions' drain cutting its call",
-    async (sub) => {
+    async () => {
       const pause = readPause(ROOT);
-      const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'other'], stopping));
-      names(said[0], "the store's pause stands as it was put", 'by ann: lunch', 'now what runs is cut');
+      const said = (await stage.main(['pause', '--now', '--yes', '--why', 'other'], stopping)) as PausedNow;
+      assert.equal(said.kept, true, "the store's pause stands as it was put");
       assert.deepEqual(readPause(ROOT), { ...pause, timeoutMs: 0 }, 'the pause stands as it was, its timeout cut');
       assert.deepEqual(b.sessionDrains.at(-1), { graceMs: 0 }, "the sessions' drain put at no timeout");
-      assert.ok(said.includes(`   ${runs.session.id}'s work: its session, its call cut, going on as the same try`), said.join('\n'));
+      assert.ok(
+        said.interrupted.some((i) => i.run === runs.session.id && i.kind === 'session'),
+        JSON.stringify(said.interrupted),
+      );
       assert.deepEqual(
         stops,
         [{ taskId: checkOf('checking'), askOnDisk: true }],
@@ -388,7 +406,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
     "`nemia resume` lifts it and the sessions' drain: each session parked goes on as the same try, each check runs again, the due fire starts — and nothing says a pause",
     async (sub) => {
       const before = task('session');
-      assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
+      await stage.main(['resume']);
       assert.equal(b.sessionDrains.at(-1), null, "the sessions' drain lifted by the resume");
       parked.clear();
       await pass();
@@ -408,8 +426,8 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       );
       const free = fs.mkdtempSync(path.join(ROOT, 'free-'));
       world().repository(free, {});
-      const started = await printedBy(sub, () =>
-        stage.main(['start', 'a free start', '--workflows', ONE, '--repo', free, '--no-worktree']),
+      const started = startedLines(
+        (await stage.main(['start', 'a free start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started,
       );
       assert.equal(
         started.some((l) => l.includes('nothing of this run is filed')),

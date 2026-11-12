@@ -39,10 +39,22 @@ import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed as onHandler } from './typed.ts';
+import { startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-mounts-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: '100' };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 type Mount = { path: string; readOnly: boolean };
 type Refusal = Error & { _tag?: string; exitCode?: number };
@@ -98,8 +110,9 @@ const filedFor = (id: string, step: string) => filings().get(runRecord(ROOT, id)
 /** One pass of the run `id`, on the stage's engine. */
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
-/** What `nemia <argv>` prints, a line each. */
+/** What `nemia <argv>` prints, a line each: of a start, the lines the client prints of its answer (`startedLines`). */
 async function typed(argv: string[]): Promise<string[]> {
+  if (argv[0] === 'start') return startedLines((await stage.main(argv)) as Started);
   const lines: string[] = [];
   const log = console.log;
   console.log = (...args: unknown[]) => lines.push(args.join(' '));

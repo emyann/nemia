@@ -19,7 +19,7 @@ import { names } from './assessed.ts';
 import { advanceRun, prune, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
-import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-hold-git-');
@@ -114,23 +114,17 @@ const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
   return run;
 };
 
-/** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
+/** `nemia <verb>` run on its entry's handler, as the api calls it: the error it ended with, if it did. */
+const typed = async (_t: TestContext, e: Engine, ...argv: string[]) => {
   try {
-    await main(argv, e, undefined, undefined, ENV);
-    return { printed: printed.join('\n'), error: undefined };
+    await onHandler(argv, e, undefined, undefined, ENV);
+    return { error: undefined };
   } catch (err) {
-    return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
-  } finally {
-    log.mock.restore();
+    return { error: err as Error & { exitCode?: number; _tag?: string } };
   }
 };
 
-/** A refusal through the CLI: of the kind `tag`, exit 2, and a message that names each of `facts` — the ids, the flag, the branch. */
+/** A refusal of the handler: of the kind `tag`, exit 2, and a message that names each of `facts` — the ids, the flag, the branch. */
 const refused = async (t: TestContext, e: Engine, tag: string, facts: string[], ...argv: string[]) => {
   const { error } = await typed(t, e, ...argv);
   assert.ok(error, `nemia ${argv.join(' ')} was not refused`);

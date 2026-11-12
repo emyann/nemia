@@ -30,6 +30,7 @@ export { StepTold } from './run-told.ts';
 export { LabelEdit, Labelled, Labels } from './labels.ts';
 export { RunClock, RunListMeta } from './run-frame.ts';
 export {
+  CardStarted,
   RETRY_ASKED_MODES,
   RunApprove,
   RunApproved,
@@ -38,6 +39,7 @@ export {
   RunCancelled,
   RunHeld,
   RunHold,
+  RunInput,
   RunPrune,
   RunPruned,
   RunRefresh,
@@ -642,7 +644,36 @@ export {
   type Said,
 } from './commands-flags.ts';
 export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
-export { RUN_WORDS } from './commands-runs.ts';
+export {
+  ANSWER_HELP,
+  APPROVE_WORDS,
+  BY_CAP,
+  CANCEL_WORDS,
+  HOLD_WORDS,
+  PAUSE_TIMEOUT_WORDS,
+  PAUSE_WORDS,
+  PRUNE_WORDS,
+  REFRESH_WORDS,
+  RESUME_WORDS,
+  RETRY_WORDS,
+  RM_WORDS,
+  ROUTE_WORDS,
+  RUN_WORDS,
+  SAY_WORDS,
+  START_WORDS,
+  WAIT_WORDS,
+  WHY_CAP,
+  answerFlag,
+  approveRefusal,
+  holdRefusal,
+  pauseRefusal,
+  pauseTimeoutCheck,
+  refreshRefusal,
+  retryRefusal,
+  rmRefusal,
+  timeoutRefusal,
+  waitRefusal,
+} from './commands-runs.ts';
 export {
   INBOX_ADD_WORDS,
   INBOX_FROM_WORDS,

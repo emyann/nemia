@@ -12,7 +12,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
-import { START } from './commands.verb.ts';
+import { startedLines } from './commands.verb.ts';
 import { filesStoreAt } from '../record/files.store.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -83,7 +83,7 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
       ],
     },
   ]);
-  const line = START.print({ home: ROOT, id: run.id, run }, {}).find((l) => l.includes('team') && l.includes('not inherited'));
+  const line = startedLines({ home: ROOT, id: run.id, run }).find((l) => l.includes('team') && l.includes('not inherited'));
   names(line, 'team', a, 'core', b, 'infra', `nemia label run ${run.id} team=`);
   const typed = await runPlaced(
     startRun({ brief: 'typed', repo, workflowDir: folder(), context: [a, b], labels: { edits: ['team=ops'] } }),
@@ -96,7 +96,7 @@ test('a run started with no labels writes no .labels file, and its start prints 
   assert.equal(fs.existsSync(labelsFile(run.id)), false);
   assert.equal(run.labels, undefined);
   assert.equal(
-    START.print({ home: ROOT, id: run.id, run }, {}).some((l) => l.startsWith('label')),
+    startedLines({ home: ROOT, id: run.id, run }).some((l) => l.startsWith('label')),
     false,
   );
 });

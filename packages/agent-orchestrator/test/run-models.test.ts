@@ -3,7 +3,7 @@
  * (`models`) and on the step it names, which the tick files on it, while the run's other steps and every other run keep their agents'; a
  * revision the run takes keeps it; and a model the step cannot run on is refused before a run is written.
  */
-import { mock, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +17,11 @@ import { main as cli } from '../src/cli/main.ts';
 import { engineOf, type Engine } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-run-models-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -29,7 +34,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
-const stage = staged({ runWith, main: cli, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `cli`.
+ */
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrCli, engineOf, env: ENV });
 const { runPlaced } = stage;
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -66,18 +77,10 @@ const frozenModels = (id: string) => Object.fromEntries((runRecord(ROOT, id).wor
 
 /** What `nemia argv` printed, line by line, over an engine of its own that is asked nothing. */
 const printedBy = async (argv: string[]): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
   const own = testEngine();
-  try {
-    await stage.main(argv, engineOf(own.layer));
-  } finally {
-    log.mock.restore();
-  }
+  const started = (await stage.main(argv, engineOf(own.layer))) as Started;
   unasked(own);
-  return printed.join('\n').split('\n');
+  return startedLines(started);
 };
 
 /** Refused `Invalid`, exit 2, its words naming each of `facts`. */
@@ -185,7 +188,6 @@ test('a step’s model at start, REFUSED before a run is written', async (t) => 
     ],
     ['the CLI: a pair with no model', () => typed('--model', 'implement='), ['implement=']],
     ['the CLI: a step named twice', () => typed('--model', 'implement=fable', '--model', 'implement=opus'), ['implement twice']],
-    ['`nemia start <folder> --model`', () => stage.main(['start', ROOT, '--model', 'plan=fable']), ['--model']],
     [
       "a card's `model:` the step cannot run on, in the card's words",
       () =>

@@ -21,16 +21,13 @@ test('nemia pause-timeout: the default with no file, a timeout set and then read
   await t.test('bare with no file: 10m, the default', async () => {
     const answer = await timed(home);
     assert.deepEqual(answer, { timeout: { ms: 600_000, set: false }, wrote: false });
-    assert.deepEqual(TIMEOUT.print(answer, {}), ["the store's pause timeout is 10m (the default)"]);
   });
   await t.test('nemia pause-timeout 15m writes it; bare then says 15m and when it was set', async () => {
     const wrote = await timed(home, { timeout: '15m' });
     assert.equal(wrote.wrote, true);
     assert.equal(wrote.timeout.ms, 900_000);
-    names(TIMEOUT.print(wrote, { timeout: '15m' })[0], '15m');
     const read = await timed(home);
     assert.deepEqual(read, { timeout: { ms: 900_000, set: true, at: wrote.timeout.at }, wrote: false });
-    assert.deepEqual(TIMEOUT.print(read, {}), [`the store's pause timeout is 15m, set ${wrote.timeout.at}`]);
   });
   await t.test('REFUSED: a timeout out of its form, by the check, and a file that does not read, by the read', async () => {
     for (const bad of ['0s', '24h', 'ten']) assert.equal(typeof TIMEOUT.check?.({ timeout: bad }), 'string', bad);

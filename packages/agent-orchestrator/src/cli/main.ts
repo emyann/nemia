@@ -50,20 +50,15 @@ import {
   liveDemandHost,
   type DemandHost,
   renamedIn,
-  PAUSE,
-  pauseNowPreview,
-  pauseNowPreviewLines,
   withProposalsPass,
   withResolutionProposer,
   type Env,
   CLI_VERBS,
-  PAUSE_NOW,
 } from '../runner.ts';
 import { forwardedOf, unlinked } from '../command/forward.verb.ts';
-import { printed, answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
+import { printed, answered, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, pruneVerb, rmVerb, sayRun } from './runs.ts';
-import { startRun } from './start.ts';
+import { admitRun } from './runs.ts';
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
@@ -174,21 +169,6 @@ function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<v
   );
 }
 
-/**
- * `nemia pause`'s runner: the CLI asks before it pauses at once — `--now` says what it would cut and writes nothing, and acts on `--yes`
- * alone, since the verb takes no yes (`PAUSE`); every other pause is handed to its handler as any command is.
- */
-async function pauseRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  if (args.now === true && args.yes !== true) {
-    const preview = await forwardedOr(env, PAUSE_NOW, {}, () => runWith(e, placedIn(env, place, pauseNowPreview())));
-    for (const line of pauseNowPreviewLines(preview)) console.log(line);
-    return;
-  }
-  const given = inputOf(PAUSE, args);
-  const data = await answered(env, e, place, PAUSE, given);
-  for (const line of printed(PAUSE, data, given)) console.log(line);
-}
-
 /** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
@@ -196,19 +176,13 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<void>;
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
- * and `nemia admit`, whose runner reads the call on stdin: handed its
- * arguments once read and checked.
+ * The runner of each command the CLI runs itself, by its name: `nemia tick` and `nemia up`, which it serves alone (`RAN`), and `nemia
+ * admit`, whose runner reads the call on stdin: handed its arguments once read and checked.
  */
 export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['tick', tickVerb],
   ['up', upVerb],
-  ['rm', rmVerb],
-  ['prune', pruneVerb],
-  ['start', startRun],
   ['admit', admitRun],
-  ['pause', pauseRun],
-  ['say', sayRun],
 ]);
 
 /**

@@ -39,6 +39,21 @@ import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { RM } from '../src/runner.ts';
+import { startedLines } from '../src/runner.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+
+/** What `nemia approve` answers, as the client prints it. */
+type Approved = {
+  try: number;
+  message: string | null;
+  next: string;
+  file: string;
+  caps: { step: string; usd: number; above: boolean; workflow: number | null }[];
+};
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -51,7 +66,13 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `cli`.
+ */
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git)));
@@ -181,8 +202,11 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
         'plan',
         '--gate=implement',
       ];
-      const printed = await printedBy(argv);
-      id = printed[0].split(' ')[0];
+      const own = testEngine();
+      const started = (await stage.main(argv, engineOf(own.layer))) as Started;
+      unasked(own);
+      const printed = startedLines(started);
+      id = started.id;
       assert.deepEqual(runRecord(ROOT, id).gates, ['plan', 'implement']);
       assert.ok(
         printed.includes(
@@ -228,12 +252,16 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
   });
   await s.test("`nemia approve --message` writes the person's approval beside the retry asks, and no record", async () => {
     const record = recordOf(id);
-    const printed = await printedBy(['approve', id, 'plan', '--message', 'Ship the second reading.'], b.e);
+    const approved = (await stage.main(['approve', id, 'plan', '--message', 'Ship the second reading.'], b.e)) as Approved;
     const file = path.join(asksDir(id), 'approve-plan-1');
     const held = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.deepEqual(held, { step: 'plan', try: 1, at: held.at, message: 'Ship the second reading.' });
     assert.ok(!Number.isNaN(Date.parse(held.at)), 'with the time');
-    assert.deepEqual(printed, [`${id}  approved: try 1 of plan, with your words — the next tick files what waits on it`, `   ${file}`]);
+    assert.deepEqual(
+      [approved.try, approved.message, approved.next, approved.file],
+      [1, 'Ship the second reading.', 'waiting', file],
+      'what nemia approve prints of it',
+    );
     assert.equal(recordOf(id), record, 'the verb writes no record');
     assert.deepEqual(runRecord(ROOT, id).approvals, [held], 'composed on read');
   });
@@ -327,10 +355,17 @@ test("a gate's step proposes the caps of the steps after it, and its approval ma
   await s.test(
     '`nemia approve --budget review=4` writes the caps into the approval, the proposal with the amount given over it',
     async () => {
-      const printed = await printedBy(['approve', id, 'plan', '--budget', 'review=4'], b.e);
+      const approved = (await stage.main(['approve', id, 'plan', '--budget', 'review=4'], b.e)) as Approved;
       const held = JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8'));
       assert.deepEqual(held.budgets, { review: 4, implement: 7 });
-      assert.ok(printed.includes('   cap  review $4.00') && printed.includes('   cap  implement $7.00'), printed.join('\n'));
+      assert.deepEqual(
+        approved.caps.map((c) => [c.step, c.usd]).sort(([a], [b]) => String(a).localeCompare(String(b))),
+        [
+          ['implement', 7],
+          ['review', 4],
+        ],
+        'each cap nemia approve says',
+      );
     },
   );
   await s.test('the next tick files implement under its approved cap, $7, not its own $40', async () => {
@@ -370,8 +405,8 @@ test("a cap proposed above a step's own budget is said at the gate and when appr
     );
   });
   await s.test('`nemia approve` says so of the cap it sets', async () => {
-    const printed = await printedBy(['approve', id, 'plan'], b.e);
-    assert.ok(printed.includes("   cap  implement $60.00 (above the workflow's $40.00)"), printed.join('\n'));
+    const approved = (await stage.main(['approve', id, 'plan'], b.e)) as Approved;
+    assert.deepEqual(approved.caps, [{ step: 'implement', usd: 60, above: true, workflow: 40 }]);
   });
 });
 
@@ -469,15 +504,12 @@ test('`nemia cancel` and `nemia rm` at a gate', async (t) => {
     for (const fact of ['plan waits at its gate', `nemia approve ${id} plan`, `nemia cancel ${id}`, `nemia rm ${id}`])
       assert.ok(said.includes(fact), said);
     assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), 'nothing of it removed');
-    await assert.rejects(stage.main(['rm', id], gate.e), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.exitCode, 2);
-      assert.ok(err.message.includes('not forgotten'), err.message);
-      return true;
-    });
+    const typedRm = await runWith(gate.e, RM.handler({ runId: id }));
+    assert.equal(typedRm.removed, false, 'nemia rm left it, its line naming why');
   });
   await s.test('`nemia cancel` calls it off as any run — marked, not `already failed`', async () => {
-    const printed = await printedBy(['cancel', gate.run.id], gate.e);
-    assert.deepEqual(printed, [`${gate.run.id}  cancelled`, '   nothing was in flight — no further steps will be filed']);
+    const { plan } = (await stage.main(['cancel', gate.run.id], gate.e)) as { plan: { kind: string; stop: unknown[] } };
+    assert.deepEqual([plan.kind, plan.stop], ['cancel', []], 'cancelled, nothing in flight');
     assert.ok(runRecord(ROOT, gate.run.id).cancelledAt);
   });
   await s.test('an approval on a cancelled run files nothing; cancelled again, it says so', async () => {
@@ -689,12 +721,6 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
     ['the CLI: --gate with no step', () => typed('--gate'), 'Invalid', ['--gate takes the step']],
     ['the CLI: --gate followed by a flag', () => typed('--gate', '--no-worktree'), 'Invalid', ['--gate takes the step']],
     ['the CLI: --gate naming no step', () => typed('--gate', 'reveiw'), 'Invalid', ['--gate reveiw', 'no step "reveiw"']],
-    [
-      '`nemia start <folder> --gate`, by name',
-      () => stage.main(['start', ROOT, '--gate', 'plan']),
-      'Invalid',
-      ['nemia start <folder> does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
-    ],
     [
       "a card's `gate:` naming no step, in the card's words",
       () => fromCard(card('plan-the-flag-e5f6', 'desing')),

@@ -33,6 +33,7 @@ import {
   sayRun,
   standingLiveOf,
   startPlan,
+  planLines,
   startRun,
   runWith,
 } from '../src/runner.ts';
@@ -44,11 +45,21 @@ import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-waiting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** `findings`, strict: what a declaring step's closeout carries. */
@@ -226,7 +237,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
   };
 
   await s.test(
-    '`nemia start <folder>` starts four runs, parents first, each `after` the runs of the cards it names, and prints a line per card',
+    '`startPlan` of a folder starts four runs, parents first, each `after` the runs of the cards it names, and says a line per card',
     async () => {
       const plan = aPlan((dir) => ({
         'README.md': '# The flag\n\nParse it, then document and store it, then show it.\n',
@@ -239,7 +250,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
         'a.md': cardText('workflow: dev', 'Parse the flag\n\nIn cli.ts, before anything reads it.'),
       }));
       const before = runsWritten();
-      const printed = await printedBy(t, () => stage.main(['start', plan, '--repo', repo]));
+      const printed = planLines((await stage.runPlaced(startPlan({ dir: plan, repo }))).started);
       assert.equal(runsWritten(), before + 4, 'four runs, and no file of the plan');
       Object.assign(ids, Object.fromEntries(printed.slice(0, 4).map((l) => l.split(/ +/).slice(0, 2))));
       assert.deepEqual(Object.keys(ids), ['a', 'b', 'c', 'd'], 'parents first');
@@ -265,7 +276,6 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
       assert.deepEqual(a, ['a', ids.a, 'dev', 'waits on nothing']);
       assert.deepEqual(b, ['b', ids.b, path.relative(plan, other), `waits on a (${ids.a})`]);
       assert.deepEqual(d, ['d', ids.d, 'dev', `waits on b (${ids.b}), c (${ids.c})`]);
-      assert.deepEqual(printed.slice(4), ["run 'nemia tick' (or 'nemia up') to start them"]);
     },
   );
   await s.test('`nemia ls` says D waits on B and C, and the tick does the waiting: a is filed, and nothing of b, c or d', async () => {
@@ -714,13 +724,13 @@ test('words said to a step of a run waiting on another are kept, and its first t
   });
   await s.test(
     "`nemia say` to its step keeps the words, a person's and an agent's under its name, and says they were kept, not delivered",
-    async (sub) => {
+    async () => {
       const told = await stage.runWith(board().e, sayRun(child.id, 'implement', person, { caller: PERSON }));
       assert.ok('kept' in told, 'kept, not said to a session');
       assert.deepEqual([told.try, told.kept.text, told.from], [1, person, { kind: 'person' }]);
       kept.push(told.kept.at);
-      const printed = await printedBy(sub, () => stage.main(['say', child.id, 'implement', 'Mind the cursor format.']));
-      assert.match(printed[0], new RegExp(`^${child.id}  kept for implement's first try, at `), printed.join('\n'));
+      const again = await stage.runWith(board().e, sayRun(child.id, 'implement', 'Mind the cursor format.', { caller: PERSON }));
+      assert.ok('kept' in again, 'kept for its first try, not delivered');
       const byAgent = await stage.runWith(
         board().e,
         sayRun(child.id, 'implement', agent, { caller: { kind: 'agent', agent: 'operator', factory: null } }),
@@ -766,13 +776,13 @@ test('words said to a step of a run waiting on another are kept, and its first t
   });
 });
 
-test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing on a folder it cannot start whole, nor with a flag the folder says instead', async (t) => {
+test('REFUSED by name at shipped defaults: `startPlan` starts nothing on a folder it cannot start whole', async (t) => {
   const repo = aRepo();
   const first = oneStep();
   const broken = folderOf({ implement: ['afer: plan'] });
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${first}`, 'the first card') }));
   const empty = aPlan(() => ({ 'README.md': '# Nothing yet\n' }));
-  const planned = (...argv: string[]) => stage.main(['start', ...argv]);
+  const planned = (dir: string, repoOf: string) => stage.runPlaced(startPlan({ dir, repo: repoOf }));
   const cards = (files: Record<string, string>) => {
     for (const f of fs.readdirSync(plan)) if (f !== 'a.md') fs.rmSync(path.join(plan, f), { recursive: true });
     for (const [file, text] of Object.entries(files)) {
@@ -804,35 +814,12 @@ test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing
     ],
     ['a folder inside the plan', { 'drafts/': '' }, [plan, '--repo', repo], 'Invalid', ['drafts/', plan, 'not a card']],
     ['a folder with no card', {}, [empty, '--repo', repo], 'Invalid', [empty, 'no cards', 'README.md']],
-    [
-      'no folder',
-      {},
-      [path.join(ROOT, 'no-such-plan'), '--repo', repo],
-      'Invalid',
-      ['no file nor plan folder', 'no-such-plan', 'nemia start <folder>'],
-    ],
-    [
-      '--after: the folder says it',
-      {},
-      [plan, '--repo', repo, '--after', 'r-xyz'],
-      'Invalid',
-      ['nemia start <folder> does not take --after', 'nemia start <card.md> --workflows <dir> --after <runId>'],
-    ],
-    ['--after=<run>', {}, [plan, '--after=r-xyz', '--repo', repo], 'Invalid', ['nemia start <folder> does not take --after']],
-    [
-      '--workflows',
-      {},
-      [plan, '--workflows', 'dev', '--repo', repo],
-      'Invalid',
-      ['nemia start <folder> does not take --workflows', 'in its workflow:'],
-    ],
-    ['--no-worktree', {}, [plan, '--no-worktree', '--repo', repo], 'Invalid', ['nemia start <folder> does not take --no-worktree']],
   ];
   for (const [what, files, argv, tag, facts] of rows) {
     await t.test(what, async () => {
       cards(files);
       const before = runsWritten();
-      await assert.rejects(planned(...argv), refusedNaming(tag, ...facts));
+      await assert.rejects(planned(argv[0] ?? '', argv[2] ?? ''), refusedNaming(tag, ...facts));
       assert.equal(runsWritten(), before, 'not even the first card');
     });
   }

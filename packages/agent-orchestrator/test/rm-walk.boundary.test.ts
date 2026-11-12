@@ -19,7 +19,7 @@ import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
-import { main } from '../src/cli/main.ts';
+import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-');
@@ -219,23 +219,10 @@ const worktreesOf = (repo: string) =>
     .filter((l) => l.startsWith('worktree '))
     .map((l) => l.slice('worktree '.length));
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
-/** `nemia rm`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
-  try {
-    await main(['rm', ...args], e, undefined, undefined, ENV);
-    return { printed, error: undefined };
-  } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number } };
-  } finally {
-    log.mock.restore();
-  }
-};
+/** `nemia rm`, as the client runs it over the api, a run at a time on the entry's handler: the lines it printed, and its error. */
+const rmTyped = (_t: TestContext, e: Engine, ...args: string[]) => forgetTyped((effect) => runWith(e, effect), ROOT, ['rm', ...args]);
 
-test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
+test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 2", async (t) => {
   const repo = anIgnoringRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
@@ -298,7 +285,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   );
 
   const again = await rmTyped(t, b.e, run.id);
-  assert.deepEqual([again.printed, again.error], [[`${run.id}  no such run — nothing to forget`], undefined]);
+  assert.deepEqual([again.printed, again.error?.exitCode], [[`${run.id}  no such run — nothing to forget`], 2]);
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
   fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
 });

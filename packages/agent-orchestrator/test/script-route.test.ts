@@ -17,6 +17,10 @@ import { runWords } from '../src/route/routed/routed-words.ts';
 import { listedWords, routedRows } from '../src/route/routed/routed-lines.ts';
 import { staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed } from './typed.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-script-route-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -29,7 +33,13 @@ const ENV: Env = {
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
 type Board = ReturnType<typeof stage.board>;
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `cli`.
+ */
+const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
+const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'the plan: a page', artifacts: [], needs: null };
 

@@ -49,10 +49,19 @@ import { StoreRoot } from '../src/config/root.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { typed as onHandler } from './typed.ts';
+import { forgetTyped, type Typed } from './forgetting.ts';
+import { COMMAND_WORDS } from 'objects';
 
 const ROOT = scratch('wf-prune-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith: runEngine, main: typedOrMain, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
 /** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
@@ -140,8 +149,12 @@ const aFinished = async (
   return { run, repo, wt, branch };
 };
 
-/** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
+/**
+ * `nemia <verb>` as a person types it: `rm` and `prune` as the client runs them over the api (`forgetTyped`), any other through the CLI;
+ * the lines it printed, and the error it ended with, if it did.
+ */
+const typed = async (t: TestContext, e: Engine, ...argv: string[]): Promise<Typed> => {
+  if (argv[0] === 'rm' || argv[0] === 'prune') return forgetTyped((effect) => stage.runWith(e, effect), ROOT, argv);
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void printed.push(a.join(' ')));
   try {
@@ -212,22 +225,21 @@ const inPlaceRun = async (b: Board) => {
 test('`nemia prune` of a run that landed: listed with its size until --yes, then its worktree removed and its files with --artifacts, its record, branch, asks and inputs kept, and a second prune with nothing to do', async (t) => {
   const s = story(t);
   const b = board();
-  await s.test(
-    'a dry prune lists its worktree with its size, and what `nemia rm` would forget of the engine, asked dry: nothing touched',
-    async () => {
-      const { run, wt } = await aFinished(b, { merged: true });
-      const dry = await typed(t, b.e, 'prune', run.id);
-      assert.equal(dry.error, undefined, 'a dry run with nobody at a terminal is no refusal');
-      assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
-      assert.ok(dry.printed[1].startsWith(`   ${wt}  `), dry.printed[1]);
-      names(dry.printed[2], 'the engine keeps 1 task of it', `nemia rm ${run.id} forgets them`);
-      assert.match(dry.printed[3], /^1 run to prune, \d+\.\d KB in all$/);
-      names(dry.printed[4], 'nothing removed', `nemia prune ${run.id} --yes`);
-      assert.ok(b.forgets.length && b.forgets.every((f) => !f.yes), 'the engine is asked dry: nemia prune forgets nothing of it');
-      assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
-      assert.ok((await runWith(b.e, prune(run.id))).worktrees[0].bytes > 0, 'what the worktree holds is counted');
-    },
-  );
+  await s.test('a dry prune lists its worktree with its size, asking the engine nothing: nothing touched', async () => {
+    const { run, wt } = await aFinished(b, { merged: true });
+    const dry = await typed(t, b.e, 'prune', run.id);
+    assert.equal(dry.error, undefined, 'a dry run with nobody at a terminal is no refusal');
+    assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
+    assert.ok(dry.printed[1].startsWith(`   ${wt}  `), dry.printed[1]);
+    assert.match(dry.printed[2], /^1 run to prune, \d+\.\d KB in all$/);
+    names(dry.printed[3], 'nothing removed', `nemia prune ${run.id} --yes`);
+    assert.ok(
+      b.forgets.every((f) => !f.yes),
+      'nemia prune forgets nothing of the engine',
+    );
+    assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
+    assert.ok((await runWith(b.e, prune(run.id))).worktrees[0].bytes > 0, 'what the worktree holds is counted');
+  });
 
   await s.test(
     'with --yes its worktree is removed, its record, closeout, branch, files and asks kept; `nemia ls` and `nemia decide`, once a pass has read where it stands, say it is pruned; a tick files nothing; a second prune has nothing to do; `nemia rm` still forgets it',
@@ -302,8 +314,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.equal(dry.error, undefined);
       assert.match(dry.printed[0], new RegExp(`^${id}  would remove 1 worktree and its files, \\d+\\.\\d KB$`));
       assert.ok(dry.printed[1].startsWith(`   ${run0.wt}  `) && dry.printed[2].startsWith(`   ${files}  `), dry.printed.join('\n'));
-      names(dry.printed[3], 'the engine keeps 1 task of it', `nemia rm ${id} forgets them`);
-      names(dry.printed[5], 'nothing removed', `nemia prune ${id} --artifacts --yes`);
+      names(dry.printed[4], 'nothing removed', `nemia prune ${id} --artifacts --yes`);
       assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), 'a dry run touches nothing');
       const measured = (await runWith(b.e, prune(id, { artifacts: true }))).artifacts!.bytes;
       assert.ok(measured >= 32 * 1024, `what the files hold is counted (${measured})`);
@@ -460,7 +471,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
   );
 
   await s.test(
-    '`nemia prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, the rest listed with the total',
+    '`nemia prune` with no run reads the runs that are over: one not over and one with nothing to prune are not said, the rest listed with the total',
     async () => {
       const merged = await aFinished(b, { merged: true });
       const running = await runPlaced(startRun({ brief: 'running', repo: aRepo(), workflowDir: oneStep() }));
@@ -470,7 +481,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.equal(error, undefined, 'a run refused is not an error when none was named');
       const text = printed.join('\n');
       assert.match(text, new RegExp(`^${merged.run.id}  would remove 1 worktree, `, 'm'));
-      assert.match(text, new RegExp(`^\\d+ runs? not over, not pruned: .*${running.id}`, 'm'));
+      assert.doesNotMatch(text, new RegExp(running.id), 'a run not over is not listed');
       assert.doesNotMatch(text, new RegExp(`^${inPlace.id} `, 'm'), 'a run that cut no worktree is not a line');
       names(printed.at(-1), 'nothing removed', 'nemia prune --yes');
       assert.ok(listRuns(ROOT).some((r) => r.id === merged.run.id) && fs.existsSync(merged.wt));

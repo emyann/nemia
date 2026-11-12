@@ -511,7 +511,11 @@ export const transcriptAt = (runId: string, step: string, after: string | undefi
     return readTranscript(s, runId, step, taskId, after, { ...asked, bounds }).catch((err: unknown) => Promise.reject(unreadAs(err)));
   });
 
-/** The step's conversation followed from `after`: read once before the stream opens, so its refusals are statuses, then streamed. */
+/**
+ * The step's conversation followed from `after`: read once before the stream opens, so its refusals are statuses, then streamed. `after`
+ * is any cursor the read answers (`transcriptCursorRead`): the engine is read from its own cursor and the `n` events a `~n` counts past
+ * it are skipped, and a count that is no whole number from 0 is `Invalid`.
+ */
 const followedFrom = (runId: string, step: string, after: string | undefined) =>
   answered(async (s) => {
     const { beats, followings } = s;
@@ -521,7 +525,10 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
         error: `Step '${step}' of run '${runId}' is not filed yet, so it has no session to follow. GET /api/runs/${runId} gives its task once a tick files it.`,
       });
     }
-    const read = await readTranscript(s, runId, step, taskId, after).catch((err: unknown) => Promise.reject(unreadAs(err)));
+    const at = transcriptCursorRead(after);
+    if (at instanceof Error) throw at;
+    const whole = await readTranscript(s, runId, step, taskId, at.engine).catch((err: unknown) => Promise.reject(unreadAs(err)));
+    const read = { ...whole, events: whole.events.slice(at.skip) };
     const context = await s.inRequest(Effect.context<Services | EngineService>());
     const r: Reading = { followings, context, reader: s, id: runId, step, beatMs: beats.step ?? STEP_BEAT_MS };
     const body = streamOf(async (stream) => {

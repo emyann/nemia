@@ -325,6 +325,16 @@ test(
         assert.equal(said.length, engines.events.length + 1, 'nothing else is sent');
       },
     );
+    await s.test('a stream from the cursor a paged read answered sends only the events after it', async () => {
+      const engines = await Effect.runPromise(engine(process.env).transcript('t-implement'));
+      const paged = (await (await app.request(url('implement', '?limit=2'))).json()) as { cursor: string; more?: boolean };
+      assert.equal(paged.more, true, 'the conversation is longer than the page');
+      const res = await app.request(streamUrl('implement', `?after=${encodeURIComponent(paged.cursor)}`));
+      assert.equal(res.status, 200);
+      assert.deepEqual(eventsIn(blocks(await res.text())), engines.events.slice(2), 'none of the two the page answered, every one after');
+      const refused = await app.request(streamUrl('implement', `?after=${encodeURIComponent(`${engines.cursor}~x`)}`));
+      assert.equal(refused.status, 422, 'a cursor whose count is no whole number is refused, as the read refuses it');
+    });
     await s.test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
       const sessionId = randomUUID();
       const lines = conversation(sessionId);

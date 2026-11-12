@@ -238,6 +238,6 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
       /** Never kept by a proxy between: each event is said once. */
       'cache-control': Schema.Literal('no-cache'),
     }),
-    error: engineReadErrors,
+    error: [...engineReadErrors, Invalid],
   }),
 ) {}

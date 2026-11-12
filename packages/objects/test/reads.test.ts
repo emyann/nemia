@@ -78,6 +78,9 @@ test('a closeout’s body is read by page: the default page, then on from bodyNe
   const rest = closeoutNarrowed(closeoutOf(100_000), undefined, { from: BODY_PAGE.byDefault, limit: 100_000 });
   assert.equal(rest.body?.length, 100_000 - BODY_PAGE.byDefault);
   assert.equal(rest.bodyNext, undefined);
+  const raw = { body: 'b'.repeat(100_000), long: 'y' };
+  const every = closeoutNarrowed({ ...closeoutOf(100_000), raw }, ['*']);
+  assert.deepEqual(every.raw, { body: 'b'.repeat(BODY_PAGE.byDefault), long: 'y' }, 'its raw holds the same page of the body');
   const capped = closeoutNarrowed(closeoutOf(BODY_PAGE.most + 10), undefined, { from: 0, limit: BODY_PAGE.most * 2 });
   assert.equal(capped.body?.length, BODY_PAGE.most);
   assert.equal(capped.bodyNext, BODY_PAGE.most);

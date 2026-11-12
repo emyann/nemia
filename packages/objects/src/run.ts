@@ -630,6 +630,15 @@ export const fieldsNamed = (fields: string): string[] =>
     .map((name) => name.trim())
     .filter((name) => name !== '');
 
+/**
+ * A closeout as it came (`raw`), its `body` cut to the characters `[from, to)` a read answers of the closeout's own, so the page bounds
+ * both: a `raw` that is no object, or whose `body` is no string, as it is.
+ */
+const rawPaged = (raw: unknown, from: number, to: number): unknown =>
+  typeof raw === 'object' && raw !== null && !Array.isArray(raw) && typeof (raw as { body?: unknown }).body === 'string'
+    ? { ...raw, body: (raw as { body: string }).body.slice(from, to) }
+    : raw;
+
 /** The page of a closeout's `body` a read asks for: the character it starts at, and how many it holds at most. */
 export type BodyPage = { readonly from: number; readonly limit: number };
 
@@ -638,7 +647,8 @@ export type BodyPage = { readonly from: number; readonly limit: number };
  * questions, replies, what it left out and was refused — whole; its `body` cut to the page `body` asks (`BODY_PAGE` by default, never
  * past its most), `bodyNext` the character to read on from where more is left; of its `output` (and the `schema` it was read by) the
  * fields `fields` names — every one where it names `*`, and where it is not given those whose JSON is at most `SHORT_FIELD` characters —
- * those it left out named in `outputLeftOut`; the closeout as it came (`raw`) kept where `fields` names `*`, else left out, as null. Pure.
+ * those it left out named in `outputLeftOut`; the closeout as it came (`raw`) kept where `fields` names `*`, its `body` cut to the same
+ * page (`rawPaged`), else left out, as null. Pure.
  */
 export const closeoutNarrowed = (
   closeout: StepCloseout,
@@ -661,7 +671,7 @@ export const closeoutNarrowed = (
     ...(whole !== null && to < whole.length ? { bodyNext: to } : {}),
     output: kept(closeout.output),
     schema: kept(closeout.schema),
-    raw: fields?.includes('*') === true ? closeout.raw : null,
+    raw: fields?.includes('*') === true ? rawPaged(closeout.raw, from, to) : null,
     outputLeftOut: Object.keys(closeout.output).filter((name) => !keeps(name)),
   };
 };

@@ -10,6 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
+import { typed } from './typed.ts';
+import { builtinGitPlace, engine } from '../src/runner.ts';
 import { teamCopy } from './team.ts';
 import { WAITED } from 'agent-runtime/testing';
 
@@ -36,7 +38,7 @@ test(
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
     const template = path.join(scratch('wf-factory-up-template-'), 'team');
     nemia('template', 'export', template, '--from', repo);
-    nemia('factory', 'apply', 'shaped', '--template', template, '--repo', repo);
+    await typed(['factory', 'apply', 'shaped', '--template', template, '--repo', repo], engine(env), undefined, builtinGitPlace, env);
     const folder = path.join(root, 'factories', 'shaped');
     assert.deepEqual(fs.existsSync(folder) ? fs.readdirSync(folder) : [], [], 'apply files the factory file alone');
     const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);

@@ -36,15 +36,10 @@ import { freeable, freeSaid, freeTurn } from '../src/forget/prune/prune.ts';
 import { up } from '../src/daemon/up.verb.ts';
 import { recentPasses } from '../src/daemon/daemon.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
-import { main } from '../src/cli/main.ts';
 import { hold, unhold } from '../src/wait/wait.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
-import { typed } from './typed.ts';
+import { told } from './typed.ts';
 import { forgetTyped } from './forgetting.ts';
-import { COMMAND_WORDS } from 'objects';
-import type { Place } from '../src/runner.ts';
-import type { Engine } from '../src/cli/flags.ts';
-import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -59,13 +54,8 @@ const ENV: Record<string, string | undefined> = {
   WF_KEEP_WORKTREES: undefined,
 };
 const files = filesStoreAt(ROOT);
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `main`.
- */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
-const stage = staged({ runWith: runEngine, main: typedOrMain, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const world = () => stage.place().world;
 const runPlaced = stage.runPlaced;
 

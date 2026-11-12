@@ -32,12 +32,13 @@ import { ownDenies } from '../src/workflow/index.ts';
 import { stepPlace } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told } from './typed.ts';
+import { RM } from '../src/forget/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-old-store-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'old-store');
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -276,12 +277,9 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     },
   );
 
-  await s.test('`nemia rm` forgets a run of the old store, and the others stay', async (c) => {
-    const said = await printed(c, ['rm', 'notes']);
-    assert.ok(
-      said.some((l) => l.startsWith('notes  ')),
-      said.join('\n'),
-    );
+  await s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
+    const forgot = await stage.runWith(b.e, RM.handler({ runId: 'notes' }));
+    assert.deepEqual([forgot.id, forgot.removed], ['notes', true]);
     assert.equal(fs.existsSync(runFile(ROOT, 'notes')), false, 'its record is gone');
     assert.deepEqual(
       listRuns(ROOT, () => {})

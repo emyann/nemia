@@ -3,7 +3,7 @@
  * workflow and the brief from its body and hands the handler what it found; the client reads the person's files where they are typed and
  * sends their text. The lines `nemia start` prints of a run it started are made here (`startedLines`), which the api answers beside it.
  */
-import { helpOf, START_WORDS } from 'objects';
+import { START_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import type { Served } from '../command/entry.verb.ts';
@@ -239,9 +239,6 @@ const cardStart = Effect.fnUntraced(function* (card: string, given: StartInput) 
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
   } satisfies Started;
 });
-
-/** What `nemia start --help` printed when this CLI served it: its words' help, kept for the test that reads it (`src/cli/main.test.ts`). */
-export const START_HELP = helpOf([START_WORDS]);
 
 /** A text, or none: a key a caller may hand as undefined. */
 const Text = Schema.optional(Schema.String);

@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import type { Run } from '../record/record.ts';
 import { scratch } from 'test-kit/scratch';
 import { testEngine } from 'agent-runtime/testing';
@@ -21,7 +21,8 @@ import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
 import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
-import { inboxDir, startRun, startFromInbox, StoreRoot } from '../runner.ts';
+import { inboxDir, parseArgv, START, startedLines, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
+import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
 import { runRecord } from '../record/record.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
@@ -48,8 +49,35 @@ const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer, ENV);
 const filed = filesStoreAt(ROOT);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
-/** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
+/**
+ * `nemia`, as a person types it, its commands given this test's place: `start` run on its entry's handler (`typed`), a card of the
+ * inbox named by its file or its name sent as the card it is (`card`), as the client sends a card it names, and its lines said as the
+ * client says them (`startedLines`); `decide`, the old path's screen.
+ */
+const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<void> => {
+  if (argv[0] !== 'start') return cli(argv, e, undefined, stand().place, ENV);
+  const [, given = '', ...rest] = argv;
+  const named = !given.includes('/') && fs.existsSync(path.join(INBOX, given.endsWith('.md') ? given : `${given}.md`));
+  const inInbox = named ? given : path.relative(INBOX, path.resolve(given));
+  const data =
+    !inInbox.startsWith('..') && !path.isAbsolute(inInbox)
+      ? await handled(
+          START,
+          { card: inInbox.replace(/\.md$/, ''), at: process.cwd(), ...startFlags(rest) },
+          { ...(e && { e }), place: stand().place, env: ENV },
+        )
+      : await typed(['start', given, ...rest], e, undefined, stand().place, ENV);
+  for (const line of startedLines(data as Started)) console.log(line);
+};
+
+/** The flags of a `start` read by its words, beside a card's name: what the handler takes of them (`--brief` its `instead`, a file's
+ * text where it names one here, as the client reads it; `--repo`). */
+const startFlags = (rest: readonly string[]): StartInput => {
+  const args = parseArgv(START.spec, ['card', ...rest]) ?? {};
+  const { brief: _card, instead, ...flags } = Schema.decodeUnknownSync(StartInput)(args);
+  if (instead === undefined) return flags;
+  return { ...flags, instead: fs.existsSync(instead) && fs.statSync(instead).isFile() ? fs.readFileSync(instead, 'utf8') : instead };
+};
 
 const engine = eachTest(testEngine);
 heldUnasked(engine);
@@ -144,13 +172,12 @@ const writeRecord = (id: string, from?: Run['from']) =>
 
 test('a person parks ideas in the inbox, lists them, starts them and drops them', async (top) => {
   const s = story(top);
-  await s.test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async (t) => {
+  await s.test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async () => {
     emptyInbox();
     assert.equal(inboxDir(ROOT), path.join(ROOT, 'inbox'));
     assert.deepEqual(readInbox(), []);
     const empty = (await verb('inbox')) as { cards: unknown[]; ended: number };
     assert.deepEqual([empty.cards, empty.ended], [[], 0], 'no card, and none ended');
-    assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox \[--all\]$/);
   });
   await s.test(
     '`nemia inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `nemia inbox` lists each, with started as for a card a record names',
@@ -298,7 +325,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     },
   );
   await s.test(
-    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and keeps the card, listed as started and never started again; `nemia decide` names the card under the run's line; a plan's card started so stays where it is",
+    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and keeps the card, listed as started and never started again; `nemia decide` names the card under the run's line",
     async (t) => {
       emptyInbox();
       const repo = aRepoWith('dev', 'ui');
@@ -348,16 +375,6 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
         'a run typed at nemia start carries no from',
       );
       assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
-
-      const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-      fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
-      const planned = runRecord(ROOT, (await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
-      assert.deepEqual(
-        [planned.brief, planned.from],
-        ['Parse the flag', undefined],
-        "a plan's card is started by nemia start, with no from",
-      );
-      assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
     },
   );
   await s.test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does', async (t) => {
@@ -481,71 +498,6 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
       assert.deepEqual(runRecord(ROOT, started.run.id).context, ['source-a1', 'source-b2']);
       assert.equal(runRecord(ROOT, started.run.id).after, undefined, 'it waits on none');
-    },
-  );
-  await s.test(
-    "a plan's card is started by `nemia start <card>.md` — its id from the body, its `workflow:` found from its plan folder, --workflows over it; a card whose `after:` names cards starts only with --after; a frontmatter a card lacks is refused naming nemia inbox add, and a rule never closed is taken whole",
-    async (t) => {
-      const repo = aRepoWith('dev');
-      const dev = path.join(repo, 'workflows', 'dev');
-      const other = fs.mkdtempSync(path.join(ROOT, 'one-'));
-      fs.writeFileSync(path.join(other, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-      const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-      const card = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
-      fs.writeFileSync(path.join(plan, 'a.md'), card('workflow: dev', 'Parse the flag option in cli'));
-      fs.writeFileSync(
-        path.join(plan, 'b.md'),
-        card(`# by a path from the plan folder\nworkflow: ${path.relative(plan, other)}`, 'Document the flag'),
-      );
-      fs.writeFileSync(path.join(plan, 'd.md'), card('workflow: dev\nafter: a, b', 'Show the flag'));
-      const startedBy = async (...argv: string[]) => runRecord(ROOT, (await printedBy(t, 'start', ...argv))[0].split(' ')[0]);
-
-      const a = await startedBy(path.join(plan, 'a.md'), '--repo', repo);
-      assert.deepEqual(
-        [a.brief, a.workflowDir],
-        ['Parse the flag option in cli', dev],
-        'the body, and workflow: dev found as nemia start <folder> finds it',
-      );
-      assert.match(a.id, /^parse-the-flag-option-in-cli-[a-z0-9]{4}$/);
-      const second = await startedBy(path.join(plan, 'b.md'), '--repo', repo);
-      assert.deepEqual(
-        [second.brief, second.workflowDir],
-        ['Document the flag', other],
-        'a path from the plan folder, not from where nemia start is typed',
-      );
-      assert.equal(
-        (await startedBy(path.join(plan, 'a.md'), '--repo', repo, '--workflows', other)).workflowDir,
-        other,
-        '--workflows over the card',
-      );
-
-      const before = runsWritten();
-      await assert.rejects(
-        main(['start', path.join(plan, 'd.md'), '--repo', repo], noEngine()),
-        refusedWith(
-          'Invalid',
-          `${path.join(plan, 'd.md')}: \`after: a, b\``,
-          `nemia start ${path.join(plan, 'd.md')} --after <a's run id> --after <b's run id>`,
-        ),
-      );
-      assert.equal(runsWritten(), before, 'no run written');
-      const d = await startedBy(path.join(plan, 'd.md'), '--workflows', dev, '--repo', repo, '--after', a.id, '--after', second.id);
-      assert.deepEqual([d.brief, d.after], ['Show the flag', [a.id, second.id]]);
-
-      const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'brief-')), 'brief.md');
-      fs.writeFileSync(brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.\n');
-      const unstarted = runsWritten();
-      await assert.rejects(
-        main(['start', brief, '--repo', repo, '--workflows', dev], noEngine()),
-        refusedWith('Invalid', `${brief}: \`title\``, "a plan's card", `nemia inbox add ${brief}`),
-      );
-      assert.equal(runsWritten(), unstarted, 'a frontmatter block is never started as the brief: no run written');
-      fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
-      assert.equal(
-        (await startedBy(brief, '--repo', repo, '--workflows', dev)).brief,
-        '---\nA brief that opens with a rule.',
-        'and so is one that opens with a rule and never closes it',
-      );
     },
   );
 });
@@ -717,11 +669,6 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
       'moved-repo-a1b2.md: `repo: ',
       `${path.join(ROOT, 'moved-away')}\` names no directory`,
     ],
-    'an empty --brief': [
-      () => starting(kept.file, '--workflows', 'dev', '--brief', ''),
-      'Invalid',
-      'nemia start <inbox>/<name>.md --brief "<brief>"',
-    ],
     'a blank brief, to startFromInbox': [
       () => fromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo }),
       'Invalid',
@@ -729,12 +676,6 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
       'is empty',
       'Give what the run is asked to do',
       'leave it out',
-    ],
-    '--brief on anything but an inbox card': [
-      () => starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
-      'Invalid',
-      `nemia start ${path.join(INBOX, '<name>.md')} --brief "<brief>"`,
-      'nemia start "<brief>"',
     ],
     '--brief twice': [
       () => starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'),

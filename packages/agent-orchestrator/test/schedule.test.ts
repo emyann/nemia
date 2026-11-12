@@ -28,7 +28,7 @@ import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { told } from './typed.ts';
 import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
@@ -43,7 +43,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_CONCURRENT: undefined,
 };
 const filesStore = filesStoreAt(ROOT);
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Engine) => stage.main(argv, e);

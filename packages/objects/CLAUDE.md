@@ -15,6 +15,11 @@ orchestrator, the api, the board and the client import it through its one entry,
   board runs it in a browser, and the layers above share it, so a reach to any of them would be a cycle. The lint block for
   `packages/objects/src` in `.oxlintrc.json` refuses every other import as typed, held by
   `agent-orchestrator/test/imports.boundary.test.ts`.
+- **The command words live here**: every command the client holds (`COMMAND_WORDS`, `src/commands.ts`) is said once, a group to a
+  file (`src/commands-<group>.ts`, cut by concept past ~450 lines, the flags several share in `commands-flags.ts`, the former names
+  in `commands-renamed.ts`, `MACHINE_VERBS` and `STREAM_COMMANDS` in `commands-machine.ts`), with its parser (`src/command.ts`); the
+  client runs them and the orchestrator's entries spread them, so a word changed here changes what admission and the MCP port read.
+  Their refusals are held in `test/commands-*.test.ts`.
 - **One entry.** Every name another layer needs is re-exported by name from `src/index.ts`; `objects/src/...` is refused by the
   `exports` map, by the web's and the client's lint blocks, and by `agent-orchestrator/test/contract.test.ts`.
 - **Plain Schemas of JSON**: strings, numbers, booleans, literals, records, arrays and structs, with no brand, no check and no
@@ -22,8 +27,8 @@ orchestrator, the api, the board and the client import it through its one entry,
 - **`effect/http-api` and `effect/http` are marked `@stability unstable`** (the paths effect 4.1.2 exports them by): their names may
   move in a minor release of effect, which is why `effect` is pinned exactly (`4.1.2`) here as in every package, and moved in every
   package at once.
-- **One client of the api**: `apiClient` (`src/api-client.ts`) is the one constructor of the `Api`'s typed client, which the client,
-  the orchestrator's CLI forwarded and the board each make, and what it sets up around the contract (a bodiless write's `{}`, the
+- **One client of the api**: `apiClient` (`src/api-client.ts`) is the one constructor of the `Api`'s typed client, which the client and
+  the board each make, and what it sets up around the contract (a bodiless write's `{}`, the
   bearer, the headers, the bound, an undeclared status decoded into `Answered`) is decided there alone. Any other `HttpApiClient`
   constructor in the repository is refused, with no baseline (`tools/guards/test/one-api-client.test.ts`).
 - **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole package: `npx turbo run test --force --continue

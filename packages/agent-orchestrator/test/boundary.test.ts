@@ -272,16 +272,6 @@ const STAND_INS: readonly string[] = [
 /** The package's files the CLI may import, beside the files of its own folder. */
 const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];
 
-/**
- * The package's files the CLI imports past `runner.ts` until its re-exports name them, each by the CLI's file: the forwarding of a
- * command line to a remote daemon (`src/command/forward.verb.ts`) and `inbox from`'s entry (`src/inbox/commands.verb.ts`). `runner.ts`
- * is not this change's to edit; a pair is dropped once it re-exports the names.
- */
-const CLI_FORWARDS: readonly (readonly [cli: string, reaches: string])[] = [
-  ...['flags', 'main', 'runs', 'start'].map((f) => [`src/cli/${f}.ts`, 'src/command/forward.verb.ts'] as const),
-  ['src/cli/start.ts', 'src/inbox/commands.verb.ts'],
-];
-
 /** The package's files a bin may import: the CLI, and what it exits with, imported before the package loads. */
 const BIN_REACHES = ['src/cli/main.ts', 'src/cli/exit.ts'];
 
@@ -499,9 +489,7 @@ function cliBreaks(sources: Sources): string[] {
     .filter((f) => isCli(f) && !BINS.includes(f))
     .sort();
   return [
-    ...cli.flatMap((file) =>
-      reaching(file, CLI_REACHES, (m) => m.startsWith(CLI_FOLDER) || CLI_FORWARDS.some(([c, r]) => c === file && r === m)),
-    ),
+    ...cli.flatMap((file) => reaching(file, CLI_REACHES, (m) => m.startsWith(CLI_FOLDER))),
     ...BINS.flatMap((bin) => reaching(bin, BIN_REACHES, () => false)),
   ];
 }
@@ -512,9 +500,8 @@ function cliBreaks(sources: Sources): string[] {
  * is the Delegation door's (`src/delegation/delegation.store.ts`), the Event objects' verb, on the Feed door, and the Subscription objects'
  * verb, on the Subscription door (`src/subscription/subscription.store.ts`); the wait (`src/await/await.verb.ts`), which follows the feed
  * through the Feed door and its hub alone; and the listing of objects (`src/object/listed.verb.ts`),
- * which reads no store and no runtime, only a page of the objects its caller read and the time a file was made; and a command line
- * forwarded to a remote daemon (`src/command/forward.verb.ts`, `src/command/requests.verb.ts`), which calls its api over HTTP and builds
- * no engine; and the machine's needs read (`src/needs/needs.verb.ts`), which runs each declared check as a short shell command of its own,
+ * which reads no store and no runtime, only a page of the objects its caller read and the time a file was made; and the machine's
+ * needs read (`src/needs/needs.verb.ts`), which runs each declared check as a short shell command of its own,
  * beside the engine and never on it, and reads the factories and folders. Named one by one, so any
  * other controller that stops reaching the client is still refused.
  */
@@ -525,8 +512,6 @@ const DOORED_ONLY: readonly string[] = [
   'src/subscription-object/subscription.verb.ts',
   'src/object/listed.verb.ts',
   'src/await/await.verb.ts',
-  'src/command/forward.verb.ts',
-  'src/command/requests.verb.ts',
   'src/needs/needs.verb.ts',
 ];
 
@@ -1054,8 +1039,8 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('src/cli/main.ts', 'src/record/record.store.ts')), [
     'src/cli/main.ts imports src/record/record.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
   ]);
-  assert.deepEqual(treeBreaks(adding('src/cli/start.ts', 'src/record/record.store.ts')), [
-    'src/cli/start.ts imports src/record/record.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
+  assert.deepEqual(treeBreaks(adding('src/cli/runs.ts', 'src/record/record.store.ts')), [
+    'src/cli/runs.ts imports src/record/record.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
   ]);
 });
 
@@ -1067,19 +1052,12 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
       imports.filter((m) => m.startsWith('src/')).sort(),
     ),
     [
-      [
-        'src/cli/decide/decide.ts',
-        'src/cli/flags.ts',
-        'src/cli/runs.ts',
-        'src/cli/start.ts',
-        'src/command/forward.verb.ts',
-        'src/runner.ts',
-      ],
-      ['src/command/forward.verb.ts', 'src/runner.ts'],
+      ['src/cli/decide/decide.ts', 'src/cli/flags.ts', 'src/cli/runs.ts', 'src/runner.ts'],
+      ['src/runner.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
     ],
-    "a file of the CLI's folder reaches the root, its own folder and the forwarding (CLI_FORWARDS), and each bin the CLI's two doors: let through",
+    "a file of the CLI's folder reaches the root and its own folder, and each bin the CLI's two doors: let through",
   );
   assert.deepEqual(
     cliBreaks(adding('src/cli/main.ts', 'src/record/record.store.ts')),

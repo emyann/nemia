@@ -4,10 +4,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
+import { typed } from './typed.ts';
+import { builtinGitPlace, engine } from '../src/runner.ts';
 
 const PKG = path.join(import.meta.dirname, '..');
 const BIN = path.join(PKG, 'bin', 'nemia.ts');
@@ -22,7 +23,7 @@ test("nemia up says a pass's lines on stdout, through the logger its process pro
     WF_MAX_RUNS: '2',
     OTEL_EXPORTER_OTLP_ENDPOINT: '',
   };
-  execFileSync(process.execPath, [BIN, 'pause'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  await typed(['pause'], engine(env), undefined, builtinGitPlace, env);
   const up = nodeChild(`process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'up']; await import(${JSON.stringify(BIN)});`, env);
   t.after(() => up.child.kill());
   await up.until(() => /Paused /.test(up.out() + up.err()), 'nemia up says the pause, in whatever form');

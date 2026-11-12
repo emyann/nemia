@@ -12,6 +12,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { nodeChild } from './child.ts';
 import { scratch } from 'test-kit/scratch';
+import { typed } from './typed.ts';
+import { engine } from '../src/runner.ts';
 import { teamCopy } from './team.ts';
 import { placeOver } from './place-over.ts';
 import { startRun } from '../src/start/start.verb.ts';
@@ -25,7 +27,10 @@ import { filesStoreAt } from '../src/record/files.store.ts';
 const ROOT = scratch('wf-start-place-');
 const rooted = filesStoreAt(ROOT);
 
-const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
+/** The command run on its entry's handler, as the api runs it (`typed`): a child imports it to start a run in a process of its own. */
+const TYPED = path.join(import.meta.dirname, 'typed.ts');
+/** The package's entry, whose real engine and built-in git place a run started here is given. */
+const RUNNER = path.join(import.meta.dirname, '..', 'src', 'runner.ts');
 
 /** A workflow folder of `implement`, and, when `landing`, an ending `ship` that lands on its check once approved. */
 function workflow(name: string, landing: boolean): string {
@@ -172,10 +177,11 @@ test('a SIGINT to nemia start is not passed on to the group of the git open runs
     ['factory', 'add', 'signal', '--repo', repo],
     ['factory', 'attach', 'signal', 'dev'],
   ])
-    execFileSync(process.execPath, [BIN, ...args], { env: { ...env, PATH: process.env.PATH }, stdio: ['ignore', 'pipe', 'pipe'] });
+    await typed(args, engine(env), undefined, builtinGitPlace, { ...env, PATH: process.env.PATH });
   const argv = ['start', 'add a flag', '--workflows', path.join(teamCopy(), 'dev'), '--repo', repo, '--factory', 'signal'];
   const start = nodeChild(
-    `process.argv = [process.argv[0], ${JSON.stringify(BIN)}, ...${JSON.stringify(argv)}]; await import(${JSON.stringify(BIN)});`,
+    `const { typed } = await import(${JSON.stringify(TYPED)}); const { engine, builtinGitPlace } = await import(${JSON.stringify(RUNNER)});` +
+      ` await typed(${JSON.stringify(argv)}, engine(process.env), undefined, builtinGitPlace); process.exit(0);`,
     env,
   );
   let pgid = 0;

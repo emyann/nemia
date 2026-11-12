@@ -2,7 +2,8 @@
  * `nemia rm` removes a repository run's worktrees through its place's `remove`, whose git runs in a process group of its own. A SIGINT to
  * `nemia rm` ends it and is not passed on to that group, which outlives it: a `git worktree remove` a person's ^C reached would stop
  * halfway. Once that group is gone, `nemia rm` again forgets the run: what the first left is read again by the place's inventory. The run
- * is started in this process on a scratch store, then forgotten by the CLI in a child whose `git` hangs on `worktree remove` alone.
+ * is started in this process on a scratch store, then forgotten by its entry's handler in a child whose `git` hangs on `worktree remove`
+ * alone.
  * The run's store is the test's own, at `STORE`, given as `ENV`.
  */
 import { test } from 'node:test';
@@ -24,7 +25,10 @@ const STORE = path.join(DIR, 'store');
 const ENV: Env = { ...process.env, WF_ROOT: STORE };
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
-const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
+/** `nemia rm`'s entry and the helper that runs it on its handler, as the api runs it (`handled`), imported by the child that forgets. */
+const TYPED = path.join(import.meta.dirname, 'typed.ts');
+const RUNNER = path.join(import.meta.dirname, '..', 'src', 'runner.ts');
+const FORGET = path.join(import.meta.dirname, '..', 'src', 'forget', 'commands.verb.ts');
 
 /** Git in `cwd`, with a fixed identity, its stdout trimmed. */
 const git = (cwd: string, ...args: string[]): string =>
@@ -97,7 +101,9 @@ test("a SIGINT to nemia rm is not passed on to the git its place's remove runs: 
   const env = { ...process.env, WF_ROOT: STORE, AE_ROOT: path.join(DIR, 'engine'), PATH: `${bin}${path.delimiter}${process.env.PATH}` };
   const rmIn = (envOf: NodeJS.ProcessEnv) =>
     nodeChild(
-      `process.argv = [process.argv[0], ${JSON.stringify(BIN)}, 'rm', ${JSON.stringify(id)}]; await import(${JSON.stringify(BIN)});`,
+      `const { handled } = await import(${JSON.stringify(TYPED)}); const { RM } = await import(${JSON.stringify(FORGET)});` +
+        ` const { engine, builtinGitPlace } = await import(${JSON.stringify(RUNNER)});` +
+        ` await handled(RM, { runId: ${JSON.stringify(id)} }, { e: engine(process.env), place: builtinGitPlace }); process.exit(0);`,
       envOf,
     );
   const rm = rmIn(env);

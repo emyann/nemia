@@ -30,7 +30,8 @@ import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { parseSelectors, selects } from '../src/watch/selector.ts';
 import { NEMIA_SELECTORS } from '../src/nemia/nemia.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told } from './typed.ts';
+import { factoryTyped } from './factory-typed.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -38,7 +39,12 @@ const ROOT = scratch('wf-conflicts-feed-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/** `nemia`, typed here: a factory's verb as `factoryTyped` runs it, a resolution proposed as a folder here proposes it; else `told`. */
+const typedHere: typeof told = async (argv, ...over) => {
+  if (argv[0] === 'factory') await factoryTyped(argv, ...over);
+  else await told(argv, ...over);
+};
+const stage = staged({ runWith, main: typedHere, engineOf, env: ENV });
 
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view. */
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
@@ -51,8 +57,8 @@ const handedTo = async (...argv: string[]): Promise<void> => {
 };
 
 /**
- * `nemia factory resolve <argv>` on the command line's own runner, its console muted: a resolution is proposed only where a template is a
- * folder on the machine, so its handler refuses it from anywhere else.
+ * `nemia factory resolve <argv>` on its entry's handler with this machine's proposer (`factoryTyped`), its console muted: a resolution
+ * is proposed only where a template is a folder on the machine, so its handler refuses it from anywhere else.
  */
 const resolvedBy = async (t: TestContext, ...argv: string[]): Promise<void> => {
   const log = t.mock.method(console, 'log', () => {});

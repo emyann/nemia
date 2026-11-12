@@ -22,6 +22,7 @@ import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import { startRun, tickRun, runWith as runEngine, gitPlaceLayer, StoreRoot, readInbox as readInboxVerb } from '../src/runner.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 
@@ -181,7 +182,7 @@ const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}
 
 /** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry's handler as the api calls it (`typed`), over `e`. */
 const listedLines = async (e: Engine): Promise<string[]> => {
-  const { cards, defaultStarts } = (await typed(['inbox'], e, undefined, undefined, ENV)) as {
+  const { cards, defaultStarts } = (await typed(['inbox'], e, undefined, builtinGitPlace, ENV)) as {
     cards: InboxListing[];
     defaultStarts: boolean;
   };

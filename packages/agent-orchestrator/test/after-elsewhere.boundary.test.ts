@@ -22,6 +22,7 @@ import { markCancelled, runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { typed as onHandler } from './typed.ts';
 import { startedLines } from '../src/runner.ts';
+import { builtinGitPlace, engine } from '../src/runner.ts';
 
 const ROOT = scratch('wf-after-elsewhere-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -277,7 +278,13 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   assert.equal(runsWritten(), before, 'no run written');
 
   const typed = (...flags: string[]) =>
-    onHandler(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags], undefined, undefined, undefined, ENV) as Promise<{
+    onHandler(
+      ['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags],
+      engine(ENV),
+      undefined,
+      builtinGitPlace,
+      ENV,
+    ) as Promise<{
       id: string;
     }>;
 

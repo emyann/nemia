@@ -22,7 +22,8 @@ import { acceptRun, advanceRun, decideRun, list, retryRun, roundRun, sayRun, PER
 import { asksDir, markCancelled, runRecord } from '../src/record/record.store.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told } from './typed.ts';
+import { renamedIn } from 'objects';
 import type { RunsListed } from '../src/list/list.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -37,7 +38,7 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** A strict `findings` schema and `again`, as the tests' team's `test/fixtures/team/agents/review.schema.json` declares them. */
@@ -137,29 +138,13 @@ const refusedAs =
     return true;
   };
 /**
- * `nemia <argv>` typed on the stage, as a person types it: the lines it printed on stdout, and each line on stderr that names a former
- * spelling as the one to type now (`renamedIn`).
+ * `nemia <argv>` typed on the stage, as a person types it, run on its entry's handler (`told`): each hint it says of a former spelling as
+ * the one to type now (`renamedIn`, which the client prints on stderr). The lines it prints are the client's (`apps/cli/test`).
  */
-const typedOn = async (t: TestContext, argv: string[]): Promise<{ out: string[]; hints: string[] }> => {
-  const out: string[] = [];
-  const err: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    out.push(a.join(' '));
-  });
-  const write = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => err.push(String(chunk)) > 0);
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-    write.mock.restore();
-  }
-  return {
-    out,
-    hints: err
-      .join('')
-      .split('\n')
-      .filter((l) => / is now /.test(l)),
-  };
+const typedOn = async (_t: TestContext, argv: string[]): Promise<{ hints: string[] }> => {
+  await stage.main(argv);
+  const { hint } = renamedIn(argv);
+  return { hints: hint === undefined ? [] : [hint] };
 };
 /** A wf pictures line a check printed, naming the picture `n`. */
 const named = (n: string) => `wf pictures: named ${n}`;
@@ -313,10 +298,9 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
   });
   let file = '';
   await s.test('`nemia retry --round` takes it once more, once: the ask written whole, and no record', async () => {
-    const { out, hints } = await typedOn(t, ['retry', id, 'review', '--round']);
+    const { hints } = await typedOn(t, ['retry', id, 'review', '--round']);
     file = path.join(asksDir(ROOT, id), 'round-review-4');
-    assert.deepEqual([out[1]?.trim(), hints], [file, []], 'the file `nemia round` wrote, and no hint: this is the spelling to type');
-    names(out[0] ?? '', `${id}  asked: round 4 of review's loop`, 'the next tick files it, once');
+    assert.deepEqual([fs.existsSync(file), hints], [true, []], 'the file `nemia round` wrote, and no hint: this is the spelling to type');
     const ask = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.deepEqual([ask.step, ask.round, ask.budget, taskOf(id, 'implement')], ['review', 4, undefined, `${id}-implement-try4`]);
     assert.deepEqual(asksOf(id, 'round'), ['round-review-4'], "a person's once more is an ask, written whole");
@@ -367,9 +351,8 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
       const accepted = path.join(asksDir(ROOT, id), 'accept-review-4');
       await assert.rejects(typedOn(t, ['approve', id, 'review']), refusedAs('Invalid', '--message'));
       assert.deepEqual(asksOf(id, 'accept'), [], 'refused without your words: nothing written');
-      const { out, hints } = await typedOn(t, ['approve', id, 'review', '--message', ENOUGH]);
-      assert.deepEqual([out[1]?.trim(), hints], [accepted, []], 'the file `nemia accept` wrote, and no hint');
-      names(out[0] ?? '', `${id}  accepted: try 4 of review as it stands`);
+      const { hints } = await typedOn(t, ['approve', id, 'review', '--message', ENOUGH]);
+      assert.deepEqual([fs.existsSync(accepted), hints], [true, []], 'the file `nemia accept` wrote, and no hint');
       const acceptance = JSON.parse(fs.readFileSync(accepted, 'utf8'));
       at = acceptance.at;
       assert.deepEqual([acceptance.step, acceptance.try, acceptance.message], ['review', 4, ENOUGH], 'written whole');
@@ -411,8 +394,8 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['waiting', [], ['ship']]);
     assert.deepEqual(offers, [], 'the loop is over');
     namesFor('accepted', accepted.review, `${at.slice(11, 16)}Z`, ENOUGH);
-    const { out } = await typedOn(t, ['approve', id, 'ship', '--message', 'the findings are filed as follow-up']);
-    assert.equal(out[1]?.trim(), path.join(asksDir(ROOT, id), 'approve-ship-1'), 'the same verb, at a gate: the approval');
+    await typedOn(t, ['approve', id, 'ship', '--message', 'the findings are filed as follow-up']);
+    assert.ok(fs.existsSync(path.join(asksDir(ROOT, id), 'approve-ship-1')), 'the same verb, at a gate: the approval');
     assert.equal((await tick(id)).status, 'succeeded');
   });
 });

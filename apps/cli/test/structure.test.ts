@@ -16,6 +16,9 @@
  * - **One process** (`spawn`): `src/local.ts` alone names the orchestrator's CLI entries (`agent-orchestrator/bin`, `/bin/wf`), which it
  *   resolves and never imports, and alone imports `node:child_process`; the daemon on demand spawns through it.
  * - **The feed's stream under `src/watch/`** (`feed`): no other file names `/api/feed/stream` or an `EventSource`.
+ * - **Nothing forwarded**: no file of `apps/cli/src` spells `FORWARD_VARIABLES` or `NEMIA_SERVER`, the variables a command line was
+ *   once forwarded to another machine's api by; the orchestrator's side is its entries' pins (`packages/agent-orchestrator/test/
+ *   entries.test.ts`), since a test here builds no path into another package's sources.
  *
  * The lint block for `apps/cli/src` and `apps/cli/bin` in `.oxlintrc.json` refuses the same packages as they are typed, and a value
  * import of the api; `packages/agent-orchestrator/test/contract.test.ts` holds the CLI entries' resolve across the repository. A
@@ -369,4 +372,22 @@ test('REFUSED: the feed followed outside src/watch/; one named in a JSDoc is let
     ruled(feedBreaks(plantedIn('src/x.ts', '/** `watch` follows `/api/feed/stream`, from watch/. */\nexport const x = 1;\n'))),
     [],
   );
+});
+
+/** Every `.ts` file under `dir`, by its path, with its text. */
+const tsUnder = (dir: string): Map<string, string> =>
+  new Map(
+    fs
+      .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts'))
+      .map((file) => [path.join(dir, file), fs.readFileSync(path.join(dir, file), 'utf8')]),
+  );
+
+/** The files of the client's sources whose text `pattern` matches, by their path from the client's folder. */
+const spelling = (pattern: RegExp): string[] =>
+  [...tsUnder(path.join(CLI, 'src'))].filter(([, text]) => pattern.test(text)).map(([file]) => path.relative(CLI, file));
+
+test("nothing is forwarded: no file of the client's sources spells FORWARD_VARIABLES or NEMIA_SERVER", () => {
+  assert.ok(spelling(/\bchosenOf\b/).includes(path.join('src', 'context.ts')), "the scan reads the client: it finds the context's choice");
+  assert.deepEqual(spelling(/FORWARD_VARIABLES|NEMIA_SERVER/), []);
 });

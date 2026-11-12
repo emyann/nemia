@@ -94,9 +94,8 @@ test('nemia stats -l sums the facts of the runs the selector takes alone', async
   assert.equal(await tries({ selector: ['team=infra'] }), 0, 'and none where it takes no run');
 });
 
-test('REFUSED by kind: nemia stats -l of no selector, on the command line and from the api', async () => {
+test("REFUSED by kind: nemia stats -l of no selector, the api's refusal, which the command line exits on", async () => {
   const STATS = COMMANDS.find((c) => c.name === 'stats')!;
-  names(STATS.check?.({ selector: ['no/pe=x'] }), 'no/pe');
   await assert.rejects(runWith(noEngine(), STATS.handler({ selector: 'no/pe=x' })), (err: Error & { exitCode?: number }) => {
     assert.ok(err instanceof Invalid, String(err));
     assert.equal(err.exitCode, 2);

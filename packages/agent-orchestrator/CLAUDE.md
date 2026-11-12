@@ -4,13 +4,16 @@ Workflows as folders of markdown, runs of their steps, a tick that files and adm
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. What
 it holds today that is a candidate for the runtime is in `docs/architecture.md`, *Who owns what*.
 
-The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): it asks the api for the moved reads and the commands
-whose words it holds, and spawns this package's CLI for everything else — every other write and a help — with the same words. A command
-in `objects`' `COMMAND_WORDS` is the client's: its entry in the table here spreads those words and keeps its `input` and `handler` alone
-(the api calls it), and this CLI no longer names it (`namedIn`). `bin/nemia.ts`
-and `bin/wf.ts` are that in-process CLI, the old path: exported as `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned by
-`apps/cli/src/local.ts` alone, and no package declares them as its bins. A change to a moved read's output changes the client's printer
-too, which holds parity with this one until the in-process reads retire.
+The `nemia` a person types is the client in `apps/cli` (`apps/cli/CLAUDE.md`): every store verb is its command, whose words are
+`objects`' `COMMAND_WORDS`, and reaches the store through the api. Its entry in the table here spreads those words and keeps its `input`
+and `handler` alone (`Served`, the api calls it), and this CLI no longer names it (`namedIn`). `bin/nemia.ts` and `bin/wf.ts` are the
+in-process CLI, the old path, which serves the verbs about this machine (`objects`' `MACHINE_VERBS`) alone, and what
+`test/held-commands.baseline.ts`' `KEPT` names, each with why (`doctor`'s help and `doctor carry`, the retired `readiness`, and `daemon
+--json`, which the client spawns to start this machine's daemon on demand): exported as `agent-orchestrator/bin` and `/bin/wf`,
+resolved and spawned by `apps/cli/src/local.ts` alone, and no package declares them as its bins. `commandBreaks` refuses a store verb
+this CLI serves that `KEPT` does not name (`heldBreaks`). A test reaches a store verb's handler through `test/typed.ts` (`typed(argv,
+…)`, read by the entry's own words; `handled(ENTRY, input, …)`; `told`, a story's `main`), and asserts the data it answers; the
+lines a person reads are the client's, held by its tests.
 
 ## Folders
 
@@ -26,7 +29,7 @@ too, which holds parity with this one until the in-process reads retire.
   required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
   one, and a line of a body that reads one, with no baseline: none is left. A test imports `src` at its head and hands its store
   as an environment record (`const ENV: Env = { ...process.env, WF_ROOT: ROOT }`) to `runOver`, `runGiven`, `staged({ …, env })`,
-  `main(argv, e, undefined, place, ENV)`, `engine(ENV)` and `configGiven(ROOT, ENV)`; only `test/ambient.ts` writes a `WF_` variable
+  `typed(argv, e, undefined, place, ENV)`, `engine(ENV)` and `configGiven(ROOT, ENV)`; only `test/ambient.ts` writes a `WF_` variable
   as it loads (`tools/guards/test/env-given.test.ts`).
 - **`src/factory/servers/` is the store that already takes its root by parameter**: `servers.store.ts`'s functions take a required
   `home: string` first, read from `StoreRoot` by `servers.verb.ts`'s handlers, which take their input alone, and by

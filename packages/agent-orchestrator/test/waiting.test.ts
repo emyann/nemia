@@ -43,23 +43,14 @@ import { isRepositoryRun } from '../src/run.ts';
 import { listRuns, markCancelled, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
-import { COMMAND_WORDS } from 'objects';
-import type { Place } from '../src/runner.ts';
-import type { Engine } from '../src/cli/flags.ts';
+import { told } from './typed.ts';
 
 const ROOT = scratch('wf-waiting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `main`.
- */
-const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
-const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** `findings`, strict: what a declaring step's closeout carries. */
@@ -670,7 +661,8 @@ test('context without a wait: a run handed another with `--from` files at once, 
     },
   );
   await s.test('`nemia concluded` prints the section the tick hands a run started with `--from` — the very one', async () => {
-    const printed = await printedBy(t, () => stage.main(['concluded', source.run.id]));
+    const { section: concluded } = (await stage.main(['concluded', source.run.id])) as { section: string };
+    const printed = [concluded.replace(/^\n+/, '').replace(/\n+$/, '')];
     const child = await started({ brief: 'Read what the source has, again', repo, workflowDir: twoSteps(), context: [source.run.id] });
     await tick(child.id);
     const brief = briefOf(`${child.id}-implement`);

@@ -1,8 +1,7 @@
 /**
  * Where a call's input goes on an endpoint of an `HttpApi`, read off its Schemas: the keys of its path, of its query (all but `watch`,
  * which turns an answer into a stream) and of its JSON payload, its method and path, and whether it answers a stream. One reading for
- * every caller that joins an endpoint's parts into one input and splits it again: the api's MCP port, and the orchestrator's CLI
- * forwarded to another machine's api. Pure, over the Schemas.
+ * every caller that joins an endpoint's parts into one input and splits it again: the api's MCP port. Pure, over the Schemas.
  */
 import { Schema } from 'effect';
 import { HttpApiSchema } from 'effect/http-api';

@@ -17,8 +17,6 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   WF_CGROUP_PARENT: 'sessions.slice',
   NEMIA_BIND: '100.126.244.0',
   WF_EXPOSED: '1',
-  NEMIA_SERVER: 'http://the-persons-vps:7777',
-  NEMIA_SERVER_TOKEN: 'a-token-of-the-persons',
   NEMIA_CONTEXT: 'the-persons-vps',
   XDG_CONFIG_HOME: '/elsewhere/.config',
 };

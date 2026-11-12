@@ -1,6 +1,6 @@
 /**
- * A template as it travels to another machine's api (`objects`' `TemplateGiven`), and as that api takes it. On the machine a command is
- * typed on, a `--template` word is made the request's (`templateGiven`): a builtin template's name sent as it is, an archive's bytes as
+ * A template as it travels to an api (`objects`' `TemplateGiven`), and as that api takes it. On the machine a command is typed on, a
+ * `--template` word is made the request's (`templateGiven`): a builtin template's name sent as it is, an archive's bytes as
  * they are, and a folder packed as `nemia template pack` packs it, each archive in base64; nothing of that machine's paths is sent. On the
  * api's, the template given is made the source a verb reads (`withTemplateTaken`): a name as it is, a path of the api's machine as it is
  * where it is whole, and an archive kept under the store
@@ -95,14 +95,3 @@ export const withTemplateTaken = <A, E, R>(
         }),
     );
   });
-
-/**
- * A forwarded call's input with its `--template` word made the request's (`templateGiven`), as a link's `request` takes it: the other
- * keys as they are, and an input that names no template as it is, for the verb there to refuse in its own words.
- */
-export const templatePacked = (input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>> => {
-  const given = input['template'];
-  return typeof given === 'string'
-    ? Effect.runPromise(Effect.map(templateGiven(given), (template) => ({ ...input, template })))
-    : Promise.resolve(input);
-};

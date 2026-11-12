@@ -47,7 +47,7 @@ import {
   isRepositoryRun,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { told } from './typed.ts';
 import { staged, story } from './story.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { runFile, runRecord } from '../src/record/record.store.ts';
@@ -368,7 +368,7 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_CONCURRENT: undefined,
   WF_MAX_RUNS: undefined,
 };
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const at = await endings(stage, ROOT);
 const rooted = filesStoreAt(ROOT);
 type Place = import('../src/place/place.store.ts').Place;
@@ -2327,15 +2327,8 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
           },
         ],
       );
-      const printed = await at.printedBy(st, ['refresh', id, '--base']);
-      assert.ok(
-        printed[0]?.includes(
-          `asked: merge main at ${base.slice(0, 7)} into implement's work, where ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic — the next tick files it`,
-        ),
-        printed.join('\n'),
-      );
-      assert.equal(asks(id).length, 1, 'the merge ask `nemia merge` wrote');
-      assert.equal(printed[1]?.trim(), path.join(ROOT, 'runs', `${id}.asks`, asks(id)[0]), 'and the file it is in');
+      await at.printedBy(st, ['refresh', id, '--base']);
+      assert.equal(asks(id).length, 1, "the merge ask `nemia merge` wrote: its lines are the client's (apps/cli/test)");
       await assert.rejects(
         at.printedBy(st, ['merge', id]),
         refusedNaming("into implement's work is already asked", `nemia ls ${id}`),

@@ -20,7 +20,8 @@ import { steeredClock } from '../../../test/steered.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
 import { attachWorkflowAt, fireAgentAt, hireAgentAt, readFactoriesAt, readFactoryAt } from '../factory.store.ts';
 import { main as cli } from '../../cli/main.ts';
-import { handled, typed } from '../../../test/typed.ts';
+import { told } from '../../../test/typed.ts';
+import { handled } from '../../../test/typed.ts';
 import { names } from '../../../test/assessed.ts';
 import type { PlaceTrust } from '../../trust/trust.ts';
 import { FACTORY_INSTRUCT } from '../instruction.verb.ts';
@@ -44,11 +45,10 @@ const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const stand = eachTest(testPlace);
 /**
- * `nemia`, as a person types it, its commands given this test's place: a `nemia factory` verb, which the client holds, run onto its
- * entry's handler as the api calls it (`typed`); the old CLI's own verbs through it.
+ * `nemia`, as a person types it, its commands given this test's place: a verb the client holds run onto its entry's handler as the
+ * api calls it (`told`); the old CLI's own verbs through it.
  */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) =>
-  argv[0] === 'factory' ? typed(argv, e, undefined, stand().place, ENV) : cli(argv, e, undefined, stand().place, ENV);
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => told(argv, e, undefined, stand().place, ENV);
 
 /** `nemia factory instruct <factory> --file <words>`, its words read where it is typed, as the client sends them. */
 const instruct = (factory: string, words: string) =>

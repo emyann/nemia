@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { factoryLines } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -33,32 +34,21 @@ import {
 } from '../src/factory/factory.store.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { detached } from './factory-planted.ts';
-import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { nemiaDefinition } from '../src/nemia/level.store.ts';
-import { FACTORY_HELP } from '../src/factory/factory.verb.ts';
 import { writeRules } from '../src/factory/rules/rules.store.ts';
 import { writeInstructionText } from '../src/factory/instruction.store.ts';
-import { typed } from './typed.ts';
+import { told } from './typed.ts';
 import { startedLines, startFactoryAtOnce, type StartInput } from '../src/runner.ts';
 import { inboxNameAt } from '../src/inbox/inbox.store.ts';
 import { settingsOf } from '../src/config/config.store.ts';
-import { COMMAND_WORDS } from 'objects';
-import type { Place } from '../src/runner.ts';
-import type { Engine } from '../src/cli/flags.ts';
-import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-start-');
 const FACTORIES = path.join(ROOT, 'factories');
 /** The test's store and its settings: `asShipped` takes the default factory's switch out of it, for a checkpoint's scope. */
 const ENV: Record<string, string | undefined> = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-/**
- * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
- * api runs it; any other through this CLI's `cli`.
- */
-const typedOrCli = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
-  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : cli(argv, e, undefined, place, env);
-const stage = staged({ runWith: runEngine, main: typedOrCli, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 /** The test place of this test, as the focused test below reads it. */
 const stand = stage.place;
 const { runPlaced } = stage;
@@ -227,6 +217,8 @@ function aCard(name: string, text: string): string {
   return card;
 }
 
+/** What `nemia factory ls` lists of the store's factories, as the orchestrator words a listing (`factoryLines`); the client's own. */
+const listedHere = (): string[] => factoryLines(readFactoriesAt(ROOT));
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
 test('a factory from nothing to a run: filed, given workflows, hires and a schedule, listed, started in, and removed', async (t) => {
@@ -236,22 +228,20 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   const file = path.join(FACTORIES, 'pipao.json');
   let run = '';
 
-  await s.test('`nemia factory ls` with no folder lists the default alone; --help prints the help', async () => {
-    assert.deepEqual(readFactoriesAt(ROOT), []);
-    const alone = await typedFrom(ROOT, ['factory']);
-    assert.deepEqual([alone[0], alone.length], [DEFAULT_LINE, 3]);
-    assert.deepEqual(await typedFrom(ROOT, ['factory', '--help']), FACTORY_HELP.split('\n'));
-  });
+  await s.test(
+    "no factory is filed before the first `nemia factory add` (its listing and help are the client's: apps/cli/test)",
+    async () => {
+      assert.deepEqual(readFactoriesAt(ROOT), []);
+    },
+  );
 
   await s.test(
     '`nemia factory add` files <name>.json, each repository absolute and named once, no workflows key, a plain directory enough',
     async () => {
-      const printed = await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
+      await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
       assert.deepEqual(factoryFiles(), ['pipao.json']);
       assert.deepEqual(fileOf('pipao'), { repos: [a, b], generation: 1 }, 'an add writes no workflows key, and its generation 1');
       assert.ok(!fs.existsSync(path.join(a, '.git')));
-      assert.deepEqual(printed.slice(0, 2), [`pipao  ${a}, ${b}`, `filed: ${file}`]);
-      assert.equal(printed[2], `trusted for Claude Code: ${a}`);
       assert.deepEqual(readFactoryAt(ROOT, 'pipao'), {
         name: 'pipao',
         repos: [a, b],
@@ -269,14 +259,11 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     '`nemia factory attach` adds a workflow by name, sorted and once, keeping every other key; detach takes it back',
     async () => {
       fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'intake']), ['pipao  attached intake', `attached: ${file}`]);
+      await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'intake']);
       attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
       attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'notes' });
       const before = fs.readFileSync(file);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build']), [
-        'pipao  already attached build',
-        `unchanged: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build']);
       assert.deepEqual(attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' }), { file, already: true });
       assert.deepEqual(fs.readFileSync(file), before, 'an attach of one attached already writes nothing');
       assert.deepEqual(readFactoryAt(ROOT, 'pipao').workflows, ['build', 'intake', 'notes']);
@@ -287,21 +274,12 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   await s.test(
     '`nemia factory hire` files one agent a step, a second hire replacing the first; fire takes one back and keeps the rest',
     async () => {
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'otto', '--step', 'build/implement']), [
-        'pipao  build/implement ← otto',
-        `hired: ${file}`,
-      ]);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'implementer', '--step=build/implement']), [
-        'pipao  build/implement ← implementer (was otto)',
-        `hired: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'otto', '--step', 'build/implement']);
+      await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'implementer', '--step=build/implement']);
       assert.deepEqual(hireAgentAt(ROOT, { factory: 'pipao', agent: 'reviewer', step: 'build/review' }), { file });
       hireAgentAt(ROOT, { factory: 'pipao', agent: 'shipper', step: 'intake/frame' });
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'fire', 'pipao', '--step', 'intake/frame']), [
-        'pipao  intake/frame  fired shipper',
-        `fired: ${file}`,
-      ]);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'detach', 'pipao', 'intake']), ['pipao  detached intake', `detached: ${file}`]);
+      await typedFrom(ROOT, ['factory', 'fire', 'pipao', '--step', 'intake/frame']);
+      await typedFrom(ROOT, ['factory', 'detach', 'pipao', 'intake']);
       assert.deepEqual(fileOf('pipao'), {
         repos: [a, b],
         later: { kept: true },
@@ -317,7 +295,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     '`nemia factory schedule` writes a schedule stamped with since, read back, written again whole; unschedule takes it',
     async () => {
       const typed = ['factory', 'schedule', 'pipao', 'build', '--cron', '0 9 * * 1', '--brief', 'Read the stats', '--tz', 'UTC'];
-      assert.equal((await typedFrom(ROOT, [...typed, '--repo', a]))[0], 'pipao  build at 0 9 * * 1 (UTC)');
+      await typedFrom(ROOT, [...typed, '--repo', a]);
       const first = readFactoryAt(ROOT, 'pipao').schedules.build;
       assert.deepEqual([first.brief, first.tz, first.repo], ['Read the stats', 'UTC', a]);
       const before = Date.now();
@@ -334,7 +312,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test('`nemia factory ls` lists the factory with its workflows, its hires and its schedule', async () => {
-    const listed = await typedFrom(ROOT, ['factory', 'ls']);
+    const listed = listedHere();
     assert.deepEqual(listed.slice(0, 5), [
       DEFAULT_LINE,
       `pipao    ${a}, ${b}`,
@@ -342,8 +320,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       '         build/implement ← implementer',
       '         build/review ← reviewer',
     ]);
-    assert.match(listed.join('\n'), /schedule build {2}0 9 \* \* 1 .*"Read the stats"/);
-    assert.equal((await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'build']))[0], 'pipao  build no longer at 0 9 * * 1');
+    await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'build']);
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').schedules, {});
   });
 
@@ -391,12 +368,8 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const [notes, scratchpad] = [scratch('wf-volume-notes-'), scratch('wf-volume-pad-')];
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]), [
-        `${f}  volume ${notes} :rw`,
-        "writable for each step whose fence writes; a step's writes there are not the run's workspace: nothing commits, lands or reverts them",
-        `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
-      ]);
-      assert.equal((await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]))[0], `${f}  volume ${notes} :ro (was :rw)`);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]);
       await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${scratchpad}:rw`]);
       const volumes = [
         { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() },
@@ -410,7 +383,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, notes]), 'Invalid', notes);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', 'default', `${notes}:ro`]), 'Conflict');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${ROOT}:ro`]), 'Invalid', ROOT);
-      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' volume '));
+      const listed = listedHere().filter((l) => l.includes(' volume '));
       assert.deepEqual(
         listed.map((l) => l.trim().split(' ').slice(0, 3).join(' ')),
         volumes.map((v) => `volume ${v.path} ${v.readOnly ? ':ro' : ':rw'}`),
@@ -433,11 +406,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         out.join('\n'),
       );
       const before = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-      for (const v of volumes)
-        assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]), [
-          `${f}  volume ${v.path} removed`,
-          `changed: ${file}`,
-        ]);
+      for (const v of volumes) await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]);
       assert.equal('volumes' in fileOf(f), false, 'the key is gone once none is left');
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), before);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, writable.path]), 'Missing', writable.path);
@@ -449,8 +418,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const off = { commit: '', pr: '' };
-      const said = await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
-      assert.equal(said[0], `${f}  setting claude.attribution {"commit":"","pr":""}`);
+      await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } });
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
       const before = fs.readFileSync(file, 'utf8');
@@ -466,7 +434,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
       await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } }, 'a wiring change keeps the settings');
-      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' setting '));
+      const listed = listedHere().filter((l) => l.includes(' setting '));
       assert.deepEqual(
         listed.map((l) => l.trim()),
         ['setting claude.attribution {"commit":"","pr":""}'],
@@ -493,10 +461,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         assert.deepEqual(JSON.parse(settings ?? '{}').attribution, { commit: '', pr: '' }, spec.id);
       }
       const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), [
-        `${f}  setting claude.attribution removed`,
-        `changed: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']);
       assert.equal('harnessSettings' in fileOf(f), false, 'the key is gone once none is left');
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), 'Missing', 'claude.attribution');
@@ -511,10 +476,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         runRecord(ROOT, startedId(await typedFrom(cwd, ['start', 'x', '--workflows', build, ...factory, '--no-worktree'])));
       await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'notes', '30']);
       assert.equal((await start(b, '--factory', f)).costLine, undefined, "notes' line is not build's");
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '80']), [
-        `${f}  cost line build $80.00`,
-        `changed: ${file} — runs started from now on are held to it; a run in flight keeps the line it was started with`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '80']);
       const frozen = await start(b, '--factory', f);
       assert.equal(frozen.costLine, 80);
       assert.equal((await start(aRepo())).costLine, undefined, 'a run in the default factory');
@@ -566,11 +528,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     const out = await typedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'mono', '--no-worktree']);
     assert.deepEqual([runRecord(ROOT, startedId(out)).repo, runRecord(ROOT, startedId(out)).factory], [c, 'mono']);
     assert.ok(out.includes(`factory: mono, on ${c}`), out.join('\n'));
-    assert.deepEqual(
-      (await typedFrom(ROOT, ['factory', 'ls'])).slice(0, 2),
-      [DEFAULT_LINE, `mono     ${c}`],
-      'listed by name, not as filed',
-    );
+    assert.deepEqual(listedHere().slice(0, 2), [DEFAULT_LINE, `mono     ${c}`], 'listed by name, not as filed');
   });
 
   await s.test('a folder team started in the factory names it and works on no repository', async () => {
@@ -606,20 +564,13 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
     writeInstructionText(ROOT, 'pipao', 'Ship small.');
     const mono = fs.readFileSync(path.join(FACTORIES, 'mono.json'));
-    assert.deepEqual(await typedFrom(ROOT, ['factory', 'rm', 'pipao']), [
-      `pipao  removed — ${file}`,
-      `instruction removed: ${path.join(FACTORIES, 'pipao')}`,
-    ]);
+    await typedFrom(ROOT, ['factory', 'rm', 'pipao']);
     assert.deepEqual([fs.existsSync(rules), fs.existsSync(path.join(FACTORIES, 'pipao'))], [false, false]);
     assert.deepEqual(factoryFiles(), ['mono.json']);
     assert.deepEqual(fs.readFileSync(path.join(FACTORIES, 'mono.json')), mono);
     fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{');
     await typedFrom(ROOT, ['factory', 'rm', 'torn']);
-    assert.deepEqual(
-      await typedFrom(ROOT, ['factory', 'rm', 'mono']),
-      [`mono  removed — ${path.join(FACTORIES, 'mono.json')}`],
-      'with no instruction, no line of it',
-    );
+    await typedFrom(ROOT, ['factory', 'rm', 'mono']);
     assert.deepEqual(factoryFiles(), []);
   });
 

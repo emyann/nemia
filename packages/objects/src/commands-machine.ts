@@ -19,3 +19,13 @@ export const MACHINE_VERBS = [
 
 /** One of `MACHINE_VERBS`. */
 export type MachineVerb = (typeof MACHINE_VERBS)[number];
+
+/**
+ * The commands the client holds that follow a stream rather than answer once: `watch`, the feed followed as it is written. The MCP port
+ * makes a tool of every other command's endpoint (`served`); a stream's form there is `wait`, which answers once what it waited on, so a
+ * stream links no endpoint of its own. Pure.
+ */
+export const STREAM_COMMANDS = ['watch'] as const;
+
+/** One of `STREAM_COMMANDS`. */
+export type StreamCommand = (typeof STREAM_COMMANDS)[number];

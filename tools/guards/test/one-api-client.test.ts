@@ -3,7 +3,8 @@
  * else in the repository builds one. Every TypeScript file git holds is read, sources and tests alike, and a call of a constructor of
  * effect's `HttpApiClient` (`make`, `makeWith`, `group`, `endpoint`) anywhere but there is refused, under any name the file imports it
  * by, with no baseline: a second client is where what each sets up around the contract — a bodiless write's body, the token, the bound,
- * an error body's decoding — drifts from the other's, as it did when a forwarded `nemia chat allow` was refused 415.
+ * an error body's decoding — drifts from the other's, as it did when the orchestrator's CLI, then forwarded to another machine's api,
+ * built its own and a `nemia chat allow` was refused 415.
  *
  * Turbo caches this package's pass by its inputs, so a change elsewhere alone replays it: `npx turbo run test --force`.
  */
@@ -40,11 +41,7 @@ function clientsMade(text: string): string[] {
 
 test('no file but objects’ own builds a typed client of the Api: every consumer makes it with `apiClient`', () => {
   const read = files().filter((f) => TYPESCRIPT.test(f) && ours(f));
-  for (const consumer of [
-    'apps/cli/src/objects.ts',
-    'packages/agent-orchestrator/src/command/forward.verb.ts',
-    'apps/web/src/lib/api/objects.ts',
-  ])
+  for (const consumer of ['apps/cli/src/objects.ts', 'apps/web/src/lib/api/objects.ts'])
     assert.ok(read.includes(consumer), `${consumer} is read: it is a consumer of the api`);
   assert.ok(clientsMade(textOf(MAKER) ?? '').length > 0, `${MAKER} makes the client: the rule reads the call it refuses elsewhere`);
   const found = read.filter((f) => f !== MAKER).flatMap((f) => clientsMade(textOf(f) ?? '').map((line) => `${f}:${line}`));

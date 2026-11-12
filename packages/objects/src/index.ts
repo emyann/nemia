@@ -643,7 +643,7 @@ export {
   takesOf,
   type Said,
 } from './commands-flags.ts';
-export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
+export { MACHINE_VERBS, type MachineVerb, STREAM_COMMANDS, type StreamCommand } from './commands-machine.ts';
 export {
   ANSWER_HELP,
   APPROVE_WORDS,

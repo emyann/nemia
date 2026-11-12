@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { scratch } from 'test-kit/scratch';
 
 import { exitCodeOf } from '../src/cli/exit.ts';
@@ -29,58 +29,30 @@ function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: n
   return { status, stderr };
 }
 
-test('a refusal exits 2 and prints its sentence: nemia approve of a run that does not exist', () => {
+test('a refusal exits 2 and prints its sentence: nemia doctor fix of a need nothing declares', () => {
   const root = path.join(scratch('wf-exit-code-refused-'), 'store');
-  const { status, stderr } = wf(root, ['approve', 'r-nope', 'implement']);
-  assert.equal(status, 2, `nemia approve of no run exits with the refusal's code; it said: ${stderr}`);
+  const { status, stderr } = wf(root, ['doctor', 'fix', 'no-piece']);
+  assert.equal(status, 2, `nemia doctor fix of no need exits with the refusal's code; it said: ${stderr}`);
   const [off, said, ...rest] = stderr.split('\n');
   assert.equal(off, offLine(root));
   assert.deepEqual(rest, [''], `its sentence alone, on one line, and no stack: ${stderr}`);
-  assert.ok(said.startsWith('no such run: r-nope.'), said);
-  assert.ok(said.includes('nemia ls'), said);
-  assert.ok(said.endsWith('nemia approve <runId> <step>.'), said);
+  assert.ok(said.includes('no-piece'), said);
+  assert.ok(said.includes('nemia doctor'), said);
 });
 
-test("REFUSED: nemia retry and nemia say of a run that does not exist exit 2, with the store's sentence naming nemia ls", () => {
-  for (const argv of [
-    ['retry', 'r-nope', 'implement'],
-    ['say', 'r-nope', 'implement', 'the words'],
-  ]) {
-    const root = path.join(scratch('wf-exit-code-no-run-'), 'store');
-    const { status, stderr } = wf(root, argv);
-    assert.equal(status, 2, `nemia ${argv[0]} of no run exits with the refusal's code; it said: ${stderr}`);
-    const off = argv[0] === 'retry' ? `${offLine(root)}\n` : '';
-    assert.equal(stderr, `${off}no such run: r-nope  (try 'nemia ls')\n`, `nemia ${argv[0]}`);
-  }
-});
-
-test('a refusal of --no-worktree on a workflow that fans out exits 2, as its sibling refusals do, and nothing is written', () => {
-  const dir = scratch('wf-exit-code-fan-out-');
-  const repo = path.join(dir, 'repo');
-  fs.mkdirSync(repo);
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'init', '-q'], { cwd: repo });
-  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], { cwd: repo });
-  const team = path.join(dir, 'team');
-  fs.mkdirSync(team);
-  fs.writeFileSync(path.join(team, 'left.md'), '---\nplace: git\n---\nwrite the left half\n');
-  fs.writeFileSync(path.join(team, 'right.md'), '---\nplace: git\n---\nwrite the right half\n');
-  const root = path.join(dir, 'store');
-  const { status, stderr } = wf(root, ['start', 'two halves', '--workflows', team, '--repo', repo, '--no-worktree']);
-  assert.equal(status, 2, `a fan-out refused --no-worktree exits with the refusal's code; it said: ${stderr}`);
-  const [off, why, fix, ...rest] = stderr.split('\n');
-  assert.equal(off, offLine(root));
-  assert.deepEqual(rest, [''], `its two lines alone, and no stack: ${stderr}`);
-  assert.ok(why.startsWith('this workflow can run two steps at once'), why);
-  assert.ok(why.includes('--no-worktree'), why);
-  assert.ok(fix.startsWith('Either drop --no-worktree'), fix);
-  assert.ok(fix.includes('make the steps a chain'), fix);
-  assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run written');
+test("REFUSED: nemia decide of a run that does not exist exits 2, with the store's sentence naming nemia ls", () => {
+  const root = path.join(scratch('wf-exit-code-no-run-'), 'store');
+  const { status, stderr } = wf(root, ['decide', 'r-nope']);
+  assert.equal(status, 2, `nemia decide of no run exits with the refusal's code; it said: ${stderr}`);
+  const [said, ...rest] = stderr.split('\n');
+  assert.deepEqual(rest, [''], `its sentence alone, on one line, and no stack: ${stderr}`);
+  assert.ok(said.includes('r-nope') && said.includes('nemia ls'), said);
 });
 
 test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relative or empty, exits 2 as the package loads, with its sentence alone, and nothing is written', () => {
   for (const root of ['relative/store', '']) {
     const cwd = scratch('wf-exit-code-root-');
-    const { status, stderr } = wf(root, ['ls'], cwd);
+    const { status, stderr } = wf(root, ['token', 'ls'], cwd);
     assert.equal(status, 2, `WF_ROOT=${root} exits with the refusal's code; it said: ${stderr}`);
     assert.equal(
       stderr,
@@ -90,11 +62,11 @@ test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relat
   }
 });
 
-test('a crash exits 1 and prints its message, with no stack: nemia ls over a store that is a file', () => {
+test('a crash exits 1 and prints its message, with no stack: nemia tick over a store that is a file', () => {
   const dir = scratch('wf-exit-code-crash-');
   const root = path.join(dir, 'store');
   fs.writeFileSync(root, 'not a directory');
-  const { status, stderr } = wf(root, ['ls']);
+  const { status, stderr } = wf(root, ['tick']);
   assert.equal(status, 1, `a store nemia cannot read is no refusal; it said: ${stderr}`);
   const last = stderr.trimEnd().split('\n').at(-1)!;
   assert.ok(last.startsWith('ENOTDIR: not a directory'), `the message, as the error has it: ${stderr}`);

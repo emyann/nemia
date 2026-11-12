@@ -50,6 +50,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { readStoreFloor, storeFile, writeStoreFloor } from '../release/archive.store.ts';
 import { STORE_READABLE_FROM } from '../release/floor.ts';
 import type { Env } from '../config/config.store.ts';
+import { told } from '../../test/typed.ts';
 
 const ROOT = scratch('wf-daemon-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -187,7 +188,7 @@ const engineOf = (
   }) as Engine & { passes: number; setTick: (tick: () => Promise<TickReport>) => void };
 };
 
-/** What a verb printed, line by line, and what it threw. */
+/** What a verb printed, line by line, and what it threw: one the client holds on its entry's handler, its lines said (`told`). */
 const typed = async (t: TestContext, argv: string[], e: Engine) => {
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -195,7 +196,7 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
   });
   let threw: unknown;
   try {
-    await main(argv, e);
+    await told(argv, e, undefined, stand().place, ENV);
   } catch (err) {
     threw = err;
   } finally {

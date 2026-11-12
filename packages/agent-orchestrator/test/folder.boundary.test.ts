@@ -54,7 +54,7 @@ import * as verbs from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { forgetLine, sentBack, stepTaskId } from '../src/run.ts';
 import { main } from '../src/cli/main.ts';
-import { START, startedLines, type StartInput } from '../src/runner.ts';
+import { builtinGitPlace, engine, START, startedLines, type StartInput } from '../src/runner.ts';
 import { handled } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -118,7 +118,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** `nemia start` on its entry's handler, as the api calls it once the client has sent what it read: the run started, or its refusal. */
-const started = (input: StartInput) => handled(START, input, { env: ENV });
+const started = (input: StartInput) => handled(START, input, { e: engine(ENV), place: builtinGitPlace, env: ENV });
 
 /** What `main` printed, line by line, while it ran. */
 const printed = async (argv: string[], e?: Engine): Promise<string[]> => {

@@ -81,15 +81,30 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
   };
 }
 
-test('`--help`, and a writer given too little, print its usage and help from `COMMAND_WORDS`, exit 0, asking nothing', async () => {
+test('`--help` prints its manual where it has one, else its usage and help, from `COMMAND_WORDS`, exit 0, asking nothing', async () => {
   const env = laptop('nemia-writers-help-');
   for (const words of COMMAND_WORDS) {
-    const short = words.spec.positionals.some((p) => p.takes === 'required') ? [words.name.split(' ')] : [];
-    for (const argv of [[...words.name.split(' '), '--help'], ...short]) {
-      const said = await nemia(argv, env);
-      assert.equal(said.code, 0, said.err);
-      assert.ok(said.out.includes(`nemia ${words.name} ${words.usage}`), said.out);
+    const said = await nemia([...words.name.split(' '), '--help'], env);
+    assert.equal(said.code, 0, `${words.name} --help: ${said.err}`);
+    if (words.manual !== undefined) assert.ok(said.out.includes(words.manual), `${words.name}: its manual`);
+    else {
+      assert.ok(said.out.includes(`nemia ${words.name} ${words.usage}`.trimEnd()), said.out);
       for (const line of words.help) assert.ok(said.out.includes(line), `${words.name}: ${line}`);
+    }
+  }
+});
+
+test('a command given too little, a required argument left out, prints its usage, exit 0, or, where its words say the refusal, is refused, exit 2, naming it', async () => {
+  const env = laptop('nemia-writers-short-');
+  for (const words of COMMAND_WORDS.filter((w) => w.spec.positionals.some((p) => p.takes === 'required'))) {
+    const said = await nemia(words.name.split(' '), env);
+    if (words.spec.missing === undefined) {
+      assert.equal(said.code, 0, `${words.name}: ${said.err}`);
+      assert.ok(said.out.includes(`nemia ${words.name} ${words.usage}`.trimEnd()), said.out);
+    } else {
+      assert.equal(said.code, 2, `${words.name}: ${said.out}`);
+      assert.match(said.err, new RegExp(`nemia ${words.name.split(' ')[0]}`), `${words.name} names a command`);
+      assert.equal(said.out, '', words.name);
     }
   }
 });

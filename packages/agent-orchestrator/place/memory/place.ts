@@ -6,14 +6,14 @@
  *
  * It models commits as whole files, a merge by file, and the directories a step works in, which are real. It does not model a merge
  * within one file, a rename, a binary file, a link, an ignore rule, a hook, a lock, a deadline, a request of the wrong shape, a checkout
- * on no branch, nor what a person does by hand past its handle, a branch deleted: a test that needs one of those asks the git place. A
+ * on no branch, a remote but the repository a clone was made from, nor what a person does by hand past its handle, a branch deleted: a test that needs one of those asks the git place. A
  * conflict is resolved, and an edit added to a staged merge, with `world.resolve`; a person takes a staged merge back with
  * `world.takeBack` and puts a base back on an older commit with `world.putBack`.
  */
 import { Effect, type Layer } from 'effect';
 import { worldOf } from './handle.ts';
 import { inventory, open, report, root, standing, status, trial, type Reply } from './reads.ts';
-import { cloned, exported, handoff, land, make, remove, seal } from './writes.ts';
+import { cloned, exported, follow, handoff, land, make, remove, seal } from './writes.ts';
 import type { Held, World } from './world.ts';
 import { PlaceService, threwWords, unreadNow, type Place } from '../../src/place/place.store.ts';
 import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../../src/place/place.ts';
@@ -22,6 +22,7 @@ import type { PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb } from '../.
 const VERBS: { readonly [V in PlaceVerb]: (held: Held, request: PlaceRequests[V]) => Reply<V> } = {
   root,
   open,
+  follow,
   make,
   handoff,
   report,

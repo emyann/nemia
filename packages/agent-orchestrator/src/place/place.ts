@@ -11,6 +11,7 @@
 export const PLACE_VERBS = [
   'root',
   'open',
+  'follow',
   'make',
   'handoff',
   'report',
@@ -35,6 +36,7 @@ export type PlaceVerb = (typeof PLACE_VERBS)[number];
 export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   root: 120_000,
   open: 120_000,
+  follow: 120_000,
   make: 600_000,
   handoff: 120_000,
   report: 120_000,
@@ -61,6 +63,22 @@ export type Rooted = { readonly root: string | null };
  * with a `stat` and no process (`stagedHere`).
  */
 export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly inProgressFile?: string };
+
+/**
+ * What `follow` answers of a checkout, once it has read its remote: the branch it is on follows `upstream` (the remote's branch, as git
+ * names it), and the checkout is
+ * - `no-upstream`: on a branch that follows none, or on no branch in a repository with no remote — nothing to follow, nothing changed;
+ * - `up-to-date`: at its upstream's commit, or `ahead`: past it with nothing of it missing — nothing changed;
+ * - `fast-forwarded`: was clean and only behind, and is now at its upstream's commit, moved `from` one commit `to` the other;
+ * - `left`: behind but not to be moved without a person — commits of its own, a merge in progress, changes not committed, no branch —
+ *   left as it is, `message` saying why and what to do;
+ * - `unfetched`: its remote could not be read, `message` saying git's words and what to do; nothing changed.
+ */
+export type Followed =
+  | { readonly state: 'no-upstream' }
+  | { readonly state: 'up-to-date' | 'ahead'; readonly upstream: string }
+  | { readonly state: 'fast-forwarded'; readonly upstream: string; readonly from: string; readonly to: string }
+  | { readonly state: 'left' | 'unfetched'; readonly upstream?: string; readonly message: string };
 
 /**
  * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for the run's
@@ -209,6 +227,7 @@ export type Cloned = { readonly repo: string; readonly made: boolean };
 export type PlaceAnswers = {
   readonly root: Rooted;
   readonly open: Opened;
+  readonly follow: Followed;
   readonly make: Made;
   readonly handoff: HandedOff;
   readonly report: Changes;
@@ -230,6 +249,7 @@ export type PlaceAnswers = {
 export type PlaceRequests = {
   readonly root: { readonly dir: string };
   readonly open: { readonly root: string; readonly isolate: boolean };
+  readonly follow: { readonly repo: string };
   readonly make: {
     readonly repo: string;
     readonly at: string;

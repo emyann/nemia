@@ -7,6 +7,7 @@ import { declared } from './declared.ts';
 import { answered, answeredNow, type Asking, type Reply } from './git.ts';
 import { clone } from './verbs/clone.ts';
 import { exported } from './verbs/export.ts';
+import { follow } from './verbs/follow.ts';
 import { handoff } from './verbs/handoff.ts';
 import { inventory } from './verbs/inventory.ts';
 import { land } from './verbs/land.ts';
@@ -26,6 +27,7 @@ import { PLACE_DEADLINE_MS, type PlaceRequests, type PlaceVerb } from '../../src
 const VERBS: { readonly [V in PlaceVerb]: (request: PlaceRequests[V]) => Asking<Reply<V>> } = {
   root,
   open,
+  follow,
   make,
   handoff,
   report,

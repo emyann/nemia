@@ -110,11 +110,10 @@ test('REFUSED: a link to an endpoint that streams, and a key the path, the query
   assert.throws(() => portTools([], [{ ...entry, served: [{ endpoint: 'probe.twice' as ApiEndpointName }] }], TWICE), /name/);
 });
 
-test('ls and inbox answer a Table, ls_run and factory_servers do not; inbox, closeout, try and decide send their narrowing defaults', () => {
-  assert.equal(tool('ls').table, true);
-  assert.equal(tool('inbox').table, true);
+test('every list tool answers a Table, ls_run, a read of one, does not; inbox, closeout, try and decide send their narrowing defaults', () => {
+  for (const list of ['ls', 'inbox', 'agents', 'skills', 'factory', 'factory_servers'])
+    assert.equal(tool(list).table, true, `${list} answers a Table`);
   assert.equal(tool('ls_run').table, false);
-  assert.equal(tool('factory_servers').table, false);
   assert.deepEqual(tool('inbox').defaults, { fieldSelector: 'status.inPlay=true' });
   assert.deepEqual(tool('ls').defaults, {});
   for (const narrow of ['closeout', 'try']) assert.deepEqual(tool(narrow).defaults, { fields: '' }, `${narrow} reads a closeout narrowly`);

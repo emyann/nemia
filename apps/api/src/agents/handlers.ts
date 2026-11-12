@@ -19,6 +19,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
+  agentTable,
   AGENT_CARD,
   AGENTS,
   AGENTS_COPY,
@@ -51,6 +52,7 @@ import type { Served } from '../layer.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
+import { wantsTable } from '../objects/table.ts';
 import { markdownNamesIn } from '../workflows/builder.ts';
 import {
   listed,
@@ -276,10 +278,13 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
 export const agentsHandlers = HttpApiBuilder.group(Api, 'agents', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
-      answeredWriteIn(namespace, async (s) => {
-        const { origin, ...page } = query;
-        return listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
-      }),
+      Effect.flatMap(wantsTable, (table) =>
+        answeredWriteIn(namespace, async (s) => {
+          const { origin, ...page } = query;
+          const list = listed('Agent', await agentObjectsOf(s, servedOf(await heldIn(s), originAsked(origin)), namespace), queryOf(page));
+          return table ? agentTable(list) : list;
+        }),
+      ),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
       answeredWriteIn(namespace, (s) => agentAt(s, namespace, name, originAsked(query.origin))),

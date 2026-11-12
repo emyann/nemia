@@ -159,7 +159,7 @@ async function startThere(env: Env, args: Args, e: Engine, place: Place): Promis
  * name with or without its `.md`, its workflow and its factory that machine's card's own where `--workflows` names none; else the words.
  * Refused (`Invalid`) for a workflow given as a path, and for a brief whose workflow is not named.
  */
-export function startedThereOf(arg: string, isFile: boolean, args: Args): Args {
+function startedThereOf(arg: string, isFile: boolean, args: Args): Args {
   const after = Array.isArray(args.after) ? args.after : [];
   const text = isFile ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, after);

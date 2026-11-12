@@ -844,7 +844,7 @@ export function inboxNameOf(at: string, dir: string): string | null {
 
 /**
  * Why a card cannot be started on no workflow: it names none, and none was given — with the workflows the repository has to name one of,
- * and how. `where` is what `nemia start` is given for the card.
+ * and how. `where` is what `nemia start` is given for the card: its name, as the start takes it on this machine and on another's.
  */
 export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, repo: string, workflows: readonly string[]): string {
   const dir = path.join(repo, 'workflows');

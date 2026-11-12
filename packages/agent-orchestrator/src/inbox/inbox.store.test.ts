@@ -673,7 +673,7 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
       'Missing',
       'no card cache-the-view in',
       `Its cards are: ${cards.join(', ')}.`,
-      `nemia start ${path.join(INBOX, '<name>.md')}`,
+      'nemia start <name>',
       'nemia inbox add "<idea>"',
     ],
     'a name with no card, typed without its .md, never started as a run asked to do its own path': [
@@ -706,7 +706,7 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
       'Invalid',
       `${kept.card.file}: no workflow`,
       `workflows are: dev, ui, in ${path.join(repo, 'workflows')}.`,
-      `nemia start ${kept.file} --workflows dev`,
+      `nemia start ${kept.card.name} --workflows dev`,
       '`workflow: dev`',
     ],
     'no workflow, on a repository that has none': [
@@ -714,7 +714,7 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
       'Invalid',
       `${loose.card.file}: no workflow`,
       'has no workflows',
-      `nemia start ${loose.file} --workflows <dir>`,
+      `nemia start ${loose.card.name} --workflows <dir>`,
     ],
     "the card's workflow does not load": [
       () => starting(nope.file),

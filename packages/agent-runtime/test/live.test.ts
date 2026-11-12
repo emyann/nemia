@@ -62,10 +62,18 @@ import { attachedOptions } from '../src/harness/claude/session-options.ts';
 import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { until as waitUntil } from '../src/waits/index.ts';
+import { claudeExecutableOf } from '../src/harness/mcp-sign-in.ts';
 import { scratch } from 'test-kit/scratch';
 import { TaskId } from '../src/core/model.ts';
 
 const live = process.env.AE_LIVE === '1';
+
+/**
+ * The Claude Code the jobs here run, as the runtime resolves it with no engine's executable or tools folder named (`claudeExecutableOf`):
+ * the SDK's bundled one on a checkout, never assumed on PATH, since a release puts none there. Asked its version and told to stop and
+ * remove a session by the same path.
+ */
+const CLAUDE = claudeExecutableOf(process.env.AE_CLAUDE_EXECUTABLE) ?? 'claude';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 const tmp = (label: string) => scratch(`ae-live-${label}-`);
 
@@ -113,7 +121,7 @@ const settleThenCheck = async (
       const short = v.sessionId.split('-')[0];
       for (const verb of ['stop', 'rm']) {
         try {
-          execFileSync('claude', [verb, short], { stdio: 'ignore', timeout: 30_000 });
+          execFileSync(CLAUDE, [verb, short], { stdio: 'ignore', timeout: 30_000 });
         } catch {}
       }
     }
@@ -577,7 +585,7 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
+    t.diagnostic(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m14-board');
     const engine = builtEngine(EngineService.layer({ root }));
     const id = await Effect.runPromise(
@@ -771,7 +779,7 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
+    const version = execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim();
     t.diagnostic(`claude --version: ${version}`);
     const engine = builtEngine(EngineService.layer({ root: tmp('m11-board') }));
     const job = oneAllowedCheckout('m11-job');
@@ -825,7 +833,7 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
+    t.diagnostic(`claude --version: ${execFileSync(CLAUDE, ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
     const engine = builtEngine(EngineService.layer({ root }));
     const secret = `m12-${randomUUID().slice(0, 8)}`;
@@ -1082,7 +1090,7 @@ test(
       if (id) {
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync(CLAUDE, [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
         }
       }
@@ -1172,7 +1180,7 @@ test(
         if (!id) continue;
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync(CLAUDE, [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
         }
       }
@@ -1299,7 +1307,7 @@ test(
       if (id) {
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync(CLAUDE, [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
         }
       }
@@ -1429,7 +1437,7 @@ test(
       for (const id of ids)
         for (const verb of ['stop', 'rm']) {
           try {
-            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+            execFileSync(CLAUDE, [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
         }
     }

@@ -70,6 +70,7 @@ ssh -t nemia@<address> 'curl -fsSL https://github.com/emyann/nemia/releases/late
 
 It asks two things ([Install](/install/#install) explains each one), and nothing of a harness: you activate one afterwards
 ([Activate a harness](/install/#activate-a-harness)).
+
 - **Start at login.** Answer yes. The installer sizes the service to the machine. The 8 vCPU, 16 GB server read as about 15.2 GiB and
   was sized to 6 sessions at once, each limited to 7.6 GiB: the limit is half the machine, a ceiling on one session and not its share.
 - **The address to bind.** `--bind` already gave it the Tailscale address, so it does not ask

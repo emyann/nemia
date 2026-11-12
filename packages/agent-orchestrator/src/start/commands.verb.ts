@@ -347,6 +347,8 @@ const START_USAGE =
 
 /** `nemia start`'s help lines, under its usage. */
 const START_LINES: readonly string[] = [
+  'start a run of a workflow from a brief, a text, a card of the inbox or a',
+  'folder of cards',
   '--after <runId>: file nothing of this run until nemia decide says that',
   'run has landed — finished, and its result branch on the base',
   'branch — and start from the base as it is then; once per run.',

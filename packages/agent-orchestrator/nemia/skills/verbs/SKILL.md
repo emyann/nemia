@@ -230,6 +230,8 @@ They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
   nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
+                               start a run of a workflow from a brief, a text, a card of the inbox or a
+                               folder of cards
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.

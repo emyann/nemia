@@ -50,11 +50,10 @@ import {
 import { answeredBefore, askOf, asksWaiting, framedFor, presenceOf, projectChat } from '../src/chat/chat.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../src/chat/say.verb.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
+import { typed } from './typed.ts';
 
 const ENV: Env = { ...process.env, WF_ROOT: scratch('wf-nemia-chat-'), WF_VERIFY_REST: '1' };
-/** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
-const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: typed, engineOf, env: ENV });
 
 /** `program` over the board's engine, given the test place. */
 const run = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);

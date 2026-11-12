@@ -45,11 +45,10 @@ const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) =>
 
 test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
   writeLevel(ROOT, { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  await t.test('her bridge up: the attach line first, then the link, printed under "reach her:"', async () => {
+  await t.test('her bridge up: the attach line first, then the link', async () => {
     const up = await levelOver({ url: LINK });
     assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');
     assert.deepEqual(up.bridge, { url: LINK, why: null });
-    assert.ok(LEVEL.print(up, {}).includes(`  ${LINK}`), 'printed under "reach her:"');
   });
   await t.test('her bridge asked and not up: why not, never a promise', async () => {
     const down = await levelOver({ url: null, why: 'its bridge is not up yet.' });

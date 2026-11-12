@@ -92,11 +92,14 @@ test("nemia subscribe and unsubscribe: a long-lived task subscribed from the fee
         digestEvery: 15,
         from: fs.statSync(feed).size,
       });
-      assert.deepEqual(SUBSCRIBE.print(asked as never, { name: 'watch', task: 'nemia' }), [
-        'subscribed watch: nemia is told at once of a line taken by waits=person, and of the rest in a digest every 60 minutes with no wake.',
-      ]);
+      const former = await typed<{ hints?: string[] }>(SUBSCRIBE, ['former', 'nemia', '-l', 'reason=NeedsHuman']);
+      assert.ok(
+        former.hints?.some((hint) => hint.includes('NeedsHuman')),
+        'a former word is answered with what it says now',
+      );
       await typed(UNSUBSCRIBE, ['watch']);
       await typed(UNSUBSCRIBE, ['own']);
+      await typed(UNSUBSCRIBE, ['former']);
     },
   );
   await t.test(

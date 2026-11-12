@@ -71,25 +71,11 @@ export const HELD_DEFINITION: readonly string[] = [];
 /** The moved reads, whose words and help are still here. */
 export const HELD_READ: readonly string[] = ['inbox', 'ls', 'show', 'closeout', 'watch'];
 
-/** The rest of the store's verbs. */
-export const HELD_REST: readonly string[] = [
-  'concluded',
-  'logs',
-  'stats',
-  'passes',
-  'series',
-  'subscribe',
-  'unsubscribe',
-  'level',
-  'memory',
-  'chat speakers',
-  'chat allow',
-  'chat disallow',
-  'pairings ls',
-  'pairings approve',
-  'board link',
-  'daemon',
-];
+/**
+ * The rest of the store's verbs: `daemon` alone, which the client's on-demand start (`apps/cli/src/daemon.ts`) still spawns here as
+ * `daemon --json`, until it is given a starter of its own.
+ */
+export const HELD_REST: readonly string[] = ['daemon'];
 
 /** Every store verb this CLI still serves. */
 export const HELD: readonly string[] = [...HELD_RUN, ...HELD_INBOX, ...HELD_FACTORY, ...HELD_DEFINITION, ...HELD_READ, ...HELD_REST];

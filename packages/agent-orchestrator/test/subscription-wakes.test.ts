@@ -16,9 +16,10 @@
  * Each story is told on a store of its own (`World`): the Subscription door's and the Feed door's memory layers, made new for it
  * (`inMemory`), given to the deliverer, to `nemia subscribe` and `nemia unsubscribe` and to the hub's writer, and read and written by the
  * story through the same doors. The feed cut under its reader alone is told on the files (`onFiles`): a cut is a file written shorter
- * under a cursor, and nothing cuts a feed in memory. That story subscribes and unsubscribes through `nemia` itself (`stage.main`),
- * whose store is the files, and reads the deliverer's file there (`deliveryAtRoot`, handed the root). Its files are at `ROOT`, which is
- * the root `nemia` is given (`ENV`) and the `StoreRoot` every deliverer is given, so the command and the program never name two stores;
+ * under a cursor, and nothing cuts a feed in memory. That story subscribes and unsubscribes through the entries' handlers
+ * (`stage.main`, `typed.ts`), whose store is the files, and reads the deliverer's file there (`deliveryAtRoot`, handed the root). Its
+ * files are at `ROOT`, which is the root `nemia` is given (`ENV`) and the `StoreRoot` every deliverer is given, so the command and the
+ * program never name two stores;
  * the factories and their levels a floor reads are on those files too. Every subscription a story puts goes through `kept`, and the one
  * `nemia subscribe` writes is dropped as its test ends, whatever their verdict, so a story on the files leaves no subscription for the
  * next one's deliverer to follow.
@@ -55,12 +56,12 @@ import { over, engineOf } from '../src/runtime-client.ts';
 import { RunDoor } from '../src/runs/runs.store.ts';
 import { runDoorMemory } from '../src/runs/memory.store.ts';
 import { runWith } from '../src/runner.ts';
-import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-subscription-wakes-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: onHandler, engineOf, env: ENV });
 
 /**
  * A story's store: the layer of its Subscription and Feed doors, given to every program of the story, and the two doors themselves, which

@@ -8,7 +8,8 @@ import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Command, Served } from '../command/entry.verb.ts';
+import { CONCLUDED_WORDS } from 'objects';
 import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
@@ -536,19 +537,8 @@ type Concluded = { run: string; landed: boolean; section: string };
 /** What `nemia concluded` takes, and the api's `GET /api/runs/:name/concluded` calls it with: the run, by its id. */
 const ConcludedInput = Schema.Struct({ runId: Schema.String });
 
-export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
-  name: 'concluded',
-  served: [{ endpoint: 'runs.concluded', request: renamed({ runId: 'name' }) }],
-  usage: '<runId>',
-  help: ['what a run started with --from <runId> would be handed of it, now'],
-  spec: {
-    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia concluded reads one run, and ${arg} is not it: nemia concluded <runId>.`,
-    missing: 'nemia concluded takes the run to read, by its id: nemia concluded <runId> — nemia ls lists them.',
-  },
-  writes: false,
-  class: 'read',
+export const CONCLUDED: Served<Concluded, typeof ConcludedInput.Type> = {
+  ...CONCLUDED_WORDS,
   input: ConcludedInput,
   handler: Effect.fnUntraced(function* (args: typeof ConcludedInput.Type) {
     const home = yield* StoreRoot;
@@ -563,7 +553,6 @@ export const CONCLUDED: Command<Concluded, typeof ConcludedInput.Type> = {
       throw new Missing({ message: `nemia concluded ${id}: nothing was read of run ${id}. See what it holds with nemia ls ${id}.` });
     return { run: id, landed: parent.landed, section: contextSection(parent) };
   }),
-  print: ({ section }) => [section.replace(/^\n+/, '')],
 };
 
 /**

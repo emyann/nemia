@@ -20,7 +20,7 @@ import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { advanceRun, list, runWith, startRun } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { readRun } from '../src/tick/told.verb.ts';
 import { assess } from '../src/tick/assess.ts';
@@ -35,7 +35,7 @@ import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-needs-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: onHandler, engineOf, env: ENV });
 
 /** The harnesses whose programs a check could find, by the names their adapters run them by. */
 const PROGRAMS = Object.values(HARNESS_DECLARATIONS).flatMap((d) => (d.needs === undefined ? [] : [d.needs.program]));

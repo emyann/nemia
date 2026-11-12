@@ -326,6 +326,22 @@ test('GET /api/stats?selector= keeps the facts of the runs one of its selectors 
   names(refused.body.error, 'no/pe');
 });
 
+test('GET /api/stats?labelSelector= keeps the facts as the former key does, given again for another, beside it or alone', async () => {
+  const day = '?from=2026-09-28&to=2026-09-28';
+  const tries = async (query: string) => {
+    const { status, body } = await asked(`${day}${query}`);
+    assert.equal(status, 200, body.error);
+    return body.all.total.tries;
+  };
+  assert.equal(await tries('&labelSelector=team%3Dcore'), 1, 'the try of r-home, labelled team=core by a person');
+  assert.equal(await tries('&labelSelector=team%3Dcore&labelSelector=factory%3Dother'), 2, 'two label queries are either');
+  assert.equal(await tries('&labelSelector=team%3Dcore&selector=factory%3Dother'), 2, 'and either beside the former key');
+  assert.equal(await tries('&labelSelector=team%3Dinfra'), 0, 'and none where it takes no run');
+  const refused = await asked(`${day}&labelSelector=no%2Fpe%3Dx`);
+  assert.equal(refused.status, 422);
+  names(refused.body.error, 'no/pe');
+});
+
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
   const first = await asked('');
   const again = await journalsAsked(() => unverified(() => asked('')));

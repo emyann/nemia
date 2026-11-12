@@ -397,28 +397,6 @@ export const healthOf = (lines: readonly RollupLine[]): Health => {
   };
 };
 
-const round = (v: number): string => (Math.abs(v) >= 100 ? `${Math.round(v)}` : v.toFixed(2));
-
-/** A label set as a person reads it: `phase=place`, nothing for none. */
-const labelWords = (l: Labels): string =>
-  SERIES_LABEL_KEYS.filter((k) => l[k] !== undefined)
-    .map((k) => `${k}=${l[k]}`)
-    .join(' ');
-
-/** `nemia series`' lines: the range, then a line a series and label set, its points' count, and its latest and highest. */
-export const seriesLines = (read: SeriesRead): string[] =>
-  read.series.length
-    ? [
-        `${read.range}, a point a ${read.span}, from ${read.from} to ${read.to}:`,
-        ...read.series.flatMap(({ s, l, points }) => {
-          const latest = points.at(-1);
-          if (latest === undefined) return [];
-          const top = Math.max(...points.map((p) => p.max));
-          return `  ${[s, labelWords(l)].filter(Boolean).join(' ')}: ${points.length} points, latest ${round(latest.p95 ?? latest.last)}, highest ${round(top)}`;
-        }),
-      ]
-    : [`nothing is kept for ${read.range} yet: nemia up, or the api, ticks the store and keeps its series a minute at a time`];
-
 /**
  * What a process that serves keeps of the series' days between reads: each day's lines, while the day's file stands as it was read and a
  * read of its tier can reach it (`memoDays`), whichever read came last.

@@ -8,9 +8,10 @@
  * store's tickets have marked the claim.
  */
 import { Effect } from 'effect';
+import { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from 'objects';
 import type { LinkMinted, Pairing, PairingClaimed, PairingList } from 'objects';
-import type { Args, Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Args } from '../command/command.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import type { Env } from '../config/config.store.ts';
 import { daemonStanding } from '../daemon/daemon.store.ts';
@@ -49,12 +50,6 @@ export function linkClaimed(home: string, secret: string, nowMs: number): { toke
   return mintedFor(home, linkMarked(home, secret, nowMs), nowMs);
 }
 
-/** Why a pairing command is the command line's, beside the endpoint the api serves it on. */
-const CLI_ALONE = {
-  side: 'cli',
-  why: "the api serves its endpoint with a handler of its own, which takes a person's token alone; at the server's shell the person is the caller",
-} as const;
-
 /** The port the api listens on where nothing says another: the daemon's. */
 const API_PORT = 8787;
 
@@ -79,89 +74,25 @@ const leaseUrl = (home: string): string | undefined => {
 };
 
 /** `nemia pairings ls`. */
-export const PAIRINGS_LS: Command<PairingList> = {
-  name: 'pairings ls',
-  usage: '',
-  help: [
-    'the pairings the store keeps, newest first: the client that asked, and',
-    'whether it waits for your approval, is approved, was claimed or lapsed.',
-    'Never a code: approve the one the client shows with nemia pairings approve',
-  ],
-  spec: { positionals: [], flags: [], unknown: (arg) => `nemia pairings ls takes nothing, not ${arg}: nemia pairings ls.` },
-  writes: false,
-  class: 'read',
-  only: CLI_ALONE,
-  served: [{ endpoint: 'pairings.list' }],
+export const PAIRINGS_LS: Served<PairingList> = {
+  ...PAIRINGS_LS_WORDS,
   handler: () => Effect.flatMap(StoreRoot, (home) => tried(() => pairingsListed(home, Date.now()))),
-  print: ({ pairings }) =>
-    pairings.length
-      ? pairings.map((p) => `${p.id}  ${p.client}  ${p.phase}  expires ${p.expiresAt}`)
-      : ['no pairing is kept: a client asks for one with nemia pair <url>'],
-};
-
-/** How `nemia pairings approve` is typed, as its refusals end on it. */
-const APPROVE_SHAPE = 'nemia pairings approve <code>, the code the client shows, as nemia pairings approve K7QM-3XRP';
-
-/** The spec of `nemia pairings approve`: the code alone. */
-const approveSpec: Spec = {
-  positionals: [{ key: 'code', takes: 'required', kind: 'text' }],
-  flags: [],
-  unknown: (arg) => `nemia pairings approve takes one code, not ${arg} besides: ${APPROVE_SHAPE}.`,
-  missing: `nemia pairings approve takes the code the client shows: ${APPROVE_SHAPE}.`,
 };
 
 /** `nemia pairings approve <code>`. */
-export const PAIRINGS_APPROVE: Command<Pairing> = {
-  name: 'pairings approve',
-  usage: '<code>',
-  help: [
-    'approve the pairing whose code a client shows (XXXX-XXXX, in either',
-    "case, the dash left out or not): the client's next ask claims a token",
-    'of yours minted then, named after it; nemia token rm <name> revokes it',
-  ],
-  spec: approveSpec,
-  writes: true,
-  class: 'none',
-  only: CLI_ALONE,
-  served: [{ endpoint: 'pairings.approve' }],
+export const PAIRINGS_APPROVE: Served<Pairing> = {
+  ...PAIRINGS_APPROVE_WORDS,
   handler: (args: Args) => Effect.flatMap(StoreRoot, (home) => tried(() => pairingApproved(home, String(args.code ?? ''), Date.now()))),
-  print: (p) => [
-    `approved ${p.client}'s pairing: it claims its token on its next ask, until ${p.expiresAt}`,
-    'the token is named after it: nemia token ls lists it once claimed, nemia token rm revokes it',
-  ],
 };
 
-/** How `nemia board link` is typed, as its refusals end on it. */
-const LINK_SHAPE = 'nemia board link [--base <url>]';
-
 /** `nemia board link [--base <url>]`. */
-export const BOARD_LINK: Command<LinkMinted> = {
-  name: 'board link',
-  usage: '[--base <url>]',
-  help: [
-    'a first-visit link to the board, opened once within ten minutes: the',
-    'browser that opens it is signed in with a token of yours minted then,',
-    'named board-<day>. Printed under where the api serves (its bound',
-    'address, or 127.0.0.1); --base <url> prints it under another, the name',
-    'you reach the board by (a browser keeps one cookie per host name)',
-  ],
-  spec: {
-    positionals: [],
-    flags: [
-      { flag: '--base', kind: 'text', key: 'base', takes: `--base takes the board's address, like --base http://box:8787: ${LINK_SHAPE}.` },
-    ],
-    unknown: (arg) => `nemia board link does not take ${arg}: ${LINK_SHAPE}.`,
-  },
-  writes: true,
-  class: 'none',
-  only: CLI_ALONE,
-  served: [{ endpoint: 'pairings.link' }],
+export const BOARD_LINK: Served<LinkMinted> = {
+  ...BOARD_LINK_WORDS,
   handler: (args: Args) =>
     Effect.flatMap(StoreRoot, (home) =>
       tried(() => linkMinted(home, typeof args.base === 'string' ? args.base : boardBase(leaseUrl(home), process.env), Date.now())),
     ),
-  print: ({ url, expiresAt }) => [url, `open it once, until ${expiresAt}: it signs that browser in, and no other`],
 };
 
 /** The pairing commands, in the order `nemia`'s help lists them. */
-export const PAIRING_COMMANDS: readonly Command[] = [PAIRINGS_LS, PAIRINGS_APPROVE, BOARD_LINK] as readonly Command[];
+export const PAIRING_COMMANDS: readonly Served[] = [PAIRINGS_LS, PAIRINGS_APPROVE, BOARD_LINK] as readonly Served[];

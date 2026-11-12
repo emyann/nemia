@@ -138,25 +138,57 @@ async function readsPieces(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `setup-pieces-${await themeOf(page)}.png`), { fullPage: true });
 }
 
+/** A piece of a planted read: `name`, of `cost`, missing. */
+const plantedPiece = (name: string, area: string, cost: 'run' | 'server') => ({
+  name,
+  area,
+  state: 'missing',
+  message: `${name}, planted by the e2e`,
+  fixes: [],
+  cost,
+});
+
 /**
- * The banner over every other page, read off the same read: raised only while a run waits on a missing piece (one whose `cost` is `run`,
- * NEED among them), and saying "first run" only where the read says no run was ever started; then back to Setup.
+ * The reads the banner is held to, each answered in place of the api's (`page.route`, as `holdFix` holds the fixes), since the api's
+ * own answers a need `unknown` until its sweep reads it: on a server whose runs have started, a missing harness sign-in, which a run
+ * waits on, raises the banner; linger alone, which no run waits on, raises none — the card's case.
+ */
+const PLANTED_READS = {
+  waits: { ready: false, ran: true, pieces: [plantedPiece('claude-token', 'harness', 'run'), plantedPiece('linger', 'service', 'server')] },
+  advised: { ready: false, ran: true, pieces: [plantedPiece('linger', 'service', 'server')] },
+} as const;
+
+/**
+ * The banner over every other page: raised by a missing piece a run waits on, never saying "first run" on a server whose runs have
+ * started nor "not ready", and raising none where the only missing piece is advised; then back to Setup.
  */
 async function raisesBanner(page: Page): Promise<void> {
   const setup = page.url();
-  await page.goto(new URL('/', setup).href);
-  await idle(page);
-  const read = await answered<{ ran?: boolean; pieces: Array<Piece & { cost?: string }> }>(page, '/api/readiness');
-  const waits = read.pieces.some((piece) => piece.state === 'missing' && (piece.cost ?? 'run') === 'run');
-  if (!waits) throw new Refused(`a run waits on the planted need ${NEED}, which the read answers missing — it answers none a run waits on`);
-  const banner = page.locator('[data-setup-banner]');
-  await expectVisible(banner, 'a run waits on a missing piece: the banner is raised');
-  const said = (await banner.textContent()) ?? '';
-  if (/first run/.test(said) !== (read.ran === false))
-    throw new Refused(`the banner says "first run" only where no run was ever started (ran: ${read.ran}); it says: ${said}`);
-  if (/not ready/.test(said)) throw new Refused(`the banner says what the missing pieces cost, never "not ready"; it says: ${said}`);
-  await settled(page);
-  await photograph(page, path.join(OUT, `setup-banner-${await themeOf(page)}.png`));
+  let planted: keyof typeof PLANTED_READS = 'waits';
+  const answer = (route: Route) =>
+    route.request().method() === 'GET'
+      ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PLANTED_READS[planted]) })
+      : route.fallback();
+  await page.route('**/api/readiness', answer);
+  try {
+    await page.goto(new URL('/', setup).href);
+    await idle(page);
+    const banner = page.locator('[data-setup-banner]');
+    await expectVisible(banner, 'claude-token, which a run waits on, is missing: the banner is raised');
+    const said = (await banner.textContent()) ?? '';
+    if (/first run|not ready/.test(said))
+      throw new Refused(`on a server whose runs have started, the banner says neither "first run" nor "not ready"; it says: ${said}`);
+    if (!/a run waits on/.test(said) || !/no run waits on/.test(said))
+      throw new Refused(`the banner says the piece a run waits on apart from the one advised; it says: ${said}`);
+    await settled(page);
+    await photograph(page, path.join(OUT, `setup-banner-${await themeOf(page)}.png`));
+    planted = 'advised';
+    await page.reload();
+    await idle(page);
+    await expectCount(banner, 0, 'linger alone is missing, and no run waits on it: no banner');
+  } finally {
+    await page.unroute('**/api/readiness', answer);
+  }
   await page.goto(setup);
   await idle(page);
 }
@@ -263,11 +295,12 @@ async function signsInByLink(page: Page): Promise<void> {
 export default {
   /**
    * Settings' Setup: the readiness read grouped by area, each piece drawn as the api answers it — its state in a word, and a piece not
-   * in place with each of its fixes — and the banner over another page, raised by a missing piece a run waits on, with a need the page
-   * plants in the checkout's `dev` (never in place, its fix a device sign-in); that fix started, its output drawn with its link a link
-   * and the code its need declares shown large (held by `holdFix`: nothing ticks the store); a pairing a client asks for, listed by its
-   * name and approved by the code typed; and, on a second seat marked exposed, a first-visit link that signs a browser in and leaves the
-   * address, refused once used. The README, the tokens, the pairings and the links are taken back.
+   * in place with each of its fixes — and the banner over another page, over reads it plants, raised by a missing piece a run waits on
+   * and by no piece advised alone; with a need the page plants in the checkout's `dev` (never in place, its fix a device sign-in); that
+   * fix started, its output drawn with its link a link and the code its need declares shown large (held by `holdFix`: nothing ticks the
+   * store); a pairing a client asks for, listed by its name and approved by the code typed; and, on a second seat marked exposed, a
+   * first-visit link that signs a browser in and leaves the address, refused once used. The README, the tokens, the pairings and the
+   * links are taken back.
    */
   name: 'setup',
   route: '/setup',

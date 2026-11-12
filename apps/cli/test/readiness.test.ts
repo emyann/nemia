@@ -19,6 +19,8 @@ import { readinessLines } from '../src/readiness.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const GOOD = 'nm_good';
+/** A token the stub answers with ADVISED, the read of a server missing only a piece no run waits on. */
+const ADVISED_TOKEN = 'nm_advised';
 
 const FIX = {
   message: 'sign in',
@@ -34,6 +36,23 @@ const READ = {
   pieces: [
     { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [] },
     { name: 'tool-auth', area: 'workflow', state: 'missing', message: 'not signed in', factory: 'f1', workflow: 'build', fixes: [FIX] },
+  ],
+};
+
+/** A server whose runs have started, missing only linger, which keeps it up and no run waits on. */
+const ADVISED = {
+  ready: false,
+  ran: true,
+  pieces: [
+    { name: 'claude-token', area: 'harness', state: 'met', message: 'a Claude token is set and loads', fixes: [], cost: 'run' },
+    {
+      name: 'linger',
+      area: 'service',
+      state: 'missing',
+      message: 'their services stop when they log out',
+      fixes: [{ message: 'keep them running', command: 'sudo loginctl enable-linger someone', startable: false }],
+      cost: 'server',
+    },
   ],
 };
 
@@ -57,6 +76,7 @@ const stub = http.createServer((req, res) => {
       res.end(JSON.stringify(body));
     };
     if (url === '/api/health') return json(200, {});
+    if (url === '/api/readiness' && req.headers.authorization === `Bearer ${ADVISED_TOKEN}`) return json(200, ADVISED);
     if (req.headers.authorization !== `Bearer ${GOOD}`) return json(401, { error: 'no such token' });
     if (url === '/api/readiness') return json(200, READ);
     if (url === '/api/readiness/fixes' && req.method === 'POST') {
@@ -159,6 +179,17 @@ test('`nemia readiness`: a context whose server takes no connection is flagged, 
   assert.equal(text.code, 1);
   assert.match(text.out, /server-reached/);
   assert.match(text.out, /nemia config get-contexts/, 'the fix names a command');
+});
+
+test('`nemia readiness` on a server missing only linger, which no run waits on: exit 0, said ready with the piece advised and its fix', async () => {
+  const said = await nemia(['readiness'], aLaptop('nemia-ready-advised-', server, ADVISED_TOKEN));
+  assert.equal(said.code, 0, `a script waiting on the read goes on: ${said.err}`);
+  const last = said.out.trimEnd().split('\n').at(-1) ?? '';
+  assert.match(last, /^ready\b/);
+  assert.doesNotMatch(last, /not ready|first run/);
+  assert.match(said.out, /sudo loginctl enable-linger/, 'the advised piece is listed with its fix');
+  const json = await nemia(['readiness', '--json'], aLaptop('nemia-ready-advised-json-', server, ADVISED_TOKEN));
+  assert.equal(json.code, 0, json.err);
 });
 
 test('`nemia readiness` as text: each area, each piece, and the command of each fix', async () => {

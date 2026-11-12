@@ -24,7 +24,7 @@
  *   store leased, else the one it listens on). 403 unless the caller is the person; 422 (`Invalid`) for a base that is no http(s) url.
  */
 import { Clock, Effect } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
+import { readsBounded } from '../objects/answer-bound.ts';
 import {
   boardBase,
   daemonStanding,
@@ -58,7 +58,7 @@ const leasedUrl = (home: string): string | undefined => {
   return standing.kind === 'ticking' && standing.file.by === 'api' ? standing.file.url : undefined;
 };
 
-export const pairHandlers = HttpApiBuilder.group(Api, 'pair', (handlers) =>
+export const pairHandlers = readsBounded(Api, 'pair', (handlers) =>
   handlers
     .handle('ask', ({ payload }) => ticketed((s, nowMs) => pairingAsked(s.home, payload.client, nowMs)))
     .handle('claim', ({ params, payload }) => ticketed((s, nowMs) => pairingClaimed(s.home, params.id, payload.secret, nowMs)))
@@ -71,7 +71,7 @@ export const pairHandlers = HttpApiBuilder.group(Api, 'pair', (handlers) =>
     ),
 );
 
-export const pairingsHandlers = HttpApiBuilder.group(Api, 'pairings', (handlers) =>
+export const pairingsHandlers = readsBounded(Api, 'pairings', (handlers) =>
   handlers
     .handle('list', () => ticketed((s, nowMs) => pairingsListed(s.home, nowMs)))
     .handle('approve', ({ params }) =>

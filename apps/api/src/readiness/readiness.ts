@@ -16,7 +16,7 @@
  *   an id no fix was started under; a read that fails on the way ends the stream, and a `GET` of the fix says where it stands.
  */
 import { Context, Effect, Stream } from 'effect';
-import { HttpApiBuilder } from 'effect/http-api';
+import { readsBounded } from '../objects/answer-bound.ts';
 import { followFix, fixOf, liveFacts, readinessOf, startFix, type FixFollowed, type ReadinessFacts } from 'agent-orchestrator';
 import { Api, type FixStreamEvent } from 'objects';
 import { answered, answeredWrite } from '../objects/refused.ts';
@@ -33,7 +33,7 @@ export const Facts = Context.Reference<(env: NodeJS.ProcessEnv) => ReadinessFact
 const eventOf = (followed: FixFollowed): FixStreamEvent =>
   followed.kind === 'output' ? { event: 'output', data: followed.text } : { event: 'ended', data: JSON.stringify(followed.fix) };
 
-export const readinessHandlers = HttpApiBuilder.group(Api, 'readiness', (handlers) =>
+export const readinessHandlers = readsBounded(Api, 'readiness', (handlers) =>
   handlers
     .handle('read', () => answeredWrite((s) => s.inRequest(Effect.flatMap(Facts, (facts) => readinessOf(facts(s.env))))))
     .handle('fix', ({ payload }) => answeredWrite((s) => s.inRequest(startFix(payload))))

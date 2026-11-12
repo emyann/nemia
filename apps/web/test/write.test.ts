@@ -66,7 +66,7 @@ const PAUSE = { at: '2026-11-09T10:00:00.000Z', by: 'ann' };
 /** A pause put through the objects' client (`POST /api/pause`), built as `refuse` says where the api refuses it. */
 const pause = (refuse?: Refuse) => call((c) => c.server.pause({ payload: { why: 'merging' } }), write(Resumed, MAY, undefined, refuse));
 
-/** A pause lifted through the objects' client (`DELETE /api/pause`): a write that sends no body. */
+/** A pause lifted through the objects' client (`DELETE /api/pause`): a write whose endpoint takes no body, sent `{}`. */
 const resume = () => call((c) => c.server.resume(), write(Resumed, MAY));
 
 test("a write through the objects' client: sent as JSON, its answer decoded, and a refusal of the api's kept in its words and status", async (t) => {
@@ -79,7 +79,11 @@ test("a write through the objects' client: sent as JSON, its answer decoded, and
       ['/api/pause', 'POST', 'application/json', '{"why":"merging"}'],
     );
     await resume();
-    assert.equal(text(sent[1]?.init?.body), undefined, 'a write with no body sends none');
+    assert.deepEqual(
+      [new Headers(sent[1]?.init?.headers).get('content-type'), text(sent[1]?.init?.body)],
+      ['application/json', '{}'],
+      'a write with no body sends `{}` as JSON',
+    );
   });
   await t.test(
     'REFUSED: a 2xx answer without a key the board reads is an UnreadAnswer naming the route, the key, the may words and the fix',

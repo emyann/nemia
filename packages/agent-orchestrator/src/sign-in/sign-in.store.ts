@@ -3,7 +3,9 @@
  * prints (`TOKEN_MAKER`), kept on the person's own machine readable by them alone (mode 0600), written whole by a temporary file and a
  * rename, and never printed, logged or served. The daemon loads it at its start into the harness's variable (`TOKEN_VARIABLE`) where unset
  * (`loadClaudeToken`), so the sessions it starts sign in with it, however the daemon was started; a file whose mode lets another user
- * read it is refused, naming `chmod 600`.
+ * read it is refused, naming `chmod 600`. The token lasts a year from when it was made: its age is read off the file's write time
+ * alone, which `writeClaudeToken` sets, and past about eleven months it is warned of (`tokenWarningLine`) before a session's first
+ * request fails on it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +15,9 @@ import { DEFAULT_HARNESS, DEFAULT_SIGN_IN } from 'agent-runtime/vocabulary';
 
 /** The token file's name under the store, and the commands' word for it: `nemia <TOKEN_NAME> set`, the default harness's name first. */
 export const TOKEN_NAME = `${DEFAULT_HARNESS}-token`;
+
+/** The default harness's name with its first letter in capitals, as a sentence names its token. */
+const capitalHarness = `${DEFAULT_HARNESS.charAt(0).toUpperCase()}${DEFAULT_HARNESS.slice(1)}`;
 
 /** The command that prints the token to keep, as a person types it: the default harness's, as the runtime names it. */
 export const TOKEN_MAKER = DEFAULT_SIGN_IN.maker;
@@ -26,8 +31,31 @@ export const claudeTokenFile = (home: string): string => path.join(home, TOKEN_N
 /** Whether the store keeps a sign-in token (`set`) or not (`unset`). */
 export type ClaudeTokenState = 'set' | 'unset';
 
-/** What `status` says: whether a token is kept, its file, and the file's mode, as `0600`; never the token. */
-export type ClaudeTokenStatus = { readonly state: ClaudeTokenState; readonly file: string; readonly mode?: string };
+/** A day, in milliseconds. */
+const DAY_MS = 86_400_000;
+
+/** How long a token `TOKEN_MAKER` prints lasts: a year. */
+export const TOKEN_LIFE_DAYS = 365;
+
+/** How old a token is when it is warned of: about eleven months, a month before its year is out. */
+export const TOKEN_WARN_DAYS = 335;
+
+/** Why a kept token is warned of: within a month of its year (`near-year`), or past it (`past-year`). */
+export type ClaudeTokenWarning = 'near-year' | 'past-year';
+
+/**
+ * What `status` says: whether a token is kept, its file, and the file's mode, as `0600`; for a kept one, when it was set (the file's
+ * write time, ISO), the whole days left of its year (below zero once past it), and its warning where it is near or past it; never the
+ * token.
+ */
+export type ClaudeTokenStatus = {
+  readonly state: ClaudeTokenState;
+  readonly file: string;
+  readonly mode?: string;
+  readonly setAt?: string;
+  readonly daysLeft?: number;
+  readonly warning?: ClaudeTokenWarning;
+};
 
 /** A file mode's permission bits, as `chmod` takes them: `0600`. */
 const modeWords = (mode: number): string => `0${(mode & 0o777).toString(8).padStart(3, '0')}`;
@@ -53,11 +81,56 @@ export function writeClaudeToken(home: string, token: string): string {
   return file;
 }
 
-/** Whether the store at `home` keeps a sign-in token, and its file's mode; never the token. */
-export function claudeTokenStatus(home: string): ClaudeTokenStatus {
+/** The warning of a token set at `setMs`, read at `now`: none while it is younger than `TOKEN_WARN_DAYS`. */
+const warningOf = (setMs: number, now: number): ClaudeTokenWarning | undefined => {
+  const age = now - setMs;
+  return age >= TOKEN_LIFE_DAYS * DAY_MS ? 'past-year' : age >= TOKEN_WARN_DAYS * DAY_MS ? 'near-year' : undefined;
+};
+
+/**
+ * Whether the store at `home` keeps a sign-in token, its file's mode, and, read at `now`, when it was set and how long its year has left
+ * (its file's write time); never the token.
+ */
+export function claudeTokenStatus(home: string, now: number = Date.now()): ClaudeTokenStatus {
   const file = claudeTokenFile(home);
   const stat = fs.statSync(file, { throwIfNoEntry: false });
-  return stat === undefined ? { state: 'unset', file } : { state: 'set', file, mode: modeWords(stat.mode) };
+  if (stat === undefined) return { state: 'unset', file };
+  const warning = warningOf(stat.mtimeMs, now);
+  return {
+    state: 'set',
+    file,
+    mode: modeWords(stat.mode),
+    setAt: new Date(stat.mtimeMs).toISOString(),
+    daysLeft: Math.floor((stat.mtimeMs + TOKEN_LIFE_DAYS * DAY_MS - now) / DAY_MS),
+    ...(warning === undefined ? {} : { warning }),
+  };
+}
+
+/** A kept token's age in words: the day it was set, and the days left of its year or how long it is past it. */
+export function tokenAgeWords(status: ClaudeTokenStatus): string | undefined {
+  if (status.setAt === undefined || status.daysLeft === undefined) return undefined;
+  const day = status.setAt.slice(0, 10);
+  const left = status.daysLeft;
+  return left >= 0
+    ? `set ${day}, ${left} day${left === 1 ? '' : 's'} left of its year`
+    : `set ${day}, ${-left} day${left === -1 ? '' : 's'} past its year`;
+}
+
+/** The command line that makes a new token and puts it in use: made, kept, and the daemon started again to load it. */
+export const TOKEN_RENEWAL = `${TOKEN_MAKER} on a machine with a browser, then nemia ${TOKEN_NAME} set, then nemia service restart`;
+
+/**
+ * The warning of a kept token near or past its year, naming the fix (`TOKEN_RENEWAL`): none for a token younger than `TOKEN_WARN_DAYS`
+ * or none kept. `nemia <TOKEN_NAME> status`, the daemon's start and the readiness read say it alike.
+ */
+export function tokenWarningLine(status: ClaudeTokenStatus): string | undefined {
+  if (status.warning === undefined) return undefined;
+  const age = tokenAgeWords(status);
+  const end =
+    status.warning === 'past-year'
+      ? 'it may no longer sign in, and every session fails at its first request'
+      : 'every session fails at its first request once its year is out';
+  return `the ${capitalHarness} token in ${status.file} was ${age}: ${end}. Make a new one: ${TOKEN_RENEWAL}`;
 }
 
 /** Removes the store's sign-in token; answers whether there was one. */

@@ -2271,7 +2271,10 @@ A person installs a published per-platform archive with one command, and the dae
   Node under `releases/current` (`pointedEntry`).
 - **`nemia claude-token set|status|rm`**: the person's Claude token in `$WF_ROOT/claude-token`, 0600, typed hidden or piped, never
   printed; the daemon loads it into `CLAUDE_CODE_OAUTH_TOKEN` where that is unset (`loadClaudeToken`, in `nemia up` and the api's
-  daemon), and refuses a file others can read, naming `chmod 600`.
+  daemon), and refuses a file others can read, naming `chmod 600`. `status` says when the token was set, off its file's write time,
+  and the days left of its year; past 335 days it warns (`tokenWarningLine`, kinds `near-year` and `past-year`), naming `claude
+  setup-token`, `nemia claude-token set` and `nemia service restart`, and so do the daemon's start, once, and the readiness read's
+  harness line. `claude auth status` reads only that a credential is present, so the file's age is the one sign of a token near its end.
 
 ## Shipped: an old release is removed once unused (harness-updates C2)
 

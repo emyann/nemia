@@ -94,6 +94,7 @@ const each =
 const READS: { readonly [V in PlaceVerb]: readonly ((request: Request) => void)[] } = {
   root: [each(text, 'dir')],
   open: [each(text, 'root'), each(flag, 'isolate')],
+  follow: [each(text, 'repo')],
   make: [each(text, 'repo', 'at', 'run', 'leaf', 'from'), each(texts, 'also')],
   handoff: [each(text, 'workspace', 'step', 'why')],
   report: [each(text, 'repo', 'baseRef', 'onto'), each(texts, 'branches', 'diffOf', 'present', 'atBase')],

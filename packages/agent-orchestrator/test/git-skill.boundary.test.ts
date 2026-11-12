@@ -622,3 +622,55 @@ test('REFUSED: seal of a repository that holds a commit, which it leaves, and of
   const gone = path.join(scratch('wf-git-skill-seal-'), 'gone');
   assert.equal(refusalOf(run('seal', { tree: gone })), `${gone} is not a directory, so there is no exported tree to seal`);
 });
+
+/** A clone of a new repository, made by git, and the repository it was cloned from, which then moves on one commit. */
+function behindOrigin(): { origin: string; clone: string; from: string; to: string } {
+  const origin = repository();
+  const clone = path.join(scratch('wf-git-skill-follow-'), 'clone');
+  git(path.dirname(clone), 'clone', '-q', origin, clone);
+  const from = git(clone, 'rev-parse', 'HEAD');
+  fs.writeFileSync(path.join(origin, 'f'), 'moved\n');
+  git(origin, 'commit', '-q', '-am', 'moved');
+  return { origin, clone, from, to: git(origin, 'rev-parse', 'HEAD') };
+}
+
+test('follow leaves a checkout behind its remote on no branch, or with a merge in progress, as it is, and says so', () => {
+  const detached = behindOrigin();
+  git(detached.clone, 'switch', '-q', '--detach');
+  const onNoBranch = answerOf(run('follow', { repo: detached.clone }));
+  assert.equal(onNoBranch.state, 'left');
+  assert.ok('message' in onNoBranch && onNoBranch.message.length > 0, 'it says what to do');
+  assert.equal(git(detached.clone, 'rev-parse', 'HEAD'), detached.from, 'nothing moved');
+
+  const merging = behindOrigin();
+  git(merging.clone, 'switch', '-q', '-c', 'side');
+  fs.writeFileSync(path.join(merging.clone, 'g'), 'side\n');
+  git(merging.clone, 'commit', '-q', '-am', 'side');
+  git(merging.clone, 'switch', '-q', 'main');
+  git(merging.clone, 'merge', '-q', '--no-ff', '--no-commit', 'side');
+  const inProgress = answerOf(run('follow', { repo: merging.clone }));
+  assert.equal(inProgress.state, 'left');
+  assert.equal(git(merging.clone, 'rev-parse', 'HEAD'), merging.from, 'nothing moved');
+  assert.equal(gitOk(merging.clone, 'rev-parse', '-q', '--verify', 'MERGE_HEAD'), true, 'the merge is still in progress');
+});
+
+test('follow of a checkout whose remote cannot be read changes nothing and says so; with no remote on no branch there is nothing to follow', () => {
+  const gone = behindOrigin();
+  fs.rmSync(gone.origin, { recursive: true });
+  const unfetched = answerOf(run('follow', { repo: gone.clone }));
+  assert.equal(unfetched.state, 'unfetched');
+  assert.ok('message' in unfetched && unfetched.message.length > 0, 'it says what to do');
+  assert.equal(git(gone.clone, 'rev-parse', 'HEAD'), gone.from, 'nothing moved');
+
+  const alone = repository();
+  git(alone, 'switch', '-q', '--detach');
+  assert.deepEqual(answerOf(run('follow', { repo: alone })), { state: 'no-upstream' });
+});
+
+test('follow of a checkout clean and only behind moves it by a fast-forward to its upstream, whatever the remote is called', () => {
+  const { clone, from, to } = behindOrigin();
+  git(clone, 'remote', 'rename', 'origin', 'hub');
+  assert.deepEqual(answerOf(run('follow', { repo: clone })), { state: 'fast-forwarded', upstream: 'hub/main', from, to });
+  assert.equal(git(clone, 'rev-parse', 'HEAD'), to);
+  assert.equal(git(clone, 'rev-list', '--count', 'HEAD'), '2', 'no merge commit was made');
+});

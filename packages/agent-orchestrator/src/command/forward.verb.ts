@@ -1,29 +1,31 @@
 /**
  * The command line forwarded to another machine's api: where `NEMIA_SERVER` names a daemon (set by the client, `apps/cli`, under a context
  * naming a remote one), the CLI still parses, checks and prints as it does on the store here, and at the one point where it would call an
- * entry's handler it calls the endpoint the entry links (`served`) instead, through `objects`' `Api` made into a typed client
- * (`HttpApiClient`), presenting `NEMIA_SERVER_TOKEN` as its bearer. The answer is the endpoint's success, decoded by its Schema, made into
- * what the entry prints by the link's `answer` where it has one; a refusal is the package's of the same kind, in the api's words, so a
- * forwarded command exits as one run here does. Nothing of `apps/api` is imported: this is a client of another machine's api, through
- * `objects` alone.
+ * entry's handler it calls the endpoint the entry links (`served`) instead, through `objects`' one typed client of its `Api` (`apiClient`),
+ * presenting `NEMIA_SERVER_TOKEN` as its bearer, within the bound every call of it has (`READ_BOUND_MS`), a write as a read. The answer is
+ * the endpoint's success, decoded by its Schema, made into what the entry prints by the link's `answer` where it has one; a refusal is the
+ * package's of the same kind, in the api's words, so a forwarded command exits as one run here does. Nothing of `apps/api` is imported:
+ * this is a client of another machine's api, through `objects` alone.
  */
 import { Cause, Effect, Exit, Option, type Schema } from 'effect';
-import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
-import { HttpApiClient } from 'effect/http-api';
+import { FetchHttpClient, HttpClientError } from 'effect/http';
 import {
+  Answered,
   Api,
+  apiClient,
   BadRequest,
   Conflict as ConflictAnswer,
   DEFAULT_NAMESPACE,
   endpointKeysOf,
   type EndpointKeys,
-  jsonBodied,
   keysOfEndpoint,
   Forbidden as ForbiddenAnswer,
   Invalid as InvalidAnswer,
   Missing as MissingAnswer,
   PROPOSAL_REFUSALS,
   type ProposalRefusal,
+  READ_BOUND_MS,
+  timedOut,
   Unauthorized,
 } from 'objects';
 import type { Env } from '../config/config.store.ts';
@@ -74,18 +76,8 @@ export function partsOf(
   };
 }
 
-/**
- * The typed client of the `Api` at `forwarded`'s server: each bodiless write sent as JSON (`jsonBodied`), each request presenting its token
- * as its bearer where it has one.
- */
-const clientOf = (forwarded: Forwarded) =>
-  HttpApiClient.make(Api, {
-    baseUrl: forwarded.server,
-    transformClient: (client) => {
-      const bodied = HttpClient.mapRequest(client, jsonBodied);
-      return forwarded.token === undefined ? bodied : HttpClient.mapRequest(bodied, HttpClientRequest.bearerToken(forwarded.token));
-    },
-  });
+/** The typed client of the `Api` at `forwarded`'s server, presenting its token as its bearer where it has one (`apiClient`). */
+const clientOf = (forwarded: Forwarded) => apiClient({ baseUrl: forwarded.server, token: forwarded.token });
 
 /** The typed client, as a forwarded call reads it: each group's endpoints by name, a call taking its parts. */
 type Calls = Readonly<Record<string, Readonly<Record<string, (parts: CallParts) => Effect.Effect<unknown, unknown>>>>>;
@@ -161,44 +153,42 @@ function refusalOfAnswer(failed: unknown): Refusal | undefined {
 }
 
 /**
- * A client's error of a forwarded call: a daemon not reached, naming the fix; else a status the `Api` does not declare, by its kind, in
- * the api's own words (`said`, its body's `error`) where it gave some — a body past its bound names the bound — else naming the release.
+ * A client's error of a forwarded call: a daemon that took it and did not answer within the bound, naming that a write may have been made;
+ * a daemon not reached, naming the fix; else a status the client's `Api` does not read, naming the release.
  */
-function clientFailure(
-  failed: HttpClientError.HttpClientError,
-  forwarded: Forwarded,
-  verb: string,
-  words: string | undefined,
-): Refusal | Error {
+function clientFailure(failed: HttpClientError.HttpClientError, forwarded: Forwarded, verb: string): Error {
+  if (timedOut(failed))
+    return new Error(
+      `the daemon at ${forwarded.server} did not answer nemia ${verb} within ${READ_BOUND_MS / 1000} s, so what it asked may or may not be done: read what it changes before you type it again, and see whether the daemon is up with \`nemia service status\` on its machine.`,
+    );
   const { reason } = failed;
   if (reason._tag === 'TransportError')
     return new Error(
       `nemia ${verb} could not reach the daemon at ${forwarded.server} (NEMIA_SERVER): see the context it is forwarded under with \`nemia config\`, or run it on this machine's store with NEMIA_CONTEXT=local.`,
     );
   const status = 'response' in reason ? reason.response.status : undefined;
-  const said =
-    words ??
-    `the daemon at ${forwarded.server} answered ${status ?? 'nothing'} to nemia ${verb}, which this nemia does not read: see that it is of this release (\`nemia version\` on both machines)`;
-  return (status === undefined ? undefined : refusalOfStatus(status, said)) ?? new Error(said);
+  return new Error(
+    `the daemon at ${forwarded.server} answered ${status ?? 'nothing'} to nemia ${verb}, which this nemia does not read: see that it is of this release (\`nemia version\` on both machines)`,
+  );
 }
 
-/** The api's own words of an answer the `Api` declares no error for: its JSON body's `error`, where it has one. */
-const wordsOf = (failed: unknown): Effect.Effect<string | undefined> => {
-  if (!HttpClientError.isHttpClientError(failed) || !('response' in failed.reason)) return Effect.succeed(undefined);
-  return failed.reason.response.json.pipe(
-    Effect.map((body) => {
-      const error = (body as { error?: unknown } | null)?.error;
-      return typeof error === 'string' && error !== '' ? error : undefined;
-    }),
-    Effect.orElseSucceed(() => undefined),
-  );
-};
+/**
+ * A status the `Api` declares no error for, as the package's refusal of its kind (`refusalOfStatus`), in the api's own words where it gave
+ * some (`said`) — a body past its bound names the bound — else naming the release.
+ */
+function answeredFailure(failed: Answered, forwarded: Forwarded, verb: string): Refusal | Error {
+  const said =
+    failed.said ??
+    `the daemon at ${forwarded.server} answered ${failed.status} to nemia ${verb}, which this nemia does not read: see that it is of this release (\`nemia version\` on both machines)`;
+  return refusalOfStatus(failed.status, said) ?? new Error(said);
+}
 
 /** What a forwarded call failed with, as the command line throws it: a refusal of the package's kind, or an `Error` naming the fix. */
-function thrownOf(failed: unknown, forwarded: Forwarded, verb: string, words: string | undefined): Refusal | Error {
+function thrownOf(failed: unknown, forwarded: Forwarded, verb: string): Refusal | Error {
   const refused = refusalOfAnswer(failed);
   if (refused !== undefined) return refused;
-  if (HttpClientError.isHttpClientError(failed)) return clientFailure(failed, forwarded, verb, words);
+  if (failed instanceof Answered) return answeredFailure(failed, forwarded, verb);
+  if (HttpClientError.isHttpClientError(failed)) return clientFailure(failed, forwarded, verb);
   const error = (failed as { error?: unknown } | null)?.error;
   if (typeof error === 'string') return new Error(error);
   return new Error(
@@ -235,7 +225,7 @@ export const forwardedCall = Effect.fn('forwardedCall')(function* (
       return namespaceFor(calls, link.endpoint, keys, request).pipe(Effect.flatMap((placed) => call(partsOf(keys, placed, link.query))));
     }),
     Effect.provide(FetchHttpClient.layer),
-    Effect.catch((failed) => Effect.flatMap(wordsOf(failed), (words) => Effect.fail(thrownOf(failed, forwarded, entry.name, words)))),
+    Effect.catch((failed) => Effect.fail(thrownOf(failed, forwarded, entry.name))),
   );
   return link.answer === undefined ? answer : link.answer(answer, input);
 });

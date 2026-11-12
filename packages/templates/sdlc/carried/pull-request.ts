@@ -408,6 +408,21 @@ function jobsFailing(entry: Entry): Entry[] {
 }
 
 /**
+ * The log of the job `id` as `gh api repos/{owner}/{repo}/actions/jobs/<id>/logs` serves it, its colour codes and all, which `failures`
+ * strips. gh 2.97.0 and later refuse to print a response holding terminal escape sequences, as a job's log always does, unless given
+ * `--allow-escape-sequences`: gh 2.103.3 refuses a job's log so, naming the flag, and the flag and the refusal are in
+ * gh's `pkg/cmd/api/api.go` from v2.97.0, not at v2.96.0. gh before 2.97.0 prints the log as it is and has no such flag, which cobra
+ * refuses as unknown: gh 2.45.0, the oldest gh this team has read logs with, printed them, its `api.go` copying a body raw. So the log
+ * is read with the flag, and again without it where that read gives none, whatever gh said: no version is asked, and no refusal's words
+ * are read.
+ */
+function jobLog(id: string): Ran {
+  const at = `repos/{owner}/{repo}/actions/jobs/${id}/logs`;
+  const flagged = read('api', at, '--allow-escape-sequences');
+  return flagged.status === 0 && flagged.out.trim() ? flagged : read('api', at);
+}
+
+/**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
  * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
@@ -430,7 +445,7 @@ function why(entries: readonly Entry[], check: string): string[] {
       break;
     }
     const api = `gh api repos/{owner}/{repo}/actions/jobs/${id}/logs`;
-    const log = read('api', `repos/{owner}/{repo}/actions/jobs/${id}/logs`);
+    const log = jobLog(id);
     if (log.status !== 0 || !log.out.trim()) {
       logs.push(`${name} (job ${id}): \`${api}\` gave no log${log.err ? `: ${log.err.split('\n')[0]}` : ''}`);
       continue;

@@ -6,9 +6,9 @@
  * other words after `inbox` go to the old path: `inbox add`, `inbox rm` and the rest are commands of their own there.
  */
 import { Schema } from 'effect';
-import { type Table, tableLines } from 'objects';
+import { READ_BOUND_MS, type Table, tableLines } from 'objects';
 import { handedOn } from '../local.ts';
-import { asked, everyPage, READ_BOUND_MS } from '../objects.ts';
+import { asked, everyPage } from '../objects.ts';
 import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What a row's card says of its play: whether the api counts it in play. */

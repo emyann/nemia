@@ -665,7 +665,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                running nemia runs on, the folder of each build whose upgrade died,
                                and each build log older than 30 days, as the daemon does every five
                                minutes. A tag older than the oldest release that can read the store
-                               (store.json) is refused before anything is fetched or built
+                               (store.json) is refused before anything is fetched or built. It
+                               upgrades this machine's install, whatever the context: the server a
+                               context names is upgraded from here with nemia server upgrade [<tag>],
+                               through its api (not nemia service, this machine's login unit)
                                on the port: upgrade
   nemia frontmatter rewrite [<folder>...] [--check]
                                rewrite as YAML each markdown file's frontmatter still in the former

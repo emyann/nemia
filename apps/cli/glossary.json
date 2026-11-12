@@ -8,12 +8,12 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `refused`, any command typed with `--local`, exit 2, naming it typed without; `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed, and for a moved command (`MOVED_COMMANDS`), its help included; `process`, for every other verb, a help of one, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon.",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `refused`, any command typed with `--local`, exit 2, naming it typed without; `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, `server`) whatever else is typed, and for a moved command (`MOVED_COMMANDS`), its help included; `process`, for every other verb, a help of one, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `forwarded`, a verb about the store only that path has, typed under a remote context, run on that CLI forwarded to the context's daemon.",
       "type": "Route"
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, the feed pushed into a Claude Code session, and `server`, the daemon a context names asked about itself, `nemia server upgrade` upgrading it through its api, `apps/cli/src/server/upgrade.ts`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
     },
     {
@@ -38,7 +38,7 @@
     },
     {
       "term": "Machine verb",
-      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and the verbs that read and write this machine's files and no store, `template`, `frontmatter`, `admit`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included.",
+      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and the verbs that read and write this machine's files and no store, `template`, `frontmatter`, `admit`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included: `nemia upgrade` upgrades this machine's install under a remote context too, then names on stderr `nemia server upgrade`, the client verb that upgrades the context's server.",
       "type": "MachineVerb"
     },
     {

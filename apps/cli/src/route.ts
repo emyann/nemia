@@ -22,10 +22,11 @@ export const READ_VERBS = ['doctor', 'daemon'] as const;
 export type ReadVerb = (typeof READ_VERBS)[number];
 
 /**
- * The verbs this client alone has, generic over every kind the api serves, and `channel`, the feed pushed into a Claude Code session
- * (`src/watch/channel.ts`): no process answers them.
+ * The verbs this client alone has, generic over every kind the api serves, `channel`, the feed pushed into a Claude Code session
+ * (`src/watch/channel.ts`), and `server`, the daemon a context names asked about itself through its api (`nemia server upgrade`,
+ * `src/server/upgrade.ts`), never `service`, this machine's login unit, which is a machine verb: no process answers them.
  */
-export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide', 'channel'] as const;
+export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide', 'channel', 'server'] as const;
 
 /** One of `CLIENT_VERBS`. */
 export type ClientVerb = (typeof CLIENT_VERBS)[number];
@@ -33,7 +34,9 @@ export type ClientVerb = (typeof CLIENT_VERBS)[number];
 /**
  * The verbs about the machine this client runs on, never a remote daemon's (`objects`' `MACHINE_VERBS`, where the orchestrator's guard
  * reads them too), and the commands whose words this client holds (`objects`' `MOVED_COMMANDS`, the names of its `COMMAND_WORDS`): each
- * of those parsed, helped, run and printed here through the api, under every context. Said here for the contract and the code to read.
+ * of those parsed, helped, run and printed here through the api, under every context. `upgrade` upgrades this machine's install
+ * under a remote context too: the server a context names is upgraded by `nemia server upgrade`, one of `CLIENT_VERBS`. Said here for the
+ * contract and the code to read.
  */
 export { MACHINE_VERBS, MOVED_COMMANDS };
 

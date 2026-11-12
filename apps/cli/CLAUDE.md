@@ -8,6 +8,12 @@ of one run on the orchestrator's own CLI, spawned with the same words (`src/loca
 word typed under a remote context that the client does not answer and this machine does not own is refused, exit 2, naming `nemia
 --help` and `NEMIA_CONTEXT=local`. `--local` is refused, exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is
 this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
+`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
+inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
+`explain`, over every kind the api serves, `propose` and `proposals`, `decide`, `channel`, and `server`) asked of it whatever else is typed, the commands
+whose words it holds (`MOVED_COMMANDS`, `objects`' `COMMAND_WORDS`) parsed, helped and run here through the api under every context, and
+every other verb and a help of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). `--local` is refused,
+exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract, each verb list spelled once there and read by the code (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
@@ -22,6 +28,14 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   RunDecision, the pause `nemia watch` says, and the runs and cards lists `nemia ls` and `nemia inbox` ask for their `Table`. **One ask**:
   `served` (`src/daemon.ts`) takes the lease's url where something listens there, else starts the daemon once and waits until `GET
   /api/health` answers, bounded; the read then asks once (`asked`). No read retries after a refused connection.
+- **`nemia server upgrade [<tag> | --back]` upgrades the server a context names** (`src/server/upgrade.ts`), as the board's Settings and
+  the MCP port's `upgrade` tool do: it reads `GET /api/version` and `GET /api/upgrades`, chooses the release (`upgradeTarget`, proved by
+  `contracts/server-upgrade.contract.ts`), posts `POST /api/upgrades`, and follows `GET /api/upgrades/:id/output` through the daemon's
+  restart: a stream that closes without `ended` is the daemon going down, waited for (`BACK_WITHIN_MS`) and opened again, its resent
+  output printed once. It asks through `askedAcross` (`src/objects.ts`), `asked` with the release check left out, since it is the verb
+  that repairs a client/daemon mismatch and talks to a newer daemon on purpose after the restart; the decode still guards it. A test
+  shortens the bound through its seams, never waiting out the shipped one. `server` is the daemon a context names; `service` is this
+  machine's login unit, a machine verb: the usage keeps the two apart.
 - **A list is printed as the server prints it** (`src/reads/table.ts`, fc2e, and `objects`' `tableLines`, the one printer of a
   `Table`, which the api's MCP port prints with too): `nemia ls` and `nemia inbox` ask with `Accept:
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
@@ -37,6 +51,8 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   `admit`, which touch this machine's files and no store) runs here whatever the context. `template export --factory`, the one of them
   that holds a store's part, reads the factory, its rules and its instruction through the api of the context in use and hands them to
   the spawned export on stdin, `--factory-parts -` (`src/template-export.ts`).
+  `nemia upgrade` upgrades this machine's install under a remote context too, then names `nemia server upgrade` on stderr
+  (`serverHint`): the server a context names is upgraded by that verb of the client's own, through its api.
   On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
   <file>`, `local-token` in the file, `chosenToken`).
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.

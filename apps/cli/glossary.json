@@ -8,7 +8,7 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`, proved by `apps/cli/contracts/route.contract.ts`): `api`, for a moved command (`MOVED_COMMANDS`), its help included, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed, and for its reads (`READ_VERBS`: `doctor`, `daemon`) asked of the api over HTTP; `process`, for a machine verb and a help of one, and under this machine's context for a word no list holds, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `refused`, exit 2, any command typed with `--local`, naming it typed without, and a word typed under a remote context that the client does not answer and this machine does not own, naming `nemia --help` and `NEMIA_CONTEXT=local`. Nothing is forwarded to another machine's api.",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`, proved by `apps/cli/contracts/route.contract.ts`): `api`, for a moved command (`MOVED_COMMANDS`), its help included, for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, `server`) whatever else is typed, and for its reads (`READ_VERBS`: `doctor`, `daemon`) asked of the api over HTTP; `process`, for a machine verb and a help of one, and under this machine's context for a word no list holds, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `refused`, exit 2, any command typed with `--local`, naming it typed without, and a word typed under a remote context that the client does not answer and this machine does not own, naming `nemia --help` and `NEMIA_CONTEXT=local`. Nothing is forwarded to another machine's api.",
       "type": "Route",
       "retired": [
         {
@@ -19,7 +19,7 @@
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, the feed pushed into a Claude Code session, and `server`, the daemon a context names asked about itself, `nemia server upgrade` upgrading it through its api, `apps/cli/src/server/upgrade.ts`): no process answers it, so it asks the api whatever else is typed, says its own help. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
     },
     {
@@ -33,7 +33,7 @@
     },
     {
       "term": "Machine verb",
-      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and the verbs that read and write this machine's files and no store, `template`, `frontmatter`, `admit`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included.",
+      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and the verbs that read and write this machine's files and no store, `template`, `frontmatter`, `admit`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included: `nemia upgrade` upgrades this machine's install under a remote context too, then names on stderr `nemia server upgrade`, the client verb that upgrades the context's server.",
       "type": "MachineVerb"
     },
     {

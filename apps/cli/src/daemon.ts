@@ -88,7 +88,7 @@ export function releaseHeld(verb: string, base: string, daemon: string | null, c
   if (releaseMet(client, daemon) !== 'differs') return base;
   throw new Refused(
     `nemia ${verb}: this nemia is ${client ?? 'a checkout'} and the daemon at ${base} runs ${daemon ?? 'a checkout'}, and a client asks only a daemon of its own release. ` +
-      "Type `nemia version` on both machines, then upgrade the older to the other's release (`nemia upgrade <tag>`), or run this command with the nemia of the daemon's release",
+      "Type `nemia version` on both machines, then upgrade the older to the other's release: this machine with `nemia upgrade <tag>`, the server with `nemia server upgrade <tag>`; or run this command with the nemia of the daemon's release",
   );
 }
 

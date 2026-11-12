@@ -1,16 +1,18 @@
 /**
  * `nemia`, a client of the api: every store verb asks the api serving the store the context in use names (`context.ts`) over HTTP. A
  * command whose words the client holds (`MOVED_COMMANDS`) is parsed, helped and run here (`commands/commanded.ts`); the client's own verbs
- * (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`) ask it whatever else is typed, each saying its
- * own help (`channel` serves the feed to a Claude Code session over stdio, `watch/channel.ts`); and its reads `doctor` and `daemon`
- * (`READ_VERBS`) ask it too. A verb about this machine (`MACHINE_VERBS`) and a help of one run on the orchestrator's own CLI, spawned with
- * the same words (`local.ts`), whatever context is in use; `template export --factory` among them reads the factory's parts through the
- * api first (`template-export.ts`). `--local` is refused, exit 2, naming the command typed without it, but on `doctor carry`
+ * (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`, `channel`, `server`) ask it whatever else is typed, each
+ * saying its own help (`channel` serves the feed to a Claude Code session over stdio, `watch/channel.ts`); and its reads `doctor` and
+ * `daemon` (`READ_VERBS`) ask it too. A verb about this machine (`MACHINE_VERBS`) and a help of one run on the orchestrator's own CLI,
+ * spawned with the same words (`local.ts`), whatever context is in use; `template export --factory` among them reads the factory's parts
+ * through the api first (`template-export.ts`). `--local` is refused, exit 2, naming the command typed without it, but on `doctor carry`
  * (`carryUnlocal`), and so is a word typed under a remote context that the client does not answer and this machine does not own, naming
- * `nemia --help` and `NEMIA_CONTEXT=local`: nothing is forwarded. `nemia config` reads and writes the contexts themselves, and `nemia
- * pair <url>` writes one a pairing minted the token of (`pair.ts`), whatever context is in use.
+ * `nemia --help` and `NEMIA_CONTEXT=local`: nothing is forwarded. `nemia config` reads and writes the contexts themselves, and `nemia pair
+ * <url>` writes one a pairing minted the token of (`pair.ts`), whatever context is in use. A bare `nemia upgrade` under a remote context
+ * upgrades this machine and names `nemia server upgrade` on stderr (`serverHint`), the client's verb that upgrades the server a context
+ * names through its api (`server/upgrade.ts`).
  */
-import { CONFIG_VERB, chosenOf, config, unheld } from './context.ts';
+import { CONFIG_VERB, type Chosen, chosenOf, config, unheld } from './context.ts';
 import { doctor, RETIRED_VERB, retiredVerb } from './doctor.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
 import { PAIR_VERB, pair } from './pair.ts';
@@ -26,6 +28,7 @@ import { explain } from './objects/explain.ts';
 import { get } from './objects/get.ts';
 import { propose, proposals } from './objects/propose.ts';
 import { channel } from './watch/channel.ts';
+import { server, serverHint } from './server/upgrade.ts';
 
 /** What the `wf` alias says first, on stderr, the same words the orchestrator's alias says. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
@@ -42,6 +45,7 @@ const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]
   proposals,
   decide: (args) => decide(args, (argv) => main(argv, entry)),
   channel,
+  server,
 });
 
 /** Whether `name` is one of `MOVED_COMMANDS`, whose words the client holds. */
@@ -91,6 +95,17 @@ const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number
 };
 
 /**
+ * `argv` run on the old path, here, and its exit code; a bare `nemia upgrade` typed under a remote context then names on stderr the form
+ * that upgrades that context's server (`serverHint`): the words keep upgrading this machine, whatever the context.
+ */
+async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean, chosen: Chosen): Promise<number> {
+  const code = await spawned(argv, entry);
+  if (argv[0] === 'upgrade' && !help && !argv.includes('-h') && chosen.kind === 'remote')
+    process.stderr.write(serverHint(chosen.name, chosen.server));
+  return code;
+}
+
+/**
  * Runs `argv` and answers the exit code: on the api for a read of the client's, a verb of its own and a command whose words it holds,
  * else on the old path under `entry`, a verb about this machine; refused, exit 2, where `--local` is typed (`localRefused`) but on `doctor
  * carry` (`carryUnlocal`), for a word stranded under a remote context (`stranded`), under a context the config does not hold, and for the
@@ -115,7 +130,7 @@ async function routed(argv: readonly string[], name: string, entry: Entry): Prom
   if (route === 'refused' && !local && chosen.kind === 'remote') throw stranded(argv, name, chosen.name);
   if (route === 'refused') throw localRefused(argv, chosen.kind === 'local');
   if (chosen.kind === 'refused' && !ofTheMachine(name)) throw unheld(chosen.name);
-  if (route === 'process') return exportsAFactory(argv) ? templateExported(argv, entry) : spawned(argv, entry);
+  if (route === 'process') return exportsAFactory(argv) ? templateExported(argv, entry) : spawnedHere(argv, entry, help, chosen);
   if (entry === 'wf') process.stderr.write(`${WF_HINT}\n`);
   if (isMoved(name)) return commanded(name, argv.slice(name.split(' ').length));
   const verb = Object.entries(own(entry)).find(([word]) => word === name)?.[1];

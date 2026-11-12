@@ -79,7 +79,7 @@ const sidesOf = ({ daemon, client }: Releases): string =>
 export const undecoded = (verb: string, base: string, failed: unknown, releases: Releases): Refused =>
   new Refused(
     `nemia ${verb}: the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): ${sidesOf(releases)}. ` +
-      "Type `nemia version` on both machines, then upgrade the older to the other's release (`nemia upgrade <tag>`), or run this command with the nemia of the daemon's release",
+      "Type `nemia version` on both machines, then upgrade the older to the other's release: this machine with `nemia upgrade <tag>`, the server with `nemia server upgrade <tag>`; or run this command with the nemia of the daemon's release",
   );
 
 /**
@@ -121,6 +121,21 @@ export async function asked<A, E>(
 ): Promise<A> {
   const { base, release } = await servedWith(verb, env);
   return answerOf(await attempt(base, call, boundMs, env, headers), verb, base, boundMs, { daemon: release, client: clientRelease() });
+}
+
+/**
+ * What `call` answers of the objects' client, as `asked` answers it, but of a daemon of any release: the client/daemon release check
+ * left out (`servedWith` given no client release), for `nemia server upgrade` alone, the verb that repairs a mismatch and talks to a
+ * newer daemon on purpose once it has restarted. The decode by the `Api`'s Schemas still refuses a shape this client does not read.
+ */
+export async function askedAcross<A, E>(
+  verb: string,
+  call: (client: ObjectsClient) => Effect.Effect<A, E>,
+  env: NodeJS.ProcessEnv = process.env,
+  boundMs: number = READ_BOUND_MS,
+): Promise<A> {
+  const { base, release } = await servedWith(verb, env, null);
+  return answerOf(await attempt(base, call, boundMs, env, {}), verb, base, boundMs, { daemon: release, client: clientRelease() });
 }
 
 /**

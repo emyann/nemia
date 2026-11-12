@@ -274,8 +274,10 @@ export type RunnerOps = {
   readonly output?: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) => Effect.Effect<string | undefined, RunnerError>;
   /**
    * Let go of a session whose attempt's end the engine has written down: stop it if it still runs,
-   * and take it out of the harness's registry. Optional — a harness whose registry is the record
-   * (a detached runner's run files, which `logs` reads) has nothing to let go of.
+   * and take it out of the harness's registry. Optional. A harness whose registry is the record
+   * (a detached runner's run files, which `logs` reads) removes nothing: a detached runner's stops
+   * what a run left in its harness's process group once its worker has ended or is gone, and fails
+   * while anything is left, so it is asked again.
    *
    * Asked on every pass that still observes such a session, so it must be idempotent and needs no
    * memory: one that fails is asked again next pass. Given the session as observed, to tell a live one

@@ -22,7 +22,7 @@ import { UsageSchema } from '../../core/event-schema.ts';
 import { readText } from '../../core/engine/tally.ts';
 import { replaceFile } from '../../core/replace.ts';
 import type { HarnessOutput, HarnessSpec } from './detached.ts';
-import { overNow, type RunFile } from './run-file.ts';
+import type { RunFile } from './run-file.ts';
 
 /**
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
@@ -191,9 +191,12 @@ export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
  */
 type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => string };
 
-/** When `run`'s capture is read (`SaidWhen`): over as of now, its lease gone included; ended once its worker wrote its end. */
-export const saidWhen = (run: RunFile, keep?: (output: string) => string): SaidWhen => ({
-  over: overNow(run),
+/**
+ * When `run`'s capture is read (`SaidWhen`): `over`, as the runner's look reads the run now (its lease gone with its worker included);
+ * ended once its worker wrote its end.
+ */
+export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) => string): SaidWhen => ({
+  over,
   ended: run.state !== 'working',
   ...(keep ? { keep } : {}),
 });

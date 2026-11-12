@@ -2,7 +2,7 @@
  * The schedules group's handlers (`objects`' `Api`): a factory's schedules as objects, in its namespace, each named by its workflow — a
  * page of them (`scheduleList`), one (`scheduleObject`), the runs they fired read through the app's memo (`ReadMemo.records.factories`),
  * so a warm read reads no finished run's record — written (`nemia factory schedule`) and taken back (`factory unschedule`), each entry
- * called by its `input`.
+ * called by its `input` and answered with what it wrote and the cron it replaced (`written`).
  */
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE, scheduleList, scheduleObject } from 'agent-orchestrator';
 import { Api } from 'objects';
@@ -32,16 +32,16 @@ export const schedulesHandlers = readsBounded(Api, 'schedules', (handlers) =>
     .handle('put', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         factoryNamed(`PUT /api/namespaces/${namespace}/schedules/${name}`, namespace);
-        await s.inRequest(FACTORY_SCHEDULE.handler({ factory: namespace, workflow: name, ...payload }));
-        return scheduleIn(s, namespace, name);
+        const { file, replaced } = await s.inRequest(FACTORY_SCHEDULE.handler({ factory: namespace, workflow: name, ...payload }));
+        return { ...(await scheduleIn(s, namespace, name)), written: { file, was: replaced?.cron ?? null } };
       }),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         factoryNamed(`DELETE /api/namespaces/${namespace}/schedules/${name}`, namespace);
         const schedule = await scheduleIn(s, namespace, name);
-        await s.inRequest(FACTORY_UNSCHEDULE.handler({ factory: namespace, workflow: name }));
-        return schedule;
+        const { file } = await s.inRequest(FACTORY_UNSCHEDULE.handler({ factory: namespace, workflow: name }));
+        return { ...schedule, written: { file } };
       }),
     ),
 );

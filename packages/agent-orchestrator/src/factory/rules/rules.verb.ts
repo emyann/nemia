@@ -4,12 +4,10 @@
  * by its `input`. Both through the Factory door (`FactoryDoor`); `factoryRules(home, name)` reads the files
  * at the root it is handed, for the package's callers not yet on it.
  */
-import { gives, givesNone, renamed } from '../../command/requests.verb.ts';
 import { doorAtOnce, FactoryDoor } from '../door/factories.store.ts';
-import { leftOut, type Flag, type Spec } from '../../command/command.ts';
-import type { Command } from '../../command/entry.verb.ts';
+import type { Served } from '../../command/entry.verb.ts';
 import { Effect, Schema } from 'effect';
-import { FactoryRulesWrite } from 'objects';
+import { FACTORY_RULES_WORDS, FactoryRulesWrite } from 'objects';
 import type { Refusal } from '../../refusal/refusal.ts';
 import { FactoryName } from '../factory.model.ts';
 
@@ -27,28 +25,6 @@ export type FactoryRules = { name: string; file: string; words: string | null; e
 export function factoryRules(home: string, name: string): FactoryRules {
   return { name, ...doorAtOnce(home, (door) => door.rules.read(FactoryName.read(name))) };
 }
-
-/** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
-const FILE = {
-  flag: '--file',
-  kind: 'text',
-  key: 'file',
-  takes: '--file takes the file whose words to write, or - to read them from stdin: nemia factory rules <name> --file <path>',
-  twice: 'nemia factory rules takes --file once: a factory keeps one file of rules.',
-  only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
-} satisfies Flag;
-
-/**
- * `nemia factory rules`'s spec: the factory's name, then `--file` or `--clear`; the words, which the runner reads from the file or the
- * api's handler is given, are no flag of it.
- */
-const SPEC: Spec = {
-  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [FILE, { flag: '--clear', kind: 'switch', key: 'clear' }],
-  unknown: (arg) => `nemia factory rules takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not ${arg}.`,
-  apart: () => FILE.takes,
-  missing: "nemia factory rules takes the factory's name: nemia factory rules <name> [--file <path>|- | --clear].",
-};
 
 /**
  * What `nemia factory rules` takes: the factory, and the words to write (`objects`' `FactoryRulesWrite`, read by the command line's runner
@@ -78,51 +54,13 @@ function ruled({ factory: name, words, clear }: RulesInput): Effect.Effect<Facto
   });
 }
 
-/** What a write or a clear says of a run already started. */
-const KEPT = 'a run already started keeps the rules it was started with';
-
 /**
  * `nemia factory rules`: the rules of the factory `name` — read bare, written from `words`, removed with `clear` — and the rules read
  * after. Refused, writing nothing: the default factory (`Conflict`); a factory that is not there (`Missing`) or does not read; `--file`
  * with `--clear`; blank words and a frontmatter block (`Invalid`); and a templated factory whose tree is not rendered yet (`Conflict`).
  */
-export const FACTORY_RULES: Command<FactoryRules, RulesInput> = {
-  name: 'factory rules',
-  served: [
-    { endpoint: 'factories.rules', takes: givesNone('words', 'clear'), request: renamed({ factory: 'name' }, ['words', 'clear']) },
-    { endpoint: 'factories.putRules', as: 'factory_rules_put', takes: gives('words'), request: renamed({ factory: 'name' }, ['clear']) },
-    { endpoint: 'factories.deleteRules', as: 'factory_rules_delete', request: renamed({ factory: 'name' }, ['words', 'clear']) },
-  ],
-  usage: '<name> [--file <path>|- | --clear]',
-  help: [
-    "a factory's rules and policies: words told to every agent hired into",
-    "it, after its custom instructions and before the step's own note,",
-    'kept by the store with the factory. Bare, prints them; --file writes',
-    'them (- for stdin); --clear removes them. Words only: a frontmatter',
-    'block is refused. A run keeps the rules it was started with',
-  ],
-  spec: SPEC,
-  check: (args) =>
-    args.clear === true && args.file !== undefined
-      ? 'nemia factory rules takes --file or --clear, not both: --file writes the rules, --clear removes them.'
-      : leftOut(SPEC, args),
-  writes: true,
-  class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'] },
-  only: {
-    side: 'cli',
-    why: "the command line's alone in the table, which routes none of it: `objects`' Api declares the Factory's `rules`, `putRules` and `deleteRules`, whose handlers call this one by its `input`",
-  },
+export const FACTORY_RULES: Served<FactoryRules, RulesInput> = {
+  ...FACTORY_RULES_WORDS,
   input: RulesInput,
   handler: (args) => ruled(args),
-  print(data, args) {
-    const { name } = data;
-    if (data.removed !== undefined)
-      return [data.removed ? `${name}: rules removed, ${data.file} — ${KEPT}` : `${name} has no rules to remove`];
-    if (args.words !== undefined)
-      return [`${name}: rules written to ${data.file}, told to every agent hired into it in every run started from now — ${KEPT}`];
-    if (data.error !== null) return [`${name}: rules kept in ${data.file}`, `they cannot be told: ${data.error}`];
-    if (data.words === null)
-      return [`${name} has no rules. Write them with nemia factory rules ${name} --file <path>, or --file - for stdin.`];
-    return [`${name}: rules kept in ${data.file}`, '', data.words];
-  },
 };

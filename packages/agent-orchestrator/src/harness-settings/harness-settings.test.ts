@@ -1,11 +1,21 @@
 /**
  * A factory's harness settings: which keys a factory may set (`harnessSettingsRefusal`), and what a Claude Code step is filed with
- * (`filedSettings`), one table each, a row per input.
+ * (`filedSettings`), one table each, a row per input; and the keys and the harness `objects`' help of `nemia factory setting` names,
+ * held to this table's own.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
-import { filedSettings, harnessSettingsRefusal, settingKeyOf, withoutSetting, withSetting } from './harness-settings.ts';
+import { FACTORY_SETTABLE, FACTORY_SETTINGS_HARNESS } from 'objects';
+import {
+  filedSettings,
+  harnessSettingsRefusal,
+  SETTABLE,
+  SETTINGS_HARNESS,
+  settingKeyOf,
+  withoutSetting,
+  withSetting,
+} from './harness-settings.ts';
 import { HarnessSettings } from './harness-settings.model.ts';
 
 test('a factory sets the allowed Claude Code settings alone, each of its type', async (t) => {
@@ -76,4 +86,9 @@ test('a setting is named <harness>.<key>, set and taken off', async (t) => {
       claude: { language: 'x' },
     }),
   );
+});
+
+test("the help of `nemia factory setting` names this table's keys and harness, the words the client prints", () => {
+  assert.deepEqual([...FACTORY_SETTABLE].sort(), [...SETTABLE].sort());
+  assert.equal(FACTORY_SETTINGS_HARNESS, SETTINGS_HARNESS);
 });

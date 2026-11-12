@@ -1,12 +1,13 @@
 /**
- * The trust of a factory's places, at each verb that asks it, told as one story (`story`): `nemia factory add` and `nemia factory
- * trust` typed on a repository, a plain folder and a workspace cut from a repository, each leaving the harness's one key on the folder
- * the harness keeps it under, in a harness file of the test's own; `--no-trust` and a place already trusted writing nothing; the
- * listing saying a place that is not trusted, and nothing once it is; and where nothing is trusted: no factory, a place that does not
- * answer, a harness file that does not read. Each checkpoint opens on a harness file and a store of factories of its own (`anew`),
- * on a store of its own at `ROOT`, given as `ENV`.
+ * The trust of a factory's places, at each verb that asks it, told as one story (`story`): `nemia factory add` and `nemia factory trust`
+ * typed on a repository, a plain folder and a workspace cut from a repository, each leaving the harness's one key on the folder the
+ * harness keeps it under, in a harness file of the test's own; `--no-trust` and a place already trusted writing nothing; the listing
+ * saying a place that is not trusted, and nothing once it is; and where nothing is trusted: no factory, a place that does not answer, a
+ * harness file that does not read. Each verb is run onto its handler as the api calls it (`typed`), and what it answers is read: the
+ * client prints it, and its tests hold the lines. Each checkpoint opens on a harness file and a store of factories of its own (`anew`), on
+ * a store of its own at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,10 +18,11 @@ import { placeOver, unreadBy } from '../../test/place-over.ts';
 import { scratch } from 'test-kit/scratch';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
-import { main as cli } from '../cli/main.ts';
+import { typed as handlerOf } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
 import { readFactoriesAt } from '../factory/factory.store.ts';
 import type { Env } from '../config/config.store.ts';
+import type { PlaceTrust, Untrusted } from './trust.ts';
 
 const ROOT = scratch('wf-trust-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
@@ -37,17 +39,24 @@ function anew(): void {
   fs.rmSync(path.join(ROOT, 'factories'), { recursive: true, force: true });
 }
 
-/** `nemia`, as a person types it, on `place` (this test's by default): the lines it printed. */
-async function typed(t: TestContext, argv: string[], place = stand().place): Promise<string[]> {
-  const printed: string[] = [];
-  const mock = t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
-  try {
-    await cli(argv, engineOf(engine().layer), undefined, place, ENV);
-  } finally {
-    mock.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-}
+/** What `nemia factory add` and `nemia factory trust` answer of the trust they asked of each place. */
+type Asked = { name: string; trusts: readonly PlaceTrust[] };
+
+/** `nemia <argv>` run onto its handler on `place` (this test's by default): what it answers. */
+const typed = (argv: string[], place = stand().place): Promise<unknown> => handlerOf(argv, engineOf(engine().layer), undefined, place, ENV);
+
+/** What `nemia factory add` or `nemia factory trust` answered on `place`. */
+const asked = async (argv: string[], place = stand().place): Promise<Asked> => (await typed(argv, place)) as Asked;
+
+/** The places the listing says are not trusted, on `place`. */
+const untrusted = async (place = stand().place): Promise<readonly Untrusted[]> =>
+  ((await typed(['factory', 'ls'], place)) as { untrusted: readonly Untrusted[] }).untrusted;
+
+/** The trusts of `answer` written now, with what each grants and the way back. */
+const wrote = (answer: Asked) => answer.trusts.flatMap((one) => ('wrote' in one && one.wrote ? [one] : []));
+
+/** The trusts of `answer` that say anything: one written, one refused, one not asked. */
+const said = (answer: Asked) => answer.trusts.filter((one) => 'unasked' in one || one.wrote || one.refused !== null);
 
 /** The folders the harness's file says are trusted, in order. */
 const trusted = (): string[] => {
@@ -85,44 +94,43 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
     async () => {
       anew();
       const { repo, workspace, plain } = places();
-      const lines = await typed(t, ['factory', 'add', 'one', '--repo', repo, '--repo', plain]);
+      const added = await asked(['factory', 'add', 'one', '--repo', repo, '--repo', plain]);
       assert.deepEqual(trusted(), [plain, repo].sort());
-      assert.ok(lines.includes(`trusted for Claude Code: ${repo}`), lines.join('\n'));
-      assert.ok(lines.includes(`trusted for Claude Code: ${plain}`), lines.join('\n'));
-      assert.ok(
-        lines.includes(`  take it back: set projects["${repo}"].hasTrustDialogAccepted to false in ${file}`),
+      const written = wrote(added);
+      assert.deepEqual(
+        written.map((one) => [one.harness, one.place, one.folder]),
+        [
+          ['Claude Code', repo, repo],
+          ['Claude Code', plain, plain],
+        ],
+        'one a place, whatever the harnesses that share it',
+      );
+      assert.equal(
+        written[0]?.back,
+        `set projects["${repo}"].hasTrustDialogAccepted to false in ${file}`,
         'the way back names the key and the file',
       );
-      assert.ok(
-        lines.some((l) => l.startsWith('  it grants ') && l.includes(`${repo}/.claude/settings.json`)),
-        lines.join('\n'),
-      );
-      assert.equal(lines.filter((l) => l.startsWith('trusted for ')).length, 2, 'one line a place, whatever the harnesses that share it');
+      assert.ok(written[0]?.grants.includes(`${repo}/.claude/settings.json`), written[0]?.grants);
 
       fs.rmSync(file);
-      const inside = await typed(t, ['factory', 'add', 'two', '--repo', workspace]);
+      const inside = await asked(['factory', 'add', 'two', '--repo', workspace]);
       assert.deepEqual(trusted(), [repo], 'the key is on the main checkout, and none on the workspace');
-      assert.ok(inside.includes(`trusted for Claude Code: ${workspace} (kept under ${repo})`), inside.join('\n'));
+      assert.deepEqual(
+        wrote(inside).map((one) => [one.place, one.folder]),
+        [[workspace, repo]],
+      );
     },
   );
 
   await s.test('a place already trusted is left byte for byte and nothing is said of it; --no-trust writes nothing', async () => {
     anew();
     const { repo, plain } = places();
-    await typed(t, ['factory', 'add', 'one', '--repo', repo]);
+    await typed(['factory', 'add', 'one', '--repo', repo]);
     const bytes = fs.readFileSync(file);
-    const again = await typed(t, ['factory', 'add', 'two', '--repo', repo]);
-    assert.deepEqual(
-      again.filter((l) => /trusted for|not trusted/.test(l)),
-      [],
-    );
+    assert.deepEqual(said(await asked(['factory', 'add', 'two', '--repo', repo])), []);
     assert.ok(fs.readFileSync(file).equals(bytes));
 
-    const without = await typed(t, ['factory', 'add', 'three', '--repo', plain, '--no-trust']);
-    assert.deepEqual(
-      without.filter((l) => /trusted for|not trusted/.test(l)),
-      [],
-    );
+    assert.deepEqual((await asked(['factory', 'add', 'three', '--repo', plain, '--no-trust'])).trusts, []);
     assert.ok(fs.readFileSync(file).equals(bytes));
     assert.deepEqual(trusted(), [repo]);
   });
@@ -132,36 +140,47 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
     async () => {
       anew();
       const { repo, workspace, plain } = places();
-      await typed(t, ['factory', 'add', 'one', '--repo', workspace, '--repo', plain, '--no-trust']);
-      const listed = await typed(t, ['factory', 'ls']);
-      const lacking = listed.filter((l) => l.includes('not trusted for Claude Code'));
-      assert.equal(lacking.length, 2, listed.join('\n'));
-      assert.ok(lacking[0].includes(`: ${workspace} — withheld: `) && lacking[0].endsWith('Trust it: nemia factory trust one'), lacking[0]);
-      assert.ok(lacking[1].includes(`: ${plain} — withheld: `) && lacking[1].endsWith('Trust it: nemia factory trust one'), lacking[1]);
-      assert.deepEqual(await typed(t, ['factory']), listed, 'the bare form lists the same');
-
-      const done = await typed(t, ['factory', 'trust', 'one']);
-      assert.deepEqual(trusted(), [plain, repo].sort());
-      assert.ok(done.includes(`trusted for Claude Code: ${workspace} (kept under ${repo})`), done.join('\n'));
+      await typed(['factory', 'add', 'one', '--repo', workspace, '--repo', plain, '--no-trust']);
+      const lacking = await untrusted();
       assert.deepEqual(
-        (await typed(t, ['factory', 'ls'])).filter((l) => l.includes('not trusted')),
-        [],
+        lacking.map((one) => [one.factory, one.harness, one.place, one.never]),
+        [
+          ['one', 'Claude Code', workspace, null],
+          ['one', 'Claude Code', plain, null],
+        ],
+        'each with what is withheld, and the trust that gives it, since one can be kept',
       );
-      assert.deepEqual(await typed(t, ['factory', 'trust', 'one']), ['one  every place is trusted already: nothing was written']);
+      assert.ok(lacking.every((one) => one.withheld !== ''));
+      assert.deepEqual(await typed(['factory']), await typed(['factory', 'ls']), 'the bare form lists the same');
+
+      const done = await asked(['factory', 'trust', 'one']);
+      assert.deepEqual(trusted(), [plain, repo].sort());
+      assert.deepEqual(
+        wrote(done).map((one) => [one.place, one.folder]),
+        [
+          [workspace, repo],
+          [plain, plain],
+        ],
+      );
+      assert.deepEqual(await untrusted(), []);
+      assert.deepEqual(said(await asked(['factory', 'trust', 'one'])), [], 'every place is trusted already: nothing is written');
 
       takenBack(repo);
-      const after = (await typed(t, ['factory', 'ls'])).filter((l) => l.includes('not trusted'));
-      assert.equal(after.length, 1, 'a trust taken back by hand is read on the next listing, and never given again by one');
-      assert.ok(after[0].includes(`: ${workspace} — `));
+      const after = await untrusted();
+      assert.deepEqual(
+        after.map((one) => one.place),
+        [workspace],
+        'a trust taken back by hand is read on the next listing, and never given again by one',
+      );
       assert.deepEqual(trusted(), [plain]);
-      await typed(t, ['factory', 'trust', 'one']);
+      await typed(['factory', 'trust', 'one']);
       assert.deepEqual(trusted(), [plain, repo].sort());
     },
   );
 
   await s.test('REFUSED: factory trust of a name with no factory, as Missing, and nothing written', async () => {
     anew();
-    await assert.rejects(typed(t, ['factory', 'trust', 'nowhere']), (err: Error & { _tag?: string; exitCode?: number }) => {
+    await assert.rejects(typed(['factory', 'trust', 'nowhere']), (err: Error & { _tag?: string; exitCode?: number }) => {
       assert.equal(err._tag, 'Missing');
       assert.equal(err.exitCode, 2);
       assert.match(err.message, /no factory nowhere in the store\. .* Nothing was trusted\.$/);
@@ -176,20 +195,18 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       anew();
       const { repo } = places();
       const deaf = placeOver(stand().place, { root: () => unreadBy('root', 'the place did not answer in time') });
-      const lines = await typed(t, ['factory', 'add', 'one', '--repo', repo], deaf);
+      const added = await asked(['factory', 'add', 'one', '--repo', repo], deaf);
       assert.deepEqual(
         readFactoriesAt(ROOT).map((f) => f.name),
         ['one'],
       );
       assert.equal(fs.existsSync(file), false);
-      assert.ok(
-        lines.includes(`not trusted: ${repo} was not asked of — the place did not answer in time. Ask again: nemia factory trust one`),
-        lines.join('\n'),
-      );
       assert.deepEqual(
-        (await typed(t, ['factory', 'ls'], deaf)).filter((l) => l.includes('not trusted')),
-        [],
+        added.trusts.map((t) => [t.place, 'unasked' in t && typeof t.unasked]),
+        [[repo, 'string']],
+        'the place is said unasked, with why',
       );
+      assert.deepEqual(await untrusted(deaf), []);
     },
   );
 
@@ -199,12 +216,15 @@ test("a factory's places trusted: added, left as they are, listed and trusted by
       anew();
       const { repo } = places();
       fs.writeFileSync(file, '{');
-      const lines = await typed(t, ['factory', 'add', 'one', '--repo', repo]);
+      const added = await asked(['factory', 'add', 'one', '--repo', repo]);
       assert.equal(fs.readFileSync(file, 'utf8'), '{');
       assert.equal(readFactoriesAt(ROOT).length, 1);
-      const said = lines.filter((l) => l.startsWith('not trusted for Claude Code'));
-      assert.equal(said.length, 1, lines.join('\n'));
-      assert.match(said[0], /was left as it is, since it is not JSON: run Claude Code in .* once and accept its prompt$/);
+      const refused = added.trusts.flatMap((one) => ('refused' in one && one.refused !== null ? [one] : []));
+      assert.deepEqual(
+        refused.map((one) => [one.harness, one.place]),
+        [['Claude Code', repo]],
+      );
+      assert.ok(refused[0]?.refused?.includes('Claude Code'), 'the refusal names the harness to run once in the place');
     },
   );
 });

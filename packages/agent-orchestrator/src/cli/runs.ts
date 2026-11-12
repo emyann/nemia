@@ -1,19 +1,13 @@
 /**
- * The runners of `nemia factory instruct` and `nemia factory rules`, which read the words a file holds; and the
  * runner of `nemia rm` (`RM`), which walks the many runs a command line names through the entry's handler, and of `nemia prune`, which
  * hands them to the package's many-run verbs (`judgingMany`, `freeingMany`) and prints what they answer; each asks a person's yes and
  * tallies what was not done into the exit code; the runner of `nemia admit`, which reads the call on stdin; and of `nemia say`, which
  * reads who calls off the session's token.
  */
 import fs from 'node:fs';
-import path from 'node:path';
 import {
   admitted,
   PRUNE,
-  FACTORY_INSTRUCT,
-  FACTORY_RULES,
-  FACTORY_SERVER_ADD,
-  serverAddOf,
   freeingMany,
   judgingMany,
   pruneLines,
@@ -255,54 +249,6 @@ export async function pruneVerb(env: Env, args: Args, e: Engine, place: Place): 
     ),
   );
   return refusedNamed(tally);
-}
-
-/**
- * The words `--file` names for the command `name`: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read.
- */
-function wordsFrom(file: string, name: string): string {
-  try {
-    return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
-  } catch (err) {
-    return usage(
-      `nemia ${name} cannot read ${file === '-' ? 'stdin' : path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`,
-    );
-  }
-}
-
-/** A factory's words as `nemia factory rules` and `instruct` take them: the factory, the words `--file` names (`wordsFrom`), `--clear`. */
-const factoryWords = (args: Args, command: string): { factory: string; words?: string; clear?: boolean } => ({
-  factory: typeof args.factory === 'string' ? args.factory : '',
-  ...(typeof args.file === 'string' ? { words: wordsFrom(args.file, command) } : {}),
-  ...(args.clear === true ? { clear: true } : {}),
-});
-
-/**
- * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
- */
-export async function factoryInstructRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = factoryWords(args, FACTORY_INSTRUCT.name);
-  const data = await answered(env, e, place, FACTORY_INSTRUCT, asked);
-  for (const line of printed(FACTORY_INSTRUCT, data, asked)) console.log(line);
-}
-
-/**
- * `nemia factory rules`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
- */
-export async function factoryRulesRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = factoryWords(args, FACTORY_RULES.name);
-  const data = await answered(env, e, place, FACTORY_RULES, asked);
-  for (const line of printed(FACTORY_RULES, data, asked)) console.log(line);
-}
-
-/**
- * `nemia factory server add`'s runner: its flags mapped to the McpServer's write its handler takes (`serverAddOf`), handed to it, and what
- * it says printed.
- */
-export async function factoryServerAddRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = serverAddOf(args);
-  const data = await answered(env, e, place, FACTORY_SERVER_ADD, asked);
-  for (const line of printed(FACTORY_SERVER_ADD, data, asked)) console.log(line);
 }
 
 /**

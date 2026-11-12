@@ -643,7 +643,6 @@ const PINNED: Record<string, string[]> = {
     'mcpServerList',
     'mcpServerObject',
     'scheduleList',
-    'serverAddOf',
     'scheduleObject',
     'hireList',
     'hireObject',

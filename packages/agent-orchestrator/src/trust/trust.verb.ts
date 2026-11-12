@@ -4,18 +4,17 @@
  * back; `untrustedPlaces` reads which places are not trusted now, for a listing; and `nemia factory trust <name>`, the verb that asks
  * again (`FACTORY_TRUST`). The repository a folder is in is the place's answer (`root`), and the trust is the runtime's.
  */
-import { renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import { Effect, Schema } from 'effect';
 import { tried, trustFolder } from '../runtime-client.ts';
-import type { Flag } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { FACTORY_TRUST_WORDS } from 'objects';
+import type { Served } from '../command/entry.verb.ts';
 import { noFactoryLine } from '../factory/factory.ts';
 import { HARNESSES } from '../harness/harness.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { Missing } from '../refusal/refusal.ts';
-import { trustedLines, type PlaceTrust } from './trust.ts';
+import type { PlaceTrust } from './trust.ts';
 import { rootOf, untrustedPlaces } from './untrusted.verb.ts';
 
 export { untrustedPlaces };
@@ -58,9 +57,6 @@ export const trustPlaces = Effect.fn('trustPlaces')(function* (repos: readonly s
   return asked.flat();
 });
 
-/** `--no-trust`, on `nemia factory add` and `apply`: the factory filed, and no place of it trusted. */
-export const NO_TRUST: Flag = { flag: '--no-trust', kind: 'switch', key: 'noTrust' };
-
 /** What `nemia factory trust` takes: the factory whose places are trusted, by its name. */
 export const TrustInput = Schema.Struct({ factory: Schema.String });
 export type TrustInput = typeof TrustInput.Type;
@@ -87,20 +83,8 @@ function placesOf(home: string, name: string): readonly string[] {
  * `nemia factory trust`: the trust of one factory's places asked again, and what was done. Written where the store runs, in the trust
  * files of the harnesses of that machine: the api serves it as the Factory's `trust`, calling this handler.
  */
-export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[] }, TrustInput> = {
-  name: 'factory trust',
-  served: [{ endpoint: 'factories.trust', request: renamed({ factory: 'name' }) }],
-  usage: '<name>',
-  help: ["trust a factory's places for the harnesses its steps run on, so each", "place's own settings apply to them"],
-  spec: {
-    positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) =>
-      `nemia factory trust trusts one factory's places, and ${arg} is a second: nemia factory trust <name>, once per factory.`,
-    missing: 'nemia factory trust takes the name of the factory, as nemia factory ls lists it: nemia factory trust <name>.',
-  },
-  writes: true,
-  class: 'ask',
+export const FACTORY_TRUST: Served<{ name: string; trusts: readonly PlaceTrust[] }, TrustInput> = {
+  ...FACTORY_TRUST_WORDS,
   input: TrustInput,
   handler: ({ factory: name }) =>
     Effect.gen(function* () {
@@ -108,8 +92,4 @@ export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[
       const repos = yield* tried(() => placesOf(home, name));
       return { name, trusts: yield* trustPlaces(repos) };
     }),
-  print: ({ name, trusts }) => {
-    const lines = trustedLines(name, trusts);
-    return lines.length ? lines : [`${name}  every place is trusted already: nothing was written`];
-  },
 };

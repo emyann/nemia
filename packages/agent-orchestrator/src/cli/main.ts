@@ -62,7 +62,7 @@ import {
 import { forwardedOf, unlinked } from '../command/forward.verb.ts';
 import { printed, answered, forwardedOr, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, factoryInstructRun, factoryRulesRun, factoryServerAddRun, pruneVerb, rmVerb, sayRun } from './runs.ts';
+import { admitRun, pruneVerb, rmVerb, sayRun } from './runs.ts';
 import { startRun } from './start.ts';
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
@@ -197,10 +197,6 @@ type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<
 
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
- * whose runners walk the many runs a command line names through their handlers; and `nemia start`,
- * `nemia agents custom`, `nemia factory instruct` and `nemia policy propose`, whose runners read the files and folders a command line
- * names before their handlers; `nemia factory server
- * add`, whose runner maps its flags to the write its handler takes; `nemia say`, whose runner reads who calls off the session's token;
  * and `nemia admit`, whose runner reads the call on stdin: handed its
  * arguments once read and checked.
  */
@@ -210,9 +206,6 @@ export const RUNS: ReadonlyMap<string, Runner> = new Map<string, Runner>([
   ['rm', rmVerb],
   ['prune', pruneVerb],
   ['start', startRun],
-  ['factory instruct', factoryInstructRun],
-  ['factory rules', factoryRulesRun],
-  ['factory server add', factoryServerAddRun],
   ['admit', admitRun],
   ['pause', pauseRun],
   ['say', sayRun],

@@ -82,7 +82,8 @@ test('a person hires an agent into a step, replaces it, and fires it', async (t)
       ['Hire', { workflow: 'make', step: 'code', agent: 'implementer' }, 'factory', 'implementer'],
     );
     assert.deepEqual(hires(), { 'make/code': 'implementer' }, 'make.code reaches the verb as make/code');
-    assert.deepEqual(await answered<Hire>(app.request(HIRE)), hire, 'got as the write answered it');
+    const { written: _written, ...read } = hire;
+    assert.deepEqual(await answered<Hire>(app.request(HIRE)), read, 'got as the write answered it, but for what it wrote');
   });
   await s.test('a second PUT replaces it', async () => {
     assert.equal((await answered<Hire>(send('PUT', HIRE, { agent: 'agora' }))).spec.agent, 'agora');

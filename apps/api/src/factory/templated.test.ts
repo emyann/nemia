@@ -1,13 +1,13 @@
 /**
  * The Factory's writes that name a template or a folder, served as endpoints of `objects`' `Api` and calling the package's entries by
  * type: a factory filed (`nemia factory add`), a volume mounted and taken off (`nemia factory volume add`, `rm`), a factory made from a
- * template sent packed by `nemia template pack`'s code or named as a builtin (`nemia factory apply`), a hand-made one previewed and taken
- * over (`nemia factory diff`, `adopt`), a templated one previewed and upgraded by the plan's digest (`nemia factory diff`, `upgrade`), and
- * a conflict's choice sent as its text (`nemia factory resolve`). Each is a story in the harness's store whose answer is read back from
- * disk, then its refusals by status, each leaving the factory's file as it was; an archive sent is kept under the store where a factory
- * is made from it, and gone after a preview or a refusal. A factory filed or applied on a repository's git URL is cloned by the place
- * under the store, and refused with nothing filed where it cannot be. Over the stand-ins (`appOver`), a scratch builtin folder given to
- * the app.
+ * template sent packed by `nemia template pack`'s code, named as a builtin or by its folder's whole path (`nemia factory apply`), a
+ * hand-made one previewed and taken over (`nemia factory diff`, `adopt`), a templated one previewed and upgraded by the plan's digest
+ * (`nemia factory diff`, `upgrade`), and a conflict's choice sent as its text (`nemia factory resolve`). Each is a story in the harness's
+ * store whose answer is read back from disk, then its refusals by status, each leaving the factory's file as it was; an archive sent is
+ * kept under the store where a factory is made from it, and gone after a preview or a refusal. A factory filed or applied on a
+ * repository's git URL is cloned by the place under the store, and refused with nothing filed where it cannot be. Over the stand-ins
+ * (`appOver`), a scratch builtin folder given to the app.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -224,6 +224,20 @@ test('a person applies a template sent packed, and a builtin by its name; the ar
     assert.deepEqual([body.template.source, body.place], ['mill', path.join(builtins, 'mill')]);
     assert.deepEqual(sent(), before);
   });
+
+  await s.test(
+    "a template's folder of the api's machine, by its whole path, makes the factory read from it, and keeps nothing",
+    async () => {
+      const before = sent();
+      const body = await answered<FactoryApplied>(
+        send('POST', '/api/factories/foldered/apply', { template: { path: press }, repos: [repo], noTrust: true }),
+      );
+      assert.equal(body.template.source, press);
+      assert.equal(JSON.parse(fileOf('foldered') ?? '{}').template.source, press);
+      assert.deepEqual(sent(), before);
+      await refused('broken', () => send('POST', '/api/factories/broken/apply', { template: { path: 'press' }, repos: [repo] }), 422);
+    },
+  );
 
   await s.test(
     'REFUSED: bytes that are no archive and a name that is no template are 422s, nothing kept; a body past the bound a 413',

@@ -11,8 +11,9 @@ import { EngineService, tried } from '../runtime-client.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
 import { runsSummarized } from '../summary/summary.verb.ts';
 import { runInFactory, kindOf } from '../run-state/run-state.ts';
-import { leftOut, type Args, type Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { FACTORY_ADOPT_WORDS } from 'objects';
+import type { Args } from '../command/command.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
@@ -22,16 +23,6 @@ import { treeDir } from '../factory/applied/applied.store.ts';
 import { sourceGiven } from '../template/door/templates.ts';
 import { adopted, adoptPlan, adoptRefusal, templatedAdoptRefusal, type AdoptPlan } from './adopt.ts';
 import { adoptionAt, planDigest, stageAdoption } from './adopt.store.ts';
-import { templatePacked } from '../template/given.store.ts';
-
-/**
- * Why the command line takes a takeover by its arguments: the api serves it as the Factory's `adopt`, calling its handler with the
- * template by a builtin's name or packed.
- */
-const HERE = {
-  side: 'cli',
-  why: "the api serves it as the Factory's `adopt` of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name",
-} as const;
 
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -130,58 +121,6 @@ export const adoptPreview = Effect.fn('adoptPreview')(function* (args: Args) {
   return { kind: 'adopt', plan, digest, line: adoptLine(factory.name, source, sets, digest) } satisfies AdoptPreview;
 });
 
-/** `nemia factory adopt --help`: the takeover's manual. */
-export const ADOPT_HELP = `nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...]
-nemia factory adopt <name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>
-
-nemia factory adopt takes a factory you made by hand over by a template, in place, as nemia factory diff
-<name> --template <name|folder|archive> [--set ...] previewed it: --plan carries the digest the
-preview printed, and a plan that changed since — the factory's file, the template, its version,
-its parameters or its render — is refused. It writes the render into factories/<name>/applied/
-and tree/, then names the template in the factory's file: the tree's workflows, hires and
-revisions policy are read from then on, the file's own left in it, unread. Its name,
-repositories, schedules, instruction, cards, runs and stats stay; a run in flight keeps the
-workflow frozen on its record. The store's RULES.md is no longer read: the preview prints the
-nemia factory rules line that writes it into the tree. Refused: a factory made from a template
-already (upgrade it), a card filed and not started or a schedule naming a workflow the
-template does not offer, and a base or tree already there that is not the render.
-`;
-
-/** `nemia factory adopt`'s spec: the factory, `--template`, a `--set` per parameter, and `--plan`. */
-const ADOPT_SPEC: Spec = {
-  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [
-    {
-      flag: '--template',
-      kind: 'text',
-      key: 'template',
-      takes:
-        "--template takes a builtin template's name, the template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
-      twice: 'take --template once: a factory is taken over by one template.',
-    },
-    {
-      flag: '--set',
-      kind: 'text',
-      key: 'sets',
-      many: true,
-      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
-    },
-    {
-      flag: '--plan',
-      kind: 'text',
-      key: 'plan',
-      takes: '--plan takes the digest nemia factory diff printed for the takeover: --plan sha256:<hex>',
-      twice: 'take --plan once: a takeover carries the one plan it was previewed by.',
-    },
-  ],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory adopt does not take ${arg}. It takes the factory, --template <name|folder|archive>, --set <key>=<value> once per parameter, and --plan <digest>.`
-      : `nemia factory adopt takes one factory over, and ${arg} is a second: nemia factory adopt <name> --template <name|folder|archive> --plan <digest>.`,
-  missing:
-    'nemia factory adopt takes the factory to take over: nemia factory diff <name> --template <name|folder|archive> previews it, then nemia factory adopt <name> --template <name|folder|archive> --plan <digest>.',
-};
-
 /** What `nemia factory adopt` wrote: the factory, its file, the template it is now made from, and the tree it runs from. */
 type Adopted = { name: string; file: string; template: FactoryTemplate; tree: string };
 
@@ -221,25 +160,7 @@ const adoptedNow = Effect.fn('adoptedNow')(function* (args: Args) {
 });
 
 /** `nemia factory adopt`: a hand-made factory taken over in place by the template whose takeover `nemia factory diff` previewed. */
-export const FACTORY_ADOPT: Command<Adopted> = {
-  name: 'factory adopt',
-  served: [{ endpoint: 'factories.adopt', request: templatePacked }],
-  usage: '<name> --template <name|folder|archive> [--set <key>=<value> ...] --plan <digest>',
-  help: [
-    'take a hand-made factory over by a template, in place, as nemia factory',
-    'diff previewed it: its name, cards, runs and stats stay',
-  ],
-  spec: ADOPT_SPEC,
-  manual: ADOPT_HELP,
-  check: (args) => leftOut(ADOPT_SPEC, args),
-  writes: true,
-  class: 'ask',
-  asksAlways: true,
-  only: HERE,
+export const FACTORY_ADOPT: Served<Adopted> = {
+  ...FACTORY_ADOPT_WORDS,
   handler: (args) => adoptedNow(args),
-  print: ({ name, file, template, tree }) => [
-    `${name}: taken over by ${template.source} at ${template.version}`,
-    `filed: ${file}`,
-    `runs from ${tree}; the daemon writes its status on its next pass (nemia up)`,
-  ],
 };

@@ -5,7 +5,8 @@
  * its instruction, where it is kept (`nemia factory instruction`) and the words the store keeps (`nemia factory instruct`); its command
  * lines (`factoryCommandsOf`), built off the command table; its cost line per workflow, set and taken back (`nemia factory
  * cost-line`), its revisions policy (`nemia factory revisions`), a workflow attached and detached (`nemia factory attach`, `detach`) and
- * a harness setting set and taken off (`nemia factory setting`), each answered with the factory as it then reads; its places trusted
+ * a harness setting set and taken off (`nemia factory setting`), each answered with the factory as it then reads and what the write did
+ * (`written`: the file, and what it replaced); its places trusted
  * again where the store runs (`nemia factory trust`), answered with what was asked of each; and the factory removed (`nemia factory rm`),
  * answered with what was removed.
  *
@@ -56,6 +57,7 @@ import {
   type FactoryCreate,
   type FactoryDiffWrite,
   type FactoryPlan,
+  type FactoryWritten,
   type FactoryResolveWrite,
   type FactoryUpgradeWrite,
   type TemplateGiven,
@@ -93,25 +95,32 @@ const instruct = (method: string, name: string, args: { words?: string; clear?: 
  * the factory after.
  */
 const costLine = (method: string, name: string, workflow: string, usd?: number) =>
-  answeredWrite(async (s: Served) => {
-    factoryNamed(`${method} /api/factories/${name}/costlines/${workflow}`, name);
-    await s.inRequest(
-      usd === undefined
-        ? FACTORY_COST_LINE_RM.handler({ factory: name, workflow })
-        : FACTORY_COST_LINE_SET.handler({ factory: name, workflow, usd }),
-    );
-    return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+  writtenThen(`${method} /api/factories/${name}/costlines/${workflow}`, name, async (s) => {
+    if (usd === undefined) return { file: (await s.inRequest(FACTORY_COST_LINE_RM.handler({ factory: name, workflow }))).file };
+    const { file, replaced } = await s.inRequest(FACTORY_COST_LINE_SET.handler({ factory: name, workflow, usd }));
+    return { file, replaced };
   });
 
 /**
- * `write`, one of the package's writes of the factory `name` (`route` the request, named in a refusal of the name), run in the request,
- * then the factory as it reads after it.
+ * `nemia factory setting set`, where `value` is given, or `setting rm` (`method` the request's) of `factory`'s harness `setting`, answered
+ * with the factory after and the file written.
  */
-const writtenThen = (route: string, name: string, write: (s: Served) => Promise<unknown>) =>
+const settingWritten = (method: string, name: string, setting: string, value?: string) =>
+  writtenThen(`${method} /api/factories/${name}/settings/${setting}`, name, async (s) =>
+    value === undefined
+      ? { file: (await s.inRequest(FACTORY_SETTING_RM.handler({ factory: name, setting }))).file }
+      : { file: (await s.inRequest(FACTORY_SETTING_SET.handler({ factory: name, setting, value }))).file },
+  );
+
+/**
+ * `write`, one of the package's writes of the factory `name` (`route` the request, named in a refusal of the name), run in the request,
+ * then the factory as it reads after it, with what the write says it did (`written`).
+ */
+const writtenThen = (route: string, name: string, write: (s: Served) => Promise<FactoryWritten>) =>
   answeredWrite(async (s: Served) => {
     factoryNamed(route, name);
-    await write(s);
-    return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+    const written = await write(s);
+    return { ...(await s.inRequest(factoryObject(s.home, defaultRepo(s), name))), written };
   });
 
 /**
@@ -281,9 +290,10 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
       }),
     )
     .handle('setRevisions', ({ params: { name }, payload: { revisions } }) =>
-      writtenThen(`PUT /api/factories/${name}/revisions`, name, (s) =>
-        s.inRequest(FACTORY_REVISIONS.handler({ factory: name, revisions })),
-      ),
+      writtenThen(`PUT /api/factories/${name}/revisions`, name, async (s) => {
+        const { file, was } = await s.inRequest(FACTORY_REVISIONS.handler({ factory: name, revisions }));
+        return { file, was };
+      }),
     )
     .handle('trust', ({ params: { name } }) =>
       answeredWrite(async (s: Served) => {
@@ -292,25 +302,18 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
       }),
     )
     .handle('attach', ({ params: { name, workflow } }) =>
-      writtenThen(`PUT /api/factories/${name}/workflows/${workflow}`, name, (s) =>
-        s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow })),
-      ),
+      writtenThen(`PUT /api/factories/${name}/workflows/${workflow}`, name, async (s) => {
+        const { file, already } = await s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow }));
+        return { file, already };
+      }),
     )
     .handle('detach', ({ params: { name, workflow } }) =>
-      writtenThen(`DELETE /api/factories/${name}/workflows/${workflow}`, name, (s) =>
-        s.inRequest(FACTORY_DETACH.handler({ factory: name, workflow })),
-      ),
+      writtenThen(`DELETE /api/factories/${name}/workflows/${workflow}`, name, async (s) => ({
+        file: (await s.inRequest(FACTORY_DETACH.handler({ factory: name, workflow }))).file,
+      })),
     )
-    .handle('putSetting', ({ params: { name, setting }, payload: { value } }) =>
-      writtenThen(`PUT /api/factories/${name}/settings/${setting}`, name, (s) =>
-        s.inRequest(FACTORY_SETTING_SET.handler({ factory: name, setting, value })),
-      ),
-    )
-    .handle('deleteSetting', ({ params: { name, setting } }) =>
-      writtenThen(`DELETE /api/factories/${name}/settings/${setting}`, name, (s) =>
-        s.inRequest(FACTORY_SETTING_RM.handler({ factory: name, setting })),
-      ),
-    )
+    .handle('putSetting', ({ params: { name, setting }, payload: { value } }) => settingWritten('PUT', name, setting, value))
+    .handle('deleteSetting', ({ params: { name, setting } }) => settingWritten('DELETE', name, setting))
     .handle('commands', ({ params: { name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/factories/${name}/commands`, name);

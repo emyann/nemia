@@ -1,7 +1,8 @@
 /**
  * The hires group's handlers (`objects`' `Api`): a factory's Hires as objects, in its namespace, one per step it offers, named
  * `<workflow>.<step>` — a page of them (`hireList`), one (`hireObject`) — an agent hired into the step (`nemia factory hire`) and fired
- * from it (`factory fire`). A name two steps join to is read and written by neither: `Conflict`, naming both and the fix.
+ * from it (`factory fire`), each answered with what it wrote and the agent it replaced or fired (`written`). A name two steps join to is
+ * read and written by neither: `Conflict`, naming both and the fix.
  */
 import { FACTORY_FIRE, FACTORY_HIRE, hireList, hireObject } from 'agent-orchestrator';
 import { Api } from 'objects';
@@ -32,16 +33,16 @@ export const hiresHandlers = readsBounded(Api, 'hires', (handlers) =>
         factoryNamed(`PUT /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
         const step = `${spec.workflow}/${spec.step}`;
-        await s.inRequest(FACTORY_HIRE.handler({ factory: namespace, agent: payload.agent, step }));
-        return hireIn(s, namespace, name);
+        const { file, replaced } = await s.inRequest(FACTORY_HIRE.handler({ factory: namespace, agent: payload.agent, step }));
+        return { ...(await hireIn(s, namespace, name)), written: { file, was: replaced } };
       }),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         factoryNamed(`DELETE /api/namespaces/${namespace}/hires/${name}`, namespace);
         const { spec } = await hireIn(s, namespace, name);
-        await s.inRequest(FACTORY_FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }));
-        return hireIn(s, namespace, name);
+        const { file, fired } = await s.inRequest(FACTORY_FIRE.handler({ factory: namespace, step: `${spec.workflow}/${spec.step}` }));
+        return { ...(await hireIn(s, namespace, name)), written: { file, was: fired } };
       }),
     ),
 );

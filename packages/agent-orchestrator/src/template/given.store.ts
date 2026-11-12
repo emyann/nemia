@@ -2,7 +2,8 @@
  * A template as it travels to another machine's api (`objects`' `TemplateGiven`), and as that api takes it. On the machine a command is
  * typed on, a `--template` word is made the request's (`templateGiven`): a builtin template's name sent as it is, an archive's bytes as
  * they are, and a folder packed as `nemia template pack` packs it, each archive in base64; nothing of that machine's paths is sent. On the
- * api's, the template given is made the source a verb reads (`withTemplateTaken`): a name as it is, and an archive kept under the store
+ * api's, the template given is made the source a verb reads (`withTemplateTaken`): a name as it is, a path of the api's machine as it is
+ * where it is whole, and an archive kept under the store
  * by its name and the digest of its content (`sentTemplatesDir`), since a factory made from it reads it again on every pass of the
  * controller; one kept by this request alone is removed as the request ends where nothing was made of it.
  */
@@ -42,7 +43,8 @@ export const templateGiven = (given: string): Effect.Effect<TemplateGiven, Refus
 type Taken = { readonly source: string; readonly wrote: string | null };
 
 /**
- * The template `given` as a source under the store `home`: a name as it is, refused where it names no template (`Invalid`); an archive
+ * The template `given` as a source under the store `home`: a name as it is, refused where it names no template (`Invalid`); a path as it
+ * is, refused where it is not whole (`Invalid`); an archive
  * unpacked to be checked, refused as `unpackArchive` refuses it (`Invalid`), and kept at `<name>-<digest>.tgz`, written by this request
  * where none is there yet.
  */
@@ -53,6 +55,13 @@ function taken(home: string, given: TemplateGiven): Taken {
         message: `${JSON.stringify(given.name)} names no builtin template: name one by its folder's name, lowercase words joined by dashes, or send the template packed, { "archive": <base64 of nemia template pack's archive> }.`,
       });
     return { source: given.name, wrote: null };
+  }
+  if ('path' in given) {
+    if (!path.isAbsolute(given.path))
+      throw new Invalid({
+        message: `${JSON.stringify(given.path)} is no whole path: name the template's folder or archive on the machine the api runs on from its root, { "path": "/…" }, or send it packed, { "archive": <base64 of nemia template pack's archive> }.`,
+      });
+    return { source: given.path, wrote: null };
   }
   const bytes = Buffer.from(given.archive, 'base64');
   const { name, digest } = unpackArchive(bytes, ARCHIVE_LIMIT, 'the template sent');

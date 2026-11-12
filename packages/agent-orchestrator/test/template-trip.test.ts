@@ -30,7 +30,7 @@ import { startDue } from '../src/factory/schedule/schedule.verb.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { TemplateDoor } from '../src/template/door/templates.store.ts';
 import { TemplateSource } from '../src/template/door/templates.model.ts';
-import { main } from '../src/cli/main.ts';
+import { factoryTyped } from './factory-typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -42,7 +42,7 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 /** The time the controller's passes here are seeded at: the time each condition of the factory last moved. */
 const AT = '2026-11-01T09:00:00.000Z';
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
 function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
@@ -196,8 +196,10 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     fs.rmSync(again);
   });
 
-  await s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async (t) => {
-    const printed = await printedBy(t, 'factory', 'apply', 'trip', '--template', archive, '--repo', repo, '--set', 'budget=7');
+  await s.test("apply of the archive with --set files only the factory's file, and trusts the repository it names", async () => {
+    const made = (await stage.main(['factory', 'apply', 'trip', '--template', archive, '--repo', repo, '--set', 'budget=7'])) as {
+      trusts: ReadonlyArray<{ place: string; wrote?: boolean }>;
+    };
     assert.deepEqual(
       (fs.readdirSync(FACTORIES, { recursive: true }) as string[]).filter((f) => f.startsWith('trip')),
       ['trip.json'],
@@ -219,8 +221,8 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     );
     assert.deepEqual(trusted(), [repo]);
     assert.ok(
-      printed.some((line) => line.includes(repo) && /trusted for/.test(line)),
-      printed.join('\n'),
+      made.trusts.some((one) => one.place === repo && one.wrote === true),
+      JSON.stringify(made.trusts),
     );
   });
 
@@ -319,10 +321,17 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     assert.ok(message.includes('nemia factory diff trip --to 0.2.0'), message);
     assert.equal(status.digest, before.digest);
     assert.doesNotMatch(fs.readFileSync(path.join(treeDir(ROOT, 'trip'), REVIEW), 'utf8'), /^rounds: 5$/m);
-    const plan = await printedBy(t, 'factory', 'diff', 'trip', '--to', '0.2.0');
-    assert.equal(plan[0], 'trip: 0.1.0 → 0.2.0');
-    assert.ok(plan.includes(`  ${REVIEW}  from both, merged`), plan.join('\n'));
-    assert.ok(plan.includes('conflicts: 0'), plan.join('\n'));
+    const plan = (await stage.main(['factory', 'diff', 'trip', '--to', '0.2.0'])) as {
+      from: string;
+      to: string;
+      merge: { merged: ReadonlyArray<{ at: string; from: string }>; conflicts: readonly unknown[] };
+    };
+    assert.deepEqual([plan.from, plan.to], ['0.1.0', '0.2.0']);
+    assert.ok(
+      plan.merge.merged.some((m) => m.at === REVIEW && m.from === 'both'),
+      JSON.stringify(plan.merge.merged),
+    );
+    assert.deepEqual(plan.merge.conflicts, []);
     assert.deepEqual(readStatus(ROOT, 'trip'), status, 'the plan writes nothing');
     const board = stage.board();
     assert.deepEqual([board.filings, board.stopped], [[], []], 'no command of the trip filed on the engine');

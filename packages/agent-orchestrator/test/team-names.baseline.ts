@@ -85,7 +85,7 @@ export const TEAM_NAMES: Baseline = {
   'packages/agent-orchestrator/test/assess-endings.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/auto-rules.test.ts': { count: 7, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/decide.test.ts': { count: 3, ...TEAM_MOVES.fixtures },
-  'packages/agent-orchestrator/test/factory-rules.test.ts': { count: 53, ...TEAM_MOVES.fixtures },
+  'packages/agent-orchestrator/test/factory-rules.test.ts': { count: 43, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/factory-start.test.ts': { count: 129, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/build-implement.md': { count: 1, ...TEAM_MOVES.fixtures },
   'packages/agent-orchestrator/test/fixtures/former-frontmatter/build-land.md': { count: 1, ...TEAM_MOVES.fixtures },

@@ -6,7 +6,7 @@
 import { Schema } from 'effect';
 import { Run } from 'objects';
 import { asked } from '../objects.ts';
-import { spawned } from '../local.ts';
+import { handedOn } from '../local.ts';
 
 /** The run's id and whether `--raw` was typed, or none for words the old path is to read. */
 const parsed = (args: readonly string[]): { runId: string; raw: boolean } | undefined => {
@@ -20,7 +20,7 @@ const parsed = (args: readonly string[]): { runId: string; raw: boolean } | unde
 
 export async function show(args: readonly string[]): Promise<number> {
   const typed = parsed(args);
-  if (typed === undefined) return spawned(['show', ...args]);
+  if (typed === undefined) return handedOn(['show', ...args]);
   const { runId, raw } = typed;
   const answer = raw
     ? await asked('show', (client) => client.runs.record({ params: { name: runId } }))

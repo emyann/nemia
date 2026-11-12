@@ -182,6 +182,7 @@ export { HARNESS_CHOICES, HARNESS_KNOBS } from './harness/choices.ts';
 export {
   CAPABILITIES,
   DEFAULT_HARNESS,
+  DEFAULT_SIGN_IN,
   HARNESS_DECLARATIONS,
   declares,
   misplacedOf,

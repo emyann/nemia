@@ -13,7 +13,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | `packages/objects` | The objects' shapes: what every kind Nemia serves is, as a `nemia/v1` object (`apiVersion`, `kind`, `metadata`, and its spec and status), the metadata every object carries and the envelope of a list of it (`src/meta.ts`), and the HttpApi definition that serves them. It imports `effect` alone (`packages/objects/CLAUDE.md`). | `objects` → `src/index.ts`, the Schemas and constants, re-exported by name. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages but `objects`, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
-| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: the moved reads (`show`, `closeout`, `ls`, the inbox's read and `watch`, `READ_VERBS` in `apps/cli/contracts/route.contract.ts`) asked of the api serving the store over HTTP, a daemon started on demand where none serves; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words. It imports no package of ours but `objects`, and from the api only its client door's types. | Its commands. |
+| `apps/cli` | `nemia` and `wf`, as a client of the api, beside the board: the moved reads (`show`, `closeout`, `ls`, the inbox's read and `watch`, `READ_VERBS` in `apps/cli/src/route.ts`) asked of the api serving the store over HTTP, a daemon started on demand where none serves; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words. A context of the client's own config (`apps/cli/src/context.ts`, kubectl's way, `nemia config …`, `NEMIA_CONTEXT`) names a remote daemon and a person's token for it: its reads and its own verbs ask that daemon, a verb about the machine (`MACHINE_VERBS`) still runs here, and a store verb only the orchestrator's CLI has is refused rather than run on this machine's store. It imports no package of ours but `objects`, and from the api only its client door's types. | Its commands. |
 
 `apps/docs`, the documentation site, sits beside the layers and is none of them: it imports no workspace package and depends on
 none (`apps/docs/test/structure.test.ts`), and reads the repository's text at build, by path from its root. Its pages draw each state
@@ -32,7 +32,7 @@ runtime's `contract.test.ts`, the web's and the cli's `structure.test.ts`):
   `src/local.ts` (`apps/cli/test/structure.test.ts`, the cli's lint block, and the resolve in
   `packages/agent-orchestrator/test/contract.test.ts`). What it does not move — `decide` and every write but one — stays on that path;
   the one is `nemia apply`, which writes the objects a file holds through `objects`' typed client, beside `get` and `explain`, the
-  verbs the client alone has (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`, resource-objects' decision 5);
+  verbs the client alone has (`CLIENT_VERBS` in `apps/cli/src/route.ts`, resource-objects' decision 5);
 - the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
   api's lint block; that its source imports no runtime: the api's lint block, proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). The api's source reaches only the orchestrator; its tests may import the
@@ -187,6 +187,16 @@ parks every session, a job or one living in the daemon, at its tool call's end t
 (`drainSessions`), the timeout bounding the calls in flight; `nemia ls` and the board say such a step `paused` (reason `Paused`). A release is a tag built and
 checked under the store (`src/release/`): `nemia upgrade <tag>` exports it clean, builds it into `$WF_ROOT/releases/<tag>` on a trial store, switches the pointer `releases/current` by a rename
 and restarts the service onto it; `nemia version` says what runs and what the pointer names, and the lease keeps its daemon's `release`.
+An install may instead come as an archive, built once per platform by the repository's release workflow (`tools/release/archive.ts`)
+with its own Node, production dependencies, the board's built pages and a `release.json` saying `from: 'archive'`, its platform and its
+download base: `install.sh` unpacks it into the same `releases/<tag>`, and `nemia upgrade [<tag>]` downloads the next (the newest where
+none is named), checks its sum and switches the pointer as a build does (`src/release/archive.store.ts`). Moving forward the store is
+read in place; going back is refused past the oldest release that reads it, which `$WF_ROOT/store.json` records and each daemon raises
+to its own release's floor as it takes the store, never lowering it (`src/release/floor.ts`). An archive install's daemon asks for the
+newest release every six hours unless `NEMIA_RELEASE_CHECK=off` (`src/release/check.verb.ts`), which `nemia version` and the board say.
+The daemon, however started, loads the person's own sign-in token from its 0600 file (`nemia claude-token set`, `loadClaudeToken`,
+`src/sign-in/`) into the environment its sessions inherit where none is set; it never sends, logs or serves it. `nemia service install
+--size auto` sizes the sessions at once and each one's memory limit to the machine (`sizedFor`, `src/service/sizing.ts`).
 A release that is not current, not among the two newest, and that no running Nemia process nor session in flight runs on is removed
 after `nemia upgrade` and on a sweep of the daemon's every five minutes (`retain`, `src/retention/retention.verb.ts`).
 The same sweep removes what a crashed upgrade left — a build's folder or a pointer link whose process is gone — and build logs older
@@ -349,7 +359,11 @@ entry of the command table names the endpoints that serve it (`served`, an `Endp
 `commandBreaks`; an entry with none is the command line's alone, its `only.why` saying why), and each link is a tool, its input the
 endpoint's Schema and its call that endpoint, made in-process with the caller's own `Authorization`. Who a request is from is judged
 before any router (`callerGate`) by the route's need of a token (`TokenNeed`): the port needs a person's token (`nemia token add`); every
-route of a store marked exposed (`WF_EXPOSED=1`) needs one; else none is the person.
+route the api answers (`/api`, `/openapi`) of a store marked exposed (`WF_EXPOSED=1`) needs one; else none is the person. The api
+listens on this machine's loopback unless `NEMIA_BIND` names another address, which it takes on a store marked exposed alone (`bindOf`,
+`apps/api/src/port.ts`); TLS stays outside it. It serves the board's built pages beside `/api` on one origin (`apps/api/src/board/`),
+which need no token: the board's page asks for one where a read is refused for it, and the api keeps the pasted token as this browser's
+HttpOnly cookie (`POST /api/session`, `TOKEN_COOKIE`), read after a bearer and let past the write guard's host but not its site.
 
 **What a harness can do is the runtime's**: each harness declares it once (`HarnessDeclaration`, agent-runtime's
 `src/harness/declaration.ts`), and every check above that used to name a harness reads the declaration — the orchestrator through

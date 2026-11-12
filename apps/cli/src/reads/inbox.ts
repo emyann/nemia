@@ -8,7 +8,7 @@
 import path from 'node:path';
 import { Schema } from 'effect';
 import type { Table } from 'objects';
-import { spawned } from '../local.ts';
+import { handedOn } from '../local.ts';
 import { asked, READ_BOUND_MS } from '../objects.ts';
 import { storeRoot } from '../where.ts';
 import { AS_TABLE, tableAsked, tableLines, tableOf } from './table.ts';
@@ -39,7 +39,7 @@ export const inboxSaid = (listed: number, selector: readonly string[], ended: nu
 export async function inbox(args: readonly string[]): Promise<number> {
   const all = args.includes('--all');
   const read = tableAsked(args.filter((word) => word !== '--all'));
-  if (read === null || read.rest.length) return spawned(['inbox', ...args]);
+  if (read === null || read.rest.length) return handedOn(['inbox', ...args]);
   const { selector } = read;
   const listed = await asked(
     'inbox',

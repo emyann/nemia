@@ -82,7 +82,7 @@ import {
   KeyForm,
   type DefinitionOrigin,
 } from 'objects';
-import { decoded, ReadRefusal, WriteRefusal } from './read.ts';
+import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read.ts';
 
 /**
  * The origin a request is made under where there is no page to resolve its path against — the node tests: effect makes every request's
@@ -115,6 +115,8 @@ type How<A> = {
   may?: string;
   /** Keys the request is sent with beyond the ones the Api declares: the place a card is started in (`?factory=&repo=`). */
   query?: Record<string, string>;
+  /** Headers the request is sent with beyond the ones the Api declares: the token pasted on the token page, as its bearer. */
+  headers?: Record<string, string>;
 };
 
 /** `input`'s path and query: a request of the board's goes to its own api, wherever it is served. */
@@ -124,18 +126,27 @@ const pathOf = (input: RequestInfo | URL, query: Record<string, string> | undefi
   return `${url.pathname}${url.search}`;
 };
 
+/** `sent`, the headers the client made, with `more` set over them. */
+const withHeaders = (sent: HeadersInit | undefined, more: Record<string, string>): Headers => {
+  const headers = new Headers(sent);
+  for (const [name, value] of Object.entries(more)) headers.set(name, value);
+  return headers;
+};
+
 /** What a refusal of the api's says: its `error`. The board's one reading of a refusal's words: every answer is read through `call`. */
 const Said = Schema.Struct({ error: Schema.String });
 
 /**
  * Runs `use` of the client: resolves with its answer, decoded; rejects with `how.refuse` of the api's words and status where it refused,
  * with an `UnreadAnswer` where its answer does not decode, and with `fetch`'s own failure where nothing answered. `signal` aborts it.
+ * A refusal that asks this browser for a token (`tokenAskOf`) is told to the token page besides (`askToken`), whichever read it was:
+ * never one of a call that sends its own bearer (`signIn`), whose refusal is of the token it sends, not of what this browser keeps.
  */
 export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>, how: How<A>, signal?: AbortSignal): Promise<A> {
   let seen: Seen | undefined;
   const fetchSeen: typeof fetch = async (input, init) => {
     const path = pathOf(input, how.query);
-    const res = await globalThis.fetch(path, init);
+    const res = await globalThis.fetch(path, how.headers ? { ...init, headers: withHeaders(init?.headers, how.headers) } : init);
     seen = {
       route: `${init?.method ?? 'GET'} ${path.split('?')[0]}`,
       status: res.status,
@@ -154,6 +165,8 @@ export async function call<A>(use: (client: Client) => Effect.Effect<A, unknown>
   if (Exit.isSuccess(exit)) return exit.value;
   if (seen === undefined) throw Cause.squash(exit.cause);
   const body = await seen.body;
+  const ask = how.headers?.authorization === undefined ? tokenAskOf(seen.status, body) : null;
+  if (ask !== null) askToken(ask);
   if (seen.status >= 200 && seen.status < 300) return decoded(seen.route, how.schema, body, how.may);
   const said = Option.getOrUndefined(Schema.decodeUnknownOption(Said)(body))?.error;
   throw how.refuse(said ?? `${seen.route} answered ${seen.status} ${seen.statusText}`, seen.status, body);

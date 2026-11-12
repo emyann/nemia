@@ -4,9 +4,14 @@
  * (`ensureDaemon`) — and waited for by its readiness, `GET /api/health` answering at the url it said or its lease names, polled until it
  * answers or `READY_WITHIN_MS` is gone. A read never asks twice: it asks once, of a daemon that answered. Refused, exit 2, where none
  * comes up or the start is off (`NEMIA_DAEMON_START=off`), naming the command that reads in process and the one that installs the service.
+ *
+ * Under a remote context (`context.ts`) the daemon is the context's server: asked there, never started, and this machine's lease never
+ * read; one that takes no connection is refused, exit 2, naming the context and `nemia config get-contexts`. A context the config does
+ * not hold is refused too.
  */
 import { Effect, Option, Schedule } from 'effect';
 import { sessionHeaders } from './client.ts';
+import { chosenOf, unheld } from './context.ts';
 import { captured } from './local.ts';
 import { Refused } from './refused.ts';
 import { servedAt } from './where.ts';
@@ -97,11 +102,24 @@ export async function daemonStarted(
   return ready;
 }
 
+/** A remote context's daemon that takes no connection: refused, naming the context, how to see the contexts, and how to leave it. */
+const remoteDown = (verb: string, name: string, server: string): Refused =>
+  new Refused(
+    `nemia ${verb}: the daemon of the context ${name}, at ${server}, takes no connection. See that it runs there (\`nemia service status\` on its machine), check its address with \`nemia config get-contexts\`, or read this machine's store after \`nemia config use-context local\``,
+  );
+
 /**
- * The base url of the daemon serving this store, ready for a read: the lease's, where something listens there — answering, or holding the
- * connection silent, which the read's own bound then says — else one started now and waited for (`daemonStarted`).
+ * The base url of the daemon a read asks, ready: under a remote context its server, where something listens there, never a daemon
+ * started here; else this store's lease's, where something listens there — answering, or holding the connection silent, which the
+ * read's own bound then says — else one started now and waited for (`daemonStarted`).
  */
 export async function served(verb: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const chosen = chosenOf(env);
+  if (chosen.kind === 'refused') throw unheld(chosen.name);
+  if (chosen.kind === 'remote') {
+    if ((await probe(chosen.server, env)) !== 'refused') return chosen.server;
+    throw remoteDown(verb, chosen.name, chosen.server);
+  }
   const at = servedAt(env);
   if (at !== undefined && (await probe(at, env)) !== 'refused') return at;
   return daemonStarted(verb, env);

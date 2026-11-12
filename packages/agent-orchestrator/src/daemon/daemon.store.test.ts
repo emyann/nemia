@@ -47,6 +47,8 @@ import { telemetryLayer } from '../telemetry/telemetry.store.ts';
 import { dropSubscription, putSubscription } from '../subscription/subscription.store.ts';
 import { feedFile, feedSize } from '../feed/feed.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { readStoreFloor, storeFile, writeStoreFloor } from '../release/archive.store.ts';
+import { STORE_READABLE_FROM } from '../release/floor.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-daemon-');
@@ -1184,6 +1186,27 @@ test('`up` writes the feed a daemon started line once it holds the store, before
     'each line written before onTaken, as the daemon serves',
   );
   assert.equal(daemonLines().length, 2);
+  clear();
+});
+
+test('`up` raises a lower floor of the store to its own as it takes the store, and never lowers a higher one', async () => {
+  const taken = async () => {
+    clear();
+    await runPlaced(Effect.scoped(up(engineOf(), { every: 10, repo: ROOT, holder: 'api' }))).then(
+      () => assert.fail('the daemon returned'),
+      (err: unknown) => assert.equal(err, STOP),
+    );
+  };
+  writeStoreFloor(ROOT, { major: 0, minor: 1, patch: 0 });
+  await taken();
+  assert.deepEqual(readStoreFloor(ROOT), STORE_READABLE_FROM, 'raised to its own');
+  const higher = { major: STORE_READABLE_FROM.major + 1, minor: 0, patch: 0 };
+  writeStoreFloor(ROOT, higher);
+  await taken();
+  assert.deepEqual(readStoreFloor(ROOT), higher, 'a newer release wrote it: never lowered');
+  fs.rmSync(storeFile(ROOT), { force: true });
+  await taken();
+  assert.deepEqual(readStoreFloor(ROOT), STORE_READABLE_FROM, 'a store with none is given its own');
   clear();
 });
 

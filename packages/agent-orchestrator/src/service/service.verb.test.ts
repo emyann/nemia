@@ -33,6 +33,7 @@ import type { Env } from '../config/config.store.ts';
 import { pausingWords } from '../pause/pause.ts';
 import { LET_GO_MS } from 'agent-runtime';
 import { restartService } from './restart.verb.ts';
+import { plistRead, unitRead } from './service.ts';
 import { putPause, readPause, readPauseFile, pauseFile, resumePause } from '../pause/pause.store.ts';
 import { EngineService, engineOf, runWith as runEngine } from '../runtime-client.ts';
 import { nemiaFence } from '../admission/fence.ts';
@@ -104,6 +105,7 @@ type World = {
   root?: string;
   stopMs?: number;
   machine?: { platform: string; wsl: boolean; systemd: boolean };
+  size?: { memoryMiB: number; cpus: number };
 };
 
 /**
@@ -117,6 +119,7 @@ function hostOf(world: World): { host: ServiceHost; events: string[] } {
     dirs: () => ({ home: HOME, configHome: path.join(HOME, '.config') }),
     roots: () => ({ root: world.root ?? ROOT, defaultRoot: ROOT }),
     daemon: () => ({ checkout: '/srv/nemia', entry: '/srv/nemia/apps/api/src/main.ts', cwd: '/srv/nemia/apps/api' }),
+    size: () => world.size ?? { memoryMiB: 16384, cpus: 8 },
     node: '/usr/bin/node',
     path: '/usr/bin:/bin',
     user: () => ({ name: 'ann', uid: 1000 }),
@@ -848,5 +851,65 @@ test("the live host's pause names this process, so the daemon's pass lifts it on
     assert.equal(readPauseFile(ROOT)?.heldBy?.pid, process.pid);
   } finally {
     resumePause(ROOT);
+  }
+});
+
+test('--size auto on a 16 GiB, 8 CPU machine writes six sessions under 8 GiB each, read back off the unit; --bind writes the address and marks the store exposed', async () => {
+  const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
+  const done = await install({ size: 'auto', bind: '100.64.0.7' }, host);
+  const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
+  assert.equal(env.get('WF_MAX_CONCURRENT'), '6');
+  assert.equal(env.get('WF_MEMORY_LIMIT'), '8192Mi');
+  assert.equal(env.get('NEMIA_BIND'), '100.64.0.7');
+  assert.equal(env.get('WF_EXPOSED'), '1');
+  assert.ok(
+    done.lines.some((l) => l.includes('WF_MAX_CONCURRENT=6') && l.includes('WF_MEMORY_LIMIT=8192Mi')),
+    done.lines.join('\n'),
+  );
+});
+
+test('--size auto keeps what --env gives, and on launchd writes no memory limit and says so', async (t) => {
+  await t.test('a variable --env gives is written once, as given', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
+    await install({ size: 'auto', env: ['WF_MAX_CONCURRENT=3'] }, host);
+    const env = unitRead(fs.readFileSync(UNIT, 'utf8')).env;
+    assert.deepEqual(
+      env.filter(([k]) => k === 'WF_MAX_CONCURRENT'),
+      [['WF_MAX_CONCURRENT', '3']],
+    );
+    assert.equal(new Map(env).get('WF_MEMORY_LIMIT'), '8192Mi');
+  });
+
+  await t.test('launchd: the sessions sized, no memory limit written, and a line saying none applies', async () => {
+    const machine = { platform: 'darwin', wsl: false, systemd: false };
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: { memoryMiB: 16384, cpus: 8 } });
+    const done = await install({ size: 'auto' }, host);
+    t.after(() => fs.rmSync(done.file, { force: true }));
+    const env = new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env);
+    assert.equal(env.get('WF_MAX_CONCURRENT'), '6');
+    assert.equal(env.has('WF_MEMORY_LIMIT'), false);
+    assert.ok(
+      done.lines.some((l) => l.includes('no per-session memory limit')),
+      done.lines.join('\n'),
+    );
+  });
+});
+
+test('REFUSED: a --size other than auto, a machine too small to size, a --bind the api would refuse at every start, and --bind beside --env NEMIA_BIND: exit 2, no unit written', async () => {
+  const cases: [Args, { memoryMiB: number; cpus: number }][] = [
+    [{ size: 'large' }, { memoryMiB: 16384, cpus: 8 }],
+    [{ size: 'auto' }, { memoryMiB: 1024, cpus: 2 }],
+    [
+      { bind: '0.0.0.0', env: ['NEMIA_BIND=127.0.0.1'] },
+      { memoryMiB: 16384, cpus: 8 },
+    ],
+    [{ bind: 'a b' }, { memoryMiB: 16384, cpus: 8 }],
+    [{ bind: 'localhost' }, { memoryMiB: 16384, cpus: 8 }],
+    [{ bind: '[::1]' }, { memoryMiB: 16384, cpus: 8 }],
+  ];
+  for (const [args, size] of cases) {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size });
+    await assert.rejects(install(args, host), refusedWith('Invalid'), JSON.stringify(args));
+    assert.equal(fs.existsSync(UNIT), false, JSON.stringify(args));
   }
 });

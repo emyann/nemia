@@ -14,7 +14,9 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { storeConfigLayer, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { TOKEN_COOKIE } from 'objects';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
+import { needOf } from './caller.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -90,4 +92,132 @@ test("REFUSED 401 on the MCP port, exposed or not: no token, and a session's, ea
   const passed = await get(app, '/mcp', personToken);
   assert.notEqual(passed.status, 401, "the person's token passes the gate");
   assert.equal(passed.headers.get('www-authenticate'), null);
+});
+
+test('needOf: the MCP port needs the person, the api’s routes a token where exposed, and the board’s pages none', () => {
+  for (const path of ['/mcp', '/mcp/x']) {
+    assert.equal(needOf(path, false), 'person', path);
+    assert.equal(needOf(path, true), 'person', path);
+  }
+  for (const path of ['/api', '/api/runs', '/openapi', '/openapi/v3/nemia/v1']) {
+    assert.equal(needOf(path, true), 'token', path);
+    assert.equal(needOf(path, false), 'none', path);
+  }
+  for (const path of ['/', '/assets/x.js', '/runs/x', '/apifoo', '/mcpx']) {
+    assert.equal(needOf(path, true), 'none', path);
+    assert.equal(needOf(path, false), 'none', path);
+  }
+});
+
+/** A GET of `url` on `on`, presenting `token` by the board's cookie alone. */
+const byCookie = (on: () => ReturnType<typeof appOver>, url: string, token: string) =>
+  on().request(url, { headers: { cookie: `other=1; ${TOKEN_COOKIE}=${token}` } });
+
+test("a store marked exposed: the board's cookie holding a token of the person's reads its runs, with no Authorization", async () => {
+  assert.equal((await byCookie(exposed, '/api/runs', personToken)).status, 200);
+});
+
+test('REFUSED 401 unknown-token: a forged cookie is judged as a forged bearer is, exposed or not, and the refusal clears it', async () => {
+  for (const on of [exposed, app]) {
+    const res = await byCookie(on, '/api/runs', 'never-minted');
+    assert.equal(res.status, 401);
+    assert.equal(await reasonOf(res), 'unknown-token');
+    const cleared = setCookieOf(res);
+    assert.equal(cleared[0], `${TOKEN_COOKIE}=`);
+    assert.ok(cleared.includes('max-age=0'), 'the stale cookie is cleared');
+  }
+  const byBearer = await exposed().request('/api/runs', { headers: { authorization: 'Bearer never-minted' } });
+  assert.equal(byBearer.headers.get('set-cookie'), null, 'a refused bearer clears nothing');
+});
+
+test('a bearer is judged before the cookie: a live bearer passes beside a forged cookie', async () => {
+  const res = await exposed().request('/api/runs', {
+    headers: { authorization: `Bearer ${personToken}`, cookie: `${TOKEN_COOKIE}=never-minted` },
+  });
+  assert.equal(res.status, 200);
+});
+
+/** The `Set-Cookie` of `res`'s answer, split into its attributes, each in lower case but the first. */
+const setCookieOf = (res: Response): string[] =>
+  (res.headers.get('set-cookie') ?? '').split(';').map((part, i) => (i === 0 ? part.trim() : part.trim().toLowerCase()));
+
+/** A session request of `method` on `on`, as the board sends one: JSON, from its own page, presenting `bearer` where given. */
+const session = (
+  on: () => ReturnType<typeof appOver>,
+  method: 'POST' | 'DELETE',
+  bearer?: string,
+  url = 'http://127.0.0.1:8787/api/session',
+) =>
+  on().request(url, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      'sec-fetch-site': 'same-origin',
+      ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+    },
+    body: method === 'POST' ? '{}' : undefined,
+  });
+
+test("POST /api/session sets the person's token as the board's HttpOnly, SameSite=Strict cookie, Secure over https alone", async () => {
+  const res = await session(exposed, 'POST', personToken);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { cookie: 'set' });
+  const cookie = setCookieOf(res);
+  assert.equal(cookie[0], `${TOKEN_COOKIE}=${personToken}`);
+  for (const part of ['httponly', 'samesite=strict', 'path=/', 'max-age=2592000']) assert.ok(cookie.includes(part), part);
+  assert.ok(!cookie.includes('secure'), 'no Secure on plain http, which a browser would drop');
+  const https = setCookieOf(await session(exposed, 'POST', personToken, 'https://nemia.example/api/session'));
+  assert.ok(https.includes('secure'), 'Secure over https');
+  const proxied = setCookieOf(
+    await exposed().request('/api/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${personToken}`, 'x-forwarded-proto': 'https' },
+      body: '{}',
+    }),
+  );
+  assert.ok(proxied.includes('secure'), 'Secure behind a proxy that says https');
+});
+
+test('REFUSED: POST /api/session with no bearer, 400 where the store is not exposed, the gate’s 401 where it is', async () => {
+  const plain = await session(app, 'POST');
+  assert.equal(plain.status, 400);
+  assert.equal(plain.headers.get('set-cookie'), null);
+  const gated = await session(exposed, 'POST');
+  assert.equal(gated.status, 401);
+  assert.equal(await reasonOf(gated), 'token-required');
+  const forged = await session(exposed, 'POST', 'never-minted');
+  assert.equal(forged.status, 401);
+  assert.equal(await reasonOf(forged), 'unknown-token');
+  assert.equal(forged.headers.get('set-cookie'), null, 'a forged token sets no cookie');
+});
+
+test("DELETE /api/session clears the board's cookie, sent by the cookie alone from the board at a private network's address", async () => {
+  const res = await exposed().request('http://100.64.0.1:8787/api/session', {
+    method: 'DELETE',
+    headers: {
+      host: '100.64.0.1:8787',
+      'content-type': 'application/json',
+      'sec-fetch-site': 'same-origin',
+      cookie: `${TOKEN_COOKIE}=${personToken}`,
+    },
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { cookie: 'cleared' });
+  const cookie = setCookieOf(res);
+  assert.equal(cookie[0], `${TOKEN_COOKIE}=`);
+  for (const part of ['httponly', 'samesite=strict', 'path=/', 'max-age=0']) assert.ok(cookie.includes(part), part);
+});
+
+test("REFUSED 403 site: a write by the board's cookie alone from a page on another port of the same host", async () => {
+  const res = await exposed().request('http://100.64.0.1:8787/api/session', {
+    method: 'DELETE',
+    headers: {
+      host: '100.64.0.1:8787',
+      'content-type': 'application/json',
+      'sec-fetch-site': 'same-site',
+      cookie: `${TOKEN_COOKIE}=${personToken}`,
+    },
+  });
+  assert.equal(res.status, 403);
+  assert.equal(await reasonOf(res), 'site');
 });

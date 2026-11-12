@@ -15,6 +15,13 @@
  * send that header without the browser asking the api first, which the api never answers, and cannot know a token; behind a proxy or a
  * tunnel the `Host` is the store's public name, which only a token makes safe. The token itself is judged before the guard (`callerGate`,
  * src/caller/caller.ts), a token refused there never reaching it, so presenting one here means a live one. It still says a JSON body.
+ *
+ * A write that presents a token by the board's cookie alone (`cookie`, `objects`' `TOKEN_COOKIE`: the HttpOnly cookie the api sets
+ * (`POST /api/session`) once a person pastes a token of theirs into the board, which no script of the page reads, and the one credential
+ * a browser sends on a stream it follows) passes the host, but not the site. The host: a site whose name was pointed at this machine is
+ * another origin, which the browser never hands the cookie, and a board reached at a private network's address names that address. Not
+ * the site: a cookie is the browser's to send, scoped by host and not by port, and `SameSite=Strict` by site, so a page on another port
+ * of the same host carries it; only the board's own page, `same-origin`, or no browser, writes by it.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { loopback, saysJson, type WriteRefusal, type WriteRequest } from '../src/guard.ts';
@@ -40,8 +47,14 @@ const ours = (site: string | undefined): boolean => site === undefined || site =
 /** Whether `contentType` says a JSON body, its parameters (`; charset=utf-8`) and its case left out. */
 const json = (contentType: string | undefined): boolean => contentType !== undefined && saysJson(contentType);
 
-/** Whether a write may come from where it says it does: this machine, from no other site, or with a token, from anywhere. */
-const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || (here(r.host) && ours(r.site));
+/** Whether a write presents a token by the board's cookie. */
+const byCookie = (r: WriteRequest): boolean => r.cookie;
+
+/**
+ * Whether a write may come from where it says it does: this machine, from no other site; with the board's cookie, from no other site at
+ * whatever host; or with a bearer token, from anywhere.
+ */
+const fromWhereItMay = (r: WriteRequest): boolean => r.bearer || ((here(r.host) || byCookie(r)) && ours(r.site));
 
 const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
   ensures: {
@@ -51,11 +64,17 @@ const writeRefusedSpec = spec<(request: WriteRequest) => WriteRefusal | null>({
     },
     anotherHostIsRefused: {
       description: 'A write with no token addressed to a name that is not this machine is refused for its host, before anything else',
-      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || here(r.host) || output === 'host',
+      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || byCookie(r) || here(r.host) || output === 'host',
     },
     anotherSiteIsRefused: {
-      description: 'A write with no token to this machine made by a page on another site, same-site included, is refused for its site',
-      condition: ({ input: [r], output }) => reads(r.method) || r.bearer || !here(r.host) || ours(r.site) || output === 'site',
+      description:
+        'A write with no bearer token, to this machine or by the board’s cookie, made by a page on another site, same-site included, is refused for its site',
+      condition: ({ input: [r], output }) =>
+        reads(r.method) || r.bearer || !(here(r.host) || byCookie(r)) || ours(r.site) || output === 'site',
+    },
+    aCookiePassesTheHost: {
+      description: 'A write that presents the board’s cookie is never refused for its host',
+      condition: ({ input: [r], output }) => !byCookie(r) || output !== 'host',
     },
     aTokenPassesHostAndSite: {
       description: 'A write that presents a token is never refused for its host or its site',

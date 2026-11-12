@@ -9,7 +9,7 @@
  */
 import type { MisplacedOf, TakersOf, VerbHarnessOf } from '../../contracts/capability.contract.ts';
 import type { ClaudeRules } from './claude/rules.ts';
-import { CLAUDE_DECLARATION } from './claude/vocabulary.ts';
+import { CLAUDE_DECLARATION, CLAUDE_SIGN_IN } from './claude/vocabulary.ts';
 import { CODEX_DECLARATION } from './codex/vocabulary.ts';
 import { COMMAND_DECLARATION } from './command/vocabulary.ts';
 
@@ -158,6 +158,12 @@ export const HARNESS_DECLARATIONS: Readonly<Record<string, HarnessDeclaration>> 
 
 /** The harness a task that names none runs on: the first of `HARNESS_DECLARATIONS`. */
 export const DEFAULT_HARNESS = 'claude';
+
+/**
+ * How a person hands the default harness a long-lived token where no browser can: the variable it reads the token from, and the
+ * command that prints one. A layer above keeps the person's token and gives it to the sessions it starts by this variable.
+ */
+export const DEFAULT_SIGN_IN: { readonly variable: string; readonly maker: string } = CLAUDE_SIGN_IN;
 
 /** Whether a declaration lists `capability`: a runner of the consumer's (`undefined`) declares nothing. */
 export const declares = (can: readonly Capability[] | undefined, capability: Capability): boolean =>

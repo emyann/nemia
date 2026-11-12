@@ -8,13 +8,27 @@
   "terms": [
     {
       "term": "Route",
-      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`) whatever else is typed; `process`, for every other verb, a help and a moved read typed with `--local`, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`).",
+      "meaning": "which way a command goes (`routeOf`, `apps/cli/src/route.ts`): `api`, for a moved read (`READ_VERBS`: `show`, `closeout`, `ls`, the inbox's read, `watch`) asked of the api over HTTP, and for the client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) whatever else is typed; `process`, for every other verb, a help, a moved read typed with `--local`, and a machine verb, run on the orchestrator's own CLI in a process of its own (`apps/cli/src/local.ts`); `refused`, a verb about the store only that path has, typed under a remote context, refused exit 2 naming `nemia config use-context local`.",
       "type": "Route"
     },
     {
       "term": "Client verb",
-      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/contracts/route.contract.ts`: `get`, `apply`, `explain`, `propose`, `proposals`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
+      "meaning": "a verb this client alone has, generic over every kind the api serves (`CLIENT_VERBS` in `apps/cli/src/route.ts`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`): no process answers it, so it asks the api whatever else is typed, says its own help, and refuses `--local`, naming `nemia service status`. Each kind is called through one table, `KIND_CALLS` (`apps/cli/src/objects/kinds.ts`), and a word names a resource by discovery (`resourceNamed`, `apps/cli/src/objects/resource.ts`).",
       "type": "ClientVerb"
+    },
+    {
+      "term": "Context",
+      "meaning": "a named daemon this client asks, kubectl's way (`contextOf`, `apps/cli/src/context.ts`, proved by `apps/cli/contracts/context.contract.ts`): the client's config file, `${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml` (mode 0600), holds each context's name, server and a person's token for it, and the one in use; `NEMIA_CONTEXT` names one for a single command. None named, or `local`, is this machine's store; a name the file does not hold is refused, exit 2, naming `nemia config get-contexts`. Written and read by `nemia config use-context <name>`, `set-context <name> --server <url> --token-file <file>`, `get-contexts` and `current-context`; the token is read from a file, never the command line, and no verb prints it.",
+      "type": "Chosen"
+    },
+    {
+      "term": "Remote context",
+      "meaning": "a context that names a daemon on another machine (`Chosen` of kind `remote`, `apps/cli/src/context.ts`): the moved reads and the client's verbs ask its server with its token as `Authorization: Bearer` (`sessionHeaders`, `apps/cli/src/client.ts`, `WF_SESSION_TOKEN` first), this machine's lease is never read (`servedAt`, `apps/cli/src/where.ts`), no daemon is started here (`served`, `apps/cli/src/daemon.ts`), and a verb about the store only the in-process path has is refused (`notHere`)."
+    },
+    {
+      "term": "Machine verb",
+      "meaning": "a verb about the machine this client runs on, never a remote daemon's (`MACHINE_VERBS` in `apps/cli/src/route.ts`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`): it runs on the orchestrator's own CLI here whatever context is in use, a context the config does not hold included.",
+      "type": "MachineVerb"
     },
     {
       "term": "get",

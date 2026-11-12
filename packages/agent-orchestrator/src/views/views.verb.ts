@@ -41,7 +41,7 @@ import { blockedWord, currentTurn, killedMemoryOf, phaseOfView, unsignedEnd, wor
 import { outOfMemory } from '../out-of-memory/out-of-memory.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
-import { ranOnWords, sessionRanOn } from '../release/release.ts';
+import { ranOnWords, sessionRanOn } from '../release/index.ts';
 import { RunId } from '../record/record.model.ts';
 
 /**

@@ -19,9 +19,13 @@ export type Staged = { readonly heads: readonly string[]; readonly conflicts: re
 /** A directory that holds a branch's files: the repository's own, at its root, or a workspace cut from it. */
 export type Checkout = { readonly dir: string; readonly branch: string; staged?: Staged };
 
-/** One repository: its root, and its commits, branches and tags by name, and its checkouts by directory. */
+/**
+ * One repository: its root, and its commits, branches and tags by name, and its checkouts by directory; and, for one cloned, the branch
+ * that follows the branch of the same name of the repository it was cloned from, at `origin` (its remote, as git's clone sets it).
+ */
 export type Repository = {
   readonly root: string;
+  readonly follows?: { readonly branch: string; readonly origin: string };
   readonly commits: Map<string, Commit>;
   readonly branches: Map<string, string>;
   readonly tags: Map<string, string>;

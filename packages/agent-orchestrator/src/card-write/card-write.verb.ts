@@ -3,6 +3,7 @@
  * door (`replaceCard`), refused as `cardWriteRefusal` says; and the `resourceVersion` a card is served and compared at (`cardVersion`).
  * A controller: Effect programs over the Card and Run doors.
  */
+import { modelsText } from '../start/index.ts';
 import { versionDigest } from '../digest/digest.ts';
 import { Effect } from 'effect';
 import { type CardWrite, DEFAULT_NAMESPACE } from 'objects';
@@ -45,8 +46,8 @@ const refusalOf = (refusal: CardWriteRefusal, card: InboxCard, file: string, sta
 
 /**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written whole from `write` (the Card's
- * update): its `workflow:`, `repo:`, `gate:`, `from:` and body as `write.spec` says — a key it leaves out taken off — its labels as
- * `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept. Written
+ * update): its `workflow:`, `repo:`, `gate:`, `model:`, `from:` and body as `write.spec` says — a key it leaves out taken off — its labels
+ * as `write.metadata.labels` says where it says (`{}` takes them all off; absent keeps them), its `queued:` and `factory:` kept. Written
  * through the Card door as `nemia inbox from` writes one (`cardText`), and not written at all where the file would read the same, so a
  * write of every key as it is leaves the file and its `resourceVersion` as they were.
  *
@@ -94,6 +95,7 @@ export const replaceCard = Effect.fn('replaceCard')(function* (name: string, nam
         workflow: spec.workflow,
         repo: spec.repo,
         gate: spec.gate,
+        model: spec.model && modelsText(spec.model),
         from: fromLine(spec.from),
         labels: { ...labels },
       },

@@ -107,7 +107,7 @@ export function destinationRefusal(dest: string, sources: readonly string[]): st
 }
 
 /** The place's verbs that change a repository or a checkout: each refused by `readOnlyPlace`. */
-export const PLACE_WRITES = ['open', 'make', 'handoff', 'land', 'remove', 'export', 'seal'] as const;
+export const PLACE_WRITES = ['open', 'follow', 'make', 'handoff', 'land', 'remove', 'export', 'seal'] as const;
 
 const isWrite = (verb: string): boolean => (PLACE_WRITES as readonly string[]).includes(verb);
 

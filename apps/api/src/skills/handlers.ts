@@ -16,6 +16,7 @@ import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, ski
 import { SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, Invalid, type Skill, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import {
   librarySkills,
   listSkills,
@@ -72,8 +73,13 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
  */
 async function heldIn(s: Served): Promise<Held<Row>[]> {
   const own = await treeSkillsHeld(s, 'factory');
-  const places = await listSkills((dirs) => readsOf(s, dirs), s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
-  const theirs = repoSkillsDir(s.repo);
+  const places = await listSkills(
+    (dirs) => readsOf(s, dirs),
+    repoNeeded(s),
+    s.home,
+    await s.inRequest(yourSkillsRead(repoNeeded(s), s.home)),
+  );
+  const theirs = repoSkillsDir(repoNeeded(s));
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
   const folded = skillFoldersIn(theirs)
     .filter((name) => !listedRepo.has(name))
@@ -113,10 +119,10 @@ export async function skillObjectsOf(s: Served, served: ReturnType<typeof served
         const { spec: read, unread } = specOf(row, name);
         const spec: SkillSpec = files.length > 0 ? { ...read, files } : read;
         const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
-        const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
+        const usedBy = yield* skillUsers(dir, name, repoNeeded(s), s.home, s.factory?.tree);
         const copyHint =
           origin === 'yours'
-            ? skillCopyCommand(dir, repoSkillsDir(s.repo))
+            ? skillCopyCommand(dir, repoSkillsDir(repoNeeded(s)))
             : origin === 'repo'
               ? skillCopyCommand(dir, librarySkills(s.home))
               : null;

@@ -48,6 +48,7 @@ import {
   Invalid,
 } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
@@ -74,14 +75,17 @@ const treeAgents = (s: Served) =>
     const dir = path.join(tree, 'workflows', AGENTS_FOLDER);
     const read: AgentReading[] = [];
     for (const name of markdownNamesIn(dir)) {
-      const one = yield* agentRead('repo', dir, name, { repo: s.repo, home: s.home });
+      const one = yield* agentRead('repo', dir, name, { repo: repoNeeded(s), home: s.home });
       if (one) read.push(one);
     }
     return read;
   });
 
 /** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
-const fillsIn = (s: Served) => ({ filled: stepsFilled(s.repo, s.home, s.factory), byFile: factoriesFilling(listedAtOnce(s.home), s.home) });
+const fillsIn = (s: Served) => ({
+  filled: stepsFilled(repoNeeded(s), s.home, s.factory),
+  byFile: factoriesFilling(listedAtOnce(s.home), s.home),
+});
 
 /**
  * The agents of the factory's tree (`<tree>/workflows/agents`), each held at `origin` — `factory` in a namespace, `builtin` for a
@@ -90,7 +94,7 @@ const fillsIn = (s: Served) => ({ filled: stepsFilled(s.repo, s.home, s.factory)
  */
 export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
   const tree = await s.inRequest(treeAgents(s));
-  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, s.repo, s.home, s.factory?.tree)));
+  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoNeeded(s), s.home, s.factory?.tree)));
   return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item }));
 }
 
@@ -106,7 +110,7 @@ async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
   const listings = await s.inRequest(
     Effect.forEach(
       agents.filter((one) => !trees.has(one.file)),
-      (one) => listingOf(one, s.repo, s.home),
+      (one) => listingOf(one, repoNeeded(s), s.home),
     ),
   );
   const elsewhere = inFactory(listings, fills.filled, fills.byFile, s.factory);

@@ -22,5 +22,9 @@ orchestrator, the api, the board and the client import it through its one entry,
 - **`effect/http-api` and `effect/http` are marked `@stability unstable`** (the paths effect 4.1.2 exports them by): their names may
   move in a minor release of effect, which is why `effect` is pinned exactly (`4.1.2`) here as in every package, and moved in every
   package at once.
+- **One client of the api**: `apiClient` (`src/api-client.ts`) is the one constructor of the `Api`'s typed client, which the client,
+  the orchestrator's CLI forwarded and the board each make, and what it sets up around the contract (a bodiless write's `{}`, the
+  bearer, the headers, the bound, an undeclared status decoded into `Answered`) is decided there alone. Any other `HttpApiClient`
+  constructor in the repository is refused, with no baseline (`tools/guards/test/one-api-client.test.ts`).
 - **Run one test** from this folder: `node --test test/<file>.test.ts`; the whole package: `npx turbo run test --force --continue
   --filter=objects`.

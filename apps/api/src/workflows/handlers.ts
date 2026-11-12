@@ -33,6 +33,7 @@ import {
 } from 'agent-orchestrator';
 import { Api, API_VERSION, Conflict, Invalid, Missing, type Need, type Workflow, type WorkflowFile, type WorkflowStep } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoNeeded } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
@@ -97,7 +98,7 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
 /** Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository, yours. */
 export const heldIn = (s: Served): Held<Folder>[] => [
   ...treeWorkflowsHeld(s, 'factory'),
-  ...foldersHeld(s, 'repo', 'repo', path.join(s.repo, 'workflows')),
+  ...foldersHeld(s, 'repo', 'repo', path.join(repoNeeded(s), 'workflows')),
   ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
 ];
 
@@ -200,18 +201,19 @@ const workflowObject = (
  * factory of its wiring as one applied from it is.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
+  const repo = repoNeeded(s);
   const loaded = await loadedOf(
     s.e,
     s,
     served.map((f) => f.item.dir),
-    s.repo,
+    repo,
     s.home,
     s.factory,
   );
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: { from, dir } }) =>
       Effect.gen(function* () {
-        const version = yield* workflowVersion(dir, placesOf(s.repo, s.home));
+        const version = yield* workflowVersion(dir, placesOf(repo, s.home));
         const revision = namespace === undefined ? undefined : yield* definitionRevision('workflow', name, version);
         const folder = loadedAt(loaded, dir);
         return workflowObject(namespace, origin, shadowedBy, listingOf(name, from, dir, folder, version, s.factory), folder, revision);
@@ -245,7 +247,7 @@ const writing = (s: Served, name: string, changes: boolean) => ({
   trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
-  repo: s.repo,
+  repo: repoNeeded(s),
   home: s.home,
   changes,
   inRequest: s.inRequest,
@@ -297,7 +299,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
           });
         const at = writing(s, name, true);
-        const now = await s.inRequest(workflowVersion(at.dir, placesOf(s.repo, s.home)));
+        const now = await s.inRequest(workflowVersion(at.dir, placesOf(repoNeeded(s), s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
         return workflowAt(s, namespace, name, 'yours');

@@ -21,7 +21,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { declared } from '../../place/memory/place.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
-import { claudeTokenFile, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
+import { claudeTokenFile, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
 import { signInNeedOf } from './harness.ts';
 import { readinessOf, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
 
@@ -128,6 +128,15 @@ test('the kept token reaches the sign-in check, said as set and loading, never a
     const kept = (await read(facts({ PATH: '/usr/bin:/bin' }), identity('exit 0'))).pieces.find((p) => p.name === SIGN_IN);
     assert.equal(kept?.state, 'met');
     assert.doesNotMatch(kept?.message ?? '', /\bvalid\b|\bgood\b(?! shows)/);
+    const year = new Date(Date.now() - 340 * 86_400_000);
+    fs.utimesSync(claudeTokenFile(ROOT), year, year);
+    const old = (await read(facts({ PATH: '/usr/bin:/bin' }), identity('exit 0'))).pieces.find((p) => p.name === SIGN_IN);
+    assert.equal(old?.state, 'met', 'a token about eleven months old still loads');
+    assert.ok(
+      old?.fixes.some((f) => f.command.startsWith(TOKEN_MAKER) && f.command.includes(`${TOKEN_NAME} set`)),
+      'it offers the commands that make a new one',
+    );
+    assert.equal(old?.message.includes('a-token'), false, 'never the token');
     fs.chmodSync(claudeTokenFile(ROOT), 0o644);
     const open = (await read(facts({ PATH: '/usr/bin:/bin' }), identity('exit 0'))).pieces.find((p) => p.name === SIGN_IN);
     assert.equal(open?.state, 'missing');

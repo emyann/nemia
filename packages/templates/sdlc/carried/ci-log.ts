@@ -21,8 +21,24 @@ const DETAIL_LINES = 14;
 /** The byte order mark GitHub opens a job's log with, built from its code so no raw mark sits in this file. */
 const BOM = String.fromCharCode(0xfeff);
 
-/** A line of a job's log as GitHub serves it, without the timestamp it prefixes each with and the mark it opens the log with. */
-const unstamped = (line: string): string => line.replace(BOM, '').replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?|\r$/g, '');
+/** The terminal's escape and bell, built from their codes so no raw one sits in this file. */
+const [ESC, BEL] = [String.fromCharCode(0x1b), String.fromCharCode(0x07)];
+
+/**
+ * A terminal escape sequence, which a job's log is full of: a control sequence (`ESC [ … m`, a colour), an operating system command
+ * (`ESC ] … BEL`, or ended by `ESC \`: a link, a title), or a two-byte escape. The next try reads plain lines.
+ */
+const ESCAPES = new RegExp(String.raw`${ESC}\[[0-?]*[ -/]*[@-~]|${ESC}\][^${BEL}${ESC}]*(?:${BEL}|${ESC}\\)|${ESC}[@-_]`, 'g');
+
+/**
+ * A line of a job's log as GitHub serves it, without its escape sequences (`ESCAPES`), the timestamp it prefixes each with and the mark
+ * it opens the log with.
+ */
+const unstamped = (line: string): string =>
+  line
+    .replace(ESCAPES, '')
+    .replace(BOM, '')
+    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?|\r$/g, '');
 
 /** A line without the prefix a monorepo's task runner gave it (`pkg:test: `), as Nemia's own check reads one. */
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');

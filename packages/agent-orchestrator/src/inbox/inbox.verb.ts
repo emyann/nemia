@@ -3,6 +3,7 @@
  * taking the card out of the inbox; and the inbox listed with each card's state (`inboxJudged`), which reads each started card's run's
  * phase. A controller: Effect programs, which reach the runtime through `start/start.verb.ts` and the judged list.
  */
+import { modelsText, type RunModels } from '../start/index.ts';
 import { setting } from '../config/config.store.ts';
 import { DEFAULT_NAMESPACE } from 'objects';
 import path from 'node:path';
@@ -84,6 +85,8 @@ export type InboxStart = {
   cards?: readonly string[];
   /** The steps its run is gated at (`nemia start --gate`), beside the card's own `gate:`. */
   gates?: readonly string[];
+  /** The model each step it names runs on in its run alone (`nemia start --model`), over the card's own `model:` for the same step. */
+  models?: RunModels;
   /** The start's label edits (`nemia start --label`), over the card's own `labels:` and what its runs agree on. */
   labels?: readonly string[];
 };
@@ -151,7 +154,9 @@ const cardFactory = Effect.fn('cardFactory')(function* (
  * `nemia start <folder>` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming
  * the repository's workflows. The factory is `factory`, else the card's `factory:`. The repository is `repo`, else the card's `repo:`, else
  * the factory's one repository, else `callerRepo` (`factoryRepo`), chosen before the workflow is found in it; `start()` judges the factory.
- * The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
+ * The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once. Its steps run on the card's
+ * `model:` and on `models`, a step both name on `models`' (`withModels`), each refused as `start()` refuses a `--model`, in the words of
+ * the card's line where it said the step's (`modelSaid`).
  *
  * The record is written first, so taking `queued:` off, should it fail, leaves a card the record keeps out of the queue; it says so in
  * `queueLeft`. A started card is not started again (`startedRefusal`). Refused by name before anything is written, exit 2: a name that is
@@ -208,6 +213,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     cards: opts.cards,
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
+    ...cardModels(card, opts.models),
     ...(factory !== undefined ? { factory } : {}),
     labels: { ...(card.labels !== undefined ? { card: card.labels } : {}), edits: opts.labels ?? [] },
   });
@@ -249,6 +255,21 @@ const cardGates = Effect.fn('cardGates')(function* (card: InboxCard, flags: read
   }
   return [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
 });
+
+/**
+ * The models a card's run is started with: its `model:`, and `flags` (`--model`) over it for the same step, each said where it was
+ * (`modelSaid`); none where neither names one.
+ */
+const cardModels = (card: InboxCard, flags: RunModels | undefined): { models?: RunModels; modelSaid?: (step: string) => string } => {
+  const models = { ...card.model, ...flags };
+  return Object.keys(models).length ? { models, modelSaid: (step) => modelSaid(card, flags, step) } : {};
+};
+
+/** Where a card's run was told a step's model: the card's `model:` line, unless the start's `--model` names that step too. */
+const modelSaid = (card: InboxCard, flags: RunModels | undefined, step: string): string =>
+  flags?.[step] !== undefined || card.model === undefined
+    ? `--model ${step}=${flags?.[step] ?? ''}`
+    : `${card.file}: \`model: ${modelsText(card.model)}\``;
 
 /**
  * The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says.

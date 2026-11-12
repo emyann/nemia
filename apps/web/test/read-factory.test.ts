@@ -56,7 +56,7 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
 
 const readInbox = inboxAllQuery(undefined).queryFn as unknown as () => Promise<InboxEntry[]>;
 const readCard = cardQuery('x').queryFn as unknown as () => Promise<InboxCardPage>;
-const readCapabilities = capabilitiesQuery.queryFn as unknown as () => Promise<Capabilities>;
+const readCapabilities = capabilitiesQuery({}).queryFn as unknown as () => Promise<Capabilities>;
 const readCeilings = ceilingsQuery.queryFn as unknown as () => Promise<Ceilings>;
 
 /** A factory's rules as the api answers them: kept in its file, with words. */
@@ -136,7 +136,13 @@ function serving(t: { after: (fn: () => void) => void }, answer: (url: string, m
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
-    sent.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    sent.push({
+      method,
+      url,
+      body: init?.body
+        ? JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body as Uint8Array))
+        : undefined,
+    });
     return new Response(JSON.stringify(answer(url, method)), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   t.after(() => {
@@ -285,7 +291,7 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
     assert.deepEqual(sent, [
       { method: 'GET', url: '/api/factories/the%20mill/rules', body: undefined },
       { method: 'PUT', url: '/api/factories/the%20mill/rules', body: { words: 'Never push.' } },
-      { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: undefined },
+      { method: 'DELETE', url: '/api/factories/the%20mill/rules', body: {} },
     ]);
   });
   await t.test("a cost line is set and cleared at its workflow's route under the factory, and read back as the Factory", async (t) => {
@@ -294,7 +300,7 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
     await clearCostLine('the mill', 'build');
     assert.deepEqual(sent, [
       { method: 'PUT', url: '/api/factories/the%20mill/costlines/build', body: { usd: 80 } },
-      { method: 'DELETE', url: '/api/factories/the%20mill/costlines/build', body: undefined },
+      { method: 'DELETE', url: '/api/factories/the%20mill/costlines/build', body: {} },
     ]);
   });
   await t.test("a hire and a fire are sent to the step's Hire, named <workflow>.<step>, and read back as the Hire", async (t) => {
@@ -305,7 +311,7 @@ test("a factory's writes: its rules, a hire and a fire, each at its own route, e
     assert.deepEqual(await fireAgent('mill', 'build/implement'), hireObject(undefined));
     assert.deepEqual(sent, [
       { url: '/api/namespaces/mill/hires/build.implement', method: 'PUT', body: { agent: 'implementer' } },
-      { url: '/api/namespaces/mill/hires/build.implement', method: 'DELETE', body: undefined },
+      { url: '/api/namespaces/mill/hires/build.implement', method: 'DELETE', body: {} },
     ]);
     answer = { file: '/f/mill.json', replaced: null };
     await assert.rejects(hireAgent('mill', 'build/implement', 'implementer'), (err: unknown) => {

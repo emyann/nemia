@@ -24,7 +24,7 @@ import { tried } from '../runtime-client.ts';
 import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
-import { claudeTokenStatus } from '../sign-in/sign-in.store.ts';
+import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
 import { fixCommandOf, type FixAt } from './needs.ts';
 import { harnessOfNeed, harnessVersionWord, signInNeedOf, versionIn } from './harness.ts';
 import { trustCommandOf } from '../trust/trust.ts';
@@ -223,7 +223,9 @@ const VERSION_WORDS = {
  * Each harness the runtime declares needs for, as its two pieces off `memo` (`harnessNeeds`), area `harness`, each naming its harness and
  * which of its needs it is (`harness`): the install, its message saying the version found against the pin where it is in place
  * (`harnessVersionWord`); and the sign-in. The default harness's sign-in is missing, whatever its check says, while the token the store
- * keeps is readable by others, since such a file does not load: its fix is the `chmod 600` that lets only the person read it.
+ * keeps is readable by others, since such a file does not load: its fix is the `chmod 600` that lets only the person read it. A kept
+ * token that loads says its age, off its file's write time, and near or past its year its warning (`tokenWarningLine`), with the commands
+ * that make a new one: still met, since it loads.
  */
 function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts): ReadinessPiece[] {
   return memo.harnessNeeds.flatMap((need) => {
@@ -254,9 +256,31 @@ function harnessPieces(home: string, memo: NeedsMemo, facts: ReadinessFacts): Re
         ),
       ];
     const later = 'whether it is still good shows only when a session or the quota is refused';
-    const message =
-      read === 'met' && status.state === 'set' ? `${need.message}: a token is kept and loads (${status.file}), and ${later}` : need.message;
-    return [needPiece(need, 'harness', read, undefined, undefined, harness, message)];
+    if (read !== 'met' || status.state !== 'set') return [needPiece(need, 'harness', read, undefined, undefined, harness)];
+    const warning = tokenWarningLine(status);
+    if (warning !== undefined)
+      return [
+        piece(
+          need.name,
+          'harness',
+          'met',
+          warning,
+          [typed(`make a new one: ${TOKEN_RENEWAL}`, `${TOKEN_MAKER} && nemia ${TOKEN_NAME} set && nemia service restart`)],
+          harness,
+        ),
+      ];
+    const age = tokenAgeWords(status) ?? 'its age unread';
+    return [
+      needPiece(
+        need,
+        'harness',
+        read,
+        undefined,
+        undefined,
+        harness,
+        `${need.message}: a token is kept and loads (${status.file}, ${age}), and ${later}`,
+      ),
+    ];
   });
 }
 

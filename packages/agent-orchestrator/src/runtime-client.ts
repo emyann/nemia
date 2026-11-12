@@ -91,6 +91,7 @@ export type {
 /** What the engine's `forget` removed, or would, and its refusal by task (`engineForgetting`). */
 export { ForgetRefused, type ForgetReport, type KeptReport } from 'agent-runtime';
 export { codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from 'agent-runtime';
+export { claudeSignIn, CLAUDE_SIGN_IN_MS, type ClaudeSignIn } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 

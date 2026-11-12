@@ -41,6 +41,7 @@ const facts = Layer.succeed(Facts, (env: NodeJS.ProcessEnv) => ({
   exists: () => false,
   run: () => undefined,
   signIn: () => ({ state: 'unknown' as const }),
+  ownSignIn: () => 'unknown' as const,
   running: runningRelease(),
 }));
 

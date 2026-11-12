@@ -34,6 +34,7 @@ const facts = (env: Record<string, string>, answers: Record<string, CommandRead>
   run: (command, args) =>
     Object.hasOwn(answers, [command, ...args].join(' ')) ? answers[[command, ...args].join(' ')] : { code: 0, out: '' },
   signIn: () => ({ state: 'unknown' }),
+  ownSignIn: () => 'signed-out',
   running: { kind: 'checkout', root: ROOT },
 });
 
@@ -68,4 +69,11 @@ test('a missing place need, a missing token and a stopped service each read miss
   assert.ok(need?.fixes.some((f) => f.command.startsWith('nemia readiness fix identity')));
   assert.equal(got.pieces.find((p) => p.name === TOKEN_NAME)?.state, 'missing');
   assert.equal(got.pieces.find((p) => p.area === 'service')?.state, 'missing');
+});
+
+test("with no token kept or given, Claude Code's own login meets the harness piece, said as signed in, never as good", async () => {
+  const got = await read({ ...facts({ PATH: '/usr/bin' }), ownSignIn: () => 'signed-in' }, identity('exit 0'));
+  const token = got.pieces.find((p) => p.name === TOKEN_NAME);
+  assert.equal(token?.state, 'met');
+  assert.doesNotMatch(token?.message ?? '', /\bvalid\b|\bgood\b(?! shows)/);
 });

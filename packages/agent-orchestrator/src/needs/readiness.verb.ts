@@ -10,7 +10,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { codexSignIn, CODEX_SIGN_IN_COMMAND, CODEX_SIGN_IN_MS, type CodexSignIn } from '../runtime-client.ts';
+import {
+  claudeSignIn,
+  CLAUDE_SIGN_IN_MS,
+  codexSignIn,
+  CODEX_SIGN_IN_COMMAND,
+  CODEX_SIGN_IN_MS,
+  type ClaudeSignIn,
+  type CodexSignIn,
+} from '../runtime-client.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessFix, ReadinessPiece } from 'objects';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
@@ -36,7 +44,7 @@ export type CommandRead = { readonly code: number | null; readonly out: string }
 /**
  * The machine's facts the read asks, each a seam a test hands its own: the environment the api listens under (`NEMIA_BIND`,
  * `NEMIA_BIND_PUBLIC`, the default harness's token variable, PATH), the user, whether a file is there, a command run with its answer, the
- * second harness's sign-in (`codexSignIn`), and the release this process runs.
+ * default harness's own login (`claudeSignIn`), the second harness's sign-in (`codexSignIn`), and the release this process runs.
  */
 export type ReadinessFacts = {
   readonly env: Env;
@@ -44,6 +52,7 @@ export type ReadinessFacts = {
   readonly exists: (file: string) => boolean;
   readonly run: (command: string, args: readonly string[]) => CommandRead;
   readonly signIn: (env: Env) => CodexSignIn;
+  readonly ownSignIn: (env: Env) => ClaudeSignIn;
   readonly running: Running;
 };
 
@@ -60,6 +69,7 @@ export const liveFacts = (): ReadinessFacts => ({
     return ran.error !== undefined ? undefined : { code: ran.status, out: `${ran.stdout ?? ''}${ran.stderr ?? ''}` };
   },
   signIn: (env) => codexSignIn({ ...env }, CODEX_SIGN_IN_MS),
+  ownSignIn: (env) => claudeSignIn({ ...env }, CLAUDE_SIGN_IN_MS),
   running: runningRelease(),
 });
 
@@ -83,7 +93,8 @@ const piece = (
 ): ReadinessPiece => ({ name, area, state, message, fixes, ...more });
 
 /**
- * The default harness's sign-in: its token kept in the store (`claudeTokenStatus`) or given in the environment. Said as set and loading,
+ * The default harness's sign-in: its token kept in the store (`claudeTokenStatus`), given in the environment, or, with neither, its own
+ * login (`claudeSignIn`), which a session runs under as well. Said as set and loading,
  * never as good: the harness takes any token at its word, so an expired or wrong one shows only when a session or the quota is refused.
  */
 function harnessPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
@@ -99,6 +110,8 @@ function harnessPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
     ]);
   if (status.state === 'set') return piece(name, 'harness', 'met', `a ${own} is set and loads (${status.file}): ${later}`);
   if (facts.env[TOKEN_VARIABLE]) return piece(name, 'harness', 'met', `a ${own} is set and loads (${TOKEN_VARIABLE}): ${later}`);
+  if (facts.ownSignIn(facts.env) === 'signed-in')
+    return piece(name, 'harness', 'met', `no ${own} is kept, and ${capital(DEFAULT_HARNESS)} Code is signed in by its own login: ${later}`);
   return piece(name, 'harness', 'missing', `no ${own} is kept: a session signs in with it`, [make]);
 }
 

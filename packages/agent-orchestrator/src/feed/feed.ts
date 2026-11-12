@@ -601,7 +601,6 @@ function levelLines(fold: FeedFold, at: string, levels: FeedLevels): StoreLine[]
 }
 
 /**
-/**
  * The store's readiness as the daemon last read it (`readinessOf`, swept beside the passes): the read's pieces, of which the feed says
  * those a run waits on that are missing. A caller that did not read it passes nothing, and the feed then says nothing of it.
  */

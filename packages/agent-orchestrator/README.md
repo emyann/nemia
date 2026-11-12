@@ -113,7 +113,8 @@ what the feed said of that factory last, so a set from the board or the CLI, a r
 writes, are each one line, and a factory at `manual` the feed has said nothing of gets none; it is one of Nemia's selectors
 (`reason=LevelChanged`), and every subscription is handed it, scoped or not, so a factory set down to `manual` is heard. The store's
 readiness is a line of the store too, a word that stands as a level does: the daemon reads its readiness (`readinessOf`) beside the
-needs' sweep, every `NEEDS_EVERY`, and hands each pass the latest read; while a piece a run waits on is missing the pass writes one
+needs' sweep, every `NEEDS_EVERY`, running no command on the loop it shares with the passes (`sweptFacts`: a piece only a command
+reads, as the service or a harness's version, reads unknown there, and `nemia doctor` reads it), and hands each pass the latest read; while a piece a run waits on is missing the pass writes one
 `not ready`, `reason: "NotReady"`, `type: "Warning"`, its note each such piece and the command of its fix (`mise (nemia/quick): nemia
 doctor fix mise --factory nemia --workflow quick; …`), again only where what is missing moves, and once none is one `ready`, `reason:
 "Ready"`, both the tick's. Each is read off the feed's own lines, never remembered, so a restarted daemon says it again exactly where the

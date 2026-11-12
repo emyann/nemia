@@ -10,7 +10,7 @@ import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Cause, Effect, Schema } from 'effect';
-import { Readiness, readinessSaid, runsWait } from 'objects';
+import { Readiness, readinessSaid, runsWait, type ReadinessPiece } from 'objects';
 import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { PlaceService, type Place } from '../place/place.store.ts';
@@ -241,8 +241,10 @@ function readinessOfJson(out: string): Readiness | string {
  * The installed release's own readiness read, run once the daemon was restarted onto it: `releases/current`'s `nemia doctor --json` on
  * the store at `root`, which asks that daemon, so the pieces it reads are the new release's — this process's code is the older one's
  * and cannot know them. Where a run waits on a missing piece (`runsWait`), one line saying the store is not ready (`readinessSaid`), then
- * each missing piece a run waits on with the fixes that put it there; nothing where it reads ready. A read that does not answer is one
- * line naming the command to type. Never a refusal: the upgrade itself succeeded.
+ * each missing piece a run waits on with the fixes that put it there; nothing where it reads ready. The client's own pieces (area
+ * `client`: the server reached, the token taken, `nemia` on PATH) hold no run of the store's and are never among them: one of them
+ * missing that a run waits on means the server's read did not reach this command, which says so, with the piece's fix. A read that does
+ * not answer is one line naming the command to type. Never a refusal: the upgrade itself succeeded.
  */
 function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS.ProcessEnv): string[] {
   const ran = spawnSync(installedNemia(root, archive), ['doctor', '--json'], {
@@ -254,10 +256,17 @@ function readinessAfter(tag: string, root: string, archive: boolean, env: NodeJS
   const read = ran.error === undefined ? readinessOfJson(ran.stdout) : ran.error.message;
   if (typeof read === 'string')
     return [`what ${tag} needs before a run could not be read (nemia doctor --json: ${read}): read it with nemia doctor`];
-  if (!runsWait(read)) return [];
-  const missing = read.pieces.filter((p) => p.state === 'missing' && (p.cost ?? 'run') === 'run');
+  const held = (p: ReadinessPiece): boolean => p.state === 'missing' && (p.cost ?? 'run') === 'run';
+  const unreached = read.pieces.find((p) => p.area === 'client' && held(p));
+  if (unreached !== undefined)
+    return [
+      `what ${tag} needs before a run could not be read: ${unreached.message}${unreached.fixes[0] ? ` (${unreached.fixes[0].command})` : ''}, then read it with nemia doctor`,
+    ];
+  const server = { ...read, pieces: read.pieces.filter((p) => p.area !== 'client') };
+  if (!runsWait(server)) return [];
+  const missing = server.pieces.filter(held);
   return [
-    `on ${tag} the store is ${readinessSaid(read)}; every new run is held until each is in place:`,
+    `on ${tag} the store is ${readinessSaid(server)}; every new run is held until each is in place:`,
     ...missing.flatMap((p) => [
       `  ✗ ${p.name}${p.factory === undefined ? '' : ` (${[p.factory, p.workflow].filter((w) => w !== undefined).join('/')})`}: ${p.message}`,
       ...p.fixes.map((f) => `      ${f.command}  — ${f.message}`),

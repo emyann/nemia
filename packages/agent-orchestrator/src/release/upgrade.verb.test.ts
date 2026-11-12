@@ -600,6 +600,38 @@ test('an upgrade onto a release whose read is not ready says each missing piece 
     }
   });
 
+  await s.test(
+    "a read the server refused, the client's token missing, says no run is held: one line naming the token's fix, and it succeeds",
+    async () => {
+      const client = (name: string, cost: ReadinessPiece['cost'], command?: string): ReadinessPiece => ({
+        name,
+        area: 'client',
+        state: 'missing',
+        message: `${name} is missing`,
+        fixes: command === undefined ? [] : [{ message: `${name} is missing`, command, startable: false }],
+        cost,
+      });
+      readAs({
+        ready: false,
+        pieces: [
+          client('token-accepted', 'run', 'nemia config set-context local --token-file <file>'),
+          client('local-bin-on-path', 'client'),
+        ],
+      });
+      try {
+        const done = await run({ tag: 'v13', repo: REPO }, onPointer());
+        const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
+        const after = done.lines.slice(restart + 1).filter((l) => !l.startsWith('removed '));
+        assert.equal(after.length, 1, after.join('\n'));
+        assert.ok(after[0]?.includes('nemia config set-context local --token-file'), after[0]);
+        assert.doesNotMatch(after[0] ?? '', /not ready|held/, 'no run is said held on a piece of the client');
+      } finally {
+        readAs({ ready: true, pieces: [] });
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
   await s.test('a read that does not answer is one line naming nemia doctor, and the upgrade still succeeds', async () => {
     fs.writeFileSync(READ, 'not json');
     try {

@@ -16,11 +16,21 @@ import { liveFacts, readinessOf, type ReadinessFacts } from './readiness.verb.ts
 export const needs = (memo: NeedsMemo) => sweepLoop(() => needsOnce(memo), NEEDS_EVERY, "The machine's needs could not be read this sweep");
 
 /**
- * The store's readiness read, for as long as the daemon runs: `readinessOf` over the needs' memory `memo` the sweep above fills, the
- * machine's facts read afresh each time (`facts`), each read handed to `keep`, then a rest of `NEEDS_EVERY`. A read that fails keeps
- * the one before, which the passes go on handing the feed.
+ * The machine's facts as the daemon's sweep reads them: this process's (`liveFacts`), but that a command is never run — `run` answers
+ * that it did not start — since `liveFacts` runs each with `spawnSync`, and the sweep shares its loop with the passes, the api and the
+ * feed's streams. So a piece only a command reads (the service, the linger, the user's service manager, a harness's version) reads
+ * `unknown` or its version unread, never `missing`, and the feed's level is what the needs' memory, filled by the needs' sweep off the
+ * loop (`needsOnce`), and the store's files say: the place's, the workflows' and the harnesses' needs, the tools folder, a factory.
+ * `nemia doctor` still runs every command.
  */
-export const readied = (memo: NeedsMemo, keep: (read: Readiness) => void, facts: () => ReadinessFacts = liveFacts) =>
+export const sweptFacts = (): ReadinessFacts => ({ ...liveFacts(), run: () => undefined });
+
+/**
+ * The store's readiness read, for as long as the daemon runs: `readinessOf` over the needs' memory `memo` the sweep above fills, the
+ * machine's facts read afresh each time with no command run (`sweptFacts`), each read handed to `keep`, then a rest of `NEEDS_EVERY`. A
+ * read that fails keeps the one before, which the passes go on handing the feed.
+ */
+export const readied = (memo: NeedsMemo, keep: (read: Readiness) => void, facts: () => ReadinessFacts = sweptFacts) =>
   sweepLoop(
     () => readinessOf(facts()).pipe(Effect.provideService(NeedsMemory, memo)),
     NEEDS_EVERY,

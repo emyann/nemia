@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { atWork, atWorkWords, versionWords } from '../../../src/lib/footer.ts';
@@ -46,6 +47,9 @@ async function opens(page: Page): Promise<void> {
   await expectTexts(bar.locator('[data-at-work-sentence]'), [work.title], 'what is at work across every factory, whole');
   await expectVisible(bar.locator('[data-quota="fresh"]'), 'the quota');
   const served = await answer<Version>(page, '/api/version');
+  const root = path.join(import.meta.dirname, '..', '..', '..', '..', '..', 'package.json');
+  const release = (JSON.parse(fs.readFileSync(root, 'utf8')) as { version: string }).version;
+  if (served.version !== release) throw new Refused(`the api serves version ${served.version}, not the release's ${release}`);
   await expectTexts(
     bar.locator('[data-version-sentence]'),
     [`${versionWords(served).title}, as the api serving this board answers it.`],

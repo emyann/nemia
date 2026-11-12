@@ -13,7 +13,7 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   api's or the objects' and the client holds no copy of it. A value the client needs is asked of the api over HTTP. Held by
   `apps/cli/test/structure.test.ts` and the cli's block of `.oxlintrc.json` (proven by
   `packages/agent-orchestrator/test/imports.boundary.test.ts`). A bin imports `../src/` and nothing else.
-- **Every read is asked through `src/objects.ts`**, `objects`' `Api` made a typed client (`HttpApiClient.make`) over the daemon's lease
+- **Every read is asked through `src/objects.ts`**, `objects`' one typed client of its `Api` (`apiClient`) over the daemon's lease
   url, decoded by the Schemas the api encodes with: `nemia show`'s Run and its record, `nemia closeout`'s tries, `nemia decide`'s
   RunDecision, the pause `nemia watch` says, and the runs and cards lists `nemia ls` and `nemia inbox` ask for their `Table`. **One ask**:
   `served` (`src/daemon.ts`) takes the lease's url where something listens there, else starts the daemon once and waits until `GET

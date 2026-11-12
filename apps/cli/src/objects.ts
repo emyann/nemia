@@ -1,32 +1,34 @@
 /**
- * The client of the objects: `objects`' `Api` made into a typed client (`HttpApiClient.make`) over the url of the daemon serving this
+ * The client of the objects: `objects`' `Api` made into its one typed client (`apiClient`) over the url of the daemon serving this
  * store, found by its lease (`where.ts`) and, where none listens there, started once and waited for until it is ready (`daemon.ts`). A
  * read asks it once through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
  *
  * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`,
- * `Forbidden`, `Unauthorized`) is the api's own words, exit 2. Every request carries the session's token where `WF_SESSION_TOKEN` holds
- * one (`sessionHeaders`). A 404 whose body is no refusal is a daemon older than this client, refused naming the restart; an answer that
- * does not decode as the `Api` says is one too, the daemon and this client being of two builds. A read the api takes and does not answer
- * within `READ_BOUND_MS` gives up, refused naming the service's status and the read in process: it starts no daemon, since one holds
+ * `Forbidden`, `Unauthorized`) is the api's own words, exit 2. Every request carries the token this client calls with (`callerToken`). A
+ * 404 whose body is no refusal is a daemon older than this client, refused naming the restart; another status the `Api` declares no
+ * error for is said in the api's words where it gave some (`Answered`); an answer that does not decode as the `Api` says is one too,
+ * the daemon and this client being of two builds. A call the api takes and does not answer within `READ_BOUND_MS` gives up, refused naming the service's status and the read in process: it starts no daemon, since one holds
  * the port and took the request.
  */
-import { Cause, Duration, Effect, Exit, Option } from 'effect';
-import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from 'effect/http';
-import { HttpApiClient } from 'effect/http-api';
+import { Cause, Effect, Exit, Option } from 'effect';
+import { FetchHttpClient, HttpClientError } from 'effect/http';
 import {
-  Api,
+  Answered,
+  apiClient,
+  type ApiClient,
   type APIResource,
   Conflict,
   Forbidden,
   Invalid,
-  jsonBodied,
   LIST_PAGE,
   Missing,
+  READ_BOUND_MS,
   type Table,
+  timedOut,
   Unauthorized,
   Unjudged,
 } from 'objects';
-import { olderThanThis, Refused, sessionHeaders, unanswered } from './client.ts';
+import { callerToken, olderThanThis, Refused, unanswered } from './client.ts';
 import { served } from './daemon.ts';
 import { resourceNamed } from './objects/resource.ts';
 import { CLIENT_VERBS } from './route.ts';
@@ -35,31 +37,8 @@ import { CLIENT_VERBS } from './route.ts';
 const localWay = (verb: string): string =>
   (CLIENT_VERBS as readonly string[]).includes(verb.split(' ')[0] ?? verb) ? '' : `, or read in process: \`nemia ${verb} … --local\``;
 
-/**
- * How long a moved read waits on the api before it gives up: the whole call, from the request to the decoded answer. Thirty seconds, some
- * twenty times the coldest read the cli asks on the measured store (the run list, 1.3 s on 100 runs; a run's page, 0.9 s:
- * `tools/store-measure/baselines/s2-vs-s1.txt`), so a store ten times as large on a loaded machine still answers, while a person at
- * the terminal is told within half a minute that an api which took the connection is not answering.
- */
-export const READ_BOUND_MS = 30_000;
-
-/**
- * The typed client of the `Api` at `base`: each write with no body sent as `{}` in JSON (`jsonBodied`), as the api's write guard takes
- * it, and each request carrying the session's token where `env` holds one (`sessionHeaders`) and `headers` beside it (an `Accept` that
- * asks a list for its `Table`).
- */
-export const clientAt = (base: string, env: NodeJS.ProcessEnv = process.env, headers: Readonly<Record<string, string>> = {}) =>
-  HttpApiClient.make(Api, {
-    baseUrl: base,
-    transformClient: (client) =>
-      HttpClient.mapRequest(
-        HttpClient.mapRequest(client, jsonBodied),
-        HttpClientRequest.setHeaders({ ...sessionHeaders(env), ...headers }),
-      ),
-  });
-
 /** What a read asks of: every group of the `Api`, each endpoint a method. */
-export type ObjectsClient = Effect.Success<ReturnType<typeof clientAt>>;
+export type ObjectsClient = ApiClient;
 
 /**
  * The `Api`'s refusals, whose `error` is the api's sentence naming the fix: a caller refused (`Forbidden`, 403) or a token the api does
@@ -77,16 +56,10 @@ const isRefusal = (err: unknown): err is Missing | Conflict | Invalid | Unjudged
 const failureOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined =>
   Exit.isFailure(exit) ? Option.getOrUndefined(Cause.findErrorOption(exit.cause)) : undefined;
 
-/** The path of the request a client error is about, as a line names it. */
-const pathOf = (err: HttpClientError.HttpClientError): string => {
-  try {
-    return new URL(err.reason.request.url).pathname;
-  } catch {
-    return err.reason.request.url;
-  }
-};
-
-/** `call` asked of the client at `base`, run to its end or until `boundMs` is gone, when it is interrupted and fails with a timeout. */
+/**
+ * `call` asked of the client at `base`, each request of it carrying `headers` and run to its end or until `boundMs` is gone, when it is
+ * interrupted and fails with a timeout (`timedOut`).
+ */
 const attempt = <A, E>(
   base: string,
   call: (client: ObjectsClient) => Effect.Effect<A, E>,
@@ -95,8 +68,7 @@ const attempt = <A, E>(
   headers: Readonly<Record<string, string>>,
 ) =>
   Effect.runPromiseExit(
-    Effect.flatMap(clientAt(base, env, headers), call).pipe(
-      Effect.timeout(Duration.millis(boundMs)),
+    Effect.flatMap(apiClient({ baseUrl: base, token: callerToken(env), headers, boundMs }), call).pipe(
       Effect.provide(FetchHttpClient.layer),
     ),
   );
@@ -115,17 +87,16 @@ function answerOf<A, E>(exit: Exit.Exit<A, E>, verb: string, base: string, bound
   if (Exit.isSuccess(exit)) return exit.value;
   const failed = failureOf(exit);
   if (failed === undefined) throw Cause.squash(exit.cause);
-  if (Cause.isTimeoutError(failed)) throw notInTime(verb, base, boundMs);
+  if (timedOut(failed)) throw notInTime(verb, base, boundMs);
   if (isRefusal(failed)) return thrown(failed.error);
-  if (HttpClientError.isHttpClientError(failed)) {
-    const { reason } = failed;
-    const status = 'response' in reason ? reason.response.status : undefined;
-    if (status === 404) throw olderThanThis(verb, base, pathOf(failed));
-    if (reason._tag === 'TransportError') throw unanswered(verb, base, failed);
+  if (failed instanceof Answered) {
+    if (failed.status === 404) throw olderThanThis(verb, base, failed.path);
     throw new Refused(
-      `the daemon at ${base} answered ${status ?? 'nothing'} to ${pathOf(failed)}, which this nemia does not read: restart it, \`nemia service restart\`${localWay(verb)}`,
+      failed.said ??
+        `the daemon at ${base} answered ${failed.status} to ${failed.path}, which this nemia does not read: restart it, \`nemia service restart\`${localWay(verb)}`,
     );
   }
+  if (HttpClientError.isHttpClientError(failed) && failed.reason._tag === 'TransportError') throw unanswered(verb, base, failed);
   throw new Refused(
     `the daemon at ${base} answered in a shape this nemia does not read (${failed instanceof Error ? failed.message : String(failed)}): restart it, \`nemia service restart\`${localWay(verb)}`,
   );

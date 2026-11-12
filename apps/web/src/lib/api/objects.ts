@@ -1,6 +1,6 @@
 /**
  * The board's client of the objects (`objects`' `Api`): every read and write of a kind the api serves as an object goes through here, made
- * by `HttpApiClient` from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
+ * by `objects`' one constructor of its typed client (`apiClient`) from the one definition the api serves, over `FetchHttpClient` — the Run and its sub-resources (`runs`), the
  * inbox's cards (`cards`), and a factory and its parts: the Factory with its rules, instruction, command lines and cost lines
  * (`factories`), its MCP servers and their sign-ins (`mcpServers`), Nemia's own servers (`builtin`), its schedules, hires and volumes;
  * and the definitions a namespace serves, its workflows, agents and skills (`workflows`, `agents`, `skills`); and the proposals that
@@ -20,15 +20,14 @@
  * Imports no sibling but the shared reads (`test/api-files.test.ts`).
  */
 import { Cause, Effect, Exit, Option, Schema } from 'effect';
-import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/http';
-import { HttpApiClient } from 'effect/http-api';
+import { FetchHttpClient } from 'effect/http';
 import {
+  apiClient,
   Agent,
   AgentCard,
   AgentList,
   AgentTried,
   type AgentWrite,
-  Api,
   Card,
   Delegation,
   DelegationList,
@@ -100,16 +99,12 @@ import { askToken, decoded, ReadRefusal, tokenAskOf, WriteRefusal } from './read
 const NO_PAGE = 'http://board.invalid';
 
 /**
- * The client, made once: every write sent as `application/json`, which the api requires of every write — a body another site's page cannot
- * send unasked — the Card's verbs that send no body included.
+ * The client, made once (`apiClient`): every write sent as `application/json`, which the api requires of every write — a body another
+ * site's page cannot send unasked — the Card's verbs that send no body sent `{}`; and every call given up at the bound `objects` gives
+ * one (`READ_BOUND_MS`), its `fetch` aborted.
  */
 const client = Effect.runSync(
-  HttpApiClient.make(Api, {
-    baseUrl: typeof location === 'undefined' ? NO_PAGE : '',
-    transformClient: HttpClient.mapRequest((request) =>
-      request.method === 'GET' ? request : HttpClientRequest.setHeader(request, 'content-type', 'application/json'),
-    ),
-  }).pipe(Effect.provide(FetchHttpClient.layer)),
+  apiClient({ baseUrl: typeof location === 'undefined' ? NO_PAGE : '' }).pipe(Effect.provide(FetchHttpClient.layer)),
 );
 
 type Client = typeof client;

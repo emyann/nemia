@@ -7,6 +7,7 @@ import { Effect, Result } from 'effect';
 import { objectsListed, type ObjectQuery } from 'agent-orchestrator';
 import { definitionsServed, definitionWriteRefusal, type DefinitionWrite } from 'agent-orchestrator/workflow';
 import { DEFINITION_ORIGINS, Invalid, Missing, type DefinitionOrigin } from 'objects';
+import { repoNeeded, type Place } from '../factory/place.ts';
 export { writtenAt } from '../workflows/builder.ts';
 
 /** An origin a definition is read from: the factory's tree, the repository, yours, or Nemia's builtin. */
@@ -26,6 +27,17 @@ export function originAsked(asked: string | undefined): Origin | undefined {
     throw new Invalid({
       error: `?origin=${asked} is no origin a definition is read from: send one of ${DEFINITION_ORIGINS.join(', ')}, or leave it out for the one each name resolves to.`,
     });
+  return origin;
+}
+
+/**
+ * `asked`, the `?origin=` of a read in `place`, as an origin (`originAsked`): the repository's own layer asked for where the request is
+ * answered on no repository (an install, no factory named) is refused as `repoNeeded` refuses it, naming the factory to pick; any other
+ * layer needs none.
+ */
+export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string | undefined): Origin | undefined {
+  const origin = originAsked(asked);
+  if (origin === 'repo') repoNeeded(place);
   return origin;
 }
 

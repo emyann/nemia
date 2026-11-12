@@ -48,7 +48,7 @@ import {
   type WorkflowStep,
 } from 'objects';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
+import { repoLayer } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
@@ -64,17 +64,7 @@ import {
   type WorkflowListing,
   type WorkflowSource,
 } from './workflows.ts';
-import {
-  listed,
-  originAsked,
-  servedNamed,
-  servedOf,
-  thereOf,
-  writeGoes,
-  writtenAt,
-  type Held,
-  type Origin,
-} from '../definitions/served.ts';
+import { listed, originIn, servedNamed, servedOf, thereOf, writeGoes, writtenAt, type Held, type Origin } from '../definitions/served.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 
 /** A folder of a workflow, where it is: the source word the api's own reads give it, and its path. */
@@ -111,12 +101,18 @@ const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: strin
 export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
   s.factory?.tree === undefined ? [] : foldersHeld(s, origin, 'repo', path.join(s.factory.tree, 'workflows'));
 
-/** Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository, yours. */
-export const heldIn = (s: Served): Held<Folder>[] => [
-  ...treeWorkflowsHeld(s, 'factory'),
-  ...foldersHeld(s, 'repo', 'repo', path.join(repoNeeded(s), 'workflows')),
-  ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
-];
+/**
+ * Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository (`repoLayer`: none on
+ * an install with no factory named, refused for a factory named whose repository the request leaves open), yours.
+ */
+export const heldIn = (s: Served): Held<Folder>[] => {
+  const repo = repoLayer(s);
+  return [
+    ...treeWorkflowsHeld(s, 'factory'),
+    ...(repo === undefined ? [] : foldersHeld(s, 'repo', 'repo', path.join(repo, 'workflows'))),
+    ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
+  ];
+};
 
 /** A key set: not null, not left out, not an empty list. */
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
@@ -242,10 +238,11 @@ const workflowObject = (
  * The objects of the folders `served`, each loaded now as a start in the request's factory would load it, its hires filling their steps:
  * in `namespace`, with the ledger's revision, where one is given; with neither where none is (a template's documents, which the ledger
  * does not count). The factory is handed to the loader whole, so a template's render, which the store does not hold, is loaded in the
- * factory of its wiring as one applied from it is.
+ * factory of its wiring as one applied from it is. On no repository, each is loaded as one of yours is, its agents and skills looked for
+ * in yours alone.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
-  const repo = repoNeeded(s);
+  const repo = repoLayer(s);
   const loaded = await loadedOf(
     s.e,
     s,
@@ -291,7 +288,7 @@ const writing = (s: Served, name: string, changes: boolean) => ({
   trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
-  repo: repoNeeded(s),
+  repo: repoLayer(s),
   home: s.home,
   changes,
   inRequest: s.inRequest,
@@ -307,12 +304,12 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) =>
       answeredWriteIn(namespace, async (s) => {
         const { origin, ...page } = query;
-        const items = await workflowObjectsOf(s, servedOf(heldIn(s), originAsked(origin)), namespace);
+        const items = await workflowObjectsOf(s, servedOf(heldIn(s), originIn(s, origin)), namespace);
         return listed('Workflow', items, queryOf(page));
       }),
     )
     .handle('get', ({ params: { namespace, name }, query }) =>
-      answeredWriteIn(namespace, (s) => workflowAt(s, namespace, name, originAsked(query.origin))),
+      answeredWriteIn(namespace, (s) => workflowAt(s, namespace, name, originIn(s, query.origin))),
     )
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredWriteIn(namespace, async (s) => {
@@ -343,7 +340,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
           });
         const at = writing(s, name, true);
-        const now = await s.inRequest(workflowVersion(at.dir, placesOf(repoNeeded(s), s.home)));
+        const now = await s.inRequest(workflowVersion(at.dir, placesOf(at.repo, s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
         return workflowAt(s, namespace, name, 'yours');
@@ -367,7 +364,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
       answeredIn(namespace, async (s) => {
         const unattached = s.factory && unattachedRefusal(s.factory, name);
         if (unattached) throw new Missing({ error: unattached });
-        const { item } = servedNamed(heldIn(s), name, originAsked(query.origin), listPath(namespace));
+        const { item } = servedNamed(heldIn(s), name, originIn(s, query.origin), listPath(namespace));
         return stepPage(s, { name, ...item }, step);
       }),
     )

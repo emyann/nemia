@@ -102,7 +102,7 @@ export type YourSkills = {
 };
 
 /** What `listSkills` lists, read through the Agent and Skill doors on the program's services: `YourSkills`. */
-export const yourSkillsRead = (repo: string, home: string, builtin: string = BUILTIN_SKILLS) =>
+export const yourSkillsRead = (repo: string | undefined, home: string, builtin: string = BUILTIN_SKILLS) =>
   Effect.gen(function* () {
     const door = yield* SkillDoor;
     return {
@@ -119,11 +119,15 @@ export const treeWorkflows = (tree: string): string => path.join(path.resolve(tr
 const inTree = (dir: string, tree: string | undefined): boolean =>
   tree !== undefined && path.dirname(path.resolve(dir)) === path.join(treeWorkflows(tree), SKILLS_FOLDER);
 
-/** Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them. */
-export function sourceOf(dir: string, repo: string, home: string): SkillSource | null {
+/**
+ * Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them, and for the repository's where there
+ * is no repository.
+ */
+export function sourceOf(dir: string, repo: string | undefined, home: string): SkillSource | null {
   const parent = path.dirname(path.resolve(dir));
   if (parent === librarySkills(home)) return 'yours';
   if (parent === BUILTIN_SKILLS) return 'builtin';
+  if (repo === undefined) return null;
   if (parent === repoSkillsDir(repo) || parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)) return 'repo';
   return null;
 }
@@ -131,10 +135,11 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
 /**
  * Where a skill with no page of the board's was found, as its folder's path from the repository's root, `/` between its parts: a skill
  * named with its folder, read from that folder's own skills, or any other found beneath `repo` in a place the board lists nothing for.
- * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, and for a folder outside it.
+ * Null for a skill of a place the board pages (`sourceOf`), for the repository's own folder, for a folder outside it, and where there is
+ * no repository.
  */
-export function foundInOf(dir: string, repo: string, home: string): string | null {
-  if (sourceOf(dir, repo, home) !== null) return null;
+export function foundInOf(dir: string, repo: string | undefined, home: string): string | null {
+  if (repo === undefined || sourceOf(dir, repo, home) !== null) return null;
   const parts = path.relative(path.resolve(repo), path.resolve(dir)).split(path.sep);
   return parts[0] === '' || parts[0] === '..' || path.isAbsolute(parts.join(path.sep)) ? null : parts.join('/');
 }
@@ -186,7 +191,8 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
  * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name, and listing the
  * agents of yours that give it where none does. The package's builtin place skill (`isBuiltinPlace`) and its builtin skills, which an
- * agent finds where no place has the name, are in neither of the first two. A name both
+ * agent finds where no place has the name, are in neither of the first two. With no repository (an install, no factory named), no place
+ * of the repository's is listed. A name both
  * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
  * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
  * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
@@ -194,7 +200,7 @@ export function yourAgentsSkills(agents: Agents): Array<[string, string[]]> {
  */
 export async function listSkills(
   readSkills: (dirs: readonly string[]) => Promise<Record<string, SkillRead>>,
-  repo: string,
+  repo: string | undefined,
   home: string,
   yoursRead: YourSkills,
 ): Promise<SkillPlace[]> {
@@ -203,20 +209,23 @@ export async function listSkills(
   const agents = yourAgentsSkills(yoursRead.agents);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
   const yours: SkillPlace = { from: 'yours', dir: librarySkills(home), skills: [] };
-  const inRepo: SkillPlace = { from: 'repo', dir: repoSkillsDir(repo), skills: [] };
-  const places: SkillPlace[] = [yours, inRepo];
+  const inRepo: SkillPlace | undefined = repo === undefined ? undefined : { from: 'repo', dir: repoSkillsDir(repo), skills: [] };
+  const places: SkillPlace[] = inRepo === undefined ? [yours] : [yours, inRepo];
+  const placed = (from: 'yours' | 'repo'): SkillPlace => (from === 'repo' && inRepo !== undefined ? inRepo : yours);
   const sorted = [...found.all]
     .filter(([, at]) => typeof at !== 'string' || !(isBuiltinPlace(at) || sourceOf(at, repo, home) === 'builtin'))
     .sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
-    at instanceof WorkflowError ? (skillDirIn([yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name)) : at;
+    at instanceof WorkflowError
+      ? (skillDirIn(inRepo === undefined ? [yours.dir] : [yours.dir, inRepo.dir], name) ?? path.join(yours.dir, name))
+      : at;
   const reads = await readSkills([...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
   const where = new Map<string, Extract<SkillSource, 'yours' | 'repo'>>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
       const from = sourceOf(dir, repo, home) === 'repo' ? 'repo' : 'yours';
-      (from === 'yours' ? yours : inRepo).skills.push({
+      placed(from).skills.push({
         ...skillRow(name, dir, from, readAt(reads, dir), usedBy(name)),
         entry: null,
         error: at.message,
@@ -225,7 +234,7 @@ export async function listSkills(
       continue;
     }
     const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';
-    (from === 'yours' ? yours : inRepo).skills.push(skillRow(name, at, from, readAt(reads, dir), usedBy(name)));
+    placed(from).skills.push(skillRow(name, at, from, readAt(reads, dir), usedBy(name)));
     where.set(name, from);
   }
   places.push({
@@ -261,7 +270,13 @@ export type GivenSkill = {
  * as a skill named with its folder is, reads `from: null` and its folder in `foundIn`. One found in the `skills/` of the factory's tree
  * `tree`, where an agent of that tree finds it first, is the factory's.
  */
-export function givenSkills(skills: readonly string[], found: SkillsFound, repo: string, home: string, tree?: string): GivenSkill[] {
+export function givenSkills(
+  skills: readonly string[],
+  found: SkillsFound,
+  repo: string | undefined,
+  home: string,
+  tree?: string,
+): GivenSkill[] {
   return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
     name,
     from: dir === null ? null : inTree(dir, tree) ? 'factory' : sourceOf(dir, repo, home),
@@ -298,7 +313,7 @@ export type SkillUser = { from: AgentPlace | 'factory'; name: string };
  * repository's two places for skills is a link to the other. With a factory's tree `tree`, its own agents first, as `factory`, each
  * finding the skill as a start in that factory finds it: in the tree, then the repository, then yours.
  */
-export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string, repo: string, home: string, tree?: string) {
+export const skillUsers = Effect.fnUntraced(function* (dir: string, name: string, repo: string | undefined, home: string, tree?: string) {
   const found = new Map<string, SkillsFound>();
   const at = path.resolve(dir);
   const users: SkillUser[] = [];

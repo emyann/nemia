@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   admitted,
+  AGENTS,
+  AGENT_CARD,
   AGENTS_CUSTOM,
   POLICY_PROPOSE,
   PRUNE,
@@ -282,6 +284,40 @@ const factoryWords = (args: Args, command: string): { factory: string; words?: s
   ...(typeof args.file === 'string' ? { words: wordsFrom(args.file, command) } : {}),
   ...(args.clear === true ? { clear: true } : {}),
 });
+
+/**
+ * `nemia agents`' runner: a repository the command line names, else the folder it is typed in, as `[--repo .]` says, handed to its entry's
+ * handler (`AGENTS`), which reads no repository where none is given (the api's, on an install with no factory named); forwarded, the
+ * repository is the api's to resolve, and none is added. What the entry says of them printed.
+ */
+export async function agentsRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const asked = repoHere(env, args);
+  const data = await answered(env, e, place, AGENTS, asked);
+  for (const line of AGENTS.print(data, asked)) console.log(line);
+}
+
+/**
+ * The repository `nemia agents` and `nemia agents card` read: the one `--repo` names, else the folder the command is typed in; none where
+ * the command line is forwarded, whose api resolves its own.
+ */
+function repoHere(env: Env, args: Args): { repo?: string } {
+  const named = args.repo;
+  return typeof named === 'string' ? { repo: named } : forwardedOf(env) === undefined ? { repo: '.' } : {};
+}
+
+/**
+ * `nemia agents card`'s runner: the agent named, from the place `--from` names where it does, in the repository `repoHere` says, handed
+ * to its entry's handler (`AGENT_CARD`), which reads no repository where none is given; the card printed, and its note.
+ */
+export async function agentsCardRun(env: Env, args: Args, e: Engine, place: Place): Promise<void> {
+  const { name, from } = args;
+  if (typeof name !== 'string') return usage(`nemia agents card takes the agent's name: nemia agents card ${AGENT_CARD.usage}.`);
+  const at: { from?: 'repo' | 'yours' } = from === 'repo' ? { from: 'repo' } : from === 'yours' ? { from: 'yours' } : {};
+  const asked = { name, ...repoHere(env, args), ...at };
+  const data = await answered(env, e, place, AGENT_CARD, asked);
+  for (const line of AGENT_CARD.print(data, asked)) console.log(line);
+  for (const line of AGENT_CARD.note?.(data, asked) ?? []) console.error(line);
+}
 
 /**
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its

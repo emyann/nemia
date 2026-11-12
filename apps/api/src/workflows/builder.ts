@@ -357,9 +357,9 @@ function heldAt(at: string): { text: string } | { unread: string } {
 }
 
 /**
- * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
- * there (`changes`), handed the version it holds once its schemas are written, or a new one. The agents and skills its schemas are
- * judged with are read through the doors on the request's services (`inRequest`).
+ * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it (with none, as one in yours alone), through the
+ * engine `e`: a change of the folder there (`changes`), handed the version it holds once its schemas are written, or a new one. The
+ * agents and skills its schemas are judged with are read through the doors on the request's services (`inRequest`).
  */
 export type Writing = {
   e: Served['e'];
@@ -368,7 +368,7 @@ export type Writing = {
   trace: Served['trace'];
   name: string;
   dir: string;
-  repo: string;
+  repo: string | undefined;
   home: string;
   changes: boolean;
   inRequest: Served['inRequest'];

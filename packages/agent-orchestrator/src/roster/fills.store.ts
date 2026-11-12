@@ -62,12 +62,12 @@ function filledIn(from: AgentPlace, dir: string, workflow: string, hires: Readon
 /**
  * Every step `factory` fills on `repo` — in the workflows it attaches, of the repository's `workflows/` and of the store `home`'s — with
  * its hires; with no factory, every step of every workflow, by what its file names. In the order they are listed: by place, then workflow,
- * then step. Throws where a place's folder cannot be listed (`foldersIn`).
+ * then step; the store's alone where there is no repository. Throws where a place's folder cannot be listed (`foldersIn`).
  */
-export function stepsFilled(repo: string, home: string, factory?: Factory): FilledStep[] {
-  const places: Places = { repo, home };
+export function stepsFilled(repo: string | undefined, home: string, factory?: Factory): FilledStep[] {
+  const places: Places = repo === undefined ? { home } : { repo, home };
   const sources: Array<{ from: AgentPlace; dir: string }> = [
-    { from: 'repo', dir: path.join(repo, 'workflows') },
+    ...(repo === undefined ? [] : [{ from: 'repo' as const, dir: path.join(repo, 'workflows') }]),
     { from: 'yours', dir: path.join(home, 'workflows') },
   ];
   return sources.flatMap(({ from, dir }) =>

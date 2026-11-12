@@ -119,6 +119,24 @@ test("nemia agents at the terminal: both places listed with what each agent can 
     },
   );
 
+  await s.test(
+    'nemia agents and its card with no --repo, typed in a repository, read that repository first, as --repo . does',
+    async (sub) => {
+      const was = process.cwd();
+      process.chdir(repo);
+      let bare: string;
+      let card: string;
+      try {
+        bare = (await printedBy(sub, 'agents')).out;
+        card = (await printedBy(sub, 'agents', 'card', 'scribe')).out;
+      } finally {
+        process.chdir(was);
+      }
+      assert.equal((JSON.parse(card) as { name: string }).name, 'scribe', 'its card is found there too');
+      assert.match(bare, /^scribe {2}repo {2}Writes it down\.$/m, `the folder it is typed in is the repository read:\n${bare}`);
+    },
+  );
+
   await s.test('nemia agents reads through the Agent door: an agent its memory holds is listed, though no disk has its file', async () => {
     const read = await Effect.runPromise(
       Effect.gen(function* () {

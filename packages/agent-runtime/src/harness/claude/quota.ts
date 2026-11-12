@@ -43,28 +43,35 @@ export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEn
 }
 
 /**
- * Which Claude Code an ask drives when none is named: `claude` from PATH, the one the harness spawns its sessions with
- * (`src/harness/claude/code.ts`). A bare name, so the SDK's spawn resolves it on PATH and its absence arrives as
- * `executable_not_found`, which `quotaOfRefusal` reads as `missing`. Were the option left off, the SDK would drive its own bundled
- * native CLI instead, and the quota would report on a Claude Code the sessions never run.
+ * The variable a job's own process reads for the Claude Code it runs (`bin/ae-claude-job.ts`): the engine's `claudeExecutable` where it
+ * names one (`claudeJobSpec`), and otherwise whatever the engine's own environment holds, which every job inherits.
  */
-export const QUOTA_COMMAND = 'claude';
+export const EXECUTABLE_VARIABLE = 'AE_CLAUDE_EXECUTABLE';
+
+/**
+ * Which Claude Code an ask drives: the one the sessions run. The engine's `claudeExecutable` where one is `named`; else the one `env`
+ * names as `EXECUTABLE_VARIABLE`, which a job inherits from the engine and runs; else `undefined`, the Agent SDK's own — the native CLI
+ * it bundles for this platform, which a job runs when nothing is named. Never resolved on PATH: a `claude` there may be another version,
+ * or signed in as another account, and on a machine with only a release there is none. Pure.
+ */
+export const quotaExecutable = (named: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined =>
+  named ?? (env[EXECUTABLE_VARIABLE] || undefined);
 
 /**
  * The SDK options an ask opens its query with. No prompt is sent, so what is asked for is what a usage question needs and nothing a
- * session needs: the system's temporary directory to run in; this process's environment without a session's keys (`usageEnv`) or its
- * telemetry (`withoutTelemetry`), given whole since `env` replaces the child's environment rather than adding to it; no session written,
- * should a version write one for a session that never had a turn; no MCP server but one named here (none); and none of the user's
- * settings, which load plugins and their hooks and sync skills to disk on each start. `command` is the Claude Code to ask,
- * `QUOTA_COMMAND` when it is not given — never the SDK's own bundled CLI.
+ * session needs: the system's temporary directory to run in; `env` (this process's environment by default) without a session's keys
+ * (`usageEnv`) or its telemetry (`withoutTelemetry`), given whole since `env` replaces the child's environment rather than adding to it;
+ * no session written, should a version write one for a session that never had a turn; no MCP server but one named here (none); and none
+ * of the user's settings, which load plugins and their hooks and sync skills to disk on each start. `command` is the Claude Code to ask
+ * (`quotaExecutable`), and where it is `undefined` the option is left off, so the SDK drives its own, as a job does.
  */
-export const usageOptions = (command: string = QUOTA_COMMAND): Options => ({
+export const usageOptions = (command?: string, env: NodeJS.ProcessEnv = process.env): Options => ({
   cwd: os.tmpdir(),
-  env: withoutTelemetry(usageEnv(process.env)),
+  env: withoutTelemetry(usageEnv(env)),
   persistSession: false,
   strictMcpConfig: true,
   settingSources: [],
-  pathToClaudeCodeExecutable: command,
+  ...(command === undefined ? {} : { pathToClaudeCodeExecutable: command }),
 });
 
 /**
@@ -76,8 +83,8 @@ export type UsageAsk = {
   readonly close: () => Promise<void>;
 };
 
-/** How an ask is opened: over the Claude Code named, `QUOTA_COMMAND` when none is. */
-export type OpenUsage = (command?: string) => UsageAsk;
+/** How an ask is opened: over the Claude Code named, the Agent SDK's own when it is `undefined` (`quotaExecutable`). */
+export type OpenUsage = (command: string | undefined) => UsageAsk;
 
 /**
  * The input of an ask's query: it yields no message, and ends only once the ask is done with it. A query whose input has ended closes
@@ -96,21 +103,24 @@ const heldInput = (): { prompt: AsyncIterable<SDKUserMessage>; release: () => vo
 };
 
 /**
- * The ask as the Agent SDK takes it (the one call site of its usage method): a query opened for the question alone (`usageOptions`),
+ * The ask as the Agent SDK takes it (the one call site of its usage method): a query opened for the question alone (`usageOptions`), in
+ * `env`,
  * asked what it is handed, and closed with its input. `claudeQuota` asks `skipBehaviors: true`: the plan's limits need none of the scan
  * of local transcripts the answer's behaviours section would cost.
  */
-const sdkUsageAsk: OpenUsage = (command) => {
-  const input = heldInput();
-  const q = query({ prompt: input.prompt, options: usageOptions(command) });
-  return {
-    usage: (opts) => q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET(opts),
-    close: async () => {
-      input.release();
-      await q.return(undefined);
-    },
+const sdkUsageAsk =
+  (env: NodeJS.ProcessEnv): OpenUsage =>
+  (command) => {
+    const input = heldInput();
+    const q = query({ prompt: input.prompt, options: usageOptions(command, env) });
+    return {
+      usage: (opts) => q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET(opts),
+      close: async () => {
+        input.release();
+        await q.return(undefined);
+      },
+    };
   };
-};
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -127,14 +137,22 @@ const subscriptionOf = (usage: Record<string, unknown>): string | null =>
   typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
 
 /**
- * What the SDK's usage answer says: the plan's limits and its subscription, no plan, a plan the usage service gave nothing for, or why it
- * cannot be read. Pure. The SDK resolves the control response's `response` — the usage itself — so this reads that and not the control
+ * The variable a token made by `claude setup-token` signs Claude Code in by. Claude Code gives such a token the `user:inference` scope
+ * alone, and answers `get_usage` with `rate_limits_available: false` without asking the usage endpoint, since it lacks `user:profile`
+ * (read off 2.1.322 and measured: `docs/harness.md`, *The quota of a token*) — the same answer as no subscription at all.
+ */
+export const TOKEN_VARIABLE = 'CLAUDE_CODE_OAUTH_TOKEN';
+
+/**
+ * What the SDK's usage answer says, asked in `env`: the plan's limits and its subscription, no plan, a token that cannot read the plan
+ * (`token`: no plan limits where `env` signs in by `TOKEN_VARIABLE`), a plan the usage service gave nothing for, or why it cannot be
+ * read. Pure. The SDK resolves the control response's `response` — the usage itself — so this reads that and not the control
  * response around it, which only the SDK sees. A plan whose `rate_limits` are null is `unanswered`, as the SDK's type for this answer
  * says: "or null when unavailable".
  */
-export function quotaOfUsage(usage: unknown): HarnessQuota {
+export function quotaOfUsage(usage: unknown, env: NodeJS.ProcessEnv = {}): HarnessQuota {
   if (!isObject(usage)) return { kind: 'unknown', what: 'its response is not an object' };
-  if (usage.rate_limits_available === false) return { kind: 'no-plan' };
+  if (usage.rate_limits_available === false) return env[TOKEN_VARIABLE] ? { kind: 'token' } : { kind: 'no-plan' };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
   if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
   if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
@@ -182,24 +200,27 @@ export function quotaOfRefusal(error: unknown): HarnessQuota {
 }
 
 /**
- * Ask Claude Code for the plan's usage: open a query for the question (`sdkUsageAsk`, or the `ask` given), put it, and read what it
- * answers (`quotaOfUsage`) or how it refused (`quotaOfRefusal`). The query is taken in the ask's scope and closed as it closes, whatever
- * ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never fails: every way it can go is
- * a `HarnessQuota`, and no Claude Code to ask is `missing`.
+ * Ask Claude Code for the plan's usage: the Claude Code the sessions run (`quotaExecutable` of `command`, the engine's `claudeExecutable`,
+ * and of `env`, this process's environment by default), read at each ask. Open a query for the question (`sdkUsageAsk`, or the `ask`
+ * given), put it, and read what it answers (`quotaOfUsage`) or how it refused (`quotaOfRefusal`). The query is taken in the ask's scope and
+ * closed as it closes, whatever ends it: an outcome, the timeout (`timeoutMs`, `QUOTA_TIMEOUT_MS` by default), or an interruption. Never
+ * fails: every way it can go is a `HarnessQuota`, and no Claude Code to ask is `missing`: the one named is not there, or the SDK bundles
+ * none for this platform.
  */
 export const claudeQuota = ({
   command,
   timeoutMs = QUOTA_TIMEOUT_MS,
-  ask = sdkUsageAsk,
-}: { command?: string; timeoutMs?: number; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
+  env = process.env,
+  ask = sdkUsageAsk(env),
+}: { command?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; ask?: OpenUsage } = {}): Effect.Effect<HarnessQuota> =>
   Effect.suspend(() =>
     Effect.acquireRelease(
-      Effect.sync(() => ask(command)),
+      Effect.sync(() => ask(quotaExecutable(command, env))),
       (open) => Effect.promise(() => open.close().catch(() => undefined)),
     ).pipe(
       Effect.flatMap((open) =>
         Effect.tryPromise({ try: () => open.usage({ skipBehaviors: true }), catch: (cause) => cause }).pipe(
-          Effect.match({ onSuccess: quotaOfUsage, onFailure: quotaOfRefusal }),
+          Effect.match({ onSuccess: (usage) => quotaOfUsage(usage, env), onFailure: quotaOfRefusal }),
         ),
       ),
       Effect.scoped,

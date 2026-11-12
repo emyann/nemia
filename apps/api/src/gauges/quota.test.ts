@@ -238,11 +238,25 @@ test('quotaOf and harnessQuotaOf: what the board and the daemon are shown of eac
   );
   await t.test('each way an ask fails, said with what to do, and when it is asked again', () => {
     const at = (asked: Held['asked'], keep = QUOTA_KEEP_MS) => quotaOf({ asked, at: NOW }, null, NOW, keep).said;
-    assert.equal(
-      at({ kind: 'missing' }),
-      "The quota cannot be asked for: there is no claude on the api's PATH. Install Claude Code, or start the api from a shell where claude runs. Asked again in 10 min.",
-    );
     assert.equal(quotaOf({ asked: { kind: 'missing' }, at: NOW }, null, NOW).state, 'no-claude');
+    assert.doesNotMatch(at({ kind: 'missing' })!, /PATH/, 'no Claude Code to ask is the one the sessions run, never a claude on PATH');
+    assert.match(
+      at({ kind: 'missing' })!,
+      /AE_CLAUDE_EXECUTABLE[^.]*\. Asked again in 10 min\.$/,
+      'and names the variable that names another',
+    );
+    const token = quotaOf({ asked: { kind: 'token' }, at: NOW }, null, NOW);
+    assert.equal(token.state, 'no-plan', 'a token of claude setup-token has no plan limits to show');
+    assert.notEqual(
+      token.said,
+      quotaOf({ asked: { kind: 'no-plan' }, at: NOW }, null, NOW).said,
+      'and says so in its own words, not as no subscription',
+    );
+    assert.match(
+      token.said!,
+      /nemia claude-token rm/,
+      'naming what would make it answer: the token taken away for a sign-in that reads the plan',
+    );
     assert.equal(
       at({ kind: 'failed', code: 3, signal: null, said: 'claude: not logged in' }),
       'Claude Code stopped before it answered the usage request (exit 3: claude: not logged in). Run claude -p in a shell where the api runs to see why. Asked again in 10 min.',

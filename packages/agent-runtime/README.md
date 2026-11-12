@@ -1642,17 +1642,21 @@ it no command, path or error text leaves the session.
 
 A subscription has limits of its own — Claude Code's plan, five hours and a week — that no session's spend says. `quota(harness?)`
 asks a harness for them, the default harness when none is named, and answers what it said (`HarnessQuota`): the plan's limits, each
-with its key, its use in percent and its reset (`windows`), or why there are none — no plan, a plan the usage service gave nothing for,
-an answer in a shape the runtime does not read, no harness binary, a timeout, a process that ended before it answered.
+with its key, its use in percent and its reset (`windows`), or why there are none — no plan, a sign-in by a token that cannot read the
+plan (`token`), a plan the usage service gave nothing for, an answer in a shape the runtime does not read, no harness binary, a
+timeout, a process that ended before it answered.
 
 ```ts
 const q = yield* engine.quota('claude')
 if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
 ```
 
-Claude Code answers it, as `claude`: the ask is the Agent SDK's own usage question, put to the `claude` on PATH —
-the Claude Code the sessions run on, named as `QUOTA_COMMAND` — with no prompt (`claudeQuota`, `harness/claude/quota.ts`), so no model
-is called and no token spent. Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
+Claude Code answers it, as `claude`: the ask is the Agent SDK's own usage question, put to the Claude Code the sessions run — the
+engine's `claudeExecutable` where it names one, else the `AE_CLAUDE_EXECUTABLE` of the engine's environment, which every job inherits,
+else the SDK's own bundled CLI, as a job runs it (`quotaExecutable`), never a `claude` on PATH — with no prompt (`claudeQuota`,
+`harness/claude/quota.ts`), so no model is called and no token spent. On a machine with only a release, that is the Claude Code the
+release carries. A Claude Code signed in by `CLAUDE_CODE_OAUTH_TOKEN` alone, a token of `claude setup-token`, answers no plan limits
+without asking the usage service, and the quota reads it as `token`, not `no-plan` (`docs/harness.md`, *The quota of a token*). Each call is one ask, one query of its own, and the SDK owns the process: `claudeQuota` closes that query
 before it returns, whatever ended it — an answer, the timeout, an interruption — and no `claude` is left behind by the time it does
 (`test/quota.boundary.test.ts`). Through the engine the ask runs behind the A2A seam, which an interruption does not cross: a caller
 that interrupts `quota()` gets control back at once, and the ask it left ends at its own timeout at the latest (`QUOTA_TIMEOUT_MS`,
@@ -2114,7 +2118,7 @@ of pure code sits beside it.
 | `src/harness/claude/attached-follow.ts` | an attached session followed live (`pushesOf`): the fan-out its message loop feeds, what each follower is said — its state, its text as it is written, its transcript's events with their cursor — and when a follow ends |
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/session-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
-| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
+| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the Claude Code the sessions run (`quotaExecutable`) with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/stream.ts` | the lines of a Claude Code job's stream the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |

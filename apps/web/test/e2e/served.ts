@@ -151,12 +151,13 @@ export function seedStore(root: string): void {
 }
 
 /**
- * First on the api's PATH is a `claude` of the store's own, so the pages are about the store, not about the sessions on this
- * machine. It answers the api's usage control request too (quota.ts), which the runtime asks through the Agent SDK: anything whose
- * first argument is a flag — the SDK's argv, never matched here, since it is the SDK's to change — it hands to the api's own stand-in
- * Claude Code, which answers the SDK as Claude Code does from the store's answer (QUOTA.file) under the request's own id, and waits on
- * its stdin as Claude Code does. With no answer in the store it ends as a claude that cannot answer would, before the stand-in is
- * reached. Another of Claude Code's verbs is a bare word, and ends well having said nothing. Returns the directory it is in.
+ * First on the api's PATH, and the Claude Code its engine's sessions run (`AE_CLAUDE_EXECUTABLE`, `apiEnvOf`), is a `claude` of the store's
+ * own, so the pages are about the store, not about the sessions on this machine. It answers the api's usage control request too (quota.ts),
+ * which the runtime asks through the Agent SDK: anything whose first argument is a flag — the SDK's argv, never matched here, since it is
+ * the SDK's to change — it hands to the api's own stand-in Claude Code, which answers the SDK as Claude Code does from the store's answer
+ * (QUOTA.file) under the request's own id, and waits on its stdin as Claude Code does. With no answer in the store it ends as a claude that
+ * cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word, and ends well having said nothing.
+ * Returns the directory it is in.
  */
 export function fakeClaude(root: string): string {
   const bin = path.join(root, 'bin');
@@ -205,6 +206,11 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
   OTEL_EXPORTER_OTLP_ENDPOINT: '',
   PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+  /**
+   * The store's `claude` is the Claude Code the engine's sessions run, as the engine's environment names one: the quota asks the one a
+   * job runs, never a `claude` on PATH, so without it the Agent SDK's own would answer the quota pages.
+   */
+  AE_CLAUDE_EXECUTABLE: path.join(bin, 'claude'),
 });
 
 /**

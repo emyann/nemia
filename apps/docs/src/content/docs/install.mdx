@@ -108,7 +108,8 @@ may not make your Account available to anyone else."
 
 A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
 connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures
-itself still work.
+itself still work. Nor can it read the plan's usage, so the board's quota shows no limits on such a server, and says why: for the quota, sign in with
+`claude`, then `/login`, and take the token away (`nemia claude-token rm`).
 
 ## Upgrade, and going back
 

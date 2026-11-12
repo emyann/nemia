@@ -10,8 +10,9 @@ import path from 'node:path';
 import { Effect, Exit, Tracer } from 'effect';
 import {
   claudeQuota,
+  EXECUTABLE_VARIABLE,
   type OpenUsage,
-  QUOTA_COMMAND,
+  quotaExecutable,
   quotaOfRefusal,
   quotaOfUsage,
   usageEnv,
@@ -98,6 +99,19 @@ test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — 
     },
   );
   await t.test(
+    "no plan limits, asked of a Claude Code signed in by a token of `claude setup-token`, is the token's: it cannot read the plan, which is not no plan",
+    () => {
+      const token = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test' };
+      assert.deepEqual(quotaOfUsage(usageOf('no-plan'), token), { kind: 'token' });
+      assert.deepEqual(
+        quotaOfUsage(usageOf('no-plan'), { CLAUDE_CODE_OAUTH_TOKEN: '' }),
+        { kind: 'no-plan' },
+        'an empty variable signs in nothing',
+      );
+      assert.deepEqual(quotaOfUsage(usageOf('plan'), token), PLAN, 'a token whose Claude Code reads the plan reads as the plan');
+    },
+  );
+  await t.test(
     'REFUSED: an answer in a shape this code does not read is unknown, and says what it found; a limit with no number is left out',
     () => {
       assert.deepEqual(quotaOfUsage('nope'), { kind: 'unknown', what: 'its response is not an object' });
@@ -179,12 +193,44 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
   );
   assert.equal(given.cwd, machineTempDir(), 'an ask runs its claude in the temp directory');
   assert.deepEqual(
-    [given.persistSession, given.strictMcpConfig, given.settingSources, given.pathToClaudeCodeExecutable],
-    [false, true, [], 'claude'],
-    "no session written, no MCP server but one named here, none of the user's settings, and the `claude` the sessions run on — never the SDK's own bundled CLI, which an ask that named none would drive",
+    [given.persistSession, given.strictMcpConfig, given.settingSources],
+    [false, true, []],
+    "no session written, no MCP server but one named here, none of the user's settings",
   );
-  assert.equal(QUOTA_COMMAND, 'claude', 'the Claude Code an ask drives when none is named is a bare name, resolved on PATH');
+  assert.equal(
+    Object.hasOwn(given, 'pathToClaudeCodeExecutable'),
+    false,
+    'with no Claude Code named the option is left off, so the SDK drives its own, as a job does — not a `claude` on PATH',
+  );
   assert.equal(usageOptions('/bin/claude').pathToClaudeCodeExecutable, '/bin/claude', 'the Claude Code named is the one asked');
+});
+
+test("the Claude Code an ask drives is the one the sessions run: the engine's where it names one, else the one a job inherits, else the SDK's own — never resolved on PATH", async (t) => {
+  const PATH = scratch('ae-quota-path-');
+  const rows: Array<[string, string | undefined, NodeJS.ProcessEnv, string | undefined]> = [
+    [
+      "the engine's `claudeExecutable`, over the one the environment names",
+      '/engine/claude',
+      { [EXECUTABLE_VARIABLE]: '/env/claude', PATH },
+      '/engine/claude',
+    ],
+    [
+      'the one the environment names, which every job inherits, where the engine names none',
+      undefined,
+      { [EXECUTABLE_VARIABLE]: '/env/claude', PATH },
+      '/env/claude',
+    ],
+    ["the SDK's own where neither names one, whatever `claude` PATH holds", undefined, { PATH }, undefined],
+    ["the SDK's own where the variable is empty, as a job reads it", undefined, { [EXECUTABLE_VARIABLE]: '', PATH }, undefined],
+  ];
+  for (const [name, named, env, asked] of rows)
+    await t.test(name, async () => {
+      assert.equal(quotaExecutable(named, env), asked);
+      const stand = standIn(async () => usageOf('plan'));
+      assert.deepEqual(await Effect.runPromise(claudeQuota({ ...(named ? { command: named } : {}), env, ask: stand.ask })), PLAN);
+      assert.equal(stand.seen.command, asked, 'the ask was opened over that Claude Code');
+      assert.equal(usageOptions(asked, env).pathToClaudeCodeExecutable, asked, "and the SDK's query is given it, or nothing");
+    });
 });
 
 test('REFUSED: an ask that threw, timed out or was interrupted closes its query all the same', async () => {

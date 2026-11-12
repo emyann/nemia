@@ -305,8 +305,8 @@ const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable
  * Claude Code's runner: each task a job (`claudeJobSpec`), on its own process, held by the store's sessions' drain, whether or not this
  * process holds the attached sessions; a long-lived task attached beside them (`withAttached`), refused `unstartable` with no holder
  * (`LONG_LIVED_UNHELD`). Every verb is the jobs' runner's, each look reading a job's bridge file and hold file into its sighting
- * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the
- * plan's usage through the Agent SDK (`claudeQuota`), and `answer` is the holder's, where this engine holds the sessions.
+ * (`withBridgeFiles`, `withHoldFiles`). `quota` asks Claude Code for the plan's usage through the Agent SDK (`claudeQuota`), of the
+ * Claude Code its jobs run, and `answer` is the holder's, where this engine holds the sessions.
  */
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
@@ -331,7 +331,7 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
     bridgeAsked,
     interrupt: (session) => interruptThrough(job, session),
     ...answerOf(attached),
-    quota: claudeQuota(),
+    quota: claudeQuota(options.claudeExecutable === undefined ? {} : { command: options.claudeExecutable }),
   };
 };
 

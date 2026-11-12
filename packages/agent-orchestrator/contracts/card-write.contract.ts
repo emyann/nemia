@@ -5,7 +5,8 @@
  * `resourceVersion` it read, where the card now has another, is stale (`stale`, a Conflict); `queued` is a person's intent said by the
  * card's actions (`nemia inbox queue`, the Card's `queue` and `unqueue`), so a write that changes it is refused (`queued`, an Invalid
  * naming them); `repo` is retired — a card names its factory and its workflow, and the factory places the run — so a write that sets a
- * `repo:` or changes the one an old card has is refused (`repo`, an Invalid naming `nemia factory attach <f> <wf> --repo <name>`), while
+ * `repo:` or changes the one an old card has is refused (`repo`, an Invalid naming `nemia factory attach <factory> <workflow> --repo
+ * <name>`), while
  * one that sends an old card's back as it is, or takes it off, is not; and a card with no body is no card (`empty`, an Invalid). Every
  * other write is the package's to read as a card (`parseInboxCard`, which refuses a key's value in its own words) and to write.
  *

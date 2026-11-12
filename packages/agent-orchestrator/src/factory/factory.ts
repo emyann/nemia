@@ -84,7 +84,8 @@ export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
  * its start (`Run.costLine`), said at a gate whose caps pass it, and holding auto back there; it cuts nothing. `origins`: each of its
  * repositories it was given by git URL, its folder (`clones/<host>/<path>` in the store, `cloneTarget`) to that URL, which the daemon
  * clones again when the folder is gone (`clonesOnce`), when it was given any. `workflowRepos`: the repository each workflow it attaches
- * works on, by the workflow's folder name to the repository's folder name (`nemia factory attach <f> <wf> --repo <name>`, `workflowRepo`),
+ * works on, by the workflow's folder name to the repository's folder name (`nemia factory attach <factory> <workflow> --repo <name>`,
+ * `workflowRepo`),
  * when it names any; kept in its own file, never in a template, which knows no person's folders. `generation`: the count of
  * changes to its spec, Kubernetes' `metadata.generation`, counted by the door's writes (`generationWritten`, `door/generation.ts`), when
  * its file holds one; a file written before the counter reads as 1 (`generationOf`).

@@ -640,7 +640,7 @@ export const repoFor = (home: string, name: string | undefined, named: string | 
 /**
  * The repository a run of the workflow named `workflow` works on in the factory `name` (`wiredRepo`): the one its wiring names by folder
  * name, else its only one; none for the default factory, which is no file and has no wiring. Refused, `Invalid`, in
- * `workflowRepoRefusal`'s words naming `nemia factory attach <f> <wf> --repo <name>`: a
+ * `workflowRepoRefusal`'s words naming `nemia factory attach <factory> <workflow> --repo <name>`: a
  * factory of several repositories that names none for it, or a name none or two of them have; and as `start` refuses the factory.
  */
 export const wiredRepoFor = (home: string, name: string, workflow: string): string | undefined => {

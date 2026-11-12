@@ -57,7 +57,8 @@ export type HarnessSettings = typeof HarnessSettings.Type;
  * revisions policy, the template it was applied from, its own level (absent where it follows the store's), and its cost line per
  * workflow: the dollars a run of that workflow should stay under, all tries and rounds included (absent where it sets none); and the
  * git URL each of its repositories named by one is cloned from, by the repository's folder (absent where it was given none); and the
- * repository each workflow it attaches works on, by the workflow's name to the repository's folder name (`nemia factory attach <f> <wf>
+ * repository each workflow it attaches works on, by the workflow's name to the repository's folder name (`nemia factory attach <factory>
+ * <workflow>
  * --repo <name>`), absent where it names none: a workflow it names none for works on its only repository.
  */
 export const FactorySpec = Schema.Struct({
@@ -166,7 +167,8 @@ export const FactoryRules = Schema.Struct({
 export type FactoryRules = typeof FactoryRules.Type;
 
 /**
- * A workflow attached to a factory (`nemia factory attach <f> <wf> [--repo <name>]`): the folder name of the repository of the factory its
+ * A workflow attached to a factory (`nemia factory attach <factory> <workflow> [--repo <name>]`): the folder name of the repository of
+ * the factory its
  * runs work on, required where the factory has several, absent to keep what its wiring names. An empty body attaches as before.
  */
 export const FactoryAttachWrite = Schema.Struct({ repo: Schema.optionalKey(Schema.String) });

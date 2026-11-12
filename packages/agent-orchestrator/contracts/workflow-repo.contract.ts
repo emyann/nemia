@@ -2,7 +2,8 @@
  * The repository a run of a workflow works on in a factory (agent-orchestrator, src/factory/factory.ts, `workflowRepo`): a card names a
  * factory and a workflow and nothing about repositories, and a brief's `--repo` only finds the factory, so the factory alone places the
  * run. Each workflow it attaches works on one of its repositories, named in its wiring by the repository's folder name (`nemia factory
- * attach <f> <wf> --repo <name>`), as a step's `writable:` names one; a workflow it names none for works on the factory's only repository.
+ * attach <factory> <workflow> --repo <name>`), as a step's `writable:` names one; a workflow it names none for works on the factory's
+ * only repository.
  *
  * Refused, closed: a factory of several repositories whose wiring names none for the workflow (`unwired`), a name no repository of the
  * factory has (`unknown`), and a name two of them share (`shared`): each said by its caller with the `nemia factory attach … --repo` that

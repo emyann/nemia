@@ -55,16 +55,18 @@ export default {
         throw new Refused(
           `the api takes the words, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
         );
-      const entry = (await response.json()) as { at?: unknown; attempt?: unknown; text?: unknown; after?: unknown };
+      const entry = (await response.json()) as Record<'at' | 'attempt' | 'text' | 'after' | 'try' | 'taskId', unknown>;
       if (
         typeof entry.at !== 'string' ||
         entry.attempt !== 1 ||
         entry.text !== SAYING.words ||
         JSON.stringify(entry.after) !== JSON.stringify(SAYING.mark) ||
-        Object.keys(entry).length !== 4
+        entry.try !== 1 ||
+        typeof entry.taskId !== 'string' ||
+        Object.keys(entry).length !== 6
       ) {
         throw new Refused(
-          `the api answers with the engine's entry, { at, attempt, text, after }, after the seeded conversation's last event — it answered ${JSON.stringify(entry)}`,
+          `the api answers with the engine's entry, { at, attempt, text, after }, after the seeded conversation's last event, and the try and the task it reached, { try, taskId } — it answered ${JSON.stringify(entry)}`,
         );
       }
       const inbox = JSON.stringify({ text: SAYING.words });
@@ -79,7 +81,8 @@ export default {
         status: { steps: Array<{ name: string; said?: unknown }> };
       };
       const onRecord = object.status.steps.find((s) => s.name === SAYING.step)?.said;
-      if (JSON.stringify(onRecord) !== JSON.stringify([entry])) {
+      const { try: _try, taskId: _task, ...journalled } = entry;
+      if (JSON.stringify(onRecord) !== JSON.stringify([journalled])) {
         throw new Refused(`the step's detail carries what was said, off the engine's journal — it carries ${JSON.stringify(onRecord)}`);
       }
       const told = talk.locator('[data-session-message="told"]', { hasText: SAYING.words });

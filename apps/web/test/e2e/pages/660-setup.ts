@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Route } from 'playwright';
@@ -8,7 +7,7 @@ import { HARNESS_SKIP_KEY } from '../../../src/lib/harnessSkip.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import { serveExposed } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
-import { apiEnv, OUT, REPO, store } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 /** The need the page plants in the checkout's `dev`: never in place, its one fix a device sign-in that prints a link and a code. */
 const NEED = 'e2e-device-sign-in';
@@ -53,16 +52,15 @@ function takeBack(before: Map<string, Set<string>>): void {
 }
 
 /**
- * A first-visit link minted on the worker's store by `nemia board link`, as the person mints one at the server's shell, under `base`.
+ * A first-visit link minted on the worker's store under `base`, asked of the worker's api through the board `page` is on (`POST
+ * /api/links`), the call `nemia board link --base` makes at the server's shell.
  */
-function mintedLink(base: string): string {
-  const printed = execFileSync(
-    process.execPath,
-    [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'board', 'link', '--base', base],
-    { encoding: 'utf8', env: apiEnv, stdio: 'pipe' },
-  );
-  const url = /^(https?:\/\/\S+\?link=\S+)$/m.exec(printed)?.[1];
-  if (!url) throw new Refused(`nemia board link prints the link it mints — it printed:\n${printed}`);
+async function mintedLink(page: Page, base: string): Promise<string> {
+  const answer = await page.request.post(new URL('/api/links', page.url()).href, { data: { base } });
+  const body = await answer.text();
+  const url = answer.ok() ? (JSON.parse(body) as { url?: unknown }).url : undefined;
+  if (typeof url !== 'string' || !/^https?:\/\/\S+\?link=\S+$/.test(url))
+    throw new Refused(`the api mints a first-visit link under the base given — it answered ${answer.status()}: ${body}`);
   return url;
 }
 
@@ -444,7 +442,7 @@ async function signsInByLink(page: Page): Promise<void> {
     .browser()!
     .newContext({ colorScheme: (await themeOf(page)) as 'light' | 'dark', viewport: { width: 1280, height: 800 } });
   try {
-    const url = mintedLink(seat.base);
+    const url = await mintedLink(page, seat.base);
     const other = await context.newPage();
     const { problems } = watch(other);
     await other.goto(url, { waitUntil: 'load' });

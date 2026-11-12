@@ -3711,7 +3711,9 @@ A workflow declares the machine needs it has in its README's frontmatter (`needs
 rendered there), and a builtin place declares its own (`PlaceDeclared.needs`: the git place's `git-identity`). A need is a shell
 `check`, exit 0 met, any other exit missing, no answer in its time `unknown`; its `fixes`, each a command, the answers it `asks`
 (given to it as `NEMIA_ANSWER_<NAME>`) and the pattern of a `code` its output shows; and `fills`, a place need whose fixes its own go
-before. The daemon runs every declared check on a sweep beside its passes (`src/needs/sweep.verb.ts`), with the tools folder's
+before. The daemon runs the declared checks on a sweep beside its passes (`src/needs/sweep.verb.ts`): the builtin places', and those
+of a factory's workflows only where its places are trusted (`trustedOf`), an untrusted factory's needs read unknown, naming `nemia
+factory trust <factory>`; each with the tools folder's
 `bin` first on PATH and `NEMIA_TOOLS` set, and every pass hands each run its reading: a run that has filed nothing waits while a need
 reads missing (`needsHolding`, `contracts/needs.contract.ts`), listed `waiting on <need>: <fix>`, takes no slot, and its first step is
 filed on the pass after the need reads met. A run that has filed a step is never held by a need.

@@ -139,10 +139,6 @@ const stepBodyOf = (step: WorkflowStep): StepBody => ({
 });
 
 /**
- * The object of one folder served: its listing, the loading its graph is drawn from, and its revision; with no namespace and no revision
- * for one no namespace holds (a template's).
- */
-/**
  * The README a write of `spec` hands the builder for the folder `dir`: its `readme` under a frontmatter of its `needs`, the folder's own
  * README and needs where either is left out (`workflowReadmeWith`), so a Workflow read then written keeps the needs the read served
  * apart; none where neither is given, the README left as it is.
@@ -156,6 +152,10 @@ const needsOf = (dir: string): { needs?: readonly Need[] } => {
   return needs.length > 0 ? { needs } : {};
 };
 
+/**
+ * The object of one folder served: its listing, the loading its graph is drawn from, and its revision; with no namespace and no revision
+ * for one no namespace holds (a template's).
+ */
 const workflowObject = (
   namespace: string | undefined,
   origin: Origin,

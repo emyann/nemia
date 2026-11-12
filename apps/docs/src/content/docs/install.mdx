@@ -6,6 +6,7 @@ description: Install a released Nemia on a Linux or macOS machine with one comma
 A released Nemia is one archive per platform: Linux on x64 or arm64, and macOS on Apple silicon. It carries its own Node, the code,
 the production dependencies with that platform's Claude Code, the board's built pages and the templates. Nothing else is installed
 system-wide, and no root is needed. A dedicated machine, such as a small VPS running Ubuntu 24.04, is the first place it is made for.
+[Self-hosting](/self-hosting/) takes such a machine from fresh to a factory's first run, GitHub included.
 
 ## Install
 
@@ -176,5 +177,3 @@ ssh -L 8787:127.0.0.1:8787 you@your-server
 
 Put the port the sign-in's address names in place of 8787 when it is another. With the tunnel open, the page's call back reaches the
 server.
-
-Signing in to Codex on a server, and a factory naming its repositories by URL to be cloned, come in a later release.

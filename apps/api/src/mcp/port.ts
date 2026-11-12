@@ -13,18 +13,37 @@
  * `tableLines` as `nemia` prints them, the token of the next page on a last line; and no answer passes `ANSWER_BOUND` (`answerFit`): a
  * page past it is asked again shorter, and any other answer past it refused with how to narrow it, never cut.
  *
+ * The feed is offered as resources too, its views' templates read off the `Api` (resources.ts): in the modern era the server
+ * declares `resources.subscribe`, and a `subscriptions/listen` naming views is held here (`listened`) while the SDK's own listen router
+ * acknowledges it and writes each `notifications/resources/updated` the views publish through its `notify` (views.ts); a 2025-era
+ * server lists and reads them alone.
+ *
  * The caller's token is the gate's before this is reached (`callerGate`, caller/caller.ts: `/mcp` needs a person's). While a call is
  * pending, a client that gave a progress token is told progress at once, so its answer streams from its start, and then every 30 s
  * (`PROGRESS_EVERY_MS`), so a host that ends a silent call (`nemia wait`, up to four minutes and a half) hears it is alive.
  */
 import { Effect, Schedule } from 'effect';
 import type { Context } from 'hono';
-import { type CallToolResult, createMcpHandler, Server, type Tool } from '@modelcontextprotocol/server';
+import {
+  type CallToolResult,
+  createMcpHandler,
+  DEFAULT_MAX_REQUEST_BODY_SIZE,
+  INVALID_PARAMS,
+  type McpHttpHandler,
+  type McpRequestContext,
+  ProtocolError,
+  readRequestBody,
+  ResourceNotFoundError,
+  Server,
+  type Tool,
+} from '@modelcontextprotocol/server';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
 import { Api, type ReadBound, READS, TABLE_ACCEPT, type Table, tableLines } from 'objects';
 import { ANSWER_BOUND, answerFit, narrowingOf, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
 import { PORT_INSTRUCTIONS } from './instructions.ts';
+import { FEED_TEMPLATES, type FeedView, viewOf } from './resources.ts';
 import { type PortTool, portTools } from './tools.ts';
+import { type FeedViews, feedViews } from './views.ts';
 
 /** How often a pending call is told as progress, where its caller gave a progress token: under any host's idle bound. */
 export const PROGRESS_EVERY_MS = 30_000;
@@ -218,6 +237,36 @@ const listed = (tool: PortTool): Tool => ({
   annotations: tool.annotations,
 });
 
+/** The era a request of `/mcp` speaks, as the SDK tells the factory: `modern` (its version in `_meta`) or `legacy`. */
+type Era = McpRequestContext['era'];
+
+/**
+ * The feed's resources on `server`: none listed by name (`resources/list` is empty: the feed is its templates), the templates read off
+ * the `Api` (`FEED_TEMPLATES`, resources.ts), and a read of a view answered from `views` (its newest events, under `ANSWER_BOUND`), a URI
+ * that names none refused as a resource not found, in words naming the templates, and one the api refuses with its words.
+ */
+function servesFeed(server: Server, views: FeedViews): void {
+  const templates = FEED_TEMPLATES.map(({ uriTemplate, name, title, description, mimeType }) => ({
+    uriTemplate,
+    name,
+    title,
+    description,
+    mimeType,
+  }));
+  server.setRequestHandler('resources/list', () => ({ resources: [] }));
+  server.setRequestHandler('resources/templates/list', () => ({ resourceTemplates: templates }));
+  server.setRequestHandler('resources/read', async ({ params }, ctx) => {
+    const named = viewOf(params.uri);
+    if (named.kind === 'none') throw new ResourceNotFoundError(params.uri, named.message);
+    const from = ctx.http?.req;
+    if (from === undefined)
+      throw new ProtocolError(INVALID_PARAMS, `${params.uri} is read over HTTP alone: POST the read to the api's /mcp`);
+    const text = await views.read(named.view, from);
+    if (typeof text !== 'string') throw new ProtocolError(INVALID_PARAMS, text.refused);
+    return { contents: [{ uri: params.uri, mimeType: 'application/json', text }] };
+  });
+}
+
 /**
  * The server that answers one request of `/mcp`, in whichever era it speaks (the SDK's `createMcpHandler` asks for one per request):
  * it says what Nemia is (`PORT_INSTRUCTIONS`) on `initialize` and on `server/discover`, lists `tools` in the order given, each list
@@ -225,14 +274,26 @@ const listed = (tool: PortTool): Tool => ({
  * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
  * go beside these.
  */
-export function portServer(tools: readonly PortTool[], appOf: () => Fetching, progressEveryMs: number): Server {
+export function portServer(
+  tools: readonly PortTool[],
+  appOf: () => Fetching,
+  progressEveryMs: number,
+  feed?: { readonly era: Era; readonly views: FeedViews },
+): Server {
   const byName = new Map(tools.map((tool) => [tool.name, tool] as const));
   const list = tools.map(listed);
   const server = new Server(SERVER_INFO, {
-    capabilities: { tools: {} },
+    capabilities: {
+      tools: {},
+      ...(feed === undefined ? {} : { resources: feed.era === 'modern' ? { subscribe: true } : {} }),
+    },
     instructions: PORT_INSTRUCTIONS,
-    cacheHints: { 'tools/list': { ttlMs: PORT_LIST_TTL_MS, cacheScope: 'private' } },
+    cacheHints: {
+      'tools/list': { ttlMs: PORT_LIST_TTL_MS, cacheScope: 'private' },
+      'resources/read': { ttlMs: 0, cacheScope: 'private' },
+    },
   });
+  if (feed !== undefined) servesFeed(server, feed.views);
   server.setRequestHandler('tools/list', () => ({ tools: list }));
   server.setRequestHandler('tools/call', async ({ params }, ctx) => {
     const tool = byName.get(params.name);
@@ -263,6 +324,100 @@ export function portServer(tools: readonly PortTool[], appOf: () => Fetching, pr
   return server;
 }
 
+/** The URIs a `subscriptions/listen` request asks `notifications/resources/updated` of, or none where `body` is no such request. */
+const subscribedIn = (body: unknown): { readonly id: unknown; readonly uris: readonly string[] } | undefined => {
+  if (!isRecord(body) || body.method !== 'subscriptions/listen' || !isRecord(body.params)) return undefined;
+  const filter = body.params.notifications;
+  if (!isRecord(filter) || !Array.isArray(filter.resourceSubscriptions)) return undefined;
+  const uris = filter.resourceSubscriptions.filter((uri): uri is string => typeof uri === 'string');
+  return uris.length === 0 ? undefined : { id: body.id, uris: [...new Set(uris)] };
+};
+
+/** A JSON-RPC error answering the request `id`, in band (HTTP 200), as the SDK's listen router answers its own refusals. */
+const rpcRefused = (id: unknown, message: string): Response =>
+  Response.json({ jsonrpc: '2.0', id: id ?? null, error: { code: INVALID_PARAMS, message } }, { status: 200 });
+
+/** `body` read off `request` within the SDK's bound, as JSON, or none where it is past it or no JSON. */
+const bodyOf = async (request: Request): Promise<unknown> => {
+  const read = await readRequestBody(request, DEFAULT_MAX_REQUEST_BODY_SIZE).catch(() => undefined);
+  if (read === undefined || read.tooLarge) return undefined;
+  return jsonOf(read.text);
+};
+
+/**
+ * Every view `wanted` names held for one stream, each closing it where the api closes the view (`closing`): the releases, or the api's
+ * refusal of one, the views held before it let go again.
+ */
+async function heldAll(
+  views: FeedViews,
+  wanted: readonly FeedView[],
+  from: Request,
+  closing: () => void,
+): Promise<{ readonly releases: readonly (() => void)[] } | { readonly refused: string }> {
+  const releases: (() => void)[] = [];
+  for (const view of wanted) {
+    const held = await views.hold(view, from, closing);
+    if (held.kind === 'refused') {
+      for (const release of releases) release();
+      return { refused: `${view.uri}: ${held.message}` };
+    }
+    releases.push(held.release);
+  }
+  return { releases };
+}
+
+/**
+ * `response`'s body, handed on as it is read, and `releases` let go once when it ends, when its reader cancels it, when `signal` aborts or
+ * when `end` is called (a view closed by the api), which cancels the SDK's stream so its listen is torn down too.
+ */
+function releasedWith(response: Response, releases: readonly (() => void)[], signal: AbortSignal): { response: Response; end: () => void } {
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    signal.removeEventListener('abort', finish);
+    for (const release of releases) release();
+  };
+  signal.addEventListener('abort', finish, { once: true });
+  const reader = response.body?.getReader();
+  if (reader === undefined) return (finish(), { response, end: finish });
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const next = await reader.read().catch(() => ({ done: true as const, value: undefined }));
+      if (next.done) return (finish(), controller.close());
+      controller.enqueue(next.value);
+    },
+    cancel: (reason) => (finish(), reader.cancel(reason)),
+  });
+  const end = () => (finish(), void reader.cancel().catch(() => undefined));
+  return { response: new Response(body, { status: response.status, headers: response.headers }), end };
+}
+
+/**
+ * One request of `/mcp` through `handler`: a `subscriptions/listen` that asks for resources has each URI judged a view (`viewOf`), any
+ * other refused -32602 naming the templates and nothing held; each view held for its stream (`views`, the caller's token judged by the
+ * list), then the request handed to the SDK, whose listen router acknowledges it and writes each `notifications/resources/updated`; its
+ * views let go as its stream ends, is cancelled or its request aborts. Any other request is the SDK's, its body read once.
+ */
+export async function listened(request: Request, handler: McpHttpHandler, views: FeedViews): Promise<Response> {
+  if (request.method !== 'POST') return handler.fetch(request);
+  const body = await bodyOf(request.clone());
+  const asked = subscribedIn(body);
+  if (asked === undefined) return handler.fetch(request, body === undefined ? undefined : { parsedBody: body });
+  const named = asked.uris.map(viewOf);
+  const wanted: FeedView[] = [];
+  for (const one of named) {
+    if (one.kind === 'none') return rpcRefused(asked.id, one.message);
+    wanted.push(one.view);
+  }
+  let end = () => {};
+  const held = await heldAll(views, wanted, request, () => end());
+  if ('refused' in held) return rpcRefused(asked.id, held.refused);
+  const answered = releasedWith(await handler.fetch(request, { parsedBody: body }), held.releases, request.signal);
+  end = answered.end;
+  return answered.response;
+}
+
 /**
  * The handler of `/mcp`, calling the app `appOf` gives (the app it is mounted on: `mcpPort(() => app)` in app.ts): the SDK's serving
  * entry, made once, a fresh `portServer` for each request. A modern request (its version in `_meta`, `server/discover` among them)
@@ -272,6 +427,11 @@ export function portServer(tools: readonly PortTool[], appOf: () => Fetching, pr
  */
 export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVERY_MS }: PortOptions = {}) {
   const tools = portTools(TABLE, CLI_VERBS, Api);
-  const handler = createMcpHandler(() => portServer(tools, appOf, progressEveryMs), { legacy: 'stateless', responseMode: 'auto' });
-  return (c: Context): Promise<Response> => handler.fetch(c.req.raw);
+  const views: FeedViews = feedViews(appOf, (uri) => handler.notify.resourceUpdated(uri));
+  const handler = createMcpHandler((ctx) => portServer(tools, appOf, progressEveryMs, { era: ctx.era, views }), {
+    legacy: 'stateless',
+    responseMode: 'auto',
+  });
+  const served = (c: Context): Promise<Response> => listened(c.req.raw, handler, views);
+  return Object.assign(served, { liveViews: () => views.live() });
 }

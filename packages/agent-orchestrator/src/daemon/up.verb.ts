@@ -11,7 +11,8 @@ import { type Settings, StoreConfig } from '../config/config.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import type { PlaceDeclared } from '../place/place.ts';
 import { NeedsMemory, needsMemo } from '../needs/needs.verb.ts';
-import { needs } from '../needs/sweep.verb.ts';
+import type { Readiness } from 'objects';
+import { needs, readied } from '../needs/sweep.verb.ts';
 import { over, quotaHarnesses, scopeRefusal, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { queueLine } from '../inbox/index.ts';
 import { scheduleLine } from '../factory/schedule/schedule.ts';
@@ -311,7 +312,10 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * (`toolsOnPath`), and adopts each harness a release carries that the tools folder lacks (`adoptedAtStart`); once the engine
  * holds, it files the install of each harness an upgrade carries that is not at its pin (`carriedFiled`); on a tenth it reads the
  * machine's needs every `NEEDS_EVERY` (`needs`), into the memory the process gives (`NeedsMemory`) or one of its own, its place's needs
- * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`).
+ * among them, and every pass reads them, so a run that has filed nothing waits on a missing need (`runNeeds`). On an eleventh, once the
+ * first pass has answered and every `NEEDS_EVERY` after, it reads the store's readiness over that memory (`readied`), and hands each
+ * pass the latest read, whose moves the pass writes to the feed: `not ready` while a piece a run waits on is missing, `ready` once none
+ * is.
  */
 export const up = (
   e: Engine,
@@ -371,13 +375,15 @@ export const up = (
     );
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(retain([leaseRelease(runningRelease())])), over(e)));
     yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(releaseCheck(runningRelease()))));
+    let ready: Readiness | undefined;
+    yield* Effect.forkScoped(Deferred.await(answered).pipe(Effect.andThen(readied(memo, (read) => void (ready = read)))));
     yield* saidStarted(taken);
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {
       const by = stillHeld(home, taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, home, holder)));
-      const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured })).pipe(
+      const pass = yield* withProposalsPass(tickRun({ repo, quota: () => reading, disk: () => measured, readiness: () => ready })).pipe(
         Effect.provideService(NeedsMemory, memo),
         over(e),
       );

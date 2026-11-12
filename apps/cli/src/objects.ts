@@ -3,8 +3,8 @@
  * store, found by its lease (`where.ts`) and, where none listens there, started once and waited for until it is ready (`daemon.ts`). A
  * read asks it once through `asked`, which answers the decoded object, or throws a `Refused` the bin prints and exits with.
  *
- * A refusal of the `Api`'s (`Missing`, `Conflict`, `Invalid`, `Unjudged`, `Forbidden`, `Unauthorized`) is the api's own words, exit 2,
- * but a `Conflict`, a stale version, exit 1. Every request carries the token this client calls with (`callerToken`). A 404 whose
+ * A refusal of the `Api`'s, any object of its error shape (`{ error }`: `Missing`, `Invalid`, `Failed`, …), is the api's own words,
+ * exit 2, but a `Conflict`, a stale version, exit 1. Every request carries the token this client calls with (`callerToken`). A 404 whose
  * body is no refusal is a daemon older than this client, refused naming the restart; another status the `Api` declares no
  * error for is said in the api's words where it gave some (`Answered`); an answer that does not decode as the `Api` says is one too,
  * the daemon and this client being of two builds, exit 2, naming both releases as known and `nemia version` (`undecoded`): a release
@@ -14,22 +14,7 @@
  */
 import { Cause, Effect, Exit, Option } from 'effect';
 import { FetchHttpClient, HttpClientError } from 'effect/http';
-import {
-  Answered,
-  apiClient,
-  type ApiClient,
-  type APIResource,
-  Conflict,
-  Forbidden,
-  Invalid,
-  LIST_PAGE,
-  Missing,
-  READ_BOUND_MS,
-  type Table,
-  timedOut,
-  Unauthorized,
-  Unjudged,
-} from 'objects';
+import { Answered, apiClient, type ApiClient, type APIResource, Conflict, LIST_PAGE, READ_BOUND_MS, type Table, timedOut } from 'objects';
 import { callerToken, olderThanThis, Refused, unanswered } from './client.ts';
 import { servedWith } from './daemon.ts';
 import { clientRelease } from './release.ts';
@@ -39,16 +24,13 @@ import { resourceNamed } from './objects/resource.ts';
 export type ObjectsClient = ApiClient;
 
 /**
- * The `Api`'s refusals, whose `error` is the api's sentence naming the fix: a caller refused (`Forbidden`, 403) or a token the api does
- * not take (`Unauthorized`, 401) among them, said and exited with as every other.
+ * A refusal of the `Api`'s, in the api's own error shape: an object whose `error` is the api's sentence naming the fix, at whatever
+ * status it declares it (`objects`' `api-errors.ts`: a caller refused, `Forbidden`, a token it does not take, `Unauthorized`, a 500 in
+ * its own words, `Failed`, among them), said and exited with as every other. Read by its shape rather than a list of its classes, so a
+ * refusal the api declares later is said in its words too, never taken for an answer of another release.
  */
-const isRefusal = (err: unknown): err is Missing | Conflict | Invalid | Unjudged | Forbidden | Unauthorized =>
-  err instanceof Missing ||
-  err instanceof Conflict ||
-  err instanceof Invalid ||
-  err instanceof Unjudged ||
-  err instanceof Forbidden ||
-  err instanceof Unauthorized;
+const isRefusal = (err: unknown): err is { readonly error: string } =>
+  typeof err === 'object' && err !== null && typeof (err as { readonly error?: unknown }).error === 'string';
 
 /** The first failure of `exit`, if it failed with one. */
 const failureOf = <A, E>(exit: Exit.Exit<A, E>): E | undefined =>

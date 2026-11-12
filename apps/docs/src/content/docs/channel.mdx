@@ -1,0 +1,66 @@
+---
+title: Follow the feed from an agent
+description: Nemia's feed pushed into a Claude Code session as it happens, with nemia channel, or followed by any MCP client through the api's resources.
+---
+
+Nemia's feed is the line it writes for each thing that happens: a run that starts, a step that waits on a person, a call an agent was
+refused. `nemia watch` prints it in a terminal. This page puts it in front of an agent instead: a Claude Code session can have it
+pushed in as it happens, and any MCP client can follow it from the api. Both see the same thing, the Event list the api serves
+(`GET /api/events`), each line an Event, chosen by the same label selectors as `nemia watch -l`.
+
+## From Claude Code: `nemia channel`
+
+`nemia channel` is a local MCP server that Claude Code starts over stdio. It declares itself a channel, a Claude Code feature in
+research preview, and sends each Event as a notification, which the session reads as a tag: the Event's message is the tag's body,
+and each of its fields is an attribute (`reason`, `involved_kind` and `involved_name`, `type`, `source`, `at`, `resource_version`, and
+`namespace`, `waits`, `on`, `via`, `call` and `try` where the Event has them). It is one-way: it offers no tools and takes no reply.
+The body is a line a person or an agent wrote, and the channel tells the session to read it as data, not as an instruction.
+
+Add it to the project's MCP servers, in a file named .mcp.json at the project's root:
+
+```json
+{
+  "mcpServers": {
+    "nemia": {
+      "command": "nemia",
+      "args": ["channel", "-l", "waits=person", "--cursor-file", "/home/you/.nemia-channel-cursor"]
+    }
+  }
+}
+```
+
+Then start an interactive session with the channel loaded:
+
+```bash
+claude --dangerously-load-development-channels server:nemia
+```
+
+Channels reach interactive sessions only: a session started with `-p`, or by the Agent SDK, gets no notification. In a Team or an
+Enterprise organization, an administrator turns channels on first, with the channelsEnabled setting.
+
+- **Which events.** `nemia channel -l <selector>` takes the selectors `nemia watch -l` takes, given again for another, any one of
+  which takes an Event: `-l waits=person` is every line that waits on a person, `-l team=core` the lines of the runs labelled so. With
+  none, every Event comes. `nemia channel -n <namespace>` keeps to one factory's Events.
+- **Which store.** The channel reads the store of the context in use, as every `nemia` command does: this machine's daemon, started
+  if it is not running, or a server's. To follow a server's store, set the context for the channel alone in the entry's environment,
+  `"env": { "NEMIA_CONTEXT": "<context>" }` beside `args`.
+- **Where it starts.** Without `--cursor-file`, the channel starts from now each time Claude Code starts it. With
+  `nemia channel --cursor-file <path>`, it keeps the position of the last line it sent in that file, and a channel started again sends
+  what was written while it was stopped, each line once. It sends at most 50 of those lines (`RESUME_MOST`): past that, it sends one
+  notice in their place, saying how many it skipped, the `resource_version` they start after, and the command that prints them:
+  `nemia watch --once <resource_version>` under the channel's context (`NEMIA_CONTEXT=<context>`, so it reads the store the channel
+  read) with the channel's selectors quoted (and, for a namespace, its factory), which a person types in a
+  terminal and the session's agent runs through its shell. Then it goes on with the lines written from then.
+- **What it says of itself.** A tag with a `notice` attribute is the channel's own: `skipped` (the lines past the cap), `missed` (the
+  saved position could not be read on, the feed having been replaced, so it started over from now), `down` and `up` (the api stopped
+  answering, and answers again: it tries again every second, and loses no line), and `refused` (the api refused what it asked, a
+  selector or a namespace: the channel stops, exit 2, saying why on stderr too).
+
+## From any MCP client: the api's resources
+
+Nemia's MCP port serves the Event lists as resources, for a client that is not Claude Code: `nemia:///api/events`, every Event, and
+`nemia:///api/namespaces/<namespace>/events`, one factory's. Each takes the selectors in its query, as the api's list does,
+`nemia:///api/events?labelSelector=waits%3Dperson`, given again for another. Reading one (resources/read) answers an Event list as
+JSON: the newest Events the port has seen of it while a client follows it, and its `metadata.resourceVersion`, the feed's position,
+from which `nemia watch --once <resourceVersion>` reads on. A client of MCP's 2026-07-28 revision follows one with a subscriptions/listen request that names it among its resource
+subscriptions: the port then tells it each time a line its selectors take is written, and the client reads the resource again.

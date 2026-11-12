@@ -25,6 +25,7 @@ import { readPause } from '../pause/pause.store.ts';
 import { runWith as runEngine, engineOf } from '../runtime-client.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { nemiaFence, widened } from '../admission/fence.ts';
+import type { Readiness, ReadinessPiece } from 'objects';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-'));
 const place = testPlace();
@@ -86,8 +87,20 @@ const REPO = (() => {
 const CARRIED = path.join(scratch('wf-upgrade-carried-'), 'carried.txt');
 
 /**
- * Commits a fixture package with `scripts` and `marker` in it, and a `nemia.sh` that appends its arguments and `WF_ROOT` to `CARRIED`
- * and exits `carry`, tags it `tag`, and answers the commit.
+ * The readiness read the fixture's `nemia doctor --json` prints, as the new release's daemon would answer it: every piece in place
+ * unless a test writes another (`readAs`).
+ */
+/** The last line the fixture's carry prints when it fails, which the upgrade's refusal names. */
+const CARRY_FAILED = 'Claude Code 9.9.9 did not install (exit 1)';
+
+const READ = path.join(scratch('wf-upgrade-read-'), 'readiness.json');
+const readAs = (read: Readiness): void => fs.writeFileSync(READ, JSON.stringify(read));
+readAs({ ready: true, pieces: [] });
+
+/**
+ * Commits a fixture package with `scripts` and `marker` in it, and a `nemia.sh` that appends its arguments and `WF_ROOT` to `CARRIED`,
+ * refuses `--local` with exit 2 on every verb as a release's cli does, and exits `carry`, its last line `CARRY_FAILED` where not 0 — or,
+ * asked `doctor --json`, prints `READ` and exits 1, as `nemia doctor` exits while a run waits —, tags it `tag`, and answers the commit.
  */
 function tagged(tag: string, marker: string, given: Record<string, string> = scripts(), carry = 0): string {
   fs.writeFileSync(
@@ -95,7 +108,10 @@ function tagged(tag: string, marker: string, given: Record<string, string> = scr
     `${JSON.stringify({ name: 'fx', version: '1.0.0', private: true, scripts: given }, null, 2)}\n`,
   );
   fs.writeFileSync(path.join(REPO, 'marker.txt'), `${marker}\n`);
-  fs.writeFileSync(path.join(REPO, 'nemia.sh'), `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nexit ${carry}\n`);
+  fs.writeFileSync(
+    path.join(REPO, 'nemia.sh'),
+    `#!/bin/sh\necho "$* $WF_ROOT" >> '${CARRIED}'\nfor word in "$@"; do if [ "$word" = --local ]; then echo '--local reads no store in process any more' >&2; exit 2; fi; done\nif [ "$1 $2" = "doctor --json" ]; then echo "context $NEMIA_CONTEXT" >> '${CARRIED}'; cat '${READ}'; exit 1; fi\necho 'carrying the harnesses'\nif [ ${carry} -ne 0 ]; then echo '${CARRY_FAILED}' >&2; fi\nexit ${carry}\n`,
+  );
   const commit = stand().world.commit(REPO, marker);
   stand().world.tag(REPO, tag, commit);
   return commit;
@@ -500,20 +516,150 @@ test("the new tree's nemia doctor carry runs on the store before the switch: its
   await s.test('a carry that exits 1 is Invalid, and releases/current stays where it was with no release placed', async () => {
     tagged('v10', 'ten', scripts(), 1);
     fs.rmSync(CARRIED, { force: true });
-    const { tag } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
+    const { tag, message } = await refusalOf({ tag: 'v10', repo: REPO }, idle().host);
     assert.equal(tag, 'Invalid');
+    assert.ok(message.includes(CARRY_FAILED), `the carry's last line is said beside the log: ${message}`);
     assert.equal(currentRelease(ROOT)?.tag, before);
     assert.equal(fs.existsSync(releaseDir('v10', ROOT)), false);
     assert.deepEqual(leftovers(), []);
-    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`], 'run once, on the store');
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry ${ROOT}`], 'run once, on the store');
   });
 
-  await s.test('a carry that exits 0 lets the upgrade switch to the new release', async () => {
+  await s.test('a carry that exits 0, from a tree whose cli refuses --local on every verb, lets the upgrade switch to it', async () => {
     tagged('v11', 'eleven');
     fs.rmSync(CARRIED, { force: true });
     const done = await run({ tag: 'v11', repo: REPO }, idle().host);
     assert.equal(done.built, true);
     assert.equal(currentRelease(ROOT)?.tag, 'v11');
-    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry --local ${ROOT}`]);
+    assert.deepEqual(fs.readFileSync(CARRIED, 'utf8').trim().split('\n'), [`doctor carry ${ROOT}`]);
+  });
+});
+
+test('an upgrade onto a release whose read is not ready says each missing piece a run waits on and its fix, and still succeeds', async (t) => {
+  const s = story(t);
+  const pointer = path.join(releasesDir(ROOT), 'current');
+  const onPointer = () => {
+    unitOn(pointer);
+    const world: World = { lease: lease(OLD), unitPid: OLD };
+    world.onSignal = () => (world.lease = lease(OLD, 'stopped'));
+    world.onStart = () => ((world.lease = lease(NEW)), (world.later = [lease(NEW, 'ticking', true)]), (world.unitPid = NEW));
+    return hostOf(world).host;
+  };
+  const piece = (name: string): ReadinessPiece => ({
+    name,
+    area: 'workflow',
+    state: 'missing',
+    message: `${name} is not installed`,
+    fixes: [{ message: `install ${name}`, command: `nemia doctor fix ${name} --factory nemia --workflow quick`, startable: true }],
+    factory: 'nemia',
+    workflow: 'quick',
+    cost: 'run',
+  });
+  const linger: ReadinessPiece = {
+    name: 'linger',
+    area: 'service',
+    state: 'missing',
+    message: 'stops at logout',
+    fixes: [],
+    cost: 'server',
+  };
+  tagged('v12', 'twelve');
+  tagged('v13', 'thirteen');
+
+  await s.test(
+    'restarted onto a release that reads two pieces missing: each is said with its fix, after the restart, and it succeeds',
+    async () => {
+      readAs({ ready: false, pieces: [piece('mise'), piece('repository-toolchain'), linger] });
+      fs.rmSync(CARRIED, { force: true });
+      try {
+        const done = await run({ tag: 'v12', repo: REPO }, onPointer());
+        assert.equal(done.restart, 'service');
+        assert.ok(fs.readFileSync(CARRIED, 'utf8').includes(`doctor --json ${ROOT}`), 'the new release read the store');
+        const after = done.lines.slice(done.lines.findIndex((l) => l.includes(`ticks the store as pid ${NEW}`)) + 1);
+        assert.match(after[0] ?? '', /not ready/, after.join('\n'));
+        for (const name of ['mise', 'repository-toolchain'])
+          assert.ok(
+            after.some((l) => l.includes(`nemia doctor fix ${name} --factory nemia --workflow quick`)),
+            `${name}'s fix: ${after.join('\n')}`,
+          );
+        assert.ok(!after.some((l) => l.includes('linger')), 'a piece no run waits on is left to nemia doctor');
+      } finally {
+        readAs({ ready: true, pieces: [] });
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
+  await s.test(
+    "a person whose context is a remote server still has this machine's store read: the read runs under the context local",
+    async () => {
+      fs.rmSync(CARRIED, { force: true });
+      try {
+        await run({ tag: 'v13', repo: REPO }, onPointer(), { ...ENV, NEMIA_CONTEXT: 'far-away' });
+        const said = fs.readFileSync(CARRIED, 'utf8').trim().split('\n');
+        assert.ok(said.includes(`doctor --json ${ROOT}`), said.join('\n'));
+        assert.ok(said.includes('context local'), said.join('\n'));
+      } finally {
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
+  await s.test('restarted onto a release that reads ready: nothing more is said than the restart', async () => {
+    try {
+      const done = await run({ tag: 'v13', repo: REPO }, onPointer());
+      const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
+      assert.ok(restart > 0, done.lines.join('\n'));
+      assert.ok(
+        done.lines.slice(restart + 1).every((l) => l.startsWith('removed ')),
+        `only the retention's removals follow the restart: ${done.lines.join('\n')}`,
+      );
+    } finally {
+      fs.rmSync(UNIT, { force: true });
+    }
+  });
+
+  await s.test(
+    "a read the server refused, the client's token missing, says no run is held: one line naming the token's fix, and it succeeds",
+    async () => {
+      const client = (name: string, cost: ReadinessPiece['cost'], command?: string): ReadinessPiece => ({
+        name,
+        area: 'client',
+        state: 'missing',
+        message: `${name} is missing`,
+        fixes: command === undefined ? [] : [{ message: `${name} is missing`, command, startable: false }],
+        cost,
+      });
+      readAs({
+        ready: false,
+        pieces: [
+          client('token-accepted', 'run', 'nemia config set-context local --token-file <file>'),
+          client('local-bin-on-path', 'client'),
+        ],
+      });
+      try {
+        const done = await run({ tag: 'v13', repo: REPO }, onPointer());
+        const restart = done.lines.findIndex((l) => l.includes(`onto v13: the service ticks the store as pid ${NEW}`));
+        const after = done.lines.slice(restart + 1).filter((l) => !l.startsWith('removed '));
+        assert.equal(after.length, 1, after.join('\n'));
+        assert.ok(after[0]?.includes('nemia config set-context local --token-file'), after[0]);
+        assert.doesNotMatch(after[0] ?? '', /not ready|held/, 'no run is said held on a piece of the client');
+      } finally {
+        readAs({ ready: true, pieces: [] });
+        fs.rmSync(UNIT, { force: true });
+      }
+    },
+  );
+
+  await s.test('a read that does not answer is one line naming nemia doctor, and the upgrade still succeeds', async () => {
+    fs.writeFileSync(READ, 'not json');
+    try {
+      const done = await run({ tag: 'v12', repo: REPO }, onPointer());
+      const restart = done.lines.findIndex((l) => l.includes(`onto v12: the service ticks the store as pid ${NEW}`));
+      assert.match(done.lines[restart + 1] ?? '', /nemia doctor\b/, done.lines.join('\n'));
+    } finally {
+      readAs({ ready: true, pieces: [] });
+      fs.rmSync(UNIT, { force: true });
+    }
   });
 });

@@ -3,7 +3,8 @@
  * relabelled, started and dropped arriving as ADDED, MODIFIED and DELETED, the DELETED carrying the last object sent; a labelSelector
  * kept on every read, a card relabelled out of it DELETED; the runs of a store holding one watched, plain and namespaced; a fieldSelector
  * of the runs' state kept on every read, a run waiting sent no MODIFIED for its clock alone and approved out of waiting DELETED; every
- * GET list of the `Api` watchable; the watch's query refused before any stream; and the feed's reader let go when the request is aborted.
+ * GET list of the `Api` watchable; the watch's query refused before any stream; the feed's reader let go when the request is aborted; and
+ * the Event list's watch resumed from a `resourceVersion` (a page's, or the last event's), sent no state, its refusals 400, 410 and 422.
  * The resync beat is shortened (`Beats.watch`), never waited out.
  */
 import { root } from '../../test/harness.ts';
@@ -379,4 +380,98 @@ test("a namespace's watch of the events sends none of another factory's", async 
   } finally {
     await w.stop();
   }
+});
+
+/** The `resourceVersion` the Event list answers on its page: the feed's end as read. */
+const listedAt = async (url = '/api/events?limit=1') => {
+  const res = await app.request(url);
+  assert.equal(res.status, 200, url);
+  const at = ((await res.json()) as { metadata: { resourceVersion?: string } }).metadata.resourceVersion;
+  assert.ok(at !== undefined, `${url} carries metadata.resourceVersion`);
+  return at;
+};
+
+test("a list of events answers the feed's end as its resourceVersion, and a watch from it sends no state, only each line after it", async (t) => {
+  fs.appendFileSync(feed, runLine('rv-1', 'mill'));
+  const at = await listedAt();
+  assert.equal(at, String(fs.statSync(feed).size), "the page's resourceVersion is the feed's size");
+  const w = await watch(t, `/api/events?watch=true&resourceVersion=${at}`);
+  try {
+    fs.appendFileSync(feed, runLine('rv-2', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED rv-2'), 'rv-2 ADDED');
+    assert.ok(!runsSaid(w.events).includes('ADDED rv-1'), 'a line before the resourceVersion asked is not sent');
+    assert.ok(!runsSaid(w.events).includes('ADDED ev-1'), 'no state is sent');
+    assert.deepEqual(
+      w.events[0],
+      { type: 'BOOKMARK', object: { apiVersion: 'nemia/v1', kind: 'Event', metadata: { resourceVersion: at } } },
+      'nothing was written after it before it opened: the first event is the BOOKMARK that says so, at the byte asked',
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch resumed from an earlier resourceVersion sends the lines written since, then a BOOKMARK at the end it opened on, then what follows', async (t) => {
+  const from = await listedAt();
+  fs.appendFileSync(feed, runLine('bk-1', 'mill') + runLine('bk-2', 'press'));
+  const end = String(fs.statSync(feed).size);
+  const w = await watch(t, `/api/events?watch=true&resourceVersion=${from}&labelSelector=factory%3Dmill`);
+  try {
+    await waitFor(t, () => w.events.some((e) => e.type === 'BOOKMARK'), 'the BOOKMARK of what was written before it opened');
+    const caught = w.events.findIndex((e) => e.type === 'BOOKMARK');
+    assert.deepEqual(runsSaid(w.events.slice(0, caught)), ['ADDED bk-1'], 'the line its selector keeps, before the BOOKMARK');
+    assert.equal(
+      w.events[caught]?.object.metadata.resourceVersion,
+      end,
+      'at the end of the feed it opened on, a line it does not keep past',
+    );
+    fs.appendFileSync(feed, runLine('bk-3', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED bk-3'), 'bk-3 ADDED after the BOOKMARK');
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch resumed from the resourceVersion of the last event it was sent repeats nothing and loses no line', async (t) => {
+  const first = await watch(t, `/api/events?watch=true&resourceVersion=${await listedAt()}`);
+  let last: string | undefined;
+  try {
+    fs.appendFileSync(feed, runLine('rs-1', 'mill'));
+    await waitFor(t, () => runsSaid(first.events).includes('ADDED rs-1'), 'rs-1 ADDED');
+    last = first.events.filter((e) => e.type === 'ADDED').at(-1)?.object.metadata.resourceVersion;
+  } finally {
+    await first.stop();
+  }
+  assert.ok(last !== undefined);
+  fs.appendFileSync(feed, runLine('rs-2', 'mill'));
+  const again = await watch(t, `/api/events?watch=true&resourceVersion=${last}`);
+  try {
+    await waitFor(t, () => runsSaid(again.events).includes('ADDED rs-2'), 'rs-2, written while no watch was open, ADDED');
+    assert.ok(!runsSaid(again.events).includes('ADDED rs-1'), 'the line already sent is not sent again');
+  } finally {
+    await again.stop();
+  }
+});
+
+test('a resourceVersion asked of a list read again, or that names no byte, is refused 400 naming it; one inside a line or past the end 410; a bad selector 422', async () => {
+  for (const url of [
+    '/api/runs?watch=true&resourceVersion=5',
+    '/api/events?watch=true&resourceVersion=abc',
+    '/api/events?watch=true&resourceVersion=007',
+  ]) {
+    const res = await app.request(url);
+    assert.equal(res.status, 400, url);
+    assert.match(((await res.json()) as { error: string }).error, /resourceVersion/, `${url} names the key`);
+  }
+  const end = fs.statSync(feed).size;
+  for (const at of [end - 1, end + 100]) {
+    const res = await app.request(`/api/events?watch=true&resourceVersion=${at}`);
+    assert.equal(res.status, 410, `resourceVersion ${at} of a feed of ${end} bytes`);
+    assert.equal(typeof ((await res.json()) as { error: unknown }).error, 'string');
+  }
+  const bad = await app.request(`/api/events?watch=true&resourceVersion=${end}&labelSelector=((`);
+  assert.equal(bad.status, 422, 'a selector the grammar refuses, before any stream');
+  const nowhere = await app.request(`/api/namespaces/nowhere/events?watch=true&resourceVersion=${end}`);
+  const plain = await app.request('/api/namespaces/nowhere/events');
+  assert.equal(nowhere.status, plain.status, 'a namespace the list refuses is refused as it would be unwatched');
 });

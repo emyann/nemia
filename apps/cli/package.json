@@ -13,12 +13,14 @@
     "typecheck": "tsrs --noEmit && tsrs --noEmit -p test"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
     "agent-orchestrator": "*",
     "effect": "4.1.2",
     "objects": "*",
     "yaml": "2.9.1"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.4.0",
     "@types/node": "^24.19.2",
     "api": "*",
     "test-kit": "*",

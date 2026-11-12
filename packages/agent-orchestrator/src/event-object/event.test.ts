@@ -148,6 +148,22 @@ test('a page of 2 reads on by continue in feed order, the last counting nothing 
   assert.equal(second.items[0]?.metadata.name, first.items[1]?.metadata.resourceVersion);
 });
 
+test("a page's resourceVersion is the feed's end as read, on a page with a continue too, and 0 for no feed", () => {
+  const lines = ['r-c', 'r-a', 'r-d'].map(inMill);
+  const end = value(
+    over(
+      lines,
+      Effect.flatMap(FeedDoor, (door) => door.lines.end()),
+    ),
+  )?.cursor;
+  assert.ok(end !== undefined && end > 0);
+  const first = value(over(lines, eventList({ limit: 1 })));
+  assert.ok(first.metadata.continue !== undefined);
+  assert.equal(first.metadata.resourceVersion, String(end));
+  assert.equal(value(over(lines, eventList({}))).metadata.resourceVersion, String(end));
+  assert.equal(value(over([], eventList({}))).metadata.resourceVersion, '0');
+});
+
 test('a token that is no cursor, a cursor inside a line, a bad limit and a bad selector are Invalid', () => {
   const lines = [inMill('r-1'), inMill('r-2')];
   assert.ok(failure(over(lines, eventList({ continue: 'not a token!' }))) instanceof Invalid);

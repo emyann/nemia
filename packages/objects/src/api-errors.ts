@@ -86,7 +86,9 @@ const LabelQuery = Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(
  * The query of a list: `limit` (a whole number from 1), `continue` (the token the page before answered), `labelSelector`, and `selector`,
  * its retired spelling, read the same. Each kept as the text it was sent as, so a wrong one is refused in the package's words, a 422.
  * And `watch`: `watch=true` asks for the list as a stream of watch events (`watchEventOf`), which the api answers before this
- * definition is reached, so a list's answer here is always a page.
+ * definition is reached, so a list's answer here is always a page. And `resourceVersion`, beside `watch=true`: a watch of a list of the
+ * feed's lines (the Event lists) starts at that byte of the feed, the `resourceVersion` of the last event or BOOKMARK a reader was sent
+ * or of a page's `metadata`, and is sent no state; a watch of any other list refuses one, since nothing keeps its old versions.
  */
 export const listQuery = {
   limit: Schema.optionalKey(Schema.String),
@@ -94,4 +96,5 @@ export const listQuery = {
   labelSelector: LabelQuery,
   selector: LabelQuery,
   watch: Schema.optionalKey(Schema.String),
+  resourceVersion: Schema.optionalKey(Schema.String),
 };

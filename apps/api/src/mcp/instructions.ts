@@ -33,6 +33,10 @@ export const PORT_INSTRUCTIONS = [
   "- `say` to tell a running step's session something.",
   "- `closeout` for what a step's try signed off with, `try` for one try of a step.",
   '',
+  "The feed of what happens in the store is offered as resources too: nemia:///api/events, or one factory's at",
+  'nemia:///api/namespaces/<factory>/events, each taking labelSelector=<selector> (repeatable, any one kept). Subscribe with',
+  'subscriptions/listen (resourceSubscriptions) to be told of each new event, and read the resource (resources/read) for the newest.',
+  '',
   'Each tool says the nemia command it is and the endpoint it calls. A list answers a page at a time: its last line names the',
   'continue token of the next. A refusal says what to do next.',
 ].join('\n');

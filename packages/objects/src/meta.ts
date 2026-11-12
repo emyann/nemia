@@ -27,12 +27,15 @@ export const ObjectMeta = Schema.Struct({
 export type ObjectMeta = typeof ObjectMeta.Type;
 
 /**
- * Where a page of a list stands: `continue`, the opaque word that asks for the next page, absent on the last; and how many items
- * remain after this page, when the server counted them.
+ * Where a page of a list stands: `continue`, the opaque word that asks for the next page, absent on the last; how many items
+ * remain after this page, when the server counted them; and `resourceVersion`, the list's position as it was read, which a watch of a
+ * list that keeps its old versions (the Event lists, the feed's lines) resumes from (`?watch=true&resourceVersion=`), as Kubernetes'
+ * ListMeta says it.
  */
 export const ListMeta = Schema.Struct({
   continue: Schema.optionalKey(Schema.String),
   remainingItemCount: Schema.optionalKey(Schema.Number),
+  resourceVersion: Schema.optionalKey(Schema.String),
 });
 export type ListMeta = typeof ListMeta.Type;
 

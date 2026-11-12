@@ -159,3 +159,29 @@ test('under a remote context that takes no connection, a read is refused naming 
   assert.match(said.err, /vps/);
   assert.equal(fs.existsSync(root), false, 'no daemon started here');
 });
+
+test("on an exposed store's own machine, a token kept for `local` lets its reads in, and its store verbs still run in process", async (t) => {
+  const server = await servedStore('nemia-context-own-', () => {}, { WF_EXPOSED: '1' });
+  t.after(server.stop);
+  const env = { ...server.env, XDG_CONFIG_HOME: scratch('nemia-context-own-config-') };
+  const asked = await nemia(['ls'], env);
+  assert.equal(asked.code, 2, `with no token the exposed store refuses its own machine's read: ${asked.err}`);
+  const minted = await nemia(['token', 'add', 'here'], env);
+  const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];
+  assert.ok(token, minted.out);
+  const set = await nemia(['config', 'set-context', 'local', '--token-file', tokenFile(scratch('nemia-context-own-token-'), token)], env);
+  assert.equal(set.code, 0, set.err);
+  assert.equal(fs.statSync(configFileOf(env)).mode & 0o777, 0o600);
+  assert.doesNotMatch(set.out, new RegExp(token), 'the token is printed by no verb');
+  const read = await nemia(['ls'], env);
+  assert.equal(read.code, 0, read.err);
+  const current = await nemia(['config', 'current-context'], env);
+  assert.equal(current.out.trim(), 'local', 'the context stays this machine’s');
+  const added = await nemia(['inbox', 'add', 'a card kept here'], env);
+  assert.equal(added.code, 0, `a store verb runs in process, never refused as remote: ${added.err}`);
+  assert.equal(
+    (await nemia(['config', 'set-context', 'local', '--server', server.url, '--token-file', 'x'], env)).code,
+    2,
+    'local takes no server: it is always this machine',
+  );
+});

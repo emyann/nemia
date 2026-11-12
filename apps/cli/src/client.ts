@@ -5,19 +5,20 @@
  * `Refused`, which the bin prints and exits with.
  */
 export { Refused } from './refused.ts';
-import { chosenOf } from './context.ts';
+import { chosenToken } from './context.ts';
 import { Refused } from './refused.ts';
 
 /**
  * The header that says who calls: `Authorization: Bearer <token>` where `WF_SESSION_TOKEN` holds the token the orchestrator handed a
- * session; else the person's token of the remote context in use (`context.ts`); none where neither is, which the api of this machine
- * reads as the person. Every request of this client carries it.
+ * session; else the person's token of the context in use (`chosenToken`, context.ts): a remote one's, or the one kept for this machine's
+ * own daemon where its store is exposed; none where neither is, which the api of a store not exposed reads as the person. Every request
+ * of this client carries it.
  */
 export const sessionHeaders = (env: NodeJS.ProcessEnv = process.env): Readonly<Record<string, string>> => {
   const session = env.WF_SESSION_TOKEN;
   if (session !== undefined && session !== '') return { authorization: `Bearer ${session}` };
-  const chosen = chosenOf(env);
-  return chosen.kind === 'remote' ? { authorization: `Bearer ${chosen.token}` } : {};
+  const token = chosenToken(env);
+  return token === undefined ? {} : { authorization: `Bearer ${token}` };
 };
 
 /** A query's words: each key once, or several times for a list (`selector`). */

@@ -27,8 +27,15 @@ export const CONFIG_VERB = 'config';
 /** A context of the client's config: its name, the daemon's address (`http(s)://host:port`) and a person's token for it. */
 export type Context = { readonly name: string; readonly server: string; readonly token: string };
 
-/** The client's config as read: its contexts and the name of the one in use, if any. */
-export type ClientConfig = { readonly contexts: readonly Context[]; readonly current: string | undefined };
+/**
+ * The client's config as read: its contexts, the name of the one in use, if any, and a person's token for this machine's own daemon
+ * (`localToken`, `local-token` in the file), which a store marked exposed asks of every caller, its own machine's included.
+ */
+export type ClientConfig = {
+  readonly contexts: readonly Context[];
+  readonly current: string | undefined;
+  readonly localToken?: string;
+};
 
 /** Which daemon a command asks: this machine's store, a remote daemon by its context, or refused for a name the file does not hold. */
 export type Chosen =
@@ -94,7 +101,8 @@ export function configRead(env: NodeJS.ProcessEnv = process.env): ClientConfig {
   if (read === null || read === undefined) return { contexts: [], current: undefined };
   if (typeof read !== 'object' || Array.isArray(read)) throw unreadable(file, 'it is not a mapping');
   const contexts = contextsIn(file, Object.entries(read).find(([k]) => k === 'contexts')?.[1]);
-  return { contexts, current: textOf(read, 'current-context') };
+  const localToken = textOf(read, 'local-token');
+  return { contexts, current: textOf(read, 'current-context'), ...(localToken === undefined ? {} : { localToken }) };
 }
 
 /** `config` written whole to the client's config file, mode 0600 in a folder of mode 0700, through a temporary file renamed over it. */
@@ -104,6 +112,7 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
   const doc = {
     ...(config.current === undefined ? {} : { 'current-context': config.current }),
     contexts: config.contexts.map(({ name, server, token }) => ({ name, server, token })),
+    ...(config.localToken === undefined ? {} : { 'local-token': config.localToken }),
   };
   const temporary = path.join(path.dirname(file), `.config.yaml.${process.pid}`);
   fs.writeFileSync(temporary, stringify(doc), { mode: 0o600 });
@@ -113,6 +122,16 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
 
 /** Which daemon a command run with `env` asks: the config file read, `NEMIA_CONTEXT` over it (`contextOf`). */
 export const chosenOf = (env: NodeJS.ProcessEnv = process.env): Chosen => contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim());
+
+/**
+ * The token a command run with `env` presents, where `WF_SESSION_TOKEN` is not set: the remote context's, or under this machine's
+ * context the person's token for its own daemon where the config keeps one (`set-context local --token-file`); none otherwise.
+ */
+export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const config = configRead(env);
+  const chosen = contextOf(config, env[CONTEXT_VARIABLE]?.trim());
+  return chosen.kind === 'remote' ? chosen.token : chosen.kind === 'local' ? config.localToken : undefined;
+}
 
 /** A context named that the file does not hold: refused, naming the list and how to add one. */
 export const unheld = (name: string): Refused =>
@@ -134,6 +153,8 @@ const USAGE = [
   'nemia config use-context <name>          use the context <name> (local: this machine’s store)',
   'nemia config set-context <name> --server <url> --token-file <file>',
   '                                         add or change a context: a remote daemon and a token of yours for it',
+  'nemia config set-context local --token-file <file>',
+  '                                         keep a token of yours for this machine’s own daemon, where its store is exposed',
   'nemia config get-contexts                list the contexts, the one in use marked *',
   'nemia config current-context             say the context a command uses now',
 ];
@@ -177,8 +198,8 @@ function setContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
   if (args.includes('--token'))
     throw misused('a token is never typed on the command line, where history keeps it: write it to a file and give --token-file <file>');
   if (name === undefined || name.startsWith('-')) throw misused('set-context takes the context’s name first');
-  if (name === LOCAL_CONTEXT) throw misused(`${LOCAL_CONTEXT} always names this machine’s store: name the context otherwise`);
   const config = configRead(env);
+  if (name === LOCAL_CONTEXT) return setLocal(rest, config, env);
   const held = config.contexts.find((c) => c.name === name);
   const typedServer = flagOf(rest, '--server');
   const typedToken = flagOf(rest, '--token-file');
@@ -188,6 +209,22 @@ function setContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
   const context = { name, server, token };
   configWritten({ ...config, contexts: [...config.contexts.filter((c) => c.name !== name), context] }, env);
   process.stdout.write(`context ${name} ${held === undefined ? 'added' : 'changed'}: ${server}\n`);
+  return 0;
+}
+
+/**
+ * `nemia config set-context local --token-file <file>`: a token of the person's kept for this machine's own daemon, which a store marked
+ * exposed asks of every caller; `local` keeps naming this machine's store, so the verbs of the store still run in process. Refused: a
+ * `--server`, since `local` is always this machine's.
+ */
+function setLocal(rest: readonly string[], config: ClientConfig, env: NodeJS.ProcessEnv): number {
+  if (rest.includes('--server'))
+    throw misused(`${LOCAL_CONTEXT} always names this machine’s store, at its lease’s address: give it --token-file <file> alone`);
+  const typedToken = flagOf(rest, '--token-file');
+  if (typedToken === undefined) throw misused(`set-context ${LOCAL_CONTEXT} takes --token-file <file>`);
+  configWritten({ ...config, localToken: tokenIn(typedToken) }, env);
+  process.stdout.write(`context ${LOCAL_CONTEXT}: this machine’s daemon is asked with your token
+`);
   return 0;
 }
 

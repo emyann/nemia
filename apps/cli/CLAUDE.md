@@ -28,6 +28,8 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` refuses a
   verb about the store only the old path has (`refused`), and `handedOn` (`src/local.ts`) the words a moved read hands on; a machine
   verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`) runs here whatever the context.
+  On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
+  <file>`, `local-token` in the file, `chosenToken`); `local` stays this machine's store, so its verbs still run in process.
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
   live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).

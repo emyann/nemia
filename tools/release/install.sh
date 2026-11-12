@@ -266,8 +266,15 @@ if [ "$service" = 1 ]; then
       warn "loginctl enable-linger failed: Nemia stops when you log out until you run loginctl enable-linger $(id -un)"
   fi
   if [ -n "$bind" ]; then
+    # An exposed store asks every caller for a token, this machine's own nemia too: the first token is minted, shown this once for
+    # the person's other machines and browsers, and kept for this machine's nemia (set-context local) in a 0600 file removed after.
     say "the store is exposed on $bind: every caller needs a person token; here is the first, shown this once"
-    "$nemia" token add "$(id -un)"
+    minted=$("$nemia" token add "$(id -un)")
+    printf '%s\n' "$minted"
+    (umask 077 && printf '%s\n' "$minted" | sed -n 's/^Authorization: Bearer //p' >"$work/local-token")
+    minted=
+    "$nemia" config set-context local --token-file "$work/local-token"
+    say "this machine's nemia asks its daemon with that token; on another machine: nemia config set-context <name> --server http://<this machine's address>:8787 --token-file <file>"
   fi
 fi
 say "done: run nemia version"

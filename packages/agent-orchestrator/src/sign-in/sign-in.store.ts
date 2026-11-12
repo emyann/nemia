@@ -72,9 +72,9 @@ export function removeClaudeToken(home: string): boolean {
 export type ClaudeTokenLoad = 'loaded' | 'given' | 'none';
 
 /**
- * Sets the harness's variable (`TOKEN_VARIABLE`) in `env` from the token file of `env`'s store (`WF_ROOT`) where it is unset or empty, as the daemon does
- * at its start: the process's own environment, which every session it starts inherits. Refused (`Invalid`, exit 2) where the file's mode
- * lets its group or others read or write it, naming `chmod 600 <file>`, and where it holds no token.
+ * Sets the harness's variable (`TOKEN_VARIABLE`) in `env` from the token file of `env`'s store (`WF_ROOT`) where it is unset or empty, as
+ * the daemon does at its start: the process's own environment, which every session it starts inherits. Refused (`Invalid`, exit 2) where
+ * the file's mode lets its group or others read or write it, naming `chmod 600 <file>`, and where it holds no token.
  */
 export function loadClaudeToken(env: Record<string, string | undefined>, root: string = wfRoot(env)): ClaudeTokenLoad {
   if (env[TOKEN_VARIABLE]) return 'given';

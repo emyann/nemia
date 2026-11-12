@@ -48,8 +48,17 @@ curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh |
 ```
 
 or answer the installer's question with that address. A store bound beyond this machine is marked exposed: every caller then needs a
-person token, the board included. The installer runs `nemia token add` once and prints the first token; keep it, it is not shown
-again. The board asks for it once and keeps it in a cookie only the board's own origin is sent.
+person token, the board included, and the server's own `nemia` too. The installer runs `nemia token add` once and prints the first
+token; keep it, it is not shown again. It also keeps that token for the server's own `nemia`, so `nemia ls` and the other reads work
+there as before and the store's other verbs still run on the server itself. Where you bound the daemon by hand, do the same with a
+token of yours in a file:
+
+```bash
+nemia token add server
+nemia config set-context local --token-file ~/.nemia-token
+```
+
+The board asks for a token once and keeps it in a cookie only the board's own origin is sent.
 
 Nemia speaks plain HTTP. TLS stays outside it: a private network such as Tailscale, which encrypts the traffic between your machines,
 or a reverse proxy of your own in front of it.
@@ -92,8 +101,10 @@ it from standard input. The token is kept in `~/.agent-workflows/claude-token`, 
 starts, however it was started. `nemia claude-token status` says whether one is set, never the token itself, and
 `nemia claude-token rm` takes it away. Nemia never sends, logs or serves it, and the board never asks for it.
 
-Each person uses their own token, on their own machine. A shared server with one person's token is that person's subscription used
-by others, which Anthropic's terms do not allow.
+Each person uses their own token, on their own machine. A server that others use while it runs on one person's token makes that
+person's account available to them, which Anthropic's
+[Consumer Terms of Service](https://www.anthropic.com/legal/consumer-terms), section 2, _Account creation and access_, forbid: "You also
+may not make your Account available to anyone else."
 
 A token made by `claude setup-token` can only make model requests: it cannot open Remote Control sessions or reach claude.ai's
 connectors. Sessions on a server signed in this way run without Remote Control, and say so; the MCP servers a factory configures

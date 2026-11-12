@@ -14,6 +14,7 @@
  * a token or a selector the package refuses is its `Invalid`, a 422. A list asked as a `Table` (`wantsTable`) answers the package's
  * (`cardTable`): the columns `nemia inbox` prints, never words of the api's own. Each entry is called by its `input`, through `inRequest`.
  */
+import path from 'node:path';
 import { Effect } from 'effect';
 import {
   cardList,
@@ -35,7 +36,7 @@ import {
 import { Api, type CardList, DEFAULT_NAMESPACE, type Table } from 'objects';
 import { filingOf } from '../inbox/inbox.ts';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from '../factory/place.ts';
+import { knownRepos, repoNeeded } from '../factory/place.ts';
 import { cardStart } from '../runs/start.ts';
 import { answered, locatedAt, orFailed, readerRefused } from './refused.ts';
 import { wantsTable } from './table.ts';
@@ -88,6 +89,18 @@ const cardIn = async (s: Served, namespace: string | undefined, name: string) =>
 /** The factory a namespace names: none for `default`. */
 const factoryOf = (namespace: string): string | undefined => (namespace === DEFAULT_NAMESPACE ? undefined : namespace);
 
+/**
+ * The repository a card filed in no factory has its workflow looked for on: the request's own (`?repo=`, or its `?factory=`'s), else the
+ * card's `repo:` where it is one the api serves (`knownRepos`), else the api's own, refused where it has none (`repoNeeded`). Asked only
+ * for a card that names a workflow: one that names none is filed without a repository being looked at.
+ */
+const workflowRepo = (s: Served, about: string | undefined): string => {
+  if (s.repo !== undefined) return s.repo;
+  const named = about !== undefined && path.isAbsolute(about) ? path.resolve(about) : undefined;
+  if (named !== undefined && knownRepos(s.env, s.home, s.running).includes(named)) return named;
+  return repoNeeded(s);
+};
+
 /** The card `name` of `namespace` queued on the workflow it names, or taken off the queue (`off`), and read again. */
 const queued = (namespace: string, name: string, off: boolean) =>
   answered(async (s) => {
@@ -119,7 +132,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
           throw new Refused({
             message: "`workflow` is a workflow folder's name, with no `/`: send one, or leave it out. Nothing was filed.",
           });
-        const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, repoNeeded(s), s.home);
+        const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, () => workflowRepo(s, payload.repo), s.home);
         if ('status' in asked) throw readerRefused(asked);
         const { text, ...keys } = asked;
         const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));

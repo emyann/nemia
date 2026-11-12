@@ -22,8 +22,11 @@ export const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A store `seed` fills, served by an api; `nemia` runs the bin on it, `stdin` its input where given. */
-export async function servedStore(prefix: string, seed: (root: string) => void) {
+/**
+ * A store `seed` fills, served by an api whose environment `more` adds to (`WF_EXPOSED`); `nemia` runs the bin on it, `stdin` its input
+ * where given.
+ */
+export async function servedStore(prefix: string, seed: (root: string) => void, more: NodeJS.ProcessEnv = {}) {
   const root = scratch(`${prefix}store-`);
   const home = scratch(`${prefix}home-`);
   const env: NodeJS.ProcessEnv = (() => {
@@ -35,6 +38,7 @@ export async function servedStore(prefix: string, seed: (root: string) => void) 
       WF_MAX_RUNS: '2',
       WF_MAX_CONCURRENT: '2',
       NEMIA_DAEMON_START: 'off',
+      ...more,
     };
   })();
   seed(root);
@@ -67,5 +71,5 @@ export async function servedStore(prefix: string, seed: (root: string) => void) 
     child.kill();
     await ended;
   };
-  return { root, home, env, nemia, stop, said: () => said };
+  return { root, home, env, url, nemia, stop, said: () => said };
 }

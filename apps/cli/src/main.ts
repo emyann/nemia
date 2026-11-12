@@ -1,11 +1,14 @@
 /**
- * `nemia`, a client of the api: a moved read asks the api serving this store over HTTP; the client's own verbs (`CLIENT_VERBS`: `get`,
- * `apply`, `explain`, `propose`, `proposals`, `decide`) ask it whatever else is typed, each saying its own help and refusing
- * `--local`; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI, spawned with the same words
- * (`local.ts`), so the writes it has not moved keep their path exactly.
+ * `nemia`, a client of the api: a moved read asks the api serving the store the context in use names (`context.ts`) over HTTP; the
+ * client's own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, `propose`, `proposals`, `decide`) ask it whatever else is typed, each
+ * saying its own help and refusing `--local`; every other verb, a help, and a read typed with `--local` run on the orchestrator's own CLI,
+ * spawned with the same words (`local.ts`), so the writes it has not moved keep their path exactly. Under a remote context a verb about
+ * the store only that path has is refused (`notHere`), a verb about this machine (`MACHINE_VERBS`) still runs here, and `nemia config`
+ * reads and writes the contexts themselves, whatever context is in use.
  */
+import { CONFIG_VERB, chosenOf, config, LOCAL_CONTEXT, notHere, unheld } from './context.ts';
 import { type Entry, spawned, unlocal } from './local.ts';
-import { type ClientVerb, nameOf, type ReadVerb, routeOf } from './route.ts';
+import { type ClientVerb, MACHINE_VERBS, nameOf, type ReadVerb, routeOf } from './route.ts';
 import { apply } from './objects/apply.ts';
 import { decide } from './objects/decide.ts';
 import { explain } from './objects/explain.ts';
@@ -33,11 +36,23 @@ const own = (entry: Entry): Readonly<Record<ClientVerb, (args: readonly string[]
   decide: (args) => decide(args, (argv) => main(argv, entry)),
 });
 
-/** Runs `argv` and answers the exit code: on the api for a moved read, else on the old path under `entry`. */
+/** Whether `name` is one of `MACHINE_VERBS`, which runs here whatever context is named, held or not. */
+const ofTheMachine = (name: string): boolean => (MACHINE_VERBS as readonly string[]).includes(name);
+
+/**
+ * Runs `argv` and answers the exit code: on the api for a moved read, else on the old path under `entry`; refused, exit 2, under a
+ * context the config does not hold, and for a verb about the store only the old path has under a remote one.
+ */
 export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const words = unlocal(argv);
   const name = nameOf(words);
-  const route = routeOf({ name, local: words.length !== argv.length, help: words.includes('--help') });
+  if (name === CONFIG_VERB) return config(words.slice(1));
+  const chosen = chosenOf();
+  if (chosen.kind === 'refused' && !ofTheMachine(name)) throw unheld(chosen.name);
+  const remote = chosen.kind === 'remote' ? chosen.name : undefined;
+  const help = words.includes('--help') || name === '';
+  const route = routeOf({ name, local: words.length !== argv.length, help, remote: remote !== undefined });
+  if (route === 'refused') throw notHere(name, remote ?? LOCAL_CONTEXT);
   if (route === 'process') return spawned(words, entry);
   if (entry === 'wf') process.stderr.write(`${WF_HINT}\n`);
   const verb = Object.entries(own(entry)).find(([word]) => word === name)?.[1];

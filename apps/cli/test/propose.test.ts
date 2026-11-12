@@ -16,6 +16,7 @@ import path from 'node:path';
 import { ambient } from './ambient.ts';
 import { scratch } from 'test-kit/scratch';
 import { sessionHeaders } from '../src/client.ts';
+import { configWritten } from '../src/context.ts';
 import type { Said } from './served.ts';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -187,10 +188,14 @@ const HIRES_FILE = [
   'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.fresh\nspec:\n  workflow: tidy\n  step: fresh\n  agent: shipper\n',
 ].join('---\n');
 
-test('`sessionHeaders`: Authorization: Bearer <token> where WF_SESSION_TOKEN holds one, none where it is unset or empty', () => {
-  assert.deepEqual(sessionHeaders({ WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
-  assert.deepEqual(sessionHeaders({ WF_SESSION_TOKEN: '' }), {});
-  assert.deepEqual(sessionHeaders({}), {});
+test('`sessionHeaders`: Bearer WF_SESSION_TOKEN where it holds one, else the remote context’s token, else none', () => {
+  const here = { XDG_CONFIG_HOME: scratch('nemia-headers-config-') };
+  assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
+  assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: '' }), {});
+  assert.deepEqual(sessionHeaders(here), {});
+  configWritten({ contexts: [{ name: 'vps', server: 'http://vps:7777', token: 'person' }], current: 'vps' }, here);
+  assert.deepEqual(sessionHeaders(here), { authorization: 'Bearer person' });
+  assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
 });
 
 test('propose sends every request with the session token, each object at the version served now, absent where none is', async () => {

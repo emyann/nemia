@@ -1,6 +1,6 @@
 # apps/cli — `nemia` (`wf`, its alias), a client of the api
 
-`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `contracts/route.contract.ts`: `show`, `closeout`, `ls`, the
+`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
 inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
 `explain`, over every kind the api serves, `propose` and `proposals`, and `decide`) asked of it whatever else is typed, and every other verb, a help, and a read typed with `--local`
 run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). It sits beside the board, above the api: the order is
@@ -23,8 +23,17 @@ run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`).
   `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
   the runs' Table, from server reads that serve no Table: the pause first, how old where the branches stand is (`Daemon.branchesLine`), a
   line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path.
+- **Which daemon, in `src/context.ts`**: kubectl's contexts, the client's own config (`${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml`,
+  0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
+  remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` refuses a
+  verb about the store only the old path has (`refused`), and `handedOn` (`src/local.ts`) the words a moved read hands on; a machine
+  verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`) runs here whatever the context.
+  `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
+- **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
+  live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
-  (`daemon.json`). No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
+  (`daemon.json`), read only under this machine's context. No other file of `src` spells a store path or reads a file of the store: what
+  it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
   other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it. `agent-orchestrator` is in

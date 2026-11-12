@@ -5,27 +5,16 @@
  * the command acts on this machine's store, as it does today (the lease's url, a daemon started on demand). A name the file does not
  * hold is refused, naming `nemia config get-contexts`: read as this machine's store, a command meant for the remote daemon would act
  * on the wrong one.
+ *
+ * `asked` is the name `NEMIA_CONTEXT` holds as its reader hands it on, trimmed (`chosenOf`): the laws read it as given, since the solver
+ * decides no law over `String.prototype.trim` (each came back unknown, out of work, at the default budget).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
+import { type Chosen, type ClientConfig, type Context, LOCAL_CONTEXT } from '../src/context.ts';
 
-/** The name that always means this machine's store, whatever the file holds. */
-export const LOCAL_CONTEXT = 'local';
-
-/** A context of the client's config: its name, the daemon's address (`http(s)://host:port`) and a person's token for it. */
-export type Context = { readonly name: string; readonly server: string; readonly token: string };
-
-/** The client's config as read: its contexts and the name of the one in use, if any. */
-export type ClientConfig = { readonly contexts: readonly Context[]; readonly current: string | undefined };
-
-/** Which daemon a command asks: this machine's store, a remote daemon by its context, or refused for a name the file does not hold. */
-export type Chosen =
-  | { readonly kind: 'local' }
-  | { readonly kind: 'remote'; readonly name: string; readonly server: string; readonly token: string }
-  | { readonly kind: 'refused'; readonly name: string };
-
-/** The name a command asks for: `NEMIA_CONTEXT` where it is set and not blank, else the file's own. */
+/** The name a command asks for: `NEMIA_CONTEXT` where it is set and not empty, else the file's own. */
 const named = (config: ClientConfig, asked: string | undefined): string | undefined =>
-  asked !== undefined && asked.trim() !== '' ? asked.trim() : config.current;
+  asked !== undefined && asked !== '' ? asked : config.current;
 
 /** The context of `name` in the file, if it holds one. */
 const held = (config: ClientConfig, name: string): Context | undefined => config.contexts.find((c) => c.name === name);
@@ -42,11 +31,8 @@ const contextOfSpec = spec<(config: ClientConfig, asked: string | undefined) => 
     },
     theVariableWins: {
       description: 'A context named by NEMIA_CONTEXT is the one asked for, over the file’s own',
-      condition: ({ input: [config, asked], output }) =>
-        asked === undefined ||
-        asked.trim() === '' ||
-        asked.trim() === LOCAL_CONTEXT ||
-        (output.kind !== 'local' && output.name === asked.trim()),
+      condition: ({ input: [, asked], output }) =>
+        asked === undefined || asked === '' || asked === LOCAL_CONTEXT || (output.kind !== 'local' && output.name === asked),
     },
     aHeldContextIsAsked: {
       description: 'A context the file holds is asked at its own address with its own token',
@@ -54,10 +40,7 @@ const contextOfSpec = spec<(config: ClientConfig, asked: string | undefined) => 
         const name = named(config, asked);
         if (name === undefined || name === LOCAL_CONTEXT) return true;
         const context = held(config, name);
-        return (
-          context === undefined ||
-          (output.kind === 'remote' && output.server === context.server && output.token === context.token)
-        );
+        return context === undefined || (output.kind === 'remote' && output.server === context.server && output.token === context.token);
       },
     },
     anUnheldNameIsRefused: {

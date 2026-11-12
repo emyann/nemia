@@ -5,7 +5,7 @@
  */
 import type { StepCloseout, TryCloseout } from 'objects';
 import { Refused } from '../client.ts';
-import { spawned } from '../local.ts';
+import { handedOn } from '../local.ts';
 import { asked } from '../objects.ts';
 
 /** A field's value on one line: a string as it is, anything else as JSON. */
@@ -51,7 +51,7 @@ function parsed(args: readonly string[]): { runId: string; step: string; tryNo?:
 
 export async function closeout(args: readonly string[]): Promise<number> {
   const typed = parsed(args);
-  if (typed === undefined) return spawned(['closeout', ...args]);
+  if (typed === undefined) return handedOn(['closeout', ...args]);
   const { runId, step, tryNo } = typed;
   let read: TryCloseout;
   if (tryNo !== undefined) read = await asked('closeout', (client) => client.steps.closeout({ params: { runId, step, try: tryNo } }));

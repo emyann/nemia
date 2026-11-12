@@ -8,44 +8,12 @@
  * change of a factory's definitions proposed and judged, and `decide`, the one decide read model the api serves, read and prompted on
  * here — the untangle intent's Q14) are verbs the orchestrator's table has none of: they ask the api alone, whatever else is typed, and
  * say their own help and refuse `--local` themselves.
+ *
+ * The verb lists, `Route` and `Routed` are `src/route.ts`'s, imported here: no shipped source reads a value of a contract, which loads
+ * the verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/** The reads this client asks the api for, which the orchestrator's CLI answers too. */
-export const READ_VERBS = ['show', 'closeout', 'ls', 'inbox', 'watch'] as const;
-
-/** A read this client asks the api for. */
-export type ReadVerb = (typeof READ_VERBS)[number];
-
-/** The verbs this client alone has, generic over every kind the api serves: no process answers them. */
-export const CLIENT_VERBS = ['get', 'apply', 'explain', 'propose', 'proposals', 'decide'] as const;
-
-/** One of `CLIENT_VERBS`. */
-export type ClientVerb = (typeof CLIENT_VERBS)[number];
-
-/**
- * The verbs about the machine this client runs on, never a remote daemon's (the distribution intent's Q6): its login service, its
- * releases, a daemon of its own, what it runs, the person's tokens of its store and its Claude token. Each runs on the old path,
- * whatever context is in use.
- */
-export const MACHINE_VERBS = ['service', 'upgrade', 'up', 'tick', 'version', 'token', 'claude-token'] as const;
-
-/** One of `MACHINE_VERBS`. */
-export type MachineVerb = (typeof MACHINE_VERBS)[number];
-
-/**
- * Where a command goes: the api, the orchestrator's CLI in a process of its own, or refused — a verb about the store that only the
- * old path has yet, typed while a context names a remote daemon, which that path cannot reach (refused naming the context to leave,
- * `nemia config use-context`, or the machine to run it on).
- */
-export type Route = 'api' | 'process' | 'refused';
-
-/**
- * A command as the route reads it: the name it opens with, whether `--local` was typed, whether it asks for its help, and whether the
- * context in use names a remote daemon (`remote`; absent, none: the store of this machine). Implement makes `remote` required once
- * `src/main.ts` reads the context.
- */
-export type Routed = { readonly name: string; readonly local: boolean; readonly help: boolean; readonly remote?: boolean };
+import { CLIENT_VERBS, MACHINE_VERBS, READ_VERBS, type Route, type Routed } from '../src/route.ts';
 
 /** Whether `name` is one of `READ_VERBS`. */
 const reads: readonly string[] = READ_VERBS;
@@ -60,7 +28,7 @@ const machines: readonly string[] = MACHINE_VERBS;
 const ofTheMachine = (name: string): boolean => machines.includes(name);
 
 /** Whether the context in use names a remote daemon. */
-const remote = (command: Routed): boolean => command.remote === true;
+const remote = (command: Routed): boolean => command.remote;
 
 /** Whether `command` is a verb about the store that only the old path has, typed against a remote daemon, asking no help. */
 const unreachable = (command: Routed): boolean =>
@@ -71,8 +39,7 @@ const routeSpec = spec<(command: Routed) => Route>({
     writesStayInProcess: {
       description:
         'A verb that is neither a moved read nor one of the client’s own runs on the old path, in a process of its own, unless it is about the store and the context is remote',
-      condition: ({ input: [command], output }) =>
-        moved(command.name) || own(command.name) || unreachable(command) || output === 'process',
+      condition: ({ input: [command], output }) => moved(command.name) || own(command.name) || unreachable(command) || output === 'process',
     },
     machineVerbsStayHere: {
       description: 'A verb about this machine runs on the old path here, whatever context is in use',

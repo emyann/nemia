@@ -13,6 +13,8 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
+  NEMIA_CONTEXT: 'the-persons-vps',
+  XDG_CONFIG_HOME: '/home/someone/.config',
 };
 
 /** What a child spawned with `env` reads of each of `DROPPED`. */

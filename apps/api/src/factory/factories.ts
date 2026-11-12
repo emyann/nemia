@@ -3,19 +3,29 @@
  * default first on the api's own repository, and one (`factoryObject`) — and a factory's sub-resources over the package's entries the
  * command line runs, each entry called by its `input` through `inRequest`: its rules (`nemia factory rules`), read, written and cleared;
  * its instruction, where it is kept (`nemia factory instruction`) and the words the store keeps (`nemia factory instruct`); its command
- * lines (`factoryCommandsOf`), built off the command table; and its cost line per workflow, set and taken back (`nemia factory
- * cost-line`), each answered with the factory as it then reads.
+ * lines (`factoryCommandsOf`), built off the command table; its cost line per workflow, set and taken back (`nemia factory
+ * cost-line`), its revisions policy (`nemia factory revisions`), a workflow attached and detached (`nemia factory attach`, `detach`) and
+ * a harness setting set and taken off (`nemia factory setting`), each answered with the factory as it then reads; its places trusted
+ * again where the store runs (`nemia factory trust`), answered with what was asked of each; and the factory removed (`nemia factory rm`),
+ * answered with what was removed.
  */
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   factoryCommandsOf,
   factoryList,
   factoryObject,
+  FACTORY_ATTACH,
   FACTORY_COST_LINE_RM,
   FACTORY_COST_LINE_SET,
+  FACTORY_DETACH,
   FACTORY_INSTRUCT,
   FACTORY_INSTRUCTION,
+  FACTORY_REVISIONS,
+  FACTORY_RM,
   FACTORY_RULES,
+  FACTORY_SETTING_RM,
+  FACTORY_SETTING_SET,
+  FACTORY_TRUST,
 } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../layer.ts';
@@ -58,6 +68,17 @@ const costLine = (method: string, name: string, workflow: string, usd?: number) 
     return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
   });
 
+/**
+ * `write`, one of the package's writes of the factory `name` (`route` the request, named in a refusal of the name), run in the request,
+ * then the factory as it reads after it.
+ */
+const writtenThen = (route: string, name: string, write: (s: Served) => Promise<unknown>) =>
+  answeredWrite(async (s: Served) => {
+    factoryNamed(route, name);
+    await write(s);
+    return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+  });
+
 export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handlers) =>
   handlers
     .handle('listAll', ({ query }) => answered((s) => s.inRequest(factoryList(s.home, defaultRepo(s), queryOf(query)))))
@@ -79,6 +100,44 @@ export const factoriesHandlers = HttpApiBuilder.group(Api, 'factories', (handler
     .handle('deleteInstructionWords', ({ params: { name } }) => instruct('DELETE', name, { clear: true }))
     .handle('putCostLine', ({ params: { name, workflow }, payload }) => costLine('PUT', name, workflow, payload.usd))
     .handle('deleteCostLine', ({ params: { name, workflow } }) => costLine('DELETE', name, workflow))
+    .handle('delete', ({ params: { name } }) =>
+      answeredWrite(async (s: Served) => {
+        factoryNamed(`DELETE /api/factories/${name}`, name);
+        const { file, instruction } = await s.inRequest(FACTORY_RM.handler({ factory: name }));
+        return { name, file, instruction };
+      }),
+    )
+    .handle('setRevisions', ({ params: { name }, payload: { revisions } }) =>
+      writtenThen(`PUT /api/factories/${name}/revisions`, name, (s) =>
+        s.inRequest(FACTORY_REVISIONS.handler({ factory: name, revisions })),
+      ),
+    )
+    .handle('trust', ({ params: { name } }) =>
+      answeredWrite(async (s: Served) => {
+        factoryNamed(`POST /api/factories/${name}/trust`, name);
+        return s.inRequest(FACTORY_TRUST.handler({ factory: name }));
+      }),
+    )
+    .handle('attach', ({ params: { name, workflow } }) =>
+      writtenThen(`PUT /api/factories/${name}/workflows/${workflow}`, name, (s) =>
+        s.inRequest(FACTORY_ATTACH.handler({ factory: name, workflow })),
+      ),
+    )
+    .handle('detach', ({ params: { name, workflow } }) =>
+      writtenThen(`DELETE /api/factories/${name}/workflows/${workflow}`, name, (s) =>
+        s.inRequest(FACTORY_DETACH.handler({ factory: name, workflow })),
+      ),
+    )
+    .handle('putSetting', ({ params: { name, setting }, payload: { value } }) =>
+      writtenThen(`PUT /api/factories/${name}/settings/${setting}`, name, (s) =>
+        s.inRequest(FACTORY_SETTING_SET.handler({ factory: name, setting, value })),
+      ),
+    )
+    .handle('deleteSetting', ({ params: { name, setting } }) =>
+      writtenThen(`DELETE /api/factories/${name}/settings/${setting}`, name, (s) =>
+        s.inRequest(FACTORY_SETTING_RM.handler({ factory: name, setting })),
+      ),
+    )
     .handle('commands', ({ params: { name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/factories/${name}/commands`, name);

@@ -431,9 +431,13 @@ export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 /**
- * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes.
+ * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes;
+ * and the Factory's own writes, a workflow attached and detached, its revisions policy, its removal, the trust of its places and its
+ * harness settings.
  */
-export { FACTORY_FIRE, FACTORY_HIRE } from './factory/factory.verb.ts';
+export { FACTORY_ATTACH, FACTORY_DETACH, FACTORY_FIRE, FACTORY_HIRE, FACTORY_REVISIONS, FACTORY_RM } from './factory/factory.verb.ts';
+export { FACTORY_TRUST } from './trust/trust.verb.ts';
+export { FACTORY_SETTING_RM, FACTORY_SETTING_SET } from './harness-settings/harness-settings.verb.ts';
 export { LS } from './list/commands.verb.ts';
 export { REFRESH } from './revisions/commands.verb.ts';
 export { RETRY } from './retry/commands.verb.ts';

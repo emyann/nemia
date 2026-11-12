@@ -18,8 +18,8 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { Effect, Schema } from 'effect';
-import { HttpClientError } from 'effect/http';
 import {
+  Answered,
   Fix,
   READINESS_AREAS,
   readinessSaid,
@@ -89,9 +89,8 @@ function localBinPiece(env: NodeJS.ProcessEnv): ReadinessPiece {
       );
 }
 
-/** Whether a failure of the typed client is the api refusing the token presented: a 401. */
-const tokenRefused = (err: unknown): boolean =>
-  err instanceof Unauthorized || (HttpClientError.isHttpClientError(err) && 'response' in err.reason && err.reason.response.status === 401);
+/** Whether a failure of the typed client is the api refusing the token presented: a 401, declared (`Unauthorized`) or not (`Answered`). */
+const tokenRefused = (err: unknown): boolean => err instanceof Unauthorized || (err instanceof Answered && err.status === 401);
 
 /** The server's read, or that it refused the token, asked of the daemon the context in use names. */
 const serverRead = (env: NodeJS.ProcessEnv): Promise<Readiness | 'refused'> =>

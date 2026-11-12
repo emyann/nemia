@@ -37,7 +37,15 @@ import { tried } from '../runtime-client.ts';
 import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
-import { claudeTokenStatus, TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE } from '../sign-in/sign-in.store.ts';
+import {
+  claudeTokenStatus,
+  tokenAgeWords,
+  tokenWarningLine,
+  TOKEN_MAKER,
+  TOKEN_NAME,
+  TOKEN_RENEWAL,
+  TOKEN_VARIABLE,
+} from '../sign-in/sign-in.store.ts';
 import { fixCommandOf } from './needs.ts';
 import { trustCommandOf } from '../trust/trust.ts';
 import {
@@ -113,7 +121,9 @@ const piece = (
 /**
  * The default harness's sign-in: its token kept in the store (`claudeTokenStatus`), given in the environment, or, with neither, its own
  * login (`claudeSignIn`), which a session runs under as well. Said as set and loading,
- * never as good: the harness takes any token at its word, so an expired or wrong one shows only when a session or the quota is refused.
+ * never as good: the harness takes any token at its word, so an expired or wrong one shows only when a session or the quota is refused. A
+ * kept token says its age, off its file's write time, and near or past its year its warning (`tokenWarningLine`), with the commands that
+ * make a new one: still met, since it loads.
  */
 function harnessPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
   const of: Of = { name: TOKEN_NAME, area: 'harness', cost: 'run' };
@@ -126,7 +136,12 @@ function harnessPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
     return piece(of, 'missing', `the ${own} file ${status.file} is readable by others (${status.mode}), so it does not load`, [
       typed('let only you read it', `chmod 600 ${status.file}`),
     ]);
-  if (status.state === 'set') return piece(of, 'met', `a ${own} is set and loads (${status.file}): ${later}`);
+  if (status.state === 'set') {
+    const warning = tokenWarningLine(status);
+    if (warning !== undefined)
+      return piece(of, 'met', warning, [typed(`make a new one: ${TOKEN_RENEWAL}`, `${TOKEN_MAKER} && ${set} && nemia service restart`)]);
+    return piece(of, 'met', `a ${own} is set and loads (${status.file}, ${tokenAgeWords(status) ?? 'its age unread'}): ${later}`);
+  }
   if (facts.env[TOKEN_VARIABLE]) return piece(of, 'met', `a ${own} is set and loads (${TOKEN_VARIABLE}): ${later}`);
   if (facts.ownSignIn(facts.env) === 'signed-in')
     return piece(of, 'met', `no ${own} is kept, and ${capital(DEFAULT_HARNESS)} Code is signed in by its own login: ${later}`);

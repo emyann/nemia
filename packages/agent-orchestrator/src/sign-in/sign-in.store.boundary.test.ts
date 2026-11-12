@@ -1,7 +1,8 @@
 /**
  * The person's Claude token file on a scratch store: `nemia claude-token set` keeps what is piped in at mode 0600 and prints none of
  * it, `status` says it is set and its mode and never the token, `rm` removes it; the daemon's load sets `CLAUDE_CODE_OAUTH_TOKEN` only
- * where it is unset, and refuses a file another user can read, naming `chmod 600`.
+ * where it is unset, and refuses a file another user can read, naming `chmod 600`. A token's age is its file's write time: one planted
+ * past about eleven months, or past its year, is warned of by its kind, naming the command that makes a new one.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +11,15 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { scratch } from 'test-kit/scratch';
 import { Invalid } from '../refusal/refusal.ts';
-import { claudeTokenFile, claudeTokenStatus, loadClaudeToken, removeClaudeToken, writeClaudeToken } from './sign-in.store.ts';
+import {
+  claudeTokenFile,
+  claudeTokenStatus,
+  loadClaudeToken,
+  removeClaudeToken,
+  TOKEN_LIFE_DAYS,
+  TOKEN_MAKER,
+  writeClaudeToken,
+} from './sign-in.store.ts';
 import { CLAUDE_TOKEN_RM, CLAUDE_TOKEN_STATUS } from './sign-in.verb.ts';
 
 const TOKEN = 'sk-ant-oat01-test-token-never-shown';
@@ -45,7 +54,12 @@ test('nemia claude-token set keeps the piped token at 0600 and never prints it; 
     'no temporary file left',
   );
   const status = claudeTokenStatus(root);
-  assert.deepEqual(status, { state: 'set', file, mode: '0600' });
+  assert.deepEqual(
+    { ...status, setAt: undefined },
+    { state: 'set', file, mode: '0600', setAt: undefined, daysLeft: TOKEN_LIFE_DAYS - 1 },
+    'a token set now has its year left, and no warning',
+  );
+  assert.equal(status.setAt, new Date(fs.statSync(file).mtimeMs).toISOString(), 'set when its file was written');
   const lines = CLAUDE_TOKEN_STATUS.print(status, {}).join('\n');
   assert.ok(lines.includes('0600'), lines);
   assert.equal(lines.includes(TOKEN), false);
@@ -95,4 +109,32 @@ test('nemia claude-token rm removes the file, and says when there was none', () 
   assert.equal(claudeTokenStatus(root).state, 'unset');
   assert.equal(removeClaudeToken(root), false);
   assert.match(CLAUDE_TOKEN_RM.print({ removed: false, file: claudeTokenFile(root) }, {}).join('\n'), /nothing to remove/);
+});
+
+test('a token whose file was written about eleven months ago, or over a year ago, is warned of by its kind, naming how to make a new one', async () => {
+  const root = scratch('wf-claude-token-old-');
+  const file = writeClaudeToken(root, TOKEN);
+  const DAY = 86_400_000;
+  const now = Date.now();
+  const planted = (days: number) => {
+    const at = new Date(now - days * DAY);
+    fs.utimesSync(file, at, at);
+    return claudeTokenStatus(root, now);
+  };
+  assert.equal(planted(300).warning, undefined, 'ten months old: no warning');
+  const near = planted(340);
+  assert.equal(near.warning, 'near-year');
+  assert.equal(near.daysLeft, TOKEN_LIFE_DAYS - 340);
+  const lines = CLAUDE_TOKEN_STATUS.print(near, {});
+  const warned = lines.filter((l) => l.startsWith('warning:'));
+  assert.equal(warned.length, 1, lines.join('\n'));
+  assert.ok(warned[0]?.includes(TOKEN_MAKER) && warned[0].includes('claude-token set'), 'the warning names the fix');
+  assert.equal(lines.join('\n').includes(TOKEN), false, 'never the token');
+  const past = planted(400);
+  assert.equal(past.warning, 'past-year');
+  assert.ok((past.daysLeft ?? 0) < 0);
+  const printed = await nemia(root, ['claude-token', 'status'], '');
+  assert.equal(printed.code, 0, printed.out);
+  assert.ok(printed.out.includes('warning:'), printed.out);
+  assert.equal(printed.out.includes(TOKEN), false);
 });

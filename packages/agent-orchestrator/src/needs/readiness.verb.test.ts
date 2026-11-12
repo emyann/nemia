@@ -16,7 +16,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { declared } from '../../place/memory/place.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { StoreRoot, toolsBinDir } from '../config/root.store.ts';
-import { TOKEN_NAME, TOKEN_VARIABLE } from '../sign-in/sign-in.store.ts';
+import { TOKEN_MAKER, TOKEN_NAME, TOKEN_VARIABLE, writeClaudeToken } from '../sign-in/sign-in.store.ts';
 import { readinessOf, type CommandRead, type ReadinessFacts } from './readiness.verb.ts';
 
 const ROOT = scratch('wf-readiness-');
@@ -41,12 +41,12 @@ const facts = (env: Record<string, string>, answers: Record<string, CommandRead>
   running: { kind: 'checkout', root: ROOT },
 });
 
-/** The read, over `given` facts, the test place declaring `need`. */
-const read = (given: ReadinessFacts, need: Need) =>
+/** The read, over `given` facts, the test place declaring `need`, of the store at `root`. */
+const read = (given: ReadinessFacts, need: Need, root = ROOT) =>
   Effect.runPromise(
     readinessOf(given).pipe(
       Effect.provide(PlaceService.layer({ ...testPlace().place, declared: { ...declared, needs: [need] } })),
-      Effect.provideService(StoreRoot, ROOT),
+      Effect.provideService(StoreRoot, root),
     ),
   );
 
@@ -79,6 +79,22 @@ test("with no token kept or given, Claude Code's own login meets the harness pie
   const token = got.pieces.find((p) => p.name === TOKEN_NAME);
   assert.equal(token?.state, 'met');
   assert.doesNotMatch(token?.message ?? '', /\bvalid\b|\bgood\b(?! shows)/);
+});
+
+test('a kept token about eleven months old still meets the harness piece, said with its age and the commands that make a new one', async () => {
+  const root = scratch('wf-readiness-old-token-');
+  const file = writeClaudeToken(root, 'a-token-never-read');
+  const at = new Date(Date.now() - 340 * 86_400_000);
+  fs.utimesSync(file, at, at);
+  const got = await read(facts({ PATH: '/usr/bin' }), identity('exit 0'), root);
+  const token = got.pieces.find((p) => p.name === TOKEN_NAME);
+  assert.equal(token?.state, 'met');
+  assert.ok(token?.message.includes(file), token?.message);
+  assert.ok(
+    token?.fixes.some((f) => f.command.startsWith(TOKEN_MAKER) && f.command.includes(`${TOKEN_NAME} set`)),
+    'the fix makes a new one',
+  );
+  assert.equal(token?.message.includes('a-token-never-read'), false, 'never the token');
 });
 
 test('a need of a factory whose places are not trusted is unknown, its check never run, with the command that trusts them', async () => {

@@ -201,8 +201,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                Never a code: approve the one the client shows with nemia pairings approve
                                on the port: pairings_ls
   nemia claude-token status
-                               whether your subscription token is kept, its file and its mode: never
-                               the token
+                               whether your subscription token is kept, its file and its mode, when it
+                               was set and the days left of its year, warned of a month before it ends:
+                               never the token
                                CLI only: the token is the person's own, kept on the machine the store is on and read there from the terminal; no caller of the port reads or writes it
   nemia version [--json]
                                this nemia's release, an install's tag or a checkout, and its folder;

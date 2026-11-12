@@ -17,8 +17,18 @@ const under = (path: string, root: string): boolean => path === root || path.sta
 /** Whether `path` is the MCP port's. */
 const onPort = (path: string): boolean => under(path, MCP_PATH);
 
+/**
+ * The routes a client that holds no token yet is let through on: asking for a pairing, claiming it with the secret it was answered,
+ * and opening a first-visit link (`/api/pair`). Each judges its own secret, and none answers with the store's data. Implement exports it
+ * from src/caller/caller.ts beside `MCP_PATH` and this file imports it from there.
+ */
+export const PAIR_PATH = '/api/pair';
+
+/** Whether `path` is a pairing route's. */
+const pairing = (path: string): boolean => under(path, PAIR_PATH);
+
 /** Whether `path` is one the api answers on with the store's data or its route table. */
-const answered = (path: string): boolean => under(path, '/api') || under(path, '/openapi');
+const answered = (path: string): boolean => !pairing(path) && (under(path, '/api') || under(path, '/openapi'));
 
 const needOfSpec = spec<(path: string, exposed: boolean) => TokenNeed>({
   ensures: {
@@ -29,6 +39,10 @@ const needOfSpec = spec<(path: string, exposed: boolean) => TokenNeed>({
     anExposedStoreNeedsATokenForItsData: {
       description: 'On a store marked exposed, a route the api answers with the store’s data or its route table needs a token',
       condition: ({ input: [path, exposed], output }) => !exposed || !answered(path) || output === 'token',
+    },
+    aPairingRouteNeedsNone: {
+      description: 'A pairing route — asking, claiming, a first-visit link — needs no token, exposed or not: it judges its own secret',
+      condition: ({ input: [path], output }) => !pairing(path) || output === 'none',
     },
     aBoardPageNeedsNone: {
       description: 'A page of the board, any path neither the port nor the api’s, needs no token, exposed or not',

@@ -527,7 +527,7 @@ export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | '
     usage: '<runId> [--sensitive <globs>]',
     help: ['what the run produced, and the choice it leaves you (nemia decide --help)'],
     class: 'read',
-    served: [{ endpoint: 'runs.decision' }],
+    served: [{ endpoint: 'runs.decision', query: { diffs: '' } }],
   },
 ];
 

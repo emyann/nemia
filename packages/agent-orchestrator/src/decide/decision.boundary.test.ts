@@ -280,7 +280,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
         "only the check-affecting files, a file each, in git's order; the source file is in the radius, not in full",
       );
       const [pkg, testFile] = sensitive.files;
-      assert.deepEqual(pkg, { path: 'package.json', lines: diffOf('package.json'), cut: 0 });
+      assert.deepEqual(pkg, { path: 'package.json', lines: diffOf('package.json'), cut: 0, added: 1, removed: 1 });
       const whole = diffOf('packages/x/test/add.test.ts');
       assert.ok(whole.length > DIFF_LINES, `the seeded test's diff is longer than the cap: ${whole.length} lines`);
       assert.equal(testFile.lines.length, DIFF_LINES);
@@ -732,6 +732,15 @@ test("a diff is cut a file at a time: named by its header, a rename as both ends
       ['new file.test.ts', DIFF_LINES, 10],
     ],
     'the new file has five header lines and DIFF_LINES + 5 added: ten past the cap',
+  );
+  assert.deepEqual(
+    files.map((f) => [f.added, f.removed]),
+    [
+      [0, 0],
+      [1, 1],
+      [DIFF_LINES + 5, 0],
+    ],
+    'the lines its hunks add and remove, counted past the cap, none of the header',
   );
   assert.equal(files[2].lines.at(-1), long[DIFF_LINES - 6]);
 });

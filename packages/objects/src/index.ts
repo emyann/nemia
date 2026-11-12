@@ -327,6 +327,7 @@ export {
   Collisions,
   Decidable,
   DecideCommand,
+  decisionNarrowed,
   DecisionTouched,
   DiffFile,
   Lesson,

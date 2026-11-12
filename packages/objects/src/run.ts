@@ -618,8 +618,8 @@ export const StepCloseout = Schema.Struct({
 export type StepCloseout = typeof StepCloseout.Type;
 
 /**
- * The fields `?fields=` names of a closeout's `output`, as JSON:API spells a sparse fieldset: comma-separated, each name trimmed, an
- * empty one naming none. Pure.
+ * The names a narrowing query lists — `?fields=` of a closeout's `output`, `?diffs=` of a decision's paths — as JSON:API spells a sparse
+ * fieldset: comma-separated, each name trimmed, an empty one naming none. Pure.
  */
 export const fieldsNamed = (fields: string): string[] =>
   fields

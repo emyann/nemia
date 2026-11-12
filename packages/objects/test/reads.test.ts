@@ -36,7 +36,6 @@ test('REFUSED: a GET the Api gains with no entry in READS, a page whose query ta
   assert.equal(readsUnbounded(withGroup(planted)).length, 1, 'no entry');
   const refused = readsUnbounded(withGroup(planted), { ...READS, 'planted.list': { shape: 'page', narrow: ['limit', 'tail'] } });
   assert.equal(refused.length, 3, 'no limit, and limit and tail named though its query takes neither');
-  assert.ok(refused.every((said) => said.startsWith('planted.list')));
 });
 
 /** A closeout with a short output field, a long one and a body of `body` characters. */

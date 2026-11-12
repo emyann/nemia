@@ -10,8 +10,11 @@ import path from 'node:path';
 import { filedAtOnce, Invalid, listedAtOnce, outsideRefusal, type Factory, type Running } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 
-/** What a request is answered in: its repository, and its factory, none for the default factory. */
-export type Place = { repo: string | undefined; factory: Factory | undefined };
+/**
+ * What a request is answered in: its repository, none where it has none; its factory, none for the default factory; and whether the
+ * request named either (`?factory=`, `?repo=`), which a page read per factory tells from a request that leaves both to the api.
+ */
+export type Place = { repo: string | undefined; factory: Factory | undefined; named: boolean };
 
 /** What of the request `placeFor` reads: its query's `factory` and `repo`, each undefined where it is not given. */
 export type PlaceQuery = { factory: string | undefined; repo: string | undefined };
@@ -58,21 +61,21 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
 export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string, running?: Running): Place {
   const named = query.repo === undefined ? undefined : path.resolve(query.repo);
   if (query.factory === undefined || query.factory === DEFAULT_NAMESPACE) {
-    if (named === undefined) return { repo: repoOf(env, running), factory: undefined };
+    if (named === undefined) return { repo: repoOf(env, running), factory: undefined, named: query.factory !== undefined };
     const known = knownRepos(env, home, running);
     if (!known.includes(named)) throw unknownRepo(named, known);
-    return { repo: named, factory: undefined };
+    return { repo: named, factory: undefined, named: true };
   }
   const factory = filedAtOnce(home, query.factory);
-  if (factory === undefined) return { repo: named ?? repoOf(env, running), factory: undefined };
+  if (factory === undefined) return { repo: named ?? repoOf(env, running), factory: undefined, named: true };
   if (named !== undefined) {
     if (outsideRefusal(factory, named) !== undefined) throw outsideRepo(factory, named);
-    return { repo: named, factory };
+    return { repo: named, factory, named: true };
   }
   const [only, ...more] = factory.repos;
-  if (only !== undefined && !more.length) return { repo: path.resolve(only), factory };
+  if (only !== undefined && !more.length) return { repo: path.resolve(only), factory, named: true };
   const own = repoOf(env, running);
-  return { repo: own !== undefined && outsideRefusal(factory, own) === undefined ? own : undefined, factory };
+  return { repo: own !== undefined && outsideRefusal(factory, own) === undefined ? own : undefined, factory, named: true };
 }
 
 /**
@@ -80,7 +83,7 @@ export function placeFor(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string
  * several repositories that the request names none of, naming them and the `?repo=` that picks one; or the default factory of an api that
  * has no repository of its own, naming the `?factory=` that picks a factory and the `nemia factory add` that files one.
  */
-export function repoNeeded(place: Place): string {
+export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
   if (place.repo !== undefined) return place.repo;
   if (place.factory !== undefined) {
     const repos = place.factory.repos.map((r) => path.resolve(r)).sort();

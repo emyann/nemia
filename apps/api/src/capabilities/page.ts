@@ -38,7 +38,7 @@ const pickRepository = (name: string, repos: readonly string[]): PageRead =>
  * (`listedAtOnce`):
  *
  * - A factory named: its repository, or `several-repositories` where it works on several and the request names none.
- * - The default factory, a `?repo=` named that is not the api's own: that one.
+ * - The default factory named (`?factory=default`), or a `?repo=` in it: that repository, where there is one.
  * - Else, every factory whose file reads, and the default where `own` is one: the one repository they all work on; `no-factory` where
  *   there is none of them; `several-repositories` where there is one, on several; `several-factories` otherwise.
  */
@@ -50,7 +50,7 @@ export function pageRead(place: Place, own: string | undefined, listings: readon
       place.factory.repos.map((r) => path.resolve(r)),
     );
   }
-  if (place.repo !== undefined && place.repo !== own) return { repo: place.repo };
+  if (place.named && place.repo !== undefined) return { repo: place.repo };
   const candidates: Candidate[] = [
     ...(own === undefined ? [] : [{ name: 'default', repos: [own] }]),
     ...listings.flatMap((l) => ('error' in l ? [] : [{ name: l.name, repos: l.repos.map((r) => path.resolve(r)) }])),

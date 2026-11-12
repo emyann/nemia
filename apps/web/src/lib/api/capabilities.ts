@@ -5,7 +5,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { CapabilitiesWithSteps, MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
+import { type CapabilitiesUnread, CapabilitiesWithSteps, MCP_TRANSPORTS, type DefinitionOrigin, type McpTransport } from 'objects';
 import { decodes } from './decodes.ts';
 import { decoded } from './read.ts';
 import { call, read } from './objects.ts';
@@ -275,9 +275,13 @@ const StepReachSchema = decodes<StepReach>()(
   }),
 );
 
-/** What the repository the api runs in offers a step, and what each step gets: `objects`' `CapabilitiesWithSteps`, read by its keys. */
+/**
+ * What the repository the page reads offers a step, and what each step gets: `objects`' `CapabilitiesWithSteps`, read by its keys. Where it
+ * reads none, `repo` is left out, every list is empty, and `unread` says why and what to do.
+ */
 export type Capabilities = {
-  repo: string;
+  repo?: string;
+  unread?: CapabilitiesUnread;
   skills: Described[];
   agents: Described[];
   mcp: McpServer[];
@@ -309,14 +313,18 @@ const CapabilitiesSchema = decodes<Capabilities>()(
   }),
 );
 
+/** Where the page is read: the factory the address picks (`?factory=`) and one of its repositories (`?repo=`), each where it names one. */
+type CapabilitiesPlace = { factory?: string; repo?: string };
+
 /**
- * What the repository offers a step. Not polled: it changes when a person edits the checkout, and the api asks
- * each server for its tools once while it runs. Read again on each visit.
+ * What the repository of `place` offers a step, read in the factory it names, else in the one the store's factories leave. Not polled: it
+ * changes when a person edits the checkout, and the api asks each server for its tools once while it runs. Read again on each visit.
  */
-export const capabilitiesQuery = queryOptions({
-  queryKey: ['capabilities'],
-  queryFn: () =>
-    call((c) => c.server.capabilities({ query: {} }), read(CapabilitiesWithSteps)).then((answer) =>
-      decoded('GET /api/capabilities', CapabilitiesSchema, answer),
-    ),
-});
+export const capabilitiesQuery = (place: CapabilitiesPlace) =>
+  queryOptions({
+    queryKey: ['capabilities', place.factory ?? null, place.repo ?? null],
+    queryFn: () =>
+      call((c) => c.server.capabilities({ query: place }), read(CapabilitiesWithSteps)).then((answer) =>
+        decoded('GET /api/capabilities', CapabilitiesSchema, answer),
+      ),
+  });

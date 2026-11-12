@@ -32,7 +32,7 @@ import { frontmatterKey } from '../former/former.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { runsDir } from '../record/record.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 import { tried } from '../runtime-client.ts';
 import type { Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
@@ -381,15 +381,6 @@ function releasePiece(home: string, facts: ReadinessFacts): ReadinessPiece {
     : piece(RELEASE, 'met', `this is the newest release (${latest.version})`);
 }
 
-/** Whether a run was ever started in the store at `home`: a run's record is in its runs folder. */
-const ranHere = (home: string): boolean => {
-  try {
-    return fs.readdirSync(runsDir(home)).some((file) => file.endsWith('.json'));
-  } catch {
-    return false;
-  }
-};
-
 /**
  * Every piece of the store's server, in the read's order (`Readiness`), `ready` where none is missing, and whether a run was ever
  * started here (`ran`). The needs are read off this
@@ -417,5 +408,6 @@ export const readinessOf = Effect.fn('readinessOf')(function* (facts: ReadinessF
     factoryPiece(factories),
     releasePiece(home, facts),
   ];
-  return { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran: ranHere(home) } satisfies Readiness;
+  const ran = (yield* (yield* RunDoor).runs.ids()).length > 0;
+  return { ready: pieces.every((p) => p.state !== 'missing'), pieces, ran } satisfies Readiness;
 });

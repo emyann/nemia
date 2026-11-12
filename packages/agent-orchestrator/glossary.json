@@ -1031,8 +1031,20 @@
       "type": "FixFollowed"
     },
     {
+      "term": "Harness need",
+      "meaning": "each harness whose runtime adapter declares what it needs on a machine (`HarnessDeclaration.needs`) is two needs, read from that declaration and never named here (`harnessNeedsOf`, `packages/agent-orchestrator/src/needs/harness.ts`): `<harness>`, its program installed at the pin the release was tested with into the tools folder, and `<harness>-sign-in`, signed in as the user the daemon runs as. Swept, held, read and fixed as every need is; a run needs those of the harnesses its frozen steps run sessions on (`harnessesOfRun`)."
+    },
+    {
+      "term": "Fix kind",
+      "meaning": "what a need's fix does (`NeedFix.kind`): `puts`, the server runs it (the kind of a fix that names none); `typed`, a person types it on the server, since it asks what no task can read (a sign-in's code), offered `startable: false` and refused `Invalid` by `startFix`, naming it; `removes`, it takes a need in place away (a harness deactivated), offered on a met piece alone and refused `Conflict` while an unfinished run needs that need (`runsHoldingRemoval`), naming `nemia cancel <run>` for each."
+    },
+    {
+      "term": "Repository need",
+      "meaning": "a need of `scope: repository` (`NeedScope`): checked and fixed in each factory's repository rather than once on the machine, one piece per factory in the read's `repository` area; swept only in a trusted factory's repository, and its fix, named by the factory alone (`nemia doctor fix <need> --factory <factory>`), refused for an untrusted one, naming `nemia factory trust <factory>`."
+    },
+    {
       "term": "Readiness",
-      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there: the harness's sign-in, the service and its linger, the bind, the machine, the place's and each workflow's needs, a factory, a newer release (`readinessOf`, `nemia readiness`, `GET /api/readiness`)."
+      "meaning": "the one read of what this server needs before a factory's first run, each piece in place, missing or unknown with the command or fix that puts it there: each harness's two needs, the service and its linger, the bind, the machine, the place's and each workflow's needs, each factory's repository needs, a factory, a newer release (`readinessOf`, `nemia doctor`, `GET /api/readiness`); `nemia doctor fix` starts a fix. `nemia readiness`, its former command, is refused, naming `nemia doctor`."
     },
     {
       "term": "Tools folder",

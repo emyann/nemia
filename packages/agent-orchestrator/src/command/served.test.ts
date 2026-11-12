@@ -17,6 +17,7 @@ const LEFT_OUT = [
   'service status',
   'service restart',
   'service addresses',
+  'readiness',
   'token add',
   'token ls',
   'token rm',

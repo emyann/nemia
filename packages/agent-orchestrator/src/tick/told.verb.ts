@@ -425,9 +425,10 @@ export type RunReadHow = {
 /**
  * The one read of a run (`RunRead`) every reader of it judges it by — the tick's pass, every verb, `nemia ls`, the api's listing and the
  * run object: its frozen steps, the engine's views of its tasks and the readers made of them (`readersOf`), and a person's asks, through
- * the Run door; and, of a run that has filed nothing, its needs as this process's memory of them reads them (`runNeeds`, `NeedsMemory`),
- * none where it keeps none. Where the result branches stand and who holds the checkout are a caller's to add, each read where it reads
- * them (`standings`, `checkout`): left as none here. With it, the notes the asks' read said (`askNotes`).
+ * the Run door; and, of a run that has filed nothing, its needs — those of the harnesses its frozen steps run on among them — as this
+ * process's memory of them reads them (`runNeeds`, `NeedsMemory`), none where it keeps none. Where the result branches stand and who holds
+ * the checkout are a caller's to add, each read where it reads them (`standings`, `checkout`): left as none here. With it, the notes the
+ * asks' read said (`askNotes`).
  */
 export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: RunReadHow = {}) {
   const steps = how.steps ?? (yield* stepsOf(run));
@@ -436,7 +437,7 @@ export const readRun = Effect.fnUntraced(function* (e: Engine, run: Run, how: Ru
   const door = yield* RunDoor;
   const { asks, rounds: roundAsks, notes: askNotes } = yield* door.asks.read(RunId.read(run.id));
   const answers = yield* door.asks.answers(RunId.read(run.id));
-  const needs = yield* runNeeds(yield* NeedsMemory, run);
+  const needs = yield* runNeeds(yield* NeedsMemory, run, steps);
   const read: RunRead = {
     run,
     steps,

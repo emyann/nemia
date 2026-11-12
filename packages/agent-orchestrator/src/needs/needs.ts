@@ -23,16 +23,20 @@ export const needStateOf: NeedStateOf = (ran) => {
 export const needsHolding: NeedsHolding = (filedAny, needs) =>
   filedAny ? [] : needs.filter((need) => need.state === 'missing').map((need) => need.name);
 
-/** Whether a fix declared at `origin` may be started: a place's always, a workflow's only where its factory's places are trusted. */
-export const fixRefusal: FixRefusalOf = (origin) => (origin.kind === 'place' || origin.trusted ? 'allowed' : 'untrusted');
+/**
+ * Whether a fix declared at `origin` may be started: a place's and a harness's always, a workflow's (and a repository need's) only where
+ * its factory's places are trusted.
+ */
+export const fixRefusal: FixRefusalOf = (origin) => (origin.kind === 'workflow' && !origin.trusted ? 'untrusted' : 'allowed');
 
 /**
  * The needs of a run, one list: its workflow's own (`workflow`), then each of its place's (`place`) that no workflow need of that name
- * already holds. A workflow need that `fills` a place need adds no need of its own: its fixes go first among the place need's, the
- * place's own kept after them, and its check stands beside the place's for nothing — the place's check says whether the need is met.
- * A `fills` naming no need of the place is a need of the workflow as it stands. Pure.
+ * already holds, then each of its harnesses' (`harness`, `harnessNeedsOf` of those it runs on) that no need before it names. A workflow
+ * need that `fills` a place need adds no need of its own: its fixes go first among the place need's, the place's own kept after them, and
+ * its check stands beside the place's for nothing — the place's check says whether the need is met. A `fills` naming no need of the place
+ * is a need of the workflow as it stands. Pure.
  */
-export function needsOfRun(workflow: readonly Need[], place: readonly Need[]): Need[] {
+export function needsOfRun(workflow: readonly Need[], place: readonly Need[], harness: readonly Need[] = []): Need[] {
   const fillers = new Map<string, NeedFix[]>();
   const own: Need[] = [];
   for (const need of workflow) {
@@ -48,12 +52,19 @@ export function needsOfRun(workflow: readonly Need[], place: readonly Need[]): N
       const filled = fillers.get(p.name) ?? [];
       return filled.length ? { ...p, fixes: [...filled, ...(p.fixes ?? [])] } : p;
     });
-  return [...own, ...placed];
+  const named = [...own, ...placed];
+  return [...named, ...harness.filter((h) => !named.some((n) => n.name === h.name))];
 }
 
-/** The command a person types to start the first fix of a need, `nemia readiness fix <need>` with the workflow it is declared by. */
-export const fixCommandOf = (need: string, workflow?: { factory: string; workflow: string }): string =>
-  `nemia readiness fix ${need}${workflow === undefined ? '' : ` --factory ${workflow.factory} --workflow ${workflow.workflow}`}`;
+/** Where a need is declared, as its fix is named: a factory's workflow, or a factory alone for a need of its repository. */
+export type FixAt = { readonly factory: string; readonly workflow?: string };
+
+/**
+ * The command a person types to start the first fix of a need, `nemia doctor fix <need>`, with the factory and workflow it is declared by
+ * (`--factory F --workflow W`), or the factory alone for a need of its repository (`--factory F`).
+ */
+export const fixCommandOf = (need: string, at?: FixAt): string =>
+  `nemia doctor fix ${need}${at === undefined ? '' : ` --factory ${at.factory}`}${at?.workflow === undefined ? '' : ` --workflow ${at.workflow}`}`;
 
 /** What a run waits on for one need: its name, what it is, and what puts it in place, the command to type or the words of its need. */
 export type NeedWaited = { readonly name: string; readonly message: string; readonly fix: string };

@@ -185,13 +185,16 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                unique-local, public), so --bind takes a private one; --json prints
                                {"addresses":[{"address","interface","family","kind"}]}
                                CLI only: it reads the network interfaces of the machine the command runs on
-  nemia readiness [--json]
-                               every piece this server needs before a run: the harness sign-in, the
-                               service and its linger, the bind, the machine, the git identity, each
-                               factory's workflows' needs, a factory, a newer release — each in place
-                               or missing, with the command or fix that puts it there. --json: the
-                               whole read
-                               on the port: readiness
+  nemia doctor [--json]
+                               every piece this server needs before a run: each harness installed and
+                               signed in, the service and its linger, the bind, the machine, the git
+                               identity, each factory's workflows' and repository's needs, a factory, a
+                               newer release — each in place or missing, with the command or fix that
+                               puts it there. --json: the whole read
+                               on the port: doctor
+  nemia readiness
+                               retired: nemia doctor reads what it read
+                               CLI only: retired: nemia doctor is the read, served on the port
   nemia token ls
                                your tokens, by name, with when each was minted: never a token itself
                                CLI only: a token is minted where the store is and printed once to the person there; a caller of the port holding one token mints and revokes no other

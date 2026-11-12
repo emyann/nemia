@@ -38,6 +38,7 @@ import {
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { type Env, type Settings, settingsOf, wfRoot } from './config/config.store.ts';
+import { toolsBinDir } from './config/root.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
 import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
@@ -205,6 +206,9 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  * `WF_CGROUP_PARENT`'s slice where one is set (`cgroupParent`): a value either variable refuses gives the engine neither, and the tick
  * refuses its pass on the same read (`ceilings`), so nothing is filed without the limit it was set to hold.
  *
+ * Each harness's program is looked for first in the store's tools folder's `bin/` (`harnessBin`, `toolsBinDir`), where `nemia doctor
+ * fix` activates one, read by the runtime at every spawn.
+ *
  * When the process exports its own telemetry (`otlpOf`), the engine is handed the same collector, and each session it starts exports
  * there too, tagged with the labels its task was filed with (`stepLabels`); with its tools' inputs only when `NEMIA_TOOL_DETAILS` is
  * `1` (`sessionTelemetryOf`). Any other value is said on stderr and leaves them off (`toolDetailsRefusalOf`), as an export interval that
@@ -223,6 +227,7 @@ export const engine = (env: Env): Engine => {
     RuntimeEngine.layer({
       root: engineRoot(root),
       harnesses,
+      harnessBin: toolsBinDir(root),
       holder: holderOption(root),
       credentials: credentialsAt(root),
       missingCredential,

@@ -1,11 +1,11 @@
 /**
- * The readiness read (`GET /api/readiness`, `nemia readiness`): every piece a person's server needs before a factory's first run, each in
+ * The readiness read (`GET /api/readiness`, `nemia doctor`): every piece a person's server needs before a factory's first run, each in
  * place or missing, with the fix that puts it there — a command to type, or a fix the server runs itself (`POST /api/readiness/fixes`),
  * its output followed as it runs (`GET /api/readiness/fixes/:id/output`). The group that serves them is `ReadinessGroup`.
  */
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
-import { BadRequest, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
+import { BadRequest, Conflict, Failed, Forbidden, Invalid, Missing } from './api-errors.ts';
 import { NeedAsk } from './workflow.ts';
 import { ADDRESS_KINDS, FIX_KINDS, FIX_PHASES, FIX_STREAM_EVENTS, HARNESS_PARTS, NEED_STATES, READINESS_AREAS } from './words.ts';
 
@@ -92,7 +92,7 @@ export class ReadinessGroup extends HttpApiGroup.make('readiness').add(
   HttpApiEndpoint.post('fix', '/api/readiness/fixes', {
     payload: FixStart,
     success: Fix,
-    error: [BadRequest, Invalid, Missing, Forbidden, Failed],
+    error: [BadRequest, Invalid, Missing, Conflict, Forbidden, Failed],
   }),
   HttpApiEndpoint.get('fixOf', '/api/readiness/fixes/:id', { params: fixParams, success: Fix, error: [Missing, Failed] }),
   HttpApiEndpoint.get('fixOutput', '/api/readiness/fixes/:id/output', {

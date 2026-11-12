@@ -2,7 +2,8 @@
  * The needs read: a check that answers past its time or whose shell does not start reads `unknown` and holds nothing (`checkRan`, on a
  * shortened bound and a shell that is not there); a workflow's needs read off its README's frontmatter, which its instruction no longer
  * shows (`workflowNeeds`, `workflowReadme`); a workflow need that fills a place's goes before it (`needsOfRun`); and the sweep reads the
- * places' needs and every factory's workflows' (`needsOnce`). The laws of `needStateOf`, `needsHolding` and `fixRefusal` are proved by
+ * places' needs, every declared harness's, every trusted factory's workflows' and the places' repository needs in each trusted factory's
+ * repository (`needsOnce`). The laws of `needStateOf`, `needsHolding` and `fixRefusal` are proved by
  * `contracts/needs.contract.ts`.
  */
 import { test } from 'node:test';
@@ -12,7 +13,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { Need } from 'objects';
-import { checkRan, checkKey, needsMemo, needsOnce, needsEnv } from './needs.verb.ts';
+import { checkRan, checkKey, harnessCheckOf, needsMemo, needsOnce, needsEnv, repositoryCheckOf } from './needs.verb.ts';
 import { needsHolding, needsOfRun, needStateOf } from './needs.ts';
 import { workflowNeeds, workflowNeedsRead, workflowReadme } from '../folder/folder.store.ts';
 import { toolsDir } from '../config/root.store.ts';
@@ -78,7 +79,7 @@ test("a workflow's needs are its README's frontmatter, which its instruction lea
   });
 });
 
-test("a workflow's need that fills a place's goes before the place's own fixes, and adds no need of its own", () => {
+test("a workflow's need that fills a place's goes before the place's own fixes, and adds no need of its own; a harness's goes last", () => {
   const place: Need[] = [
     { name: 'git-identity', message: 'identity', check: 'true', fixes: [{ command: 'place-fix', message: 'by hand' }] },
   ];
@@ -101,6 +102,15 @@ test("a workflow's need that fills a place's goes before the place's own fixes, 
     needs[1]?.fixes?.map((f) => f.command),
     ['host-fix', 'place-fix'],
   );
+  const harness: Need[] = [
+    { name: 'git-identity', message: 'named twice', check: 'false' },
+    { name: 'some-harness', message: 'installed', check: 'true' },
+  ];
+  assert.deepEqual(
+    needsOfRun(workflow, place, harness).map((n) => n.name),
+    ['tool', 'git-identity', 'some-harness'],
+    "a harness's need follows, and one another need names is left out",
+  );
 });
 
 /** A workflow `dev` of a factory's own repository, under `home`, its README declaring one need checked by `check`. */
@@ -113,7 +123,7 @@ const devRepo = (home: string, check: string): { repo: string; dir: string } => 
   return { repo, dir };
 };
 
-test("a sweep reads the places' needs and every trusted factory's workflows', each kept by its check and folders, and runs no check of an untrusted one", async () => {
+test("a sweep reads the places', the harnesses' and every trusted factory's workflows' and repository's needs, each kept by its check and folders, and runs no check of an untrusted one", async () => {
   const home = scratch('wf-needs-sweep-');
   const trusted = devRepo(home, 'exit 1');
   const untrusted = devRepo(home, 'touch ran');
@@ -122,12 +132,23 @@ test("a sweep reads the places' needs and every trusted factory's workflows', ea
   const placed = PlaceService.layer(testPlace().place);
   await Effect.runPromise(trustPlaces([trusted.repo]).pipe(Effect.provide(placed)));
   const memo = needsMemo(home, 2_000);
-  memo.placeNeeds = [{ name: 'identity', message: 'identity', check: 'exit 0' }];
+  const toolchain: Need = { name: 'toolchain', message: 'the toolchain', check: 'touch ran-here && test -f here', scope: 'repository' };
+  memo.placeNeeds = [{ name: 'identity', message: 'identity', check: 'exit 0' }, toolchain];
+  fs.writeFileSync(path.join(trusted.repo, 'here'), '');
   const read = await Effect.runPromise(needsOnce(memo).pipe(Effect.provide(placed)));
   assert.equal(read.get(checkKey({ check: 'exit 0' })), 'met');
   const own = { workflowFiles: trusted.dir, carriedFiles: carriedDirOf(trusted.dir) };
   assert.equal(read.get(checkKey({ check: 'exit 1', ...own })), 'missing');
-  assert.equal(read.size, 2, "the untrusted factory's check is not swept");
+  assert.equal(
+    read.get(checkKey(repositoryCheckOf(toolchain, trusted.repo))),
+    'met',
+    "a repository need is read in the factory's repository",
+  );
+  assert.equal(read.has(checkKey({ check: toolchain.check })), false, 'and never on the machine alone');
+  assert.ok(memo.harnessNeeds.length > 0, 'the runtime declares harnesses with needs');
+  for (const need of memo.harnessNeeds) assert.ok(read.has(checkKey(harnessCheckOf(need))), `${need.name} is swept`);
+  assert.equal(read.size, 3 + memo.harnessNeeds.length, "the untrusted factory's checks are not swept");
   assert.equal(fs.existsSync(path.join(home, 'ran')), false, 'and never ran');
-  assert.equal(memo.version, 2);
+  assert.equal(fs.existsSync(path.join(untrusted.repo, 'ran-here')), false, 'nor its repository need');
+  assert.equal(memo.version, read.size);
 });

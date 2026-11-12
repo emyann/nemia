@@ -86,7 +86,7 @@ proposals, the inbox, decisions) reach the server, and so does every other verb 
 prints its answer on your laptop as it always does, and the server does the work. The files a command names on your laptop, a card
 for `nemia inbox add -f`, a template folder or archive for `nemia factory apply --template`, a file for `nemia factory resolve
 --file`, travel with the request. A repository path (`--repo`) or a volume's path names a folder on the server's machine, not on
-yours. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
+yours; a repository's git URL is cloned on the server, with the server's own git credentials. A verb no endpoint of the server serves yet is refused, naming the context to leave (`NEMIA_CONTEXT=local`) or the machine to
 run it on.
 
 The machine's own verbs always act on the machine you type them on: the service, upgrade, the daemon (`nemia up`, `nemia tick`), the
@@ -134,6 +134,9 @@ Nemia clones it under `~/.agent-workflows/clones/<host>/<path>` before it files 
 folder goes. The clone uses the machine's own git credentials, and Nemia holds none: for an SSH URL, an SSH key the host accepts, with
 the host's key in `~/.ssh/known_hosts`; for an HTTPS URL, a git credential helper for the host. On GitHub, `gh auth login` sets one up.
 A URL that carries a password is refused. A clone that fails is refused with git's own words and the setup to do, and nothing is filed.
+
+From a laptop under a remote context, the same line (and `nemia factory apply … --repo <url>`) files the factory on the server: the
+server clones the repository with its own credentials, so the SSH key or the credential helper is set up there, not on the laptop.
 
 ## Signing Codex in
 

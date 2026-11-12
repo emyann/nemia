@@ -45,7 +45,14 @@ the orchestrator's code holds a fact today, it is named beside it.
   `test/live-sdk.boundary.test.ts`'s third case, one job per model filed in `auto` and read off its `init` line: `haiku`
   (`claude-haiku-5-5`), `sonnet` (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) ran in `auto`, and
   `claude-haiku-4-5` and `claude-sonnet-4-5` in `default`, so `CLAUDE_AUTO_DROPPED` stands as it was. The case makes this measurement
-  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`.
+  again at every bump, and hands each line over as `sdk-<version>-auto-<model>.json`. Measured ten times a model the same day, after
+  two runs' checks failed on the case and a third passed: `claude-haiku-4-5` and `claude-sonnet-4-5` ran in `default` in all ten, and
+  `haiku` and `sonnet` in `auto` in all ten, so no model's answer varies. What varied is the `init` line: in one run of ten each listed
+  model's said `auto`, and a `{"type":"system","subtype":"status","permissionMode":"default"}` line after it said the mode the
+  session ran in, which Claude Code settles after printing `init` (its bundled code refuses `auto` on a model before
+  `claude-opus-4-6` in its list, a local check, no flag fetched). So `ranIn` is the last mode an `init` or a `status` line names
+  (`claudeStreamOutput`), and the case reads it so. A case that fails is a change of Claude Code's: measure the model ten times, as
+  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own.
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries

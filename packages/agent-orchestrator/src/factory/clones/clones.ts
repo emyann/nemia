@@ -107,7 +107,7 @@ export const cloneTarget: CloneTargetOf = (given) => {
   if (holdsPassword(given))
     return {
       kind: 'refused',
-      message: `--repo carries a password, and Nemia holds no credential: give the URL without it, and let this machine's git hold the credential (a credential helper for the host, or an SSH key). Nothing was filed.`,
+      message: `--repo carries a password, and Nemia holds no credential: give the URL without it, and let the git of the machine Nemia's daemon runs on hold the credential (a credential helper for the host, or an SSH key). Nothing was filed.`,
     };
   if (given.includes('://') && !knownScheme(given))
     return {
@@ -118,7 +118,7 @@ export const cloneTarget: CloneTargetOf = (given) => {
   if (staysUnder(folder) && plain(folder) && !folder.endsWith('.git')) return { kind: 'url', folder };
   return {
     kind: 'refused',
-    message: `--repo ${given} is read as a git URL, and it names no host and repository Nemia can keep a clone of: give one as ${FORMS}, or the path of a directory of this machine. Nothing was filed.`,
+    message: `--repo ${given} is read as a git URL, and it names no host and repository Nemia can keep a clone of: give one as ${FORMS}, or the path of a directory of the machine Nemia's daemon runs on. Nothing was filed.`,
   };
 };
 

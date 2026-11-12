@@ -4,6 +4,8 @@ import { KeyRound } from 'lucide-react';
 import { CutField, CutFrame, CutPress, ScanLines } from '@/components/look';
 import type { TokenAsk, TokenAsked } from '@/lib/api/read';
 import { signIn } from '@/lib/api/session';
+import { LinkRefusal } from './LinkRefusal';
+import { PairBrowser } from './PairBrowser';
 
 /** Why the token is asked for, by the refusal that asked it. */
 const WHY: Record<TokenAsk, string> = {
@@ -21,7 +23,8 @@ const reload = () => window.location.reload();
  * own words, which say where a token of the person's is minted, a field the person pastes one into, and a press that sends it to the
  * api, which keeps it as this browser's cookie (`signIn`); then the page loads again, and the board is read with it. A token the api
  * refuses is said, in its words, and the page stays. Where the cookie's token is the one refused, the api's refusal cleared the cookie
- * already, so the browser sends none until one is pasted.
+ * already, so the browser sends none until one is pasted. Under the form, the other way in: this browser paired by a code the person
+ * approves (`PairBrowser`), no token pasted; over it, a first-visit link this page was opened on and the api refused (`LinkRefusal`).
  */
 export function TokenPage({ asked }: { asked: TokenAsked }) {
   const ask = asked.reason;
@@ -45,6 +48,7 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
             <KeyRound aria-hidden className="size-5" />
             Paste a token
           </h1>
+          <LinkRefusal />
           <p className="text-body-medium text-muted-foreground">{WHY[ask]}</p>
           {asked.message && (
             <p data-token-said className="font-mono text-body-small break-words text-muted-foreground">
@@ -82,6 +86,12 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
             </CutPress>
           </div>
         </form>
+        <section aria-label="Pair this browser" className="flex flex-col gap-3 border-t border-outline-variant p-6">
+          <p className="text-body-medium text-muted-foreground">
+            Or pair this browser: it shows a code, and you approve it at the server, with no token to copy.
+          </p>
+          <PairBrowser />
+        </section>
       </CutFrame>
     </ScanLines>
   );

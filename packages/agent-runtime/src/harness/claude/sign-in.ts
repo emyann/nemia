@@ -77,23 +77,33 @@ export const claudeLaunch = (executable: string): { cmd: string; args: string[] 
 /** One ask, as its child ended, with what its stdout said. */
 type Asked = { ask: ClaudeSignInAsk; status: AuthStatus | undefined };
 
-/**
- * Asks `<executable> auth status` in the session's working root and environment — the engine's, less its telemetry, under the task's
- * own `config.env`, where a token given to the session is — as the user the engine runs as, bounded by `ms`.
- */
-const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked => {
+/** One ask of `<executable> auth status` in `cwd`, under `env`, bounded by `ms`. */
+const askedIn = (executable: string, cwd: string | undefined, env: NodeJS.ProcessEnv, ms: number): Asked => {
   const { cmd, args } = claudeLaunch(executable);
-  const ran = spawnSync(cmd, [...args, 'auth', 'status'], {
-    cwd: r.cwd,
-    encoding: 'utf8',
-    timeout: ms,
-    env: { ...withoutTelemetry(process.env), ...r.config?.env },
-  });
+  const ran = spawnSync(cmd, [...args, 'auth', 'status'], { cwd, encoding: 'utf8', timeout: ms, env });
   if (ran.error !== undefined && 'code' in ran.error && ran.error.code === 'ETIMEDOUT')
     return { ask: { kind: 'timed-out' }, status: undefined };
   if (ran.error !== undefined || ran.status === null) return { ask: { kind: 'not-run' }, status: undefined };
   const status = authStatusOf(ran.stdout ?? '');
   return { ask: { kind: 'exited', code: ran.status, loggedIn: status?.loggedIn }, status };
+};
+
+/**
+ * Asks `<executable> auth status` in the session's working root and environment — the engine's, less its telemetry, under the task's
+ * own `config.env`, where a token given to the session is — as the user the engine runs as, bounded by `ms`.
+ */
+const askClaudeSignIn = (executable: string, r: SpawnRequest, ms: number): Asked =>
+  askedIn(executable, r.cwd, { ...withoutTelemetry(process.env), ...r.config?.env }, ms);
+
+/**
+ * Whether Claude Code is signed in on this machine under `env` (less its telemetry), by `auth status` as a job's spawn asks it: the
+ * Claude Code `AE_CLAUDE_EXECUTABLE` names, else the SDK's bundled one, `unknown` where none is found or it does not start. What a
+ * caller that is no session reads, to say whether a session would start; as the spawn's ask, it cannot see a credential that no longer
+ * works.
+ */
+export const claudeSignIn = (env: NodeJS.ProcessEnv, ms: number = CLAUDE_SIGN_IN_MS, cwd?: string): ClaudeSignIn => {
+  const claude = claudeExecutableOf(env.AE_CLAUDE_EXECUTABLE ?? process.env.AE_CLAUDE_EXECUTABLE);
+  return claude === undefined ? 'unknown' : claudeSignInOf(askedIn(claude, cwd, withoutTelemetry(env), ms).ask);
 };
 
 /**

@@ -33,7 +33,7 @@ import type { InstructionRead } from '../instruction.store.ts';
 import type { RulesRead } from '../rules/rules.store.ts';
 import { doorAt, doorAtOnce } from '../door/factories.store.ts';
 import { FactoryName, isDefaultFactory, type DefaultFactory } from '../factory.model.ts';
-import { untrustedPlaces } from '../../trust/trust.verb.ts';
+import { untrustedPlaces } from '../../trust/untrusted.verb.ts';
 import type { Untrusted } from '../../trust/trust.ts';
 import { Invalid, Missing } from '../../refusal/refusal.ts';
 import type { Level } from '../../level/level.ts';

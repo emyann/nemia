@@ -4,6 +4,27 @@ metadata:
   name: build
   description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 spec:
+  needs:
+    - name: gh
+      message: "gh, the GitHub CLI, on the PATH, which pushes the run's branch, opens its pull request and lands it: needed only where github is true"
+      check: "if [ \"${{ parameters.github }}\" = true ]; then command -v gh >/dev/null; fi"
+      fixes:
+        - message: "install the latest gh release for this machine into Nemia's tools folder, its sum checked against the release's checksums, with no sudo"
+          command: "node \"$WF_CARRIED_FILES/needs.ts\" install-gh"
+    - name: gh-sign-in
+      message: "gh signed in to github.com with the workflow scope, which a push of a CI file takes: needed only where github is true"
+      check: "if [ \"${{ parameters.github }}\" = true ]; then node \"$WF_CARRIED_FILES/needs.ts\" scope workflow; fi"
+      fixes:
+        - message: "sign gh in to GitHub in a browser: open https://github.com/login/device, type the code shown here and approve; gh then serves git's https sign-in"
+          command: "gh auth login --hostname github.com --web --git-protocol https --scopes workflow </dev/null && gh auth setup-git"
+          code: "[A-Z0-9]{4}-[A-Z0-9]{4}"
+    - name: git-identity
+      message: "git commits under the GitHub account gh is signed in to"
+      check: "git config --global user.name >/dev/null && git config --global user.email >/dev/null"
+      fills: git-identity
+      fixes:
+        - message: "set git's name and email from the GitHub account gh is signed in to: its name (its login where it has none) and its noreply address, <id>+<login>@users.noreply.github.com; where gh is not signed in, take the next fix, which asks for a name and an email"
+          command: "node \"$WF_CARRIED_FILES/needs.ts\" identity"
   steps:
     - name: design
       place: git

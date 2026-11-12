@@ -268,6 +268,9 @@ export {
   WorkflowFile,
   WorkflowList,
   WorkflowSpec,
+  Need,
+  NeedAsk,
+  NeedFix,
   WorkflowStatus,
   WorkflowStep,
   WorkflowStepStatus,
@@ -516,6 +519,34 @@ export {
 } from './agent.ts';
 export { KeyField, KeyForm, KeyRow, WorkflowStepPage } from './workflow.ts';
 export { AGENT_SOURCE_PLACES, type AgentSourcePlace } from './words.ts';
+export {
+  NEED_STATES,
+  type NeedState,
+  ADDRESS_KINDS,
+  type AddressKind,
+  READINESS_AREAS,
+  type ReadinessArea,
+  FIX_PHASES,
+  type FixPhase,
+  FIX_STREAM_EVENTS,
+  type FixStreamEventName,
+  TICKET_STATES,
+  type TicketState,
+} from './words.ts';
+export { Fix, FixStart, FixStreamEvent, Readiness, ReadinessFix, ReadinessGroup, ReadinessPiece } from './readiness.ts';
+export {
+  LinkClaimed,
+  LinkMinted,
+  LinkRequest,
+  Pairing,
+  PairingAsked,
+  PairingClaimed,
+  PairingList,
+  PairingRequest,
+  PairGroup,
+  PairingsGroup,
+  TicketClaim,
+} from './pairing.ts';
 export {
   ANSWER_MOST,
   BODY_PAGE,

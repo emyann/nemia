@@ -111,7 +111,7 @@ export const claudeSignedOutRefusal = (
   if (claude === undefined) return undefined;
   const { ask, status } = askClaudeSignIn(claude, r, ms);
   const judged = claudeSignInOf(ask);
-  const signIn = `Make a token with \`${CLAUDE_SIGN_IN.maker}\` and give it to the engine as \`${CLAUDE_SIGN_IN.variable}\`, which it reads when it starts, or sign in with \`claude auth login\`, as the user the engine runs as; then try again.`;
+  const signIn = `Make a token with \`${CLAUDE_SIGN_IN.maker}\` and give it to the engine as \`${CLAUDE_SIGN_IN.variable}\`, which it reads when it starts, or sign in with \`${CLAUDE_SIGN_IN.login}\`, as the user the engine runs as; then try again.`;
   if (judged === 'signed-out') {
     const said =
       status?.authMethod !== undefined

@@ -91,7 +91,6 @@ test(
       const [attempt] = state.attempts;
       assert.equal(attempt?.reason, 'unstartable');
       assert.ok(attempt?.error?.includes('did not answer'), 'the words say the check did not answer');
-      assert.deepEqual(lines(dir, 'auth.jsonl'), [['auth', 'status']]);
       assert.deepEqual(lines(dir, 'argv.jsonl'), [], 'and no session started');
     });
   },

@@ -71,15 +71,39 @@ const PARKED = Array.from({ length: 20 }, (_, i) => `parked-${String(i).padStart
 const ENDED = Array.from({ length: 10 }, (_, i) => `ended-${String(i).padStart(2, '0')}`);
 const CARD_BODY = (name: string) => words(3_000, `the body of ${name}`);
 const LONG_CLOSEOUT = 'r-long-closeout';
+const WIDE_CLOSEOUT = 'r-wide-closeout';
 
 for (const id of BIG_RUNS) write(path.join(root, 'runs', `${id}.json`), JSON.stringify(record(id, 8, 20_000, false)));
 for (const name of [...PARKED, ...ENDED]) write(path.join(root, 'inbox', `${name}.md`), `# ${name}\n\n${CARD_BODY(name)}\n`);
 for (const name of ENDED) write(path.join(root, 'runs', `r-${name}.json`), JSON.stringify(record(`r-${name}`, 1, 100, true, name)));
 write(path.join(root, 'runs', `${LONG_CLOSEOUT}.json`), JSON.stringify(record(LONG_CLOSEOUT, 1, 100, true)));
+/** A step whose output declares two fields, `plan` long and `budget` short, as a design's closeout carries them. */
+const wide = record(WIDE_CLOSEOUT, 1, 100, true);
+write(
+  path.join(root, 'runs', `${WIDE_CLOSEOUT}.json`),
+  JSON.stringify({
+    ...wide,
+    workflow: wide.workflow.map((step) => ({
+      ...step,
+      output: {
+        file: 'design.json',
+        schema: {
+          type: 'object',
+          properties: { plan: { type: 'string' }, budget: { type: 'number' } },
+          required: ['plan', 'budget'],
+          additionalProperties: false,
+        },
+      },
+    })),
+  }),
+);
 for (let i = 0; i < 20; i++)
   write(path.join(root, 'workflows', 'agents', `agent-${String(i).padStart(2, '0')}.md`), `---\nharness: claude\n---\n${words(8_000, `agent ${i}`)}\n`);
 
-/** Each ended card's run, its one task settled failed; the long closeout's task settled with a 60,000-character body. */
+/**
+ * Each ended card's run, its one task settled failed; the long closeout's task settled with 60,000 characters it carries as it came (its
+ * `raw`, which `tries` answers whole); the wide closeout's with a long field of its output.
+ */
 const settled = () => {
   for (const name of ENDED) {
     Effect.runSync(engine().file({ id: `t-r-${name}-0`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
@@ -89,6 +113,11 @@ const settled = () => {
   standIn().settle(`t-${LONG_CLOSEOUT}-0`, 'succeeded', {
     exitCode: 0,
     closeout: { outcome: 'done', summary: 'Wrote a lot.', needs: null, artifacts: [], body: words(60_000, 'a long account') },
+  });
+  Effect.runSync(engine().file({ id: `t-${WIDE_CLOSEOUT}-0`, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
+  standIn().settle(`t-${WIDE_CLOSEOUT}-0`, 'succeeded', {
+    exitCode: 0,
+    closeout: { outcome: 'done', summary: 'Planned.', needs: null, artifacts: [], plan: words(30_000, 'a wide plan'), budget: 30 },
   });
 };
 
@@ -193,10 +222,29 @@ test('a list of long items with no limit is asked a page short enough to fit, th
 test('REFUSED: a read that is no page, past the bound, is an error naming how to narrow it, short, with nothing of the body', async () => {
   settled();
   const client = await connected();
-  const answer = await call(client, 'closeout', { runId: LONG_CLOSEOUT, step: 'step-0', try: '1' });
-  assert.equal(answer.isError, true, 'refused');
+  const answer = await call(client, 'tries', { runId: LONG_CLOSEOUT, step: 'step-0' });
+  assert.equal(answer.isError, true, `refused: ${answer.size} ${answer.text.slice(0, 400)}`);
   assert.ok(answer.text.length < 2_000, `${answer.text.length} characters of refusal`);
   assert.equal(answer.structured, undefined, 'no body carried');
   assert.ok(!answer.text.includes('a long account'), 'nothing of the answer');
   assert.ok(/narrow/.test(answer.text), 'it says how to narrow the read');
+});
+
+test("closeout and try answer a closeout narrowly, its output's fields named and left out, each asked for by name", async () => {
+  settled();
+  const client = await connected();
+  const whole = await app().request(`/api/runs/${WIDE_CLOSEOUT}/steps/step-0/tries/1/closeout`);
+  assert.ok((await whole.text()).length > ANSWER_BOUND, 'the closeout read whole is past the bound');
+  for (const tool of ['closeout', 'try']) {
+    const narrow = await call(client, tool, { runId: WIDE_CLOSEOUT, step: 'step-0', try: '1' });
+    assert.equal(narrow.isError, false, narrow.text.slice(0, 300));
+    assert.ok(narrow.size <= ANSWER_BOUND, `${tool} answered ${narrow.size} characters`);
+    const read = narrow.structured as { closeout: { summary: string; output: object; outputLeftOut: string[] } };
+    assert.equal(read.closeout.summary, 'Planned.', `${tool}: what a person decides on is answered`);
+    assert.deepEqual(read.closeout.output, {}, `${tool}: no output field unless named`);
+    assert.deepEqual(read.closeout.outputLeftOut.sort(), ['budget', 'plan'], `${tool}: the fields left out are named`);
+    const asked = await call(client, tool, { runId: WIDE_CLOSEOUT, step: 'step-0', try: '1', fields: 'budget' });
+    const named = asked.structured as { closeout: { output: object; outputLeftOut: string[] } };
+    assert.deepEqual([named.closeout.output, named.closeout.outputLeftOut], [{ budget: 30 }, ['plan']], `${tool}: a field asked by name`);
+  }
 });

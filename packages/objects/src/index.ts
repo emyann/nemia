@@ -14,6 +14,8 @@ export {
   StepCost,
   StepCheck,
   StepCloseout,
+  closeoutNarrowed,
+  fieldsNamed,
   StepRaise,
   StepTries,
   StepTry,

@@ -138,6 +138,13 @@ const tryParams = { ...stepParams, try: Schema.String };
 /** A file of a step's, by its name, never by a path. */
 const fileParams = { ...stepParams, file: Schema.String };
 
+/**
+ * The query of a read of a try or its closeout: `fields`, the fields of the closeout's `output` to answer, comma-separated, as JSON:API's
+ * sparse fieldsets spell them; given (an empty one naming none), the closeout is read narrowly (`closeoutNarrowed`): whole but its
+ * `output` and `schema`, which keep the fields named, the rest named in `outputLeftOut`, and its `raw`, left out. None reads it whole.
+ */
+const closeoutQuery = { fields: Schema.optionalKey(Schema.String) };
+
 /** What a sub-resource of the run object refuses with: none by that name, a try the package refuses, a run not judged. */
 const subResourceErrors = [Missing, Invalid, Unjudged];
 
@@ -158,11 +165,13 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('try', '/api/runs/:runId/steps/:step/tries/:try', {
     params: tryParams,
+    query: closeoutQuery,
     success: StepTry,
     error: subResourceErrors,
   }),
   HttpApiEndpoint.get('closeout', '/api/runs/:runId/steps/:step/tries/:try/closeout', {
     params: tryParams,
+    query: closeoutQuery,
     success: TryCloseout,
     error: subResourceErrors,
   }),

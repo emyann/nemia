@@ -195,7 +195,7 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
 
 /**
  * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then how the port answers it — a `Table` as its
- * lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends unless the call gives the key.
+ * lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives none.
  */
 const describe = (
   verb: PortVerb,
@@ -213,7 +213,7 @@ const describe = (
     ...(how.queryKeys.includes('limit')
       ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
       : []),
-    ...Object.entries(how.defaults).map(([key, value]) => `Sends ${key}=${value} unless ${key} is given ("" lifts it).`),
+    ...Object.entries(how.defaults).map(([key, value]) => `Sends ${key}=${value} where the call gives no ${key}: give it to ask otherwise.`),
   ].join('\n');
 };
 

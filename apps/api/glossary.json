@@ -149,7 +149,11 @@
     },
     {
       "term": "Port tool",
-      "meaning": "a tool of the port, one for each endpoint link of the command table (`served`, read by `toolsOf`): named by its verb (spaces as `_`) or its link's `as`, described by the verb's help and usage, its input the endpoint's path, query and payload as one JSON Schema, and its `readOnlyHint` and `destructiveHint` from the verb's class and the endpoint's method (`toolHints`, `apps/api/src/mcp/hints.ts`); generated in `apps/api/src/mcp/tools.ts`, never listed by hand."
+      "meaning": "a tool of the port, one for each endpoint link of the command table (`served`, read by `toolsOf`): named by its verb (spaces as `_`) or its link's `as`, described by the verb's help and usage, its input the endpoint's path, query and payload as one JSON Schema, and its `readOnlyHint` and `destructiveHint` from the verb's class and the endpoint's method (`toolHints`, `apps/api/src/mcp/hints.ts`); generated in `apps/api/src/mcp/tools.ts`, never listed by hand. A call is sent with its link's `query` for each key it leaves out and a page of `PORT_PAGE` where its endpoint takes `limit`; a list that answers a `Table` is answered as its lines, printed by `objects`' `tableLines` as `nemia` prints them; and its answer is held under the answer bound."
+    },
+    {
+      "term": "Answer bound",
+      "meaning": "the most characters a port tool answers at once, `ANSWER_BOUND` (`apps/api/src/mcp/bound.ts`), its text and any `structuredContent`'s JSON counted together, under the 50,000 characters past which Claude Code saves a tool's result to a file: a page past it is asked again at most half as long, and any other answer past it is refused with how to narrow it, never cut (`answerFit`, proved by `apps/api/contracts/answer-fit.contract.ts`)."
     }
   ]
 }

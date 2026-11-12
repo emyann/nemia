@@ -1,10 +1,11 @@
 /**
  * `nemia factory setting set` and `setting rm`: a harness setting a factory gives every session of its runs' steps on that harness, and
  * taken back. Written into the factory's own file through the Factory door, whether or not it is made from a template: a factory's
- * settings are the person's, never the template's.
+ * settings are the person's, never the template's. Served on both sides, typed by their `input`: the api's `putSetting` and
+ * `deleteSetting` call these handlers.
  */
-import { Effect } from 'effect';
-import type { Args, Spec } from '../command/command.ts';
+import { Effect, Schema } from 'effect';
+import type { Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { FactoryDoor, filedFactory, refuseName } from '../factory/door/factories.store.ts';
 import { tried } from '../runtime-client.ts';
@@ -22,11 +23,16 @@ import {
   withSetting,
 } from './harness-settings.ts';
 
-/** The text under `key`, as the spec read it. */
-const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
+/**
+ * What `nemia factory setting set` takes: the factory, the setting as `<harness>.<key>`, and its value as JSON text, read by the handler
+ * as the command line types it (`'{"commit":"","pr":""}'`, `'"french"'`, `false`).
+ */
+export const SettingSetInput = Schema.Struct({ factory: Schema.String, setting: Schema.String, value: Schema.String });
+export type SettingSetInput = typeof SettingSetInput.Type;
 
-/** Why the api does not write a setting: the board shows none yet. */
-const ONLY_HERE = { side: 'cli', why: 'the board shows no harness setting yet: nemia factory setting writes them' } as const;
+/** What `nemia factory setting rm` takes: the factory, and the setting taken back, as `<harness>.<key>`. */
+export const SettingRmInput = Schema.Struct({ factory: Schema.String, setting: Schema.String });
+export type SettingRmInput = typeof SettingRmInput.Type;
 
 const SET_USAGE = '<factory> <harness>.<key> <json>';
 const RM_USAGE = '<factory> <harness>.<key>';
@@ -94,8 +100,9 @@ const jsonOf = (text: string): Effect.Effect<unknown, Invalid> =>
  * is not JSON, and a harness, key or value a factory may not set (`harnessSettingsRefusal`); the default factory and a name with no
  * factory, as every factory write refuses them.
  */
-export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: unknown }> = {
+export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: unknown }, SettingSetInput> = {
   name: 'factory setting set',
+  served: [{ endpoint: 'factories.putSetting' }],
   usage: SET_USAGE,
   help: [
     "give every session of a factory's runs on a harness one of its settings,",
@@ -105,12 +112,11 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
   manual: SETTING_HELP,
   writes: true,
   class: 'ask',
-  only: ONLY_HERE,
-  handler: (args) => {
-    const name = textOf(args, 'factory');
-    return Effect.gen(function* () {
-      const { harness, key } = yield* keyOf(textOf(args, 'setting'));
-      const value = yield* jsonOf(textOf(args, 'value'));
+  input: SettingSetInput,
+  handler: ({ factory: name, setting, value: text }) =>
+    Effect.gen(function* () {
+      const { harness, key } = yield* keyOf(setting);
+      const value = yield* jsonOf(text);
       yield* tried(() => refuseName(name, 'setting'));
       const door = yield* FactoryDoor;
       const factory = yield* filedFactory(name, 'setting');
@@ -119,27 +125,26 @@ export const FACTORY_SETTING_SET: Command<{ file: string; name: string; value: u
       if (refused) return yield* Effect.fail(new Invalid({ message: `${refused}. Nothing was changed.` }));
       const file = yield* door.factories.rewrite({ ...factory, harnessSettings });
       return { file, name: `${harness}.${key}`, value };
-    });
-  },
-  print: ({ file, name, value }, args) => [
-    `${textOf(args, 'factory')}  setting ${name} ${JSON.stringify(value)}`,
+    }),
+  print: ({ file, name, value }, { factory }) => [
+    `${factory}  setting ${name} ${JSON.stringify(value)}`,
     `changed: ${file} — runs started from now on are given it; a run in flight keeps what it was started with`,
   ],
 };
 
 /** `nemia factory setting rm`: a harness setting taken off a factory, by its key; runs started after are given it no more. */
-export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }> = {
+export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }, SettingRmInput> = {
   name: 'factory setting rm',
+  served: [{ endpoint: 'factories.deleteSetting' }],
   usage: RM_USAGE,
   help: ['take a harness setting off a factory, by its key'],
   spec: specOf('rm', RM_USAGE, false),
   writes: true,
   class: 'ask',
-  only: ONLY_HERE,
-  handler: (args) => {
-    const name = textOf(args, 'factory');
-    return Effect.gen(function* () {
-      const { harness, key } = yield* keyOf(textOf(args, 'setting'));
+  input: SettingRmInput,
+  handler: ({ factory: name, setting }) =>
+    Effect.gen(function* () {
+      const { harness, key } = yield* keyOf(setting);
       yield* tried(() => refuseName(name, 'setting'));
       const door = yield* FactoryDoor;
       const factory = yield* filedFactory(name, 'setting');
@@ -155,9 +160,8 @@ export const FACTORY_SETTING_RM: Command<{ file: string; removed: string }> = {
       const left = withoutSetting(factory.harnessSettings, harness, key);
       const file = yield* door.factories.rewrite(left ? { ...rest, harnessSettings: left } : rest);
       return { file, removed };
-    });
-  },
-  print: ({ file, removed }, args) => [`${textOf(args, 'factory')}  setting ${removed} removed`, `changed: ${file}`],
+    }),
+  print: ({ file, removed }, { factory }) => [`${factory}  setting ${removed} removed`, `changed: ${file}`],
 };
 
 /**

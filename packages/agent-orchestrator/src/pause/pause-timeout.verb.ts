@@ -1,13 +1,14 @@
 /**
  * `nemia pause-timeout [<d>]`: the store's pause timeout, how long a person's pause, a restart and an upgrade give each tool call in flight
- * before it is cut. Bare, the timeout in force, as `nemia level` says the level; given a duration, the timeout written (`putTimeout`). A
- * command of the CLI alone: the board pauses with the store's timeout and sets none.
+ * before it is cut. Bare, the timeout in force, as `nemia level` says the level; given a duration, the timeout written (`putTimeout`).
+ * Served on both sides, typed by its `input` (`TimeoutInput`): the api reads it as the server's `pauseTimeout` (`GET /api/pause/timeout`)
+ * and writes it as `setPauseTimeout` (`PUT /api/pause/timeout`, `{ timeout }`), each calling this handler.
  */
 import { StoreRoot } from '../config/root.store.ts';
-import { Effect } from 'effect';
+import { Effect, Schema } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Args } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import { checked, type Command } from '../command/entry.verb.ts';
 import { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './commands.verb.ts';
 import { timeoutAt, putTimeout, type TimeoutAt } from './pause-timeout.store.ts';
 import { timeoutRefusal, timeoutWords } from './pause.ts';
@@ -15,8 +16,18 @@ import { timeoutRefusal, timeoutWords } from './pause.ts';
 /** The timeout given, or undefined for a bare `nemia pause-timeout`. */
 const textOf = (args: Args): string | undefined => (typeof args.timeout === 'string' ? args.timeout : undefined);
 
+/** What `nemia pause-timeout` takes: the timeout to set (`10m`), or none for the one in force; the api's `PUT` body, and its `GET` none. */
+export const TimeoutInput = Schema.Struct({ timeout: Schema.optionalKey(Schema.String) });
+export type TimeoutInput = typeof TimeoutInput.Type;
+
 /** `nemia pause-timeout`'s form, as each of its refusals ends on it. */
 const TIMEOUT_SHAPE = 'nemia pause-timeout [<d>]';
+
+/** Why the timeout `text` is refused, ending on the form the command takes; null where it is none, or one in its form. */
+const timeoutCheck = (text: string | undefined): string | null => {
+  const wrong = text === undefined ? undefined : timeoutRefusal(text);
+  return wrong === undefined ? null : `${wrong}: ${TIMEOUT_SHAPE}, as nemia pause-timeout 10m.`;
+};
 
 /** What `nemia pause-timeout` answers: the timeout in force, and whether this call wrote it. */
 export type TimeoutAnswer = { timeout: TimeoutAt; wrote: boolean };
@@ -29,8 +40,9 @@ const timeoutLine = ({ ms, set, at }: TimeoutAt): string =>
  * `nemia pause-timeout`: the store's pause timeout, read bare and written given a duration. Refused: a timeout out of its form, a file that
  * does not read.
  */
-export const TIMEOUT: Command<TimeoutAnswer> = {
+export const TIMEOUT: Command<TimeoutAnswer, TimeoutInput> = {
   name: 'pause-timeout',
+  served: [{ endpoint: 'server.pauseTimeout' }, { endpoint: 'server.setPauseTimeout', as: 'pause_timeout_set' }],
   usage: '[<d>]',
   help: [
     "the store's pause timeout: how long nemia pause, nemia service restart and",
@@ -44,24 +56,20 @@ export const TIMEOUT: Command<TimeoutAnswer> = {
     flags: [],
     unknown: (arg) => `nemia pause-timeout takes one timeout, not ${arg}: ${TIMEOUT_SHAPE}, as nemia pause-timeout 10m.`,
   },
-  check: (args) => {
-    const text = textOf(args);
-    const wrong = text === undefined ? undefined : timeoutRefusal(text);
-    return wrong === undefined ? null : `${wrong}: ${TIMEOUT_SHAPE}, as nemia pause-timeout 10m.`;
-  },
+  check: (args) => timeoutCheck(textOf(args)),
   writes: true,
   class: 'ask',
-  only: { side: 'cli', why: "the board pauses with the store's timeout and sets none: nemia pause-timeout <d> sets it" },
-  handler: (args: Args) =>
-    Effect.flatMap(StoreRoot, (home) =>
-      tried(() => {
-        const root = home;
-        const text = textOf(args);
-        return text === undefined
-          ? ({ timeout: timeoutAt(root), wrote: false } satisfies TimeoutAnswer)
-          : ({ timeout: putTimeout(root, text), wrote: true } satisfies TimeoutAnswer);
-      }).pipe(Effect.withSpan('pause-timeout')),
-    ),
+  input: TimeoutInput,
+  handler: ({ timeout: text }) =>
+    Effect.gen(function* () {
+      yield* checked(timeoutCheck(text));
+      const home = yield* StoreRoot;
+      return yield* tried(() =>
+        text === undefined
+          ? ({ timeout: timeoutAt(home), wrote: false } satisfies TimeoutAnswer)
+          : ({ timeout: putTimeout(home, text), wrote: true } satisfies TimeoutAnswer),
+      );
+    }).pipe(Effect.withSpan('pause-timeout')),
   print: ({ timeout, wrote }) =>
     wrote
       ? [

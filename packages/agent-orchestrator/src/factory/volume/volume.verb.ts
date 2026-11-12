@@ -19,7 +19,10 @@ import { volumeOf, volumeRefusal, withVolume } from './volume.ts';
 const textOf = (args: Args, key: string): string => (typeof args[key] === 'string' ? args[key] : '');
 
 /** Why the api does not write a volume: the board lists them and writes none. */
-const ONLY_HERE = { side: 'cli', why: 'the board lists volumes and writes none: nemia factory volume writes them' } as const;
+const ONLY_HERE = {
+  side: 'cli',
+  why: 'a volume is a folder of the machine the store runs on, its path resolved from where the command runs: the api lists volumes and writes none',
+} as const;
 
 /** What a writable volume is not, said wherever a person reads one. */
 export const NOT_THE_WORKSPACE = "a step's writes there are not the run's workspace: nothing commits, lands or reverts them";

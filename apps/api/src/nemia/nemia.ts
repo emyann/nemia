@@ -1,21 +1,26 @@
 /**
  * Nemia, the store's own agent, on the api: the nemia group of `objects`' Api (`NemiaGroup`), each endpoint's handler calling the
  * orchestrator by type — her level read and set (`LEVEL`), the facts she keeps (`MEMORY`), an agent's rules for auto (`POLICY`,
- * `POLICY_CONFIRM`, `POLICY_DROP`), her custom instructions (`AGENTS_CUSTOM` for her name), and her chat (chat.ts). What each takes,
- * answers and refuses is the group's to say (packages/objects/src/nemia-api.ts); a refusal of the orchestrator's is answered by its kind
- * (`answered`, objects/refused.ts).
+ * `POLICY_PROPOSE`, `POLICY_CONFIRM`, `POLICY_DROP`) and what they reach (`POLICY_REACH`), her custom instructions (`AGENTS_CUSTOM` for
+ * her name), her chat (chat.ts) and the names an agent may speak under in it (`CHAT_SPEAKERS`, `CHAT_ALLOW`, `CHAT_DISALLOW`). What
+ * each takes, answers and refuses is the group's to say (packages/objects/src/nemia-api.ts); a refusal of the orchestrator's is answered
+ * by its kind (`answered`, objects/refused.ts).
  */
+import type { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import {
   AGENTS_CUSTOM,
+  CHAT_ALLOW,
+  CHAT_DISALLOW,
+  CHAT_SPEAKERS,
   customInstructionsFile,
   LEVEL,
   MEMORY,
   POLICY,
   POLICY_CONFIRM,
   POLICY_DROP,
-  type Command,
-  type POLICY_PROPOSE,
+  POLICY_PROPOSE,
+  POLICY_REACH,
 } from 'agent-orchestrator';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 import { Api } from 'objects';
@@ -27,7 +32,7 @@ import { chatAnswer, chatPage, chatRead, chatSend, chatStop, chatStream } from '
  * What `GET /api/policy/:name` and its writes answer, as the package types it: read by the board's wire test until it reads `objects`'
  * `PolicyList`.
  */
-export type PolicyAnswer = typeof POLICY_PROPOSE extends Command<infer T> ? T : never;
+export type PolicyAnswer = Effect.Success<ReturnType<(typeof POLICY)['handler']>>;
 
 /** The store's own agent's name, whose custom instructions are hers (`STORE_AGENT` in the package's custom.store.ts). */
 const NEMIA = 'nemia';
@@ -57,12 +62,29 @@ export const nemiaHandlers = HttpApiBuilder.group(Api, 'nemia', (handlers) =>
       answeredWrite((s) => s.inRequest(POLICY_CONFIRM.handler({ name, id, words }))),
     )
     .handle('dropRule', ({ params: { name, id } }) => answeredWrite((s) => s.inRequest(POLICY_DROP.handler({ name, id }))))
+    .handle('propose', ({ params: { name }, payload: { words } }) =>
+      answeredWrite((s) => s.inRequest(POLICY_PROPOSE.handler({ name, words }))),
+    )
+    .handle('reach', ({ params: { name }, query: { factory, run } }) =>
+      answered((s) =>
+        s.inRequest(
+          POLICY_REACH.handler({
+            name,
+            ...(factory === undefined ? {} : { factory }),
+            ...(run === undefined ? {} : { runId: run }),
+          }),
+        ),
+      ),
+    )
     .handle('chat', ({ query }) => chatPage(query))
     .handle('chatStream', ({ query, headers }) => chatStream(headers['last-event-id'] || query.after || undefined))
     .handle('chatSend', ({ payload }) => chatSend(payload))
     .handle('chatStop', () => chatStop())
     .handle('chatAnswer', ({ payload }) => chatAnswer(payload))
     .handle('chatRead', ({ payload: { through } }) => chatRead(through))
+    .handle('speakers', () => answered((s) => s.inRequest(CHAT_SPEAKERS.handler({}))))
+    .handle('allowSpeaker', ({ params: { speaker } }) => answeredWrite((s) => s.inRequest(CHAT_ALLOW.handler({ name: speaker }))))
+    .handle('disallowSpeaker', ({ params: { speaker } }) => answeredWrite((s) => s.inRequest(CHAT_DISALLOW.handler({ name: speaker }))))
     .handle('instructions', () =>
       answered(async (s) => {
         try {

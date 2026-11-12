@@ -6,9 +6,10 @@
  * harness does not trust now, and why its file does not read. Its `metadata.generation` counts the changes to its spec.
  *
  * Beside it, its sub-resources: its rules (`FactoryRules`), its instruction (`FactoryInstruction`) and the lines a person types for it
- * (`FactoryCommands`), with the bodies their writes are sent. The rules and the instruction share the Factory's `resourceVersion`, as a
- * Kubernetes subresource shares its object's: a write of either moves it, as a change of its spec or its status does. Plain Schemas of
- * JSON, as every object of this package is.
+ * (`FactoryCommands`), with the bodies their writes are sent; and what its other writes are sent and answer: its revisions policy, a
+ * harness setting, its places trusted again (`FactoryTrusted`) and its removal (`FactoryRemoved`). The rules and the instruction share
+ * the Factory's `resourceVersion`, as a Kubernetes subresource shares its object's: a write of either moves it, as a change of its spec
+ * or its status does. Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
@@ -157,6 +158,47 @@ export type FactoryRulesWrite = typeof FactoryRulesWrite.Type;
 /** What a person writes of a factory's cost line for one workflow: its dollars. */
 export const FactoryCostLineWrite = Schema.Struct({ usd: Schema.Finite });
 export type FactoryCostLineWrite = typeof FactoryCostLineWrite.Type;
+
+/** What a person writes of a factory's revisions policy (`PUT …/revisions`): whether its runs follow merged revisions or keep them. */
+export const FactoryRevisionsWrite = Schema.Struct({ revisions: Schema.Literals(REVISIONS_POLICIES) });
+export type FactoryRevisionsWrite = typeof FactoryRevisionsWrite.Type;
+
+/**
+ * What a person writes of one harness setting of a factory (`PUT …/settings/<harness>.<key>`): its value as JSON text, as the command
+ * line takes it (`'{"commit":"","pr":""}'`, `'"french"'`, `false`), so a JSON string value is told from the text of another.
+ */
+export const FactorySettingWrite = Schema.Struct({ value: Schema.String });
+export type FactorySettingWrite = typeof FactorySettingWrite.Type;
+
+/**
+ * What was asked for one place of a factory as its trust was asked again: the harness by the name a person reads, the folder the harness
+ * keeps its trust under, what the trust grants, how to take it back, whether it was written now and why it could not be (null where it
+ * was or where it was given already); or that the place was not asked at all, and why (`unasked`).
+ */
+export const FactoryPlaceTrust = Schema.Union([
+  Schema.Struct({
+    place: Schema.String,
+    harness: Schema.String,
+    folder: Schema.String,
+    grants: Schema.String,
+    back: Schema.String,
+    wrote: Schema.Boolean,
+    refused: Schema.NullOr(Schema.String),
+  }),
+  Schema.Struct({ place: Schema.String, unasked: Schema.String }),
+]);
+export type FactoryPlaceTrust = typeof FactoryPlaceTrust.Type;
+
+/** A factory's places trusted again (`POST …/trust`): the factory, and what was asked for each place, one a harness that keeps a trust. */
+export const FactoryTrusted = Schema.Struct({ name: Schema.String, trusts: Schema.Array(FactoryPlaceTrust) });
+export type FactoryTrusted = typeof FactoryTrusted.Type;
+
+/**
+ * A factory removed (`DELETE /api/factories/<name>`): the factory, the file removed, and the folder of the instruction and the rules the
+ * store kept for it, removed whole (null where it kept none). A trust given to its places is left.
+ */
+export const FactoryRemoved = Schema.Struct({ name: Schema.String, file: Schema.String, instruction: Schema.NullOr(Schema.String) });
+export type FactoryRemoved = typeof FactoryRemoved.Type;
 
 /**
  * A factory's instruction: the factory, the path its file names (null for none), whether the store keeps it, the file it is read from,

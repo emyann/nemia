@@ -25,6 +25,8 @@ import {
   RunRefreshed,
   RunRemoved,
   RunRetry,
+  RunRoute,
+  RunRouted,
   RunSaid,
   RunSay,
   RunStart,
@@ -75,8 +77,9 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
  * The run object, listed across namespaces (`/api/runs`) and in one, read in one and across all by its name (`/api/runs/:name`), what is
  * read beside it; and its named actions, each in its namespace alone: started, removed — a try alone, a run started
  * from an agent's page, any other being `nemia rm`'s — refreshed, pruned, its labels edited, held and its hold lifted, and a step of it
- * tried again, approved and said words to. A run's namespace is its factory, `default` for one that names none: a run addressed under
- * another is `Missing`. A start is placed on the repository `?repo=` names, else the api's own.
+ * tried again, approved, routed — a condition's route given by hand — and said words to. A run's namespace is its factory, `default`
+ * for one that names none: a run addressed under another is `Missing`. A start is placed on the repository `?repo=` names, else the
+ * api's own.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
   HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }),
@@ -143,6 +146,12 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
     params: runStepParams,
     payload: RunApprove,
     success: takenLater(RunApproved),
+    error: runActionErrors,
+  }),
+  HttpApiEndpoint.post('route', '/api/namespaces/:namespace/runs/:name/steps/:step/route', {
+    params: runStepParams,
+    payload: RunRoute,
+    success: RunRouted,
     error: runActionErrors,
   }),
   HttpApiEndpoint.post('say', '/api/namespaces/:namespace/runs/:name/steps/:step/say', {

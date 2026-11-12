@@ -13,12 +13,14 @@
  * volume mounted and taken off (`nemia factory volume add`, `rm`), a factory made from a template (`nemia factory apply`), a hand-made one
  * taken over (`nemia factory adopt`), either previewed (`nemia factory diff`), an upgrade filed (`nemia factory upgrade`) and a
  * conflict's choice, sent as its text (`nemia factory resolve`). A repository's or a volume's path names a folder of this machine by its
- * whole path; a template sent packed is kept under the store while a factory is made from it (`withTemplateTaken`), and a preview's or a
- * refused request's is removed as the request ends.
+ * whole path, and a repository may be a git URL instead, which this machine clones under its store with its own git credentials
+ * (`cloneTarget`, then the verb's clone, refused on the spot with the setup to do); a template sent packed is kept under the store
+ * while a factory is made from it (`withTemplateTaken`), and a preview's or a refused request's is removed as the request ends.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
 import {
+  cloneTarget,
   factoryTable,
   factoryCommandsOf,
   factoryList,
@@ -112,16 +114,32 @@ const writtenThen = (route: string, name: string, write: (s: Served) => Promise<
   });
 
 /**
- * Each of `paths` as a folder of this machine, by its whole path: a relative one is refused `Invalid`, `route` and `key` named, since no
- * folder the caller's command ran from is this machine's.
+ * Each of `values` that `isPath` reads as a path, as a folder of this machine, by its whole path: a relative one is refused `Invalid`,
+ * `route` and `key` named, since no folder the caller's command ran from is this machine's. `orElse`, where given, is the other fix a
+ * refusal names.
  */
-const wholePaths = (route: string, key: string, paths: readonly string[] | undefined): void => {
-  const relative = (paths ?? []).filter((p) => !path.isAbsolute(p));
+const wholePaths = (
+  route: string,
+  key: string,
+  values: readonly string[] | undefined,
+  isPath: (given: string) => boolean = () => true,
+  orElse = '',
+): void => {
+  const relative = (values ?? []).filter((given) => isPath(given) && !path.isAbsolute(given));
   if (relative.length)
     throw new Refused({
-      message: `${route}: ${key} names a folder of the machine the api runs on by its whole path, and ${relative.join(', ')} is not one: give it from /.`,
+      message: `${route}: ${key} names a folder of the machine the api runs on by its whole path, and ${relative.join(', ')} is not one: give it from /${orElse}.`,
     });
 };
+
+/** Whether a repository given names a folder, as the verb reads it (`cloneTarget`): a URL or a refused one is the verb's to judge. */
+const repoPath = (given: string): boolean => cloneTarget(given).kind === 'path';
+
+/** The other fix a refusal of a repository's relative path names. */
+const OR_URL = ', or give the repository by its git URL for this machine to clone';
+
+/** `repos` held to the whole-path rule where they are paths, `route` named in a refusal. */
+const wholeRepos = (route: string, repos: readonly string[] | undefined): void => wholePaths(route, 'repos', repos, repoPath, OR_URL);
 
 /**
  * The program `run` makes of a template's source, given the template sent (`withTemplateTaken`, the archive kept as `keep` says), or
@@ -151,11 +169,14 @@ const planOf = (planned: Effect.Success<ReturnType<typeof FACTORY_PLAN.handler>>
   };
 };
 
-/** `nemia factory add`: the factory `name` filed on `repos`, each by its whole path, its places trusted unless `noTrust`. */
+/**
+ * `nemia factory add`: the factory `name` filed on `repos`, each by its whole path or a git URL this machine clones, its places trusted
+ * unless `noTrust`.
+ */
 const created = ({ name, repos, noTrust }: FactoryCreate) =>
   answeredWrite(async (s: Served) => {
     factoryNamed('POST /api/factories', name);
-    wholePaths('POST /api/factories', 'repos', repos);
+    wholeRepos('POST /api/factories', repos);
     return s.inRequest(FACTORY_ADD.handler({ name, repos, noTrust }));
   });
 
@@ -177,12 +198,15 @@ const volumeRemoved = (factory: string, at: string) =>
     return s.inRequest(FACTORY_VOLUME_RM.handler({ factory, path: at }));
   });
 
-/** `nemia factory apply`: the factory `name` made from the template sent, kept under the store once it is filed. */
+/**
+ * `nemia factory apply`: the factory `name` made from the template sent, kept under the store once it is filed, on `repos`, each by its
+ * whole path or a git URL this machine clones.
+ */
 const applied = (name: string, { template, repos, sets, noTrust }: FactoryApplyWrite) =>
   answeredWrite(async (s: Served) => {
     const route = `POST /api/factories/${name}/apply`;
     factoryNamed(route, name);
-    wholePaths(route, 'repos', repos);
+    wholeRepos(route, repos);
     return s.inRequest(withTemplate(template, 'made', (source) => FACTORY_APPLY.handler({ name, template: source, repos, sets, noTrust })));
   });
 

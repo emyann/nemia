@@ -157,6 +157,7 @@ const PINNED: Record<string, string[]> = {
     'STATS',
     'CEILINGS',
     'FACTORY_ADD',
+    'cloneTarget',
     'FACTORY_ADOPT',
     'FACTORY_APPLY',
     'FACTORY_PLAN',

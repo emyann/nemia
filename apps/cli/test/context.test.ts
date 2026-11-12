@@ -9,10 +9,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { servedStore, type Said } from './served.ts';
@@ -163,6 +164,44 @@ test('under a remote context `nemia ls` asks that daemon with its token, reading
   const refused = await nemia(['ls'], { ...env, NEMIA_CONTEXT: 'bad' });
   assert.equal(refused.code, 2, `a token the daemon never minted is its 401, exit 2: ${refused.err}`);
   assert.equal(fs.existsSync(root), false, 'no daemon started here');
+});
+
+/** A git repository of one commit in a scratch folder of its own, made with git itself, and its `file://` URL. */
+function anOrigin(): { dir: string; url: string } {
+  const dir = path.join(scratch('nemia-context-origin-'), 'o', 'r');
+  fs.mkdirSync(dir, { recursive: true });
+  const git = (...args: string[]) => {
+    const done = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, encoding: 'utf8' });
+    assert.equal(done.status, 0, done.stderr);
+  };
+  git('init', '-q');
+  fs.writeFileSync(path.join(dir, 'a.txt'), 'one\n');
+  git('add', 'a.txt');
+  git('commit', '-qm', 'one');
+  return { dir, url: pathToFileURL(dir).href };
+}
+
+test('under a remote context `nemia factory add --repo <url>` files the factory on the server, cloned there; a URL with a password is refused, exit 2, nothing filed', async (t) => {
+  const vps = await servedStore('nemia-context-clone-', () => {}, { WF_EXPOSED: '1' });
+  t.after(vps.stop);
+  const minted = await nemia(['token', 'add', 'laptop'], vps.env);
+  assert.equal(minted.code, 0, minted.err);
+  const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];
+  assert.ok(token, minted.out);
+  const { env, root, folder } = aLaptop('nemia-context-clone-');
+  assert.equal((await nemia(['config', 'set-context', 'vps', '--server', vps.url, '--token-file', tokenFile(folder, token)], env)).code, 0);
+  assert.equal((await nemia(['config', 'use-context', 'vps'], env)).code, 0);
+  const { dir, url } = anOrigin();
+  const added = await nemia(['factory', 'add', 'mill', '--repo', url, '--no-trust'], env);
+  assert.equal(added.code, 0, added.err);
+  const into = path.join(vps.root, 'clones', 'localhost', ...dir.split(path.sep).filter(Boolean));
+  const mill = JSON.parse(fs.readFileSync(path.join(vps.root, 'factories', 'mill.json'), 'utf8'));
+  assert.deepEqual([mill.repos, mill.origins], [[into], { [into]: url }]);
+  assert.ok(fs.existsSync(path.join(into, '.git')), 'the clone is made on the server');
+  const secret = await nemia(['factory', 'add', 'secret', '--repo', 'https://u:p@host/o/r', '--no-trust'], env);
+  assert.equal(secret.code, 2, secret.err);
+  assert.equal(fs.existsSync(path.join(vps.root, 'factories', 'secret.json')), false, 'nothing filed');
+  assert.equal(fs.existsSync(root), false, 'no store read or made on this machine');
 });
 
 test('under a remote context that takes no connection, a read is refused naming the context and `nemia config get-contexts`', async () => {

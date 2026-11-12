@@ -17,6 +17,7 @@ import {
   DEFAULT_NAMESPACE,
   endpointKeysOf,
   type EndpointKeys,
+  jsonBodied,
   keysOfEndpoint,
   Forbidden as ForbiddenAnswer,
   Invalid as InvalidAnswer,
@@ -73,11 +74,17 @@ export function partsOf(
   };
 }
 
-/** The typed client of the `Api` at `forwarded`'s server, each request presenting its token as its bearer where it has one. */
+/**
+ * The typed client of the `Api` at `forwarded`'s server: each bodiless write sent as JSON (`jsonBodied`), each request presenting its token
+ * as its bearer where it has one.
+ */
 const clientOf = (forwarded: Forwarded) =>
   HttpApiClient.make(Api, {
     baseUrl: forwarded.server,
-    transformClient: forwarded.token === undefined ? undefined : HttpClient.mapRequest(HttpClientRequest.bearerToken(forwarded.token)),
+    transformClient: (client) => {
+      const bodied = HttpClient.mapRequest(client, jsonBodied);
+      return forwarded.token === undefined ? bodied : HttpClient.mapRequest(bodied, HttpClientRequest.bearerToken(forwarded.token));
+    },
   });
 
 /** The typed client, as a forwarded call reads it: each group's endpoints by name, a call taking its parts. */

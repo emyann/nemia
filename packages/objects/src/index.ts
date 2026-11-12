@@ -230,6 +230,7 @@ export {
   keysOfEndpoint,
   streamsOf,
 } from './endpoint-keys.ts';
+export { jsonBodied } from './write-body.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
 export { Volume, VolumeList, VolumeSpec, VolumeStatus } from './volume.ts';

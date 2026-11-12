@@ -97,3 +97,52 @@ test("REFUSED: a body past the api's bound is Invalid, exit 2, in the api's word
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+/**
+ * The bodiless writes a forwarded command line makes: each endpoint a link of an entry it runs calls, by any method but GET and HEAD, whose
+ * payload takes no key — the writes the typed client gives no body of its own.
+ */
+const BODILESS_WRITES = [...new Set(RUN_HERE.flatMap((c) => (c.served ?? []).map((l) => l.endpoint)))].filter((endpoint) => {
+  const keys = endpointKeysOf(Api, endpoint);
+  return !['GET', 'HEAD'].includes(keys.method) && keys.payloadKeys.length === 0;
+});
+
+test("every bodiless write a forwarded command line makes sends `{}` as JSON, with that content-type, as the api's write guard takes it", async () => {
+  const seen = new Map<string, { readonly contentType: string | undefined; readonly body: string }>();
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+    req.on('end', () => {
+      if (req.method !== 'GET') seen.set(`${req.method} ${req.url}`, { contentType: req.headers['content-type'], body });
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'none here' }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address() as AddressInfo;
+    for (const endpoint of BODILESS_WRITES) {
+      const keys = endpointKeysOf(Api, endpoint);
+      const input = {
+        ...Object.fromEntries([...keys.pathKeys, ...keys.queryKeys].map((k) => [k, k === 'try' ? 1 : `a-${k}`])),
+        namespace: 'default',
+      };
+      seen.clear();
+      await Effect.runPromiseExit(
+        forwardedCall({ server: `http://127.0.0.1:${port}`, token: 't' }, { name: endpoint, served: [{ endpoint }] }, input),
+      );
+      const sent = [...seen.values()];
+      assert.equal(sent.length, 1, `${endpoint} reached the server once`);
+      const [one] = sent;
+      assert.match(one?.contentType ?? '', /^application\/json\b/, `${endpoint} sent its body as JSON`);
+      assert.deepEqual(JSON.parse(one?.body || 'null'), {}, `${endpoint} sent \`{}\``);
+    }
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('the bodiless writes the test above reads hold nemia chat allow, the write met without a content-type, and its disallow', () => {
+  assert.ok(BODILESS_WRITES.includes('nemia.allowSpeaker'));
+  assert.ok(BODILESS_WRITES.includes('nemia.disallowSpeaker'));
+});

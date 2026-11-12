@@ -56,8 +56,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **The MCP port (`/mcp`, `src/mcp/`) is a protocol host, not a resource**: it calls the `Api`'s own endpoints through the app's `fetch`
   with the caller's `Authorization`, so every middleware, refusal and memo applies as to any client (a call logs two request lines). A
   tool is a link of the command table (`served` on the entry, `toolsOf`), never added here; a non-GET call always sends a JSON body, which
-  the write guard asks for. A store marked exposed (`WF_EXPOSED=1`) refuses a request with no token on every route of the api
-  (`/api`, `/openapi`), and `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
+  the write guard asks for. An answer fits what a host reads (`src/mcp/bound.ts`): a link's `query` gives the defaults a call is sent
+  with, a list is asked a page of `PORT_PAGE`, a `Table` endpoint is asked for its Table and answered as its lines (`objects`'
+  `tableLines`), and no answer passes `ANSWER_BOUND` (`answerFit`), a page past it asked again shorter and any other refused, never
+  cut. A store marked exposed (`WF_EXPOSED=1`) refuses a request with no token on every route of the api (`/api`, `/openapi`), and
+  `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
   running code's `apps/web/dist`, `index.html` for a route of the board's, never a path under `/api`, `/openapi` or `/mcp`. The board's
   token is an HttpOnly cookie (`TOKEN_COOKIE`) the api sets and clears (`POST` and `DELETE /api/session`, `src/server/session.ts`);

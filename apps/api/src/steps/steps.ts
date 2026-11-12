@@ -28,6 +28,8 @@ import { filesPrunedWords } from 'agent-orchestrator/run';
 import {
   Api,
   BadRequest,
+  closeoutNarrowed,
+  fieldsNamed,
   Gone,
   Missing,
   ReadFailed,
@@ -467,7 +469,8 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
 /**
  * A run's step's reads. Each answers `Missing` (404) for a run or a step the run does not have.
  *
- * - `tries`, `try`, `closeout`, `told` — the run object's sub-resources: the entries of the same names, off the app's informer.
+ * - `tries`, `try`, `closeout`, `told` — the run object's sub-resources: the entries of the same names, off the app's informer; a try
+ *   and a closeout asked with `?fields=` answer the closeout narrowly (`objects`' `closeoutNarrowed`).
  * - `log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry (`LOGS`), which reads it whole; empty
  *   for a step not filed yet; `ReadFailed` (502) when the engine could not read it. The board reads the conversation from the transcript.
  * - `artifact` — one file of the step's files directory, by name and never by path (`STEP_ARTIFACT`), as its closeout's `artifacts` link
@@ -503,8 +506,22 @@ const followedFrom = (runId: string, step: string, after: string | undefined) =>
 export const stepsHandlers = HttpApiBuilder.group(Api, 'steps', (handlers) =>
   handlers
     .handle('tries', ({ params: { runId, step } }) => answered((s) => s.inRequest(TRIES.handler({ runId, step }))))
-    .handle('try', ({ params }) => answered((s) => s.inRequest(TRY.handler(params))))
-    .handle('closeout', ({ params }) => answered((s) => s.inRequest(CLOSEOUT.handler(params))))
+    .handle('try', ({ params, query }) =>
+      answered(async (s) => {
+        const read = await s.inRequest(TRY.handler(params));
+        return read.closeout === null || query.fields === undefined
+          ? read
+          : { ...read, closeout: closeoutNarrowed(read.closeout, fieldsNamed(query.fields)) };
+      }),
+    )
+    .handle('closeout', ({ params, query }) =>
+      answered(async (s) => {
+        const read = await s.inRequest(CLOSEOUT.handler(params));
+        return read.closeout === null || query.fields === undefined
+          ? read
+          : { ...read, closeout: closeoutNarrowed(read.closeout, fieldsNamed(query.fields)) };
+      }),
+    )
     .handle('told', ({ params: { runId, step } }) => answered((s) => s.inRequest(TOLD.handler({ runId, step }))))
     .handle('log', ({ params: { runId, step } }) => logOf(runId, step))
     .handle('artifact', ({ params: { runId, step, file } }) => artifactOf(runId, step, file))

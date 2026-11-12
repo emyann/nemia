@@ -6,6 +6,11 @@
  * nothing of tokens or refusals is said again here. A 2xx answers the endpoint's JSON, as text and as `structuredContent`; anything else
  * is the tool's error, in the api's own words, which say what to do next.
  *
+ * What a host reads is held here (`bound.ts`): a list is asked a page of `PORT_PAGE` where a call gives no `limit`, with the defaults
+ * its link sends (`PortTool.defaults`); a list that answers a `Table` is asked for it and answered as its lines, printed by `objects`'
+ * `tableLines` as `nemia` prints them, the token of the next page on a last line; and no answer passes `ANSWER_BOUND` (`answerFit`): a
+ * page past it is asked again shorter, and any other answer past it refused with how to narrow it, never cut.
+ *
  * The caller's token is the gate's before this is reached (`callerGate`, caller/caller.ts: `/mcp` needs a person's). While a call is
  * pending, a client that gave a progress token is told progress every 30 s (`PROGRESS_EVERY_MS`), so a host that ends a silent call
  * (`nemia wait`, up to four minutes and a half) hears it is alive.
@@ -16,7 +21,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { type CallToolResult, CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { CLI_VERBS, TABLE } from 'agent-orchestrator';
-import { Api } from 'objects';
+import { Api, TABLE_ACCEPT, type Table, tableLines } from 'objects';
+import { ANSWER_BOUND, answerFit, PAGE_MOST, PORT_PAGE, pastTheBound } from './bound.ts';
 import { type PortTool, portTools } from './tools.ts';
 
 /** How often a pending call is told as progress, where its caller gave a progress token: under any host's idle bound. */
@@ -67,7 +73,7 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
     if (value === undefined || value === null) continue;
     for (const one of Array.isArray(value) ? value : [value]) url.searchParams.append(key, asText(one));
   }
-  const headers = new Headers({ accept: 'application/json' });
+  const headers = new Headers({ accept: tool.table ? `${TABLE_ACCEPT}, application/json` : 'application/json' });
   const authorization = from.headers.get('authorization');
   if (authorization !== null) headers.set('authorization', authorization);
   if (tool.method === 'GET') return new Request(url, { method: 'GET', headers, signal });
@@ -77,9 +83,81 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
 }
 
 /**
- * A call of `tool` with `args`, answered by `app`'s own fetch of its endpoint: a 2xx its JSON as text and as `structuredContent` (a list
- * as `{ items }`), or its text alone where it is not JSON; anything else the tool's error, the body's `error` sentence its text. A path
- * name not given is refused before any request, naming it.
+ * The arguments a call of `tool` with `args` is sent with: each default its link sends (`defaults`) for a key the call leaves out, and a
+ * page of `PORT_PAGE` where its endpoint takes `limit` and the call gives none.
+ */
+export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  const absent = (key: string) => args[key] === undefined || args[key] === null;
+  const sent: Record<string, unknown> = { ...args };
+  for (const [key, value] of Object.entries(tool.defaults)) if (absent(key)) sent[key] = value;
+  if (tool.queryKeys.includes('limit') && absent('limit')) sent.limit = PORT_PAGE;
+  return sent;
+}
+
+/** Whether `json` is a `Table`, as a list asked with `TABLE_ACCEPT` answers one. */
+const isTable = (json: unknown): json is Table =>
+  isRecord(json) && json.kind === 'Table' && Array.isArray(json.rows) && Array.isArray(json.columnDefinitions);
+
+/**
+ * The text a `Table` is answered as: its lines as `nemia <verb> -o wide` prints them, then the token of the next page where there is one;
+ * where it has no row, a line saying so and the defaults `tool` sent that `args` did not lift.
+ */
+const tableText = (tool: PortTool, table: Table, args: Readonly<Record<string, unknown>>): string => {
+  const lines = tableLines(table, { wide: true, showLabels: true, columns: [] });
+  const sent = Object.entries(tool.defaults).filter(([key, value]) => args[key] === value);
+  const none =
+    lines.length > 0
+      ? []
+      : [
+          `none listed${sent.length > 0 ? `, sent ${sent.map(([k, v]) => `${k}=${v}`).join(' and ')}: give ${sent.map(([k]) => `${k} ""`).join(' and ')} for every item` : ''}`,
+        ];
+  const next = table.metadata.continue;
+  return [...lines, ...none, ...(next === undefined ? [] : [`more: call again with continue ${next}`])].join('\n');
+};
+
+/** The page `args` asks for, as `answerFit` judges it: its `limit` (no longer than `PAGE_MOST`), or null where it asks none. */
+const pageOf = (tool: PortTool, args: Readonly<Record<string, unknown>>): number | null => {
+  if (!tool.queryKeys.includes('limit')) return null;
+  const limit = Number(args.limit);
+  return Number.isInteger(limit) && limit >= 1 ? Math.min(limit, PAGE_MOST) : null;
+};
+
+/** The characters a result holds, as a host counts them: its texts and the JSON of its `structuredContent`. */
+const sizeOf = (result: CallToolResult): number =>
+  result.content.reduce((n, c) => n + (c.type === 'text' ? c.text.length : 0), 0) +
+  (result.structuredContent === undefined ? 0 : JSON.stringify(result.structuredContent).length);
+
+/**
+ * One answer of `app` to `tool` with `args`, as a tool's result: a 2xx's `Table` as its lines alone (`tableText`), any other JSON as text
+ * and as `structuredContent` (a list as `{ items }`), or its text alone where it is not JSON; anything else the tool's error, the body's
+ * `error` sentence its text.
+ */
+async function answerOf(
+  tool: PortTool,
+  args: Readonly<Record<string, unknown>>,
+  from: Request,
+  app: Fetching,
+  signal?: AbortSignal,
+): Promise<CallToolResult> {
+  const res = await app.fetch(requestOf(tool, args, from, signal));
+  const text = await res.text();
+  const json = jsonOf(text);
+  if (res.ok) {
+    if (tool.table && isTable(json)) return { content: [{ type: 'text', text: tableText(tool, json, args) }] };
+    const structured = Array.isArray(json) ? { items: json } : isRecord(json) ? json : undefined;
+    return { content: [{ type: 'text', text }], ...(structured === undefined ? {} : { structuredContent: structured }) };
+  }
+  const said = isRecord(json) && typeof json.error === 'string' ? json.error : undefined;
+  return failed(
+    said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,
+    isRecord(json) ? json : undefined,
+  );
+}
+
+/**
+ * A call of `tool` with `args`, answered by `app`'s own fetch of its endpoint (`answerOf`), sent with its link's defaults and the port's
+ * page (`argsSent`), and held under `ANSWER_BOUND` (`answerFit`): a page past it asked again shorter, any other answer past it refused
+ * with how to narrow it (`pastTheBound`), its body left out. A path name not given is refused before any request, naming it.
  */
 export async function called(
   tool: PortTool,
@@ -90,18 +168,15 @@ export async function called(
 ): Promise<CallToolResult> {
   const missing = tool.pathKeys.filter((key) => args[key] === undefined || args[key] === null || args[key] === '');
   if (missing.length > 0) return failed(`${tool.name} needs ${missing.join(' and ')}: give each in its arguments (${tool.path})`);
-  const res = await app.fetch(requestOf(tool, args, from, signal));
-  const text = await res.text();
-  const json = jsonOf(text);
-  if (res.ok) {
-    const structured = Array.isArray(json) ? { items: json } : isRecord(json) ? json : undefined;
-    return { content: [{ type: 'text', text }], ...(structured === undefined ? {} : { structuredContent: structured }) };
+  let sent = argsSent(tool, args);
+  for (;;) {
+    const result = await answerOf(tool, sent, from, app, signal);
+    const size = sizeOf(result);
+    const fit = answerFit(size, ANSWER_BOUND, pageOf(tool, sent));
+    if (fit.kind === 'answer') return result;
+    if (fit.kind === 'refuse') return failed(pastTheBound(tool.name, size, ANSWER_BOUND, tool.queryKeys));
+    sent = { ...sent, limit: fit.limit };
   }
-  const said = isRecord(json) && typeof json.error === 'string' ? json.error : undefined;
-  return failed(
-    said ?? `${tool.method} ${tool.path} answered ${res.status}${text === '' ? '' : `: ${text}`}`,
-    isRecord(json) ? json : undefined,
-  );
 }
 
 /** Whether `body`, a JSON-RPC message or a batch, holds a call that asked to be told progress: its answer is then a stream. */

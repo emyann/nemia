@@ -7,11 +7,11 @@
  */
 import path from 'node:path';
 import { Schema } from 'effect';
-import type { Table } from 'objects';
+import { type Table, tableLines } from 'objects';
 import { handedOn } from '../local.ts';
 import { asked, READ_BOUND_MS } from '../objects.ts';
 import { storeRoot } from '../where.ts';
-import { AS_TABLE, tableAsked, tableLines, tableOf } from './table.ts';
+import { AS_TABLE, tableAsked, tableOf } from './table.ts';
 
 /** What a row's card says of its play: whether the api counts it in play. */
 const InPlay = Schema.Struct({ status: Schema.Struct({ inPlay: Schema.Boolean }) });

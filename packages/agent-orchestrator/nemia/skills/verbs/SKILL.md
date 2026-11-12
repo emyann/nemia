@@ -23,7 +23,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
                                run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
                                their labels on each line
-                               on the port: inbox
+                               on the port: inbox, inbox_card
   nemia factory
                                the store's factories: the default first — every run and card that
                                names no factory, read, never written — then each by name with its

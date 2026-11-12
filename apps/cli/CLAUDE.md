@@ -3,17 +3,11 @@
 `nemia` and `wf` as a person types them. Every store verb is a moved command: its words are `objects`' (`COMMAND_WORDS`, the names
 `MOVED_COMMANDS`), and it is parsed, helped, run and printed here through the api under every context. Its reads (`READ_VERBS` in
 `src/route.ts`: `doctor` and `daemon`) and its own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, over every kind the api serves,
-`propose` and `proposals`, and `decide`) ask the api serving the store over HTTP. A verb about this machine (`MACHINE_VERBS`) and a help
+`propose` and `proposals`, `decide`, `channel` and `server`) ask the api serving the store over HTTP. A verb about this machine (`MACHINE_VERBS`) and a help
 of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`), whatever the context. Nothing is forwarded: a
 word typed under a remote context that the client does not answer and this machine does not own is refused, exit 2, naming `nemia
 --help` and `NEMIA_CONTEXT=local`. `--local` is refused, exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is
 this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
-`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
-inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
-`explain`, over every kind the api serves, `propose` and `proposals`, `decide`, `channel`, and `server`) asked of it whatever else is typed, the commands
-whose words it holds (`MOVED_COMMANDS`, `objects`' `COMMAND_WORDS`) parsed, helped and run here through the api under every context, and
-every other verb and a help of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). `--local` is refused,
-exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract, each verb list spelled once there and read by the code (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 

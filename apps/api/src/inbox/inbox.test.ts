@@ -16,6 +16,7 @@ import { app } from '../app.ts';
 import { addToInbox, fromNote, inboxDir, startFromInbox, runsAtOnce, engine, StoreRoot } from 'agent-orchestrator';
 import { addFactory } from 'agent-orchestrator/testing';
 import { runWith } from '../../test/builtin-place.ts';
+import { TEAM } from '../../test/team.ts';
 import { objectOf, linesOf } from '../../test/run-reads.ts';
 import { names } from '../../test/named.ts';
 import { Effect } from 'effect';
@@ -967,55 +968,53 @@ test("a card's labels: filed with them, listed with them, selected by them with 
 });
 
 /**
- * The factory `tree`, made from a template, on a repository of its own with a commit: its tree's one workflow `quick`, attached, whose
- * step names an agent of the tree's — a workflow neither its repository nor yours has. Filed for one test and taken off after it, so the
- * other tests read the store's factories as they file them.
+ * The factory `acme`, made from a template, on a repository of its own with a commit: its tree the tests' own team (`TEAM`), its workflow
+ * `dev` attached — a `dev` neither its repository nor yours has. Filed for one test and taken off after it, so the other tests read the
+ * store's factories as they file them.
  */
-const treeFactory = (): { quick: string; repo: string; gone: () => void } => {
-  const repo = scratch('nemia-api-inbox-tree-');
+const acmeFactory = (): { dev: string; repo: string; gone: () => void } => {
+  const repo = scratch('nemia-api-inbox-acme-');
   execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
   execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
-  const tree = path.join(root, 'factories', 'tree', 'tree');
-  const quick = path.join(tree, 'workflows', 'quick');
+  const tree = path.join(root, 'factories', 'acme', 'tree');
+  const folders = path.join(tree, 'workflows');
+  fs.cpSync(TEAM, folders, { recursive: true });
   write(
-    path.join(root, 'factories', 'tree.json'),
+    path.join(root, 'factories', 'acme.json'),
     JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
-  write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['quick'], hires: {} }));
-  write(path.join(quick, 'README.md'), '# quick\n\nImplement it.\n');
-  write(path.join(quick, 'implement.md'), '---\nplace: git\nagent: maker\n---\nImplement it.\n');
-  write(path.join(tree, 'workflows', 'agents', 'maker.md'), '---\ndescription: Makes the change a card asks for.\n---\nMake it.\n');
+  write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
   const gone = (): void => {
-    fs.rmSync(path.join(root, 'factories', 'tree.json'), { force: true });
-    fs.rmSync(path.join(root, 'factories', 'tree'), { recursive: true, force: true });
+    fs.rmSync(path.join(root, 'factories', 'acme.json'), { force: true });
+    fs.rmSync(path.join(root, 'factories', 'acme'), { recursive: true, force: true });
   };
-  return { quick, repo, gone };
+  return { dev: path.join(folders, 'dev'), repo, gone };
 };
 
 test("a card started through its factory's namespace runs in that factory, on the factory's workflow: the card's own when the start names none, or the one it names", async (t) => {
   clear();
-  const { quick, repo: treeRepo, gone } = treeFactory();
+  const { dev: acmeDev, repo: acmeRepo, gone } = acmeFactory();
   t.after(gone);
-  write(path.join(inbox, 'by-its-own.md'), "---\nworkflow: quick\nfactory: tree\n---\nRun on the card's own workflow\n");
-  write(path.join(inbox, 'by-the-start.md'), '---\nfactory: tree\n---\nRun on the workflow the start names\n');
+  write(path.join(inbox, 'by-its-own.md'), "---\nworkflow: dev\nfactory: acme\n---\nRun on the card's own workflow\n");
+  write(path.join(inbox, 'by-the-start.md'), '---\nfactory: acme\n---\nRun on the workflow the start names\n');
   const start = (name: string, body: Record<string, unknown>) =>
-    app.request(`/api/namespaces/tree/cards/${name}/start`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
+    app.request(`/api/namespaces/acme/cards/${name}/start`, { method: 'POST', headers: JSON_TYPE, body: JSON.stringify(body) });
 
   const own = await start('by-its-own', {});
   assert.equal(own.status, 201, await own.clone().text());
   const ownRun = runsAtOnce(root).runs.read(((await own.json()) as CardStarted).id);
   assert.deepEqual(
     [ownRun.workflowDir, ownRun.factory, ownRun.repo],
-    [quick, 'tree', treeRepo],
-    "no `workflow` sent: the card's `workflow:`, found in its factory's tree, as `nemia start <card> --factory tree` finds it",
+    [acmeDev, 'acme', acmeRepo],
+    "no `workflow` sent: the card's `workflow:`, found in its factory's tree, as `nemia start <card> --factory acme` finds it",
   );
 
-  const named = await start('by-the-start', { workflow: 'quick' });
+  const named = await start('by-the-start', { workflow: 'dev' });
   assert.equal(named.status, 201, await named.clone().text());
   const namedRun = runsAtOnce(root).runs.read(((await named.json()) as CardStarted).id);
   assert.deepEqual(
     [namedRun.workflowDir, namedRun.factory, namedRun.repo],
-    [quick, 'tree', treeRepo],
+    [acmeDev, 'acme', acmeRepo],
     "a `workflow` only the factory has: looked up in the factory's tree, the request placed in the namespace's factory",
   );
 });

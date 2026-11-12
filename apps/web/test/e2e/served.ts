@@ -270,12 +270,12 @@ export async function startServers(seat: Served, dist?: string): Promise<Require
 }
 
 /**
- * A second seat on the worker's store, marked exposed (`WF_EXPOSED=1`), as an install bound beyond its machine serves it: an api of its
- * own that ticks nothing, and a `vite preview` of the built app proxying `/api` to it, each on a free port. Answers the app's address,
- * and `stop`, which ends both and waits for them, leaving the worker's own servers running: a page that starts one stops it before it
- * ends.
+ * A second seat on the worker's store: an api of its own that ticks nothing, started now over the api's environment with `env` laid over
+ * it, so what it reads at its start (its first sweep of the machine's needs among them) is read afresh, and a `vite preview` of the built
+ * app proxying `/api` to it, each on a free port. `name` says which seat in what the servers print. Answers the app's address, and
+ * `stop`, which ends both and waits for them, leaving the worker's own servers running: a page that starts one stops it before it ends.
  */
-export async function serveExposed(): Promise<{ base: string; stop: () => Promise<void> }> {
+export async function serveSeat(name: string, env: NodeJS.ProcessEnv = {}): Promise<{ base: string; stop: () => Promise<void> }> {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
   const from = servers.length;
   const stop = async () => {
@@ -297,14 +297,14 @@ export async function serveExposed(): Promise<{ base: string; stop: () => Promis
   };
   try {
     const apiPort = await startServer(
-      'the exposed api',
+      `the ${name} api`,
       [path.join(API, 'src', 'main.ts'), '--no-tick'],
       API,
-      { ...apiEnv, WF_EXPOSED: '1' },
+      { ...apiEnv, ...env },
       /api listening on http:\/\/127\.0\.0\.1:(\d+)/,
     );
     const base = await startServer(
-      'the exposed vite preview',
+      `the ${name} vite preview`,
       [vite, 'preview', '--port', '0', '--host', '127.0.0.1'],
       WEB,
       { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
@@ -316,6 +316,9 @@ export async function serveExposed(): Promise<{ base: string; stop: () => Promis
     throw err;
   }
 }
+
+/** A second seat (`serveSeat`) marked exposed (`WF_EXPOSED=1`), as an install bound beyond its machine serves it. */
+export const serveExposed = (): Promise<{ base: string; stop: () => Promise<void> }> => serveSeat('exposed', { WF_EXPOSED: '1' });
 
 /**
  * Seeds `root`, an empty directory, and serves it (`startServers`). draft's say file (SAYING) is read, standing in for its holder,

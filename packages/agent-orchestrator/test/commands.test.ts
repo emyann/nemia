@@ -150,6 +150,7 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['service addresses', 'cli'],
       ['doctor', 'cli'],
       ['doctor fix', 'cli'],
+      ['doctor carry', 'cli'],
       ['readiness', 'cli'],
       ['token add', 'cli'],
       ['token ls', 'cli'],

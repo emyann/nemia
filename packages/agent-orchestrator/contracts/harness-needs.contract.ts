@@ -21,7 +21,7 @@ export type StepHarness = { readonly harness: string | undefined; readonly runsS
 const harnessOfStep = (step: StepHarness, defaultHarness: string): string => step.harness ?? defaultHarness;
 
 /** Whether `list` holds no name twice. */
-const noneTwice = (list: readonly string[]): boolean => list.every((name, i) => list.indexOf(name) === i);
+const noneTwice = (list: readonly string[]): boolean => list.every((name, i) => !list.slice(0, i).includes(name));
 
 const harnessesOfRunSpec = spec<(steps: readonly StepHarness[], defaultHarness: string, withNeeds: readonly string[]) => readonly string[]>(
   {

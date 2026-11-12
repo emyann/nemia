@@ -2,7 +2,9 @@
  * The commands of a machine's needs and its readiness, entries of the command table: `nemia doctor`, every piece the server needs with
  * the command or fix that puts it there (`readinessOf`), and `nemia doctor fix`, which starts a need's fix on the server (`startFix`)
  * and, at the command line, follows what it prints to its end (`followFix`), a code it declares shown on a line of its own. `nemia
- * readiness`, the read's former name, is refused, naming `nemia doctor` (`READINESS_RETIRED`).
+ * readiness`, the read's former name, is refused, naming `nemia doctor` (`READINESS_RETIRED`). `nemia doctor carry` installs, at this
+ * release's pins, the harnesses the store holds activated or a release carries (`carryHarnesses`): what `nemia upgrade` runs of the new
+ * release before it switches.
  */
 import { Effect, Stream } from 'effect';
 import type { Fix, FixStart, Readiness } from 'objects';
@@ -10,6 +12,9 @@ import type { Args } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { tried } from '../runtime-client.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { StoreRoot } from '../config/root.store.ts';
+import { carryHarnesses, type CarryRan } from '../release/carry.verb.ts';
+import { runningRelease } from '../release/version.verb.ts';
 import { followFix, startFix } from './fix.verb.ts';
 import { readinessOf } from './readiness.verb.ts';
 
@@ -182,6 +187,41 @@ export const DOCTOR_FIX: Command<Fix> = {
   print: (fix) => fixLines(fix),
 };
 
+/**
+ * `nemia doctor carry`: each harness the store at its root holds activated, or the release this runs from or another installed release
+ * carries in its own tree, installed at this release's pins (`carryHarnesses`), each said as it goes. Refused (`Invalid`, exit 2) where
+ * an install fails, after trying the rest, naming `nemia doctor fix <harness>`. Run on this machine alone: `nemia upgrade` runs the new
+ * release's before it switches to it.
+ */
+export const DOCTOR_CARRY: Command<CarryRan> = {
+  name: 'doctor carry',
+  usage: '',
+  help: [
+    "install, at this release's pins, each harness the store has activated",
+    'or a release of it carries: what nemia upgrade runs of the new release',
+    'before it switches',
+  ],
+  spec: { positionals: [], flags: [], unknown: (arg) => `nemia doctor carry takes nothing, not ${arg}: nemia doctor carry.` },
+  writes: true,
+  class: 'none',
+  only: { side: 'cli', why: "it installs into this machine's tools folder, as the upgrade that runs it does" },
+  handler: () =>
+    Effect.gen(function* () {
+      const home = yield* StoreRoot;
+      const ran = carryHarnesses(home, process.env, runningRelease().root);
+      if (ran.code !== 0) {
+        const failed = ran.harnesses.filter((h) => h.kind === 'failed').map((h) => h.name);
+        return yield* Effect.fail(
+          new Invalid({
+            message: `nemia doctor carry: ${failed.join(', ')} did not install: read what it printed above, then nemia doctor fix ${failed[0] ?? '<harness>'} runs its install again.`,
+          }),
+        );
+      }
+      return ran;
+    }),
+  print: (ran) => [ran.harnesses.length ? `carried ${ran.harnesses.map((h) => `${h.name} ${h.pin}`).join(', ')}` : 'no harness to carry'],
+};
+
 /** What `nemia readiness`, the read's former name, is refused with: the command it became. */
 const RETIRED_WORDS = 'nemia readiness is retired: nemia doctor reads every piece, and nemia doctor fix <need> starts a fix.';
 
@@ -202,4 +242,4 @@ export const READINESS_RETIRED: Command = {
 };
 
 /** The needs' and the readiness read's commands, in the order `nemia`'s help lists them. */
-export const NEEDS_COMMANDS: readonly Command[] = [DOCTOR, DOCTOR_FIX, READINESS_RETIRED] as readonly Command[];
+export const NEEDS_COMMANDS: readonly Command[] = [DOCTOR, DOCTOR_FIX, DOCTOR_CARRY, READINESS_RETIRED] as readonly Command[];

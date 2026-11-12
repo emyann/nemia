@@ -799,7 +799,7 @@ export type FixKind = (typeof FIX_KINDS)[number];
 
 /**
  * Where a need's check and fix run (`Need.scope`): once on the machine (`machine`, a need that says no scope), or in each factory's
- * repository checkout (`repository`, its toolchain), read and fixed per factory.
+ * repository (`repository`, its toolchain), read and fixed per factory.
  */
 export const NEED_SCOPES = ['machine', 'repository'] as const;
 

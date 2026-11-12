@@ -401,7 +401,32 @@ test("a list of events answers the feed's end as its resourceVersion, and a watc
     await waitFor(t, () => runsSaid(w.events).includes('ADDED rv-2'), 'rv-2 ADDED');
     assert.ok(!runsSaid(w.events).includes('ADDED rv-1'), 'a line before the resourceVersion asked is not sent');
     assert.ok(!runsSaid(w.events).includes('ADDED ev-1'), 'no state is sent');
-    assert.equal(w.events[0]?.type, 'ADDED', 'the first event is the line after it, no BOOKMARK of a state');
+    assert.deepEqual(
+      w.events[0],
+      { type: 'BOOKMARK', object: { apiVersion: 'nemia/v1', kind: 'Event', metadata: { resourceVersion: at } } },
+      'nothing was written after it before it opened: the first event is the BOOKMARK that says so, at the byte asked',
+    );
+  } finally {
+    await w.stop();
+  }
+});
+
+test('a watch resumed from an earlier resourceVersion sends the lines written since, then a BOOKMARK at the end it opened on, then what follows', async (t) => {
+  const from = await listedAt();
+  fs.appendFileSync(feed, runLine('bk-1', 'mill') + runLine('bk-2', 'press'));
+  const end = String(fs.statSync(feed).size);
+  const w = await watch(t, `/api/events?watch=true&resourceVersion=${from}&labelSelector=factory%3Dmill`);
+  try {
+    await waitFor(t, () => w.events.some((e) => e.type === 'BOOKMARK'), 'the BOOKMARK of what was written before it opened');
+    const caught = w.events.findIndex((e) => e.type === 'BOOKMARK');
+    assert.deepEqual(runsSaid(w.events.slice(0, caught)), ['ADDED bk-1'], 'the line its selector keeps, before the BOOKMARK');
+    assert.equal(
+      w.events[caught]?.object.metadata.resourceVersion,
+      end,
+      'at the end of the feed it opened on, a line it does not keep past',
+    );
+    fs.appendFileSync(feed, runLine('bk-3', 'mill'));
+    await waitFor(t, () => runsSaid(w.events).includes('ADDED bk-3'), 'bk-3 ADDED after the BOOKMARK');
   } finally {
     await w.stop();
   }

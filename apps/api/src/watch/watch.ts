@@ -195,7 +195,7 @@ async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: Vers
   const initial =
     start.kind === 'from' ? await firstPage(list, c, url, start.cursor) : await readAll(list, c, url, page, feedSize(home), versionOf);
   if (initial instanceof Response) return initial;
-  return { start, initial, home, url, page };
+  return { start, initial, home, url, page, end: feedSize(home) };
 }
 
 /**
@@ -206,7 +206,9 @@ async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: Vers
  * parts measured to the read hands it, or its watch sends a MODIFIED of each on every read. A `resourceVersion` asked is read by
  * `watchStartOf`: of a list that follows the feed, the watch starts at that byte and sends no state (a byte the feed cannot be read from,
  * inside a line or past its end, refused 410, Kubernetes' expired one; the list's own refusals answered from a first page of one); of
- * any other list, or a word that is no byte, refused 400.
+ * any other list, or a word that is no byte, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
+ * opened (at once where none was), as the initial state's BOOKMARK ends what a reader was sent of what was there already: a reader
+ * that resumes counts what it missed by it.
  */
 export const watchable =
   (list: Listed, { follow, versionOf = JSON.stringify }: { readonly follow?: Follow; readonly versionOf?: VersionOf } = {}) =>
@@ -217,7 +219,7 @@ export const watchable =
     if (refused !== null) return c.json({ error: refused.error }, refused.status);
     const opened = await openedAt(c, list, versionOf, follow !== undefined);
     if (opened instanceof Response) return opened;
-    const { start, initial, home, url, page } = opened;
+    const { start, initial, home, url, page, end } = opened;
     return streamSSE(c, async (stream: SSEStreamingApi) => {
       const gone = new AbortController();
       stream.onAbort(() => gone.abort());
@@ -228,6 +230,8 @@ export const watchable =
         for (const object of initial.objects.values()) await stream.writeSSE(frameOf({ type: 'ADDED', object }));
         await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
       }
+      const caughtUp = { due: start.kind === 'from' && initial.at < end };
+      if (start.kind === 'from' && !caughtUp.due) await stream.writeSSE(bookmarkOf(initial.kind, initial.at));
       const again = Effect.gen(function* () {
         const now = yield* Effect.promise(() => readAll(list, c, url, page, feedSize(home), versionOf));
         if (now instanceof Response) return yield* new ListRefused({ status: now.status });
@@ -256,12 +260,20 @@ export const watchable =
                 Stream.map(() => null),
               )
             : follow(c, initial.at, beats.feed).pipe(
-                Stream.map(({ object, at: after }) => {
-                  state.at = after;
-                  if (object === undefined || sentKeys.has(keyOf(object))) return null;
-                  sentKeys.add(keyOf(object));
-                  return frameOf({ type: 'ADDED', object });
-                }),
+                Stream.mapEffect(({ object, at: after }) =>
+                  Effect.gen(function* () {
+                    state.at = after;
+                    if (object !== undefined && !sentKeys.has(keyOf(object))) {
+                      sentKeys.add(keyOf(object));
+                      yield* write(frameOf({ type: 'ADDED', object }));
+                    }
+                    if (caughtUp.due && after >= end) {
+                      caughtUp.due = false;
+                      yield* write(bookmarkOf(initial.kind, after));
+                    }
+                    return null;
+                  }),
+                ),
               );
         const bookmarks = Stream.tick(BOOKMARK_EVERY).pipe(
           Stream.drop(1),

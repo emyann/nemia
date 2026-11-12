@@ -183,3 +183,19 @@ test('REFUSED forwarded: what the api answers 404 exits as Missing does, and a t
     assert.equal(refused.code, 2, refused.stderr);
     assert.deepEqual(filesOf(laptop), {});
   }));
+
+test("REFUSED forwarded: a card of the api's inbox that names no workflow, started with none, is refused naming the start by the card's name, never a path of the api's store", () =>
+  serving(async () => {
+    fs.writeFileSync(path.join(here, 'bare.md'), 'Show the flag\n\nNo workflow named.\n');
+    const before = cardsAt(root);
+    const filed = await forwarded(['inbox', 'add', 'bare.md', '--factory', 'mill']);
+    assert.equal(filed.code, 0, filed.stderr);
+    const [made = ''] = cardsAt(root).filter((f) => !before.includes(f));
+    const name = made.replace(/\.md$/, '');
+    assert.match(filed.stdout, new RegExp(`nemia start ${name} --workflows <w>`), 'the filing asks for a workflow, the card naming none');
+    const started = await forwarded(['start', name]);
+    assert.equal(started.code, 2, started.stderr);
+    assert.ok(started.stderr.includes(`nemia start ${name} --workflows`), started.stderr);
+    assert.ok(!started.stderr.includes(root), `no path of the api's store: ${started.stderr}`);
+    assert.deepEqual(filesOf(laptop), {});
+  }));

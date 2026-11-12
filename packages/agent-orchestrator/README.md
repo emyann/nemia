@@ -3113,13 +3113,13 @@ about a run changes.
 ```text
 $ wf inbox add "Cache the engine's views between passes" --workflow dev --repo ~/code/myapp
 cache-the-engine-s-views-bet-9prl  Cache the engine's views between passes  workflow: dev  repo: /home/me/code/myapp
-filed: /home/me/.agent-workflows/inbox/cache-the-engine-s-views-bet-9prl.md — start it with wf start /home/me/.agent-workflows/inbox/cache-the-engine-s-views-bet-9prl.md
+filed: /home/me/.agent-workflows/inbox/cache-the-engine-s-views-bet-9prl.md — start it with wf start cache-the-engine-s-views-bet-9prl
 $ wf inbox add "Show what a step cost on the board"
 $ wf inbox
 cache-the-engine-s-views-bet-9prl  Cache the engine's views between passes  workflow: dev  repo: /home/me/code/myapp
 show-what-a-step-cost-on-the-c3cw  Show what a step cost on the board
 
-start one: wf start /home/me/.agent-workflows/inbox/<name>.md [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>
+start one: wf start <name> [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>
 $ wf start ~/.agent-workflows/inbox/show-what-a-step-cost-on-the-c3cw.md --repo ~/code/myapp --workflows dev \
     --brief "Show each step's cost beside its status on the run page, in dollars."
 show-each-step-s-cost-beside-42g6  2 step(s): implement → review

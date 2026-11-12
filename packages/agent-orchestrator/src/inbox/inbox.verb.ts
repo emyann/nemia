@@ -103,18 +103,18 @@ export type InboxStarted = { run: StartedRun; card: InboxCard; ignoredRepo?: str
 /**
  * The workflow folder a card is started on, found in the factory's `tree` where it has one, then in `repo`: `opts.workflow`, from
  * `opts.from`, else the card's `workflow:`, from the inbox. Refused by name: a card's workflow that does not load, in the card's words,
- * and none from either, naming the repository's.
+ * and none from either, naming the repository's and the card by its name, which a start takes on this machine and on another's alike.
  */
 function cardWorkflow(
   home: string,
   opts: Pick<InboxStart, 'workflow' | 'from'>,
   card: InboxCard,
-  file: string,
   repo: string,
   tree?: string,
 ): WorkflowDir {
   if (opts.workflow !== undefined) return workflowFolder(opts.workflow, opts.from ?? process.cwd(), repo, tree);
-  if (card.workflow === undefined) throw new WorkflowError(noWorkflowRefusal(card, file, repo, workflowsIn(path.join(repo, 'workflows'))));
+  if (card.workflow === undefined)
+    throw new WorkflowError(noWorkflowRefusal(card, card.name, repo, workflowsIn(path.join(repo, 'workflows'))));
   try {
     return workflowFolder(card.workflow, inboxDir(home), repo, tree);
   } catch (err) {
@@ -175,7 +175,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   if (text === null) {
     return yield* Effect.fail(
       new Missing({
-        message: `${noCardLine(opts.name, yield* inboxCards())} Start one of those — nemia start ${path.join(path.dirname(file), '<name>.md')} — or park the idea first: nemia inbox add "<idea>".`,
+        message: `${noCardLine(opts.name, yield* inboxCards())} Start one of those — nemia start <name> — or park the idea first: nemia inbox add "<idea>".`,
       }),
     );
   }
@@ -186,7 +186,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
   const factory = yield* cardFactory(opts, card.factory, file);
   const filed = yield* factoryOrNone(factory);
   const repo = factoryRepo(filed, opts.repo ?? card.repo, opts.callerRepo);
-  const workflowDir = cardWorkflow(home, opts, card, file, repo, filed?.tree);
+  const workflowDir = cardWorkflow(home, opts, card, repo, filed?.tree);
   if (opts.brief !== undefined && !opts.brief.trim()) {
     throw new WorkflowError(
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,

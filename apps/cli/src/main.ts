@@ -76,6 +76,16 @@ const exportsAFactory = (words: readonly string[]): boolean =>
   words[0] === 'template' && words[1] === 'export' && words.some((word) => word === '--factory' || word.startsWith('--factory='));
 
 /**
+ * The verbs answered before any context or route is read: `nemia config` and `nemia pair`, about the client's own config, and the
+ * retired word `readiness`, refused naming `nemia doctor`.
+ */
+const FIRST: Readonly<Record<string, (args: readonly string[]) => Promise<number>>> = {
+  [CONFIG_VERB]: config,
+  [PAIR_VERB]: pair,
+  [RETIRED_VERB]: () => Promise.reject(retiredVerb()),
+};
+
+/**
  * Runs `argv` and answers the exit code: on the api for a moved read, a verb of the client's own and a command whose words it holds,
  * else on the old path under `entry`, forwarded to the daemon a remote context names for a verb about the store only that path has;
  * refused, exit 2, where `--local` is typed (`localRefused`), under a context the config does not hold, for a `template export
@@ -84,9 +94,8 @@ const exportsAFactory = (words: readonly string[]): boolean =>
  */
 export async function main(argv: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const name = nameOf(argv);
-  if (name === RETIRED_VERB) throw retiredVerb();
-  if (name === CONFIG_VERB) return config(argv.slice(1));
-  if (name === PAIR_VERB) return pair(argv.slice(1));
+  const first = Object.entries(FIRST).find(([word]) => word === name)?.[1];
+  if (first !== undefined) return first(argv.slice(1));
   const chosen = chosenOf();
   const help = argv.includes('--help') || name === '';
   const route = routeOf({ name, local: unlocal(argv), help, remote: chosen.kind === 'remote' });

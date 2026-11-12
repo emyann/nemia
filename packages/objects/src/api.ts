@@ -22,7 +22,9 @@
  *
  * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
  * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
- * skill copied to yours and a skill's files listed by path.
+ * skill copied to yours and a skill's files listed by path; and, in no namespace, each kind's files as a person keeps them read into its
+ * spec (`read`), which writes nothing — a Kubernetes `*Review`'s way: the client reads a person's files, the api reads them by the
+ * orchestrator's readers, and the client writes the spec through `create` or `replace`, the board's one write path.
  *
  * Cluster-scoped, beside the factories: group `templates`, the templates Nemia builds in, and each one's documents as the definitions'
  * Schemas; group `subscriptions`, the feed's subscriptions, read alone here. Group `events`, the feed's lines, each in the namespace of
@@ -73,12 +75,13 @@ import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
 import { Volume, VolumeList } from './volume.ts';
-import { KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
+import { DefinitionFiles, KeyForm, Workflow, WorkflowCreate, WorkflowList, WorkflowStepPage, WorkflowWrite } from './workflow.ts';
 import {
   Agent,
   AgentCard,
   AgentCopied,
   AgentCopy,
+  AgentDrafted,
   AgentInstructions,
   AgentInstructionsCleared,
   AgentInstructionsWrite,
@@ -88,7 +91,7 @@ import {
   AgentTry,
   AgentWrite,
 } from './agent.ts';
-import { Skill, SkillFiles, SkillList, SkillWrite } from './skill.ts';
+import { Skill, SkillDrafted, SkillFiles, SkillList, SkillWrite } from './skill.ts';
 import { LabelEdit, Labelled } from './labels.ts';
 import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
@@ -560,6 +563,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('keys', '/api/workflows/keys', { success: KeyForm, error: definitionErrors }),
+  HttpApiEndpoint.post('read', '/api/workflows/read', { payload: DefinitionFiles, success: WorkflowCreate, error: definitionErrors }),
 ) {}
 
 /**
@@ -638,6 +642,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     success: AgentInstructionsCleared,
     error: definitionErrors,
   }),
+  HttpApiEndpoint.post('read', '/api/agents/read', { payload: DefinitionFiles, success: AgentDrafted, error: definitionErrors }),
 ) {}
 
 /** A namespace's skills: listed, read, yours made and written in `default`, a builtin one copied to yours, and a folder's files by path. */
@@ -677,6 +682,7 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
     success: SkillFiles,
     error: definitionErrors,
   }),
+  HttpApiEndpoint.post('read', '/api/skills/read', { payload: DefinitionFiles, success: SkillDrafted, error: definitionErrors }),
 ) {}
 
 /** A template, by its name, and one of its documents, by the template's name and the document's. */

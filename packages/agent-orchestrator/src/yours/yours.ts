@@ -12,7 +12,9 @@ import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { skillCopyCommand } from '../try/try.ts';
-import { CLI, type Args, type Flag, type Positional, type Spec } from '../command/command.ts';
+import type { Args } from '../command/command.ts';
+
+export { cliPath, factoryFlag, FROM, versionFlag, writerSpec } from 'objects';
 
 /** What a writer writes: an agent, a workflow, or a skill. */
 export type YoursKind = 'agents' | 'workflows' | 'skills';
@@ -109,46 +111,8 @@ export function yoursOrRefused(
   return from === 'factory' && target?.factory !== undefined ? yoursOf(kind, target.treeOf(target.factory)) : yoursOf(kind, home);
 }
 
-/** `--factory`, the factory made from a template whose tree a writer named on `factory` writes into: taken on both sides, once. */
-export const factoryFlag = (command: string): Flag => ({
-  flag: '--factory',
-  kind: 'text',
-  key: 'factory',
-  takes: `--factory takes the name of a factory made from a template, whose tree is written: ${CLI} ${command} factory … --factory <name>`,
-  twice: `${CLI} ${command} takes --factory once: one tree is written.`,
-});
-
 /** The text under `key`, or undefined where none was given. */
 export const writerText = (args: Args, key: string): string | undefined => {
   const value = args[key];
   return typeof value === 'string' ? value : undefined;
 };
-
-/** The place a writer is named on (`<from>`), required: `yours`, the one it writes. */
-export const FROM: Positional = { key: 'from', takes: 'required', kind: 'name' };
-
-/** `--version`, the version `what` was read at, which a refusal of a write without it names: taken on both sides, once. */
-export const versionFlag = (command: string, what: string): Flag => ({
-  flag: '--version',
-  kind: 'text',
-  key: 'version',
-  takes: `--version takes the version ${what} was read at, which a write without it names: ${CLI} ${command} … --version <version>`,
-  twice: `${CLI} ${command} takes --version once: one write is checked against one version.`,
-});
-
-/** A text flag the command line alone takes, under `key`, once: a path its runner reads, never sent to the api. */
-export const cliPath = (command: string, key: string, takes: string, why: string): Flag => ({
-  flag: `--${key}`,
-  kind: 'text',
-  key,
-  takes: `--${key} takes ${takes}: ${CLI} ${command} … --${key} <path>`,
-  twice: `${CLI} ${command} takes --${key} once.`,
-  only: { side: 'cli', why },
-});
-
-/** The spec of a writer named `command`, used as `usage` says: its positionals and flags; any other argument refused in its words. */
-export const writerSpec = (command: string, usage: string, positionals: readonly Positional[], flags: readonly Flag[]): Spec => ({
-  positionals,
-  flags,
-  unknown: (arg) => `${CLI} ${command} takes no ${arg}: ${CLI} ${command} ${usage}`,
-});

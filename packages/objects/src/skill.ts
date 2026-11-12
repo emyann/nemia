@@ -77,6 +77,10 @@ export const SkillWrite = Schema.Union([
 ]);
 export type SkillWrite = typeof SkillWrite.Type;
 
+/** A skill's files read into its spec (`POST /api/skills/read`): the name its SKILL.md says, and what its files say. */
+export const SkillDrafted = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: SkillSpec });
+export type SkillDrafted = typeof SkillDrafted.Type;
+
 /** The files of a skill's folder, by their path in it: SKILL.md among them. */
 export const SkillFiles = Schema.Struct({ paths: Schema.Array(Schema.String) });
 export type SkillFiles = typeof SkillFiles.Type;

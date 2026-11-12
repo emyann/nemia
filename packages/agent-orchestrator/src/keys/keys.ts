@@ -21,7 +21,7 @@ import { looseAt } from '../closeout/index.ts';
 import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import { bareSkillOf, GIVEN_SKILL_FORMS, givenSkillOf, ONE_BARE_NAME, sameBareIn } from './given-skill.ts';
-import type { PlaceKind } from 'objects';
+import { dollarsOf, type PlaceKind } from 'objects';
 
 /**
  * `harness:` as written: one of `HARNESSES`, or `a2a:<name>`, or refused. `claude-detached`, retired, is refused by its name: every session
@@ -181,15 +181,8 @@ export function sessionContext(
 
 export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
 
-/**
- * Dollars as a person writes them — `5`, `2.50` — or undefined for anything else: digits, and a point with digits after it, above
- * zero. What `budget:` takes, and `nemia retry --budget` and `nemia retry --round --budget` too.
- */
-export function dollarsOf(written: string): number | undefined {
-  const value = written.trim();
-  const n = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
+/** Dollars written as digits above zero, or undefined (`objects`' `dollarsOf`, which the command line's parser reads amounts by). */
+export { dollarsOf } from 'objects';
 
 /**
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`). Which harnesses keep a cap, and beside what, is the runtime's to

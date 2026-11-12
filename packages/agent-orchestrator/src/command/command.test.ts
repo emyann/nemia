@@ -1082,6 +1082,13 @@ const BREAKS: ReadonlyArray<readonly [string, Table, readonly string[], readonly
     [["a's link to runs.hold says no takes", 'takes']],
   ],
   [
+    'a command the client holds (COMMAND_WORDS), whose links say no takes, since nothing forwards it',
+    [{ name: 'workflows write', input, handler, served: [{ endpoint: 'runs.hold' }, { endpoint: 'runs.unhold', as: 'un_a' }] }],
+    [],
+    [],
+    [],
+  ],
+  [
     'the last link of several, which says no takes, being the one a forwarded call takes where none before it holds',
     [
       {

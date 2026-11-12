@@ -93,6 +93,10 @@ export type AgentList = typeof AgentList.Type;
 export const AgentWrite = Schema.Struct({ metadata: WriteMeta, spec: AgentSpec });
 export type AgentWrite = typeof AgentWrite.Type;
 
+/** An agent's files read into its spec (`POST /api/agents/read`): the name it is read under, and what its files say. */
+export const AgentDrafted = Schema.Struct({ metadata: Schema.Struct({ name: Schema.String }), spec: AgentSpec });
+export type AgentDrafted = typeof AgentDrafted.Type;
+
 /** A try of an agent (`POST …/agents/<name>/try`): what it is asked to do. */
 export const AgentTry = Schema.Struct({ brief: Schema.String });
 export type AgentTry = typeof AgentTry.Type;

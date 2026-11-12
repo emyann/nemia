@@ -265,6 +265,7 @@ export {
   StepLayers,
   Workflow,
   WorkflowCreate,
+  DefinitionFiles,
   WorkflowFile,
   WorkflowList,
   WorkflowSpec,
@@ -284,9 +285,10 @@ export {
   AgentTry,
   AgentUser,
   AgentWrite,
+  AgentDrafted,
   GivenSkill,
 } from './agent.ts';
-export { Skill, SkillFile, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite } from './skill.ts';
+export { Skill, SkillFile, SkillFiles, SkillList, SkillSpec, SkillStatus, SkillUser, SkillWrite, SkillDrafted } from './skill.ts';
 export { Template, TemplateList, TemplateParameter, TemplateSpec, TemplateStatus, TemplateText } from './template.ts';
 export { Subscription, SubscriptionList, SubscriptionScope, SubscriptionSpec, SubscriptionStatus } from './subscription.ts';
 export { Event, EventInvolved, EventList } from './event.ts';
@@ -529,3 +531,31 @@ export {
   SHORT_FIELD,
   TRANSCRIPT_PAGE,
 } from './reads.ts';
+export {
+  CLI,
+  CommandRefused,
+  amountOf,
+  commandLine,
+  dollarsOf,
+  helpOf,
+  parseArgv,
+  type Args,
+  type CommandClass,
+  type CommandLink,
+  type CommandWords,
+  type Flag,
+  type Positional,
+  type Spec,
+} from './command.ts';
+export {
+  AGENTS_WRITE_WORDS,
+  COMMAND_WORDS,
+  FROM,
+  SKILLS_WRITE_WORDS,
+  WORKFLOWS_WRITE_WORDS,
+  cliPath,
+  factoryFlag,
+  versionFlag,
+  writerSpec,
+  type MovedCommand,
+} from './commands.ts';

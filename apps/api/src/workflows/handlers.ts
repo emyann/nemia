@@ -48,6 +48,7 @@ import {
   type WorkflowStep,
 } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoLayer } from '../factory/place.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn, readerRefused } from '../objects/refused.ts';
 import { stepPage } from '../step/step.ts';
@@ -101,14 +102,17 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
   s.factory?.tree === undefined ? [] : foldersHeld(s, origin, 'repo', path.join(s.factory.tree, 'workflows'));
 
 /**
- * Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository — none where the
- * request is answered on none (an install, no factory named) — yours.
+ * Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository (`repoLayer`: none on
+ * an install with no factory named, refused for a factory named whose repository the request leaves open), yours.
  */
-export const heldIn = (s: Served): Held<Folder>[] => [
-  ...treeWorkflowsHeld(s, 'factory'),
-  ...(s.repo === undefined ? [] : foldersHeld(s, 'repo', 'repo', path.join(s.repo, 'workflows'))),
-  ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
-];
+export const heldIn = (s: Served): Held<Folder>[] => {
+  const repo = repoLayer(s);
+  return [
+    ...treeWorkflowsHeld(s, 'factory'),
+    ...(repo === undefined ? [] : foldersHeld(s, 'repo', 'repo', path.join(repo, 'workflows'))),
+    ...foldersHeld(s, 'yours', 'yours', path.join(s.home, 'workflows')),
+  ];
+};
 
 /** A key set: not null, not left out, not an empty list. */
 /** The keys whose unset value is null, so a list of none (`tools: []`) is a line the file writes. */
@@ -238,7 +242,7 @@ const workflowObject = (
  * in yours alone.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
-  const repo = s.repo;
+  const repo = repoLayer(s);
   const loaded = await loadedOf(
     s.e,
     s,
@@ -284,7 +288,7 @@ const writing = (s: Served, name: string, changes: boolean) => ({
   trace: s.trace,
   name,
   dir: path.join(s.home, 'workflows', name),
-  repo: s.repo,
+  repo: repoLayer(s),
   home: s.home,
   changes,
   inRequest: s.inRequest,
@@ -336,7 +340,7 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`metadata.resourceVersion\` the Workflow was read at, so a folder changed since is not written over: ${SHAPE}.`,
           });
         const at = writing(s, name, true);
-        const now = await s.inRequest(workflowVersion(at.dir, placesOf(s.repo, s.home)));
+        const now = await s.inRequest(workflowVersion(at.dir, placesOf(at.repo, s.home)));
         if (now !== given) throw new Conflict({ error: workflowStale.write(at.dir, given, now) });
         builderRefused(await write(at, steps, readmeOf(at.dir, payload.spec), schemas, files));
         return workflowAt(s, namespace, name, 'yours');

@@ -50,6 +50,7 @@ import {
   Invalid,
 } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoLayer } from '../factory/place.ts';
 import { agentDraftOf, listingOf, saved, type AgentDraftBody, type LibraryAgent } from './agents.ts';
 import { queryOf } from '../factory/parts/index.ts';
 import { answered, answeredIn, answeredWriteIn } from '../objects/refused.ts';
@@ -66,7 +67,7 @@ const treeAgents = (s: Served) =>
     const dir = path.join(tree, 'workflows', AGENTS_FOLDER);
     const read: AgentReading[] = [];
     for (const name of markdownNamesIn(dir)) {
-      const one = yield* agentRead('repo', dir, name, { repo: s.repo, home: s.home });
+      const one = yield* agentRead('repo', dir, name, { repo: repoLayer(s), home: s.home });
       if (one) read.push(one);
     }
     return read;
@@ -74,7 +75,7 @@ const treeAgents = (s: Served) =>
 
 /** What the namespace's agents are told apart by: the steps each file fills (`stepsFilled`) and the factories that fill one with it. */
 const fillsIn = (s: Served) => ({
-  filled: stepsFilled(s.repo, s.home, s.factory),
+  filled: stepsFilled(repoLayer(s), s.home, s.factory),
   byFile: factoriesFilling(listedAtOnce(s.home), s.home),
 });
 
@@ -85,7 +86,7 @@ const fillsIn = (s: Served) => ({
  */
 export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
   const tree = await s.inRequest(treeAgents(s));
-  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, s.repo, s.home, s.factory?.tree)));
+  const listings = await s.inRequest(Effect.forEach(tree, (one) => listingOf(one, repoLayer(s), s.home, s.factory?.tree)));
   return inFactory(listings, fills.filled, fills.byFile).map((item) => ({ name: item.name, origin, item }));
 }
 
@@ -94,14 +95,15 @@ export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(
  * other only where it fills a step there (`inFactory`).
  */
 async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
-  const { agents } = await s.inRequest(AGENTS.handler({ repo: s.repo }));
+  const repo = repoLayer(s);
+  const { agents } = await s.inRequest(AGENTS.handler({ repo }));
   const fills = fillsIn(s);
   const own = await treeAgentsHeld(s, 'factory', fills);
   const trees = new Set(own.map(({ item }) => item.file));
   const listings = await s.inRequest(
     Effect.forEach(
       agents.filter((one) => !trees.has(one.file)),
-      (one) => listingOf(one, s.repo, s.home),
+      (one) => listingOf(one, repo, s.home),
     ),
   );
   const elsewhere = inFactory(listings, fills.filled, fills.byFile, s.factory);

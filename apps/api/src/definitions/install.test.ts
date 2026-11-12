@@ -85,11 +85,21 @@ test('an install with no repository and no factory named: yours is created, read
     const replaced = (await put.json()) as Agent;
     assert.equal(put.status, 200, JSON.stringify(replaced));
     assert.equal(replaced.spec.instructions?.trim(), 'Write it again.');
-    const list = await got<{ items: Agent[] }>(`${D}/agents`);
+    const cwd = scratch('nemia-api-install-cwd-');
+    fs.mkdirSync(path.join(cwd, 'workflows', 'agents'), { recursive: true });
+    fs.copyFileSync(path.join(home, 'workflows', 'agents', 'scribe.md'), path.join(cwd, 'workflows', 'agents', 'stray.md'));
+    const was = process.cwd();
+    process.chdir(cwd);
+    let list: { items: Agent[] };
+    try {
+      list = await got<{ items: Agent[] }>(`${D}/agents`);
+    } finally {
+      process.chdir(was);
+    }
     assert.deepEqual(
       list.items.map((a) => [a.metadata.name, a.status.origin]),
       [['scribe', 'yours']],
-      'yours alone: no repository is read, nor the folder the api runs in',
+      'yours alone: no repository is read, nor an agent of the folder the api runs in (stray)',
     );
   });
 

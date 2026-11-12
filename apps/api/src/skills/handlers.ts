@@ -16,6 +16,7 @@ import { BUILTIN_SKILLS, definitionRevision, SKILLS_WRITE, skillCopyCommand, ski
 import { frontmatterKey, SKILLS_FOLDER, skillDraftOf, skillNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import { Api, API_VERSION, type DefinitionFiles, Invalid, type Skill, type SkillDrafted, type SkillSpec } from 'objects';
 import type { Served } from '../layer.ts';
+import { repoLayer } from '../factory/place.ts';
 import {
   librarySkills,
   listSkills,
@@ -63,8 +64,9 @@ export async function treeSkillsHeld(s: Served, origin: Origin): Promise<Held<Ro
  */
 async function heldIn(s: Served): Promise<Held<Row>[]> {
   const own = await treeSkillsHeld(s, 'factory');
-  const places = await listSkills((dirs) => readsOf(s, dirs), s.repo, s.home, await s.inRequest(yourSkillsRead(s.repo, s.home)));
-  const theirs = s.repo === undefined ? undefined : repoSkillsDir(s.repo);
+  const repo = repoLayer(s);
+  const places = await listSkills((dirs) => readsOf(s, dirs), repo, s.home, await s.inRequest(yourSkillsRead(repo, s.home)));
+  const theirs = repo === undefined ? undefined : repoSkillsDir(repo);
   const listedRepo = new Set(places.flatMap((p) => (p.from === 'repo' ? p.skills.map((row) => row.name) : [])));
   const folded =
     theirs === undefined
@@ -98,6 +100,7 @@ function specOf({ dir, error }: Row, name: string): { spec: SkillSpec; unread: s
 export async function skillObjectsOf(s: Served, served: ReturnType<typeof servedOf<Row>>, namespace?: string): Promise<Skill[]> {
   const read = served.filter(({ item }) => item.error === null).map(({ item }) => item.dir);
   const shown = new Map(await Promise.all(read.map(async (dir) => [dir, await skillShownAt(s, dir)] as const)));
+  const repo = repoLayer(s);
   return s.inRequest(
     Effect.forEach(served, ({ name, origin, shadowedBy, item: row }) =>
       Effect.gen(function* () {
@@ -107,12 +110,12 @@ export async function skillObjectsOf(s: Served, served: ReturnType<typeof served
         const { spec: read, unread } = specOf(row, name);
         const spec: SkillSpec = files.length > 0 ? { ...read, files } : read;
         const revision = namespace === undefined ? undefined : yield* definitionRevision('skill', name, version);
-        const usedBy = yield* skillUsers(dir, name, s.repo, s.home, s.factory?.tree);
+        const usedBy = yield* skillUsers(dir, name, repo, s.home, s.factory?.tree);
         const copyHint =
           origin === 'yours'
-            ? s.repo === undefined
+            ? repo === undefined
               ? null
-              : skillCopyCommand(dir, repoSkillsDir(s.repo))
+              : skillCopyCommand(dir, repoSkillsDir(repo))
             : origin === 'repo'
               ? skillCopyCommand(dir, librarySkills(s.home))
               : null;

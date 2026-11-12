@@ -7,7 +7,7 @@ import { OUT } from '../world.ts';
 /** What the held read is answered with, in the api's shape for a refusal. */
 const WHY = 'the store could not be read';
 
-/** The error's class name as the bundle minifies it: an identifier, which may hold a `$` (`$L`), whatever the build names it. */
+/** The error's class name as the bundle minifies it: an identifier, which may hold a dollar sign (such as $L). */
 const ERROR_NAME = '[\\w$]+';
 
 export default {

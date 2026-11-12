@@ -690,7 +690,7 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
  *   there and unreadable, or whose start or output was refused and whose process still runs, said as `observe` says it and
  *   answered by name (`unreadWhy`).
  * - `find`: the run under a name, off its own run file alone, as `detachedFind`; `stop` and `transcript` read by it.
- * - `stop` (`stopRun`), in order, for any run, ended or not:
+ * - `stop` (`stopRunOf`), in order, for any run, ended or not:
  *   1. Leaves the stop on disk (`.stop`), holding the first ask's instant. The run file exists before the worker has written
  *      its own pid, and a stop in that window has no process to signal; the worker reads the stop once its pid is published,
  *      before it starts the harness, writes `stopped` and starts nothing.

@@ -417,7 +417,7 @@ spawn while their workers, slow under a load of 65, were starting, and ran on or
 
 What is called dead is stopped. The worker writes its harness's pid and start on the run file (`harness`) as it spawns it, and
 once a run has ended — its worker wrote its end, or is gone — what is left in its harness's process group is ended by the runner's
-`stop` and `release` (`stopRun`, `src/harness/detached/left.ts`): SIGTERM from the first ask, kept in `.stop`, and SIGKILL once the
+`stop` and `release` (`stopRunOf`, `src/harness/detached/left.ts`): SIGTERM from the first ask, kept in `.stop`, and SIGKILL once the
 run's stop grace has passed since (`leftSignal`, proved by `contracts/left.contract.ts`). A process that left the group with
 `setsid` is not reached.
 
@@ -2149,7 +2149,7 @@ of pure code sits beside it.
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where it has one (`startWorker`) |
-| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them and `release`, `stopRun` the stop both take, and `output`, a stream kept whole |
+| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them and `release`, `stopRunOf` the stop both take, and `output`, a stream kept whole |
 | `src/harness/detached/detached-options.ts` | how a detached runner's workers run, beside its spec (`DetachedOptions`): their stop grace and heartbeat, each defaulted to the shipped bound, and a beat the lease would read as dead refused (`workerBoundsOf`) |
 | `src/harness/detached/worker-bounds.ts` | the detached worker's two shipped bounds, named once (`WORKER_STOP_GRACE_MS`, `WORKER_BEAT_MS`), importing nothing, as the worker it is read by imports nothing else |
 | `src/harness/detached/looked.ts` | what a detached look at the names it was told found: each sighting, the names left unread and why each was (`unreadWhy`), and every warning to log |

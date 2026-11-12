@@ -2,7 +2,7 @@
  * What a detached run left behind once its worker has ended or is gone, and the signal it is sent (`leftSignal`): the processes still
  * in its harness's process group (`groupLeft`), which nobody else is left to stop. A stop's grace is measured from the first time one
  * was asked, an instant kept in the run's `.stop` file (`firstAsked`), so a pass carries nothing in memory and a restart loses nothing.
- * What `stop` and `release` share (`detached.ts`, `stopRun`).
+ * What `stop` and `release` share (`detached.ts`, `stopRunOf`).
  */
 import fs from 'node:fs';
 import { Option, Schema } from 'effect';

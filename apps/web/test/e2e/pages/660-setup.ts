@@ -152,8 +152,9 @@ async function runsFix(page: Page): Promise<void> {
     await expectVisible(run.locator('[data-fix-code] button'), 'with the control that copies it');
     await expectVisible(page.locator(`section[data-fix-run="${NEED}"][data-fix-phase="succeeded"]`), 'its end is drawn: done');
     await idle(page);
+    await run.scrollIntoViewIfNeeded();
     await settled(page);
-    await photograph(page, path.join(OUT, `setup-fix-${await themeOf(page)}.png`));
+    await photograph(run, path.join(OUT, `setup-fix-${await themeOf(page)}.png`));
   } finally {
     await unroute();
   }
@@ -211,6 +212,15 @@ async function signsInByLink(page: Page): Promise<void> {
     await expectVisible(other.locator('[data-pair-press]'), 'the sign-in offers to pair this browser');
     await settled(other);
     await photograph(other, path.join(OUT, `setup-link-refused-${await themeOf(other)}.png`));
+
+    await other.locator('[data-pair-press]').click();
+    const waiting = other.locator('[data-pair-browser="waiting"]');
+    await expectVisible(waiting, 'pressed, the browser waits on the approval');
+    const shown = (await waiting.locator('[data-pair-code]').textContent())?.trim() ?? '';
+    if (!/\S{4,}/.test(shown)) throw new Refused(`the code to approve is shown, large — it shows "${shown}"`);
+    await expectVisible(waiting.locator('[data-pair-said]'), 'and says it waits for the approval');
+    await settled(other);
+    await photograph(other, path.join(OUT, `setup-pair-waiting-${await themeOf(other)}.png`));
 
     const claim = new URL('/api/pair/link', seat.base).href;
     const others = problems().filter(

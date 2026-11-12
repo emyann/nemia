@@ -1,6 +1,5 @@
 /**
- * `nemia inbox from` (`INBOX_FROM`), on the command line alone, and its print. And `nemia inbox` (`INBOX`): the cards in play
- * by default, every card with `--all`, each started card in its run's phase.
+ * `nemia inbox` (`INBOX`): the cards in play by default, every card with `--all`, each started card in its run's phase.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +11,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { Effect } from 'effect';
-import { INBOX, INBOX_FROM } from './commands.verb.ts';
+import { INBOX } from './commands.verb.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
@@ -29,18 +28,6 @@ const CARD = '---\nworkflow: dev\n---\nCache the engine views.\n';
 fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
 fs.writeFileSync(path.join(ROOT, 'inbox', 'notes'), 'a stray file, no card\n');
 fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
-
-test("`INBOX_FROM`: the command line's alone, the api writing `from:` as the Card's update; its print unchanged", () => {
-  assert.equal(INBOX_FROM.only?.side, 'cli');
-  const card = { name: 'notes', file: 'notes.md', body: 'Cache the engine views.' };
-  assert.deepEqual(
-    INBOX_FROM.print({ card: { ...card, from: ['r-1'] }, file: '/root/inbox/notes.md', was: [], name: 'notes', from: ['r-1'] }, {}),
-    ['notes  from: r-1 — its run is handed what each concluded, as context, and waits on none (/root/inbox/notes.md)'],
-  );
-  assert.deepEqual(INBOX_FROM.print({ card, file: '/root/inbox/notes.md', was: ['r-1'], name: 'notes', from: [] }, {}), [
-    'notes  from: taken off (was r-1)',
-  ]);
-});
 
 /** A run's record of one step, `implement`, its task `t-<id>`, started from the card `card`. */
 const runFrom = (id: string, card: string) =>

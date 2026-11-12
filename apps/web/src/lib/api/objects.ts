@@ -410,7 +410,7 @@ export const cards = {
   /** A card queued to start on its own: answers the card as it now reads. */
   queue: (namespace: string, name: string): Promise<Card> =>
     call(
-      (c) => c.cards.queue({ params: { namespace, name } }),
+      (c) => c.cards.queue({ params: { namespace, name }, query: {} }),
       write(Card, 'The card may be queued, or not: look in the inbox before asking again.'),
     ),
   /** A card taken off the queue: answers the card as it now reads. */

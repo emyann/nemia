@@ -101,12 +101,27 @@ const workflowRepo = (s: Served, about: string | undefined): string => {
   return repoNeeded(s);
 };
 
-/** The card `name` of `namespace` queued on the workflow it names, or taken off the queue (`off`), and read again. */
-const queued = (namespace: string, name: string, off: boolean) =>
+/**
+ * The card `name` of `namespace` queued on the workflow sent by name (`workflow`, written over the card's own) or else the one it names,
+ * or taken off the queue (`off`), and read again; a card queued says too how many are queued (`queueLength`) and, where its factory has
+ * one repository, the one it starts on (`factoryRepo`). A workflow sent as a path, or as no text, is refused before the card is read: the
+ * daemon finds a workflow by its name where a start of the card would.
+ */
+const queued = (namespace: string, name: string, off: boolean, workflow?: string) =>
   answered(async (s) => {
+    if (workflow !== undefined && (workflow === '' || /[\\/]/.test(workflow)))
+      throw new Refused({
+        message: `\`workflow\` is a workflow's name, with no \`/\`: queue the card on one by name — nemia inbox queue ${name} --workflow <name> — or leave it out for the card's own. Nothing was queued.`,
+      });
     await cardIn(s, namespace, name);
-    await s.inRequest(INBOX_QUEUE.handler({ name, off }));
-    return cardIn(s, namespace, name);
+    const done = await s.inRequest(INBOX_QUEUE.handler({ name, off, ...(workflow === undefined ? {} : { workflow }) }));
+    const card = await cardIn(s, namespace, name);
+    if (done.was !== 'queued') return card;
+    const extra = {
+      ...(done.of === null ? {} : { queueLength: done.of }),
+      ...(done.factoryRepo === null ? {} : { factoryRepo: done.factoryRepo }),
+    };
+    return { ...card, status: { ...card.status, ...extra } };
   });
 
 export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
@@ -135,8 +150,9 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
         const asked = filingOf({ ...payload, ...(factory === undefined ? {} : { factory }) }, () => workflowRepo(s, payload.repo), s.home);
         if ('status' in asked) throw readerRefused(asked);
         const { text, ...keys } = asked;
-        const { card } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));
-        return cardIn(s, card.factory ?? DEFAULT_NAMESPACE, card.name);
+        const { card, labelsLeftOut } = await s.inRequest(INBOX_ADD.handler({ idea: text, ...keys }));
+        const filed = await cardIn(s, card.factory ?? DEFAULT_NAMESPACE, card.name);
+        return labelsLeftOut?.length ? { ...filed, status: { ...filed.status, labelsLeftOut } } : filed;
       }),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
@@ -160,7 +176,7 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
         }),
       ).pipe(Effect.tap((started) => ('id' in started ? locatedAt(started.id) : Effect.void))),
     )
-    .handle('queue', ({ params: { namespace, name } }) => queued(namespace, name, false))
+    .handle('queue', ({ params: { namespace, name }, query }) => queued(namespace, name, false, query.workflow))
     .handle('unqueue', ({ params: { namespace, name } }) => queued(namespace, name, true))
     .handle('labels', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {

@@ -641,7 +641,19 @@ export {
 } from './commands-flags.ts';
 export { MACHINE_VERBS, type MachineVerb } from './commands-machine.ts';
 export { RUN_WORDS } from './commands-runs.ts';
-export { INBOX_WORDS } from './commands-inbox.ts';
+export {
+  INBOX_ADD_WORDS,
+  INBOX_FROM_WORDS,
+  INBOX_QUEUE_WORDS,
+  INBOX_RM_WORDS,
+  INBOX_WORDS,
+  LABEL_INBOX_WORDS,
+  LABEL_RUN_WORDS,
+  labelEdits,
+  noEdits,
+  runsNamed,
+} from './commands-inbox.ts';
+export { CardLabelLeftOut, CardQueue } from './card.ts';
 export { FACTORY_WORDS } from './commands-factories.ts';
 export { DEFINITION_WORDS } from './commands-definitions.ts';
 export { READ_WORDS } from './commands-reads.ts';

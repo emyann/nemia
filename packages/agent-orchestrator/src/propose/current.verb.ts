@@ -14,6 +14,7 @@ import { tried, type EngineService } from '../runtime-client.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { Invalid, type Refusal } from '../refusal/refusal.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
+import { factoryWriteOf } from '../workflows/workflows.verb.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { AgentName, SkillName } from '../agents/agents.model.ts';
 import { SkillDoor } from '../skills/skill-door.store.ts';
@@ -85,11 +86,15 @@ function workflowSpecAt(dir: string): unknown {
   return workflowSpecOf(texts);
 }
 
-/** The Workflow `name` of the factory's tree, now. */
+/**
+ * The Workflow `name` of the factory's tree, now: its version read in the places its write is judged in (`factoryWriteOf`), the factory's
+ * repository among them, so a proposal is pinned to the version its apply writes over, a skill a step adds from that repository counted.
+ */
 const workflowNow = (place: ProposalPlace, factory: string, name: string) =>
   Effect.gen(function* () {
     const dir = yield* tried(() => workflowDirAt(path.join(treeDir(place.home, factory, 'workflows'), name)));
-    const there = yield* (yield* WorkflowDoor).workflows.there(dir);
+    const { places } = yield* tried(() => factoryWriteOf(place.home, factory, name));
+    const there = yield* (yield* WorkflowDoor).workflows.there(dir, places);
     return there.kind === 'folder' ? { version: there.version, spec: yield* tried(() => workflowSpecAt(dir)) } : NONE;
   });
 

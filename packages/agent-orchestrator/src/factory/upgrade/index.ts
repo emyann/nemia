@@ -33,10 +33,12 @@ export {
   ownerKey,
   ownerOfKey,
   resolutionOf,
+  resolvedAgain,
   resolvedBy,
   segmentsOf,
   takenFromTree,
   WIRING_FILE,
+  type ResolvedAgain,
 } from './resolution.ts';
 export type { MergeAt, SameVersionKind } from '../../../contracts/same-version.contract.ts';
 export type { ResolutionKind, ResolutionOwner, ResolutionProposal, UpgradeResolution } from '../../../contracts/resolution.contract.ts';

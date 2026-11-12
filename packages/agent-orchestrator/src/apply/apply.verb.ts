@@ -16,6 +16,8 @@ import { verbOf } from '../propose/propose.verb.ts';
 import { factsOf, standingOf } from '../approval/standing.verb.ts';
 import { objectWritten } from './write.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
+import { readResolutions } from '../factory/applied/applied.store.ts';
+import { resolvedAgain, type ResolvedAgain } from '../factory/upgrade/index.ts';
 
 /** How a program reads the state of a proposal's run: as the tick judged it, or as its record says. */
 export type RunStateOf = (run: string) => Effect.Effect<RunState | undefined, Refusal>;
@@ -51,21 +53,37 @@ const readAgain = (factory: string, object: ProposedObject): string =>
     ? `nemia get ${RESOURCE_PLURALS.Factory} ${object.metadata.name}`
     : `nemia get ${RESOURCE_PLURALS[object.kind]} ${object.metadata.name} -n ${factory}`;
 
+/** Where `proposal` of `factory` resolves an upgrade's conflicts (`resolutions.json`), the lines that resolve them again; else none. */
+const resolutionOf = (place: ProposalPlace, factory: string, proposal: Proposal): ResolvedAgain | undefined => {
+  const kept = readResolutions(place.home, factory);
+  return kept === undefined ? undefined : resolvedAgain(factory, proposal.metadata.name, kept.proposals ?? {}, kept.choices);
+};
+
+/** What to do once the proposal cannot apply: resolve its owner's conflicts again where it is a resolution's, else `otherwise`. */
+const doNext = (again: ResolvedAgain | undefined, otherwise: string): string =>
+  again === undefined
+    ? otherwise
+    : `it resolves the upgrade's conflicts of ${again.owner}, so resolve them again on what the tree holds now: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
+
 /**
  * What the action other than an apply makes of `proposal` of `factory`: its phase, and a sentence saying why — for a stale one, each
- * object of `changed` that moved since it was read, and the line that reads it again.
+ * object of `changed` that moved since it was read, and the line that reads it again, or, for an upgrade's resolution (`again`), the
+ * lines that resolve its conflicts again.
  */
 const moved = (
   proposal: Proposal,
   factory: string,
   changed: readonly ProposedObject[],
   action: Exclude<ApplyAction, 'apply' | 'wait'>,
+  again: ResolvedAgain | undefined,
 ): Proposal => {
   if (action === 'stale') {
-    const named = changed.map((o) => `${o.kind} ${o.metadata.name} (${readAgain(factory, o)})`).join(', ');
+    const named = changed
+      .map((o) => (again === undefined ? `${o.kind} ${o.metadata.name} (${readAgain(factory, o)})` : `${o.kind} ${o.metadata.name}`))
+      .join(', ');
     return withStatus(proposal, {
       phase: 'stale',
-      message: `${named || 'an object it carries'} changed since it was read: read it again and propose from what it holds now.`,
+      message: `${named || 'an object it carries'} changed since it was read: ${doNext(again, 'read it again and propose from what it holds now')}.`,
     });
   }
   if (action === 'drop')
@@ -111,6 +129,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
         factory,
         objects.filter((o) => !o.current).map((o) => o.object),
         action,
+        resolutionOf(place, factory, proposal),
       ),
     );
   const before: ProposedObject[] = objects.flatMap(({ object, now }) =>
@@ -129,7 +148,7 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
           before,
           revisions,
           written,
-          message: `${object.kind} ${object.metadata.name} was refused as it was written: ${wrote.failure.message} What is named in written stands; propose the rest again.`,
+          message: `${object.kind} ${object.metadata.name} was refused as it was written: ${wrote.failure.message} What is named in written stands; ${doNext(resolutionOf(place, factory, proposal), 'propose the rest again')}.`,
         }),
       );
     revisions.push(wrote.success);

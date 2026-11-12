@@ -10,6 +10,7 @@ import {
   REFUSED,
   splitFrontmatter,
   STEP_KEYS,
+  type RouteEval,
   type StepAgent,
   type StepKey,
   type StepOutput,
@@ -18,7 +19,7 @@ import {
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
 import { MAP_KEYS, readFrontmatter, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
-import { routeWritten, routingOf } from '../route/index.ts';
+import { routeOf, routeWritten, routingOf } from '../route/index.ts';
 import { checkFailurePolicyOf, checkFailurePolicyWritten, type CheckFailurePolicy } from '../check/index.ts';
 import { DEFAULT_HARNESS, fenceKeyOf, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
@@ -496,7 +497,10 @@ export function renderStep(step: StepDraft): string {
   if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
-    if (key === 'route') return step.route == null ? [] : [['route', routeWritten(step.route)]];
+    if (key === 'route') {
+      const route = routeDrafted(step.name, step.route);
+      return route === undefined ? [] : [['route', routeWritten(route)]];
+    }
     if (key === 'checkFailurePolicy') {
       const policy = policyDrafted(step.name, step.checkFailurePolicy);
       return policy === undefined ? [] : [['checkFailurePolicy', checkFailurePolicyWritten(policy)]];
@@ -600,6 +604,23 @@ function checkPolicyOf(step: string, text: string | undefined, check: string | u
       `${step}: \`checkFailurePolicy:\` reads the exit code of the step's \`check:\`, and this step has none. Add \`check: <command>\`, or delete the line.`,
     );
   return checkFailurePolicyOf(step, text);
+}
+
+/**
+ * A draft's `route:`, read as a file's line would be: the parsed eval, the map a step's frontmatter reads as, or its line as a Workflow's
+ * spec carries it — `judge`, the JSON text `readKeys` keeps of its map, or the map in YAML flow. Undefined for none.
+ */
+function routeDrafted(step: string, drafted: unknown): RouteEval | undefined {
+  if (drafted == null) return undefined;
+  if (typeof drafted === 'object' && 'kind' in drafted) return drafted as RouteEval;
+  if (typeof drafted !== 'string') return routeOf(step, JSON.stringify(drafted));
+  let read: unknown;
+  try {
+    read = readFrontmatter(step, `route: ${drafted}`).entries[0]?.value;
+  } catch {
+    read = drafted;
+  }
+  return routeOf(step, typeof read === 'string' ? read : JSON.stringify(read));
 }
 
 /**

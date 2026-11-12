@@ -530,3 +530,61 @@ test("a workflow's resolution made from a session: its agent's in its own factor
     assert.deepEqual(proposalIn('theirs', made).status.proposedBy, { agent: 'implementer' });
   });
 });
+
+test('a workflow whose step writes checkFailurePolicy as a block map: a conflict in another of its files resolved, applied, and the map kept', async (t) => {
+  const s = story(t);
+  const name = 'policed';
+  const IMPLEMENT = 'workflows/dev/implement.md';
+  let applied = '';
+  let proposed = '';
+
+  await s.test(
+    'a factory whose implement writes its policy as a block map, as sdlc does, upgraded with a conflict in its script',
+    async (t) => {
+      const repo = scratch(`wf-upgrade-conflict-${name}-repo-`);
+      fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
+      const policy =
+        'checkFailurePolicy:\n  rules:\n    - action: FailStep\n      onExitCodes:\n        operator: In\n        values: [78]\n';
+      rewrite(repo, IMPLEMENT, 'check: npm test && npm run typecheck && npm run lint\n', `check: npm test\nretries: 2\n${policy}`);
+      stage.place().world.repository(repo, {});
+      stage.place().world.commit(repo, 'base');
+      const at = path.join(scratch(`wf-upgrade-conflict-${name}-`), 'team');
+      exportTemplate({ dir: at, from: repo });
+      fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.base);
+      await printedBy(t, 'factory', 'apply', name, '--template', at, '--repo', repo);
+      reconciled(factory(name));
+      applied = textIn(treeDir(ROOT, name), IMPLEMENT);
+      assert.match(applied, /^checkFailurePolicy:\n {2}rules:\n/m, 'the applied step writes its policy as a block map');
+      fs.writeFileSync(path.join(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.ours);
+      edit(at, 'nemia.yaml', (spec) => {
+        spec.version = '0.2.0';
+      });
+      fs.writeFileSync(path.join(at, SCRIPT), SCRIPT_AT.theirs);
+      await printedBy(t, 'factory', 'upgrade', name, '--to', '0.2.0');
+      assert.deepEqual(
+        reconciled(factory(name)).upgrade?.conflicts.map((c) => c.at),
+        [SCRIPT_LINE],
+      );
+    },
+  );
+
+  await s.test('resolved with a file, the workflow is proposed, its policy carried as the text the loader reads', async (t) => {
+    await printedBy(t, 'factory', 'resolve', name, SCRIPT_LINE, '--file', scriptChoice());
+    proposed = recordedFor(name, 'Workflow/dev') ?? '';
+    assert.deepEqual(proposalsOf(name), [proposed]);
+    const implement = proposalIn(name, proposed).spec.objects[0].spec.steps.find((step: { name: string }) => step.name === 'implement');
+    assert.equal(typeof implement.keys.checkFailurePolicy, 'string', "StepKeys' text, as readKeys keeps it");
+    assert.deepEqual(JSON.parse(implement.keys.checkFailurePolicy), {
+      rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: ['78'] } }],
+    });
+  });
+
+  await s.test('approved, the upgrade applies, and the applied implement.md keeps its map as it was written', async () => {
+    const approved = await stage.runWith(stage.board().e, approveProgram(PERSON, name, proposed, PLACE));
+    assert.equal(approved.status.phase, 'applied');
+    const merged = reconciled(factory(name));
+    assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
+    assert.equal(textIn(treeDir(ROOT, name), SCRIPT), SCRIPT_AT.composed);
+    assert.equal(textIn(treeDir(ROOT, name), IMPLEMENT), applied, 'the block map stays a block map');
+  });
+});

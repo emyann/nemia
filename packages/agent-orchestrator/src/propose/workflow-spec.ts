@@ -6,7 +6,7 @@
  */
 import { isReadme, splitFrontmatter } from '../step/step.ts';
 import { isMarkdown } from '../folder/folder.ts';
-import { frontmatterValues } from '../frontmatter/frontmatter.ts';
+import { frontmatterValues, MAP_KEYS, readFrontmatter } from '../frontmatter/frontmatter.ts';
 import { STEP_KEY_FORM } from 'objects';
 import { tokensOf } from '../keys/index.ts';
 
@@ -28,9 +28,23 @@ export const fileParts = (name: string, text: string): { keys: Record<string, un
 };
 
 /**
+ * The keys of a step's `block` the loader reads as text though they hold a map (`MAP_KEYS`), each as the JSON text `readKeys` keeps of
+ * it: the block read as the loader reads it (`readFrontmatter`, every scalar the string written), whether the file writes the map in flow
+ * or as a block. A key written as a line is left out, carried as it reads.
+ */
+const mapTexts = (name: string, block: string | null): Record<string, string> =>
+  block === null
+    ? {}
+    : Object.fromEntries(
+        readFrontmatter(name, block).entries.flatMap(({ key, value }) =>
+          MAP_KEYS.includes(key) && typeof value === 'object' && !Array.isArray(value) ? [[key, JSON.stringify(value)]] : [],
+        ),
+      );
+
+/**
  * A step's keys as its frontmatter reads them put in the form a Workflow's spec carries them (objects' `STEP_KEY_FORM`): a
  * list of steps or of names, which a file writes `a, b`, as its names; a context window written `200k` as its tokens. Any other value as
- * it reads, the proposal's check judging it.
+ * it reads, the proposal's check judging it; a map on a key the loader reads as text is `mapTexts`'.
  */
 const servedKeys = (keys: Readonly<Record<string, unknown>>): Record<string, unknown> =>
   Object.fromEntries(
@@ -58,7 +72,7 @@ export function workflowSpecOf(files: readonly FolderText[]): WorkflowSpecRead {
     .map((f) => {
       const name = f.name.slice(0, -'.md'.length);
       const { keys, body } = fileParts(name, f.text);
-      return { name, keys: servedKeys(keys), body };
+      return { name, keys: { ...servedKeys(keys), ...mapTexts(name, splitFrontmatter(name, f.text).block) }, body };
     });
   const others = byName.filter((f) => !isMarkdown(f.name)).map((f) => ({ path: f.name, text: f.text }));
   return { ...(readme !== undefined && { readme: readme.text }), steps, files: others };

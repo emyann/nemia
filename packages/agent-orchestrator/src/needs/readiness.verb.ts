@@ -26,7 +26,7 @@ import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { tried } from '../runtime-client.ts';
-import type { Running } from '../release/index.ts';
+import { archiveInstall, toolsNeed, toolsNemia, type Running } from '../release/index.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
 import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
@@ -187,15 +187,35 @@ function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
         : piece(manager, 'missing', "the user's service manager (systemd --user) does not answer", [
             typed('log in as the user once, so their manager starts, and keep it with linger', `sudo loginctl enable-linger ${facts.user}`),
           ]);
+  return [cgroup, user, toolsPiece(home, facts)];
+}
+
+/**
+ * The tools folder: made and first on the daemon's PATH, and, where this process runs a release unpacked from an archive, holding its
+ * `nemia` (`toolsNemia`, followed through its link), so a step's session runs the `nemia` its settings allow. Each part missing offers
+ * its own fix: the daemon's restart, which makes the folder and puts it first, and `nemia doctor fix tools` (`toolsNeed`), which links
+ * `nemia`. A checkout's process reads no link, since its person has their own `nemia`.
+ */
+function toolsPiece(home: string, facts: ReadinessFacts): ReadinessPiece {
   const bin = toolsBinDir(home);
+  const made = facts.exists(bin);
   const onPath = (facts.env.PATH ?? '').split(path.delimiter).includes(bin);
-  const tools =
-    facts.exists(bin) && onPath
-      ? piece(TOOLS, 'met', `the tools folder ${bin} is first on the daemon's PATH`)
-      : piece(TOOLS, 'missing', `the tools folder ${bin} is ${facts.exists(bin) ? 'not on this process’s PATH' : 'not made yet'}`, [
-          typed('start the daemon again, which makes it and puts it first', 'nemia service restart'),
-        ]);
-  return [cgroup, user, tools];
+  const linked = !archiveInstall(facts.running) || facts.exists(toolsNemia(home));
+  if (made && onPath && linked)
+    return piece(
+      TOOLS,
+      'met',
+      `the tools folder ${bin} is first on the daemon's PATH${archiveInstall(facts.running) ? ', and holds nemia' : ''}`,
+    );
+  const placed = made && onPath;
+  const said = [
+    ...(placed ? [] : [`the tools folder ${bin} is ${made ? 'not on this process’s PATH' : 'not made yet'}`]),
+    ...(linked ? [] : [`${toolsNemia(home)} is not there, so no step's session runs nemia`]),
+  ].join('; ');
+  return piece(TOOLS, 'missing', said, [
+    ...(placed ? [] : [typed('start the daemon again, which makes it and puts it first', 'nemia service restart')]),
+    ...(linked ? [] : needFixes(toolsNeed(home), 'missing')),
+  ]);
 }
 
 /**

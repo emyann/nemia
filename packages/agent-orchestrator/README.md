@@ -3785,6 +3785,13 @@ of the store carries in its own tree (`upgradeCarries`, `src/release/carry.ts`).
 switches, a carry that fails refusing the upgrade with nothing switched; and the daemon, at its start, adopts the Claude Code an older
 release carried into the tools folder where it holds none (`adoptBundled`), then files each carried install as a fix.
 
+**The tools folder's `nemia`.** On an install, `<tools>/bin/nemia` is a link to `releases/current/bin/nemia`
+(`src/release/nemia-link.store.ts`), so a step's session runs the `nemia` its settings allow on a server whose own PATH has none, and
+the link follows every switch of the pointer. The installer makes it, `nemia doctor carry` makes it where it is not (`linkNemia`), so a
+store installed before it gets it at its next upgrade, and the read's `tools` piece, on a process that runs an archive's release, reads
+it missing where it is not, offering `nemia doctor fix tools`, the store's own need (`toolsNeed`). A store with no pointer, which a
+checkout runs, gets none: its person has their own `nemia`.
+
 ## One daemon per store: `daemon.json`
 
 The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its

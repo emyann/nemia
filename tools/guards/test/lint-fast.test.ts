@@ -114,7 +114,10 @@ const tree = (fastText: string): string => {
   return dir;
 };
 
-/** What oxlint reports over `dir` with `config`, each `file:line code`, sorted. */
+/**
+ * What oxlint reports over `dir` with `config`, each `file:line code severity`, sorted: a rule the fast config carried as a warning
+ * would let `npm run lint:fast` exit 0 where `npm run lint` exits 1, so the severity is compared with the rest.
+ */
 const lint = (dir: string, config: string): string[] => {
   const ran = spawnSync(path.join(BIN, 'oxlint'), ['-c', config, '-f', 'json', '.'], {
     cwd: dir,
@@ -124,8 +127,10 @@ const lint = (dir: string, config: string): string[] => {
   });
   assert.equal(ran.signal, null, `oxlint was stopped by ${ran.signal}: ${ran.stderr}`);
   assert.ok(ran.status === 0 || ran.status === 1, `oxlint exited ${ran.status}: ${ran.stderr}${ran.stdout}`);
-  const report = JSON.parse(ran.stdout) as { diagnostics: { code: string; filename: string; labels: { span: { line: number } }[] }[] };
-  return report.diagnostics.map((d) => `${d.filename}:${d.labels[0].span.line} ${d.code}`).sort();
+  const report = JSON.parse(ran.stdout) as {
+    diagnostics: { code: string; severity: string; filename: string; labels: { span: { line: number } }[] }[];
+  };
+  return report.diagnostics.map((d) => `${d.filename}:${d.labels[0].span.line} ${d.code} ${d.severity}`).sort();
 };
 
 /** Each diagnostic the whole config reports but the type-aware ones, that the fast one does not, and each it adds, one line each. */
@@ -156,6 +161,10 @@ test('the fast config reports what the whole one does, but the type-aware rules'
     assert.ok(codes.has(code), `the fixture no longer breaks ${code} under ${FULL}: ${whole.join(', ')}`);
   assert.ok(aware.has('typescript(no-floating-promises)'), 'oxlint no longer lists no-floating-promises as type-aware');
   assert.ok(!whole.some((line) => line.startsWith('apps/')), `${FULL} lints a file its ignore patterns skip: ${whole.join(', ')}`);
+  assert.ok(
+    lint(dir, FAST).includes(`${guarded()}/a.ts:4 eslint(no-debugger) error`),
+    `${FAST} does not refuse the fixture's debugger as an error, as ${FULL}'s "categories" say: does "extends" still carry them?`,
+  );
   assert.deepEqual(unlike(dir, aware), []);
 });
 
@@ -165,5 +174,14 @@ test('REFUSED: a fast config that turns a rule off of its own', () => {
   assert.equal(text.split(key).length, 2, `no one ${key} in ${FAST}`);
   const drifted = text.replace(key, `"rules": { "no-debugger": "off" },\n  ${key}`);
   assert.equal(drift(parse(read(FULL), FULL), parse(drifted, FAST)).length, 1);
-  assert.deepEqual(unlike(tree(drifted), typeAware()), [`${FAST} misses ${guarded()}/a.ts:4 eslint(no-debugger)`]);
+  assert.deepEqual(unlike(tree(drifted), typeAware()), [`${FAST} misses ${guarded()}/a.ts:4 eslint(no-debugger) error`]);
+});
+
+test('REFUSED: a fast config that holds a rule as a warning where the whole one refuses it', () => {
+  const key = '"options": {';
+  const drifted = read(FAST).replace(key, `"rules": { "no-debugger": "warn" },\n  ${key}`);
+  assert.deepEqual(unlike(tree(drifted), typeAware()), [
+    `${FAST} misses ${guarded()}/a.ts:4 eslint(no-debugger) error`,
+    `${FAST} adds ${guarded()}/a.ts:4 eslint(no-debugger) warning`,
+  ]);
 });

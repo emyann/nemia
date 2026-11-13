@@ -148,7 +148,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   Grace's and Otto's one list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
   verb or a deny: a verb is added by asking what file it can be made to write and what program it can be made to run. The denies hold
   the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. Agora alone allows `gh pr
-  view` and `gh pr checks`. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
+  view` and `gh pr checks`; the four read a tool's own help and version, gh's by `gh help <core command>` (never `gh
+  <command> --help`, which can run an alias or an extension) and claude's by exact lines measured safe (`help.allow.yaml`), while
+  the writers keep gh refused whole. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
   holds the agents to the files and proves on their rendered fences, through the test kit's matcher (`test-kit/fence`), each read open
   and each write refused; `packages/agent-orchestrator/test/agent-fences.test.ts` proves, on the same lines, what each deny refuses
   spelling by spelling. The set is on the agents, not in `.claude/settings.json`, so the team travels to a factory that is not this
@@ -182,7 +184,10 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
   board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
-  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays).
+  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays), and
+  `code-review` (Matt Pocock's two-axis review of a diff, Standards and Spec: taken by `npx skills add
+  https://github.com/mattpocock/skills --skill code-review -a claude-code --copy -y`, on trial on build's review, given to its step by
+  the nemia factory's overlay).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
   folder, given to the build's design, implement and review steps as `apps/web:<name>` by the nemia factory's overlays, and said to a

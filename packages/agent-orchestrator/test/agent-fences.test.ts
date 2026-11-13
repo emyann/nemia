@@ -19,7 +19,8 @@
  * on the tests' reviewer, a dontAsk agent, in a copy of the team (`planted`), and read as a run reads it. Each deny is proven to be the one
  * that refuses its own spellings, and each plain read still asked. Beside them, a reviewer's reads of its pull request (`GH_ALLOWS`), and
  * the denies of every other form of gh they reach (`GH_REFUSED`), each proven the one that refuses its own spellings, and proven needed
- * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does. The planted lines
+ * where a settings file allows those reads to a step that allows none itself, which the checkout's no longer does; and a tool's own help
+ * and version (`HELP_ALLOWS`), each line proven to reach no alias, extension, flag or other command (`HELP_REFUSED`). The planted lines
  * are sdlc's own, read from its fence files (`SDLC_FENCES`), so a line dropped there is refused here by the test of what it refuses.
  *
  * A writer of one kind of file: the read set with the allows of a contract (`CONTRACT_WRITES`), each a path from the session's working
@@ -1187,6 +1188,71 @@ test("REFUSED: a settings allow of gh's reads reaches every step, so a read-only
   assert.deepEqual(runs(fenced, GH_READS, settings, []), GH_READS.map(shown), "the settings' reads reach it");
   assert.deepEqual(runs(fenced, GH_REFUSED_CALLS, settings, []), [], 'and its denies fence them');
   assert.deepEqual(runs(planted(), GH_REFUSED_CALLS, settings, []), GH_REFUSED_CALLS.map(shown), 'without them, the settings open each');
+});
+
+/**
+ * A tool's own help and version, which sdlc's read-only agents allow themselves beside the read set (`help.allow.yaml`): gh's by
+ * `gh help <core command>`, which never runs an extension or an alias, and claude's by exact lines, which no flag or command fits
+ * into. The reviewer here carries them with the read set, its denies and gh's.
+ */
+const HELP_ALLOWS = fenceLines('help.allow.yaml');
+
+/** The help a step reads, in the spellings sdlc's rules tell it to type. */
+const HELP_READS: Call[] = [
+  'gh help',
+  'gh help auth login',
+  'gh help pr merge 1',
+  'gh --version',
+  'claude --help',
+  'claude --version',
+  'claude auth --help',
+  'claude mcp add --help',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * What the help lines must not reach: `gh <x> --help`, which runs a shell alias (it parses no flags) or the command whose value-taking
+ * flag swallows the `--help`; `gh help` of a name no core command holds, which gh rewrites to run an extension; gh's help with an
+ * assignment or an option the read set's gh denies refuse; and claude with a flag, another command or a word beside an exact line.
+ */
+const HELP_REFUSED: Call[] = [
+  'gh auth login --help',
+  'gh pr co --help',
+  'gh pr merge 1 --subject --help',
+  'gh help myext',
+  'gh help copilot',
+  'gh help prx',
+  'GH_PAGER=sh gh help pr',
+  'gh help pr --web',
+  'gh help pr -R o/r',
+  'claude -p x --help',
+  'claude --help --bg',
+  'claude auth status',
+  'claude auth --help x',
+  'codex --help',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The reviewer with the read set, gh's denies and `allows` in place of the help lines. */
+const helpPlanted = ({ allows = HELP_ALLOWS, denies = GH_DENIES }: { allows?: readonly string[]; denies?: readonly string[] } = {}): Step =>
+  planted({ allows: [...READ_SET_ALLOWS, ...allows], denies: [...READ_SET_DENIES, ...denies] });
+
+test("a dontAsk step with the help lines planted reads gh's and claude's help, and runs no alias, extension, flag or other command by them", () => {
+  const step = helpPlanted();
+  assert.deepEqual(runs(step, HELP_READS, {}, []), HELP_READS.map(shown), 'by its own allow, no settings read');
+  assert.deepEqual(runs(step, HELP_REFUSED, {}, []), []);
+  assert.deepEqual(runs(step, GH_WRITES, {}, []), []);
+  assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), 'and the read set still asks');
+});
+
+test('REFUSED: gh help whole, gh … --help, claude … --help in place of the lines, or no deny of an assignment, each run what the lines refuse', () => {
+  const reached = (allows: string[], denies: string[] = GH_DENIES): string[] => runs(helpPlanted({ allows, denies }), HELP_REFUSED, {}, []);
+  assert.deepEqual(reached(['Bash(gh * --help)']), [
+    'Bash(gh auth login --help)',
+    'Bash(gh pr co --help)',
+    'Bash(gh pr merge 1 --subject --help)',
+  ]);
+  assert.deepEqual(reached(['Bash(gh help:*)']), ['Bash(gh help myext)', 'Bash(gh help copilot)', 'Bash(gh help prx)']);
+  assert.deepEqual(reached(['Bash(claude * --help)']), ['Bash(claude -p x --help)']);
+  assert.deepEqual(reached(HELP_ALLOWS, less(GH_DENIES, 'Bash(*=* gh *)')), ['Bash(GH_PAGER=sh gh help pr)']);
 });
 
 /**

@@ -1,13 +1,13 @@
 import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
-import { runsQuery } from '../../lib/api/runs.ts';
-import { judged, type RunView } from '../../lib/api/judged.ts';
+import type { RunView } from '../../lib/api/judged.ts';
 import { startCard } from '../../lib/api/inbox.ts';
 import { standingOf, titleOf } from '../../lib/factory';
 import { afterFor } from '../../lib/inbox';
-import { ContextPicker } from '../agent/ContextPicker';
+import { usePickerRuns } from '../../lib/pickerRuns.ts';
+import { ContextPicker, ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 
 /**
@@ -171,17 +171,18 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
 }
 
 /**
- * The runs a new run waits on (the CLI's `start --after`): every run on `repo`, the repository a start runs in, in flight and finished,
- * newest first, each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out —
- * which runs it may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is the one a
- * factory wires for the workflow; with none, the default factory working on no repository, no run is listed and nothing is asked of the
- * api, and the form says why. The runs are read as the page opens, not on the list's beat: a run started since is listed on the next
- * visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
+ * The runs a new run waits on (the CLI's `start --after`): the runs on `repo`, the repository a start runs in, those not finished newest
+ * created first, then the finished newest finished first, a page of them at a time with Show older for the next (`usePickerRuns`), each
+ * by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which runs it may
+ * wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is the one a factory wires for the
+ * workflow; with none, the default factory working on no repository, no run is listed, and the form says why. The runs not finished are
+ * read as the picker opens, not on the list's beat, and read again with the feed. A title wraps within its row, read whole, and no row
+ * runs past the card it is in, however long the title.
  */
 function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]; onChange: (after: string[]) => void; repo?: string }) {
-  const runs = useQuery({ ...runsQuery, refetchInterval: false });
+  const runs = usePickerRuns();
   const legend = useId();
-  const onRepo = repo && runs.data ? newestFirst(runs.data.filter(judged).filter((run) => run.repo === repo)) : null;
+  const onRepo: RunView[] | null = repo && !runs.reading ? [...runs.open, ...runs.finished].filter((run) => run.repo === repo) : null;
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
@@ -225,9 +226,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
           ))}
         </ul>
       )}
+      {repo && !runs.error && runs.more && <ShowOlder onPress={runs.older} />}
     </fieldset>
   );
 }
-
-const newestFirst = (runs: readonly RunView[]): RunView[] =>
-  [...runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));

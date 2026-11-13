@@ -28,4 +28,5 @@ CLAUDE.md merge=union
 /.claude/skills/shadcn/** linguist-vendored
 /.claude/skills/react-aria/** linguist-vendored
 /.claude/skills/tsverify/** linguist-vendored
+/.claude/skills/code-review/** linguist-vendored
 /package-lock.json linguist-generated

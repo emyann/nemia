@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
-import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectCount, expectNone, expectTexts, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type RunList, type ScheduleList } from 'objects';
 import {
   FINISHED_SELECTOR,
@@ -975,4 +975,37 @@ export async function bannerShown(context: BrowserContext): Promise<void> {
     const read = (await response.json()) as { ready: boolean; pieces: unknown[] };
     return route.fulfill({ response, json: { ...read, ready: false, pieces: [...read.pieces, BANNER_PIECE] } });
   });
+}
+
+/**
+ * The Overview's strip reads whole in the room its page column gives it: its three headings, the readout and the agents' count are cut
+ * by nothing, and each agent's row shows at least the agent's name, the words before its first ` · `, whole inside its row (the rest of
+ * the row may be cut short). The intent's 'A.', 'Q.' and 'd…' at 1280 beside her sheet are what this refuses.
+ */
+export async function expectStripWhole(page: Page, assertion: string): Promise<void> {
+  const strip = page.locator('[data-overview-strip]');
+  await expectCount(strip.locator('[data-strip-heading]'), 3, `${assertion}: the strip shows its three headings`);
+  await expectUncut(strip.locator('[data-strip-heading]'), `${assertion}: each heading is read whole`);
+  await expectUncut(
+    strip.locator('[data-strip-readout], [data-strip-agents]'),
+    `${assertion}: the readout and the agents' count are whole`,
+  );
+  await expectNone(
+    () =>
+      strip.locator('[data-agent-words]').evaluateAll((all) => {
+        const cut = all.flatMap((words) => {
+          const text = document.createTreeWalker(words, NodeFilter.SHOW_TEXT).nextNode();
+          const said = text?.textContent ?? '';
+          const name = said.split(' · ')[0] ?? '';
+          if (!text || !name) return [`a row with no name (${said})`];
+          const range = document.createRange();
+          range.setStart(text, 0);
+          range.setEnd(text, name.length);
+          const right = range.getBoundingClientRect().right;
+          return right > words.getBoundingClientRect().right + 1 ? [name] : [];
+        });
+        return cut.length ? `the agent's name is cut in its row: ${cut.join(', ')}` : null;
+      }),
+    `${assertion}: each agent's row shows the agent's name whole`,
+  );
 }

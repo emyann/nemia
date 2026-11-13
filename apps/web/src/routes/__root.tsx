@@ -34,8 +34,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * line saying a run waits on a piece the server misses, linking to Setup (`SetupBanner`), and a first-visit link refused on a board that
  * asks no token (`LinkRefusal`). The lines are measured as they come and go into `--frame-lines`, which a page that fills the window
  * takes off its height beside `--frame-top`, so no page's height assumes they are not there. Then the page, under the strip of Settings'
- * tabs on one of them (`FrameTabs`), in a centred column unless a matched route's `staticData` asks for `fullBleed`. Over the page, under
- * the top bar, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to another page,
+ * tabs on one of them (`FrameTabs`), in a centred column unless a matched route's `staticData` asks for `fullBleed`. The page's column
+ * (`<main data-frame-page>`) is the named container `@container/page`, and a page lays out by it (`@<size>/page:`), never by the
+ * window: beside her docked sheet it is narrower than the window (`test/page-room.test.ts`). Over the page, under the top bar, the
+ * floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to another page,
  * which carries no `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again at once, the
  * polls slow while it is open, and the gauges say which. Her chat is held over the whole frame too (`NemiaChatProvider`), one stream of
  * hers for the visit, which her side sheet and the chat page both read, so a navigation neither closes it nor opens another. Her face,
@@ -63,7 +65,7 @@ function Root() {
             <FrameRail path={path} search={search} />
             <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
               <FrameHeader path={path} search={search} feed={feed} />
-              <main data-frame-page className="relative flex min-w-0 flex-1 flex-col bg-background">
+              <main data-frame-page className="@container/page relative flex min-w-0 flex-1 flex-col bg-background">
                 <div ref={lines} data-frame-lines>
                   <NewerRelease />
                   <SetupBanner path={path} />

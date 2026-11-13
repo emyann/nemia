@@ -27,7 +27,7 @@ function PlaceChoice({
   return (
     <fieldset className="space-y-1">
       <legend className="block text-body-small font-medium">Where its steps work</legend>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 @md/page:grid-cols-2">
         {PLACES.map((p) => (
           <label
             key={p.place}
@@ -114,7 +114,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
           A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its page opens in its builder.
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @md/page:grid-cols-2">
         <div className="space-y-1">
           <label htmlFor={ids.name} className="block text-body-small font-medium">
             Workflow name

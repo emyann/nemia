@@ -89,6 +89,14 @@ const RunFileSchema = Schema.StructWithRest(
     memory: Schema.optional(
       Schema.Struct({ limitBytes: Schema.Finite, peakBytes: Schema.optional(Schema.Finite), oomKills: Schema.Finite }),
     ),
+    /**
+     * The scope the session's Claude Code runs in, its folder under the cgroup mount, read off Claude Code on the first message it sent
+     * (`cgroupNow`): what its end, a let-go and a take-up end whole, once `scopeToEnd` allows it, and what `release` asks again while it
+     * holds a process. Absent where it runs in no scope, or sent no message.
+     */
+    cgroup: Schema.optional(Schema.String),
+    /** Why a session with no limit runs bare on a host that passed the probe: its scope's program refused (`scopedOrBare`). */
+    unscoped: Schema.optional(Schema.String),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */
     bridge: Schema.optional(BridgeFactsSchema),
     /** The spawn, its brief left out: what a holder resumes the session with. */

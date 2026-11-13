@@ -137,7 +137,7 @@ holds what every change needs.
   merging nothing; the receipt merges that head once `ci` is green there. The landed commit differs from git's plain merge of the
   reviewed head and the base only in the paths `landingDerives` names. This repository's command is `node packages/templates/released.ts
   cut`, which cuts each template's version and record again from the base: the nemia factory takes them at its upgrade onto sdlc
-  3.10.0, `nemia factory upgrade <factory> --to 3.10.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
+  3.11.0, `nemia factory upgrade <factory> --to 3.11.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
   "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`.
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 

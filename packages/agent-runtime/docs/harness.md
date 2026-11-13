@@ -495,3 +495,24 @@ tree (`resources.limits.memory`, `src/harness/cgroup.ts`), measured **2026-11-05
   oomKills: 1 }` — and exited 0. On GitHub's runner the same 64Mi task ended by its worker with another exit than its child's kill:
   three Node processes of some 40 MB each start near 64Mi, so which the kernel picks is the machine's. The boundary test runs at 256Mi,
   where the runaway child is the largest process by far (`test/memory-limit.boundary.test.ts`).
+
+### A session's scope, ended whole
+
+What ends a scope a session left a process in (`scopeToEnd`, `scopeLeftIn`, `endScopeIn`, `src/harness/cgroup.ts`), measured
+**2026-11-13 on systemd 255 (255.4-1ubuntu8.18), kernel 6.8.0 (Ubuntu 24.04), Node 24.16**, in a throwaway scope started for the
+measurement alone (`systemd-run --user --scope --quiet --collect -- sh -c '…'`, no property), the user manager's own `app.slice`:
+
+- **A detached child keeps the scope alive after its parent exits**: the scope's `sh` started `setsid sh -c "trap '' TERM HUP; sleep
+  600" &` and exited; the scope `/user.slice/user-1000.slice/user@1000.service/app.slice/run-r<id>.scope` stayed, its `cgroup.procs`
+  listing the two processes left (the setsid shell and its `sleep`). A SIGTERM to the one listed first changed nothing: it ignores it.
+- **The user may write `cgroup.kill` in the scopes of its own user manager's tree**: the file is there (`--w-------`, owned by the
+  user), and `echo 1 > …/cgroup.kill` from outside the scope, by a process of another scope of the same user, succeeded with no
+  privilege.
+- **`cgroup.kill` ended the scope whole, and systemd collected it**: every process listed was gone, and half a second later the scope's
+  folder was too (`--collect`).
+
+So the runtime ends what a finished session left by SIGTERM to each pid listed, then, past the stop grace, one write of `1` to
+`cgroup.kill`, which the kernel applies to every process of the cgroup at once, one forked meanwhile included; where the file is missing
+(a kernel before 5.14) or refuses the write, by SIGKILL to each pid listed, and the next pass's release asks again for what a fork slipped
+past. `test/session-scope.boundary.test.ts` holds it on this host: a job's child out of its group and deaf to SIGTERM, unlimited and
+limited, and a held session's, ended with the scope.

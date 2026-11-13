@@ -105,7 +105,7 @@ const oursIn = (files: Map<string, string>, words: readonly string[] = REPOSITOR
   );
 
 /** The skills that are the team's own, which sdlc carries. */
-const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'land-a-branch', 'read-the-stats'];
+const OWN_SKILLS = ['write-a-spec', 'implement-a-change', 'review-a-change', 'land-a-branch', 'read-the-stats', 'groom-the-inbox'];
 
 /** The skills an agent may name: its own, the place's, and the interview Nemia ships. */
 const ROLE_SKILLS = [...OWN_SKILLS, 'git', 'grilling'];

@@ -17,6 +17,8 @@ import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
   INSTALL,
+  UNPROVISIONED,
+  type CheckFirst,
   LANDING_CHECK_DEADLINE_SECONDS,
   attemptVerdict,
   checkArgv,
@@ -56,10 +58,10 @@ const ENV: CheckEnv = {
 test('checkArgv: the line the run froze, run by sh', async (t) => {
   await t.test('as `sh -c` and the line, as it is', () => {
     assert.deepEqual(checkArgv('npm test'), ['sh', '-c', 'npm test']);
-    assert.deepEqual(checkArgv('npm test', false), ['sh', '-c', 'npm test']);
+    assert.deepEqual(checkArgv('npm test', undefined), ['sh', '-c', 'npm test']);
   });
   await t.test("an ending's check that owes an install runs it first, its text fixed, then the command on a line of its own", () => {
-    const [sh, c, script] = checkArgv('npm test # the suite', true);
+    const [sh, c, script] = checkArgv('npm test # the suite', 'install');
     assert.deepEqual([sh, c], ['sh', '-c']);
     const lines = script.split('\n');
     assert.equal(lines[0], `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`);
@@ -248,7 +250,7 @@ const fakeNpm = (code: number): { bin: string; args: string; PATH: string } => {
 };
 
 /** `checkArgv` for a command, run to its end with `npm` faked, in a workspace of its own: what came back, and the workspace. */
-const checked = (npm: ReturnType<typeof fakeNpm>, install: boolean) => {
+const checked = (npm: ReturnType<typeof fakeNpm>, install: CheckFirst | undefined) => {
   const workspace = scratch('wf-check-install-');
   const [cmd, ...args] = checkArgv('echo command ran > ran.txt', install);
   return { r: spawnSync(cmd, args, { cwd: workspace, encoding: 'utf8', env: { ...process.env, PATH: npm.PATH } }), workspace };
@@ -259,7 +261,7 @@ test('checkArgv run by sh, `npm` faked: the install a check owes', async (t) => 
     "one that owes it runs `npm install --no-save` first, in its workspace, then its command, to the command's exit code",
     () => {
       const npm = fakeNpm(0);
-      const { r, workspace } = checked(npm, true);
+      const { r, workspace } = checked(npm, 'install');
       assert.equal(r.status, 0, r.stdout + r.stderr);
       assert.deepEqual(fs.readFileSync(npm.args, 'utf8').trim().split('\n'), ['install', '--no-save', '--no-audit', '--no-fund']);
       assert.equal(INSTALL, 'npm install --no-save --no-audit --no-fund');
@@ -270,7 +272,7 @@ test('checkArgv run by sh, `npm` faked: the install a check owes', async (t) => 
   );
   await t.test('REFUSED: an install that fails runs no command and prints no exit code — the process ends by a signal', () => {
     const npm = fakeNpm(3);
-    const { r, workspace } = checked(npm, true);
+    const { r, workspace } = checked(npm, 'install');
     assert.deepEqual(
       [r.status, r.signal],
       [null, 'SIGKILL'],
@@ -281,12 +283,23 @@ test('checkArgv run by sh, `npm` faked: the install a check owes', async (t) => 
   });
   await t.test('one that owes no install never calls npm', () => {
     const npm = fakeNpm(0);
-    const { r, workspace } = checked(npm, false);
+    const { r, workspace } = checked(npm, undefined);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.equal(fs.existsSync(npm.args), false, 'npm was not called');
     assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')));
     assert.doesNotMatch(r.stdout, /npm install/);
   });
+  await t.test(
+    'REFUSED: a worktree whose install failed before its check runs no command and calls no npm — the process ends by a signal',
+    () => {
+      const npm = fakeNpm(0);
+      const { r, workspace } = checked(npm, 'unprovisioned');
+      assert.deepEqual([r.status, r.signal], [null, 'SIGKILL'], `no exit code: the run reads it as unfinished\n${r.stdout}${r.stderr}`);
+      assert.equal(fs.existsSync(path.join(workspace, 'ran.txt')), false, 'the command never ran');
+      assert.equal(fs.existsSync(npm.args), false, 'npm was not called: the pass tried the install, and the step is told');
+      assert.ok(r.stdout.includes(UNPROVISIONED), r.stdout);
+    },
+  );
 });
 
 test('checkContract: a step is told the command before it is judged by it, and that it comes from the run', async (t) => {
@@ -371,7 +384,7 @@ const rig = () => {
   fs.mkdirSync(workspace);
   const e = plainEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: HARNESSES.check } }));
   const env = (step: string): CheckEnv => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace });
-  const file = (step: string, command: string, deadlineSeconds = 60, install = false) =>
+  const file = (step: string, command: string, deadlineSeconds = 60, install?: CheckFirst) =>
     Effect.runPromise(
       e.file({
         id: `r-1-${step}-check`,
@@ -461,7 +474,7 @@ test(
       process.env.PATH = PATH;
     });
     process.env.PATH = npm.PATH;
-    const id = await file('ship', 'echo command ran', 60, true);
+    const id = await file('ship', 'echo command ran', 60, 'install');
     const v = await settled(t, e, id);
     process.env.PATH = PATH;
     assert.equal(v.state.settled, 'failed');

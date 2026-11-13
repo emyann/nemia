@@ -20,6 +20,7 @@
  * `cost-state` line in `cost-state.jsonl` of its folder, where Claude Code saves one in its transcript; a `--resume=<id>` starts
  * from the last total saved for that session, and a process killed saves nothing, so its resume starts from nothing.
  */
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -84,6 +85,11 @@ type Plan = {
   output?: unknown;
   cost?: number;
   turns?: 'one' | 'many';
+  /**
+   * Start, as it starts, a process of its own that leaves its group and session (`setsid`) and ignores SIGTERM and SIGHUP, its pid in
+   * `left` of its folder: what a command a session ran leaves behind, which only its scope still holds.
+   */
+  leave?: boolean;
 };
 
 /**
@@ -115,6 +121,13 @@ const note = (file: string, value: unknown) => fs.appendFileSync(path.join(dir, 
 note('argv.jsonl', argv);
 fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
 fs.writeFileSync(path.join(dir, 'env.json'), JSON.stringify(process.env));
+if (plan.leave) {
+  const left = spawn('sh', ['-c', `trap '' TERM HUP; echo $$ > '${path.join(dir, 'left')}'; exec sleep 600`], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  left.unref();
+}
 
 /** Where the stand-in saves its running total on a clean exit, a `cost-state` line per exit, as Claude Code's transcript keeps it. */
 const COST_STATE = path.join(dir, 'cost-state.jsonl');

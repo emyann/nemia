@@ -1075,6 +1075,22 @@ task's spawn, so its attempt ends `unstartable`, the refusal saying what to set 
 each slice, the same properties around `sh` reading its own `memory.max`). An unlimited task never asks it. What the host measured
 before it was built is in `docs/harness.md`, *A memory limit, held by a scope*.
 
+**A session's scope is its Pod.** Every local session runs in a scope of its own where the host makes one, a limited one as above and
+an unlimited one with no property (`scopeFor`, `src/harness/scope.ts`), so whatever its commands start — a detached server, a test
+runner's workers, a shell its harness opened — sits in its cgroup wherever it was started from. The scope's folder is recorded on the
+run file: the detached worker reads its own in its first write, inside the scope (`cgroup`, `bin/ae-worker.ts`), and a held session's
+holder reads Claude Code's on the first message it sends. Once the session has ended, its stop and its release end the scope whole as
+they end its harness's process group: SIGTERM to each process its `cgroup.procs` lists, then, past the run's stop grace, `1` written to
+its `cgroup.kill` (`endScopeIn`), SIGKILL to each pid where the kernel has none; a held session's scope is killed at once, as its group
+is. The release is refused while anything is left, so the engine asks again on its next pass (level-triggered), and a holder's
+`release` does the same for a held session that has ended. `scopeToEnd` (`contracts/scope-end.contract.ts`) guards what may be ended:
+a `.scope` folder under the cgroup mount, never the cgroup the runtime runs in nor one it runs inside, so a cgroup read too early, a
+daemon run in a terminal's scope, or a holder beside its session never ends itself. An unlimited session whose scope cannot be made
+though the probe passed (`systemd-run` refusing later) still runs, bare, as before scopes, and its run file says why (`unscoped`): it
+never needed a scope to start. Off systemd, nothing changes: an unlimited session runs bare and its process group alone is ended, and
+the orchestrator's sweep of a finished run's processes is the backstop. Measured in `docs/harness.md`, *A session's scope, ended
+whole*.
+
 ## How much a session keeps in mind: `contextTokens`
 
 `contextTokens: 200000` is the context window a task's sessions are given, in tokens: past about it, Claude Code compacts
@@ -2099,6 +2115,7 @@ of pure code sits beside it.
 | `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in and the wait |
 | `src/waits/index.ts` | the wait's face: `until`, `bell` and `WAITED`, as a test of this package and the testing entry read them |
 | `src/waits/waits.ts` | the one copy of the wait a test makes on the event it counts, never on a length of time (`until`), the bell its source rings (`bell`) and the bound a waiting test takes (`WAITED`) |
+| `src/process/processes.ts` | this user's processes read off `/proc`, each with its start, name, working folder and the variables asked for (`processesNow`), and ended by pid and start, never a pid taken since (`endProcesses`): what the orchestrator's sweep of a finished run's processes reads and ends |
 | `src/process/alive.ts` | whether a process is there, as signal 0 finds it (`alive`): it answers, or it is another user's (`EPERM`); the runtime's one copy, a leaf every folder may import |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
@@ -2182,15 +2199,16 @@ of pure code sits beside it.
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/claude/rules.ts` | Claude Code's permission matching (`bashCovers`, `denyingRule`, deny before ask before allow) and the tool sets measured on it, as `CLAUDE_RULES`, `CLAUDE_DECLARATION.rules` |
-| `src/harness/cgroup.ts` | a task's memory limit held by the host: the scope of systemd's user manager its process tree runs in (`scopeArgv`), the probe that says why a host cannot make one (`scopeRefusal`), and what a cgroup's files say of its memory (`cgroupMemoryOf`) |
-| `src/harness/scope.ts` | the scope a spawn asks for, off its request's memory limit (`scopeFor`): its bytes and the argv before its command, or the words that say what to set |
+| `src/harness/cgroup.ts` | a session's scope held by the host: the scope of systemd's user manager its process tree runs in, under a memory limit where it has one (`scopeArgv`), the probe that says why a host cannot make one (`scopeRefusal`), the cgroup a process sits in (`cgroupNow`), what a cgroup's files say of its memory (`cgroupMemoryOf`), which recorded scope may be ended (`scopeToEnd`), what it still holds (`scopeLeftIn`, `scopeLeft`) and its end (`endScopeIn`) |
+| `src/harness/scope.ts` | the scope a spawn asks for (`scopeFor`): every session's where the host makes one, its limit's bytes where it has one, and the argv before its command, or the words that say what to set |
+| `src/harness/claude/scope-fallback.ts` | a held session's Claude Code started behind an unlimited scope's argv, or bare where the scope is refused after the probe passed (`scopedOrBare`) |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, its usage, and what a follow reads of it (`codexPartials`: no pieces of text, its lines decoded) |
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
-| `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where it has one (`startWorker`) |
+| `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where the host makes one, an unlimited run handed the scope's argv to fall back bare where it is refused (`startWorker`) |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them and `release`, `stopRunOf` the stop both take, and `output`, a stream kept whole |
 | `src/harness/detached/detached-options.ts` | how a detached runner's workers run, beside its spec (`DetachedOptions`): their stop grace and heartbeat, each defaulted to the shipped bound, and a beat the lease would read as dead refused (`workerBoundsOf`) |
 | `src/harness/detached/worker-bounds.ts` | the detached worker's two shipped bounds, named once (`WORKER_STOP_GRACE_MS`, `WORKER_BEAT_MS`), importing nothing, as the worker it is read by imports nothing else |

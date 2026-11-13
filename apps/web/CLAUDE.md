@@ -62,7 +62,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   build`: `test/e2e/parts.test.ts` presses it, and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
-  on <url>`; `npm run board:stop` ends its holder, which else ends by itself.
+  on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
+  `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 
 ## Writing an e2e page
 

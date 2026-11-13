@@ -2,11 +2,11 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: janitor
-  description: "Read how the factory's work went and say what to correct. Argus, the janitor, reads `nemia stats` since the janitor's last run, against the same length of time before it, writes a short report, and proposes one correction per card: an allow or a deny by name, a line in an agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus proposes and never acts."
+  description: "Read how the factory's work went and say what to correct. Argus, the janitor, reads `nemia stats` since the janitor's last run, against the same length of time before it, writes a short report, and proposes one correction per card: an allow or a deny by name, a line in an agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus also reads each card in play against the repository and says it done, replaced, stale or standing, and the check writes the report and the one command a person types to remove or amend each. Argus proposes and never acts."
 spec:
   steps:
     - name: argus
       place: git
-      check: "node \"${WF_WORKFLOW_FILES:?nemia check: cards.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/cards.ts\" \"${WF_CLOSEOUT:-}\""
+      check: "node \"${WF_WORKFLOW_FILES:?nemia check: cards.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/cards.ts\" \"${WF_CLOSEOUT:-}\" && node \"${WF_WORKFLOW_FILES:?nemia check: groom.ts is read from the frozen workflow files of a run, which sets this: run this check in a run}/groom.ts\" \"${WF_CLOSEOUT:-}\""
       reads:
         - inbox

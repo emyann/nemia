@@ -59,6 +59,10 @@ is written, the commands, and what its own code promises — and this section ho
 ### The kit, the look and the colours
 
 - A component the kit lacks is written beside it, under the board's own rules.
+- A named container variant (`@lg/page:`) matches nothing outside its container: a part drawn in her sheet, or in a sheet the kit
+  portals over the window, takes its narrow layout, and a sheet's own width stays the window's (`sm:`, kept in `page-room.test.ts`).
+- A flex item whose basis is `auto` asks for its whole max-content width, its longest unwrapped line included: give a line that is cut
+  or wraps by design `contain-inline-size`, so the item asks only for what must read whole (the strip's frames, `OverviewStrip.tsx`).
 - Adding a component of `apps/web/src/components/ui` or `apps/web/src/components/ai-elements` again overwrites the edits that put it on
   React Aria (the sidebar's `ul` menu, `showCloseButton={false}`, shiki's fine-grained build), and brings back comments the guards refuse.
 - The kit has no adapter for TanStack Router: an `href` on one of its buttons, chips or menu items loads the page whole.

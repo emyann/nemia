@@ -1464,6 +1464,11 @@ test('parentsWanted and floorRowsOf: the finished runs the floor reads beside th
     );
     assert.deepEqual(parentsWanted([]), []);
   });
+  await t.test('a run a row reads as context is wanted too, after the waits, so its chip names it by its title; a row is not', () => {
+    const reader = run(['running (working)'], { id: 'r', moving: true, context: ['source', 'w'], after: ['done'], waiting: waitsOn('done') });
+    const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], context: ['source'] });
+    assert.deepEqual(parentsWanted([reader, waiting]), ['done', 'source']);
+  });
   await t.test('the rows are the waiting, then in flight, then the parents read, then the finished page, each id once', () => {
     const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], createdAt: at(0) });
     const flying = run([], { id: 'b', after: ['p'], waiting: waitsOn('p'), createdAt: at(1) });

@@ -232,17 +232,18 @@ export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: 
 }
 
 /**
- * The runs the floor reads by id beside the light answer: each a row in flight still waits on (`liveWaits`) that is no row of it — a
- * finished run, since the light answer holds every run of the factory not finished, or a run of another factory. Each once, in the order
- * the rows name them; a row the list could not judge waits on nothing it says. One level, as `floorRuns` draws them.
+ * The runs the floor reads by id beside the light answer: each a row in flight still waits on (`liveWaits`), and each a row reads as
+ * context (its chip names it by its title, `readsLines`), that is no row of it — a finished run, since the light answer holds every run
+ * of the factory not finished, or a run of another factory. Each once, the waits first, in the order the rows name them; a row the list
+ * could not judge names nothing. One level, as `floorRuns` draws them; a run read only for its title is no card unless it is finished
+ * and Show finished is on.
  */
-export function parentsWanted(rows: readonly (FloorRun | UnjudgedRun)[]): string[] {
+export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context'>) | UnjudgedRun)[]): string[] {
   const listed = new Set(rows.map((row) => row.id));
-  const waits = rows
-    .filter((row): row is FloorRun => judged(row))
-    .filter(inFlight)
-    .flatMap(liveWaits);
-  return [...new Set(waits)].filter((id) => !listed.has(id));
+  const judgedRows = rows.filter((row): row is FloorRun & Pick<RunView, 'context'> => judged(row));
+  const waits = judgedRows.filter(inFlight).flatMap(liveWaits);
+  const reads = judgedRows.flatMap((row) => row.context);
+  return [...new Set([...waits, ...reads])].filter((id) => !listed.has(id));
 }
 
 /**

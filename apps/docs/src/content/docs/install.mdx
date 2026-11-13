@@ -207,6 +207,13 @@ folder goes. The clone uses the machine's own git credentials, and Nemia holds n
 the host's key in `~/.ssh/known_hosts`; for an HTTPS URL, a git credential helper for the host. On GitHub, `gh auth login` sets one up.
 A URL that carries a password is refused. A clone that fails is refused with git's own words and the setup to do, and nothing is filed.
 
+The daemon installs the clone's npm dependencies when a run first cuts a worktree from it, and again whenever its `package-lock.json`
+has moved past its `node_modules`, with `npm install --no-save`: no `npm ci` is typed by hand, and each worktree hardlinks the clone's
+packages rather than installing its own. That costs about a minute of the cut after each lockfile change, and one `node_modules` on
+disk. A failed install is tried again at the next cut, and the step is told to run `npm ci` meanwhile. A repository whose install reads
+an environment variable (an install script that needs one) needs it set in the daemon's environment. A repository with no
+`package-lock.json` gets nothing installed.
+
 From a laptop under a remote context, the same line (and `nemia factory apply … --repo <url>`) files the factory on the server: the
 server clones the repository with its own credentials, so the SSH key or the credential helper is set up there, not on the laptop.
 

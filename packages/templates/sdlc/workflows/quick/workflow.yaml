@@ -63,3 +63,4 @@ spec:
       tally:
         - findings
         - findings.kind=placement
+        - findings.missed

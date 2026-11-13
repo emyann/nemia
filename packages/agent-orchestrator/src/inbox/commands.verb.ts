@@ -4,9 +4,18 @@
  * Api, and the api's handlers (apps/api/src/objects/cards.ts) call the handlers of `inbox add`, `inbox queue` and `inbox rm` by their
  * `input`. The writes' words are the client's (`objects`' `INBOX_WORDS`): it parses, words and prints them, and the entries here spread
  * those words beside their handlers. A card's `from:` (`nemia inbox from`) the api writes as part of the Card's whole write (`update`,
- * `replaceCard`), and reads one card with its file as written (`get`).
+ * `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox edit`) it writes through the Card's
+ * `edit`, which calls the handler of `inbox edit` (`editCard`).
  */
-import { INBOX_READ_WORDS, INBOX_ADD_WORDS, INBOX_FROM_WORDS, INBOX_QUEUE_WORDS, INBOX_RM_WORDS, runsNamed } from 'objects';
+import {
+  INBOX_READ_WORDS,
+  INBOX_ADD_WORDS,
+  INBOX_EDIT_WORDS,
+  INBOX_FROM_WORDS,
+  INBOX_QUEUE_WORDS,
+  INBOX_RM_WORDS,
+  runsNamed,
+} from 'objects';
 import { Effect, Schema } from 'effect';
 import { type Args } from '../command/command.ts';
 import { tableEntry, type Command, type Served } from '../command/entry.verb.ts';
@@ -19,6 +28,8 @@ import { addToInbox, dropFromInbox, queueInInbox, type InboxDropped, type InboxQ
 import { EngineService } from '../runtime-client.ts';
 import { howOf } from '../summary/how.verb.ts';
 import { inboxJudged, setFrom, type InboxFrom } from './inbox.verb.ts';
+import { editCard } from '../card-write/card-edit.verb.ts';
+import type { CardReplaced } from '../card-write/card-write.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -137,6 +148,25 @@ export const INBOX_FROM: Served<InboxFrom & { name: string; from: string[] }> = 
     })),
 };
 
+/** What `nemia inbox edit`'s handler takes: the card, its namespace, its text, and the version it was read at. */
+export const InboxEditInput = Schema.Struct({
+  name: Schema.String,
+  namespace: Schema.String,
+  source: Schema.String,
+  resourceVersion: Schema.optionalKey(Schema.String),
+});
+export type InboxEditInput = typeof InboxEditInput.Type;
+
+/**
+ * `nemia inbox edit`: a card's body and keys replaced by a card's text, its name and labels kept (`editCard`), its words the client's
+ * (`objects`' `INBOX_EDIT_WORDS`). The api's `edit` hands it the text the client read, of a file or as typed.
+ */
+export const INBOX_EDIT: Served<CardReplaced, InboxEditInput> = {
+  ...INBOX_EDIT_WORDS,
+  input: InboxEditInput,
+  handler: ({ name, namespace, ...edit }) => editCard(name, namespace, edit),
+};
+
 /** What `nemia inbox rm`'s handler takes: the card's name. */
 export const InboxRmInput = Schema.Struct({ name: Schema.String });
 export type InboxRmInput = typeof InboxRmInput.Type;
@@ -157,5 +187,6 @@ export const INBOXES: readonly (Command | Served)[] = [
   tableEntry(INBOX_ADD),
   tableEntry(INBOX_QUEUE),
   INBOX_FROM,
+  tableEntry(INBOX_EDIT),
   tableEntry(INBOX_RM),
 ];

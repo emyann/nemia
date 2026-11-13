@@ -1,7 +1,7 @@
 # build
 
 Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora
-reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing.
+reviews it and sends it back while a finding is worth a round, five at most; Otto lands it, once a person approves the landing.
 A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 
 ```
@@ -128,9 +128,28 @@ check` and before anything is pushed or the local check runs, so a non-zero exit
 `true`, checks nothing. A factory that adds a check of its own sets the parameter rather than editing the check line or the sentences
 that list its scripts, and an upgrade that changes either merges with no conflict on them.
 
-Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
-them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern). `nemia stats` totals each per
+Review counts what it closes out on (`tally: findings, findings.kind=placement, findings.missed`): the findings of each round, those
+of them whose `kind` is `placement` (a change in a boundary the repository's rules give to another concern), and those it marks
+`missed` (code that was there when the first round read the change, which that round did not name). `nemia stats` totals each per
 day, `—` on a day no review closed out.
+
+**What stops the loop.** The loop goes `rounds: 5` before it asks a person: a run that took five rounds, each finding real things, then
+went through with nobody woken, and five rounds of a wide card cost about half of what a run is meant to stay under. Three things stop
+it, and each waits on a person:
+
+- the rounds: a fifth objection leaves review `exhausted`, and a person types `nemia retry <run> review --round` for one more or
+  `nemia approve <run> review --message "<why>"` to take the work as it stands;
+- the budgets: each step's `budget:` covers all its tries and rounds (implement $50, review $24, sized to five rounds; design's
+  proposed budgets replace them at its gate), so a round that would pass a cap is held `over budget`; a factory's own line for a
+  run of the workflow cuts nothing, but a gate whose caps would let the run pass it says so;
+- a finding raised again: a review that would raise a finding a second time, after the engineer answered it, signs off `blocked`
+  rather than asking for another round, its `needs` naming each such finding, the reply, and why it still holds
+  (`review-a-change`, step 7); a person settles it with `nemia retry <run> review --message "<answer>"`, whose answer tells the
+  review to pass or to send the work back (a blocked step has nothing to approve).
+
+The rounds converge: the first reads the whole change and lists every finding it can stand on, and says what it read (`read`: the
+commit, the files and the rules); a later round reads only the diff since the last round's commit, checks each earlier finding against
+its reply, and marks `missed` a finding the first round should have named.
 
 On GitHub, the implement step's check runs no suite itself: CI runs it on the pushed commit, on clean runners and with no cache of this machine's, and
 Grace's session runs only the tests of what she changed.

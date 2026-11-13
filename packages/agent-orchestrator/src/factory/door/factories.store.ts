@@ -4,17 +4,21 @@
  * `FactoryName` and answer an Effect failing with a refusal. Its pattern is the Run door's (`src/door/door.store.ts`,
  * `src/runs/runs.store.ts`).
  *
- * Two layers: the files (`factoryFiles`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts`, `instruction.store.ts` and
- * `servers.store.ts` at a store's root, so a file is the very bytes it was and a key the model does not name is kept), and the memory
- * stand-in (`factoryDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by `factoryDoorOver`, so each write is
- * checked the one way on both: a new factory's name as `FactoryName.OnCreate` checks it, and a factory written through the model's
- * `Factory`, whose checks are its invariants — one repository at least, hires and schedules only into a workflow it offers — or `Invalid`
- * names the check broken and nothing is written; a name a level, rules or servers are written under as `FactoryName.OnCreate` checks it. A
- * factory already at a new one's name is `Conflict`. The walks of `test/factory-walks.ts` hold both layers to one table.
+ * Two layers: the files (`factoryFiles`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts`, `instruction.store.ts`,
+ * `servers.store.ts` and `folder.store.ts` at a store's root, so a file is the very bytes it was and a key the model does not name is
+ * kept), and the memory stand-in (`factoryDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
+ * `factoryDoorOver`, so each write is checked the one way on both: a new factory's name as `FactoryName.OnCreate` checks it, and a factory
+ * written through the model's `Factory`, whose checks are its invariants — one repository at least, hires and schedules only into a
+ * workflow it offers — or `Invalid` names the check broken and nothing is written; a name a level, rules or servers are written under as
+ * `FactoryName.OnCreate` checks it. A factory already at a new one's name is `Conflict`. The walks of `test/factory-walks.ts` hold both
+ * layers to one table.
  *
  * The default factory is the door's too, the same on both layers: it is no file, and the door serves it as a record (`DefaultFactory`),
  * listed first and read under its name; every write of it — filed, written back, removed, its rules, its instruction, its level, which is
  * the store's — is refused `Conflict`. Its servers alone are its own record, since every run and card that names no factory runs in it.
+ *
+ * A factory's own folder is the door's as a whole too (`folder`), for a move between stores: its files read, but those that stay with the
+ * store (`FOLDER_STAYS`), placed where none is, and removed. The default factory has none to move, and each is refused it `Conflict`.
  *
  * The door's default is rooted (`rootedDoor`): the files at the store's root the program is given (`StoreRoot`), refused where it was given
  * none, since this door reads no root of its own module's (`test/root-given.test.ts`).
@@ -44,6 +48,8 @@ import {
   treeChecked,
 } from '../factory.store.ts';
 import { levelDiffers } from './generation.ts';
+import type { TreeFile } from '../../archive/archive.ts';
+import { folderPlacedAt, folderReadAt, folderRemovedAt, type FolderRead } from './folder.store.ts';
 import type { FactoryLevelFile } from '../../level/level.ts';
 import { readFactoryLevel, writeFactoryLevel } from '../../level/level.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten, type RulesRead } from '../rules/rules.store.ts';
@@ -63,8 +69,10 @@ import {
  * or why its file does not read, so one bad file hides no other — read, filed, written back, removed, each write answering the file it
  * wrote), a factory's level (none where it follows the store's), its rules (a read's file, its words or
  * why they do not read; a write's file; whether a clear found any), its instruction (where it is kept and its words; the text the store
- * keeps written, answering its file, or cleared, answering whether there was any) and its servers (none where it has none). A layer
- * knows no default factory: the door answers it before a layer is asked.
+ * keeps written, answering its file, or cleared, answering whether there was any), its servers (none where it has none), and its own
+ * folder as a whole (its files, by path from it, sorted, but those that stay with the store, which it names; placed where none is,
+ * answering the folder, `Conflict` where one is; removed, answering whether there was one). A layer knows no default factory: the door
+ * answers it before a layer is asked.
  */
 export type FactoryLayer = {
   readonly factories: {
@@ -93,6 +101,11 @@ export type FactoryLayer = {
     readonly read: (name: string) => FactoryServers;
     readonly write: (name: string, servers: FactoryServers) => void;
   };
+  readonly folder: {
+    readonly read: (name: string) => FolderRead;
+    readonly place: (name: string, files: readonly TreeFile[]) => string;
+    readonly remove: (name: string) => boolean;
+  };
 };
 
 /** The door's methods as `doorOf` makes them of a layer's. */
@@ -120,6 +133,9 @@ const isDefault = (name: string): boolean => name === DEFAULT_NAMESPACE;
 /** `act` on the factory `name`, or, the default factory's, `Conflict` in `refusal`'s words: what the door refuses of the default. */
 const notDefault = <A>(name: string, refusal: string, act: Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
   isDefault(name) ? Effect.fail(new Conflict({ message: refusal })) : act;
+
+/** The refusal of the default factory's folder, which no move takes: it is no file, and its runs and cards are the store's own. */
+const DEFAULT_FOLDER_REFUSAL = `\`${DEFAULT_NAMESPACE}\` is the default factory: it holds every run and card that names no factory, and has no folder of its own to move. Move a factory nemia factory ls lists. Nothing was moved.`;
 
 /** `act` on the factory `name`, refused for the default factory as `nemia factory <verb>` is (`defaultFactoryRefusal`). */
 const notDefaultBy = <A>(name: string, verb: FactoryWrite, act: Effect.Effect<A, Refusal>): Effect.Effect<A, Refusal> =>
@@ -178,6 +194,11 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
     servers: {
       ...door.servers,
       write: (name, servers) => Effect.andThen(nameChecked(name), door.servers.write(name, servers)),
+    },
+    folder: {
+      read: (name) => notDefault(name, DEFAULT_FOLDER_REFUSAL, door.folder.read(name)),
+      place: (name, files) => notDefault(name, DEFAULT_FOLDER_REFUSAL, Effect.andThen(nameChecked(name), door.folder.place(name, files))),
+      remove: (name) => notDefault(name, DEFAULT_FOLDER_REFUSAL, door.folder.remove(name)),
     },
   };
 }
@@ -279,6 +300,11 @@ export function factoryFiles(home: string): FactoryLayer {
     servers: {
       read: (name) => factoryServers(home, name),
       write: (name, servers) => writeFactoryServers(home, name, servers),
+    },
+    folder: {
+      read: (name) => folderReadAt(home, name),
+      place: (name, files) => folderPlacedAt(home, name, files),
+      remove: (name) => folderRemovedAt(home, name),
     },
   };
 }

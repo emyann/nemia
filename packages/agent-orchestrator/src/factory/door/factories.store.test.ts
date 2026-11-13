@@ -1,6 +1,7 @@
 /**
  * The Factory door's files layer: the door's walks (`test/factory-walks.ts`) on a fresh scratch store each, what only the files can be
- * asked — a key the model does not name kept by a write, a templated factory's wiring written into its tree, the default door's root —
+ * asked — a key the model does not name kept by a write, a templated factory's wiring written into its tree, the default door's root, a
+ * folder placed leaving no staging folder behind —
  * and the seam: no file of `src` but the door's imports the factories' store or calls a store the door is over, with no baseline.
  */
 import { test } from 'node:test';
@@ -187,6 +188,15 @@ test("REFUSED: a planted import of the factories' store, a module spelling and a
     'src/workflows/workflows.verb.ts': `${sources['src/workflows/workflows.verb.ts']}\nconst y = readFactoryAt(home, 'a');\n`,
   };
   assert.equal(seamBreaks(rootedAgain).length, 1, 'a rooted spelling is a bypass too');
+});
+
+test('a folder placed, refused or failing, leaves no hidden staging folder beside the factories, and a failing one no folder', () => {
+  const { root, door } = store();
+  const file = (at: string) => ({ path: at, mode: 0o644, bytes: new TextEncoder().encode('words\n') });
+  done(door.folder.place(FactoryName.read('acme'), [file('tree/a.md')]));
+  assert.deepEqual(act(door.folder.place(FactoryName.read('acme'), [file('tree/b.md')])), { refused: 'Conflict' });
+  assert.throws(() => act(door.folder.place(FactoryName.read('other'), [file('tree'), file('tree/a.md')])));
+  assert.deepEqual(fs.readdirSync(path.join(root, 'factories')), ['acme']);
 });
 
 /** How many changes `write` counts on the file of `acme`, a factory filed with a level file at manual. */

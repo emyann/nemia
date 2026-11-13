@@ -11,14 +11,14 @@
  * started, queued and taken off the queue, and their labels edited. Every refusal is an object with one key, `error`, the
  * sentence that says what to do next, as the api's other routes answer one; a Conflict carries the `users` that hold the thing too.
  *
- * Group `factories`: the factories, which no namespace holds, listed, read and removed, and each one's sub-resources — its rules and its
- * instruction, read, written and cleared, the lines a person types for it (`commands`), its cost line per workflow, its revisions
- * policy, its places trusted again, a workflow attached and detached, and a harness setting set and taken off; and the writes that name a
- * template or a folder: a factory filed, a volume mounted and taken off, a factory made from a template, a hand-made one taken over by
- * one, either previewed, an upgrade filed and a conflict's choice, a template in the body as `TemplateGiven`. The factory's parts are
- * each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken off, and signed in to; group `builtin`,
- * the servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and taken back; and group `volumes`, read
- * alone.
+ * Group `factories`: the factories, which no namespace holds, listed, read, removed, exported whole and filed from another store's export,
+ * and each one's sub-resources — its rules and its instruction, read, written and cleared, the lines a person types for it (`commands`),
+ * its cost line per workflow, its revisions policy, its places trusted again, a workflow attached and detached, and a harness setting set
+ * and taken off; and the writes that name a template or a folder: a factory filed, a volume mounted and taken off, a factory made from a
+ * template, a hand-made one taken over by one, either previewed, an upgrade filed and a conflict's choice, a template in the body as
+ * `TemplateGiven`. The factory's parts are each in the factory's namespace: group `mcpservers`, its MCP servers, read, recorded and taken
+ * off, and signed in to; group `builtin`, the servers Nemia offers, in no namespace; groups `schedules` and `hires`, read, written and
+ * taken back; and group `volumes`, read alone.
  *
  * The definitions, each in a factory's namespace as the factory resolves it: groups `workflows`, `agents` and `skills`, each listed with
  * `?origin=` for one origin's, shadowed or not, read, and yours written in `default` alone; an agent tried and read as a card, a builtin
@@ -39,7 +39,7 @@
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
-import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite } from './card.ts';
+import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite, CardEdit } from './card.ts';
 import { Table } from './table.ts';
 import {
   Factory,
@@ -72,6 +72,7 @@ import {
   FactorySettingWrite,
   FactoryTrusted,
 } from './factory.ts';
+import { FactoryExport, FactoryImported, FactoryImportWrite, MOVE_CARDS } from './factory-move.ts';
 import { Hire, HireList, HireWrite } from './hire.ts';
 import { McpServer, McpServerList, McpServerWrite, SignInCallback, SignInStarted, SignInState, SignedOut } from './mcp-server.ts';
 import { Schedule, ScheduleList, ScheduleWrite } from './schedule.ts';
@@ -211,6 +212,12 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.put('update', '/api/namespaces/:namespace/cards/:name', {
     params: cardParams,
     payload: CardWrite,
+    success: CardObject,
+    error: cardErrors,
+  }),
+  HttpApiEndpoint.put('edit', '/api/namespaces/:namespace/cards/:name/source', {
+    params: cardParams,
+    payload: CardEdit,
     success: CardObject,
     error: cardErrors,
   }),
@@ -373,6 +380,18 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
     params: factoryParams,
     payload: FactoryApplyWrite,
     success: FactoryApplied,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.get('export', '/api/factories/:name/export', {
+    params: factoryParams,
+    query: { cards: Schema.optionalKey(Schema.Literals(MOVE_CARDS)) },
+    success: FactoryExport,
+    error: objectErrors,
+  }),
+  HttpApiEndpoint.post('import', '/api/factories/:name/import', {
+    params: factoryParams,
+    payload: FactoryImportWrite,
+    success: FactoryImported,
     error: objectErrors,
   }),
   HttpApiEndpoint.post('adopt', '/api/factories/:factory/adopt', {

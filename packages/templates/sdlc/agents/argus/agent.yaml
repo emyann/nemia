@@ -29,6 +29,7 @@ spec:
         - Bash(nemia stats:*)
         - Bash(nemia inbox)
         - { path: fences/read-only.allow.yaml }
+        - { path: fences/help.allow.yaml }
       disallowedTools:
         - { path: fences/read-only.deny.yaml }
         - Edit(${{ parameters.storeRoot }}/factories/**)

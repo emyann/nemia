@@ -244,6 +244,17 @@ const REFUSALS: readonly Refused[] = [
       : []),
   ]),
   ['factory, a word it has no command of', 'factory', ['frob'], ['nemia factory does not take frob', 'nemia factory --help']],
+  ['factory move, no --to', 'factory move', ['f'], ['--to <context>', 'nemia config get-contexts']],
+  ['factory move, --repo with no =', 'factory move', ['f', '--to', 'b', '--repo', '/src/a'], ['--repo <source>=<url|path>', '/src/a']],
+  ['factory move, --volume with no path', 'factory move', ['f', '--to', 'b', '--volume', 'data='], ['--volume <name>=<path>']],
+  ['factory move, --from as --to', 'factory move', ['f', '--to', 'b', '--from', 'b'], ['--from', '--to', 'nemia config get-contexts']],
+  ['factory move, --cards neither word', 'factory move', ['f', '--to', 'b', '--cards', 'some'], ['--cards follow|stay']],
+  [
+    'factory move, every flag',
+    'factory move',
+    ['f', '--to', 'b', '--from', 'a', '--repo', '/a=https://h/o/r.git', '--volume', 'v=/x', '--cards', 'stay'],
+    null,
+  ],
 ];
 
 test('REFUSED: what each command the client holds refuses of its command line, before anything is asked', async (t) => {

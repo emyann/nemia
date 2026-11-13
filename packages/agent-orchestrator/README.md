@@ -3187,6 +3187,16 @@ run 'wf tick' (or 'wf up') to start it
   refused, naming the attach. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the
   body whole, as `wf start` takes a brief that is not a card. `--repo`, and a file's `repo:`, are refused: the factory names
   the repository.
+- **`nemia inbox edit <name> <file>`, or `nemia inbox edit <name> -- "<card>"`, changes a card where it lives.** It takes a
+  card's text, frontmatter and body, as `status.source` serves it, and reads it as the card's own file is read: a key no card has,
+  or one whose value does not read, is refused by name, and nothing is written. The body and the keys `workflow:`, `gate:`,
+  `model:` and `from:` are the text's, a key left out taken off; the card keeps its name, so every reference to it still holds,
+  though its title may no longer slug to it. Its labels are `nemia label inbox`'s, and its factory and `queued:` its own: a text
+  that says other labels, another factory or another `queued:` is refused, naming the verb that does it, and one that leaves them
+  out or says them as they are keeps them. A started card is refused (`Conflict`), since its run copied it, naming `nemia inbox
+  add` for a new card. The api serves it as the Card's `edit`, `PUT /api/namespaces/<factory>/cards/<name>/source`, which takes
+  the `resourceVersion` it was read at, and the MCP port as `inbox_edit`; the card is written whole, by the Card's update, or not
+  at all.
 - **`wf inbox` lists the cards**: name, first line, workflow when set, an old card's `repo:` marked `(retired)`, `queued 2 of 3` for a queued card, and
   `started as <runId>` for a card whose name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
   refusal, never hidden. A hidden file and a README are not listed.
@@ -3784,6 +3794,13 @@ mise's own file (`.tool-versions`, `mise.toml`); one where mise reads none is me
 of the store carries in its own tree (`upgradeCarries`, `src/release/carry.ts`). `nemia upgrade` runs the new release's before it
 switches, a carry that fails refusing the upgrade with nothing switched; and the daemon, at its start, adopts the Claude Code an older
 release carried into the tools folder where it holds none (`adoptBundled`), then files each carried install as a fix.
+
+**The tools folder's `nemia`.** On an install, `<tools>/bin/nemia` is a link to `releases/current/bin/nemia`
+(`src/release/nemia-link.store.ts`), so a step's session runs the `nemia` its settings allow on a server whose own PATH has none, and
+the link follows every switch of the pointer. The installer makes it, `nemia doctor carry` makes it where it is not (`linkNemia`), so a
+store installed before it gets it at its next upgrade, and the read's `tools` piece, on a process that runs an archive's release, reads
+it missing where it is not, offering `nemia doctor fix tools`, the store's own need (`toolsNeed`). A store with no pointer, which a
+checkout runs, gets none: its person has their own `nemia`.
 
 ## One daemon per store: `daemon.json`
 

@@ -1,8 +1,8 @@
 /**
  * Nemia's chat, as the canvas draws it: her header, the band that says why she stopped or that the board lost the daemon, her talk, the
- * message this browser kept, and the composer. In her side sheet beside the page (`HerSheet`), with no frame of its own, the sheet being
- * its frame; or the page of its own at `/chat`, the same panel full-bleed in the look's cut frame — alive while her session is up, a quiet
- * outline while she is down. Either way it takes the whole of the room it is given, so its header and its controls, and its composer,
+ * message this browser kept, and the composer. A kept message the api refused raises no band: its own line under it says what the api
+ * said. In her side sheet beside the page (`HerSheet`), with no frame of its own, the sheet being its frame; or the page of its own at
+ * `/chat`, the same panel full-bleed in the look's cut frame — alive while her session is up, a quiet outline while she is down. Either way it takes the whole of the room it is given, so its header and its controls, and its composer,
  * are all inside the window. What may be long — her talk, her greeting — scrolls inside the panel; the kept message, its band and the
  * composer keep their room.
  *
@@ -90,14 +90,14 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onClose }:
       {kept !== null && (
         <div className="flex shrink-0 flex-col gap-3.5">
           <ChatKeptMessage kept={kept} onAgain={chat.sendKept} onEdit={chat.editKept} onDiscard={chat.discardKept} />
-          <ChatLostBand since={kept.at} now={now} />
+          {kept.refused === undefined && <ChatLostBand since={kept.at} now={now} />}
         </div>
       )}
       <div className="shrink-0">
         <Composer
           marks="chat"
           label="Message to Nemia"
-          placeholder={composerWords(presence, inWords !== undefined)}
+          placeholder={composerWords(presence, inWords !== undefined, kept?.refused !== undefined)}
           off={presence.notSent}
           sendLabel="Send"
           onSend={(text) => (inWords === undefined ? chat.send(text) : chat.answer(inWords.call, wordsAnswer(inWords, text)))}

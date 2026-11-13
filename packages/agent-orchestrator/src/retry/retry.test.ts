@@ -12,12 +12,16 @@ import type { StepSpec } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
+import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import {
   continuesFrom,
   dueNote,
   messageRefusal,
   nextTry,
+  retriesSpent,
   sessionModel,
+  tryWord,
+  turnsOf,
   type EarlierTry,
   type Retry,
   type RetryAsk,
@@ -651,5 +655,58 @@ test('deniedOffer: each rule once, one line, the first five named and the rest c
   await t.test('calls its own deny beside one it does not: the rule for that one, and which rules are at work for them', () => {
     const mixed = deniedOffer(['Bash(npm)', 'SendMessage', 'Bash(pytest)'], { disallowedTools: ['Bash(npm run build)', 'SendMessage'] });
     names(mixed, 'Bash(pytest:*)', 'Bash(npm), SendMessage', '(Bash(npm run build), SendMessage)', 'no rule is offered for them');
+  });
+});
+
+test('retriesDue of a check the machine killed: run again as its check by `retries:`, whatever it exited with', async (t) => {
+  const GI = 1024 ** 3;
+  const machine: OutOfMemoryKill = { by: 'machine', kills: 1, limitBytes: 8 * GI, peakBytes: 3 * GI };
+  const limit: OutOfMemoryKill = { by: 'limit', kills: 1, limitBytes: 8 * GI, peakBytes: 8 * GI, raise: 'default' };
+  const ONE: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 1 }, step('review', ['implement'])];
+  const due = (
+    o: { steps?: StepSpec[]; tries?: EarlierTry[]; verdict?: Verdict; kill?: OutOfMemoryKill; extra?: Partial<Run> } = {},
+  ): Retry[] =>
+    retriesDue(
+      o.steps ?? ONE,
+      onTry(o.tries, 'c1', o.extra),
+      phases({ t1: 'succeeded', c1: 'failed' }),
+      signedDone,
+      asked,
+      () => o.verdict ?? 1,
+      [],
+      () => false,
+      undefined,
+      (s) => (s === 'implement' ? o.kill : undefined),
+    );
+  const policy: StepSpec[] = [{ ...ONE[0]!, checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [1] } }] } }, ONE[1]!];
+  const rows: Array<[string, Parameters<typeof due>[0], Retry[]]> = [
+    ['exit 1, the machine’s kill: a recheck by retries', { kill: machine }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
+    ['exit 1, a kill at the limit: the session continued, as before', { kill: limit }, [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }]],
+    ['unfinished, the machine’s kill: a recheck', { kill: machine, verdict: 'unfinished' }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
+    ['a code the policy names a person’s, the machine’s kill: a recheck', { steps: policy, kill: machine }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
+    ['retries spent by an earlier recheck the run filed: nothing', { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck', retried: true }] }, []],
+    ['a person’s recheck spends no retry: a recheck still due', { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck' }] }, [{ step: 'implement', try: 3, mode: 'recheck', by: 'retries' }]],
+  ];
+  for (const [name, o, is] of rows) await t.test(name, () => assert.deepEqual(due(o), is));
+});
+
+test('a recheck `retries:` filed: the same task, marked retried, counted by retriesSpent and by no turn', async (t) => {
+  const record: StepRecord = { taskId: 't1', workspace: '/wt', check: { taskId: 'c1' } };
+  const retried = nextTry(record, { step: 'implement', try: 2, mode: 'recheck', by: 'retries' });
+  await t.test('the task kept, the try behind it a recheck marked retried', () => {
+    assert.equal(retried.taskId, 't1');
+    assert.deepEqual(retried.tries, [{ taskId: 't1', check: { taskId: 'c1' }, cause: 'recheck', retried: true }]);
+  });
+  await t.test('retriesSpent counts it; turnsOf does not; sessionModel looks past it', () => {
+    assert.equal(retriesSpent(retried), 1);
+    assert.equal(turnsOf(retried), 0);
+    assert.equal(sessionModel({ ...IMPLEMENT, model: 'opus' }, retried), 'opus');
+  });
+  await t.test('its notes name retries: and the check run again', () => {
+    const s: StepSpec = { ...IMPLEMENT, retries: 1 };
+    namesFor('tryNote', tryNote(s, retried), ['try 2', 'rechecked', 'retries: 1']);
+    const r: Retry = { step: 'implement', try: 2, mode: 'recheck', by: 'retries' };
+    namesFor('dueNote', dueNote(s, pauseRun('t1', 'c1'), r), ['try 2 due', 'retries: 1', 'check']);
+    namesFor('tryWord', tryWord(r, s), ['retries: 1', 'check']);
   });
 });

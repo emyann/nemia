@@ -1808,9 +1808,46 @@ test('a check killed at its memory limit is told to the step tried again, outsid
     for (const fact of ['check out of memory', '6Gi', 'WF_MEMORY_LIMIT']) assert.ok(said.includes(fact), fact);
     assert.ok(said.indexOf('out of memory') < said.search(/`{3,}json/));
   });
+  await t.test('killed with its own limit reached (oom): the same kill and knob', async () => {
+    const said = await toldAfter({ exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 6 * GI, oomKills: 1, oom: 1 } });
+    for (const fact of ['check out of memory', '6Gi', 'WF_MEMORY_LIMIT']) assert.ok(said.includes(fact), fact);
+  });
   await t.test('a record with no kill, or none: nothing of memory', async () => {
     assert.doesNotMatch(await toldAfter({ exitCode: 1, memory: { limitBytes: 6 * GI, peakBytes: GI, oomKills: 0 } }), /out of memory/);
     assert.doesNotMatch(await toldAfter({ exitCode: 1 }), /out of memory/);
+  });
+});
+
+test('a check the machine killed under its own limit is run again by `retries:`, as its check, and then waits on you offered --recheck', async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  const GI = 1024 ** 3;
+  const squeezed = { exitCode: 137, memory: { limitBytes: 6 * GI, peakBytes: 3 * GI, oomKills: 1, oom: 0 } };
+  let run: RepositoryRun;
+  const check1 = () => `${run.id}-implement-check`;
+  const check2 = () => `${run.id}-implement-try2-check`;
+  await s.test('implement, with `retries: 1`, signs off and the machine kills a process of its check', async () => {
+    run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', squeezed);
+  });
+  await s.test('one pass runs its check again, and files no session', async () => {
+    const pass = await tick(run.id);
+    assert.deepEqual([pass.tried, pass.checked], [['implement'], ['implement']]);
+    assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no session');
+    assert.equal(b.tasks.has(`${run.id}-implement-try2`), false);
+    assert.deepEqual(filedAs(runRecord(ROOT, run.id).steps.implement).tries, [
+      { taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck', retried: true },
+    ]);
+    assert.deepEqual(retryAsks(run.id), [], 'nobody asked for it');
+  });
+  await s.test('the machine kills it again: its retries spent, it waits on you, and `nemia decide` offers --recheck first', async () => {
+    ended(check2(), 'failed', squeezed);
+    const pass = await tick(run.id);
+    assert.deepEqual(pass.tried, []);
+    assert.deepEqual((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).waitingOnYou, ['implement']);
+    const { offers } = await stage.runWith(b.e, decideRun(run.id));
+    assert.ok(offers[0]?.includes(`nemia retry ${run.id} implement --recheck`), offers[0]);
+    assert.ok(offers[0]?.includes('machine'), offers[0]);
+    assert.ok(!offers.join('\n').includes('WF_MEMORY_LIMIT'));
   });
 });
 

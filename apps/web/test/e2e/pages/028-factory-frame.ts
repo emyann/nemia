@@ -1,9 +1,8 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
-import { BAR_KEY } from '../../../src/lib/bar.ts';
 import { cardOf, expectClearOfEachOther } from '../canvas.ts';
-import { expectInside, expectVisible, Refused, settled } from '../checks.ts';
+import { expectInside, expectNone, expectVisible, settled } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -20,33 +19,17 @@ const BLINK = { width: 100, height: 160 };
 /** The floor's frame. */
 const floorOf = (page: Page) => page.locator('.react-flow').first();
 
-/** How wide the floor is drawn: 0 once the bar at its widest covers it whole. */
-const widthOf = async (page: Page) => (await floorOf(page).boundingBox())?.width ?? 0;
-
-/** How wide a strip of the floor the bar leaves in view, in pixels, once its edge is dragged there. */
-const STRIP = 40;
-
-/** Drags the bar's edge to `x`, as a person does, and waits for the floor to settle. */
-async function dragEdgeTo(page: Page, x: number): Promise<void> {
-  const edge = await page.getByRole('separator', { name: 'Resize the bar' }).boundingBox();
-  if (!edge) throw new Refused("the bar's edge is not drawn");
-  const y = edge.y + edge.height / 2;
-  await page.mouse.move(edge.x + edge.width / 2, y);
-  await page.mouse.down();
-  await page.mouse.move(x, y, { steps: 12 });
-  await page.mouse.up();
-  await settled(page);
-}
+/** The frame's side sheet, docked at the right of the frame's row. */
+const sheetOf = (page: Page) => page.locator('[data-frame-sheet]');
 
 export default {
   /**
    * The Factory keeps the run a person inspected in view when the floor's frame changes size, down as well as across, and aims no view at
-   * a frame without one. Three times, with ENDING's card open and its ending's step in the bar: the floor loses its height for a moment
-   * and gets it back, as a full-page screenshot lays the page out, then the bar is closed; the bar's edge is dragged to its widest, until
-   * the bar covers the floor whole and squeezes its frame flat across, then the bar is closed; and the edge is dragged until the bar leaves
-   * the floor a strip, then is closed. Each time the card's head, with its Hide steps button, is inside the floor, clear of the queue
-   * lane and the header over it, and Hide steps closes the card. The window and the bar's width are given back and the floor laid out
-   * again, as each page after it reads them.
+   * a frame without one. Twice, with ENDING's card open and its ending's step in the frame's side sheet: the floor loses its height for a
+   * moment and gets it back, as a full-page screenshot lays the page out, then the bar is closed; and the floor narrows beside the docked
+   * sheet, ending where the sheet begins, then the bar is closed. Each time the card's head, with its Hide steps button, is inside the
+   * floor, clear of the queue lane and the header over it, and Hide steps closes the card. The window is given back and the floor laid
+   * out again, as each page after it reads them.
    */
   name: 'factory-frame',
   route: '/factories/default',
@@ -88,21 +71,14 @@ export default {
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
-    await inspectThenClose('squeezed', async () => {
-      await dragEdgeTo(page, 0);
-      const width = await widthOf(page);
-      if (width > 1) throw new Refused(`the bar at its widest covers the floor whole and squeezes it flat — it leaves ${width} px`);
-    });
-
-    await page.getByRole('button', { name: 'Reset layout' }).click();
-    await settled(page);
-    await inspectThenClose('strip', async () => {
-      const floor = await floorOf(page).boundingBox();
-      await dragEdgeTo(page, (floor?.x ?? 0) + STRIP);
-      const width = await widthOf(page);
-      if (!width || width > 2 * STRIP) throw new Refused(`the bar leaves the floor a strip, ${STRIP} px or so — it leaves ${width}`);
-    });
-    await page.evaluate((key) => localStorage.removeItem(key), BAR_KEY);
+    await inspectThenClose('beside', () =>
+      expectNone(async () => {
+        const floor = await floorOf(page).boundingBox();
+        const sheet = await sheetOf(page).boundingBox();
+        if (!floor || !sheet) return 'the floor and the sheet are not both drawn';
+        return floor.x + floor.width > sheet.x + 1 ? `it ends at ${floor.x + floor.width}, the sheet begins at ${sheet.x}` : null;
+      }, 'the floor narrows beside the sheet, ending where it begins'),
+    );
 
     await page.setViewportSize(WIDE);
     await page.getByRole('button', { name: 'Reset layout' }).click();

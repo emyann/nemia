@@ -852,9 +852,22 @@ export function herStopped(at: string): void {
   fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
 }
 
-/** Her face in the rail (or in the top bar on a narrow screen), her side sheet, and the panel it holds. */
+/** Her face in the rail (or in the top bar on a narrow screen), the frame's side sheet that holds her chat or a bar, and her panel. */
 export const herFaceOf = (page: Page): Locator => page.locator('[data-nemia-face-button]');
 export const herSheetOf = (page: Page): Locator => page.locator('[data-slot="side-sheet"]');
+
+/** The frame's docked sheet's holder, which says how it stands (`data-frame-sheet`) and what it shows (`data-sheet-shows`). */
+export const frameSheetOf = (page: Page): Locator => page.locator('[data-frame-sheet]');
+
+/** The frame's docked sheet comes to show `shows`, within `WAIT_MS`: what the address's `?bar=` names, her chat, or nothing. */
+export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none', assertion: string): Promise<void> {
+  try {
+    await page.locator(`[data-frame-sheet][data-sheet-shows="${shows}"]`).waitFor({ state: 'attached', timeout: WAIT_MS });
+  } catch {
+    const now = await frameSheetOf(page).getAttribute('data-sheet-shows', { timeout: 1000 }).catch(() => 'no docked sheet');
+    throw new Refused(`${assertion} — the sheet shows ${now}`);
+  }
+}
 export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
 
 /**

@@ -78,7 +78,7 @@ write(
     id: RUN,
     place: { kind: 'folder' },
     workspace: root,
-    brief: 'Hold the reads to the old path\n\nAnd say why.',
+    brief: '# Hold the reads to the old path\n\nAnd say why.',
     workflowDir: path.join(root, 'no-such-workflow'),
     createdAt: at(0),
     workflow: [
@@ -447,7 +447,11 @@ test('`nemia show <run>` prints the run object, nemia/v1, with the line that poi
   assert.equal(raw.err, '');
   const record = JSON.parse(raw.out) as { id: string; brief: string; workflow: { name: string; body: string }[]; labels: object };
   assert.equal(record.id, RUN);
-  assert.equal(record.brief, 'Hold the reads to the old path\n\nAnd say why.…', 'its brief cut at 120 characters, marked');
+  assert.equal(
+    record.brief,
+    '# Hold the reads to the old path\n\nAnd say why.…',
+    'its brief as stored, heading kept, cut at 120 characters, marked',
+  );
   assert.deepEqual(
     record.workflow.map(({ name, body }) => [name, body]),
     [

@@ -8,7 +8,7 @@
  * already carries. A run of the page that could not be judged is a row too, its note saying why, as `nemia ls` says it unreadable. The
  * api answers it to a list asked for a `Table` (`TABLE_ACCEPT`), so no client keeps a printer of the runs. Pure.
  */
-import type { Run, RunList, RunStepStatus, RunUnjudged, Table, TableColumnDefinition } from 'objects';
+import { headline, type Run, type RunList, type RunStepStatus, type RunUnjudged, type Table, type TableColumnDefinition } from 'objects';
 import { ranOnWords } from '../release/index.ts';
 
 /** How much of a brief's first line a row shows, as `nemia ls` cuts it. */
@@ -51,12 +51,6 @@ export const RUN_COLUMNS: readonly TableColumnDefinition[] = [
     priority: 1,
   },
 ];
-
-/** `text` up to its first line's end. */
-const firstLine = (text: string): string => {
-  const at = text.indexOf('\n');
-  return at === -1 ? text : text.slice(0, at);
-};
 
 /** A run's labels, `key=value` by key, comma-separated: empty for none. */
 const labelsCell = (labels: Readonly<Record<string, string>>): string =>
@@ -149,7 +143,7 @@ const partialOf = (metadata: Run['metadata']) => ({ kind: 'PartialObjectMetadata
 export const runCells = (run: Run): readonly unknown[] => [
   run.metadata.name,
   statusCell(run),
-  firstLine(run.spec.brief).slice(0, BRIEF_WIDTH),
+  headline(run.spec.brief).slice(0, BRIEF_WIDTH),
   run.status.cost?.said ?? '',
   calledOff(run),
   waitsCell(run),

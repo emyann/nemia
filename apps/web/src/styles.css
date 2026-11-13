@@ -302,8 +302,9 @@
 }
 
 /*
- * The height of the frame's top bar, which a page that fills the window and the floating bar stand under: one line on a window 80rem
- * wide or more, two under it, where the page's name stands over the factory switcher and the bar's buttons. Under it, the frame's lines
+ * The height of the frame's top bar, which a page that fills the window and the floating bar stand under: one line where the bar is wide
+ * enough, two where it says it takes two (`data-lines`, `FrameHeader.tsx`, which decides by its own width beside the rail and Nemia's
+ * sheet), the page's name then standing over the factory switcher and the bar's buttons. Under it, the frame's lines
  * (a newer release, the setup banner, a refused link) are as tall as `--frame-lines`, which the frame measures and sets on the column
  * the page stands in (`__root.tsx`): a page that fills the window is `100svh` less both.
  */
@@ -312,10 +313,8 @@
   --frame-lines: 0px;
 }
 
-@media (width < 80rem) {
-  :root {
-    --frame-top: 9rem;
-  }
+:root:has([data-frame-header][data-lines='two']) {
+  --frame-top: 9rem;
 }
 
 /*

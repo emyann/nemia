@@ -1,9 +1,22 @@
 /**
  * What the inbox's writes print of a Card the api answered (`objects`' `Card`): its factory by its namespace, its labels as kubectl's
- * LABELS column shows them, and the keys its spec carries as one line names them; and a workflow given as a path refused, exit 2.
+ * LABELS column shows them, and the keys its spec carries as one line names them; a workflow given as a path refused, exit 2; and a
+ * card's text as typed, a file's read here where it names one (`textOrFile`).
  */
+import fs from 'node:fs';
 import { type Card, DEFAULT_NAMESPACE } from 'objects';
 import { Refused } from '../../refused.ts';
+import { textOf } from '../files.ts';
+
+/**
+ * What `command` was typed as text: a file's text, read here, where it names one; else the words. A folder is refused, exit 2, naming
+ * `forms`, the ways to type it.
+ */
+export const textOrFile = (given: string, command: string, forms: string): string => {
+  const at = fs.statSync(given, { throwIfNoEntry: false });
+  if (at?.isDirectory()) throw new Refused(`${given} is a directory, and nemia ${command} takes text or one file: ${forms}.`);
+  return at ? textOf(given, command) : given;
+};
 
 /** The factory a card is in, by its namespace: none for `default`. */
 export const factoryOf = (card: Card): string | undefined => {

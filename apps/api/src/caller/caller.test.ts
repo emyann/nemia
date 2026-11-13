@@ -94,24 +94,21 @@ test("REFUSED 401 on the MCP port, exposed or not: no token, and a session's, ea
   assert.equal(passed.headers.get('www-authenticate'), null);
 });
 
-test('needOf: the MCP port needs the person, the api’s routes a token where exposed but the pairing routes, and the board’s pages none', () => {
-  for (const path of ['/mcp', '/mcp/x']) {
-    assert.equal(needOf(path, false), 'person', path);
-    assert.equal(needOf(path, true), 'person', path);
-  }
-  for (const path of ['/api', '/api/runs', '/openapi', '/openapi/v3/nemia/v1']) {
-    assert.equal(needOf(path, true), 'token', path);
-    assert.equal(needOf(path, false), 'none', path);
-  }
-  for (const path of ['/api/pair', '/api/pair/abc/claim', '/api/pair/link']) {
-    assert.equal(needOf(path, true), 'none', `${path}: a pairing route judges its own secret`);
-    assert.equal(needOf(path, false), 'none', path);
-  }
-  for (const path of ['/api/pairings', '/api/pairings/ABCD-EFGH/approve', '/api/pairx']) assert.equal(needOf(path, true), 'token', path);
-  for (const path of ['/', '/assets/x.js', '/runs/x', '/apifoo', '/mcpx']) {
-    assert.equal(needOf(path, true), 'none', path);
-    assert.equal(needOf(path, false), 'none', path);
-  }
+test('needOf: the MCP port needs a standing token, every api route a token on any store but the pairing routes, the board’s pages none', () => {
+  for (const path of ['/mcp', '/mcp/x']) assert.equal(needOf(path), 'standing', path);
+  for (const path of [
+    '/api',
+    '/api/runs',
+    '/openapi',
+    '/openapi/v3/nemia/v1',
+    '/api/pairings',
+    '/api/pairings/ABCD-EFGH/approve',
+    '/api/pairx',
+  ])
+    assert.equal(needOf(path), 'token', `${path}: no request to the api is the person for presenting none`);
+  for (const path of ['/api/pair', '/api/pair/abc/claim', '/api/pair/link'])
+    assert.equal(needOf(path), 'none', `${path}: a pairing route judges its own secret`);
+  for (const path of ['/', '/assets/x.js', '/runs/x', '/apifoo', '/mcpx']) assert.equal(needOf(path), 'none', path);
 });
 
 /** A GET of `url` on `on`, presenting `token` by the board's cookie alone. */

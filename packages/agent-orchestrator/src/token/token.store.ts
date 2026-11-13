@@ -5,9 +5,11 @@
  * taken back: whether its session is still the live one is judged afresh on each request against the run (`caller.verb.ts`), so a token
  * ends with its try and no list of revoked ones is kept.
  *
- * And a person's tokens: named, minted by the person at the store's machine (`mintPersonToken`, `nemia token add`), answered once and kept
- * as the record its digest names, `<home>/person-tokens/<digest>.json` (`PersonTokenFiled`: its name and when it was minted), every one
- * of them the person; listed by name (`personTokens`) and removed by name (`revokePersonToken`), after which it is refused as unknown.
+ * And the standing tokens, the person's to mint: named, minted through the api (`mintPersonToken`, `POST /api/tokens`), answered once and
+ * kept as the record its digest names, `<home>/person-tokens/<digest>.json` (`PersonTokenFiled`: its name, when it was minted, and who
+ * holds it — the person, or an agent bound to a factory or store-wide and maybe narrowed; a record that names no holder, minted before
+ * holders were said, is the person's); listed by name (`personTokens`) and removed by name (`revokePersonToken`), after which it is refused
+ * as unknown. The folder keeps its name, `person-tokens`, so no record minted before is orphaned.
  *
  * Rooted: every function takes the store's root as `home`, and the door (`TokenDoor`) reads the root the program is given (`StoreRoot`).
  * And the minting of a step's token as its try is filed (`stepToken`), which the tick's filings spread into the config they file.
@@ -21,7 +23,7 @@ import { doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../workflow.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import type { TokenRecord } from './token.ts';
+import type { StandingRecord, TokenHolder, TokenRecord } from './token.ts';
 
 /**
  * What the store keeps of a token it minted: the contract's record (`TokenRecord`), and the engine's task the session runs in (`task`),
@@ -92,10 +94,34 @@ export function readToken(home: string, token: string): TokenFiled | null {
   return Result.isSuccess(read) ? read.success : null;
 }
 
-/** What the store keeps of a person's token, found by its digest: the name the person gave it and when it was minted (an ISO date). */
-export type PersonTokenFiled = { readonly name: string; readonly createdAt: string };
+/**
+ * What the store keeps of a standing token, found by its digest: the name the person gave it, when it was minted (an ISO date), and who
+ * holds it (`holder`: absent, minted before holders were said, is the person).
+ */
+export type PersonTokenFiled = { readonly name: string; readonly createdAt: string; readonly holder?: TokenHolder };
 
-const PersonTokenFiledSchema = Schema.Struct({ name: Schema.String, createdAt: Schema.String });
+/** The holder of an agent's token as its record keeps it. */
+const AgentHolderSchema = Schema.Struct({
+  kind: Schema.Literal('agent'),
+  agent: Schema.String,
+  factory: Schema.NullOr(Schema.String),
+  narrowed: Schema.NullOr(Schema.Literals(['read', 'act'])),
+});
+
+const PersonTokenFiledSchema = Schema.Struct({
+  name: Schema.String,
+  createdAt: Schema.String,
+  holder: Schema.optionalKey(Schema.Union([Schema.Struct({ kind: Schema.Literal('person') }), AgentHolderSchema])),
+});
+
+/** The person, as a token's holder. */
+const PERSON_HOLDER: TokenHolder = { kind: 'person' };
+
+/** Who holds the token `record` is of: its holder, or the person where it names none. */
+export const holderOf = (record: PersonTokenFiled): TokenHolder => record.holder ?? PERSON_HOLDER;
+
+/** The standing record `record` is, as `callerOf` reads it: its name and its holder. */
+export const standingOf = (record: PersonTokenFiled): StandingRecord => ({ name: record.name, holder: holderOf(record) });
 
 /** The folder the store keeps a person's token records in, under the store `home`. */
 export const personTokensDir = (home: string): string => path.join(home, 'person-tokens');
@@ -112,7 +138,9 @@ function personRecordOf(text: string): PersonTokenFiled | null {
     return null;
   }
   const read = Schema.decodeUnknownResult(PersonTokenFiledSchema)(raw);
-  return Result.isSuccess(read) ? { name: read.success.name, createdAt: read.success.createdAt } : null;
+  if (!Result.isSuccess(read)) return null;
+  const { name, createdAt, holder } = read.success;
+  return holder === undefined ? { name, createdAt } : { name, createdAt, holder };
 }
 
 /** Every record of a person's token under the store `home`, with the file it is kept in; none where the folder is not there. */
@@ -130,20 +158,27 @@ function personFiles(home: string): Array<{ file: string; record: PersonTokenFil
 }
 
 /**
- * Mints a person's token under `name`, its record (`PersonTokenFiled`) written under its digest, readable by its owner alone (`minted`).
- * Answers the token itself, once: the store keeps only its digest. Refused, writing nothing: a name that is no name (`Invalid`), and a
- * name a token of the person's is already kept under (`Conflict`, naming the removal that frees it).
+ * Mints a standing token under `name`, held by `holder` (the person where not said), its record (`PersonTokenFiled`) written under its
+ * digest, readable by its owner alone (`minted`). Answers the token itself, once: the store keeps only its digest. Refused, writing
+ * nothing: a name that is no name (`Invalid`), an agent's name that is none (`Invalid`), and a name a token is already kept under
+ * (`Conflict`, naming the removal that frees it).
  */
-export function mintPersonToken(home: string, name: string, now: Date = new Date()): string {
+export function mintPersonToken(home: string, name: string, now: Date = new Date(), holder: TokenHolder = PERSON_HOLDER): string {
   if (!PERSON_TOKEN_NAME.test(name))
     throw new Invalid({
       message: `nemia token add takes a name of letters, digits, \`.\`, \`_\` or \`-\`, starting with a letter or a digit, 63 at most, and \`${name}\` is not one: name it for where it is used, as nemia token add laptop.`,
+    });
+  if (holder.kind === 'agent' && !PERSON_TOKEN_NAME.test(holder.agent))
+    throw new Invalid({
+      message: `nemia token add --agent takes the agent's name, of letters, digits, \`.\`, \`_\` or \`-\`, and \`${holder.agent}\` is not one: nemia token add <name> --agent <agent>, as nemia token add ops --agent operator.`,
     });
   if (personFiles(home).some((f) => f.record.name === name))
     throw new Conflict({
       message: `a token named ${name} is already kept: name this one otherwise, or nemia token rm ${name} first, which refuses the old one from then on.`,
     });
-  return minted(personTokensDir(home), { name, createdAt: now.toISOString() } satisfies PersonTokenFiled);
+  const record: PersonTokenFiled =
+    holder.kind === 'person' ? { name, createdAt: now.toISOString() } : { name, createdAt: now.toISOString(), holder };
+  return minted(personTokensDir(home), record);
 }
 
 /**
@@ -198,8 +233,8 @@ export function revokePersonToken(home: string, name: string): PersonTokenFiled 
 }
 
 /**
- * A layer of the token door: minting a session's token and reading the record of one presented; and a person's tokens minted by name,
- * read by digest, listed and removed by name.
+ * A layer of the token door: minting a session's token and reading the record of one presented; and the standing tokens minted by name
+ * for a holder, read by digest, listed and removed by name.
  */
 export type TokensLayer = {
   readonly tokens: {
@@ -207,7 +242,7 @@ export type TokensLayer = {
     readonly read: (token: string) => TokenFiled | null;
   };
   readonly persons: {
-    readonly mint: (name: string) => string;
+    readonly mint: (name: string, holder?: TokenHolder) => string;
     readonly read: (digest: string) => PersonTokenFiled | null;
     readonly list: () => PersonTokenFiled[];
     readonly revoke: (name: string) => PersonTokenFiled;
@@ -221,7 +256,7 @@ export type TokenDoorShape = DoorOf<TokensLayer, string>;
 const tokenFiles = (home: string): TokensLayer => ({
   tokens: { mint: (record) => mintToken(home, record), read: (token) => readToken(home, token) },
   persons: {
-    mint: (name) => mintPersonToken(home, name),
+    mint: (name, holder) => mintPersonToken(home, name, new Date(), holder),
     read: (digest) => personTokenOf(home, digest),
     list: () => personTokens(home),
     revoke: (name) => revokePersonToken(home, name),

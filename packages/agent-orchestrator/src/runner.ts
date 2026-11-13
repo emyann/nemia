@@ -560,9 +560,10 @@ import * as RunObject from './object/run.model.ts';
 export { RunModel, RunObject };
 
 export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
-export type { CallerOf, PersonTokenFiled, TokenNeed } from './token/caller.verb.ts';
+export type { CallerOf, PersonTokenFiled, StandingRecord, TokenHolder, TokenNeed } from './token/caller.verb.ts';
 export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
 export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
+export { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from './token/commands.verb.ts';
 export { LINK_TTL_MS, PAIRING_TTL_MS, ticketState, type Ticket } from './pairing/ticket.ts';
 export {
   addressKind,
@@ -575,7 +576,7 @@ export {
   type MachineAddress,
   type Parsed,
 } from './service/index.ts';
-export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
+export { PERSON, actorOf, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export type { ProposalPlace } from './propose/current.verb.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';

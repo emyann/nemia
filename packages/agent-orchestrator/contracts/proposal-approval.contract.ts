@@ -34,12 +34,19 @@ export type Grant = {
 export type ProposalRule = Grant & { readonly id: string; readonly widens: boolean; readonly proposedBy: readonly string[] };
 
 /**
- * Who calls: the person (no session's token), or an agent's session the store started, by its agent and its factory — null for a session
- * of the store's own (Nemia's), which works in every factory and holds there only what that factory's delegation grants it.
+ * Who calls: the person (a token the person holds, or none in-process), or an agent — a session the store started, or a standing token
+ * the person minted for it — by its agent and its factory: null for a session of the store's own (Nemia's) or a store-wide token, which
+ * works in every factory and holds there only what that factory's delegation grants it. `token`, the name of the standing token it
+ * presented, where it presented one.
  */
 export type Caller =
-  | { readonly kind: Extract<CallerKind, 'person'> }
-  | { readonly kind: Extract<CallerKind, 'agent'>; readonly agent: string; readonly factory: string | null };
+  | { readonly kind: Extract<CallerKind, 'person'>; readonly token?: string | null }
+  | {
+      readonly kind: Extract<CallerKind, 'agent'>;
+      readonly agent: string;
+      readonly factory: string | null;
+      readonly token?: string | null;
+    };
 
 /** Whether `caller` acts in `factory`: the person anywhere, a factory's session in its own, a store-wide session in any. */
 const actsIn = (caller: Caller, factory: string): boolean =>

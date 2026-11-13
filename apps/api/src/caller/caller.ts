@@ -4,14 +4,15 @@
  * package (`sessionCaller`). Resolved once per request, before any router is reached (`callerGate`, app.ts), and put on the request for
  * `served` to hand every handler as `caller` (layer.ts): a proposal's and a delegation's handlers read it there.
  *
- * What a route needs: the MCP port (`/mcp`) always one of the person's tokens; a route the api answers (`API_PATHS`), where the store is
- * marked exposed (`WF_EXPOSED=1`, `StoreConfig.exposed`), a token, any live one; and otherwise none, a request that presents none being
- * the person. A page of the board (board/board.ts) needs none, exposed or not: it carries no data of the store.
+ * What a route needs: the MCP port (`/mcp`) always a standing token, one the person minted, held by the person or an agent; a route the
+ * api answers (`API_PATHS`) a token, any live one, on every store, loopback included: no request to the api is the person for presenting
+ * none. A pairing route needs none, as it judges its own secret, and a page of the board (board/board.ts) none: it carries no data of the
+ * store. The person's own `nemia` presents the credential the daemon keeps for it with nothing to type.
  *
  * Every request that presents a token is judged, whatever its route, not only the proposals' and delegations': a session's client sends
  * its token on every request (apps/cli), so a token refused on a read is the same forged or ended token a write would carry, and a
  * session that learns so on its first request learns it before it acts. A header that is not `Bearer <token>`, no token where the route
- * needs one, a session's where it needs the person's, and a token the store never minted or whose try is no longer the live one, are
+ * needs one, a session's where it needs a standing one, and a token the store never minted or whose try is no longer the live one, are
  * refused 401 (`Unauthorized`, with its reason), answered by `answerError` (app.ts); on the MCP port with `WWW-Authenticate: Bearer`.
  */
 import { Effect } from 'effect';
@@ -30,7 +31,7 @@ export class Unauthorized extends TaggedError('Unauthorized')<{ readonly message
   readonly exitCode = 2;
 }
 
-/** The MCP port's path: it and every path under it need one of the person's tokens. */
+/** The MCP port's path: it and every path under it need a standing token, one the person minted. */
 export const MCP_PATH = '/mcp';
 
 /**
@@ -59,23 +60,23 @@ const onPairing = (path: string): boolean => under(path, PAIR_PATH);
 export const answered = (path: string): boolean => API_PATHS.some((root) => under(path, root));
 
 /**
- * What a request to `path` needs of a token: the person's on the MCP port; none on a pairing route (`PAIR_PATH`), which judges its own
- * secret; a token, any live one, on a route the api answers where the store is `exposed`; and none on a page of the board, which
- * carries no data of the store, so that a browser reaching an exposed store loads the page that asks for a token.
+ * What a request to `path` needs of a token: a standing one on the MCP port; none on a pairing route (`PAIR_PATH`), which judges its own
+ * secret; a token, any live one, on a route the api answers, exposed or not; and none on a page of the board, which carries no data of
+ * the store, so that a browser with no token loads the page that asks for one.
  */
-export const needOf: NeedOf = (path, exposed) =>
-  onPort(path) ? 'person' : onPairing(path) ? 'none' : exposed && answered(path) ? 'token' : 'none';
+export const needOf: NeedOf = (path) => (onPort(path) ? 'standing' : onPairing(path) ? 'none' : answered(path) ? 'token' : 'none');
 
-/** How a client sends a token, and where the person mints one. */
-const SEND = "send one as `Authorization: Bearer <token>`: `nemia token add <name>`, at the store's machine, mints one of yours";
+/** How a client sends a token, and where the person finds or mints one. */
+const SEND =
+  "send one as `Authorization: Bearer <token>`: the person's own `nemia` on the store's machine sends the one the daemon keeps for it, `nemia board link` opens the board with one, and `nemia token add <name>` mints another";
 
 /** Why a token is refused for `reason`, and what the person who sent it does next. */
 const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
   'unknown-token': `no token the store keeps is this one, a session's or yours (a token of yours removed with nemia token rm is refused): ${SEND}`,
   'session-ended':
     "the try this session's token was minted for is no longer its step's live one, and a session's token ends with its try: run the command from the session its run filed, which carries WF_SESSION_TOKEN",
-  'token-required': `this store is marked exposed (WF_EXPOSED=1), or the route is the MCP port, so a request with no token is refused: ${SEND}`,
-  'person-token-required': `the MCP port takes a token of yours, never a session's: ${SEND}`,
+  'token-required': `every route of the api and the MCP port takes a token, on loopback as on a shared address, so a request with none is refused: ${SEND}`,
+  'person-token-required': `the MCP port takes a token the person minted, for themselves or for an agent (\`nemia token add <name> --agent <agent>\`), never a session's: ${SEND}`,
 };
 
 /**
@@ -101,10 +102,6 @@ export async function callerBy(
     message: `${c.req.method} ${c.req.path} refuses its request (${caller.reason}): ${REFUSED_WORDS[caller.reason]}.`,
   });
 }
-
-/** Whether the store the app serves is marked exposed (`WF_EXPOSED=1`), read afresh from its settings. */
-const exposedOf = (c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Promise<boolean> =>
-  c.var.runtime.runPromise(Effect.map(StoreConfig, (config) => config.exposed));
 
 /**
  * The middleware that puts the request's caller on it (`c.var.caller`), or refuses it 401 before any router is reached: the need its
@@ -139,17 +136,18 @@ async function callerOfRequest(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): Pro
       message: `${c.req.method} ${path} reads its Authorization header as \`Bearer <token>\`, and this one is not: send a token as \`Authorization: Bearer <token>\` — a session's is in $WF_SESSION_TOKEN, and \`nemia token add <name>\` mints one of yours.`,
     });
   const token = bearer ?? (onPort(path) || answered(path) ? cookieTokenOf(c) : undefined);
-  return callerBy(c, token, needOf(path, await exposedOf(c)));
+  return callerBy(c, token, needOf(path));
 }
 
 /**
- * A route that is the person's alone: throws `Forbidden` (403) unless the caller of `route` is the person, as a step's session must not
- * act on the machine outside its agent's fence (approve a pairing, make a first-visit link, start a need's fix). Its words name
- * `instead`, what the person types at the store's machine.
+ * A route that is the person's alone: throws `Forbidden` (403, reason `person-only`) unless the caller of `route` is the person, as an
+ * agent — its session, or a token the person minted for it — must not act on the machine outside its agent's fence (approve a pairing,
+ * make a first-visit link, mint a token, start a need's fix). Its words name `instead`, what the person types with their own `nemia`.
  */
 export const personOnly = (s: Served, route: string, instead: string): void => {
   if (s.caller.kind === 'person') return;
   throw new Forbidden({
-    error: `${route} is the person's alone, and this request carries a session's token: run ${instead} at the store's machine, or send a token of yours (\`nemia token add <name>\` mints one).`,
+    reason: 'person-only',
+    error: `${route} is the person's alone, and this request carries a token an agent holds (${s.caller.agent}'s): the person types ${instead} with their own nemia, which sends a token they hold.`,
   });
 };

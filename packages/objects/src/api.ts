@@ -109,6 +109,7 @@ import { ServerGroup, Subscribed, SubscriptionWrite, Unsubscribed } from './serv
 import { ReadinessGroup } from './readiness.ts';
 import { UpgradesGroup } from './upgrade.ts';
 import { PairGroup, PairingsGroup } from './pairing.ts';
+import { TokensGroup } from './token.ts';
 
 export {
   BadRequest,
@@ -847,7 +848,8 @@ export const Api = HttpApi.make('nemia')
   .add(ReadinessGroup)
   .add(UpgradesGroup)
   .add(PairGroup)
-  .add(PairingsGroup);
+  .add(PairingsGroup)
+  .add(TokensGroup);
 
 /** The groups `Api` holds. */
 type GroupsOf<A> = A extends HttpApi.HttpApi<string, infer G> ? G : never;

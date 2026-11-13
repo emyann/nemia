@@ -53,6 +53,7 @@ import { nemiaHandlers } from '../nemia/index.ts';
 import { readinessHandlers } from '../readiness/readiness.ts';
 import { upgradesHandlers } from '../upgrades/index.ts';
 import { pairHandlers, pairingsHandlers } from '../pairing/pairing.ts';
+import { tokensHandlers } from '../tokens/tokens.ts';
 
 /** Where every path the api serves is listed, with what each takes. */
 const DOCUMENT = 'GET /openapi/v3/nemia/v1';
@@ -193,6 +194,7 @@ export const objectsHandler = (runtime: ApiRuntime) =>
         upgradesHandlers,
         pairHandlers,
         pairingsHandlers,
+        tokensHandlers,
       ]),
       Layer.provide(decodeRefused),
       Layer.provide(answerRefused),

@@ -11,6 +11,7 @@
  * words.
  */
 import { Schema } from 'effect';
+import { Actor } from './token.ts';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { Paused } from './server-api.ts';
@@ -206,6 +207,7 @@ export const RunApproved = Schema.Struct({
   at: Schema.String,
   message: Schema.NullOr(Schema.String),
   file: Schema.String,
+  actor: Schema.optionalKey(Actor),
   loop: Schema.optionalKey(Schema.Boolean),
   next: Schema.optionalKey(Schema.Literals(['step', 'waiting', 'nothing'])),
   caps: Schema.optionalKey(
@@ -279,6 +281,7 @@ export const RunHoldWritten = Schema.Struct({
   until: Strings,
   why: Schema.optionalKey(Schema.String),
   by: Schema.optionalKey(Schema.String),
+  actor: Schema.optionalKey(Actor),
 }).annotate({ identifier: 'RunHoldWritten' });
 export type RunHoldWritten = typeof RunHoldWritten.Type;
 
@@ -303,7 +306,9 @@ export const RunCancelPlan = Schema.Union([
 export type RunCancelPlan = typeof RunCancelPlan.Type;
 
 /** What a cancel answers: the run and the plan it followed (`nemia cancel`). */
-export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan }).annotate({ identifier: 'RunCancelled' });
+export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan, actor: Schema.optionalKey(Actor) }).annotate({
+  identifier: 'RunCancelled',
+});
 export type RunCancelled = typeof RunCancelled.Type;
 
 /** A condition routed by hand, as `nemia route` routes one: the route, one of the condition's `routes:`. */

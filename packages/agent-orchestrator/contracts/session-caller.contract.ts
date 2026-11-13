@@ -109,14 +109,12 @@ const callerOfSpec = spec<
     aSessionTokenIsRefusedWhereAStandingOneIsNeeded: {
       description: "A session's token, to a route that needs a standing one, is refused for it",
       condition: ({ input: [presented, need, standing, record], output }) =>
-        !(sessionSide(presented, standing) && record !== null && need === 'standing') ||
-        refusedFor(output, 'person-token-required'),
+        !(sessionSide(presented, standing) && record !== null && need === 'standing') || refusedFor(output, 'person-token-required'),
     },
     endedRefused: {
       description: "A session's token whose try is no longer live is refused, where the route takes a session's",
       condition: ({ input: [presented, need, standing, record, live], output }) =>
-        !(sessionSide(presented, standing) && record !== null && need !== 'standing' && !live) ||
-        refusedFor(output, 'session-ended'),
+        !(sessionSide(presented, standing) && record !== null && need !== 'standing' && !live) || refusedFor(output, 'session-ended'),
     },
     liveIsItsAgent: {
       description: "A live session's token, where the route takes a session's, is its agent, in its factory, run and step",

@@ -11,6 +11,7 @@ import { boardLink, pairingsApprove, pairingsLs } from './pairing.ts';
 import { concluded, logs, memory } from './reads.ts';
 import { stats } from './stats.ts';
 import { subscribe, unsubscribe } from './subscriptions.ts';
+import { tokenAdd, tokenLs, tokenRm } from './tokens.ts';
 
 /** Each of the group's commands' runner. */
 export const REST_RUNNERS: Readonly<Record<RestCommand, Runner>> = {
@@ -29,4 +30,7 @@ export const REST_RUNNERS: Readonly<Record<RestCommand, Runner>> = {
   'pairings ls': pairingsLs,
   'pairings approve': pairingsApprove,
   'board link': boardLink,
+  'token add': tokenAdd,
+  'token ls': tokenLs,
+  'token rm': tokenRm,
 };

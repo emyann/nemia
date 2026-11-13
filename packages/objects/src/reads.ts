@@ -156,6 +156,7 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'upgrades.upgradeOf': { shape: 'one', why: 'its output is the tail the orchestrator keeps of it, never the whole' },
   'upgrades.output': { shape: 'stream', why: 'sent one chunk at a time, never built as one answer' },
   'pairings.list': { shape: 'one', why: 'the tickets a person asked for, each short-lived: a handful at once' },
+  'tokens.list': { shape: 'one', why: 'the tokens the person minted, each named by hand or for a client it paired: a handful' },
   'nemia.speakers': ONE,
   'nemia.instructions': ONE,
 };

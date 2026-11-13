@@ -1,6 +1,6 @@
 /**
- * Who a request is from, by the token it presents and what its route needs of one (`sessionCaller`): the record of a person's token read
- * by its digest first, then the record of a session's (`TokenDoor`), whether that session is still the live one judged afresh against
+ * Who a request is from, by the token it presents and what its route needs of one (`sessionCaller`): the record of a standing token
+ * read by its digest first, then the record of a session's (`TokenDoor`), whether that session is still the live one judged afresh against
  * the run's record and the engine (`liveSession`), then the pure judgement (`callerOf`). Remembers nothing between requests: a session's
  * token ends with its try, and a person's with its record, removed by name; no list of revoked ones is kept. What the api reads of the
  * tokens, re-exported here so the package's entry names it from one module.
@@ -10,10 +10,18 @@ import { EngineService, asked } from '../runtime-client.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { callerOf, type CallerOf, type TokenNeed } from './token.ts';
-import { TokenDoor, tokenDigest, type TokenFiled } from './token.store.ts';
+import { TokenDoor, standingOf, tokenDigest, type TokenFiled } from './token.store.ts';
 
-export { callerOf, type CallerOf, type TokenNeed, type TokenRecord } from './token.ts';
-export { TokenDoor, tokenDoorFiles, tokenDigest, type PersonTokenFiled, type TokenDoorShape, type TokenFiled } from './token.store.ts';
+export { callerOf, type CallerOf, type StandingRecord, type TokenHolder, type TokenNeed, type TokenRecord } from './token.ts';
+export {
+  TokenDoor,
+  holderOf,
+  tokenDoorFiles,
+  tokenDigest,
+  type PersonTokenFiled,
+  type TokenDoorShape,
+  type TokenFiled,
+} from './token.store.ts';
 export { SESSION_TOKEN } from '../filed/filed.ts';
 
 /** Whether the engine's task `task` was filed and has not settled: a session that still runs, or will run again. */
@@ -37,17 +45,18 @@ export const liveSession = Effect.fn('liveSession')(function* (record: TokenFile
 
 /**
  * The caller a request is, from the token it presents (`undefined`: it presents none) and what its route needs of one (`need`, `none`
- * where not said): with none, the person where the route needs none and refused `token-required` where it needs one; one of the person's
- * tokens, the person; refused `unknown-token` where the store keeps no record of it, `person-token-required` for a session's where the
- * route needs the person's, `session-ended` where its session is no longer the live one, and otherwise its agent in its factory, run and
- * step (`callerOf`). Reads the store's root off the program (`StoreRoot`, through `TokenDoor`), the run off `RunDoor` and the task off the
- * engine (`EngineService`), each only where the judgement turns on it.
+ * where not said): with none, the person where the route needs none and refused `token-required` where it needs one; a standing token,
+ * its holder under its name; refused `unknown-token` where the store keeps no record of it, `person-token-required` for a session's where
+ * the route needs a standing one, `session-ended` where its session is no longer the live one, and otherwise its agent in its factory,
+ * run and step (`callerOf`). Reads the store's root off the program (`StoreRoot`, through `TokenDoor`), the run off `RunDoor` and the
+ * task off the engine (`EngineService`), each only where the judgement turns on it.
  */
 export const sessionCaller = Effect.fn('sessionCaller')(function* (token: string | undefined, need: TokenNeed = 'none') {
-  if (token === undefined) return callerOf(false, need, false, null, false);
+  if (token === undefined) return callerOf(false, need, null, null, false);
   const door = yield* TokenDoor;
-  const person = (yield* door.persons.read(tokenDigest(token))) !== null;
-  const record = person ? null : yield* door.tokens.read(token);
-  const live = record === null || need === 'person' ? false : yield* liveSession(record);
-  return callerOf(true, need, person, record, live) satisfies CallerOf;
+  const kept = yield* door.persons.read(tokenDigest(token));
+  const standing = kept === null ? null : standingOf(kept);
+  const record = standing !== null ? null : yield* door.tokens.read(token);
+  const live = record === null || need === 'standing' ? false : yield* liveSession(record);
+  return callerOf(true, need, standing, record, live) satisfies CallerOf;
 });

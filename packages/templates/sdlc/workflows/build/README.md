@@ -8,12 +8,12 @@ A change its card settles, which needs no design, goes through [`quick`](../quic
 design → implement ⇄ review → land
 ```
 
-Each script a step runs is read from the run's frozen carried files (`$WF_CARRIED_FILES`), the copy of the template's `carried/`
-folder the run took when it began, never from the tree it judges: a step's check runs `node "$WF_CARRIED_FILES/<script>.ts"`. The
-scripts live there once, since `quick` runs them too, with the helpers `landing.ts` and `pull-request.ts` share (`exec.ts`) and the
-rules of a CI log (`ci-log.ts`). Where `WF_CARRIED_FILES` is not set, the check names it on stderr and fails: a factory's scripts are
-not in the repository it works on, so there is nowhere else to read them from. This sdlc needs the Nemia it ships with: one that
-renders and freezes a template's carried folder and reads a `{ path }` item of a list.
+Each script a step runs is read from the run's frozen carried files (`$WF_CARRIED_FILES`), the copy of the template's `carried/` folder
+the run took when it began, never from the tree it judges: a step's check runs `node "$WF_CARRIED_FILES/<script>.ts"`. The scripts live
+there once, since `quick` runs them too, with the helpers `landing.ts` and `pull-request.ts` share (`exec.ts`), the rules of a CI log
+(`ci-log.ts`) and the landing refresh (`refresh.ts`). Where `WF_CARRIED_FILES` is not set, the check names it on stderr and fails: a
+factory's scripts are not in the repository it works on, so there is nowhere else to read them from. This sdlc needs the Nemia it ships
+with: one that renders and freezes a template's carried folder and reads a `{ path }` item of a list.
 
 ## Two ways to judge and land: in this checkout, or on GitHub
 
@@ -89,24 +89,35 @@ no label from it.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads from the frozen files. Otto runs its `merge --run
 <id> --subject … --body-file … --check <name>`: it refuses anything but this run's own green pull request — not a draft, based on the
-base branch, its head the commit the review read, `mergeable`, the CI context green at that commit, and no result branch of the run
-left out — then merges it with a merge commit whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never
+base branch, its head the commit the review read, `mergeable`, the CI context green at that commit, and no result branch of the run left
+out — then merges it with a merge commit whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never
 `--delete-branch`: GitHub deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only
-origin/<base>`). On a refusal he changes nothing and signs off `blocked` with the `nemia retry` line it printed. Land's check is then
-the receipt alone — the pull request `MERGED` with a merge commit reachable from HEAD, the checkout clean on the base with no merge in
-progress, every commit of every branch of the run with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its
-own counts as taken) — which is what the run needs to record `landed` on the commit that landed. It runs no suite: CI judged the head
-the review read, and the merge commit's first parent is the base. Last, where the factory's `landingWaitsOnCi` is true (the default),
-the receipt waits on the CI context at the merge commit on the base branch (`receipt --run <id> --check <name> --wait-on-ci <true|false>`;
-up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS` while another check there still runs, and `WHOLE_SECONDS` in all,
-the bounds the implement step's wait keeps in `exec.ts`, inside the landing check's own deadline). Green passes. Red fails the step
-though the merge stands — nothing is taken back — naming the jobs that did not pass: a person re-runs them where CI failed on its own
-account, or lands a fix, then types `nemia retry <run> land`; where the base's tip holds the merge and the context is green there, the
-receipt passes and says so. A merge whose own run was cancelled — a CI that replaces a pending run of the base with a newer push's
-— or never reported is read at the base's tip where GitHub's compare says it holds the merge: green there passes, naming the commit
-read and why; red there fails the step naming that commit; anything else waits on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming
-`landingWaitsOnCi`: a repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and the
-receipt then waits on nothing.
+origin/<base>`). On a refusal he changes nothing and signs off `blocked` with the `nemia retry` line it printed. Where the factory names
+a refresh — `landingRefresh`, a command of its own that derives files from the tree, and `landingDerives`, the paths it owns, which the
+merge takes as `--refresh` and `--derives` — and the pull request's head lacks the base, the merge first refreshes the branch
+(`refresh.ts`, beside it): it merges the base into the branch in the run's worktree, runs the command there, refuses and takes the merge
+back where anything is left unmerged, the command fails, or the result differs from git's plain merge outside the derived paths, and
+otherwise commits it, pushes the branch with no force and leaves `refreshed.json` in the step's files, merging nothing yet. A refresh
+the command changed nothing of, on a merge that went clean, is taken back, and the merge goes on as before. So two runs that change one
+derived file side by side both land: the landed commit differs from the reviewed head only in the files `landingDerives` names. Land's
+check then merges a head so refreshed, where none is merged and `refreshed.json` names this run's open pull request at it: once the CI
+context is green there (red refuses, with the `nemia retry <run> review --message "…"` that sends the work back) and while it holds the
+base (a base that moved past it refuses with the land retry line), with `--match-head-commit <head>` and the session's subject and body,
+then fast-forwards the checkout. Past that, land's check is the receipt alone — the pull request `MERGED` with a merge commit reachable
+from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run with an equivalent patch on
+HEAD (`git cherry`, so a part taken as a commit of its own counts as taken) — which is what the run needs to record `landed` on the
+commit that landed. It runs no suite: CI judged the head the review read, and the merge commit's first parent is the base. Last, where
+the factory's `landingWaitsOnCi` is true (the default), the receipt waits on the CI context at the merge commit on the base branch
+(`receipt --run <id> --check <name> --wait-on-ci <true|false>`; up to `START_SECONDS` for it to be reported there, or `WHOLE_SECONDS`
+while another check there still runs, and `WHOLE_SECONDS` in all, the bounds the implement step's wait keeps in `exec.ts`, inside the
+landing check's own deadline). Green passes. Red fails the step though the merge stands — nothing is taken back — naming the jobs that
+did not pass: a person re-runs them where CI failed on its own account, or lands a fix, then types `nemia retry <run> land`; where the
+base's tip holds the merge and the context is green there, the receipt passes and says so. A merge whose own run was cancelled — a CI
+that replaces a pending run of the base with a newer push's — or never reported is read at the base's tip where GitHub's compare says it
+holds the merge: green there passes, naming the commit read and why; red there fails the step naming that commit; anything else waits
+on, to the bounds. Still running at the bound fails with the same retry line. Never reported fails too, naming `landingWaitsOnCi`: a
+repository whose CI does not run on pushes to the base sets it false (`--set landingWaitsOnCi=false`), and the receipt then waits on
+nothing.
 
 The implement step's check runs `probe.ts`, read from the frozen files as well: a session a step starts to measure something, a probe, is named
 `<run>-probe-<label>` (`node "$WF_CARRIED_FILES/probe.ts" start <label> -- <prompt>`), runs in the machinery's trusted folder

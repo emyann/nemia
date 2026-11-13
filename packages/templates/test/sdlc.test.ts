@@ -1,12 +1,13 @@
 /**
  * sdlc as a factory gets it: `nemia template lint` passes it, spawned as a person types it, and `nemia factory apply` renders it into a
- * factory's tree with every parameter written where the template says it: the CI context in each implement check and each landing,
- * the round's check in build's implement check, the rules of the pull request's labels in each implement check, the areas in
- * RULES.md, and no expression left in any file. Its way, `github`, is the branch each implement and land check takes and the answer
- * each of their notes opens with: on GitHub where it is set true, and in the checkout by default, where the local check judges each
- * round and the merged tree; a `github` that is no boolean is refused at apply. Each step that writes its own `output:` has its schema
- * beside it in the tree, the template's own bytes; the team is six agents, Ada none of them. Applied with no `--set`, each parameter
- * takes its default. Build's design, read with its agent as a run reads it, declares the budgets of the later steps by their shape.
+ * factory's tree with every parameter written where the template says it: the CI context in each implement check and each landing, the
+ * round's check in build's implement check, the landing's refresh in each land's merge and its derived paths in each review, the rules
+ * of the pull request's labels in each implement check, the areas in RULES.md, and no expression left in any file. Its way, `github`,
+ * is the branch each implement and land check takes and the answer each of their notes opens with: on GitHub where it is set true, and
+ * in the checkout by default, where the local check judges each round and the merged tree; a `github` that is no boolean is refused at
+ * apply. Each step that writes its own `output:` has its schema beside it in the tree, the template's own bytes; the team is six
+ * agents, Ada none of them. Applied with no `--set`, each parameter takes its default. Build's design, read with its agent as a run
+ * reads it, declares the budgets of the later steps by their shape.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,6 +35,8 @@ const TREES = await rendered([
       'areas=a, b',
       'pullRequestLabels=work=fix:fix',
       'implementCheck=echo own',
+      'landingRefresh=node x.ts cut',
+      'landingDerives=a.json',
     ],
   },
   { name: 'plain', template: COPY },
@@ -125,6 +128,19 @@ test('applied with no --set, each parameter takes its default', () => {
   }
   assert.ok(fs.readFileSync(path.join(tree, 'RULES.md'), 'utf8').includes('the top-level folders of the repository'));
   assert.ok(fs.readFileSync(path.join(tree, 'workflows/agents/otto.md'), 'utf8').includes('Edit(~/.agent-workflows/inbox/**)'));
+});
+
+test("the factory's landing refresh reaches land's merge as its two flags, and both reviews' notes name the paths it derives", () => {
+  const tree = treeOf('set');
+  for (const workflow of ['build', 'quick'])
+    assert.ok(
+      stepIn(tree, workflow, 'land').body.includes(' --refresh "node x.ts cut" --derives "a.json"'),
+      `${workflow}/land's merge carries both flags`,
+    );
+  for (const workflow of ['build', 'quick'])
+    assert.ok(stepIn(tree, workflow, 'review').body.includes('`a.json`'), `${workflow}/review names the derived paths`);
+  const plain = stepIn(treeOf('plain'), 'build', 'land').body;
+  assert.ok(plain.includes(' --refresh "" --derives ""'), 'unset, both are given empty, which the merge takes as no refresh');
 });
 
 test("build's and quick's implement try again on their own twice when their check refuses, either way, and land never does", () => {

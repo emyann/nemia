@@ -2,9 +2,9 @@
  * `node landing.ts <verb>` — the two acts a landing is made of, which no agent may type: the merge of this run's own pull request on
  * GitHub, and the receipt that it happened. A Bash prefix rule cannot tell `gh pr merge 7` from `gh pr merge 9`, and `gh` is denied whole
  * to the agents that land, so the act is this script, read from the run's frozen carried files (`$WF_CARRIED_FILES`) and run with `node`,
- * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads, and
- * `exec.ts`, for how a command is run and CI waited on, as `pull-request.ts` does: the run freezes the carried folder whole, so a script
- * may import a sibling it holds. It is told the name of
+ * as `pull-request.ts` carries the push and the pull request. It imports `ci-log.ts`, beside it, for how a check of a commit reads,
+ * `exec.ts`, for how a command is run and CI waited on, as `pull-request.ts` does, and `refresh.ts`, for the landing refresh: the run
+ * freezes the carried folder whole, so a script may import a sibling it holds. It is told the name of
  * the CI context it reads (`--check <name>`), since that name is the repository's, never the script's.
  *
  * - `merge --run <id> --subject <line> --body-file <f> --check <name>`, which the landing session types once its step has been filed — on a
@@ -16,12 +16,27 @@
  *   auto-deletes the head branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`).
  *   **Level-triggered**: it reads the world rather than what a last try left, so a retry after a merge that went through and a fast-forward
  *   that was then declined — the one failure between the two acts — does the fast-forward alone and merges nothing a second time.
+ *   Given the factory's own command `--refresh <cmd>` and the paths it derives `--derives <paths>` (the factory's `landingRefresh` and
+ *   `landingDerives`, each may be empty, and an empty `--refresh` is the merge above), where the pull request's head is the run's
+ *   own and leaves no branch out but does not hold `origin/<base>` after a `git fetch origin`, it refreshes the branch first
+ *   (`refresh.ts`): the base merged into it in the worktree that has it checked out, the command run there to derive its files again,
+ *   the result committed and pushed with no force, and `refreshed.json` left in `$WF_STEP_FILES` for the check; it then merges nothing
+ *   and exits 0, saying the check merges once CI is green at the pushed head. A refresh the command changed nothing of, on a merge
+ *   that went clean, is taken back, and the merge goes on as above. **The landed commit differs from the reviewed head only in the
+ *   files `landingDerives` names**, since review reads a head that no longer lands as is: the refreshed head is git's plain merge of the
+ *   reviewed head and the base (`git merge-tree --write-tree`), differing from it only in the derived paths, and a refresh with any
+ *   other difference, any path left unmerged, or a command that exits non-zero is refused and taken back, nothing pushed.
  * - `receipt --run <id> --check <name> --wait-on-ci <true|false>`, which the land step's `check:` runs: it refuses unless the pull request
  *   is `MERGED` with a merge commit that is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every
  *   commit of every `wf/<id>/*` branch has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record
- *   `landed: {commit}` on the commit that landed. Then, last, so a receipt that refuses never waits, and only where `--wait-on-ci` is
- *   `true` (the factory's `landingWaitsOnCi`), it waits on the CI context `--check` names at the merge commit on the base branch, read
- *   over REST (its check runs and its status contexts; the combined `state` is never a verdict): 1800 s for it to be reported
+ *   `landed: {commit}` on the commit that landed. Where none is merged, it first reads `refreshed.json` in `WF_ARTIFACTS` (the land
+ *   step's files folder): where it names this run's open pull request at its head, the receipt merges it — once the CI context is green
+ *   at that head (red refuses, naming the jobs and the `nemia retry <id> review --message "…"` that sends the work back), and only while
+ *   the head holds `origin/<base>` (a base that moved past it refuses with the land step's retry line) — by `gh pr merge --merge
+ *   --match-head-commit <head>` with the subject and body the session gave, and fast-forwards the checkout, then receipts as above.
+ *   Then, last, so a receipt that refuses never waits, and only where `--wait-on-ci` is `true` (the factory's `landingWaitsOnCi`), it
+ *   waits on the CI context `--check` names at the merge commit on the base branch, read over REST (its check runs and its status
+ *   contexts; the combined `state` is never a verdict): 1800 s for it to be reported
  *   (`WF_CI_START_SECONDS`), 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval, inside the landing check's own
  *   deadline, the whole of it while another check at the merge still runs (a context that sums up other jobs comes once they end).
  *   Green passes. Red refuses, naming the jobs that did not pass — unless the base's tip holds the merge and the context is green there,
@@ -31,7 +46,9 @@
  *   out, exiting non-zero, or answering no JSON — is no verdict: the wait reads again within the whole bound, and a read still failing
  *   there refuses, naming the last error. Still running at the bound, or never reported (CI may not run on pushes to the base: the
  *   factory then sets `landingWaitsOnCi` false), refuses. A refusal there takes nothing back: the merge stands, and the retry reads
- *   GitHub again.
+ *   GitHub again. Where the receipt merged a refreshed head, the merge commit's tree is most often the head's, already judged, and it
+ *   says so rather than waiting again; else the wait at the merge has what remains of the one `WF_CI_WAIT_SECONDS` clock the wait at
+ *   the head began, so both stay inside the landing check's deadline.
  *
  * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1 on
  * stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty checkout,
@@ -44,9 +61,11 @@
 import fs from 'node:fs';
 import {
   type Landing,
+  NOT_FAILED,
   PASSED,
   type Seen,
   greenLater,
+  listing,
   named,
   noVerdict,
   pending,
@@ -58,6 +77,7 @@ import {
   verdict,
 } from './ci-log.ts';
 import { POLL_SECONDS, Refusal, START_SECONDS, WHOLE_SECONDS, authed, base, git, noGh, run, seconds, sleep } from './exec.ts';
+import { type Refreshed, bodyFileOf, lacksBase, recorded, refresh } from './refresh.ts';
 
 /** The one `mergeable` GitHub gives a pull request that can be merged now; `CONFLICTING` and `UNKNOWN` are both refusals. */
 const MERGEABLE = 'MERGEABLE';
@@ -270,6 +290,21 @@ function green(pr: Pr, check: string): void {
 
 /** The pull request read as the merge requires it: this run's own, green, and at the sha the reviewer read. */
 function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): void {
+  own(pr, onto, named, check);
+  if ((pr.mergeable ?? '').toUpperCase() !== MERGEABLE)
+    throw new Refusal(
+      `GitHub says #${pr.number} is \`${pr.mergeable ?? 'unknown'}\`, not \`${MERGEABLE}\`, so it cannot be merged as it stands: the ` +
+        `work merges its base again and goes round, or a person reads ${pr.url}. Nothing is merged here.`,
+    );
+  green(pr, check);
+  whole(pr, named);
+}
+
+/**
+ * The pull request read as this run's own, before anything else of it is: not a draft, on the base, its head the tip of a result branch
+ * here — the sha the review read.
+ */
+function own(pr: Pr, onto: string, named: readonly { branch: string; tip: string }[], check: string): void {
   if (pr.isDraft)
     throw new Refusal(
       `#${pr.number} is a draft, and a draft is not judged by the \`${check}\` context branch protection requires: a person marks ` +
@@ -292,12 +327,10 @@ function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: str
       `#${pr.number} has ${pr.headRefOid.slice(0, 12)} as its head and \`${mine.branch}\` is at ${mine.tip.slice(0, 12)} here, so ` +
         'the commit that would land is not the one the review read: a person brings the two together, then the step is retried',
     );
-  if ((pr.mergeable ?? '').toUpperCase() !== MERGEABLE)
-    throw new Refusal(
-      `GitHub says #${pr.number} is \`${pr.mergeable ?? 'unknown'}\`, not \`${MERGEABLE}\`, so it cannot be merged as it stands: the ` +
-        `work merges its base again and goes round, or a person reads ${pr.url}. Nothing is merged here.`,
-    );
-  green(pr, check);
+}
+
+/** The pull request's head read as holding every result branch of the run, by patch; refuses one that leaves a branch out. */
+function whole(pr: Pr, named: readonly { branch: string; tip: string }[]): void {
   const left = leftOut(named, pr.headRefOid);
   if (left.length)
     throw new Refusal(
@@ -321,14 +354,18 @@ const andThe = (branches: readonly { branch: string }[]): string =>
 /** The line a person types where the landing refused and the step must be run again. */
 const retryLine = (id: string): string => `  Then: nemia retry ${id} ${process.env.WF_STEP || STEP}`;
 
-/** The options a verb was given, each flag of `takes` with its value; refuses a flag it has not, and one with no value. */
-function options(verb: string, args: readonly string[], takes: readonly string[]): Record<string, string> {
+/**
+ * The options a verb was given, each flag of `takes` with its value; refuses a flag it has not, and one with no value. A flag of
+ * `may` is the factory's own, rendered from a parameter that is empty by default: it may be left out, or given empty.
+ */
+function options(verb: string, args: readonly string[], takes: readonly string[], may: readonly string[] = []): Record<string, string> {
   const opts: Record<string, string> = {};
   for (let i = 0; i < args.length; i += 2) {
     const [flag, value] = [args[i], args[i + 1]];
-    if (!takes.includes(flag) || !value)
+    if (may.includes(flag) && value !== undefined) opts[flag] = value;
+    else if (!takes.includes(flag) || !value)
       throw new Refusal(`\`${flag}\` is not an option of ${verb}: give ${takes.map((t) => `${t} <value>`).join(' ')}, each with a value`);
-    opts[flag] = value;
+    else opts[flag] = value;
   }
   for (const flag of takes)
     if (!opts[flag]) throw new Refusal(`${verb} takes ${takes.map((t) => `${t} <value>`).join(' ')}: \`${flag}\` was not given`);
@@ -351,8 +388,9 @@ function bodyOf(file: string): void {
 
 /** `merge`: this run's own green pull request merged with a merge commit, and the checkout fast-forwarded onto it. */
 function merge(args: string[]): string[] {
-  const opts = options('merge', args, ['--run', '--subject', '--body-file', '--check']);
+  const opts = options('merge', args, ['--run', '--subject', '--body-file', '--check'], ['--refresh', '--derives']);
   const [id, subject, file, check] = [opts['--run'], opts['--subject'], opts['--body-file'], opts['--check']];
+  const [command, derives] = [(opts['--refresh'] ?? '').trim(), (opts['--derives'] ?? '').trim()];
   bodyOf(file);
   const named = tips(id);
   const branch = settled();
@@ -382,6 +420,24 @@ function merge(args: string[]): string[] {
     'The implement step opens it, so a run with none goes round again; a person reopens one that was closed ' +
       '(`gh pr reopen <number>`), then the step is retried.',
   );
+  if (command) {
+    own(pr, onto, named, check);
+    whole(pr, named);
+    const said = lacksBase(onto, pr.headRefOid, retryLine(id))
+      ? refresh({
+          pr: pr.number,
+          branch: pr.headRefName,
+          tip: pr.headRefOid,
+          onto,
+          command,
+          derives,
+          subject,
+          bodyFile: file,
+          retry: retryLine(id),
+        })
+      : undefined;
+    if (said) return said;
+  }
   judged(pr, onto, named, check);
   const merged = run('gh', [
     'pr',
@@ -435,7 +491,61 @@ function receipt(args: string[]): string[] {
   origin();
   authed(MERGING);
   const onto = base('the landing', gh);
-  const { all, merged } = standing(id);
+  const began = Date.now();
+  const { before, fresh, all, merged } = takenFresh(id, onto, check, began);
+  const { pr, oid } = mergeOf(id, all, merged);
+  const branch = settled();
+  onBase(branch, onto);
+  if (!asks('merge-base', '--is-ancestor', oid, 'HEAD'))
+    throw new Refusal(
+      `${oid.slice(0, 12)}, the merge of #${pr.number}, is not reachable from this checkout's HEAD: the fast-forward did not happen ` +
+        `here. \`git fetch origin && git merge --ff-only origin/${onto}\` is what the merge verb does; a person types it, then the ` +
+        'step is retried.',
+    );
+  const left = leftOut(named, 'HEAD');
+  if (left.length)
+    throw new Refusal(
+      `${withCommits(left)} ${left.length === 1 ? 'holds' : 'hold'} a commit whose patch this checkout's HEAD does not hold, so part of the run's result did ` +
+        'not land and the run would record a landing that left it out. A person brings it onto the base, then the step is retried.',
+    );
+  const proven = [
+    `#${pr.number} is merged as ${oid.slice(0, 12)}, a merge commit`,
+    `\`${onto}\` here holds it, clean, with every commit of \`wf/${id}/\` on HEAD, by its patch`,
+  ];
+  if (!waits)
+    return [
+      ...before,
+      ...proven,
+      `\`${check}\` at ${oid.slice(0, 12)} on \`${onto}\` was not waited on: the factory's \`landingWaitsOnCi\` is false`,
+    ];
+  if (fresh && treeOf(oid) === treeOf(fresh.headRefOid))
+    return [
+      ...before,
+      ...proven,
+      `\`${check}\` at ${oid.slice(0, 12)} was not waited on again: it has the same tree as ${fresh.headRefOid.slice(0, 12)}, ` +
+        'the refreshed head it passed at',
+    ];
+  return [...before, ...proven, ciAt(pr, oid, onto, check, id, began)];
+}
+
+/**
+ * Where this run's pull requests stand once a head the land step's session refreshed is merged: none merged and `refreshed.json` in
+ * `WF_ARTIFACTS` naming this run's open pull request at its head, it is merged here (`mergedFresh`) and the pull requests read again,
+ * what that said in `before`; otherwise they are read once and nothing is merged.
+ */
+function takenFresh(id: string, onto: string, check: string, began: number): { before: string[]; fresh?: Pr; all: Pr[]; merged: Pr[] } {
+  const now = standing(id);
+  if (now.merged.length > 1) throw new Refusal(twoMerged(now.merged, id));
+  const record = now.merged.length === 0 ? recorded(process.env.WF_ARTIFACTS) : undefined;
+  const fresh = record && now.open.find((pr) => pr.number === record.pr && pr.headRefOid === record.head);
+  if (!record || !fresh) return { before: [], all: now.all, merged: now.merged };
+  const before = mergedFresh(fresh, record, onto, check, id, began);
+  const after = standing(id);
+  return { before, fresh, all: after.all, merged: after.merged };
+}
+
+/** The one merged pull request of the run and its merge commit, as the receipt records them; refuses none, two, and a squash. */
+function mergeOf(id: string, all: readonly Pr[], merged: readonly Pr[]): { pr: Pr; oid: string } {
   if (merged.length > 1) throw new Refusal(twoMerged(merged, id));
   if (merged.length === 0)
     throw new Refusal(
@@ -456,27 +566,90 @@ function receipt(args: string[]): string[] {
         "two a merge commit has: it was squashed or rebased, and main's history no longer holds the run's own commits. A person says " +
         'what to do with it; the merge this script makes is `--merge`.',
     );
-  const branch = settled();
-  onBase(branch, onto);
-  if (!asks('merge-base', '--is-ancestor', oid, 'HEAD'))
-    throw new Refusal(
-      `${oid.slice(0, 12)}, the merge of #${pr.number}, is not reachable from this checkout's HEAD: the fast-forward did not happen ` +
-        `here. \`git fetch origin && git merge --ff-only origin/${onto}\` is what the merge verb does; a person types it, then the ` +
-        'step is retried.',
-    );
-  const left = leftOut(named, 'HEAD');
-  if (left.length)
-    throw new Refusal(
-      `${withCommits(left)} ${left.length === 1 ? 'holds' : 'hold'} a commit whose patch this checkout's HEAD does not hold, so part of the run's result did ` +
-        'not land and the run would record a landing that left it out. A person brings it onto the base, then the step is retried.',
-    );
-  const proven = [
-    `#${pr.number} is merged as ${oid.slice(0, 12)}, a merge commit`,
-    `\`${onto}\` here holds it, clean, with every commit of \`wf/${id}/\` on HEAD, by its patch`,
+  return { pr, oid };
+}
+
+/** The tree of the commit `sha`. */
+const treeOf = (sha: string): string => git(`the tree of ${sha.slice(0, 12)}`, 'rev-parse', `${sha}^{tree}`);
+
+/**
+ * The merge of `pr`, whose head the land step's session refreshed (`record`): once `check` is green at that head, and only while it
+ * holds the base, merged at that head with the subject and body the session gave, and the checkout fast-forwarded onto it. The wait
+ * here and the one at the merge after it share one clock, from `began`, so the two stay inside the landing check's deadline.
+ */
+function mergedFresh(pr: Pr, record: Refreshed, onto: string, check: string, id: string, began: number): string[] {
+  onBase(settled(), onto);
+  holds(pr, onto, id);
+  const said = greenAtHead(pr, check, id, began);
+  holds(pr, onto, id);
+  const body = bodyFileOf(record.body);
+  try {
+    const merged = run('gh', [
+      'pr',
+      'merge',
+      String(pr.number),
+      '--merge',
+      '--match-head-commit',
+      pr.headRefOid,
+      '--subject',
+      record.subject,
+      '--body-file',
+      body.file,
+    ]);
+    if (merged.missing) throw new Refusal(noGh(MERGING));
+    if (merged.status !== 0)
+      throw new Refusal(
+        `GitHub declined to merge #${pr.number} at ${pr.headRefOid.slice(0, 12)}, the head the landing refreshed: ${merged.err}\n` +
+          `  Nothing landed and this checkout is untouched. Read ${pr.url}.\n${retryLine(id)}`,
+      );
+  } finally {
+    body.done();
+  }
+  return [
+    said,
+    `#${pr.number} merged at ${pr.headRefOid.slice(0, 12)}, the refreshed head, with a merge commit: ${pr.url}`,
+    ...forwarded(pr, onto, id),
   ];
-  if (!waits)
-    return [...proven, `\`${check}\` at ${oid.slice(0, 12)} on \`${onto}\` was not waited on: the factory's \`landingWaitsOnCi\` is false`];
-  return [...proven, ciAt(pr, oid, onto, check, id)];
+}
+
+/** The base, fetched, held by `pr`'s refreshed head; refuses where it moved past it, the land step then refreshing it again. */
+function holds(pr: Pr, onto: string, id: string): void {
+  if (lacksBase(onto, pr.headRefOid, retryLine(id)))
+    throw new Refusal(
+      `\`${onto}\` moved past ${pr.headRefOid.slice(0, 12)}, the head the landing refreshed #${pr.number} to, so it would not land as ` +
+        `CI judged it: the land step runs again and refreshes it onto the base as it is now. Nothing is merged.\n${retryLine(id)}`,
+    );
+}
+
+/**
+ * The CI context `check` at `pr`'s refreshed head, waited out on the clock that began at `began`: a line where it passed; a refusal
+ * where it is red, naming the jobs and sending the work back to review, or where it never came or never finished within the bounds.
+ */
+function greenAtHead(pr: Pr, check: string, id: string, began: number): string {
+  const head = pr.headRefOid;
+  const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
+  const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
+  const l: Landing = { number: pr.number, url: pr.url, oid: head, onto: pr.headRefName, check };
+  for (;;) {
+    const { entries, unread } = readAt(head);
+    const ours = named(entries, check);
+    const seen = unread === undefined && !(ours.length && superseded(ours)) ? seenOf(ours) : 'pending';
+    if (seen === 'passed') return `\`${check}\` passed at ${head.slice(0, 12)}, the head the landing refreshed #${pr.number} to`;
+    if (seen === 'failed')
+      throw new Refusal(
+        [
+          `\`${check}\` is red at ${head.slice(0, 12)}, the base merged into #${pr.number} at the landing, so nothing is merged. The jobs ` +
+            'that did not pass:',
+          ...listing(entries.filter((entry) => !pending(entry) && !NOT_FAILED.has(verdict(entry)))),
+          '  The work goes back to be fixed on the branch:',
+          `  Then: nemia retry ${id} review --message "\`${check}\` is red at ${head.slice(0, 12)}, the base merged in at the landing"`,
+        ].join('\n'),
+      );
+    const bound = unread === undefined && ours.length === 0 && !entries.some(pending) ? start : whole;
+    if (Date.now() - began >= bound * 1000)
+      throw new Refusal([unfinished(l, entries, bound, unread), '  Nothing is merged.', retryLine(id)].join('\n'));
+    sleep(seconds('WF_CI_POLL_SECONDS', POLL_SECONDS));
+  }
 }
 
 /** Whether the receipt waits on CI at the merge, from `--wait-on-ci`; refuses a value that is neither `true` nor `false`. */
@@ -534,11 +707,10 @@ function readAt(sha: string): { entries: Entry[]; unread?: string } {
  * did not, never came, or never finished (`judgedAt`). A context that sums up other jobs is reported only once they end, so while any
  * check at the merge runs it has the whole bound, not the start's.
  */
-function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string): string {
+function ciAt(pr: Pr, oid: string, onto: string, check: string, id: string, began = Date.now()): string {
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);
-  const began = Date.now();
   const l: Landing = { number: pr.number, url: pr.url, oid, onto, check };
   for (;;) {
     const { entries, unread } = readAt(oid);

@@ -2,7 +2,9 @@
  * The daemon's retention of worktrees: a run that is finished — landed, or cancelled — has its worktrees removed with no person's act
  * (`freeOnce`, one sweep; `free`, the loop the daemon forks). It is `nemia prune <id> --yes` with no flag, asked of each finished run:
  * the same judgement (`judging`), sizing (`sized`) and removal (`freeing`), so what a person's prune keeps is kept and what it refuses
- * is refused. A controller: it reads the runs a pass answered and the disk on every sweep, and carries nothing a restart must not lose.
+ * is refused. Each sweep first ends what a finished run's sessions left running (`endLeftBehind`), the backstop behind the runtime, and
+ * leaves a worktree another process works in. A controller: it reads the runs a pass answered, this user's processes and the disk on
+ * every sweep, and carries nothing a restart must not lose.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,8 +12,20 @@ import { Cause, Effect, Exit, type Duration } from 'effect';
 import { setting } from '../../config/config.store.ts';
 import { firstPiece } from '../../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
-import { freeable, freedLine, freeSaid, freeTurn, pruneLines, untakenOf, untakenWords, type Answered, type Pruning } from './prune.ts';
+import {
+  freeable,
+  freedLine,
+  freeSaid,
+  freeTurn,
+  heldWords,
+  pruneLines,
+  untakenOf,
+  untakenWords,
+  type Answered,
+  type Pruning,
+} from './prune.ts';
 import { StoreRoot } from '../../config/root.store.ts';
+import { endLeftBehind, LEFT_GRACE } from './left-behind.verb.ts';
 
 /** The sweep's pace when it is given none. */
 export const FREE_EVERY: Duration.Input = '5 seconds';
@@ -104,11 +118,15 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
 });
 
 /**
- * One sweep over what the latest pass answered (`answers`), given what this daemon's sweeps remember (`memory`). Nothing, where the
- * store keeps its worktrees (`keepsWorktrees`). Else:
+ * One sweep over what the latest pass answered (`answers`), given what this daemon's sweeps remember (`memory`). First, whatever the
+ * store keeps, each process of a run the pass found at rest, succeeded or cancelled, that its sessions left running is ended — SIGTERM,
+ * then SIGKILL once the grace given (`LEFT_GRACE`) has passed — and said on the feed, a line a run (`endLeftBehind`): ending them frees
+ * nothing. Then nothing more, where the store keeps its worktrees (`keepsWorktrees`). Else:
  *
  * - the candidates are the runs the pass found at rest, succeeded or cancelled (`freeable`), whose folder `worktrees/<id>` is on disk;
  *   no other run is asked anything, of its place or of the engine;
+ * - a candidate whose worktree another process works in (a person's shell, another run's session) is left this sweep, and said once
+ *   while the same processes hold it (`heldWords`): it is not judged, so nothing is removed under a process at work;
  * - the sweep takes `FREE_A_SWEEP` of them not judged yet, or one already judged in its turn (`freeTurn`);
  * - each is judged as `nemia prune <id>` judges it, with no flag (`judging`), and sized when ready (`sized`), side by side;
  * - those ready are removed by one `remove` a repository (`freedByRepo`), repositories side by side;
@@ -120,16 +138,32 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * Level-triggered: a run freed has no folder left and is no candidate; one that is not freed is judged again on a later sweep, by what
  * the store and the place say then.
  */
-export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answered[], memory: FreeMemory) {
+export const freeOnce = Effect.fn('freeOnce')(function* (
+  answers: readonly Answered[],
+  memory: FreeMemory,
+  grace: Duration.Input = LEFT_GRACE,
+) {
   const home = yield* StoreRoot;
-  if (yield* setting('keepWorktrees')) return { freed: [], said: [] } satisfies Freed;
-  const candidates = freeable(answers).filter((id) => fs.existsSync(path.join(home, 'worktrees', id)));
+  const keeps = yield* setting('keepWorktrees');
+  const candidates = keeps ? [] : freeable(answers).filter((id) => fs.existsSync(path.join(home, 'worktrees', id)));
+  const { ended, holds } = yield* endLeftBehind(answers, candidates, grace);
+  yield* Effect.annotateCurrentSpan({ ended: [...ended.values()].flat().length });
+  if (keeps) return { freed: [], said: [] } satisfies Freed;
+  const heldLeft = candidates.flatMap((id) => {
+    const ps = holds.get(id);
+    return ps ? [{ id, words: heldWords(ps, path.join(home, 'worktrees', id)) }] : [];
+  });
   const untakenLeft = answers.flatMap((a) => {
     const why = untakenOf(a);
     return why && fs.existsSync(path.join(home, 'worktrees', a.run.id)) ? [{ id: a.run.id, words: untakenWords(a.run, why) }] : [];
   });
   forgotten(memory, [...candidates, ...untakenLeft.map((u) => u.id)]);
-  const turn = freeTurn(candidates, memory.judged, FREE_A_SWEEP, memory.turn++);
+  const turn = freeTurn(
+    candidates.filter((id) => !holds.has(id)),
+    memory.judged,
+    FREE_A_SWEEP,
+    memory.turn++,
+  );
   const judged = yield* Effect.forEach(turn, swept, { concurrency: FREE_A_SWEEP });
   for (const id of turn) memory.judged.add(id);
 
@@ -139,6 +173,7 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
   const freed = removed.filter((p) => p.kind === 'pruned' && p.worktrees.length > 0);
   const left = [
     ...untakenLeft,
+    ...heldLeft,
     ...judged.flatMap((j) => ('words' in j ? [j] : [])),
     ...removed.map((p) => ({ id: p.id, words: afterWords(p) })),
   ];
@@ -147,6 +182,7 @@ export const freeOnce = Effect.fn('freeOnce')(function* (answers: readonly Answe
   yield* Effect.annotateCurrentSpan({
     candidates: candidates.length,
     untaken: untakenLeft.length,
+    held: heldLeft.length,
     judged: turn.length,
     freed: freed.length,
   });

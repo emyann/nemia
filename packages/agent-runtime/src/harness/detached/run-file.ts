@@ -122,6 +122,22 @@ const RunFileSchema = Schema.StructWithRest(
      */
     memoryLimit: Schema.optional(Schema.Finite),
     /**
+     * The spawn put the worker behind a scope's argv (`scopeArgv`), limited or not: the worker records the scope's folder (`cgroup`).
+     * Absent where the host makes no scope, and from a run file written before every session ran in one.
+     */
+    scoped: Schema.optional(Schema.Literal(true)),
+    /**
+     * The scope's folder under the cgroup mount, as the worker read its own (`cgroupNow('self')`) in its first write, inside the scope:
+     * what an ended run's stop and release end whole, once `scopeToEnd` allows it. Absent with no scope.
+     */
+    cgroup: Schema.optional(Schema.String),
+    /**
+     * Why a run with no limit runs bare though the host passed the probe, written by its worker: the scope's program exited before it
+     * ran the worker, so the worker it was handed to runs the session bare (`--scope-by`) rather than not at all. Its words are in the
+     * run's log.
+     */
+    unscoped: Schema.optional(Schema.String),
+    /**
      * What the run's scope said of its memory (`cgroupMemoryOf`), read by the worker on each beat and at the harness's exit, the last
      * read kept: the run's `Sighting.memory`. Absent where it ran under no limit, or no read found its cgroup.
      */

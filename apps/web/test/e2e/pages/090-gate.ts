@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectRendered, fed, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
+import { expectRendered, fed, openFold, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -29,7 +29,8 @@ async function expectPolicy(policy: Locator, where: string): Promise<void> {
 
 export default {
   /**
-   * The gate on the board: a run waiting at plan's gate, the closeout plan handed on rendered in it, beside Approve and Send back. Refused
+   * The gate on the board: a run waiting at plan's gate, in what plan's part asks of you, Approve and Send back above what plan said and
+   * gave in the same part. Refused
    * first, in a page of its own whose one refusal is the point: an approval of a step that is not gated, the page having read the gate and
    * the record lost it before Approve was pressed, in the package's words beside the button, and nothing written. Then approved from the
    * page, with words: the approval's file as `wf approve` writes it, and the page reads the approval under the step. Taken back, and sent
@@ -52,16 +53,18 @@ export default {
     const wordsOf = (p: Page) => gateOf(p).getByRole('textbox', { name: `Words to approve ${gated} with, if any` });
     const approveOf = (p: Page) => gateOf(p).getByRole('button', { name: 'Approve', exact: true });
 
-    const banner = page.locator('section[aria-label="Waiting on you"]');
-    const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget — nemia decide ${id}`;
-    await expectVisible(banner.locator(':scope > p', { hasText: line }), `the banner says, in wf ls's words, ${line}`);
-    await expectCount(banner.locator(':scope > p'), 1, 'in its one line');
-    await expectCount(
-      banner.locator(`a[data-approve="${gated}"][href="#step-${gated}"]`),
-      1,
-      `approve ${gated} links to the step's section`,
+    const banner = page.locator('section[aria-label="Asks of you"]');
+    const line = `approve ${gated}`;
+    await expectVisible(
+      banner.locator(`li[data-ask="gate"][data-step="${gated}"]`, { hasText: line }),
+      `the asks of you say ${gated} waits at its gate: ${line}`,
     );
-    await expectCount(banner.locator('li'), 0, 'and lists nothing under it: the approval is no question');
+    await expectCount(banner.locator('li'), 1, 'in its one line: the approval is no question, and the gate is not said twice');
+    await expectCount(
+      banner.locator(`a[data-ask-link="${gated}"][href$="#step-${gated}"]`),
+      1,
+      `approve ${gated} links to the step's part`,
+    );
 
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const node = graph.locator(`.react-flow__node[data-id="${gated}"]`);
@@ -80,38 +83,44 @@ export default {
       0,
       'no warning about the workflow folder: it reads as the workflow the run froze, its declared output with it',
     );
-    const section = page.locator(`article > section#step-${gated}`);
-    await expectVisible(gateOf(page), `${gated}'s section has its gate`);
+    const section = partOf(page, gated);
+    await expectVisible(
+      section.locator('[data-part-asks]').locator(`section[aria-label="The gate of ${gated}"]`),
+      `${gated}'s part has its gate, in what it asks of you`,
+    );
     await expectVisible(
       gateOf(page).locator('p code').getByText(`nemia approve ${id} ${gated}`, { exact: true }),
       "and beside its Approve, the command that does the same, as the api's decision words it",
     );
-    const handedOn = gateOf(page).locator(`section[aria-label="What ${gated} handed on"]`);
-    await expectRendered(handedOn.locator('[data-handed-on] > [data-markdown]'), { heading: GATED.plan.heading, items: GATED.plan.items });
+    const said = section.locator('[data-part-said]');
+    await expectRendered((await openFold(said, 'account')).locator('[data-body]'), {
+      heading: GATED.plan.heading,
+      items: GATED.plan.items,
+    });
+    const gave = section.locator('[data-part-gave="L"]');
     await expectVisible(
-      handedOn.locator('[data-field="approach"]', { hasText: GATED.output.approach }),
-      `the plan's approach is at the gate, read without a tab (${GATED.output.approach})`,
+      gave.locator('[data-field="approach"]', { hasText: GATED.output.approach }),
+      `the plan's approach is in what it gave, in the same part as its gate (${GATED.output.approach})`,
     );
     for (const [name, entries] of [
       ['steps', GATED.output.steps],
       ['risks', GATED.output.risks],
     ] as const) {
-      await expectVisible(
-        handedOn.locator(`[data-field="${name}"]`, { hasText: entries[0] }),
-        `its ${name}, ${entries.length} of them, drawn unfolded`,
-      );
+      await expectVisible(gave.locator(`[data-field="${name}"]`, { hasText: entries[0] }), `its ${name}, ${entries.length} of them, drawn`);
     }
-    const files = handedOn.locator('details[data-fold="files"]:not([open])');
-    await expectVisible(
-      files.locator('summary', { hasText: `files · ${GATED.output.files.length}` }),
-      `its ${GATED.output.files.length} files are folded, the fold saying how many`,
+    const files = gave.locator('[data-field="files"][data-widget="table"]');
+    await expectCount(
+      files.locator('tbody tr'),
+      GATED.output.files.length,
+      `its ${GATED.output.files.length} files are a table, a row each, by the widget its schema picks`,
     );
-    await expectCount(handedOn.getByText(GATED.output.files[0].path), 0, 'and no file is drawn while the fold is shut');
-    await expectLeftOf(
-      handedOn,
-      gateOf(page).locator(`form[aria-label^="Approve"]`),
-      'what is being approved is beside Approve, on its left',
-    );
+    await expectVisible(files.getByText(GATED.output.files[0].path), 'each file drawn by its path');
+    const before = await section.evaluate((part) => {
+      const asks = part.querySelector('[data-part-asks]');
+      const gaveIt = part.querySelector('[data-part-gave]');
+      return !!asks && !!gaveIt && !!(asks.compareDocumentPosition(gaveIt) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    if (!before) throw new Refused("what is being approved is in the gated step's own part, under its gate");
     await expectVisible(wordsOf(page), 'a box for the words to approve with');
     if (!(await approveOf(page).isEnabled())) throw new Refused('Approve is enabled with no words: an approval needs none');
     const objection = gateOf(page).getByRole('textbox', { name: `What to change, sent back to ${gated}` });
@@ -122,8 +131,11 @@ export default {
       gateOf(page).getByRole('radio', { name: /^a new session/ }),
       'a new session as an option to continuing its session',
     );
-    await expectVisible(section.locator('dd', { hasText: /^awaiting approval$/ }), "the step's facts say its gate awaits approval");
-    const decide = page.locator('section[aria-label="Decide"]');
+    await expectVisible(
+      (await openFold(section, 'detail')).locator('dd', { hasText: /^awaiting approval$/ }),
+      "the step's facts, in its Detail, say its gate awaits approval",
+    );
+    const decide = (await openFold(page.locator('[data-asks]'), 'decide')).locator('section[aria-label="Decide"]');
     await expectCount(
       decide.locator('section[aria-label="Answer"]'),
       0,
@@ -147,27 +159,21 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), { fullPage: true });
     await photograph(policy, path.join(OUT, `gate-policy-${await themeOf(page)}.png`));
-    await files.locator('summary').click();
-    await expectVisible(handedOn.getByText(GATED.output.files[0].path), 'opened, the fold draws the files');
-    await handedOn.locator('details[data-fold="files"] summary').click();
-    await expectCount(handedOn.locator('details[data-fold="files"][open]'), 0, 'and shuts again');
 
     await node.click();
     const inspector = stepBar(page, id, gated);
     await expectVisible(
-      inspector.getByRole('tab', { name: 'Output', selected: true }),
-      `${gated}'s inspector opens on Output: it has signed off`,
+      inspector.locator('[data-part-gave] [data-field="approach"]', { hasText: GATED.output.approach }),
+      `${gated}'s inspector draws what it gave, the approach in it`,
     );
-    await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), 'with the approach in it');
     await expectVisible(
-      inspector.locator('[data-answer-at="Details"]', { hasText: `${gated} waits at its gate on you` }),
-      'and says the answer is under Details',
+      inspector.locator('[data-part-asks]').locator(`section[aria-label="The gate of ${gated}"]`),
+      'and its gate above it, in what it asks of you: the answer is in the bar too',
     );
     await settled(page);
     await expectLeftOf(node, inspector, `the run is too wide to fit beside the bar at 1280, so ${gated} alone is fitted clear of it`);
     await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
-    await inspector.getByRole('tab', { name: 'Details' }).click();
-    await expectPolicy(inspector.locator('[data-gate-policy]'), 'in its inspector, under Details');
+    await expectPolicy(inspector.locator('[data-gate-policy]'), 'in its inspector, at its gate');
     await settled(page);
     await photograph(inspector, path.join(OUT, `gate-inspector-policy-${await themeOf(page)}.png`));
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
@@ -254,13 +260,13 @@ export default {
     if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)
       throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
 
-    const approval = section.locator(`section[aria-label="The approval of ${gated}"]`);
+    const approval = (await openFold(section, 'detail')).locator(`section[aria-label="The approval of ${gated}"]`);
     await expectVisible(approval, `the approval shows under ${gated} once the run is read again`);
     const words = await approval.locator('[data-words]').textContent();
     if (words !== GATED.words) throw new Refused(`the approval's words are shown as they were written — it shows ${JSON.stringify(words)}`);
     await expectVisible(approval.locator(`time[datetime="${took.at}"]`), 'with when it was given');
     await expectCount(gateOf(page), 0, 'and the gate is gone: nothing to approve');
-    await expectCount(banner, 0, 'and the banner with it: nobody is waited on');
+    await expectCount(banner, 0, 'and the asks of you with it: nobody is waited on');
     await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), "the step's facts say its gate is approved");
     await settled(page);
     await photograph(page, path.join(OUT, `gate-approved-${await themeOf(page)}.png`), { fullPage: true });

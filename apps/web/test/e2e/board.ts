@@ -503,9 +503,48 @@ export async function reloadForQuota(page: Page, state: string): Promise<void> {
   await idle(page);
 }
 
-/** A step's Debug panel on `page`, opened: its trigger pressed and the path of `taskId` drawn, with the lifecycle it is drawn on. */
-export async function openDebug(page: Page, taskId: string): Promise<{ panel: Locator; lifecycle: Locator }> {
-  const panel = page.getByRole('region', { name: 'Debug' });
+/** The run page's ledger: every step's part at L, in run order. */
+export const LEDGER = 'section[aria-label="Every step"]';
+
+/** A step's part at L in `scope`: its row of the run page's ledger, the step bar's part or the step page's. */
+export const partOf = (scope: Page | Locator, step: string): Locator =>
+  scope.locator(`article[data-step-part="L"][data-step-name="${step}"]`);
+
+/** The first fold `name` in `scope`, opened if it is closed (a fold draws what it holds only once open), and returned. */
+export async function openFold(scope: Locator, name: string): Promise<Locator> {
+  const fold = scope.locator(`[data-fold="${name}"]`).first();
+  const trigger = fold.locator(':scope > [data-slot="collapsible-trigger"]');
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+  await expectVisible(trigger.and(scope.page().locator('[aria-expanded="true"]')), `the fold ${name} opens`);
+  return fold;
+}
+
+/** The run page's menu of actions on `page`, opened: its one button pressed and the dialog that holds Remove, Hold or Lift, and Prune. */
+export async function openRunMenu(page: Page): Promise<Locator> {
+  const actions = page.locator('[data-run-actions]');
+  if (!(await actions.isVisible())) await page.locator('button[data-run-menu]').click();
+  await expectVisible(actions, "the run's menu opens on its actions");
+  return actions;
+}
+
+/**
+ * The actions the run page's menu holds, as its button names them (`remove`, `hold` or `lift`, `prune`): none where the page, read, draws
+ * no menu.
+ */
+export async function runMenuActions(page: Page): Promise<string[]> {
+  await expectVisible(page.locator('header[data-run-header]'), "the run's header is drawn");
+  const menu = page.locator('button[data-run-menu]');
+  if (!(await menu.count())) return [];
+  return ((await menu.getAttribute('data-run-menu')) ?? '').split(' ').filter(Boolean);
+}
+
+/**
+ * The Debug panel of the step part `part`, opened: its Detail fold opened, its trigger pressed and the path of `taskId` drawn, with the
+ * lifecycle it is drawn on.
+ */
+export async function openDebug(part: Locator, taskId: string): Promise<{ panel: Locator; lifecycle: Locator }> {
+  const detail = await openFold(part, 'detail');
+  const panel = detail.getByRole('region', { name: 'Debug' });
   await panel.getByRole('button', { name: /Debug$/ }).click();
   await expectVisible(panel.locator(`[data-path="${taskId}"]`), `opened, the Debug panel draws the path of ${taskId}`);
   return { panel, lifecycle: panel.locator('[data-machine="lifecycle"]') };

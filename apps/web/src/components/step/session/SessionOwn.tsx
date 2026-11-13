@@ -89,11 +89,21 @@ function Told({ told, marks }: { told: Extract<Own, { what: 'told' }>; marks: st
   );
 }
 
-/** The part's Said slot of the step `step`, in what holds both the part and the talk (`data-step-scope`), scrolled into view. */
+/**
+ * The part's Said slot of the step `step`, in what holds both the part and the talk (`data-step-scope`), scrolled to its top: that scroll
+ * alone is moved, as `scrollIntoView` would move the window too and carry the page's header out of view.
+ */
 function toSaid(from: HTMLElement, step: string): void {
-  const scope = from.closest(`[data-step-scope]`) ?? document;
-  scope.querySelector(`[data-part-said="${CSS.escape(step)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scope = from.closest<HTMLElement>(`[data-step-scope]`);
+  const said = (scope ?? document).querySelector(`[data-part-said="${CSS.escape(step)}"]`);
+  if (!said) return;
+  if (!scope) return said.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const top = said.getBoundingClientRect().top - scope.getBoundingClientRect().top + scope.scrollTop;
+  scope.scrollTo({ top: Math.max(0, top - SAID_MARGIN), behavior: 'smooth' });
 }
+
+/** The room left above the Said slot once it is scrolled to: the slot's own `scroll-mt-4`. */
+const SAID_MARGIN = 16;
 
 /**
  * The step's closeout, in one line: that it signed off and how, linking to what it said, drawn once, in its part above the talk (`Said`);

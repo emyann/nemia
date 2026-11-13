@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { DIAMOND, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -200,12 +200,14 @@ export default {
       await page.waitForURL((url) => url.pathname === `/runs/${RECENT.id}` && url.hash === '#step-review');
       await idle(page);
       const back = `${placed}&repo=${encodeURIComponent(checkout)}`;
+      await openFold(partOf(page, 'review'), 'detail');
       await expectHref(page, '[data-step-page-link="review"]', back, "the run's step links back to the step's page, in its place");
+      await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
       await expectHref(
         page,
-        `article header a[data-workflow="${good.name}"]`,
+        `section[aria-label="Receipts"] a[data-workflow="${good.name}"]`,
         `/workflows/repo/${good.name}?factory=${factory}&repo=${encodeURIComponent(checkout)}`,
-        "the run's header links its workflow's page, in its place",
+        "the run's receipt of where it ran links its workflow's page, in its place",
       );
       await settled(page);
       await photograph(page, path.join(OUT, `step-told-run-link-${theme}.png`));

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -22,7 +22,7 @@ export default {
     try {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      const row = page.locator(`section[aria-label="Answer"] [data-offer="raise"][data-step="${raised}"]`);
+      const row = partOf(page, raised).locator(`[data-part-asks] [data-offer="raise"][data-step="${raised}"]`);
       await expectVisible(row.locator(`fieldset[data-question="${tone.title}"]`), `${raised}'s raise asks its question as a field`);
       await expectCount(row.getByRole('textbox', { name: `Your answer to ${raised}` }), 0, 'answered by choosing, not in a box of words');
       const button = row.getByRole('button', { name: 'Raise the budget and answer' });

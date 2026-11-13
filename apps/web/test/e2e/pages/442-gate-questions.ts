@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { fed, photograph, sidebar, stepBar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, stepBar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -37,7 +37,7 @@ async function answer(page: Page, gate: Locator): Promise<void> {
 
 export default {
   /**
-   * A gate whose step asks questions as data: they are drawn in its answer column, after what it handed on, which draws them no more,
+   * A gate whose step asks questions as data: they are drawn in what its part asks of you, and what it gave draws them no more,
    * and before Approve, which waits — the button disabled, what is unanswered on hover — until each has a choice, in the step's inspector
    * too. `Choose the recommended answers` chooses the one recommended, a click the other; then the approval goes with its note, and the
    * api writes the approval's words in the package's: whose questions they answer, each answer, the note. Taken back, the same answers go
@@ -60,9 +60,9 @@ export default {
       await expectVisible(asked, `${gated}'s gate asks its questions`);
       await expectCount(asked.locator('fieldset[data-question]'), 2, 'a field for each question it asks');
       await expectCount(
-        gate.locator(`section[aria-label="What ${gated} handed on"] [data-questions]`),
+        partOf(page, gated).locator('[data-part-gave] [data-questions]'),
         0,
-        'and what it handed on draws them no more: they are answered beside it',
+        'and what it gave draws them no more: they are answered above it',
       );
       const approve = gate.getByRole('button', { name: 'Approve', exact: true });
       const sendBack = gate.getByRole('button', { name: 'Send back', exact: true });
@@ -76,7 +76,6 @@ export default {
 
       await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${gated}"]`).click();
       const inspector = stepBar(page, id, gated);
-      await inspector.getByRole('tab', { name: 'Details' }).click();
       const inspected = inspector.locator(`section[aria-label="What ${gated} asks of you"]`);
       await expectCount(inspected.locator('fieldset[data-question]'), 2, `${gated}'s inspector asks its questions too, a field for each`);
       const approveThere = inspected.getByRole('button', { name: 'Approve', exact: true });
@@ -117,10 +116,10 @@ export default {
       if (approval.message !== words.join('\n\n'))
         throw new Refused(`the approval's words are the answers, in the package's words — it holds ${JSON.stringify(approval)}`);
       await expectVisible(
-        page.locator(`section[aria-label="The approval of ${gated}"] [data-words]`, {
+        (await openFold(partOf(page, gated), 'detail')).locator(`section[aria-label="The approval of ${gated}"] [data-words]`, {
           hasText: `The person's answers to ${gated}'s questions:`,
         }),
-        `the approval shows under ${gated}, its words the answers`,
+        `the approval shows in ${gated}'s Detail, its words the answers`,
       );
 
       fs.rmSync(asks, { recursive: true, force: true });

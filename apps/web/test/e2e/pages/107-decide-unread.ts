@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -26,7 +26,7 @@ export default {
       fs.writeFileSync(record, JSON.stringify({ ...JSON.parse(was), repo: NOWHERE }, null, 2));
       fed(ENDING.id, ENDING.ending, 'awaiting approval');
       await page.reload();
-      const acts = page.locator(`article > section#step-${ENDING.ending} section[aria-label="What ${ENDING.ending} would act on"]`);
+      const acts = partOf(page, ENDING.ending).locator(`section[aria-label="What ${ENDING.ending} would act on"]`);
       await expectVisible(
         acts.locator('[data-standing="unread"]', { hasText: `${ENDING.branch}: where it stands is not read (` }),
         'the panel says where the branch stands is not read, with what the place said',

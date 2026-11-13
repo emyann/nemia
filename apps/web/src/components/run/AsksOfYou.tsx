@@ -5,7 +5,9 @@
  */
 import type { ReactNode } from 'react';
 import { stepAnchor } from '@/lib/asks';
-import { decidableRun } from '@/lib/decide';
+import { useQuery } from '@tanstack/react-query';
+import { decisionQuery } from '@/lib/api/decision';
+import { decidableRun, decisionStamp, isDecidable } from '@/lib/decide';
 import { container } from '@/lib/meaning';
 import { runAsksOf, type RunAsk } from '@/lib/runAsks';
 import type { RunDetail } from '@/lib/runView';
@@ -68,12 +70,16 @@ function AskLine({ run, ask, onStep }: { run: string; ask: RunAsk; onStep?: (ste
 /**
  * What the run `run` asks of a person, top of its page: a line per ask, linked to its step's part, or given `onStep` (the frame's bar) a
  * button that shows the step; then its wait on runs and its hold, each in the package's words (`RunWait`), Lift being the run's menu's;
- * and, where there is something to decide and the parts are drawn, what the command line's decide shows, folded. Nothing at all for a
- * run that asks nothing and waits on nobody.
+ * and, on the page, what the command line's decide shows, folded: under the asks, or where nothing is asked, once the api says there is
+ * something to decide — a finished run asks nothing and still has its branch to land or drop. Nothing at all for a run that asks nothing,
+ * waits on nobody and has nothing to decide.
  */
 export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const asks = runAsksOf(run);
-  if (!asks.length && !run.waiting && !run.holding) return null;
+  const decidable = !onStep && decidableRun(run);
+  const { data } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable && !asks.length });
+  const decide = decidable && (asks.length > 0 || isDecidable(data));
+  if (!asks.length && !run.waiting && !run.holding && !decide) return null;
   return (
     <div data-asks={asks.length} className="space-y-2">
       {asks.length > 0 && (
@@ -84,12 +90,12 @@ export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: str
               <AskLine key={`${ask.kind}:${ask.step ?? ''}`} run={run.id} ask={ask} onStep={onStep} />
             ))}
           </ul>
-          {!onStep && decidableRun(run) && (
-            <Fold name="decide" title="What there is to decide, and the commands">
-              <Decide run={run} />
-            </Fold>
-          )}
         </section>
+      )}
+      {decide && (
+        <Fold name="decide" title="What there is to decide, and the commands">
+          <Decide run={run} />
+        </Fold>
       )}
       {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
       {run.holding && <RunWait label="Held" wait={run.holding} />}

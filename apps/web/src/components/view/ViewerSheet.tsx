@@ -22,10 +22,15 @@ import { bytesWord } from '../run/Artifacts';
 /** A file the api serves: its name, its link and its kind. */
 type Served = Extract<StepArtifact, { url: string }>;
 
-/** Every file of a step the sheet steps through, each path once: those its shown try named, then those its folders hold. */
+/**
+ * Every file of a step the sheet steps through, each path once: those its shown try named, then those its folders hold. A path named and
+ * held is the one the api serves, where a closeout's own entry for it is only its path.
+ */
 const filesOf = (step: StepView): StepArtifact[] => {
   const all = [...(step.closeout?.artifacts ?? []), ...(step.artifactsFolder?.files ?? []), ...step.files];
-  return all.filter((file, i) => all.findIndex((other) => other.path === file.path) === i);
+  return [...new Set(all.map((file) => file.path))].map(
+    (path) => all.find((file) => file.path === path && 'url' in file) ?? all.find((file) => file.path === path)!,
+  );
 };
 
 /** The viewer of a file: by the kind the api serves it as and its name's extension; none for one it does not serve. */

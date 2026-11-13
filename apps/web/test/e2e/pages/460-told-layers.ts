@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { openFold, partOf, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -124,9 +124,12 @@ async function expectOnce(section: Locator, words: Array<[string, string]>): Pro
   for (const [what, said] of words) await expectCount(section.getByText(said), 1, `${what} once in the section, only in its fold`);
 }
 
-/** The section of the run page for `step`, under its heading. */
-const sectionOf = (page: Page, step: string) =>
-  page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: step, exact: true }) });
+/** The detail of `step`'s part in the run's ledger, its Detail fold opened: where what it was told now lives. */
+const sectionOf = async (page: Page, step: string): Promise<Locator> => {
+  const detail = partOf(page, step).locator('[data-part-detail]');
+  await openFold(detail, 'detail');
+  return detail;
+};
 
 /**
  * Refuses unless the open fold `fold` draws its layers as the markdown they are: the policy's bold and list drawn, no mark printed, its
@@ -174,7 +177,7 @@ const PHONE = { width: 390, height: 844 };
  */
 async function expectRules(page: Page): Promise<void> {
   await goto(page, `/runs/${LAYERED.ruled}`);
-  const write = sectionOf(page, 'write');
+  const write = await sectionOf(page, 'write');
   const fold = write.locator('details[data-told]');
   await fold.locator('summary').click();
   const layers = ['instructions', 'custom', 'folder', 'factory', 'policy', 'task'];
@@ -194,7 +197,7 @@ async function expectRules(page: Page): Promise<void> {
     ['the custom instructions', LAYERED.custom],
     ['the policy', LAYERED.policySays],
   ]);
-  const review = sectionOf(page, 'review').locator('details[data-told]');
+  const review = (await sectionOf(page, 'review')).locator('details[data-told]');
   await review.locator('summary').click();
   await expectCount(review.locator('[data-layer="factory"]'), 0, 'a step with no agent froze no rules of its own');
   await expectCount(review.locator('[data-layer="folder"]'), 1, "and is told the folder's files all the same");
@@ -225,7 +228,7 @@ export default {
       records.push(unfrozen());
       records.push(written(LAYERED.ruled, LAYERED.rules));
       await goto(page, `/runs/${LAYERED.id}`);
-      const write = sectionOf(page, 'write');
+      const write = await sectionOf(page, 'write');
       const fold = write.locator('details[data-told]');
       await expectVisible(fold.locator('summary', { hasText: 'What it would be told now' }), "write's fold: a step not filed yet");
       await settled(page);
@@ -278,7 +281,7 @@ export default {
         ['the policy', LAYERED.policySays],
       ]);
 
-      const review = sectionOf(page, 'review').locator('details[data-told]');
+      const review = (await sectionOf(page, 'review')).locator('details[data-told]');
       await review.locator('summary').click();
       await expectVisible(
         review.getByText('No agent: of the words Nemia composes, its own are all it was told', { exact: false }),
@@ -290,17 +293,17 @@ export default {
         1,
         "but the folder's files, which the session reads itself, are told whether a step has an agent or not",
       );
-      await expectOnce(sectionOf(page, 'review'), [["review's own words", LAYERED.review]]);
+      await expectOnce(await sectionOf(page, 'review'), [["review's own words", LAYERED.review]]);
       await settled(page);
       await photograph(write, path.join(OUT, `told-layers-open-${await themeOf(page)}.png`));
-      await photograph(sectionOf(page, 'review'), path.join(OUT, `told-layers-agentless-${await themeOf(page)}.png`));
+      await photograph(await sectionOf(page, 'review'), path.join(OUT, `told-layers-agentless-${await themeOf(page)}.png`));
       await onPhone(page, write);
       await expectRules(page);
 
       await goto(page, `/runs/${LAYERED.unfrozen}`);
-      const whole = sectionOf(page, 'write');
+      const whole = await sectionOf(page, 'write');
       await expectVisible(
-        whole.locator(':scope > [data-markdown]', { hasText: LAYERED.folderSays }),
+        whole.locator('[data-markdown]:not([data-told] *)', { hasText: LAYERED.folderSays }),
         'a record that froze no layers still draws its body',
       );
       await expectCount(whole.locator('[data-layer]'), 0, 'and no layer, since none was frozen');

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { photograph, stepBar, themeOf } from '../board.ts';
+import { openFold, photograph, stepBar, themeOf } from '../board.ts';
 import { expectVisible, idle } from '../checks.ts';
 import { DIAMOND } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -10,15 +10,22 @@ const STEP = 'implement';
 
 /**
  * What a step's session ran on, in its inspector's facts: the DIAMOND's running step, whose attempt recorded an image under the store's
- * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another;
- * its top, whose attempt recorded neither, says `not recorded` on its Details tab, a finished step's inspector opening on its Output.
+ * `releases/<tag>/` and Claude Code's version, says the tag and the version, and the mode its harness ran it in, filed with another; its
+ * top, whose attempt recorded neither, says `not recorded` there too: each in its part's Detail fold, opened, the mode in its spec fold.
+ * The running step's bar follows its live conversation, so it is opened from the page, never as the route the runner idles on, and its
+ * stream is awaited.
  */
 export default {
   name: 'step-ran-on',
-  route: `/runs/${running.id}?bar=step:${running.id}/${STEP}`,
+  route: `/runs/${running.id}`,
   expect: async (page) => {
+    const streaming = page.waitForRequest((request) => request.url().includes('/transcript/stream'));
+    await page.goto(new URL(`/runs/${running.id}?bar=step:${running.id}/${STEP}`, page.url()).href, { waitUntil: 'load' });
+    await streaming;
     const bar = stepBar(page, running.id, STEP);
     await expectVisible(bar, `the address opens ${STEP}'s inspector on ${running.id}`);
+    const detail = await openFold(bar.locator('[data-part-detail]'), 'detail');
+    await openFold(detail, 'spec');
     await expectVisible(
       bar.locator('[data-fact="ran on"] dd', { hasText: `${DIAMOND.ranOn.tag} · claude ${DIAMOND.ranOn.harnessVersion}` }),
       'the step at work says the release and the Claude Code its session runs on',
@@ -32,7 +39,7 @@ export default {
     await page.goto(new URL(`/runs/${top.id}?bar=step:${top.id}/${STEP}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);
     const finished = stepBar(page, top.id, STEP);
-    await finished.getByRole('tab', { name: 'Details', exact: true }).click();
+    await openFold(finished.locator('[data-part-detail]'), 'detail');
     await expectVisible(
       finished.locator('[data-fact="ran on"] dd', { hasText: /^not recorded$/ }),
       'a step whose attempt recorded neither says so, never a guess',

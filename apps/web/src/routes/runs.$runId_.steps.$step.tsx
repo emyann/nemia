@@ -90,14 +90,14 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
 /**
  * The session of `step` in `run`: its header — the way back to its run, its name and whether it is followed live — then its part whole
  * (`StepPart` at L, its Debug in its detail), and under it the bands over its talk, its talk, and the composer under it — which is drawn
- * only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`). The part and
- * the talk scroll together under the header, the composer staying in view.
+ * only while there is a session to say anything to, the stopped band standing in its place where there is not (`sayable`). The part and the
+ * talk scroll together under the header, the talk held to 60% of the window so it keeps its own latest and its way back to it, the composer
+ * staying in view.
  *
- * The transcript is told whether the step waits on a person's word — its session over, nothing of it running — and never whether the
- * run is held: a hold (the CLI's
- * `hold`) answers nothing, and the session runs or rests as it did. What this page said that the run, as last read, does not have yet is
- * kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are drawn once, as what
- * was said, where they reached it (`heardIn`).
+ * The transcript is told whether the step waits on a person's word — its session over, nothing of it running — and never whether the run is
+ * held: a hold (the CLI's `hold`) answers nothing, and the session runs or rests as it did. What this page said that the run, as last read,
+ * does not have yet is kept with the task it was said to, so a later try starts afresh. Words the transcript shows reaching the session are
+ * drawn once, as what was said, where they reached it (`heardIn`).
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
@@ -143,7 +143,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
           {following.retrying !== null && <SessionRetryingBand why={following.retrying} />}
           {following.error !== null && <SessionUnreadableBand why={following.error} />}
           {!say.open && <SessionStoppedBand why={say.why} />}
-          <div className="flex min-h-[60svh] shrink-0 flex-col">
+          <div className="flex h-[60svh] min-h-80 shrink-0 flex-col">
             <SessionBody step={step} following={following} turns={turns} />
           </div>
         </div>

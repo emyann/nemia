@@ -142,3 +142,12 @@ settings-end
 setup
 settings-release
 light-readers
+step-got
+run-ledger
+run-asks
+run-result
+run-menu
+viewer-sheet
+try-address
+debug-detail
+step-sizes

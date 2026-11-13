@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, openFold, partOf, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, literal, Refused, settled } from '../checks.ts';
 import { DIAMOND, GATED, HELD } from '../seed.ts';
@@ -75,10 +75,14 @@ export default {
       await expectVisible(section.locator('p.font-mono', { hasText: new RegExp(`^${literal(word)}$`) }), `the run's page says ${word}`);
       await expectVisible(section.locator('[data-advice]', { hasText: new RegExp(`^${literal(advice)}$`) }), 'and how to lift it');
       await expectVisible(section.getByRole('link', { name: until, exact: true }), `and links ${until}`);
-      const step = page.locator(`article > section#step-${gated}`);
-      await expectVisible(step.locator('[data-state="held"]'), `${gated}'s chip is held on its page`);
-      await expectCount(step.getByRole('button', { name: 'Approve', exact: true }), 0, `and ${gated}'s section offers no Approve`);
-      await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the page no Decide section');
+      const step = partOf(page, gated);
+      await expectVisible(
+        page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${gated}"] [data-state="held"]`),
+        `${gated}'s chip is held on its page's graph`,
+      );
+      await expectVisible(step.locator('[data-step-tag]', { hasText: /^held$/i }), `and its part's tag says held`);
+      await expectCount(step.getByRole('button', { name: 'Approve', exact: true }), 0, `and ${gated}'s part offers no Approve`);
+      await expectCount(page.locator('[data-fold="decide"]'), 0, 'and the page no Decide fold');
       await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
       await expectCount(page.locator('[data-gate-band]'), 0, 'and no step of it has a gate band');
       await settled(page);
@@ -89,10 +93,7 @@ export default {
     }
 
     await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold lifted, the run page says no hold');
-    await expectVisible(
-      page.locator(`article > section#step-${gated}`).getByRole('button', { name: 'Approve', exact: true }),
-      `and offers ${gated}'s Approve again`,
-    );
+    await expectVisible(partOf(page, gated).getByRole('button', { name: 'Approve', exact: true }), `and offers ${gated}'s Approve again`);
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(card.locator('[data-answer="Approve"]'), `and on the Factory, ${id}'s card offers its gate again`);
@@ -148,7 +149,7 @@ async function heldWithWords(page: Page): Promise<void> {
     await idle(page);
     await expectVisible(page.locator('section[aria-label="Held"] p.font-mono', { hasText: whole }), `the run's page says ${word}`);
     await expectVisible(
-      page.locator(`article > section#step-${gated} [data-note]`, {
+      (await openFold(partOf(page, gated), 'detail')).locator('[data-note]', {
         hasText: new RegExp(`^${literal(noted)}$`),
       }),
       `and ${gated}'s note, at the gate the hold keeps back, says it too`,
@@ -194,8 +195,11 @@ async function heldNotStarted(page: Page): Promise<void> {
     await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);
     await expectVisible(page.locator('section[aria-label="Held"]'), `${id}'s page says it is held`);
-    const chip = page.locator('article > section#step-implement [data-state="waiting"]').first();
-    await expectVisible(chip, 'and its step not started has the chip of a step to come');
+    const chip = page
+      .locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="implement"] [data-state="waiting"]`)
+      .first();
+    await expectVisible(chip, 'and its step not started has the chip of a step to come, on its graph');
+    await expectVisible(partOf(page, 'implement').locator('[data-step-tag]', { hasText: /^to come$/i }), 'and its part says to come');
     if (!(await chip.getAttribute('title'))?.includes('holds the run'))
       throw new Refused(`the chip says on hover that it waits on the hold — it says ${JSON.stringify(await chip.getAttribute('title'))}`);
     await settled(page);

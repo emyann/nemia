@@ -624,7 +624,13 @@ test("AsksOfYou lists each ask as one line linked to its step's part on the page
   assert.doesNotMatch(bar, /href=/, 'in the bar a hash would point nowhere');
   assert.match(bar, /<button type="button" data-ask-link="review"/);
 
-  assert.equal(await routedWith(createElement(AsksOfYou, { run: needing('running (working)', {}, { waitingOnYou: [] }) })), '');
+  const quiet = needing('running (working)', {}, { waitingOnYou: [] });
+  assert.equal(await routedWith(createElement(AsksOfYou, { run: { ...quiet, status: 'running' } })), '', 'nothing for a run at work');
+  assert.equal(
+    await routedWith(createElement(AsksOfYou, { run: { ...quiet, status: 'succeeded' } })),
+    '',
+    'nor for a finished run that asks nothing, until the api says there is something to decide',
+  );
 });
 
 test("the run's menu holds its actions behind one button, each its own question: Remove for a try, Lift while held, else Hold, and Prune", async () => {

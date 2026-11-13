@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, openFold, openRunMenu, photograph, runMenuActions, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, photographCard, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
@@ -44,9 +44,10 @@ export default {
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
       await idle(page);
       const open = page.locator('[data-prune-open]');
+      await openRunMenu(page);
       await expectVisible(
         open.filter({ hasText: /^Prune…$/ }),
-        `${id}'s page offers Prune… in its header: it is over, and its worktree and files are on disk`,
+        `${id}'s page offers Prune… in its header's menu: it is over, and its worktree and files are on disk`,
       );
       await open.click();
       const dialog = page.getByRole('dialog', { name: `Prune ${id}` });
@@ -96,8 +97,14 @@ export default {
       if (fs.existsSync(lane)) throw new Refused(`the prune removes the worktree — ${lane} is still there`);
       if (fs.existsSync(files)) throw new Refused(`the prune removes its files — ${files} is still there`);
       if (!git('branch', '--list', branch).trim()) throw new Refused(`the prune deletes no branch — ${branch} is gone`);
-      await expectVisible(page.locator('[data-pruned][data-files-pruned]'), "the run's page says its worktrees and its files were pruned");
-      await expectCount(open, 0, 'and offers no prune: nothing of it is left on disk');
+      await openFold(page.locator('section[aria-label="Receipts"]'), 'where');
+      await expectVisible(
+        page.locator('[data-pruned][data-files-pruned]'),
+        "the run's receipt of where it ran says its worktrees and its files were pruned",
+      );
+      const actions = await runMenuActions(page);
+      if (actions.includes('prune'))
+        throw new Refused(`and its menu offers no prune: nothing of it is left on disk — it offers ${actions.join(', ')}`);
       await settled(page);
       await photograph(page, path.join(OUT, `prune-pruned-${theme}.png`), { fullPage: true });
 

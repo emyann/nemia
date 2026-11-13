@@ -122,9 +122,12 @@ function StepFacts({ run, step }: { run: RunDetail; step: StepView }) {
   const cause = useDeniedCause(run, Boolean(step.denied));
   if (step.taskId === null)
     return (
-      <p data-unfiled className="text-body-small text-on-surface-variant">
-        {step.approve && run.cancelledAt === null ? 'not filed yet: it waits at its gate' : 'not filed yet'}
-      </p>
+      <>
+        <p data-unfiled className="text-body-small text-on-surface-variant">
+          {step.approve && run.cancelledAt === null ? 'not filed yet: it waits at its gate' : 'not filed yet'}
+        </p>
+        {step.gate && <Facts rows={[['gate', gateWord(step.gate, endsTheRun(step))]]} />}
+      </>
     );
   const latest = step.attempts.latest;
   const state = stepState(step, run.cancelledAt !== null, run.holding != null);

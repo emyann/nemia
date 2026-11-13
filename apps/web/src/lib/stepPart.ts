@@ -306,7 +306,7 @@ export function headOf({ run, step, detail, agents, now }: HeadInput): PartHead 
   const codes = row ?? UNLISTED;
   const state = stepState(codes, run.cancelledAt !== null, run.holding != null);
   const own = detail?.steps.find((s) => s.name === step);
-  const kind = kindOf(codes.phase, state, Boolean(own && own.tries.length > 0));
+  const kind = kindOf(codes.phase, state, Boolean(own?.tries.some((t) => t.taskId !== null)));
   const word = stateWordsOf(state, codes.on, run.holding != null).rail;
   return {
     step,
@@ -457,12 +457,17 @@ type PartGave = {
   unnamed: number;
 };
 
-/** The step's declared fields: as the closeout's schema reads them, in its order; before a closeout, as the run froze them, each a dash. */
+/**
+ * The step's declared fields: as the closeout's schema reads them, in its order; before a closeout, as the run froze them, each a dash. A
+ * field the api read questions from is of the questions shape where nothing else says its shape: a run frozen before shapes were kept.
+ */
 function fieldsOf(step: StepView, spec: StepSpecView | null): GaveField[] {
   const closeout = step.closeout;
   const declared = spec?.fields ?? [];
   if (!closeout) return declared.map((f) => ({ name: f.name, widget: widgetOf(fieldReadOf(null, f.shape)), given: false, value: null }));
-  const shapeOf = (name: string) => closeout.shapes?.[name] ?? declared.find((f) => f.name === name)?.shape ?? null;
+  const asks = (name: string) => closeout.questions.some((q) => q.field === name);
+  const shapeOf = (name: string) =>
+    closeout.shapes?.[name] ?? declared.find((f) => f.name === name)?.shape ?? (asks(name) ? ('questions' as const) : null);
   const names = [...Object.keys(closeout.schema), ...declared.map((f) => f.name).filter((n) => !Object.hasOwn(closeout.schema, n))];
   return names.map((name) => ({
     name,
@@ -479,16 +484,21 @@ function unnamedOf(step: StepView): number {
   return [...held].filter((path) => !named.has(path)).length;
 }
 
-/** What the step gave, of the try shown; none where it declares nothing and gave nothing. */
-function gaveOf(step: StepView, packets: readonly Packet[]): PartGave | None {
+/**
+ * What the step gave, of the try shown; none where it declares nothing and gave nothing — its loop's replies to findings counting as
+ * something given, which `PartGave` draws from the closeout beside its fields. A field whose questions the part asks of a person
+ * (`answered`) is drawn there, as the form that answers it, and not again here.
+ */
+function gaveOf(step: StepView, packets: readonly Packet[], answered: ReadonlySet<string>): PartGave | None {
   const gave: PartGave = {
     packet: packets.find((p) => p.from === step.name)?.label ?? null,
-    fields: fieldsOf(step, step.spec),
+    fields: fieldsOf(step, step.spec).filter((field) => !answered.has(field.name)),
     files: step.closeout?.artifacts ?? [],
     values: step.closeout?.values ?? [],
     unnamed: unnamedOf(step),
   };
-  return gave.fields.length + gave.files.length + gave.values.length + gave.unnamed > 0 ? gave : 'none';
+  const replies = step.closeout?.replies?.length ?? 0;
+  return gave.fields.length + gave.files.length + gave.values.length + gave.unnamed + replies > 0 ? gave : 'none';
 }
 
 /**
@@ -555,12 +565,14 @@ export function stepPartOf(
   if (!own) return { head, asks: 'none', got: 'none', said: 'none', gave: 'none', detail: 'none' };
   const packets = packetsOfView(view);
   const got = gotOf(own, packets);
+  const asks = asksOf(own, head.state, view.waitingOnYou.includes(step));
+  const answered = new Set(asks === 'none' ? [] : asks.questions.map((q) => q.field));
   return {
     head,
-    asks: asksOf(own, head.state, view.waitingOnYou.includes(step)),
+    asks,
     got: got.length > 0 ? got : 'none',
     said: saidOf(own),
-    gave: gaveOf(own, packets),
+    gave: gaveOf(own, packets, answered),
     detail: detailOf(own),
   };
 }

@@ -135,8 +135,8 @@ async function contents(page: Page): Promise<void> {
   await cardOf(page, id).locator('time').first().click();
   const decide = page.locator(`aside[data-bar="run:${id}"]`);
   await expectVisible(decide, `a click on ${id}'s card shows that run in the bar`);
-  await decide.locator(`section[aria-label="To decide"] button[data-approve="${ending}"]`).click();
-  await expectVisible(stepBar(page, id, ending), `${ending}, at its gate and named in the to-decide banner, shows in the bar when pressed`);
+  await decide.locator(`section[aria-label="Asks of you"] button[data-ask-link="${ending}"]`).click();
+  await expectVisible(stepBar(page, id, ending), `${ending}, at its gate and named in the asks of you, shows in the bar when pressed`);
   await page.keyboard.press('Escape');
   await expectNoBar(page, 'Escape closes it');
 }

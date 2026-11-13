@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectInstant, nextVisit, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
+import { expectInstant, nextVisit, openFold, partOf, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
 import {
   cardOf,
   cardsOf,
@@ -620,8 +620,7 @@ export default {
 
     await tile(FAKE.refused).click();
     const refused = stepBar(page, FAKE.id, FAKE.refused);
-    await refused.getByRole('tab', { name: 'Details' }).click();
-    const check = refused.locator('section[aria-label="Check"]');
+    const check = (await openFold(partOf(refused, FAKE.refused), 'detail')).locator('section[aria-label="Check"]');
     await expectVisible(
       check.getByText(FAKE.check, { exact: true }),
       `the inspector of ${FAKE.refused} shows its check's command (${FAKE.check})`,

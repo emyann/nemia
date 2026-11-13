@@ -15,7 +15,8 @@ export const packetWords = (packet: Pick<Packet, 'label' | 'fields' | 'files'>):
 
 /**
  * The packet `packet` on the graph's edge, at `x`, `y` on the canvas: a button that moves the page to the giver's part (`#step-<giver>`),
- * the address kept, so the part shows the try the packet was counted from. Neither a drag nor a pan starts on it.
+ * the address kept, so the part shows the try the packet was counted from. Neither a drag nor a pan starts on it. It stands over the
+ * nodes, whose gap is narrower than its words, so it is read whole.
  */
 export function PacketChip({ packet, x, y }: { packet: Packet; x: number; y: number }) {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export function PacketChip({ packet, x, y }: { packet: Packet; x: number; y: num
       data-packet-to={packet.to}
       title={`What ${packet.from} handed ${packet.to}: read it in ${packet.from}'s part`}
       onClick={() => void navigate({ to: '.', search: true, hash: stepAnchor(packet.from), resetScroll: false })}
-      style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, pointerEvents: 'all' }}
+      style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`, pointerEvents: 'all', zIndex: 1001 }}
       className={cn(
         'nodrag nopan border border-outline-variant bg-surface-container px-1.5 py-0.5 font-mono text-body-small text-on-surface hover:border-on-surface',
         focusRing(),

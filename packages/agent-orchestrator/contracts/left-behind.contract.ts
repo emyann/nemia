@@ -1,6 +1,6 @@
 /**
  * What the daemon's sweep does with one process of this user, read against one run (agent-orchestrator,
- * src/forget/prune/left-behind.ts, `leftBehindOf`): a backstop behind the runtime, which ends a session's scope with the session. A
+ * src/forget/prune/prune.ts, `leftBehindOf`): a backstop behind the runtime, which ends a session's scope with the session. A
  * process that descends from one of the run's sessions — its environment names the run's own files, as every session's does — is the
  * run's, and once the run is finished nothing of it may run on: it is ended. A process of no session of the run's (a person's shell, an
  * editor, another run's) is never ended; where its working folder is in the run's worktree it holds that worktree, which is not freed
@@ -20,7 +20,7 @@ export type LeftVerdict = 'end' | 'holds' | 'none';
 
 /** Whether `cwd` is the folder `folder` or inside it: a folder named alike beside it (`<folder>2`) is not. */
 const inFolder = (cwd: string | undefined, folder: string): boolean =>
-  cwd !== undefined && (cwd === folder || cwd.startsWith(`${folder}/`));
+  cwd !== undefined && (cwd === folder || cwd.startsWith(folder + '/'));
 
 const leftBehindSpec = spec<(p: LeftProcess, run: SweptRun) => LeftVerdict>({
   requires: ({ input: [, run] }) => run.id !== '' && run.worktree !== '' && !run.worktree.endsWith('/'),

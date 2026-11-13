@@ -23,6 +23,7 @@ export {
   publishedOf,
   REMOVED,
   LINE_WORDS,
+  leftEndedLine,
   startedLine,
   STORE,
   upgraded,

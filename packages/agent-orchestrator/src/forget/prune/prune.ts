@@ -2,14 +2,20 @@
  * Pruning a finished run: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`)
  * and what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and the lines that say what it frees (`pruneLines`); and
  * the daemon's rule for a finished run: which runs it may free (`freeable`), which of them a sweep takes (`freeTurn`), why it leaves
- * one out until a person acts (`untaken`, `untakenWords`), and what it says of one it left (`freeSaid`) or freed (`freedLine`). Pure.
+ * one out until a person acts (`untaken`, `untakenWords`), and what it says of one it left (`freeSaid`) or freed (`freedLine`); and the
+ * sweep's backstop behind the runtime: which run a process of this user is of (`runOfEnvironment`), what the sweep does with it
+ * (`leftBehindOf`, proved by `contracts/left-behind.contract.ts`), which runs it ends processes of (`finishedAtRest`), and its words
+ * (`leftLineNote`, `heldWords`); `left-behind.verb.ts` reads the processes and ends them. Pure.
  */
+import path from 'node:path';
+import { firstPiece } from '../../piece/piece.ts';
 import { andList, isRepositoryRun, prunedWords, type RepositoryRun, type Pruned, type Run } from '../../record/record.ts';
 import { holdWord } from '../../wait/wait.ts';
 import { sizeOf } from '../../artifacts/artifacts.ts';
 import type { Decision } from '../../decide/decide.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 import type { Untaken, UntakenWhy } from '../../../contracts/sweep-untaken.contract.ts';
+import type { LeftBehindOf, LeftProcess, LeftVerdict, SweptRun } from '../../../contracts/left-behind.contract.ts';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>
@@ -293,3 +299,71 @@ export function untakenWords(run: Run, why: UntakenWhy): string {
   }
   return `its record froze no workflow, so no pass finds it at rest and no sweep frees it: free it by hand, nemia prune ${run.id}`;
 }
+
+/** One process as the sweep reads it, one run as it reads it, and what it does with the one against the other. */
+export type { LeftProcess, LeftVerdict, SweptRun };
+
+/** The variable a check is given its run by (`checkEnvOf`). */
+export const RUN_MARK = 'WF_RUN';
+
+/** The variable a session is given its step's files by (`STEP_FILES`, `filed.ts`), a folder under `<home>/runs/<id>/`. */
+export const STEP_FILES_MARK = 'WF_STEP_FILES';
+
+/** The variables a process is told apart by: what the sweep asks `/proc` for. */
+export const LEFT_MARKS = [RUN_MARK, STEP_FILES_MARK] as const;
+
+/**
+ * The run of this store a process is of, by its environment `env`: `WF_RUN` where it is set, else the `<id>` of a `WF_STEP_FILES` under
+ * `<home>/runs/<id>/`; `undefined` for one under another store's home, one that climbs out by `..`, and one that names neither. Pure.
+ */
+export function runOfEnvironment(env: Readonly<Record<string, string>>, home: string): string | undefined {
+  const run = env[RUN_MARK];
+  if (run !== undefined && run !== '') return run;
+  const files = env[STEP_FILES_MARK];
+  if (files === undefined || !path.isAbsolute(files) || files.split('/').includes('..')) return undefined;
+  const runs = `${path.join(path.resolve(home), 'runs')}/`;
+  if (!files.startsWith(runs)) return undefined;
+  const id = firstPiece(files.slice(runs.length), '/');
+  return id === '' || id === '.' ? undefined : id;
+}
+
+/**
+ * What the sweep does with the process `p`, read against the run `run`: nothing of the daemon's own process nor of a run not finished
+ * and at rest; it ends one the run's sessions started (`runOf`), wherever it works; and another working in the run's worktree — the
+ * folder or one inside it, never a folder named alike beside it (`<worktree>2`) — holds it. Pure.
+ */
+export const leftBehindOf: LeftBehindOf = (p, run) => {
+  if (p.own || !run.finished) return 'none';
+  if (p.runOf === run.id) return 'end';
+  const { cwd } = p;
+  if (cwd === undefined) return 'none';
+  return cwd === run.worktree || cwd.startsWith(run.worktree + '/') ? 'holds' : 'none';
+};
+
+/**
+ * The runs whose processes the sweep ends, by id, among what a pass answered: at rest, succeeded or cancelled, as `freeable` reads them,
+ * a folder run's too, since a process a session left runs whatever place its run has. A failed run is not: it may be tried again. Pure.
+ */
+export const finishedAtRest = (answers: readonly Answered[]): string[] =>
+  answers.filter((a) => a.feed.atRest === true && (a.status === 'succeeded' || a.status === 'cancelled')).map((a) => a.run.id);
+
+/** A process as the sweep's words name it: its pid and its command's name. */
+export type NamedProcess = { readonly pid: number; readonly name: string };
+
+/** Each process by its pid and its command's name, in the order of their pids. */
+const named = (processes: readonly NamedProcess[]): string =>
+  [...processes]
+    .sort((a, b) => a.pid - b.pid)
+    .map((p) => `pid ${p.pid} (${p.name})`)
+    .join(', ');
+
+/** The note of the run `run`'s `left running, ended` line: the run, and each process the sweep ended of it. Pure. */
+export const leftLineNote = (run: string, ended: readonly NamedProcess[]): string =>
+  `${run} had finished, and ${ended.length === 1 ? 'a process' : `${ended.length} processes`} it started still ran: ${named(ended)}`;
+
+/**
+ * What the sweep says of a finished run's worktree `folder` it leaves, since `processes` work in it: each by its pid and command, and what
+ * frees it. Pure.
+ */
+export const heldWords = (processes: readonly NamedProcess[], folder: string): string =>
+  `${named(processes)} ${processes.length === 1 ? 'works' : 'work'} in ${folder}: end ${processes.length === 1 ? 'it' : 'them'} or leave the folder, and a later sweep frees it`;

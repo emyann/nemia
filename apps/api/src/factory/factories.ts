@@ -224,7 +224,7 @@ const applied = (name: string, { template, repos, sets, noTrust }: FactoryApplyW
     return s.inRequest(withTemplate(template, 'made', (source) => FACTORY_APPLY.handler({ name, template: source, repos, sets, noTrust })));
   });
 
-/** A factory's export (`nemia factory move`'s read of the source): the factory `name` whole, its cards following unless `cards` is `stay`. */
+/** A factory's export (`nemia factory move`'s read of the source): the factory `name` whole, its cards following unless `stay`. */
 const exported = (name: string, cards: MoveCards | undefined) =>
   answered((s: Served) => {
     factoryNamed(`GET /api/factories/${name}/export`, name);

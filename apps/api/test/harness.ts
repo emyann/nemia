@@ -20,7 +20,9 @@
  * and a test that means one sets it in its own scope. And neither store is the person's and neither is their home: it points `WF_ROOT`,
  * `AE_ROOT` and `HOME` each at a scratch folder (`root`, `engineRoot`, `away`), so a module that pins a root as it loads pins a throwaway
  * one and `os.homedir()` answers a throwaway too — the engine's store and `~/.claude.json` with it. A test that needs something of the
- * person's own `$HOME` reads it from `realHome`.
+ * person's own `$HOME` reads it from `realHome`. And every request a test makes through `app.request` presents the person's token
+ * (`PERSON_TOKEN`, kept in `root`; `seatPerson` keeps it in a store of a test's own) unless it presents one of its own or says
+ * `NO_TOKEN`: no route the api answers takes a request with none.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -117,6 +119,50 @@ process.env.HOME = away;
  */
 const { SERVING_VARIABLES, SESSION_VARIABLES } = await import('agent-orchestrator');
 for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.env[name];
+
+const { tokenDigest } = await import('agent-orchestrator');
+
+/**
+ * The person's token every request a test makes presents where it presents none of its own: no route the api answers takes a request
+ * with no token, so a test of a route reads as the person on their own device unless it says otherwise. Kept in a store by `seatPerson`
+ * — in `root` as this module loads — under the name `harness`, as a standing token the person minted. A test that means a request with
+ * no token sends `NO_TOKEN` among its headers; one that presents a token of its own (`authorization`, or the board's cookie) presents it.
+ */
+export const PERSON_TOKEN = 'harness-person-token-0123456789abcdefghijklmnopq';
+
+/** The header a request sends that means to present no token at all: the harness takes it off, and adds none. */
+export const NO_TOKEN = { 'x-harness-token': 'none' } as const;
+
+/**
+ * `PERSON_TOKEN` kept in the store `home`, as the record a standing token the person minted is kept by (`person-tokens/<digest>.json`),
+ * so an app over a store of a test's own takes it too. Idempotent.
+ */
+export function seatPerson(home: string): void {
+  const dir = path.join(home, 'person-tokens');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${tokenDigest(PERSON_TOKEN)}.json`);
+  if (!fs.existsSync(file))
+    fs.writeFileSync(file, `${JSON.stringify({ name: 'harness', createdAt: '2026-01-01T00:00:00.000Z' })}\n`, { mode: 0o600 });
+}
+seatPerson(root);
+
+/** Where `app.request` addresses a path it is handed (Hono's own base): an address no server of a test listens on. */
+const IN_PROCESS = 'http://localhost/';
+
+/**
+ * Every request a test makes in process (`app.request`, which builds a `Request` at Hono's own base, `IN_PROCESS`): one that presents no
+ * token of its own presents `PERSON_TOKEN`; one that sends `NO_TOKEN` presents none. `Request` is subclassed as this module loads, since
+ * Hono's `request` is a field of each app, not of its prototype; a request to a server a test started, at its own port, goes as it is.
+ */
+class Tokened extends Request {
+  constructor(input: ConstructorParameters<typeof Request>[0], init?: RequestInit) {
+    super(input, init);
+    if (!this.url.startsWith(IN_PROCESS)) return;
+    if (this.headers.get('x-harness-token') === 'none') this.headers.delete('x-harness-token');
+    else if (!this.headers.has('authorization') && !this.headers.has('cookie')) this.headers.set('authorization', `Bearer ${PERSON_TOKEN}`);
+  }
+}
+globalThis.Request = Tokened;
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

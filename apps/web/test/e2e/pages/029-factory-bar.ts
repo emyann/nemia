@@ -108,6 +108,7 @@ async function presses(page: Page): Promise<void> {
   await cardOf(page, RUN).focus();
   await page.keyboard.press('Enter');
   await expectRun(page, `Enter on ${RUN}'s card shows the run in the bar`);
+  await settled(page);
   await clickPane(page);
   await expectNoBar(page, 'a click on the empty floor closes the bar');
 }
@@ -186,6 +187,7 @@ async function others(page: Page): Promise<void> {
   await visit(page, `${FLOOR}?bar=${start}`);
   const bar = page.locator(`aside[data-bar="${start}"]`);
   await expectVisible(bar, 'the start of a run opens in the bar on the floor');
+  await settled(page);
   await clickPane(page);
   await expectVisible(bar, 'a click on the empty floor leaves the start of a run open');
   if (barInUrl(page) !== start) throw new Refused(`and the address keeps bar=${start} — it is ${page.url()}`);
@@ -214,7 +216,7 @@ async function others(page: Page): Promise<void> {
   await visit(page, FLOOR);
 }
 
-/** A card dragged to the floor's right edge, where the bar opens over it, is brought clear of the bar once inspected. */
+/** A card dragged to the floor's right edge, which the sheet narrows past it, is brought back into the floor once inspected. */
 async function edge(page: Page): Promise<void> {
   await fit(page);
   const [floor, card, zoom] = [await floorOf(page).boundingBox(), await cardOf(page, RUN).boundingBox(), await zoomOf(page)];
@@ -225,7 +227,7 @@ async function edge(page: Page): Promise<void> {
   await bodyOf(page).click();
   await expectRun(page, `a click on ${RUN}'s card, at the floor's right edge, shows the run`);
   await settled(page);
-  await expectLeftOf(cardOf(page, RUN), runBar(page), 'the card, dragged to where the bar opens, is brought left of it');
+  await expectLeftOf(cardOf(page, RUN), runBar(page), 'the card, dragged to the edge the sheet takes, is brought left of it');
   await photograph(page, path.join(OUT, `factory-bar-card-${await themeOf(page)}.png`));
   await runBar(page).getByRole('button', { name: 'Close', exact: true }).click();
   await expectNoBar(page, 'its Close closes the bar');
@@ -238,7 +240,7 @@ export default {
    * run's title and id, the gates its banners name and its steps as buttons that show each step, and its brief. A tile, the card unfolded
    * by its chevron, shows its step and is pressed, the open card whole beside the bar. Open and a double click open the run's page. The
    * start of a run is not closed by the floor, keeps the lane, and leaves the floor's hint clear of its buttons; a ghost opens its card's
-   * page. A card dragged under where the bar opens is brought clear of it. The page lays the floor out again at its end.
+   * page. A card dragged to the edge the sheet takes is brought left of it. The page lays the floor out again at its end.
    */
   name: 'factory-bar',
   route: FLOOR,

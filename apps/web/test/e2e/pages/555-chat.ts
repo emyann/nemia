@@ -7,6 +7,8 @@ import {
   expectUncovered,
   expectPanelHeld,
   expectSheetIn,
+  expectSheetShows,
+  gaugesOf,
   expectStripWhole,
   herChat,
   herFaceOf,
@@ -307,7 +309,12 @@ export default {
       await idle(page);
       await expectVisible(page.locator('[data-chat-page] [data-chat-panel="page"]'), 'the same panel, as a page of its own');
       await expectVisible(face.and(page.locator('[aria-current="page"]')), 'her face in the rail says the page is hers');
-      await expectCount(herSheetOf(page), 0, 'and opens no sheet over it: the page is the panel');
+      await expectSheetShows(page, 'none', 'and draws no sheet beside it: the page is the panel');
+      const gauges = await gaugesOf(page);
+      await expectSheetShows(page, 'bar', 'on her own page a bar still opens in the sheet');
+      await expectVisible(page.locator('[data-chat-page] [data-chat-panel="page"]'), 'beside her page, which stays');
+      await gauges.getByRole('button', { name: 'Close' }).click();
+      await expectSheetShows(page, 'none', 'and closes, leaving her page alone');
       await expectCount(page.locator('[data-chat-panel] button[aria-label="Close"]'), 0, 'a page closes on nothing, being a page');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-page-${await themeOf(page)}.png`), { fullPage: true });

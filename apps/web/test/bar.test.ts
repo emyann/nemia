@@ -1,25 +1,19 @@
 /**
- * The side bar (src/lib/bar.ts), as tables: its address read and written, what a press shows or closes, what Open visits, its width and
- * the room it takes, and how it closes.
+ * The frame's bar (src/lib/bar.ts), as tables: its address read and written, what a press shows or closes, what Open visits, what the
+ * modal sheet is named by for it, and how it closes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BAR_DEFAULT,
-  BAR_GAP,
-  BAR_MIN,
-  barMost,
+  BAR_NAMES,
   barOf,
   barOpens,
-  barOver,
   barSearch,
   barValue,
-  barWidth,
   escapeDoes,
   focusGoesBack,
   inspects,
   nextBar,
-  parseWidth,
   specStep,
   type Bar,
   wholeMachine,
@@ -246,36 +240,16 @@ test('escapeDoes and focusGoesBack: how the bar closes, and where the focus goes
   );
 });
 
-test("parseWidth, barWidth, barMost, barOver and wholeMachine: the bar's width and the room it takes", async (t) => {
-  await t.test('a stored width reads as a number of pixels, else the default', () => {
-    for (const raw of [null, '', 'abc', '-5', '0', 'NaN', '1e9x', 'Infinity'])
-      assert.equal(parseWidth(raw), BAR_DEFAULT, `${JSON.stringify(raw)} reads as the default`);
-    assert.equal(parseWidth('600'), 600);
-    assert.equal(parseWidth('640.5'), 640.5);
+test("BAR_NAMES and wholeMachine: the sheet's name for each kind of bar, and what is the whole machine's", async (t) => {
+  await t.test('each kind of bar names its modal sheet, each by a name of its own', () => {
+    const names = Object.values(BAR_NAMES);
+    assert.equal(names.length, 7, 'start, factory, run, step, spec, gauges and waiting');
+    assert.ok(
+      names.every((name) => name.trim() !== ''),
+      'no kind is named by nothing',
+    );
+    assert.equal(new Set(names).size, names.length, 'no two kinds share a name');
   });
-  await t.test(
-    'the width stays between the least and the window less a strip of page, and a window too narrow for both is the whole width',
-    () => {
-      assert.equal(barWidth(100, 1280), BAR_MIN);
-      assert.equal(barWidth(5000, 1280), 1280 - BAR_GAP);
-      assert.equal(barWidth(600, 1280), 600);
-      assert.equal(barWidth(600, BAR_MIN + BAR_GAP - 1), BAR_MIN + BAR_GAP - 1);
-    },
-  );
-  await t.test('the widest the bar is drawn is the window less a strip of page, or the whole of a window too narrow for both', () => {
-    assert.equal(barMost(1280), 1280 - BAR_GAP);
-    assert.equal(barMost(BAR_MIN + BAR_GAP), BAR_MIN);
-    assert.equal(barMost(390), 390);
-  });
-  await t.test(
-    'the bar covers the part of a frame right of its left edge, and none with no bar, past the frame, or on a narrow screen',
-    () => {
-      assert.equal(barOver(1280, null, false), 0);
-      assert.equal(barOver(1280, 704, true), 0);
-      assert.equal(barOver(900, 1000, false), 0);
-      assert.equal(barOver(1280, 1280 - BAR_DEFAULT, false), BAR_DEFAULT);
-    },
-  );
   await t.test(
     "REFUSED: the floor gives its queue lane's room to a bar of the whole machine alone: its gauges, the runs waiting on you",
     () => {

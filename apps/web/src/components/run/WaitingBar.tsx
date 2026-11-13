@@ -1,5 +1,5 @@
 /**
- * The frame's floating bar for the runs waiting on you, which the Runs page opens under what waits on you: each run, across every
+ * The frame's side sheet for the runs waiting on you, which the Runs page opens under what waits on you: each run, across every
  * factory, that waits on a person as the api answers it (`bellRows`), oldest first, with its factory and what it waits for, a link to its
  * run's page at its gate. They are the whole machine's, not a page's, so the bar has no Open (`barOpens`).
  */
@@ -8,7 +8,7 @@ import { openRunsQuery } from '@/lib/api/runs';
 import { bellHash, bellRows, type BellRow } from '@/lib/bell';
 import { RouteLink } from '../agent/AgentParts';
 import { FactoryTag } from '../factory/FactoryTag';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 
 /** One run waiting on you: its title, its factory and what it waits for, a link to its run's page at its gate, or at its top for none. */
 function WaitingRow({ row }: { row: BellRow }) {
@@ -48,7 +48,7 @@ export function WaitingBar() {
   const runs = useQuery(openRunsQuery());
   const rows = runs.data ? bellRows(runs.data.waiting) : null;
   return (
-    <FloatingBar title="Waiting on you" description={rows ? countWords(rows.length) : 'Across every factory'}>
+    <BarPanel title="Waiting on you" description={rows ? countWords(rows.length) : 'Across every factory'}>
       {rows ? (
         rows.length ? (
           <ul data-waiting className="space-y-2">
@@ -64,6 +64,6 @@ export function WaitingBar() {
       ) : (
         <p className="text-body-medium">{runs.error ? `The runs could not be read: ${runs.error.message}` : 'Reading the runs…'}</p>
       )}
-    </FloatingBar>
+    </BarPanel>
   );
 }

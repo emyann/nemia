@@ -236,7 +236,7 @@ export default {
     await inspected.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
     await inspected.getByRole('button', { name: 'Close', exact: true }).click();
-    await expectCount(inspected, 0, "the inspector's Close closes it, and uncovers the steps it floated over");
+    await expectCount(inspected, 0, "the inspector's Close closes it, and the canvas widens again");
 
     await graph.locator('.react-flow__node[data-id="review"]').click();
     await expectVisible(stepBar(page, FAKE.id, 'review'), 'the step inspector opens on a click on review');
@@ -244,7 +244,7 @@ export default {
     await expectInside(
       graph.locator('.react-flow__node'),
       graph.locator('.react-flow'),
-      'every step is on the canvas, the whole width of the page, under the bar that floats over it',
+      'every step is on the canvas, narrowed beside the sheet',
     );
 
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();

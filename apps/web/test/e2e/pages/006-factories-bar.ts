@@ -6,7 +6,7 @@ import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
-/** The factory the page inspects, and the one it switches to: last in the grid, in its right-hand column, where the bar opens over it. */
+/** The factory the page inspects, and the one it switches to: last in the grid, in its right-hand column, nearest the sheet. */
 const [HIRING, LAST] = [FACTORIES.hiring.name, FACTORIES.others[2]];
 
 /** The canvas's frame. */
@@ -66,8 +66,8 @@ async function clickPane(page: Page): Promise<void> {
 }
 
 /**
- * A click on a block shows its factory, the block brought whole onto the canvas, and it and the canvas's controls clear of the bar; again
- * closes it; another switches it.
+ * A click on a block shows its factory, the block brought whole onto the canvas, which narrows beside the sheet, and it and the canvas's
+ * controls left of the bar; again closes it; another switches it.
  */
 async function presses(page: Page): Promise<void> {
   await blockOf(page, LAST).click();
@@ -113,6 +113,8 @@ async function contents(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `factories-bar-open-${await themeOf(page)}.png`));
 
   const { broken } = FACTORIES;
+  await page.keyboard.press('Escape');
+  await expectNoBar(page, `Escape closes ${HIRING}'s bar, and the canvas widens again to fit every block`);
   await settled(page);
   await blockOf(page, broken).click();
   const why = await expectFactory(page, broken, `a click on ${broken}'s block shows it`);

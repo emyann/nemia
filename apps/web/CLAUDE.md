@@ -103,7 +103,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   strip, a step card, the quota's keep and the pause's `cut in`.
 - An amount of money has one writer, `dollars` (`lib/money.ts`), by the package's rule: `$0.004` under a cent, `$12.50`, `-$0.13`, `—`
   for none; a budget as its author writes it is `budgetWord` (`$16`, `$2.50`). How a run ended, its word, sentence and hue, is `ENDED`.
-- What this browser keeps (a layout, the open runs, the bar's width, the chat's unsent message) goes through `lib/stored.ts`
+- What this browser keeps (a layout, the open runs, the chat's unsent message) goes through `lib/stored.ts`
   (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
   (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
   read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
@@ -148,9 +148,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
   conversation's alone stays in that conversation's folder: hers is `components/nemia/chat/` (her kept message, her asks), a step's session's
   is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
-- How the frame stands around Nemia's side sheet — the rail folded for it under 1600, docked or modal — is `frameFold` (`lib/frameFold.ts`,
-  proved by `contracts/frame-fold.contract.ts`), read through `useFrameFold` and never written to the `sidebar_state` cookie; her face
-  is `components/nemia/NemiaRailFace.tsx`, her sheet `components/frame/HerSheet.tsx`, and her presence for both `useNemiaPresence`.
+- How the frame stands around its one side sheet — what it shows (what the address's `?bar=` names, else Nemia's chat), the rail folded
+  for it under 1600, docked or modal — is `frameFold` (`lib/frameFold.ts`, proved by `contracts/frame-fold.contract.ts`), read through
+  `useFrameFold` and never written to the `sidebar_state` cookie; the sheet is `components/frame/FrameSheet.tsx`, a bar's panel in it
+  `components/frame/BarPanel.tsx`, her face `components/nemia/NemiaRailFace.tsx`, her sheet's state and panel
+  `components/frame/HerSheet.tsx`, and her presence for both `useNemiaPresence`.
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by
   `components/nemia/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
   `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.

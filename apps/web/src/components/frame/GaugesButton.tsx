@@ -9,7 +9,7 @@ import { type DaemonTone, daemonDot, quotaShort } from '@/lib/footer';
 import { useBar } from '@/lib/useBar';
 import { useNow } from '@/lib/useNow';
 
-/** What the button opens in the floating bar: the machine's gauges, whole. */
+/** What the button opens in the frame's side sheet: the machine's gauges, whole. */
 const GAUGES: Bar = { kind: 'gauges' };
 
 /** The colour of the daemon's dot, by its tone. */
@@ -23,7 +23,7 @@ const DOT: Record<DaemonTone, string> = {
 /**
  * The top bar's gauges button: a gauge with a dot in the daemon's tone at its corner, the api's own standing as the store's daemon
  * (`GET /api/daemon`), and beside it a mark in money while the quota nears its limit (`quotaShort`, `GET /api/quota`); its name says
- * both. A press opens the machine's gauges in the floating bar (`GaugesBar`) — the daemon, the feed (`feed`, carried as `data-feed`),
+ * both. A press opens the machine's gauges in the frame's side sheet (`GaugesBar`) — the daemon, the feed (`feed`, carried as `data-feed`),
  * what is at work, the quota and the version — and pressed again closes them.
  */
 export function GaugesButton({ feed }: { feed: FeedStatus }) {

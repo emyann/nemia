@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectRendered, fed, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
-import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -168,7 +168,8 @@ export default {
       'and says the answer is under Details',
     );
     await settled(page);
-    await expectLeftOf(node, inspector, `the run is too wide to fit beside the bar at 1280, so ${gated} alone is fitted clear of it`);
+    await expectLeftOf(node, inspector, `${gated}'s node stands left of the sheet at 1280`);
+    await expectInside(node, page.locator('.react-flow').first(), `and whole inside the canvas, narrowed beside the sheet`);
     await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
     await inspector.getByRole('tab', { name: 'Details' }).click();
     await expectPolicy(inspector.locator('[data-gate-policy]'), 'in its inspector, under Details');

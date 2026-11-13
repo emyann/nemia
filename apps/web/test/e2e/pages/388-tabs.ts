@@ -46,15 +46,15 @@ async function underHeader(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `tabs-strip-${await themeOf(page)}.png`));
 }
 
-/** A click on a tab opens its own address, the floating bar closed; a next visit to it opens the same tab. */
+/** A click on a tab opens its own address, the side sheet closed; a next visit to it opens the same tab. */
 async function clicks(page: Page): Promise<void> {
   await page.goto(new URL('/settings?bar=gauges', page.url()).href);
   await idle(page);
-  await expectVisible(page.locator('aside[data-bar="gauges"]'), "the machine's gauges are shown in the floating bar");
+  await expectVisible(page.locator('aside[data-bar="gauges"]'), "the machine's gauges are shown in the frame's side sheet");
   await tabOf(page, 'Capabilities').click();
   await expectTab(page, 'Capabilities', 'a click on Capabilities selects it');
   expectAt(page, '/capabilities', 'and opens its own address, which carries no bar');
-  await expectCount(page.locator('aside[data-bar]'), 0, 'the floating bar is closed');
+  await expectCount(page.locator('aside[data-bar]'), 0, 'the side sheet is closed');
   await expectVisible(
     page.locator('[data-unread="several-factories"]'),
     "the Capabilities page is drawn in the tab's panel: with All picked on the seed's several factories, it asks for one",
@@ -103,7 +103,7 @@ async function onPhone(page: Page): Promise<void> {
 export default {
   /**
    * The frame's tabs: Settings is one destination in the rail with a tab each, Settings, Capabilities, Setup and Tokens, in a strip under
-   * the top bar and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same
+   * the top bar and above the page. A tab is its own address: a click opens it, closing the side sheet, and a next visit opens the same
    * tab. The arrow keys move between the tabs without opening one, and Enter opens one, once. A page with one view, Agents, has no strip.
    * The window's size is taken back.
    */

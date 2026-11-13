@@ -23,7 +23,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
+import { MemoryUseSchema } from '../src/core/event-schema.ts';
 import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
@@ -159,7 +160,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
   const s = story(t);
   const b = board();
   const usage = { responses: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
-  const memory = { limitBytes: 67_108_864, peakBytes: 67_108_864, oomKills: 1 };
+  const memory = { limitBytes: 67_108_864, peakBytes: 67_108_864, oomKills: 1, oom: 0 };
   let id = '';
   let cursor = 0;
 
@@ -395,6 +396,12 @@ test('tick: what a pass starts, carries to its harness untouched, and reports', 
     assert.equal('memory' in a, false, 'no cgroup read, no memory: the key absent, as a former journal reads');
     const ended = (await b.run(eventsOf(id))).find((e) => e.kind === 'ended');
     assert.ok(ended && !('memory' in ended), 'and absent from the end');
+  });
+
+  await t.test('a memory record written before the runtime carried oom still decodes, and carries none', () => {
+    const former = Schema.decodeUnknownSync(MemoryUseSchema)({ limitBytes: 1024, peakBytes: 1024, oomKills: 1 });
+    assert.equal('oom' in former, false, 'the key absent, as the former journal wrote it');
+    assert.equal(Schema.decodeUnknownSync(MemoryUseSchema)({ limitBytes: 1024, oomKills: 1, oom: 0 }).oom, 0, 'and carried where written');
   });
 
   await t.test("a task's memory limit reaches its harness untouched, and a task with none hands none", async () => {

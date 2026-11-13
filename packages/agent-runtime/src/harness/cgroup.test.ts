@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scopeArgv, scopeRefusal } from './cgroup.ts';
+import { memoryEventsOf, scopeArgv, scopeRefusal } from './cgroup.ts';
 
 test('scopeArgv: the scope a limited task runs in, with and without a slice, and the program a test stands in', async (t) => {
   const ROWS: Array<{ name: string; argv: string[]; is: string[] }> = [
@@ -66,4 +66,15 @@ test('scopeRefusal: a program that makes no scope is refused with words, asked o
   const words = scopeRefusal(undefined, 'false');
   assert.equal(typeof words, 'string');
   assert.equal(scopeRefusal(undefined, 'false'), words, 'the same answer, cached');
+});
+
+test('memoryEventsOf: the kills of any OOM killer and the times the cgroup’s own limit was reached, read apart', async (t) => {
+  const ROWS: Array<{ name: string; text: string; is: { oomKills: number; oom: number } }> = [
+    { name: 'a kill at the limit', text: 'low 0\nhigh 0\nmax 3\noom 1\noom_kill 1\noom_group_kill 0\n', is: { oomKills: 1, oom: 1 } },
+    { name: 'a kill of the machine’s', text: 'low 0\nhigh 0\nmax 0\noom 0\noom_kill 1\noom_group_kill 0\n', is: { oomKills: 1, oom: 0 } },
+    { name: 'no kill', text: 'low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n', is: { oomKills: 0, oom: 0 } },
+    { name: 'oom_group_kill is not read as oom', text: 'oom_group_kill 3\noom_kill 2\n', is: { oomKills: 2, oom: 0 } },
+    { name: 'lines missing read as none', text: '', is: { oomKills: 0, oom: 0 } },
+  ];
+  for (const row of ROWS) await t.test(row.name, () => assert.deepEqual(memoryEventsOf(row.text), row.is));
 });

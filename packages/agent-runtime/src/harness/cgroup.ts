@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import type { ScopeToEnd } from '../../contracts/scope-end.contract.ts';
 
 /** What a scope's files say of its memory: the limit it ran under, its peak where the kernel keeps one, and its OOM kills. */
-export type CgroupMemory = { limitBytes: number; peakBytes?: number; oomKills: number };
+export type CgroupMemory = { limitBytes: number; peakBytes?: number; oomKills: number; oom: number };
 
 /**
  * The argv put before a command to run it in a scope of its own, in `parent` (a slice's name) where given, and under `limitBytes` where
@@ -94,27 +94,36 @@ const numberIn = (file: string): number | undefined => {
 };
 
 /**
+ * What a cgroup's `memory.events` counts, read apart: `oom_kill`, the processes of the cgroup any OOM killer ended, the machine's own
+ * included (`oomKills`), and `oom`, the times the cgroup's own limit was reached and its OOM killer ran (`oom`). Never `oom_group_kill`
+ * for `oom`: each line is matched by its whole key. A line missing, or no number, reads 0.
+ */
+export const memoryEventsOf = (text: string): { oomKills: number; oom: number } => {
+  const count = (key: string): number => {
+    const line = text.split('\n').find((l) => l.startsWith(`${key} `));
+    return line === undefined ? 0 : Number(line.slice(key.length + 1)) || 0;
+  };
+  return { oomKills: count('oom_kill'), oom: count('oom') };
+};
+
+/**
  * What the cgroup `pid` sits in says of its memory: its `memory.max`, its `memory.peak` (a kernel from 5.19), and `memory.events`'
- * `oom_kill`, the processes the OOM killer ended in it. `undefined` where the process is gone, the host is off cgroup v2, or the
- * cgroup has no limit.
+ * `oom_kill`, the processes any OOM killer ended in it, and `oom`, the times its own limit was reached (`memoryEventsOf`). `undefined`
+ * where the process is gone, the host is off cgroup v2, or the cgroup has no limit.
  */
 export const cgroupMemoryOf = (pid: number | 'self'): CgroupMemory | undefined => {
   const folder = cgroupNow(pid);
   if (folder === undefined) return undefined;
   const limitBytes = numberIn(`${folder}/memory.max`);
   if (limitBytes === undefined) return undefined;
-  let oomKills = 0;
+  let events: { oomKills: number; oom: number };
   try {
-    const line = fs
-      .readFileSync(`${folder}/memory.events`, 'utf8')
-      .split('\n')
-      .find((l) => l.startsWith('oom_kill '));
-    oomKills = line === undefined ? 0 : Number(line.slice('oom_kill '.length)) || 0;
+    events = memoryEventsOf(fs.readFileSync(`${folder}/memory.events`, 'utf8'));
   } catch {
     return undefined;
   }
   const peakBytes = numberIn(`${folder}/memory.peak`);
-  return { limitBytes, oomKills, ...(peakBytes === undefined ? {} : { peakBytes }) };
+  return { limitBytes, ...events, ...(peakBytes === undefined ? {} : { peakBytes }) };
 };
 
 /**

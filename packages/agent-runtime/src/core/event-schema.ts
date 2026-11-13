@@ -135,6 +135,7 @@ export const MemoryUseSchema = Schema.Struct({
   limitBytes: Schema.Finite,
   peakBytes: Schema.optional(Schema.Finite),
   oomKills: Schema.Finite,
+  oom: Schema.optional(Schema.Finite),
 });
 
 /**

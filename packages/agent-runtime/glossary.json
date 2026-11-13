@@ -212,7 +212,7 @@
     },
     {
       "term": "Memory limit",
-      "meaning": "a task's `resources.limits.memory`, a Kubernetes quantity (`8Gi`), or its engine's `defaultLimits` written onto it at filing: its harness and every child it starts run in a transient scope of systemd's user manager under that `MemoryMax=`, so a process passing it is killed by the kernel in that cgroup alone, and the attempt records what the cgroup saw (`memory`: `limitBytes`, `peakBytes`, `oomKills`). A host that cannot make the scope refuses a limited task `unstartable` (`packages/agent-runtime/src/harness/cgroup.ts`, `packages/agent-runtime/src/core/memory.ts`).",
+      "meaning": "a task's `resources.limits.memory`, a Kubernetes quantity (`8Gi`), or its engine's `defaultLimits` written onto it at filing: its harness and every child it starts run in a transient scope of systemd's user manager under that `MemoryMax=`, so a process passing it is killed by the kernel in that cgroup alone, and the attempt records what the cgroup saw (`memory`: `limitBytes`, `peakBytes`, `oomKills`, the processes any OOM killer ended in it, and `oom`, the times its own limit was reached, absent on a record written before). A host that cannot make the scope refuses a limited task `unstartable` (`packages/agent-runtime/src/harness/cgroup.ts`, `packages/agent-runtime/src/core/memory.ts`).",
       "type": "TaskResources"
     },
     {

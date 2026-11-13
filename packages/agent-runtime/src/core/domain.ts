@@ -39,10 +39,11 @@ import type { Observe } from '../../contracts/observe.contract.ts';
 
 /**
  * What a task's own cgroup said of its memory, for one run under a memory limit (`resources.limits.memory`): the limit in bytes, its
- * peak where the kernel keeps one, and how many processes the kernel's OOM killer ended in it. Read by the runner off the cgroup's
- * files (`cgroupMemoryOf`, `harness/cgroup.ts`); carried, never read by `decide`.
+ * peak where the kernel keeps one, how many processes any OOM killer ended in it, the machine's included (`oomKills`), and how many
+ * times its own limit was reached (`oom`, absent on a record written before it was carried). Read by the runner off the cgroup's files
+ * (`cgroupMemoryOf`, `harness/cgroup.ts`); carried, never read by `decide`.
  */
-type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
+type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number; oom?: number };
 
 /**
  * What a task asks of its host's resources, as a container's `resources`: a memory limit and a memory request, each a Kubernetes
@@ -607,7 +608,7 @@ export type Attempt = {
   terminationMessage?: string;
   /**
    * What its cgroup said of its memory as it ended, for a task run under a memory limit: `oomKills` above 0 is the kernel ending a
-   * process of it at the limit. Absent where it ran under none, or its runner read nothing. Carried, never read.
+   * process of it, at its limit where `oom` is above 0 too, else the machine's own OOM killer. Absent where it ran under none, or its runner read nothing. Carried, never read.
    */
   memory?: MemoryUse;
   /**

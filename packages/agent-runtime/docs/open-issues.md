@@ -864,8 +864,9 @@ measured of Claude Code.
 3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
    line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
    such line for a cancelled run. The reasons are in `RESPONSE.md` on
-   `wf/make-wf-ls-say-how-each-fini-zpp7/respond`. **Kept, and never revisited**: `nemia ls` prints each of the three today
-   (`lsLines`, `agent-orchestrator/src/list/list.ts`), and nothing has asked to change them.
+   `wf/make-wf-ls-say-how-each-fini-zpp7/respond`. **Kept, and never revisited**: the listing still says each of the three
+   (`listing`, `agent-orchestrator/src/list/list.ts`), which `nemia ls` prints from the api since 2026-11-12 (the server's table,
+   `agent-orchestrator/src/run-list/table.ts`, and `apps/cli/src/reads/run-lines.ts`), and nothing has asked to change them.
 5. **hkb migration**: two decisions to make before starting. **Overtaken**: hkb was deprecated on 2026-10-19, so nothing
    moves onto this engine, and the notes toward the migration were removed on 2026-10-23.
 

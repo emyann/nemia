@@ -2,10 +2,10 @@
  * What `nemia ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's
  * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
-import { gated, hasStarted, holdAdvice, holdNeedsYou, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
+import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type RunSlot } from '../cap/cap.ts';
 import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
-import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, unrunEnding, type ToDecide } from '../ending/ending.ts';
+import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
 import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
@@ -36,10 +36,9 @@ import { saidBeforeWord, saidWord } from '../say/say.ts';
 import { askedQuestions } from '../question/index.ts';
 import { assess, type Assessment, type AssessRead } from '../tick/assess.ts';
 import { neverApproved } from '../forget/prune/prune.ts';
-import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
+import { staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
-import { firstPiece } from '../piece/piece.ts';
-import { fireWord, scheduleLines, type ScheduleListed } from '../factory/schedule/schedule.ts';
+import type { ScheduleListed } from '../factory/schedule/schedule.ts';
 
 export type Listing = {
   /**
@@ -698,71 +697,3 @@ export const onYouWords = (l: {
   waitingOnYou: readonly string[];
 }): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.reason === 'AwaitingApproval' ? `approve ${name}` : name));
-
-/** What `nemia ls` says a run asks beneath its steps: its ending's gate once, what waits on a person, a hold, and its result. */
-function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }: Listing, result: readonly string[]): string[] {
-  const lines: string[] = [];
-  if (toDecide) lines.push(`   → to decide: ${toDecideWords(run, toDecide)}`);
-  const waitingWords = onYouWords({ steps, waitingOnYou }).filter(
-    (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
-  );
-  if (waitingWords.length) lines.push(`   → waiting on you: ${waitingWords.join(', ')}  —  nemia decide ${run.id}`);
-  if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
-  if (holding) {
-    const never = holdNeedsYou(holding);
-    const lifting = holding.length > 0 && holding.every((w) => w.landed);
-    lines.push(
-      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  nemia hold ${run.id} --off lifts it`}`,
-    );
-  }
-  if (result.length) lines.push(`   → result: ${result.join(', ')}  —  nemia decide ${run.id}`);
-  return lines;
-}
-
-/**
- * A run's lines on `nemia ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for
- * (`shownStatus`), its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and
- * why.
- */
-function runLines({ run, listed, result }: RunsListed['runs'][number], more: string): string[] {
-  const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
-  if ('said' in listed) {
-    const width = Math.max(20, ...listed.steps.map((s) => s.message.length));
-    return [
-      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${more}`,
-      ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.message.padEnd(width)} ${s.branch ?? ''}`),
-      `   → unreadable: ${listed.said}`,
-    ];
-  }
-  const { steps, cost } = listed;
-  const said = steps.map((s) => ({ s, word: `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}` }));
-  const width = Math.max(20, ...said.map(({ word }) => word.length));
-  return [
-    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}${more}`,
-    ...said.map(({ s, word }) => {
-      const note = shownNote(s);
-      return `   ${s.name.padEnd(14)} ${word.padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
-    }),
-    ...asksLines(run, listed, result),
-  ];
-}
-
-/**
- * Every line `nemia ls` prints of its answer at `now`: `no runs` for none, each run's lines, how old what it shows of where the branches
- * stand is (`standingLine`), the factories' schedules (`scheduleLines`), and last whether a nemia up ticks the store. `more` is what each
- * run's head line ends on (the labels' segments, `labelSegments`): nothing by default, so the lines are as they were.
- */
-export const lsLines = (
-  { runs, daemon, standing, schedules }: RunsListed,
-  now: number,
-  more: (run: Run) => string = () => '',
-): string[] => {
-  const stood = standingLine(standing, daemon, now);
-  const scheduled = scheduleLines(schedules ?? [], (iso) => fireWord(iso, now));
-  return [
-    ...(runs.length ? runs.flatMap((row) => runLines(row, more(row.run))) : ['no runs']),
-    ...(stood ? [stood] : []),
-    ...scheduled,
-    daemonLine(daemon, now),
-  ];
-};

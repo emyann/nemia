@@ -20,7 +20,7 @@ export class Refused extends Error {}
  */
 export const FEED_STREAM = '/api/feed/stream';
 
-/** Nemia's chat's stream, which her docked face holds open from the root of every page on the same terms. */
+/** Nemia's chat's stream, which the frame holds open for her face in the rail from the root of every page on the same terms. */
 export const CHAT_STREAM = '/api/nemia/chat/stream';
 
 /** The streams the frame holds open on every page: neither ever answers in full, and either is aborted when the page itself goes. */
@@ -118,7 +118,7 @@ export async function idle(page: Page, timeout = 30_000): Promise<void> {
  * One failure passes: a stream the frame holds open on every page (`PAGE_STREAMS`: the workflow feed's, and Nemia's chat's) aborted
  * (`net::ERR_ABORTED`) once the page it was opened on was left — the window navigated or reloaded after it opened (the navigation
  * committed after it, as `track` reads a page left), or the router moved to another address, which takes down a part the address does
- * not draw, Nemia's docked face on her own page among them. That is how a browser and the board end a request nothing reads any more,
+ * not draw, Nemia's side sheet on her own page among them. That is how a browser and the board end a request nothing reads any more,
  * though Playwright 1.62 reports none of a navigation's, and a later one may. A stream the board closes while the address stands is
  * counted, as any other failure is.
  */

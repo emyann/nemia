@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { chatFieldOf, chatPanelOf, dockOf, expectPanelHeld, herChat, openChat, photograph, themeOf } from '../board.ts';
+import { chatFieldOf, chatPanelOf, expectCues, expectPanelHeld, herChat, openChat, photograph, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -86,7 +86,7 @@ export default {
       const panel = await wrote(down, WROTE, true);
       await expectKept(panel, WROTE);
       await expectCount(panel.locator('[data-chat-bubble="person"]'), 0, 'and no bubble of theirs stands for a message nobody has');
-      await expectVisible(dockOf(down).locator('[data-cue]', { hasText: 'Not sent' }), 'a cue beside her face says one was not sent');
+      await expectCues(down, (words) => words.includes('Not sent'), 'a cue at her face says one was not sent');
       await expectPanelHeld(down);
       for (const chip of await panel.locator('[data-chat-chip]').all())
         if (!(await chip.isDisabled()))

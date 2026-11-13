@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Route } from 'playwright';
-import { chatPanelOf, dockOf, expectPanelHeld, herChat, herEvent, openChat, photograph, themeOf, type HerLine } from '../board.ts';
+import { chatPanelOf, expectCues, expectPanelHeld, herChat, herEvent, openChat, photograph, themeOf, type HerLine } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -112,7 +112,10 @@ export default {
       );
       await page.reload({ waitUntil: 'load' });
       await idle(page);
-      await expectVisible(dockOf(page).locator('[data-cue]', { hasText: '2 new' }), 'two answers of hers are unread, and a cue says so');
+      await expectCues(page, (words) => words.includes('2 new'), 'two answers of hers are unread, and a cue at her face says so');
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-talk-cues-${await themeOf(page)}.png`));
+      await page.mouse.move(640, 400);
 
       const panel = await openChat(page);
       await expectVisible(panel.locator('[data-chat-where]', { hasText: 'Answering' }), 'the header says she is answering');
@@ -155,7 +158,7 @@ export default {
         (held as Route).continue(),
       ]);
       await expectCount(panel.locator('[data-chat-new]'), 0, 'and once the api has it, nothing is new any more');
-      await expectCount(dockOf(page).locator('[data-cue]', { hasText: 'new' }), 0, 'nor is the cue beside her face');
+      await expectCues(page, (words) => !words.some((said) => said.includes('new')), 'nor is the cue at her face');
     } finally {
       await page.unroute((url) => url.pathname === '/api/nemia/chat/read');
       back();

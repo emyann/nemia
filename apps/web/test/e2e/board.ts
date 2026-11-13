@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type RunList, type ScheduleList } from 'objects';
 import {
   FINISHED_SELECTOR,
@@ -852,16 +852,60 @@ export function herStopped(at: string): void {
   fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
 }
 
-/** Her docked face, the cue beside it, and the panel it opens. */
-export const dockOf = (page: Page): Locator => page.locator('[data-nemia-dock]');
-export const dockFaceOf = (page: Page): Locator => page.locator('[data-nemia-dock-face]');
+/** Her face in the rail (or in the top bar on a narrow screen), her side sheet, and the panel it holds. */
+export const herFaceOf = (page: Page): Locator => page.locator('[data-nemia-face-button]');
+export const herSheetOf = (page: Page): Locator => page.locator('[data-slot="side-sheet"]');
 export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
 
-/** Opens the panel from her docked face, and waits for it. */
+/**
+ * The words of every cue her face says now, in its order: none where her face counts none (`data-nemia-cues`), else read off the tooltip
+ * a fresh hover of her face opens.
+ */
+export async function herCues(page: Page): Promise<string[]> {
+  const face = herFaceOf(page);
+  const count = Number(await face.getAttribute('data-nemia-cues', { timeout: WAIT_MS }));
+  if (count === 0) return [];
+  await page.mouse.move(0, 0);
+  await face.hover();
+  const cues = page.locator('[data-nemia-cues] [data-cue]');
+  await expectCount(cues, count, 'a hover of her face says every cue that holds in its tooltip');
+  return (await cues.allTextContents()).map((words) => words.trim());
+}
+
+/** Her cues come to hold what `holds` asks of their words, within `timeout`, each read by a fresh hover (`herCues`). */
+export async function expectCues(page: Page, holds: (words: string[]) => boolean, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await expectNone(
+    async () => {
+      const words = await herCues(page);
+      return holds(words) ? null : `her face says ${JSON.stringify(words)}`;
+    },
+    assertion,
+    timeout,
+  );
+}
+
+/**
+ * `element` is in the window and nothing is drawn over it: the element at the centre of its box is it or inside it. What a fixed layer
+ * laid over a page's foot would fail.
+ */
+export async function expectUncovered(element: Locator, assertion: string): Promise<void> {
+  const seen = await element.evaluate((own) => {
+    const box = own.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    if (box.bottom > innerHeight + 1 || box.top < -1)
+      return `it stands from ${Math.round(box.top)} to ${Math.round(box.bottom)} of ${innerHeight}`;
+    const at = document.elementFromPoint(x, y);
+    return at !== null && own.contains(at) ? null : `the element at its centre is ${at?.outerHTML.slice(0, 120) ?? 'none'}`;
+  });
+  if (seen !== null) throw new Refused(`${assertion} — ${seen}`);
+}
+
+/** Opens her side sheet from her face, and waits for the panel in it. */
 export async function openChat(page: Page): Promise<Locator> {
-  await dockFaceOf(page).click();
+  await herFaceOf(page).click();
   const panel = chatPanelOf(page);
-  await expectVisible(panel, "her docked face opens Nemia's chat");
+  await expectVisible(panel, "her face in the rail opens Nemia's chat");
   return panel;
 }
 

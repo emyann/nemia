@@ -4,7 +4,8 @@
  * that holds of her (`dockWords`), ringed while her sheet is open. On her own page (`/chat`) it is a link to that page, lit as the page's
  * (`aria-current`), ringed, opening nothing. Her expression follows her presence (`NemiaFace`); a dot at its corner takes the hue of the
  * first cue that holds — alive where none does — and every cue (`cuesOf`) is said in the kit's rich tooltip on hover or focus, as the
- * look's `CutCue`, since a cue's words do not fit the narrow rail.
+ * look's `CutCue`, since a cue's words do not fit the narrow rail; `data-nemia-cues` counts them. The tooltip is always there, off while
+ * no cue holds, so a cue that comes while the pointer rests on her face does not take the face out from under it.
  */
 import { Button, Link } from 'react-aria-components';
 import { CutCue } from '@/components/look';
@@ -57,12 +58,13 @@ export function NemiaRailFace({
     </>
   );
   const trigger = ownsChat ? (
-    <RouterLink to="/chat" data-nemia-face-button={at} aria-label={dockWords(presence, at)} className={pressed(true)}>
+    <RouterLink to="/chat" data-nemia-face-button={at} data-nemia-cues={cues.length} aria-label={dockWords(presence, at)} className={pressed(true)}>
       {face}
     </RouterLink>
   ) : (
     <Button
       data-nemia-face-button={at}
+      data-nemia-cues={cues.length}
       aria-label={dockWords(presence, at)}
       aria-expanded={open}
       onPress={onToggle}
@@ -71,9 +73,8 @@ export function NemiaRailFace({
       {face}
     </Button>
   );
-  if (cues.length === 0) return trigger;
   return (
-    <TooltipTrigger>
+    <TooltipTrigger isDisabled={cues.length === 0}>
       {trigger}
       <Tooltip variant="rich" placement="right">
         <span data-nemia-cues className="flex flex-col items-start gap-1.5 pb-1">

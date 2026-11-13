@@ -1,9 +1,10 @@
 /**
- * Every run, as the Factory, the strips and the pickers list them, and the frame's and the Runs page's lists of them, each read off the
- * RunList (`runs.listAll`, `runs.list`) and made the board's one view of a run (`runViewOf`), or said unjudged (`UnjudgedRun`); and a
- * run's named actions, each in the run's namespace.
+ * The runs as the board reads them off the RunList (`runs.listAll`, `runs.list`), each made the board's one view of a run (`runViewOf`)
+ * or said unjudged (`UnjudgedRun`): the light answer of the runs not finished (`openRunsQuery`), the finished runs a page at a time
+ * (`finishedRunsQuery`, `finishedPagesQuery`) or those finished today (`finishedTodayQuery`), and a label's runs whole (`runsSelectedQuery`);
+ * and a run's named actions, each in the run's namespace. No page reads every run (`test/structure.test.ts`).
  */
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import type { Run, RunHeld, RunList, RunRemoved, RunUnjudged } from 'objects';
 import { Concluded as ConcludedAnswer, type RunClock, type RunOutcome, type StepCost } from 'objects';
 import { pace } from '../feed.ts';
@@ -11,6 +12,7 @@ import { selectorKey } from './selector.ts';
 import { call, read, runs, type RunListQuery } from './objects.ts';
 import { factoryIn } from './namespace.ts';
 import { runViewOf, type RunRow, type RunView, type UnjudgedRun } from './judged.ts';
+import type { FinishedPageRead, ReadsOnToday } from '../../../contracts/finished-today.contract.ts';
 
 export type { RunClock, RunOutcome, StepCost } from 'objects';
 
@@ -26,17 +28,18 @@ export const rowsOf = (list: RunList): RunRow[] => [...list.items.map(runViewOf)
 /** Every run of `query`, the RunList whole: a plain list, no page and no state, so no run's frame is measured. */
 const everyRun = (query: RunListQuery = {}): Promise<RunRow[]> => runs.listAll(query).then(rowsOf);
 
-/**
- * Every run (`GET /api/runs`). Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed —
- * every minute while it is.
- */
+/** TEMPORARY: every run, until its last reader moves off it; deleted in this run. */
 export const runsQuery = queryOptions({
   queryKey: ['runs'],
   queryFn: () => everyRun(),
   refetchInterval: () => pace(5_000),
 });
 
-/** The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), under `['runs']`, read again as it is. */
+/**
+ * The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), every page of them, under `['runs']`: the labels page's,
+ * which counts a label's runs by how each ended. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed
+ * is not followed — every minute while it is.
+ */
 export const runsSelectedQuery = (selector: string) =>
   queryOptions({
     queryKey: ['runs', ...selectorKey(selector)],
@@ -128,7 +131,7 @@ const labelled = (query: RunListQuery, selector: string | undefined): RunListQue
 /**
  * The frame (`GET /api/runs?fieldSelector=status.state!=finished`, or `/api/namespaces/<factory>/runs` for one factory, `default` naming
  * the runs of none): the runs that wait and move with the counts, what the board's frame reads on every page. Keyed `['runs-open']`, and
- * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsQuery` is.
+ * `['runs-open', factory]` for one factory; read again on each event of the workflow feed (`useFeed`), and paced as `runsSelectedQuery` is.
  */
 export const openRunsQuery = (factory?: string, selector?: string) =>
   queryOptions({
@@ -141,7 +144,7 @@ export const openRunsQuery = (factory?: string, selector?: string) =>
  * A finished run: when its work stopped (`finishedAt`), its wall time from its creation until then (`wallMs`), how it ended
  * (`outcome`), and where that wall time went (`clock`), read where its work stopped and so standing still.
  */
-type FinishedRun = RunView & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
+export type FinishedRun = RunView & { wallMs: number; finishedAt: string; outcome: RunOutcome; clock: RunClock | null };
 
 /**
  * One page of the finished runs, newest finished first, measured to `asOf`: `total` finished in all (the list's count), the rows of this
@@ -175,7 +178,7 @@ export const FINISHED_SIZE = 9;
  * One page of the finished runs (`GET /api/runs?fieldSelector=status.state=finished&limit=9`), of every factory or of `factory` alone, from
  * the token the page before it answered, the last of `older` (`continue`), the first page for none. Keyed `['runs-finished', factory,
  * token]`, the factory and the token null for every factory's and the first page; read again on each event of the workflow feed
- * (`useFeed`), and paced as `runsQuery` is.
+ * (`useFeed`), and paced as `runsSelectedQuery` is.
  */
 export const finishedRunsQuery = (factory: string | undefined, older: readonly string[], selector?: string) => {
   const from = older.at(-1);
@@ -189,6 +192,67 @@ export const finishedRunsQuery = (factory: string | undefined, older: readonly s
     refetchInterval: () => pace(5_000),
   });
 };
+
+/**
+ * Whether the strip reads the page after `page` to have every run finished today, the day beginning at `dayStart` (epoch ms): the list
+ * answers the newest finished first, so a page that holds a run finished before the day began is the last that holds one of today's.
+ * Proved by `contracts/finished-today.contract.ts`.
+ */
+export const readsOnToday: ReadsOnToday = (page: FinishedPageRead, dayStart: number): boolean =>
+  page.next && page.finishedMs.length > 0 && page.finishedMs.every((ms) => ms >= dayStart);
+
+/** How many finished runs a page of a picker, or of the strip's read of today, holds. */
+export const PICKED_SIZE = 50;
+
+/** A page of the finished runs as `readsOnToday` reads it. */
+const pageRead = (page: FinishedPage): FinishedPageRead => ({
+  finishedMs: page.runs.map((run) => Date.parse(run.finishedAt)),
+  next: page.continue !== null,
+});
+
+/** One page of the finished runs of every factory or of `factory`, `PICKED_SIZE` a page, from `from`, the first page for none. */
+const finishedPage = (factory: string | undefined, from: string | undefined): Promise<FinishedPage> =>
+  listOf(factory, { fieldSelector: FINISHED_SELECTOR, limit: PICKED_SIZE, ...(from === undefined ? {} : { continue: from }) }).then(
+    finishedOf,
+  );
+
+/** The runs finished at or after `dayStart`, newest first, read a page at a time while `readsOnToday` says so. */
+async function finishedSince(factory: string | undefined, dayStart: number): Promise<FinishedRun[]> {
+  const kept: FinishedRun[] = [];
+  let page = await finishedPage(factory, undefined);
+  for (;;) {
+    kept.push(...page.runs.filter((run) => Date.parse(run.finishedAt) >= dayStart));
+    if (!readsOnToday(pageRead(page), dayStart) || page.continue === null) return kept;
+    page = await finishedPage(factory, page.continue);
+  }
+}
+
+/**
+ * The runs finished since the day began at `dayStart` (epoch ms), of every factory or of `factory` alone, newest finished first: the
+ * strip's. Read off `GET /api/runs?fieldSelector=status.state=finished&limit=50` page by page until a page reaches into the day before
+ * (`readsOnToday`). Keyed `['runs-finished', factory, 'today', dayStart]`, so the feed and a write read it again as they read every page
+ * of the finished runs; paced as `runsSelectedQuery` is.
+ */
+export const finishedTodayQuery = (factory: string | undefined, dayStart: number) =>
+  queryOptions({
+    queryKey: ['runs-finished', factory ?? null, 'today', dayStart],
+    queryFn: () => finishedSince(factory, dayStart),
+    refetchInterval: () => pace(5_000),
+  });
+
+/**
+ * The finished runs of every factory, newest finished first, `PICKED_SIZE` a page, each page from the token the one before it answered:
+ * what a picker offers past the open runs, one page more each time a person asks (`fetchNextPage`). Keyed `['runs-finished', null,
+ * 'pages']`, so the feed and a write read it again; never on a clock, since a picker is open only a moment.
+ */
+export const finishedPagesQuery = () =>
+  infiniteQueryOptions({
+    queryKey: ['runs-finished', null, 'pages'],
+    queryFn: ({ pageParam }: { pageParam: string | null }) => finishedPage(undefined, pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last: FinishedPage) => last.continue,
+    refetchInterval: false,
+  });
 
 /** What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on. */
 export const concludedQuery = (id: string) =>
@@ -238,3 +302,4 @@ export async function pruneRun(namespace: string, id: string, how: PruneHow): Pr
   const answer = await runs.prune(namespace, id, how, 'The run may be pruned: look at its page before pruning it again.');
   return { id, pruned: true, lines: [...answer.lines], left: answer.left.length };
 }
+

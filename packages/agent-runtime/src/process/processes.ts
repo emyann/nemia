@@ -91,9 +91,7 @@ export const endProcesses = (processes: readonly ProcessToEnd[], signal: 'SIGTER
     try {
       process.kill(p.pid, signal);
       signalled.push(p.pid);
-    } catch {
-      // Gone between the read and the signal, or not ours: nothing to end.
-    }
+    } catch {}
   }
   return signalled;
 };

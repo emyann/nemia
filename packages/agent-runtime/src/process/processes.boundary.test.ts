@@ -11,9 +11,9 @@ import { scratch } from 'test-kit/scratch';
 import { alive } from './alive.ts';
 import { endProcesses, processesNow } from './processes.ts';
 
-/** A `node` child that waits, in `cwd`, with `env` beside the parent's; killed when the test ends. */
+/** A `sleep` child that waits, in `cwd`, with `env` beside the parent's; killed when the test ends. */
 const waiting = (cwd: string, env: Record<string, string>): ChildProcess => {
-  const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], {
+  const child = spawn('sleep', ['60'], {
     cwd,
     env: { ...process.env, ...env },
     stdio: 'ignore',
@@ -40,7 +40,7 @@ test('processesNow reads this user processes with the variables asked for, and e
     assert.deepEqual(read.env, { AE_PROCESSES_MARK: 'here' });
     assert.equal(read.cwd, fs.realpathSync(folder));
     assert.equal(read.cwdDeleted, false);
-    assert.equal(read.name, 'node');
+    assert.equal(read.name, 'sleep');
   });
 
   await t.test('once its folder is removed under it, its working folder is read as deleted, by its old path', () => {

@@ -100,7 +100,10 @@ export { nameFor } from 'agent-runtime';
 
 /** Why this host cannot hold a task's memory limit, a scope of systemd's user manager in a slice where given, or `undefined`. */
 export { scopeRefusal } from 'agent-runtime';
-/** This user's processes with the variables asked for, and their end by pid and start: what the free sweep reads a finished run's left by. */
+/**
+ * This user's processes with the variables asked for, and their end by pid and start: what the free sweep reads a finished run's left
+ * by.
+ */
 export { endProcesses, processesNow, type ProcessNow, type ProcessToEnd } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api carries on a step's path (`StepPath`'s `lifecycle`). */
 export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';

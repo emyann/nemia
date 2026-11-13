@@ -281,7 +281,7 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
       acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false, actor: actorOf(s.caller) }))),
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
-      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }))),
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true, actor: actorOf(s.caller) }))),
     )
     .handle('cancel', ({ params: { namespace, name } }) =>
       acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name, actor: actorOf(s.caller) }))),

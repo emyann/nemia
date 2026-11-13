@@ -141,6 +141,11 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       refused(await asked('POST', {}), 409, 'ann', pause.at, 'nemia resume', 'nemia pause --now');
       assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
       assert.equal(fs.existsSync(FILE), false, 'the file removed');
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(`${FILE}.lifted`, 'utf8')),
+        { since: pause.at, actor: { kind: 'person', token: 'harness' } },
+        'who lifted it kept beside the pause, paired by the moment of the pause it lifted',
+      );
       assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], parked: [], staged: [], held: [] } });
       refused(await asked('DELETE'), 404, 'nemia pause');
       const timed = await asked('POST', { timeout: '15m', by: 'ann' });

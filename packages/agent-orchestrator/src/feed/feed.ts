@@ -488,6 +488,13 @@ function oncePast(fold: FeedFold, about: About, offers: readonly Once[]): Once[]
 const holdSince = (at: string): string => `since ${at}`;
 
 /**
+ * Who lifted the hold or pause a lift's note is of (`note`), where the lift left that (`receipt`, paired by the moment of what it lifted):
+ * nobody elsewhere. Pure.
+ */
+const liftedBy = (note: string, receipt: { since: string; actor: Actor } | undefined): { actor?: Actor } =>
+  receipt && note === holdSince(receipt.since) ? { actor: receipt.actor } : {};
+
+/**
  * The one-shots a run's hold owes the feed: the put, for the hold the pass read on the record (`held`, its `at`) or lifted itself
  * (`lifted`), and the lift — the pass's own, and one for each put the feed holds that is no longer the hold on the record. A put or a
  * lift already written is no concern of this: each is an offer like any other, and `oncePast` holds it to one line. Pure.
@@ -505,9 +512,17 @@ const holdSince = (at: string): string => `since ${at}`;
  * absence rule would read the tick's own deed as a person's. The pass that lifted it says so (`lifted`), and that one put is the
  * absence rule's exception: exactly one lift either way, sourced by whoever took the hold off.
  *
- * The put carries who put the hold (`holder`, the record's hold's actor) where the record says; a lift, read off an absence, names none.
+ * The put carries who put the hold (`holder`, the record's hold's actor) where the record says; a lift read off an absence carries who
+ * lifted it where the lift left that beside the run (`unheld`, paired by the moment of the hold it lifted), and names none elsewhere.
  */
-function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined, holder: Actor | undefined): Once[] {
+function holdOnce(
+  fold: FeedFold,
+  run: string,
+  held: string | undefined,
+  lifted: string | undefined,
+  holder: Actor | undefined,
+  unheld: { since: string; actor: Actor } | undefined,
+): Once[] {
   const involved = onceInvolved(run, undefined);
   const standing = held === undefined ? undefined : holdSince(held);
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
@@ -521,7 +536,7 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
     if (note === standing || note === lifting) continue;
-    out.push({ word: LINE_WORDS.HoldLifted, note });
+    out.push({ word: LINE_WORDS.HoldLifted, note, ...liftedBy(note, unheld) });
   }
   return out;
 }
@@ -537,6 +552,13 @@ const STORE_INVOLVED: Involved = { kind: 'Store', name: STORE };
 export type FeedPause = { at: string; by?: string; why?: string; actor?: Actor } | null;
 
 /**
+ * Who last lifted the store's pause by hand (`nemia resume`, the api's `DELETE /api/pause`), as its lift left it beside the pause's file
+ * (`readResumed`): the moment of the pause lifted (`since`), which pairs it with that pause's lift, and the caller (`actor`). Undefined
+ * where none was left, and the lift then names nobody.
+ */
+export type FeedResumed = { since: string; actor: Actor } | undefined;
+
+/**
  * The one-shots the store's pause owes the feed: the put, while a pause stands, and a lift for each put the feed holds that is not the one
  * standing. Each is a person's deed — `nemia pause` or a take-over they typed puts the file, and `nemia resume` takes it away, or the
  * pass, of a take-over's pause whose command has gone (`liftLapsedPause`) — so neither names a source over the table's. A put or a lift
@@ -549,9 +571,10 @@ export type FeedPause = { at: string; by?: string; why?: string; actor?: Actor }
  * stands.
  *
  * The put carries who put the pause and why, as fields of its own (`by`, `why`, and the caller who put it, `actor`), never in its note:
- * the note is what the lift is paired by, and the lift, read off an absence, cannot know them.
+ * the note is what the lift is paired by. The lift, read off an absence, carries who lifted it where the lift left that beside the
+ * pause's file (`resumed`, paired by the moment of the pause it lifted), and names nobody elsewhere.
  */
-function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
+function storeOnce(fold: FeedFold, pause: FeedPause, resumed?: FeedResumed): Once[] {
   const standing = pause === null ? undefined : holdSince(pause.at);
   const out: Once[] =
     pause !== null && standing !== undefined
@@ -569,14 +592,14 @@ function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
-    if (note !== standing) out.push({ word: LINE_WORDS.StoreResumed, note });
+    if (note !== standing) out.push({ word: LINE_WORDS.StoreResumed, note, ...liftedBy(note, resumed) });
   }
   return out;
 }
 
 /** The store's lines a pass owes the feed (`storeOnce`), each written once per occurrence (`oncePast`), stamped through `upgraded`. */
-const storeLines = (fold: FeedFold, at: string, pause: FeedPause): StoreLine[] =>
-  oncePast(fold, () => STORE_INVOLVED, storeOnce(fold, pause)).map(
+const storeLines = (fold: FeedFold, at: string, pause: FeedPause, resumed?: FeedResumed): StoreLine[] =>
+  oncePast(fold, () => STORE_INVOLVED, storeOnce(fold, pause, resumed)).map(
     (o) =>
       upgraded({
         at,
@@ -749,7 +772,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
   const offers = [
     ...(words.denials ?? []).map(denialOnce),
     ...(words.acts ?? []),
-    ...holdOnce(fold, run, words.held, words.lifted, words.holder),
+    ...holdOnce(fold, run, words.held, words.lifted, words.holder, words.unheld),
     ...(words.faults ?? []),
     ...(words.closeouts ?? []).map(closeoutOnce),
   ];
@@ -795,6 +818,7 @@ export function feedChanges(
   levels?: FeedLevels,
   conflicts?: FeedConflicts,
   readiness?: FeedReadiness,
+  resumed?: FeedResumed,
 ): Array<RunLine | StoreLine | FactoryLine> {
   const line = (run: string, step: string | undefined, said: FeedSaid, labels: FeedLabels): RunLine =>
     upgraded({
@@ -824,7 +848,7 @@ export function feedChanges(
   }
   return [
     ...out,
-    ...storeChanges(fold, at, pause, levels, readiness),
+    ...storeChanges(fold, at, pause, levels, readiness, resumed),
     ...(conflicts === undefined ? [] : conflictLines(fold, at, conflicts)),
   ];
 }
@@ -839,8 +863,9 @@ const storeChanges = (
   pause: FeedPause | undefined,
   levels: FeedLevels | undefined,
   readiness: FeedReadiness | undefined,
+  resumed?: FeedResumed,
 ): StoreLine[] => [
-  ...(pause === undefined ? [] : storeLines(fold, at, pause)),
+  ...(pause === undefined ? [] : storeLines(fold, at, pause, resumed)),
   ...(levels === undefined ? [] : levelLines(fold, at, levels)),
   ...(readiness === undefined ? [] : readinessLines(fold, at, readiness)),
 ];
@@ -912,8 +937,8 @@ export type FeedSaid = { word: string; note?: string; reason?: Reason; on?: Wait
  * Beside the words, the one-shots the pass read of the run, each written once per occurrence and no part of any word: the calls its
  * steps were denied (`denials`), the acts a person took on it (`acts`, from `actsOf`), the faults the runtime journalled (`faults`, from
  * `faultsOf`), the closeouts its steps' current turns gave (`closeouts`, from `closeoutsOf`), the moment the hold on its record was put
- * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift, and who put the
- * hold on the record (`holder`), which its put carries.
+ * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift, who put the
+ * hold on the record (`holder`), which its put carries, and who last lifted a hold by hand (`unheld`), which that hold's lift carries.
  */
 export type FeedWords = {
   run: FeedSaid;
@@ -927,6 +952,7 @@ export type FeedWords = {
   held?: string;
   lifted?: string;
   holder?: Actor;
+  unheld?: { since: string; actor: Actor };
 };
 
 /**

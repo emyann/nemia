@@ -158,9 +158,34 @@ export function cutPause(home: string): Pause {
   return pause;
 }
 
-/** Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. */
-export function resumePause(home: string): Pause {
+/**
+ * Who last lifted the store's pause by hand: `{ since, actor }`, a file of its own beside the pause's, written whole by the lift before the
+ * pause's file is taken away (`resumePause`), so the pass that reads the pause gone reads who lifted it, paired by the moment of the pause
+ * lifted (`since`); overwritten by the next such lift.
+ */
+export const resumedFile = (home: string): string => path.join(home, `${PAUSE_FILE}.lifted`);
+
+/** Who last lifted the store's pause by hand (`resumedFile`): undefined where no file is there, or it does not read as one. */
+export function readResumed(home: string): { since: string; actor: Actor } | undefined {
+  let read: unknown;
+  try {
+    read = jsonOr(fs.readFileSync(resumedFile(home), 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (typeof read !== 'object' || read === null) return undefined;
+  const since = 'since' in read && typeof read.since === 'string' ? read.since : undefined;
+  const actor = actorRead('actor' in read ? read.actor : undefined);
+  return since !== undefined && actor ? { since, actor } : undefined;
+}
+
+/**
+ * Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. Given who lifts it (`actor`), that
+ * is written first, beside the pause's file (`resumedFile`), so the feed's lift of the pause names them.
+ */
+export function resumePause(home: string, actor?: Actor): Pause {
   const pause = readPause(home);
+  if (pause !== null && actor) writeWhole(resumedFile(home), `${JSON.stringify({ since: pause.at, actor })}\n`);
   try {
     fs.unlinkSync(pauseFile(home));
   } catch (err) {

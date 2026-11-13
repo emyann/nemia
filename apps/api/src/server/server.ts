@@ -173,7 +173,7 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('pauseTimeout', () => answered((s) => s.inRequest(PAUSE_TIMEOUT.handler({}))))
     .handle('setPauseTimeout', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE_TIMEOUT.handler(payload))))
     .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler({ ...payload, actor: actorOf(s.caller) }))))
-    .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}))))
+    .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({ actor: actorOf(s.caller) }))))
     .handle('wait', ({ query }) =>
       answered(async (s) =>
         waitSent(

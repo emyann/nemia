@@ -200,6 +200,9 @@ const Hold = Schema.Struct({
   actor: Schema.optional(Actor),
 });
 
+/** Who lifted a person's hold by hand, composed on read (`Unheld`, record.ts). */
+const Unheld = Schema.Struct({ since: Schema.String, actor: Actor });
+
 /** What `nemia prune` removed of a run, composed on read (`Pruned`, record.ts). */
 const Pruned = Schema.Struct({
   at: Schema.String,
@@ -441,6 +444,12 @@ const runFields = {
    * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold: Schema.optional(Hold),
+  /**
+   * Who lifted the run's last hold lifted by hand, and the moment that hold was put (`since`) — composed on read from a file of its own,
+   * `runs/<id>.unheld`, written by the lift before the hold's file is taken away, and never written into the record. The feed's lift of
+   * that hold carries it (`holdOnce`). Absent where no caller the api resolved has lifted one.
+   */
+  unheld: Schema.optional(Unheld),
   /**
    * That a person paused the whole store (`nemia pause`), by whom and why — composed on read onto every run from the store's one file,
    * `pauseFile`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and

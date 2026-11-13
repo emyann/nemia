@@ -73,6 +73,13 @@ export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) 
 export type Hold = { at: string; until: readonly string[]; why?: string; by?: string; actor?: Actor };
 
 /**
+ * Who lifted a person's hold by hand (`nemia hold <run> --off`, the api's `DELETE …/hold`), as its file says it: the moment of the hold
+ * lifted (`since`, the hold's `at`), which pairs it with that hold's lift on the feed, and the caller who lifted it (`actor`). The last
+ * lift's alone: a lift by a caller the api did not resolve leaves none.
+ */
+export type Unheld = { since: string; actor: Actor };
+
+/**
  * Words said to a step before it was filed (`nemia say` to a step with no task and no try behind it): when, and the words as said — an
  * agent's in the frame that names it (`framedForStep`), as the engine journals words said to a session. A person's fact, kept beside the
  * record and composed onto it as `saidBefore` (the model's), for the step's first try's brief (`saidBeforeSection`).
@@ -570,8 +577,11 @@ export type RunStore = {
     readonly where: (id: string, key: AskKey) => string;
   };
   readonly holds: {
-    /** Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. */
-    readonly lift: (id: string, at: string) => boolean;
+    /**
+     * Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. Given who lifts it
+     * (`actor`), kept beside the run as its `unheld` first, so the pass that reads the hold gone reads who took it.
+     */
+    readonly lift: (id: string, at: string, actor?: Actor) => boolean;
     /**
      * Hold the run until the runs `until` land, with a person's `why` and who they are (`by`) when given: the hold written, or null when
      * one already stands, which is kept.

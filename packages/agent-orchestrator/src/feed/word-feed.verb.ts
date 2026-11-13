@@ -70,6 +70,7 @@ export function wordFeed(
       closeouts: closeoutsOf(run, r),
       ...(run.hold ? { held: run.hold.at } : {}),
       ...(run.hold?.actor ? { holder: run.hold.actor } : {}),
+      ...(run.unheld ? { unheld: run.unheld } : {}),
       ...(lifted !== undefined ? { lifted } : {}),
     },
   );

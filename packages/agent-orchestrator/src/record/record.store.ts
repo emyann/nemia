@@ -10,7 +10,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
 import { Actor } from 'objects';
-import { BY_CAP, CARDS_FOLDER, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
+import {
+  BY_CAP,
+  CARDS_FOLDER,
+  oneLine,
+  WHY_CAP,
+  type Acceptance,
+  type Approval,
+  type Hold,
+  type Pruned,
+  type Run,
+  type Unheld,
+} from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
@@ -23,6 +34,7 @@ import type { AsksRead, MergeAskHeld, SaidBefore } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -290,12 +302,29 @@ export const writeHold = (
 };
 
 /**
+ * Who lifted the run's last hold lifted by hand (`Unheld`): `{ since, actor }`, a file of its own beside the hold's, written by the lift
+ * whole before the hold's file is taken away (`removeHold`), so a pass that reads the hold gone reads who took it; overwritten by the next
+ * such lift, and removed by `nemia rm` with the run. Composed onto the run on read as `unheld`.
+ */
+export const unheldFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unheld`);
+
+/** Who lifted the run's last hold by hand, read: undefined where no file is there, or it does not read as one. */
+function readUnheld(home: string, id: string): Unheld | undefined {
+  const marker = markerOf(unheldFile(home, id));
+  if (!marker) return undefined;
+  const since = fieldOf(marker.json, 'since');
+  const { actor } = actorIn(fieldOf(marker.json, 'actor'));
+  return isText(since) && actor ? { since, actor } : undefined;
+}
+
+/**
  * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
  * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
- * in those seconds put a hold the tick never read, and it stays.
+ * in those seconds put a hold the tick never read, and it stays. Given who lifts it (`actor`), that is written first (`unheldFile`).
  */
-export const removeHold = (home: string, id: string, at: string): boolean => {
+export const removeHold = (home: string, id: string, at: string, actor?: Actor): boolean => {
   if (readHold(home, id)?.at !== at) return false;
+  if (actor) writeWhole(unheldFile(home, id), JSON.stringify({ since: at, actor } satisfies Unheld, null, 2));
   try {
     fs.rmSync(holdFile(home, id));
     return true;
@@ -321,6 +350,12 @@ export const removeHold = (home: string, id: string, at: string): boolean => {
  */
 export const runRecord = (home: string, id: string): Run => within('records', () => readRecord(home, id));
 
+/** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
+const heldOf = (home: string, id: string): Pick<Run, 'hold' | 'unheld'> => {
+  const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
+  return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) };
+};
+
 const readRecord = (home: string, id: string): Run => {
   if (!fs.existsSync(runFile(home, id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   countRecord();
@@ -333,15 +368,10 @@ const readRecord = (home: string, id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(home, id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
-  const [cancelled, pruned, hold, saidBefore] = [
-    readCancelled(home, id),
-    readPruned(home, id),
-    readHold(home, id),
-    readSaidBefore(home, id),
-  ];
+  const [cancelled, pruned, saidBefore] = [readCancelled(home, id), readPruned(home, id), readSaidBefore(home, id)];
   const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(home, id));
     return {
@@ -355,7 +385,7 @@ const readRecord = (home: string, id: string): Run => {
     ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
     ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
     ...(pruned ? { pruned } : {}),
-    ...(hold ? { hold } : {}),
+    ...heldOf(home, id),
     ...(saidBefore ? { saidBefore } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),

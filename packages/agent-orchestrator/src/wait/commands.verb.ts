@@ -8,8 +8,8 @@ import { saidOf } from '../command/command.ts';
 
 /**
  * What `nemia hold` takes: the run, the hold as the api is sent it (`objects`' `RunHold`: `until`, `why`, `by`), and `off`, its lift — the
- * api's `DELETE …/hold`, never its `POST`; and who puts it (`actor`, objects' `Actor`), which the api hands of its caller and the hold
- * keeps beside `by` — none from the command line.
+ * api's `DELETE …/hold`, never its `POST`; and who puts it or lifts it (`actor`, objects' `Actor`), which the api hands of its caller: a
+ * put keeps it beside `by`, a lift beside the run (`unheld`) — none from the command line.
  */
 export const HoldInput = Schema.Struct({
   runId: Schema.String,
@@ -32,7 +32,7 @@ export const HOLD: Served<{ id: string; lifted: boolean; hold: Hold }, HoldInput
     yield* checked(holdRefusal(flags));
     const { runId } = input;
     if (input.off === true) {
-      const { run, hold: lifted } = yield* unhold(runId);
+      const { run, hold: lifted } = yield* unhold(runId, actor);
       return { id: run.id, lifted: true, hold: lifted };
     }
     const said = { why: saidOf(flags, 'why'), by: saidOf(flags, 'by'), ...(actor ? { actor } : {}) };

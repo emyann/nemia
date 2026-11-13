@@ -14,7 +14,7 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore } from '../record/record.ts';
+import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
@@ -33,7 +33,7 @@ const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
 const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
-const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause'] as const;
+const COMPOSED = ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause'] as const;
 const recordOf = (run: Run): Run => {
   const kept: Record<string, unknown> = { ...run };
   for (const key of COMPOSED) delete kept[key];
@@ -50,6 +50,7 @@ type State = {
   cancellers: Map<string, Actor>;
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
+  unheld: Map<string, Unheld>;
   labels: Map<string, Labels>;
   said: Map<string, Array<SaidBefore & { step: string }>>;
   refresh: Map<string, { at: string }>;
@@ -64,6 +65,7 @@ const stateOf = (): State => ({
   cancellers: new Map(),
   pruned: new Map(),
   holds: new Map(),
+  unheld: new Map(),
   labels: new Map(),
   said: new Map(),
   refresh: new Map(),
@@ -83,13 +85,14 @@ function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
-  const [pruned, hold, labels] = [st.pruned.get(id), st.holds.get(id), st.labels.get(id)];
+  const [pruned, hold, unheld, labels] = [st.pruned.get(id), st.holds.get(id), st.unheld.get(id), st.labels.get(id)];
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
     ...(st.cancellers.has(id) ? { cancelledBy: structuredClone(st.cancellers.get(id)) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
+    ...(unheld !== undefined ? { unheld: structuredClone(unheld) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
     ...saidBeforeOf(st, id),
     ...(approvals.length ? { approvals } : {}),
@@ -109,6 +112,7 @@ function forgetOf(st: State, id: string): string[] {
     [st.cancelled, `${id}.cancelled`],
     [st.pruned, `${id}.pruned`],
     [st.holds, `${id}.hold`],
+    [st.unheld, `${id}.unheld`],
     [st.refresh, `${id}.refresh`],
     [st.labels, `${id}.labels`],
     [st.asks, `${id}.asks/`],
@@ -244,8 +248,9 @@ function asksGroup(st: State): RunsLayer['asks'] {
 
 function holdsOf(st: State): RunsLayer['holds'] {
   return {
-    lift: (id, at) => {
+    lift: (id, at, actor) => {
       if (st.holds.get(id)?.at !== at) return false;
+      if (actor) st.unheld.set(id, { since: at, actor: structuredClone(actor) });
       st.holds.delete(id);
       touch(st, id);
       return true;

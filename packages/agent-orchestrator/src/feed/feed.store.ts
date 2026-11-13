@@ -36,6 +36,7 @@ import {
   type FeedLine,
   type FeedMemo,
   type FeedPause,
+  type FeedResumed,
   type FeedLevels,
   type FeedConflicts,
   type FeedReadiness,
@@ -277,6 +278,7 @@ export const feedPass = (
     at = new Date().toISOString(),
     unjudged = new Set<string>(),
     pause,
+    resumed,
     levels,
     conflicts,
     readiness,
@@ -284,6 +286,7 @@ export const feedPass = (
     at?: string;
     unjudged?: ReadonlySet<string>;
     pause?: FeedPause;
+    resumed?: FeedResumed;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
     readiness?: FeedReadiness;
@@ -300,7 +303,7 @@ export const feedPass = (
     foldFeed(memo.fold, read.lines);
     memo.cursor = read.cursor;
     memo.generation = end?.generation;
-    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts, readiness);
+    const lines = feedChanges(memo.fold, now, at, unjudged, pause, levels, conflicts, readiness, resumed);
     const size = end?.cursor ?? 0;
     if (!lines.length) return { lines, before: size, after: size, leading: '' };
     const appended = yield* door.lines.append(lines);
@@ -334,6 +337,7 @@ export const recordFeed = (
     memo?: FeedMemo;
     unjudged?: ReadonlySet<string>;
     pause?: FeedPause;
+    resumed?: FeedResumed;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
     readiness?: FeedReadiness;

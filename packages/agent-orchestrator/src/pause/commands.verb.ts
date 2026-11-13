@@ -49,8 +49,11 @@ export const PAUSE: Served<PauseAnswer, PauseInput> = {
   handler: (input) => Effect.flatMap(StoreRoot, (home) => pauseBy(input, home)),
 };
 
-/** What `nemia resume`'s handler takes: nothing. */
-const ResumeInput = Schema.Struct({});
+/**
+ * What `nemia resume`'s handler takes: who lifts the pause (`actor`, objects' `Actor`), which the api hands of its caller — none from the
+ * command line.
+ */
+const ResumeInput = Schema.Struct({ actor: Schema.optionalKey(Actor) });
 type ResumeInput = typeof ResumeInput.Type;
 
 /**
@@ -60,8 +63,8 @@ type ResumeInput = typeof ResumeInput.Type;
 export const RESUME: Served<{ pause: Pause }, ResumeInput> = {
   ...RESUME_WORDS,
   input: ResumeInput,
-  handler: () =>
-    Effect.flatMap(StoreRoot, (home) => tried(() => ({ pause: resumePause(home) }))).pipe(Effect.tap(() => sessionsDrained(null))),
+  handler: ({ actor }) =>
+    Effect.flatMap(StoreRoot, (home) => tried(() => ({ pause: resumePause(home, actor) }))).pipe(Effect.tap(() => sessionsDrained(null))),
 };
 
 /** The store's pause and the checks it holds, a landing with its merge staged among them (`pausedRead`), which the api alone serves. */

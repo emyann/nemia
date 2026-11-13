@@ -735,6 +735,12 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       assert.equal((await detail(PUT)).holding?.word, words);
       assert.equal((await lift(PUT)).status, 200);
       assert.equal(fs.existsSync(holdFile(PUT)), false);
+      assert.deepEqual(
+        JSON.parse(fs.readFileSync(path.join(root, 'runs', `${PUT}.unheld`), 'utf8')),
+        { since: answer.hold.at, actor: SEATED },
+        'who lifted it kept beside the run, paired by the moment of the hold it lifted',
+      );
+      assert.deepEqual(runsAtOnce(root).runs.read(PUT).unheld, { since: answer.hold.at, actor: SEATED }, 'read with the run');
     },
   );
   await s.test(

@@ -1,14 +1,14 @@
 # templates — the factory templates Nemia ships
 
-Each folder here but `test/` is a template in the template layout (`nemia.yaml`, `RULES.md`, `agents/<a>/`, `workflows/<w>/`,
+Each folder here but `test/` and `contracts/` is a template in the template layout (`nemia.yaml`, `RULES.md`, `agents/<a>/`, `workflows/<w>/`,
 `skills/<s>/`, `carried/`, and a file a `{ path }` item names), which `nemia template lint <folder>` reads and `nemia factory apply <name> --template <folder>` renders. Only what the
 layout gives a place sits inside a template's folder: the workspace's own files (this one, `package.json`, `tsconfig.json`,
-`released.json`, `test/`) sit beside it, since a render would carry anything inside.
+`released.json`, `released.ts`, `contracts/`, `test/`) sit beside it, since a render would carry anything inside.
 
 - `sdlc/` — the team that builds Nemia, with this repository's words taken out: six agents and four workflows, the role skills they
   name, and the scripts their checks run, kept once in `carried/` (`landing.ts`, `parts.ts`, `probe.ts`, `pull-request.ts`, `needs.ts` — what build's and quick's needs check and
   fix — with
-  `ci-log.ts` and `exec.ts`, which `landing.ts` and `pull-request.ts` import), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
+  `ci-log.ts` and `exec.ts`, which `landing.ts` and `pull-request.ts` import, and `refresh.ts`, the landing refresh `landing.ts` imports), read by a check as `$WF_CARRIED_FILES/<script>.ts`;
   `change.ts` in `quick/` and `cards.ts` in `janitor/`, read as `$WF_WORKFLOW_FILES/<script>.ts`. quick's land step is told build's
   `land.md` (`instruction: { path }`). What the repository a factory is applied to decides is a parameter of `nemia.yaml`, written in text as `${{ parameters.<name> }}`; a carried
   script is never rendered, so a script takes what it needs as a flag (`--check <name>`).
@@ -21,12 +21,16 @@ layout gives a place sits inside a template's folder: the workspace's own files 
 - **Two copies kept on purpose.** The `github` parameter is spelt in each note that differs by it (`### true`/`### false` headings and
   the check lines): a note is read by an agent whole, and one note per way of landing would copy everything the two share. And every
   change to sdlc's content bumps its version in `nemia.yaml` and `released.json`, so two runs that change sdlc side by side meet there:
-  the version is what a factory pins and upgrades by, and a digest no version names would let a change ship unnoticed.
+  the version is what a factory pins and upgrades by, and a digest no version names would let a change ship unnoticed. The version a
+  branch writes is cut again at its landing, from the base as it is then (`released.ts cut`, which the factory's `landingRefresh`
+  names; `landedVersion`, proved by `contracts/version.contract.ts`), so the second of two such runs takes the next version on its own.
 
 ## Traps
 
 - **Any change to a template's content bumps its `spec.version` and records it in `released.json`**, with the digest `nemia template
   lint <folder>` prints: `test/released.test.ts` refuses changed content under a recorded version.
+  Bump from the version your branch forked at: where a sibling lands first, the landing re-cuts it (`released.ts cut`), keeping the
+  kind of your bump.
 - **No word of this repository in a template**: none of its paths, its tools or its owner's settings. `test/portable.test.ts` holds
   the list; a word it refuses goes in the factory's own overlay, not here.
 - **sdlc lands two ways, picked by its `github` parameter** (false, in the checkout, by default; true, on GitHub). A parameter replaces

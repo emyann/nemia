@@ -79,4 +79,18 @@ test('outOfMemoryWords says the kill, the limit, the peak and what to raise', as
     for (const fact of ['check', 'WF_MEMORY_LIMIT']) assert.ok(words.includes(fact), fact);
     assert.ok(!words.includes('step'));
   });
+  await t.test('a kill under the limit the cgroup never reached is the machine’s, of a session and of a check: no limit knob', () => {
+    for (const task of ['session', 'check'] as const) {
+      const words = said({ limitBytes: 8 * GI, peakBytes: 3 * GI, oomKills: 1, oom: 0 }, '8Gi', task);
+      for (const fact of ['machine', '3Gi', '8Gi', 'WF_MAX_CONCURRENT', `this ${task}`]) assert.ok(words.includes(fact), `${task}: ${fact}`);
+      for (const knob of ['WF_MEMORY_LIMIT', 'memory:']) assert.ok(!words.includes(knob), `${task} names no ${knob}`);
+    }
+  });
+  await t.test('a kill at the limit the cgroup reached, and a former record with no oom, keep the limit’s words', () => {
+    for (const m of [{ ...KILLED, oom: 1 }, KILLED]) {
+      const words = said(m, undefined);
+      for (const fact of ['WF_MEMORY_LIMIT', 'memory:', '4Gi limit']) assert.ok(words.includes(fact), fact);
+      assert.ok(!words.includes('machine'));
+    }
+  });
 });

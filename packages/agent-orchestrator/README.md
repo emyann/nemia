@@ -506,7 +506,12 @@ so a runaway test is killed there alone. The step's check is filed without it, a
 is set. A daemon started with `WF_MEMORY_LIMIT` on a host where the runtime cannot make such a scope refuses to start, naming the
 variable to unset (`limitRefusal`). A session or a check the kernel killed a process of at its limit says so in its step's note — on the
 feed, `nemia ls` and the run page — with the limit, the peak, and the knob to raise: the step's `memory:` where it names one, else
-`WF_MEMORY_LIMIT` (`outOfMemoryWords`). A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
+`WF_MEMORY_LIMIT` (`outOfMemoryWords`). The runtime's record tells that kill apart from the machine's: `oomKills` counts the processes
+any OOM killer ended in the cgroup, `oom` the times its own limit was reached. A kill with no `oom` is the machine's: the whole machine
+ran out of memory, under the task's own limit. Its note says so, with the peak and the limit, and names fewer sessions at once
+(`WF_MAX_CONCURRENT`) or the machine's memory, never a limit knob, since a higher limit squeezes the machine further. A check the
+machine killed is no verdict on the work: the step's `retries:` runs it again as its check, never a session told to look at it. A
+record written before `oom` was carried reads as a kill at the limit. A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
 `WF_MEMORY_LIMIT` reaches what the daemon files once it is restarted with it.
 
 **A session is admitted only while the memory it asks fits the machine.** What each asks is its request, a container's

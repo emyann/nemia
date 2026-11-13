@@ -31,7 +31,8 @@ export type AttemptMemory = { limitBytes: number; peakBytes?: number; oomKills: 
  * A session or a check the kernel's OOM killer ended a process of: how many it killed, the limit and the peak in bytes (the peak null
  * where the kernel kept none), and whose memory ran out — `limit`, the task's own, with the knob that raises it (`step`, the step's own
  * `memory:`, or `default`, the daemon's `WF_MEMORY_LIMIT`, where the step names none); or `machine`, the whole machine's, which no limit
- * knob raises.
+ * knob raises. That a machine's kill names no limit to raise is this type's, which gives its variant no `raise` (a law of it would hold of
+ * every result, and say nothing of the function), and the words' (`outOfMemoryWords`, held by src/views/views-words.test.ts).
  */
 export type OutOfMemoryKill =
   | { by: 'limit'; kills: number; limitBytes: number; peakBytes: number | null; raise: 'step' | 'default' }
@@ -102,10 +103,6 @@ const outOfMemorySpec = spec<(memory: AttemptMemory | undefined, own: string | u
       description: "A kill at the limit of a step that names no memory: ran under the daemon's default, and is told of WF_MEMORY_LIMIT",
       condition: ({ input: [, own], output }) =>
         output === undefined || output.by !== 'limit' || own !== undefined || output.raise === 'default',
-    },
-    theMachinesNamesNoLimitKnob: {
-      description: "A kill of the machine's names no limit to raise: neither the step's memory: nor WF_MEMORY_LIMIT would have saved it",
-      condition: ({ output }) => output === undefined || output.by !== 'machine' || !('raise' in output),
     },
   },
 });

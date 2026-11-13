@@ -340,13 +340,25 @@ test('refusalSection: what a check said reaches the step tried again as data', a
     const killed = refusalSection({
       ...said,
       verdict: 137,
-      killed: { kills: 1, limitBytes: 6 * 1024 ** 3, peakBytes: null, raise: 'default' },
+      killed: { by: 'limit', kills: 1, limitBytes: 6 * 1024 ** 3, peakBytes: null, raise: 'default' },
     });
     const fenceAt = killed.search(/`{3,}json/);
     assert.ok(killed.indexOf('out of memory') > 0 && killed.indexOf('out of memory') < fenceAt);
     assert.ok(killed.indexOf('WF_MEMORY_LIMIT') < fenceAt);
     assert.deepEqual(Object.keys(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(killed)![1])), ['command', 'exit', 'stdout', 'stderr']);
     assert.doesNotMatch(refusalSection(said), /out of memory/);
+  });
+  await t.test('a check the machine killed says the machine before the data, naming no WF_MEMORY_LIMIT; its data unchanged', () => {
+    const killed = refusalSection({
+      ...said,
+      verdict: 137,
+      killed: { by: 'machine', kills: 1, limitBytes: 6 * 1024 ** 3, peakBytes: 3 * 1024 ** 3 },
+    });
+    const fenceAt = killed.search(/`{3,}json/);
+    assert.ok(killed.indexOf('machine') > 0 && killed.indexOf('machine') < fenceAt);
+    assert.ok(killed.includes('--recheck'));
+    assert.ok(!killed.includes('WF_MEMORY_LIMIT'));
+    assert.deepEqual(Object.keys(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(killed)![1])), ['command', 'exit', 'stdout', 'stderr']);
   });
 });
 

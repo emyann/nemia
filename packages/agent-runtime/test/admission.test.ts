@@ -14,7 +14,21 @@ import { Runner } from '../src/harness/seam.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { Admission, tick, view } from '../src/core/engine/engine.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
-import { holdsSlot, ownPool, toAdmit, type AdmissionRule, type AdmissionView } from '../src/core/admission.ts';
+import {
+  admitting,
+  holdsSlot,
+  ownPool,
+  roomOf,
+  toAdmit,
+  type AdmissionPass,
+  type AdmissionRule,
+  type AdmissionView,
+  type AdmissionWait,
+  type Admitted,
+  type Holder,
+  type MachineMemory,
+  type Waiter,
+} from '../src/core/admission.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from 'test-kit/scratch';
@@ -505,6 +519,205 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
     assert.deepEqual(admittedIds(waiting, rule), [], 'unschedulable: nothing admitted, though the pool has room');
     unschedulable = false;
     assert.deepEqual(admittedIds(waiting, rule), ['a-1', 'a-2'], 'schedulable again: the same rule admits as a ceiling does');
+  });
+});
+
+/**
+ * The laws of a whole pass, which sum over its waiters: `contracts/admission.contract.ts` proves `admitOne`, what `admitting`
+ * decides of each waiter, and the verifier proves no sum over an array without a loop's invariant in the code, which imports nothing
+ * of it. Each law here is one design wrote of `admitting`, but `admittedInTurn`, held on every pass `passes` builds.
+ */
+const sumOf = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
+const admittedNeed = (pass: AdmissionPass, out: Admitted): number =>
+  sumOf(pass.waiting.filter((w) => out.admit.includes(w.id)).map((w) => w.needBytes));
+const promised = (pass: AdmissionPass): number => sumOf(pass.holders.map((h) => h.needBytes));
+const unseen = (pass: AdmissionPass): number => sumOf(pass.holders.filter((h) => !h.running).map((h) => h.needBytes));
+const heldInPool = (pass: AdmissionPass, pool: string): number => pass.holders.filter((h) => h.pool === pool).length;
+const inPoolAfter = (pass: AdmissionPass, out: Admitted, pool: string): number =>
+  heldInPool(pass, pool) + pass.waiting.filter((w) => w.pool === pool && out.admit.includes(w.id)).length;
+const roomAfter = (pass: AdmissionPass, m: MachineMemory, out: Admitted): number =>
+  Math.min(m.totalBytes - m.reservedBytes - promised(pass), m.availableBytes - m.reservedBytes - unseen(pass)) - admittedNeed(pass, out);
+const waitOf = (out: Admitted, id: string): AdmissionWait | undefined => out.waits.find((x) => x.id === id)?.wait;
+
+/** Each law of a whole pass, by design's name: true where the pass keeps it. */
+const PASS_LAWS: Record<string, (pass: AdmissionPass, out: Admitted) => boolean> = {
+  eachWaiterAnsweredOnce: (pass, out) =>
+    out.admit.length + out.waits.length === pass.waiting.length &&
+    pass.waiting.every((w) => out.admit.includes(w.id) !== out.waits.some((x) => x.id === w.id)),
+  admittedInTurn: (pass, out) =>
+    out.admit.join(',') ===
+    pass.waiting
+      .filter((w) => out.admit.includes(w.id))
+      .map((w) => w.id)
+      .join(','),
+  ceilingKept: (pass, out) =>
+    pass.waiting.every(
+      (w) => inPoolAfter(pass, out, w.pool) - heldInPool(pass, w.pool) <= Math.max(0, pass.ceiling - heldInPool(pass, w.pool)),
+    ),
+  requestsFitTheMachine: (pass, out) =>
+    pass.machine === null || admittedNeed(pass, out) <= Math.max(0, pass.machine.totalBytes - pass.machine.reservedBytes - promised(pass)),
+  availableCoversTheNewcomers: (pass, out) =>
+    pass.machine === null ||
+    admittedNeed(pass, out) <= Math.max(0, pass.machine.availableBytes - pass.machine.reservedBytes - unseen(pass)),
+  slotWaitMeansAFullPool: (pass, out) =>
+    pass.waiting.every((w) => {
+      const wait = waitOf(out, w.id);
+      return (
+        wait?.for !== 'slot' || (wait.pool === w.pool && wait.ceiling === pass.ceiling && inPoolAfter(pass, out, w.pool) >= pass.ceiling)
+      );
+    }),
+  memoryWaitMeansItDidNotFit: (pass, out) =>
+    pass.waiting.every((w) => {
+      const wait = waitOf(out, w.id);
+      if (wait?.for !== 'memory') return true;
+      if (pass.machine === null) return false;
+      const left = roomAfter(pass, pass.machine, out);
+      return (
+        wait.needBytes === w.needBytes &&
+        w.needBytes > left &&
+        wait.roomBytes >= Math.max(0, left) &&
+        wait.roomBytes < wait.needBytes &&
+        Number.isInteger(wait.roomBytes)
+      );
+    }),
+  unreadMachineAdmitsByTheCeilingAlone: (pass, out) => pass.machine !== null || out.waits.every((x) => x.wait.for === 'slot'),
+  stopsAtTheFloorOfAvailableOverTheLimit: (pass, out) => {
+    const m = pass.machine;
+    const first = pass.waiting[0];
+    if (m === null || first === undefined || pass.holders.length > 0) return true;
+    const need = first.needBytes;
+    const alike = pass.waiting.every((w) => w.needBytes === need && w.pool === first.pool);
+    if (!alike || need <= 0 || pass.ceiling < pass.waiting.length || m.totalBytes < m.availableBytes) return true;
+    return out.admit.length === Math.min(pass.waiting.length, Math.floor(Math.max(0, m.availableBytes - m.reservedBytes) / need));
+  },
+};
+
+/** A generator of whole numbers from a seed (mulberry32): the same passes on every run. */
+const seeded = (seed: number) => {
+  let a = seed >>> 0;
+  return (below: number): number => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) % below;
+  };
+};
+
+/**
+ * Passes over two pools and a few needs, on a machine read or not: `count` of every shape, and as many of the shape
+ * `stopsAtTheFloorOfAvailableOverTheLimit` speaks of (nothing held, alike waiters under a ceiling that leaves the memory to decide).
+ */
+const passes = (seed: number, count: number): AdmissionPass[] => {
+  const n = seeded(seed);
+  const NEEDS = [0, 1, 2, 3, 5];
+  const POOLS = ['a', 'b'];
+  const machine = (): MachineMemory => {
+    const totalBytes = n(16);
+    return { totalBytes, availableBytes: n(totalBytes + 3), reservedBytes: n(4) };
+  };
+  const pick = <T>(xs: readonly T[]): T => xs[n(xs.length)];
+  const out: AdmissionPass[] = [];
+  for (let i = 0; i < count; i++) {
+    const holders: Holder[] = Array.from({ length: n(4) }, () => ({ pool: pick(POOLS), needBytes: pick(NEEDS), running: n(2) === 0 }));
+    const waiting: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({ id: `w${k}`, pool: pick(POOLS), needBytes: pick(NEEDS) }));
+    out.push({ ceiling: 1 + n(3), machine: n(4) === 0 ? null : machine(), holders, waiting });
+    const need = 1 + n(4);
+    const pool = pick(POOLS);
+    const alike: Waiter[] = Array.from({ length: n(6) }, (_, k) => ({ id: `w${k}`, pool, needBytes: need }));
+    const m = machine();
+    out.push({
+      ceiling: alike.length + n(2) + 1,
+      machine: { ...m, availableBytes: Math.min(m.availableBytes, m.totalBytes) },
+      holders: [],
+      waiting: alike,
+    });
+  }
+  return out;
+};
+
+test("admitting, the whole pass: each law design wrote of it, and the order it admits in, holds on 4000 passes from a seed, `admitOne`'s laws being proved by the contract", async (t) => {
+  const all = passes(20261113, 2000);
+  for (const [law, holds] of Object.entries(PASS_LAWS)) {
+    await t.test(law, () => {
+      const broken = all.find((pass) => !holds(pass, admitting(pass)));
+      assert.equal(broken, undefined, `${law} is broken on ${JSON.stringify(broken)}`);
+    });
+  }
+  await t.test('the passes reach every answer: an admission, a slot wait and a memory wait, on a machine read and not', () => {
+    const answers = all.map(admitting);
+    assert.ok(answers.some((o) => o.admit.length > 0));
+    assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'slot')));
+    assert.ok(answers.some((o) => o.waits.some((x) => x.wait.for === 'memory')));
+    assert.ok(all.some((p, i) => p.machine === null && (answers[i]?.admit.length ?? 0) > 0));
+    const floorCases = all.filter(
+      (p) =>
+        p.holders.length === 0 &&
+        p.machine !== null &&
+        p.waiting.length > 1 &&
+        p.waiting.every((w) => w.pool === p.waiting[0]?.pool && w.needBytes === p.waiting[0]?.needBytes && w.needBytes > 0) &&
+        p.ceiling >= p.waiting.length,
+    );
+    assert.ok(
+      floorCases.some((p) => {
+        const k = admitting(p).admit.length;
+        return k > 0 && k < p.waiting.length;
+      }),
+      'a floor below the waiters',
+    );
+  });
+});
+
+test('admitting and roomOf: the rows a person reads the whole pass by', async (t) => {
+  const machine = (totalBytes: number, availableBytes: number, reservedBytes: number): MachineMemory => ({
+    totalBytes,
+    availableBytes,
+    reservedBytes,
+  });
+  await t.test('roomOf: the lesser of the total less the floor and every holder, and the available less the floor and the unseen', () => {
+    const holders: Holder[] = [
+      { pool: 'a', needBytes: 3, running: true },
+      { pool: 'b', needBytes: 2, running: false },
+    ];
+    assert.equal(roomOf(machine(16, 11, 1), holders), Math.min(16 - 1 - 5, 11 - 1 - 2));
+    assert.equal(roomOf(machine(16, 4, 1), holders), 4 - 1 - 2, 'the available memory the lesser');
+    assert.equal(roomOf(machine(6, 11, 1), holders), 6 - 1 - 5, 'the promised the lesser');
+    assert.equal(roomOf(machine(2, 2, 1), holders), 2 - 1 - 5, 'below nothing where the machine is already past it');
+    assert.equal(roomOf(machine(16, 11, 1), []), 10);
+  });
+  await t.test('a waiter that does not fit is passed by a smaller one behind it, and a need of nothing always fits', () => {
+    const out = admitting({
+      ceiling: 5,
+      machine: machine(16, 4, 1),
+      holders: [],
+      waiting: [
+        { id: 'big', pool: 'a', needBytes: 5 },
+        { id: 'small', pool: 'a', needBytes: 2 },
+        { id: 'next', pool: 'a', needBytes: 2 },
+        { id: 'none', pool: 'a', needBytes: 0 },
+      ],
+    });
+    assert.deepEqual(out.admit, ['small', 'none']);
+    assert.deepEqual(out.waits, [
+      { id: 'big', wait: { for: 'memory', needBytes: 5, roomBytes: 3 } },
+      { id: 'next', wait: { for: 'memory', needBytes: 2, roomBytes: 1 } },
+    ]);
+  });
+  await t.test('a full pool says slot before memory, and the room told is never below nothing', () => {
+    const out = admitting({
+      ceiling: 1,
+      machine: machine(4, 4, 1),
+      holders: [{ pool: 'a', needBytes: 6, running: true }],
+      waiting: [
+        { id: 'a-1', pool: 'a', needBytes: 1 },
+        { id: 'b-1', pool: 'b', needBytes: 1 },
+      ],
+    });
+    assert.deepEqual(out.admit, []);
+    assert.deepEqual(out.waits, [
+      { id: 'a-1', wait: { for: 'slot', pool: 'a', ceiling: 1 } },
+      { id: 'b-1', wait: { for: 'memory', needBytes: 1, roomBytes: 0 } },
+    ]);
   });
 });
 

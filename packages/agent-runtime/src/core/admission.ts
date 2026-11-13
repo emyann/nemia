@@ -5,19 +5,37 @@
  * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and one reading of the machine,
  * and journals what it returns.
  */
-import type { AdmissionWait, Admitted, Admitting, Holder, MachineMemory, Waiter } from '../../contracts/admission.contract.ts';
+import type {
+  AdmissionPass,
+  AdmissionWait,
+  Admitted,
+  AdmitOne,
+  Holder,
+  MachineMemory,
+  Waiter,
+} from '../../contracts/admission.contract.ts';
 import type { TaskPhase } from './session.ts';
 import type { TaskResources } from './domain.ts';
 import { memoryBytesOf } from './memory.ts';
 
-export type { AdmissionPass, AdmissionWait, Admitted, Holder, MachineMemory, Waiter } from '../../contracts/admission.contract.ts';
+export type {
+  AdmissionPass,
+  OneWaiter,
+  AdmissionWait,
+  Admit,
+  Admitted,
+  Holder,
+  MachineMemory,
+  Waiter,
+} from '../../contracts/admission.contract.ts';
 
 /**
  * The room the machine has for newcomers before a pass admits any, in bytes: the lesser of its total less the floor and what every
  * holder needs (what is promised), and what is available now less the floor and what the holders with no process yet need (what the
  * kernel does not see yet). Below nothing where the machine is already past either.
+ * Exported only for the tests that import it.
  */
-const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
+export const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
   let promised = 0;
   let unseen = 0;
   for (const h of holders) {
@@ -28,30 +46,45 @@ const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
 };
 
 /**
- * Which waiters a pass admits, in turn, and why each other waits: a waiter whose pool has no free slot under the ceiling waits for
- * a slot; one that needs more than the machine has room for waits for memory, told its need and the room; any other is admitted,
- * its slot and its need counted at once. A waiter that waits never stops the ones after it, as a scheduler goes on to the next Pod:
- * a smaller one behind it may fit. A waiter that needs nothing always fits, and with no reading of the machine only the ceiling
+ * What a pass decides of one waiter, in turn: a waiter whose pool has no free slot under the ceiling waits for a slot; one that needs
+ * more than the room the machine has left waits for memory, told its need and the room; any other is admitted, its need taken off
+ * the room and its slot counted. A waiter that needs nothing always fits, and with no reading of the machine only the ceiling
  * decides. Proved by `contracts/admission.contract.ts`.
  */
-export const admitting: Admitting = (pass) => {
-  const machine = pass.machine;
-  let room = machine === null ? 0 : roomOf(machine, pass.holders);
+export const admitOne: AdmitOne = (one) => {
+  if (one.inPool >= one.ceiling) return { for: 'slot', pool: one.pool, ceiling: one.ceiling };
+  const room = one.roomBytes;
+  if (room !== null && one.needBytes > 0 && one.needBytes > room) {
+    return { for: 'memory', needBytes: one.needBytes, roomBytes: room < 0 ? 0 : room };
+  }
+  return { for: 'admitted', roomBytes: room === null ? null : room - one.needBytes, inPool: one.inPool + 1 };
+};
+
+/**
+ * Which waiters a pass admits, in turn, and why each other waits: `admitOne` taken at each waiter, handed its pool's count and the
+ * room the waiters before it left. A waiter that waits never stops the ones after it, as a scheduler goes on to the next Pod: a smaller
+ * one behind it may fit. The laws of the whole pass, which sum over its waiters, are held by `test/admission.test.ts`.
+ */
+export const admitting = (pass: AdmissionPass): Admitted => {
+  let room = pass.machine === null ? null : roomOf(pass.machine, pass.holders);
+  const inPool = new Map<string, number>();
+  for (const h of pass.holders) inPool.set(h.pool, (inPool.get(h.pool) ?? 0) + 1);
   const admit: string[] = [];
-  const admittedPools: string[] = [];
   const waits: { id: string; wait: AdmissionWait }[] = [];
   for (const w of pass.waiting) {
-    const n = pass.holders.filter((h) => h.pool === w.pool).length + admittedPools.filter((p) => p === w.pool).length;
-    if (n >= pass.ceiling) {
-      waits.push({ id: w.id, wait: { for: 'slot', pool: w.pool, ceiling: pass.ceiling } });
+    const answer = admitOne({
+      ceiling: pass.ceiling,
+      inPool: inPool.get(w.pool) ?? 0,
+      roomBytes: room,
+      needBytes: w.needBytes,
+      pool: w.pool,
+    });
+    if (answer.for !== 'admitted') {
+      waits.push({ id: w.id, wait: answer });
       continue;
     }
-    if (machine !== null && w.needBytes > 0 && w.needBytes > room) {
-      waits.push({ id: w.id, wait: { for: 'memory', needBytes: w.needBytes, roomBytes: Math.max(0, room) } });
-      continue;
-    }
-    admittedPools.push(w.pool);
-    if (machine !== null) room -= w.needBytes;
+    room = answer.roomBytes;
+    inPool.set(w.pool, answer.inPool);
     admit.push(w.id);
   }
   return { admit, waits };

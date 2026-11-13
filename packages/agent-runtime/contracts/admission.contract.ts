@@ -1,8 +1,9 @@
 /**
- * Which queued tasks a pass admits, and why each other one waits (agent-runtime, src/core/admission.ts, `admitting`): the per-pool
- * ceiling (`maxConcurrent`) as today, and beside it the machine's memory, as Kubernetes' scheduler admits a Pod on a node only while
- * the requests of what runs there fit the node's allocatable memory. A task's need is its memory request, `resources.requests.memory`,
- * else its limit (Kubernetes gives a container that names a limit and no request a request equal to its limit), else nothing.
+ * Which queued tasks a pass admits, and why each other one waits (agent-runtime, src/core/admission.ts, `admitOne`, what
+ * `admitting` decides of each waiter in turn): the per-pool ceiling (`maxConcurrent`) as today, and beside it the machine's memory, as
+ * Kubernetes' scheduler admits a Pod on a node only while the requests of what runs there fit the node's allocatable memory. A task's
+ * need is its memory request, `resources.requests.memory`, else its limit (Kubernetes gives a container that names a limit and no
+ * request a request equal to its limit), else nothing.
  *
  * Two readings of the machine bound what is admitted, both off one reading per pass (`MachineMemory`), the floor kept for the daemon
  * and the machine (`reservedBytes`) taken off each:
@@ -14,6 +15,10 @@
  *
  * Pure: the pass hands it the tasks holding a slot and the queued tasks in the order a free slot goes to them (`byTurn`), and journals
  * what it returns. Nothing is carried between passes: the next pass reads the machine again.
+ *
+ * The laws are `admitOne`'s, each a fact of one waiter: a law of the whole pass sums over its waiters, which the verifier proves only
+ * through a loop's invariant written in the code, and the code imports nothing of the verifier. What the whole pass keeps is held by
+ * `test/admission.test.ts`, on passes the test builds.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -60,137 +65,90 @@ const MOST = 2 ** 50;
 /** A whole number of bytes from nothing to `MOST`. */
 const bytes = (n: number): boolean => Number.isInteger(n) && n >= 0 && n <= MOST;
 
-/** The sum of some byte counts. A loop, which the verifier reads, where `reduce` is not read. */
-const sum = (xs: readonly number[]): number => {
-  let total = 0;
-  for (const x of xs) total += x;
-  return total;
+/**
+ * One waiter as a pass meets it, in turn: the ceiling per pool, how many tasks of its pool hold a slot by then (`inPool`: the holders
+ * and those this pass admitted before it), the room the machine has left by then (`roomBytes`: the room before the pass less what it
+ * admitted before this one, below nothing where the machine is already past it; null where the machine was not read), its need and
+ * its pool. A pass asks this of each of its waiters in order, each one's `inPool` and room what the waiters before it left.
+ */
+export type OneWaiter = {
+  readonly ceiling: number;
+  readonly inPool: number;
+  readonly roomBytes: number | null;
+  readonly needBytes: number;
+  readonly pool: string;
 };
 
-/** How many of some facts hold. A loop, as `sum` is: `.filter` is not read inside a law's quantifier. */
-const count = (xs: readonly boolean[]): number => {
-  let n = 0;
-  for (const x of xs) if (x) n += 1;
-  return n;
+/** A waiter admitted: the room left once its need is counted (null where the machine was not read), and its pool's count with it. */
+export type Admit = { readonly for: 'admitted'; readonly roomBytes: number | null; readonly inPool: number };
+
+/** Whether the room the machine has left takes a need: a need of nothing always fits, and with no reading only the ceiling decides. */
+const fits = (one: OneWaiter): boolean => {
+  const room = one.roomBytes;
+  return room === null || one.needBytes === 0 || one.needBytes <= room;
 };
-
-/** What the waiters this pass admits need together. */
-const admittedNeed = (pass: AdmissionPass, out: Admitted): number =>
-  sum(pass.waiting.map((w) => (out.admit.includes(w.id) ? w.needBytes : 0)));
-
-/** What the tasks holding a slot need together: what the machine has promised. */
-const promised = (pass: AdmissionPass): number => sum(pass.holders.map((h) => h.needBytes));
-
-/** What the holders with no process yet need together: what the available memory does not show yet. */
-const unseen = (pass: AdmissionPass): number => sum(pass.holders.map((h) => (h.running ? 0 : h.needBytes)));
-
-/** The room the machine has for newcomers before the pass admits any: the lesser of the two readings, each less the floor. */
-const roomBefore = (pass: AdmissionPass, m: MachineMemory): number =>
-  Math.min(m.totalBytes - m.reservedBytes - promised(pass), m.availableBytes - m.reservedBytes - unseen(pass));
-
-/** The room the machine has left once the pass has admitted what it admits. */
-const roomAfter = (pass: AdmissionPass, m: MachineMemory, out: Admitted): number => roomBefore(pass, m) - admittedNeed(pass, out);
-
-/** How many tasks of `pool` hold a slot once the pass has admitted what it admits. */
-const inPool = (pass: AdmissionPass, out: Admitted, pool: string): number =>
-  heldInPool(pass, pool) + count(pass.waiting.map((w) => w.pool === pool && out.admit.includes(w.id)));
-
-/** How many tasks of `pool` held a slot before the pass. */
-const heldInPool = (pass: AdmissionPass, pool: string): number => count(pass.holders.map((h) => h.pool === pool));
-
-/** The wait the pass gave the waiter `id`, or undefined where it was admitted. */
-const waitOf = (out: Admitted, id: string): AdmissionWait | undefined => out.waits.find((x) => x.id === id)?.wait;
-
-/** Ids each once: a task is one waiter. */
-const distinctIds = (waiting: readonly Waiter[]): boolean => waiting.every((w, i) => waiting.every((x, j) => j === i || x.id !== w.id));
 
 /**
- * `admitting`'s laws. Its `open` is the wait's word: which of the two a waiter is told where both are true of it — its pool filled
- * during the pass and the room ran out — is the order's (`byTurn`): the laws hold either word to what it says, and neither is wrong.
+ * `admitOne`'s laws: the whole of what a pass decides of one waiter. Each law of a pass is a law of one waiter kept at every waiter in
+ * turn: the ceiling is kept because a waiter is admitted only below it and counted at once; what is admitted fits the machine because
+ * each need fits the room left, and the room left falls by exactly that need; a wait says the truth of the pool or the room as the
+ * waiter met them. The laws each kept over the waiters of a pass, and the sums they make, are held by `test/admission.test.ts`.
  */
-const admittingSpec = spec<(pass: AdmissionPass) => Admitted>({
-  requires: ({ input: [pass] }) =>
-    Number.isInteger(pass.ceiling) &&
-    pass.ceiling >= 1 &&
-    distinctIds(pass.waiting) &&
-    pass.holders.every((h) => bytes(h.needBytes)) &&
-    pass.waiting.every((w) => bytes(w.needBytes)) &&
-    (pass.machine === null || (bytes(pass.machine.totalBytes) && bytes(pass.machine.availableBytes) && bytes(pass.machine.reservedBytes))),
+const admitOneSpec = spec<(one: OneWaiter) => Admit | AdmissionWait>({
+  requires: ({ input: [one] }) => {
+    const room = one.roomBytes;
+    return (
+      bytes(one.ceiling) &&
+      one.ceiling >= 1 &&
+      bytes(one.inPool) &&
+      bytes(one.needBytes) &&
+      (room === null || (Number.isInteger(room) && room >= -MOST && room <= MOST))
+    );
+  },
   ensures: {
-    eachWaiterAnsweredOnce: {
-      description: 'Every queued task is either admitted or told why it waits, never both, and nothing else is named',
-      condition: ({ input: [pass], output }) =>
-        output.admit.length + output.waits.length === pass.waiting.length &&
-        pass.waiting.every((w) => output.admit.includes(w.id) !== output.waits.some((x) => x.id === w.id)),
-    },
     ceilingKept: {
-      description: 'A pool is never given more slots than its ceiling leaves free',
-      condition: ({ input: [pass], output }) =>
-        pass.waiting.every(
-          (w) => inPool(pass, output, w.pool) - heldInPool(pass, w.pool) <= Math.max(0, pass.ceiling - heldInPool(pass, w.pool)),
-        ),
+      description: 'A waiter is admitted only while its pool holds fewer tasks than the ceiling, and is counted in its pool at once',
+      condition: ({ input: [one], output }) => output.for !== 'admitted' || (one.inPool < one.ceiling && output.inPool === one.inPool + 1),
     },
-    requestsFitTheMachine: {
+    needFitsTheRoom: {
+      description: 'A waiter admitted on a machine read needs no more than the room the machine has left, or nothing',
+      condition: ({ input: [one], output }) => output.for !== 'admitted' || fits(one),
+    },
+    roomFallsByTheNeed: {
       description:
-        'What is admitted needs no more than the machine’s total, less its floor, leaves once every task holding a slot has its request',
-      condition: ({ input: [pass], output }) =>
-        pass.machine === null ||
-        admittedNeed(pass, output) <= Math.max(0, pass.machine.totalBytes - pass.machine.reservedBytes - promised(pass)),
-    },
-    availableCoversTheNewcomers: {
-      description: 'What is admitted needs no more than the memory available now, less its floor and what holders with no process yet need',
-      condition: ({ input: [pass], output }) =>
-        pass.machine === null ||
-        admittedNeed(pass, output) <= Math.max(0, pass.machine.availableBytes - pass.machine.reservedBytes - unseen(pass)),
+        'Admitting a waiter takes exactly its need off the room the machine has left, and no room is made up where none was read',
+      condition: ({ input: [one], output }) => {
+        const room = one.roomBytes;
+        return output.for !== 'admitted' || (room === null ? output.roomBytes === null : output.roomBytes === room - one.needBytes);
+      },
     },
     slotWaitMeansAFullPool: {
-      description: 'A task told it waits for a slot is in a pool at its ceiling once the pass is done, and is told its pool and ceiling',
-      condition: ({ input: [pass], output }) =>
-        pass.waiting.every((w) => {
-          const wait = waitOf(output, w.id);
-          return (
-            wait?.for !== 'slot' || (wait.pool === w.pool && wait.ceiling === pass.ceiling && inPool(pass, output, w.pool) >= pass.ceiling)
-          );
-        }),
+      description: 'A waiter waits for a slot exactly when its pool is at the ceiling, and is told its pool and the ceiling',
+      condition: ({ input: [one], output }) =>
+        (output.for === 'slot') === one.inPool >= one.ceiling &&
+        (output.for !== 'slot' || (output.pool === one.pool && output.ceiling === one.ceiling)),
     },
     memoryWaitMeansItDidNotFit: {
       description:
-        'A task told it waits for memory was read on a machine, needs more than the room left once the pass is done, and is told its need and a room below it',
-      condition: ({ input: [pass], output }) =>
-        pass.waiting.every((w) => {
-          const wait = waitOf(output, w.id);
-          if (wait?.for !== 'memory') return true;
-          if (pass.machine === null) return false;
-          const left = roomAfter(pass, pass.machine, output);
-          return (
-            wait.needBytes === w.needBytes &&
-            w.needBytes > left &&
-            wait.roomBytes >= Math.max(0, left) &&
-            wait.roomBytes < wait.needBytes &&
-            Number.isInteger(wait.roomBytes)
-          );
-        }),
-    },
-    unreadMachineAdmitsByTheCeilingAlone: {
-      description: 'With no reading of the machine, no task waits for memory: the ceiling alone admits, as before',
-      condition: ({ input: [pass], output }) => pass.machine !== null || output.waits.every((x) => x.wait.for === 'slot'),
-    },
-    stopsAtTheFloorOfAvailableOverTheLimit: {
-      description:
-        'On a machine with N bytes available above its floor and nothing at work, tasks of one pool each needing L are admitted floor(N / L) at most, and as many as wait up to that',
-      condition: ({ input: [pass], output }) => {
-        const m = pass.machine;
-        const first = pass.waiting[0];
-        if (m === null || first === undefined || pass.holders.length > 0) return true;
-        const need = first.needBytes;
-        const alike = pass.waiting.every((w) => w.needBytes === need && w.pool === first.pool);
-        if (!alike || need <= 0 || pass.ceiling < pass.waiting.length || m.totalBytes < m.availableBytes) return true;
-        return output.admit.length === Math.min(pass.waiting.length, Math.floor(Math.max(0, m.availableBytes - m.reservedBytes) / need));
+        'A waiter waits for memory exactly when its pool has a slot and its need is more than the room left on a machine read, and is told its need and that room, at least nothing',
+      condition: ({ input: [one], output }) => {
+        const room = one.roomBytes;
+        return (
+          (output.for === 'memory') === (one.inPool < one.ceiling && !fits(one)) &&
+          (output.for !== 'memory' ||
+            (room !== null &&
+              output.needBytes === one.needBytes &&
+              output.roomBytes === (room < 0 ? 0 : room) &&
+              output.roomBytes < output.needBytes))
+        );
       },
     },
+    unreadMachineAdmitsByTheCeilingAlone: {
+      description: 'With no reading of the machine, no waiter waits for memory: one whose pool has a slot is admitted',
+      condition: ({ input: [one], output }) => one.roomBytes !== null || output.for !== 'memory',
+    },
   },
-  open: ['output.waits'],
 });
 
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
-export type Admitting = Implementation<typeof admittingSpec>;
+export type AdmitOne = Implementation<typeof admitOneSpec>;

@@ -1195,7 +1195,8 @@ agent-orchestrator files every task `queued` with its run's momentum as `priorit
 memory beside the ceiling, as Kubernetes' scheduler admits a Pod onto a node only while the requests of what runs there fit its
 allocatable memory. `reserved` is the floor kept for the daemon and the machine, kubelet's `system-reserved`. Each pass reads the
 machine once (`machine`, by default `/proc/meminfo`'s `MemTotal` and `MemAvailable`, `src/service/machine.ts`) and admits a queued
-task, in turn, only while both hold (`admitting`, `src/core/admission.ts`, proved by `contracts/admission.contract.ts`):
+task, in turn, only while both hold (`admitting`, `src/core/admission.ts`, which decides each waiter by `admitOne`, proved
+by `contracts/admission.contract.ts`; what the whole pass keeps, summed over its waiters, is held by `test/admission.test.ts`):
 
 - the requests of every task holding a slot, its own among them, fit the machine's total less the floor: what is promised, so a
   session at work that has not yet grown to its request is counted at it;

@@ -27,6 +27,7 @@
     "test": "turbo run test --continue",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
+    "lint:fast": "oxlint -c .oxlintrc.fast.json && oxfmt --check",
     "contracts": "node tools/contracts/prove.ts",
     "format": "oxfmt",
     "e2e": "npm run e2e --workspace web --",

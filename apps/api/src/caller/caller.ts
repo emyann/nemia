@@ -81,7 +81,9 @@ const REFUSED_WORDS: Readonly<Record<TokenRefusal, string>> = {
 
 /**
  * The caller `token` is (`undefined`: none presented), asked of the package over the app's engine and store for a route that needs `need`;
- * refused, `Unauthorized`.
+ * refused, `Unauthorized`. A request with no token is the person (`PERSON`, what an in-process program is) only on a route that needs none
+ * (a pairing route, which judges its own secret, and a page of the board, which carries no data of the store); on any other the package
+ * refuses it.
  */
 export async function callerBy(
   c: Parameters<MiddlewareHandler<ApiEnv>>[0],

@@ -1,9 +1,9 @@
 /**
  * The board's built pages served beside the `Api` on one origin (`board`, src/board/board.ts): a file of the folder by its path, the
  * board's `index.html` for a path that names none (a route of the board's own), a path that climbs out of the folder refused, and with
- * no folder built a 404 that names the build. On a store marked exposed a page needs no token, while the `Api`'s routes still do.
+ * no folder built a 404 that names the build. On every store, marked exposed or not, a page needs no token, while the `Api`'s routes do.
  */
-import { root } from '../../test/harness.ts';
+import { NO_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -77,13 +77,17 @@ test('REFUSED 404: with no board built, a page answers a 404 naming npm run buil
   assert.match(((await res.json()) as { error: string }).error, /npm run build/);
 });
 
-test('a store marked exposed: a page answers with no token, a stale cookie included, while /api/runs answers 401 token-required', async () => {
-  const app = appWith({ NEMIA_BOARD_DIR: DIST }, true);
-  assert.equal((await app.request('/')).status, 200);
-  assert.equal((await app.request('/runs/x', { headers: { cookie: `${TOKEN_COOKIE}=never-minted` } })).status, 200, 'a stale cookie');
-  const api = await app.request('/api/runs');
-  assert.equal(api.status, 401);
-  assert.equal(((await api.json()) as { reason?: string }).reason, 'token-required');
+test('a store marked exposed or not: a page answers with no token, a stale cookie included, while /api/runs answers 401 token-required', async () => {
+  for (const exposed of [true, false]) {
+    const app = appWith({ NEMIA_BOARD_DIR: DIST }, exposed);
+    const on = exposed ? 'exposed' : 'not exposed';
+    assert.equal((await app.request('/', { headers: NO_TOKEN })).status, 200, on);
+    const stale = await app.request('/runs/x', { headers: { cookie: `${TOKEN_COOKIE}=never-minted` } });
+    assert.equal(stale.status, 200, `a stale cookie, ${on}`);
+    const api = await app.request('/api/runs', { headers: NO_TOKEN });
+    assert.equal(api.status, 401, on);
+    assert.equal(((await api.json()) as { reason?: string }).reason, 'token-required', on);
+  }
 });
 
 test("the board serves no path of the api's: an unknown one under /api, /mcp or /openapi stays the api's own", async () => {

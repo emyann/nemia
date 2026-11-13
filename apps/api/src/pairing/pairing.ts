@@ -15,10 +15,11 @@
  *   as `POST /api/session` sets it (`cookieSent`, server/session.ts), answered `{ cookie: 'set', name }`, never the token. 404 for an
  *   unknown secret, 409 for one claimed already or lapsed.
  *
- * The person's side, under `/api/pairings` and `/api/links`, which need a token where the store is exposed, as every other route does:
+ * The person's side, under `/api/pairings` and `/api/links`, which need a token on every store, loopback included, as every other
+ * route does:
  * - `GET /api/pairings` — the pairings the store keeps, newest first, never a code or a secret.
  * - `POST /api/pairings/:code/approve` — the pairing its short code names approved, the code read in either case, with or without its
- *   dash. 403 (`Forbidden`) unless the caller is the person (a token of theirs, the board's cookie, or none on a store not exposed): a
+ *   dash. 403 (`Forbidden`) unless the caller is the person (a token they hold, by the bearer or the board's cookie): a
  *   session's token never lets another client in. 404 for no pairing under the code, 409 for one lapsed or claimed.
  * - `POST /api/links` — a first-visit link made under `base`, else the board's own address (`boardBase`: the address the api ticking the
  *   store leased, else the one it listens on). 403 unless the caller is the person; 422 (`Invalid`) for a base that is no http(s) url.

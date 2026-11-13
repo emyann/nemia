@@ -117,10 +117,8 @@ process.env.HOME = away;
  * address its api listens on, the store marked exposed): a test that means one sets it itself. The package is imported here, after
  * every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
  */
-const { SERVING_VARIABLES, SESSION_VARIABLES } = await import('agent-orchestrator');
+const { SERVING_VARIABLES, SESSION_VARIABLES, tokenDigest } = await import('agent-orchestrator');
 for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.env[name];
-
-const { tokenDigest } = await import('agent-orchestrator');
 
 /**
  * The person's token every request a test makes presents where it presents none of its own: no route the api answers takes a request

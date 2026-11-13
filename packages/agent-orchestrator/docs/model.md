@@ -362,6 +362,7 @@ erDiagram
   Run ||--o{ RepositoryRun : context
   WorkflowStep ||--o{ RepositoryRun : gates
   Factory ||--o{ RepositoryRun : factory
+  RepositoryRun ||--o| Actor : cancelledBy
   RepositoryRun ||--o{ Step : steps
   Run ||--o{ FolderRun : id
   Workflow ||--o{ FolderRun : workflowDir
@@ -370,6 +371,7 @@ erDiagram
   Run ||--o{ FolderRun : context
   WorkflowStep ||--o{ FolderRun : gates
   Factory ||--o{ FolderRun : factory
+  FolderRun ||--o| Actor : cancelledBy
   FolderRun ||--o{ Step : steps
   TaskId ||--o{ Step : taskId
   Step ||--o{ Try : tries
@@ -407,6 +409,8 @@ erDiagram
   Run ||--o{ RunLine : run
   WorkflowStep ||--o{ RunLine : step
   Try ||--o{ RunLine : try
+  RunLine ||--o| Actor : actor
+  StoreLine ||--o| Actor : actor
 ```
 <!-- diagram:orchestrator-model:end -->
 

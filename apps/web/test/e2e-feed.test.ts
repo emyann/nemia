@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test, type TestContext } from 'node:test';
@@ -17,8 +18,23 @@ const dir = scratch('e2e-feed-');
 after(() => setStore(undefined));
 
 /**
+ * A token of the person's kept in `store` as the store keeps one, its record under `person-tokens/` named by its sha-256 digest: every
+ * route of the api takes a token, loopback included. Answers the token, to present as `Authorization: Bearer <token>`.
+ */
+function personToken(store: string): string {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const dir = path.join(store, 'person-tokens');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const digest = crypto.createHash('sha256').update(token).digest('hex');
+  fs.writeFileSync(path.join(dir, `${digest}.json`), `${JSON.stringify({ name: 'e2e-feed', createdAt: new Date().toISOString() })}\n`, {
+    mode: 0o600,
+  });
+  return token;
+}
+
+/**
  * The feed as the api reads it back: `GET /api/feed/wait?from=0` of an api served over the store, ticking nothing, the read `nemia watch
- * --once 0` asks. The web imports nothing of the packages, so the store is asked as the board asks it. Answers each line's run, step (`—`
+ * --once 0` asks, under a token of the person's. The web imports nothing of the packages, so the store is asked as the board asks it. Answers each line's run, step (`—`
  * for a run's own line) and word, and the cursor.
  */
 async function apiFeed(t: TestContext, store: string): Promise<{ said: string[]; cursor: number }> {
@@ -42,7 +58,7 @@ async function apiFeed(t: TestContext, store: string): Promise<{ said: string[];
     child.stderr.on('data', look);
     void ended.then(() => reject(new Error(`the api ended before it listened:\n${printed}`)));
   });
-  const answer = await fetch(`${url}/api/feed/wait?from=0&for=1s`);
+  const answer = await fetch(`${url}/api/feed/wait?from=0&for=1s`, { headers: { authorization: `Bearer ${personToken(store)}` } });
   assert.equal(answer.status, 200, `the api answers the feed's wait: ${await answer.clone().text()}`);
   const body = (await answer.json()) as {
     lines: { metadata: { labels: { run: string; step?: string } }; message: string }[];

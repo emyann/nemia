@@ -9,6 +9,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
@@ -43,8 +44,24 @@ const CLIENT = path.join(REPO, 'apps', 'cli', 'bin', 'nemia.ts');
 const API = path.join(REPO, 'apps', 'api');
 
 /**
- * The api served on the store `env` names, `--no-tick` on a free port, its lease written where the client reads it (`daemon.json`): its
- * url, once it listens, and stopped as the test ends.
+ * The store's credential put in place under `root` as the daemon puts it at its start, which an api served `--no-tick` does not: a token
+ * of the person's named `local`, kept as its record by its sha-256 digest under `person-tokens/`, and itself in `credential` (0600),
+ * which the client presents on this machine with nothing typed.
+ */
+function credentialIn(root: string): void {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const dir = path.join(root, 'person-tokens');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const digest = crypto.createHash('sha256').update(token).digest('hex');
+  fs.writeFileSync(path.join(dir, `${digest}.json`), `${JSON.stringify({ name: 'local', createdAt: new Date().toISOString() })}\n`, {
+    mode: 0o600,
+  });
+  fs.writeFileSync(path.join(root, 'credential'), `${token}\n`, { mode: 0o600 });
+}
+
+/**
+ * The api served on the store `env` names, `--no-tick` on a free port, its lease written where the client reads it (`daemon.json`) and
+ * the store's credential put in place (`credentialIn`): its url, once it listens, and stopped as the test ends.
  */
 async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
@@ -65,6 +82,7 @@ async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
   });
   fs.mkdirSync(env.WF_ROOT!, { recursive: true });
   fs.writeFileSync(path.join(env.WF_ROOT!, 'daemon.json'), JSON.stringify({ url }));
+  credentialIn(env.WF_ROOT!);
 }
 
 /**

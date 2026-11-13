@@ -135,6 +135,7 @@ export function runWith(note: string | null): RunDetail {
             },
           },
         ],
+        shown: 1,
         timeline: [],
       },
     ],

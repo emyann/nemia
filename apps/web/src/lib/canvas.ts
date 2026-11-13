@@ -61,7 +61,32 @@ type CanvasEdge = {
   label: string | null;
   /** A route edge its condition answered another route than: drawn thin and faint (`StateEdge`). False on every other edge. */
   untaken: boolean;
+  /** What passed along it: on an edge whose taker is handed its giver's declared output (`input`), that packet; absent on any other. */
+  packet?: Packet;
 };
+
+/**
+ * What a step hands the step that takes its declared output (`input`): the giver and the taker, its label, the giver's name, which the
+ * graph's edge, the giver's Gave and the taker's Got all say, and how many fields and files the giver's shown try gave.
+ */
+export type Packet = { from: string; to: string; label: string; fields: number; files: number };
+
+/** A step as its packets read it: its name, the steps whose declared output it is handed, and what its shown try gave. */
+export type PacketStep = { name: string; input: readonly string[]; fields: number; files: number };
+
+/** A packet's label: the name of the step that gave it. */
+export const packetLabel = (giver: string): string => giver;
+
+/** Every packet of a run: one for each step its taker's `input` names among the run's steps, in the takers' order, then the input's. */
+export function packetsOf(steps: readonly PacketStep[]): Packet[] {
+  const of = new Map(steps.map((s) => [s.name, s]));
+  return steps.flatMap((taker) =>
+    taker.input.flatMap((name) => {
+      const giver = of.get(name);
+      return giver ? [{ from: name, to: taker.name, label: packetLabel(name), fields: giver.fields, files: giver.files }] : [];
+    }),
+  );
+}
 
 /** A step as its edges read it: its state, the note the list words beside it, and whether its next round is due, as the api answers it. */
 export type EdgeStep = { name: string; state: StepState; note: string | null; roundDue: boolean };
@@ -69,9 +94,15 @@ export type EdgeStep = { name: string; state: StepState; note: string | null; ro
 /**
  * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
  * done — verified, or on its own word — and a `loop` edge from the looping step back to its target. A `route` edge is drawn as an `after`
- * one labelled with its route, and untaken where its condition took another route (`taken`, by condition) or its target was skipped.
+ * one labelled with its route, and untaken where its condition took another route (`taken`, by condition) or its target was skipped. An
+ * edge other than a loop carries the packet of `packets` from its giver to its taker, where there is one.
  */
-export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[], taken: ReadonlyMap<string, string> = new Map()): CanvasEdge[] {
+export function edgesOf(
+  graph: Frozen<RunGraph>,
+  steps: readonly EdgeStep[],
+  taken: ReadonlyMap<string, string> = new Map(),
+  packets: readonly Packet[] = [],
+): CanvasEdge[] {
   const of = new Map(steps.map((s) => [s.name, s]));
   const drawn = new Map<string, CanvasEdge>();
   for (const edge of graph.edges) {
@@ -86,7 +117,10 @@ export function edgesOf(graph: Frozen<RunGraph>, steps: readonly EdgeStep[], tak
     }
     drawn.set(id, edgeOf(id, edge, source, target, taken));
   }
-  return [...drawn.values()];
+  return [...drawn.values()].map((edge) => {
+    const packet = edge.kind === 'loop' ? undefined : packets.find((p) => p.from === edge.source && p.to === edge.target);
+    return packet ? { ...edge, packet } : edge;
+  });
 }
 
 /** Whether a route edge is off the route: its condition took another route, or its target was skipped. */

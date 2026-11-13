@@ -14,13 +14,19 @@ import { DOCK_ROOM, NemiaDock } from '@/components/nemia/NemiaDock';
 import { OpenBar } from '@/components/factory/OpenBar';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
+import { trySearch } from '@/lib/tryAddress';
+import { viewSearch } from '@/lib/viewAddress';
 import { useFeed } from '@/lib/useFeed';
 import { NemiaChatProvider } from '@/lib/useNemiaChat';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { useScrollMark } from '@/lib/useScrollMark';
 
+/**
+ * The search every page reads: what the bar shows (`bar`), the try each step shows (`try`), and the file the viewer's sheet shows
+ * (`view`).
+ */
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  validateSearch: barSearch,
+  validateSearch: (search: Record<string, unknown>) => ({ ...barSearch(search), ...trySearch(search), ...viewSearch(search) }),
   component: Root,
 });
 

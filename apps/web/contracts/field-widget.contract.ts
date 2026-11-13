@@ -6,12 +6,7 @@
  * object, and the JSON itself where its schema names no one type.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-
-/**
- * The shapes a field's schema may name (`x-shape`). Implement moves it into `objects` as `FIELD_SHAPES` (`packages/objects/src/words.ts`)
- * and imports it from there: this declaration changes no law.
- */
-export type FieldShape = 'questions' | 'budgets' | 'link' | 'commit';
+import type { FieldShape } from 'objects';
 
 /** A JSON Schema's `type` word. */
 export type JsonType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null';
@@ -42,11 +37,22 @@ export type FieldWidget =
   | 'record'
   | 'json';
 
-/** The types a field may be but null: a nullable field is drawn by what it is when it is not null. */
-const solid = (types: readonly JsonType[]): readonly JsonType[] => types.filter((t) => t !== 'null');
+/**
+ * Whether the types but null are exactly the one type `t`: `t` among them, and every other null (a nullable field is drawn by what it is
+ * when it is not null). Read of a list that names each word once, as a schema's `type` does; said without counting a filter, which the
+ * verifier knows only as none or some.
+ */
+const only = (types: readonly JsonType[], t: JsonType): boolean =>
+  types.some((x) => x === t) && types.every((x) => x === t || x === 'null');
 
-/** Whether the types but null are exactly the one type `t`. */
-const only = (types: readonly JsonType[], t: JsonType): boolean => solid(types).length === 1 && solid(types)[0] === t;
+/** Whether the types but null are exactly one type. */
+const oneType = (types: readonly JsonType[]): boolean =>
+  only(types, 'string') ||
+  only(types, 'number') ||
+  only(types, 'integer') ||
+  only(types, 'boolean') ||
+  only(types, 'array') ||
+  only(types, 'object');
 
 /** Whether the types but null are exactly one scalar. */
 const scalar = (types: readonly JsonType[]): boolean =>
@@ -100,13 +106,12 @@ const widgetOfSpec = spec<(field: FieldRead) => FieldWidget>({
     },
     noOneTypeIsJson: {
       description: 'An unshaped field whose schema names no one type but null is drawn as its JSON',
-      condition: ({ input: [field], output }) => !(field.shape === null && solid(field.types).length !== 1) || output === 'json',
+      condition: ({ input: [field], output }) => !(field.shape === null && !oneType(field.types)) || output === 'json',
     },
     anArrayOfNoOneKindIsJson: {
       description: 'An unshaped array whose items are of no one scalar type and are not objects is drawn as its JSON',
       condition: ({ input: [field], output }) =>
-        !(field.shape === null && only(field.types, 'array') && !scalar(field.items) && !only(field.items, 'object')) ||
-        output === 'json',
+        !(field.shape === null && only(field.types, 'array') && !scalar(field.items) && !only(field.items, 'object')) || output === 'json',
     },
   },
 });

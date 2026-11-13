@@ -6,7 +6,12 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
+/** Whether `n` is one of the step's tries (`===`, as the board compares numbers). */
+const has = (tries: readonly number[], n: number): boolean => tries.some((t) => t === n);
+
 const tryShownSpec = spec<(tries: readonly number[], current: number | null, asked: number | null) => number | null>({
+  /** A try's number is a whole number, as the api counts tries: never NaN, which no try equals. */
+  requires: ({ input: [tries] }) => tries.every((t) => Number.isInteger(t)),
   ensures: {
     noneWithoutTries: {
       description: 'A step with no try shows none',
@@ -14,24 +19,24 @@ const tryShownSpec = spec<(tries: readonly number[], current: number | null, ask
     },
     oneOfItsTries: {
       description: 'A step with tries shows one of them',
-      condition: ({ input: [tries], output }) => tries.length === 0 || (output !== null && tries.includes(output)),
+      condition: ({ input: [tries], output }) => tries.length === 0 || (output !== null && has(tries, output)),
     },
     theAddressKeepsTheChoice: {
       description: 'A try the address names that the step has is the one shown',
-      condition: ({ input: [tries, , asked], output }) => asked === null || !tries.includes(asked) || output === asked,
+      condition: ({ input: [tries, , asked], output }) => asked === null || !has(tries, asked) || output === asked,
     },
     currentFirst: {
       description: 'With no choice it has, the step shows its current try',
       condition: ({ input: [tries, current, asked], output }) =>
-        (asked !== null && tries.includes(asked)) || current === null || !tries.includes(current) || output === current,
+        (asked !== null && has(tries, asked)) || current === null || !has(tries, current) || output === current,
     },
     elseItsLast: {
       description: 'With no choice it has and no current try among its tries, the step shows its last',
       condition: ({ input: [tries, current, asked], output }) =>
-        (asked !== null && tries.includes(asked)) ||
-        (current !== null && tries.includes(current)) ||
+        (asked !== null && has(tries, asked)) ||
+        (current !== null && has(tries, current)) ||
         tries.length === 0 ||
-        output === tries[tries.length - 1],
+        output === tries.at(tries.length - 1),
     },
   },
 });

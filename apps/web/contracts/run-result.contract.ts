@@ -26,9 +26,14 @@ export type RunResult =
 /** The final steps the run will run: a final step on a branch not taken is no part of its result. */
 const owed = (steps: readonly ResultStep[]): readonly ResultStep[] => steps.filter((s) => s.final && s.stands !== 'skipped');
 
+/** The names of the final steps the run will run, in the run order. */
+const owedNames = (steps: readonly ResultStep[]): readonly string[] => owed(steps).map((s) => s.name);
+
+/** Whether two lists of names are the same, in the same order. */
+const sameNames = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((name, i) => b.at(i) === name);
+
 /** Whether every final step the run will run is done and gave, and there is at least one. */
-const given = (steps: readonly ResultStep[]): boolean =>
-  owed(steps).length > 0 && owed(steps).every((s) => s.stands === 'done' && s.gave);
+const given = (steps: readonly ResultStep[]): boolean => owed(steps).length > 0 && owed(steps).every((s) => s.stands === 'done' && s.gave);
 
 /** Whether some step stands as `why`. */
 const some = (steps: readonly ResultStep[], why: Stands): boolean => steps.some((s) => s.stands === why);
@@ -45,9 +50,7 @@ const resultOfSpec = spec<(steps: readonly ResultStep[]) => RunResult>({
     },
     gaveIsTheFinalSteps: {
       description: 'What the box draws as given is exactly the final steps the run will run, in the run order',
-      condition: ({ input: [steps], output }) =>
-        output.kind !== 'gave' ||
-        (output.steps.length === owed(steps).length && output.steps.every((name, i) => owed(steps)[i]?.name === name)),
+      condition: ({ input: [steps], output }) => output.kind !== 'gave' || sameNames(output.steps, owedNames(steps)),
     },
     yoursFirst: {
       description: 'Where a step waits on a person, the box says so first',
@@ -61,20 +64,12 @@ const resultOfSpec = spec<(steps: readonly ResultStep[]) => RunResult>({
     thenWhatIsAtWork: {
       description: 'Where none waits and none failed, and one is at work, the box says what is at work',
       condition: ({ input: [steps], output }) =>
-        output.kind !== 'stands' ||
-        some(steps, 'yours') ||
-        some(steps, 'failed') ||
-        !some(steps, 'working') ||
-        output.why === 'working',
+        output.kind !== 'stands' || some(steps, 'yours') || some(steps, 'failed') || !some(steps, 'working') || output.why === 'working',
     },
     elseWhatIsToCome: {
       description: 'Where none waits, none failed and none is at work, the box says what is still to come',
       condition: ({ input: [steps], output }) =>
-        output.kind !== 'stands' ||
-        some(steps, 'yours') ||
-        some(steps, 'failed') ||
-        some(steps, 'working') ||
-        output.why === 'toCome',
+        output.kind !== 'stands' || some(steps, 'yours') || some(steps, 'failed') || some(steps, 'working') || output.why === 'toCome',
     },
     linkedToTheFirstThatSaysIt: {
       description: 'The box links to the first step, in the run order, that stands as it says; to none where no step does',

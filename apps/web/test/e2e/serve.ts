@@ -16,7 +16,8 @@
  *   page itself from the folder it was built into (`serveStories`), writes where each listens,
  *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a
  *   test), sooner when `stop` asks, a server dies or a signal comes. On its way out it stops both servers by the handles it kept and
- *   removes the folder. A port the steps given a browser are refused by address (`usable`) is given back and the servers started
+ *   removes the folder once it has served; before that it keeps `hold.log`, where it wrote its error's stack, and `serve`'s refusal
+ *   (`startHolder`) quotes the log's last lines and names its path. A port the steps given a browser are refused by address (`usable`) is given back and the servers started
  *   again, `TRIES` times at most.
  * - `stop` asks the holder to end, by a file in the folder, and waits until its pid is gone. No board served here is no failure.
  *
@@ -295,7 +296,7 @@ export async function startHolder(dir: string, tree: string, env: NodeJS.Process
     if (lines.join('').trim()) return `the last lines of ${log}:\n${lines.join('\n')}`;
     return (
       `it wrote nothing to ${log} before it ended (${exited ?? 'still running'}): a kill or a crash. ` +
-      'Run `node test/e2e/serve.ts serve` again, and read the machine\'s memory pressure if it ends the same way.'
+      "Run `node test/e2e/serve.ts serve` again, and read the machine's memory pressure if it ends the same way."
     );
   };
   return awaited(

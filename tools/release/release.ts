@@ -7,8 +7,9 @@
  *   pure entry a test drives) or, unset, from the pull request numbered `PR_NUMBER` as it is now, as the workflow passes it. Given a
  *   `HEAD_SHA` (a dispatched run's commit), it refuses a pull request whose head is another commit.
  * - `labels`: makes the five labels in the repository, and puts back the colour or description of one that drifted.
- * - `tag`: where the root `package.json` names a version that has no tag `v<version>`, makes that GitHub release on the first-parent
- *   commit of main that set the version, with the notes GitHub generates since the previous release.
+ * - `tag`: where the root `package.json` names a version that has no tag `v<version>`, or a tag with no release on it, tags the
+ *   first-parent commit of main that set the version and makes a draft GitHub release on the tag, with the notes GitHub generates since
+ *   the previous release; the workflow's upload job publishes it once its assets are attached.
  * - `pr`: keeps the release pull request (`release` into `main`) open while a pull request merged since the last release carries a label
  *   that releases, rebuilt from main when main moves, and dispatches `DISPATCHED` on its head where the head has no such run pending or
  *   green: the runs that report main's required checks with no person's approval. Closes it when nothing is to release.
@@ -134,11 +135,12 @@ const reach = (env: Env) => {
       throw new Refusal(`gh ${args.slice(0, 3).join(' ')} failed: ${ran.stderr.trim()} — check GH_TOKEN and the job's permissions`);
     return ran.stdout;
   };
+  const ghSays = (args: string[]): boolean => spawn('gh', args, env).status === 0;
   const api = <T>(method: string, endpoint: string, fields: string[] = []): T => {
     const out = gh(['api', '-X', method, endpoint, ...fields.flatMap((field) => ['-f', field])]);
     return (out.trim() === '' ? null : JSON.parse(out)) as T;
   };
-  return { git, gitMaybe, gh, api };
+  return { git, gitMaybe, gh, ghSays, api };
 };
 
 type Reach = ReturnType<typeof reach>;
@@ -266,7 +268,11 @@ const notes = (r: Reach, tag: string, target: string, previous: string | undefin
     ...(previous ? [`previous_tag_name=${previous}`] : []),
   ]).body;
 
-/** `tag`: the release of the version main names, on the commit that set it. */
+/**
+ * `tag`: the release of the version main names, on the commit that set it: the tag pushed first, then a draft GitHub release on it,
+ * which the upload job publishes once its assets are attached, so no published release names nothing to download. A tag already there
+ * with a release on it (a draft or published) is left alone; one with none, a run cut off between the two, is given its draft.
+ */
 const tag = (out: Out, r: Reach): number => {
   fetchMain(r);
   const version = versionAt(r, `origin/${BASE}`);
@@ -275,17 +281,19 @@ const tag = (out: Out, r: Reach): number => {
     return 0;
   }
   const name = `v${version}`;
-  if (r.git('ls-remote', '--tags', 'origin', `refs/tags/${name}`) !== '') {
+  const tagged = r.git('ls-remote', '--tags', 'origin', `refs/tags/${name}`) !== '';
+  if (tagged && r.ghSays(['release', 'view', name, '--json', 'isDraft'])) {
     out(`tag: ${name} is released already`);
     return 0;
   }
   const touched = r.git('log', '--first-parent', '--format=%H', `origin/${BASE}`, '--', 'package.json').split('\n').filter(Boolean);
   const setter = touched.find((sha) => versionAt(r, sha) === version && versionAt(r, `${sha}^1`) !== version);
   if (!setter) throw new Refusal(`tag: no first-parent commit of ${BASE} sets version ${version}: set it through the release pull request`);
+  if (!tagged) r.api('POST', 'repos/{owner}/{repo}/git/refs', [`ref=refs/tags/${name}`, `sha=${setter}`]);
   const previous = releasesIn(r, `origin/${BASE}`).find((each) => below(each.version, version))?.tag;
   const body = notes(r, name, setter, previous);
-  r.gh(['release', 'create', name, '--target', setter, '--title', name, '--notes-file', '-'], body);
-  out(`tag: released ${name} on ${setter}`);
+  r.gh(['release', 'create', name, '--draft', '--verify-tag', '--title', name, '--notes-file', '-'], body);
+  out(`tag: tagged ${name} on ${setter}, its release a draft until the upload job attaches its assets`);
   return 0;
 };
 

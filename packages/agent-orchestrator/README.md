@@ -1767,6 +1767,10 @@ retries: 1
   `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
+  A check the machine's OOM killer ended a process of, under its own limit (its memory record's `oom` at 0, *out of memory*), is no
+  verdict on the work: the next tick runs the check again, and nothing else, as `--recheck` does, whatever it exited with and whatever
+  `checkFailurePolicy:` says of the code. Its record keeps the try as a `recheck` marked `retried`, and it counts against `n` like any
+  try of `retries:`. Past them, the step waits on you, offered `--recheck` first.
 - **`checkFailurePolicy:` — which refusals are a person's.** A step's check can say which of its exit codes mean a refusal only a
   person can answer — no tool signed in, a remote not there — read against Kubernetes' Job `podFailurePolicy`:
 

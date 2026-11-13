@@ -442,7 +442,7 @@ type CountKey = { [K in StepKey]: (typeof STEP_KEY_FORM)[K] extends 'count' ? K 
  */
 export const COUNTS = {
   deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
-  retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
+  retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it, or runs its check again where the machine killed it', example: 1 },
   rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
 } as const satisfies { readonly [K in CountKey]: { least: number; counts: string; example: number } };
 

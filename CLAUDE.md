@@ -182,7 +182,10 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
   board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
-  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays).
+  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by the nemia factory's overlays), and
+  `code-review` (Matt Pocock's two-axis review of a diff, Standards and Spec: taken by `npx skills add
+  https://github.com/mattpocock/skills --skill code-review -a claude-code --copy -y`, on trial on build's review, given to its step by
+  the nemia factory's overlay).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
   folder, given to the build's design, implement and review steps as `apps/web:<name>` by the nemia factory's overlays, and said to a

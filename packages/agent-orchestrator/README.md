@@ -1451,6 +1451,23 @@ filed, it fills in the rest:
   so the step knows why it started late; `wf up` prints it too. An optional package main does not have
   is not a difference: it is another machine's platform build. If `npm ci` fails, the step is told what
   npm said and to run it itself.
+- **Kept to its lockfile, at each filing.** A step merges its base, and a landing in between can move
+  the branch's `package-lock.json` past the tree the cut gave the worktree: a check run then judges the
+  old install, not the work. So before the run files a step that inherits a worktree, a try, a round or
+  a check in one of its own worktrees, it reads that worktree's `node_modules` against its lockfile
+  again, from the disk and never from what the cut left, by the comparison above made against the
+  worktree's own tree (`worktreeParts`, which reads through a link that leaves the worktree, so a
+  linked tree is judged by what its links give). Where they part, the run clears the tree (the root's
+  `node_modules` and each workspace folder's own, unlinked, so main's hardlinked files keep their
+  content) and provisions it again as a cut does: hardlinked from a current checkout in under a second,
+  or `npm ci`, which holds that pass for as long as it takes, about a minute and at most ten
+  (`NPM_CI_TIMEOUT_MS`): a slow pass after a dependency bump is that install, and the notes say so
+  (`keepWorktreeInstalled`, decided by `worktreeDeps`, proved by `contracts/worktree-deps.contract.ts`).
+  Only a worktree under the store's `worktrees/<run>/` is written; the checkout, a worktree whose
+  `node_modules` is one link, and one with no lockfile never are. A try that answers a session held open
+  is not installed first: a live process keeps its tree, and the check after it reads it again. An
+  install that fails is said in the run's notes; a check filed on that tree runs no command and ends
+  unfinished, with no verdict on the work, and the try after it is told npm's words and to run `npm ci`.
 - **What `.worktreeinclude` lists.** This is the file at the root of the main checkout that Claude Code's
   `--worktree` reads, taken as paths rather than as its gitignore patterns: one path per line, file or
   directory, relative to the root, with blank lines and `#` comments skipped. A leading `/` anchors a
@@ -1463,8 +1480,9 @@ filed, it fills in the rest:
   **`node_modules` is never copied**, listed or not: it is provisioned as above, because a copy costs
   minutes per step.
 
-All of it is idempotent. A tree npm installed is left alone, a linked tree gains only what it lacks,
-and nothing already there is replaced. A pass that dies after cutting a worktree, in the minute
+All of it is idempotent. A tree npm installed is left alone while its lockfile names it, a linked tree
+gains only what it lacks, and nothing already there is replaced: a tree whose lockfile moved past it is
+cleared whole first, before a filing, never patched. A pass that dies after cutting a worktree, in the minute
 `npm ci` takes for instance, leaves the worktree for the next pass to take up. Before, `git worktree
 add` would have refused the branch on every pass after.
 

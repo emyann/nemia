@@ -117,7 +117,12 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
         ) : (
-          <select id={field} value={workflow ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
+          <select
+            id={field}
+            value={workflow ?? ''}
+            onChange={(event) => setPicked(event.target.value)}
+            className={`${FIELD} @md/page:max-w-xs`}
+          >
             <option value="" disabled>
               Pick what runs it
             </option>

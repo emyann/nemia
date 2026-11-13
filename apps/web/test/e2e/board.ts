@@ -986,7 +986,10 @@ export async function expectStripWhole(page: Page, assertion: string): Promise<v
   const strip = page.locator('[data-overview-strip]');
   await expectCount(strip.locator('[data-strip-heading]'), 3, `${assertion}: the strip shows its three headings`);
   await expectUncut(strip.locator('[data-strip-heading]'), `${assertion}: each heading is read whole`);
-  await expectUncut(strip.locator('[data-strip-readout], [data-strip-agents]'), `${assertion}: the readout and the agents' count are whole`);
+  await expectUncut(
+    strip.locator('[data-strip-readout], [data-strip-agents]'),
+    `${assertion}: the readout and the agents' count are whole`,
+  );
   await expectNone(
     () =>
       strip.locator('[data-agent-words]').evaluateAll((all) => {

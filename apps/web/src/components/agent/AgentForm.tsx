@@ -528,7 +528,9 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
             </CollapsibleTrigger>
             <CollapsibleContent>
               {isExpanded && (
-                <div className="grid gap-2 pt-2 @md/page:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
+                <div className="grid gap-2 pt-2 @md/page:grid-cols-2">
+                  {HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}
+                </div>
               )}
             </CollapsibleContent>
           </>

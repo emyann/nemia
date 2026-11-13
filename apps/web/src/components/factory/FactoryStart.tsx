@@ -192,7 +192,12 @@ function Unfixed({ factory, repos }: { factory: Factory; repos: number }) {
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
         ) : (
-          <select id={field} value={picked ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
+          <select
+            id={field}
+            value={picked ?? ''}
+            onChange={(event) => setPicked(event.target.value)}
+            className={`${FIELD} @md/page:max-w-xs`}
+          >
             <option value="" disabled>
               Pick what runs
             </option>

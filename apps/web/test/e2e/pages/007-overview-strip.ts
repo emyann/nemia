@@ -167,8 +167,8 @@ export default {
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
    * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. At 1024 the
    * frames wrap by their own widths, and on a phone they stack, one under the other: at each width every heading, the readout, the
-   * agents' count and each agent's name read whole (`expectStripWhole`). At `?factory=default` the strip counts that factory's runs alone, and its agents against those
-   * of its own.
+   * agents' count and each agent's name read whole (`expectStripWhole`). At `?factory=default` the strip counts that factory's runs
+   * alone, and its agents against those of its own.
    */
   name: 'overview-strip',
   route: '/',

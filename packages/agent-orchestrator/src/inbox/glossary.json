@@ -39,7 +39,7 @@
     },
     {
       "term": "Card name",
-      "meaning": "a card's name: its file's in the inbox, without its extension, which `nemia inbox` lists and a start names it by.",
+      "meaning": "a card's name: its file's in the inbox, without its extension, which `nemia inbox` lists and a start names it by; drawn from its first line when it is filed and kept when it is edited (`nemia inbox edit`), so it may no longer read as its title.",
       "type": "CardName"
     },
     {

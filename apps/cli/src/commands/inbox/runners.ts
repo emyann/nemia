@@ -6,6 +6,7 @@
 import type { InboxCommand } from 'objects';
 import type { Runner } from '../runner.ts';
 import { inboxAdd } from './add.ts';
+import { inboxEdit } from './edit.ts';
 import { inboxFrom } from './from.ts';
 import { labelInbox, labelRun } from './label.ts';
 import { inboxQueue } from './queue.ts';
@@ -16,6 +17,7 @@ export const INBOX_RUNNERS: Readonly<Record<InboxCommand, Runner>> = {
   'inbox add': inboxAdd,
   'inbox queue': inboxQueue,
   'inbox from': inboxFrom,
+  'inbox edit': inboxEdit,
   'inbox rm': inboxRm,
   'label run': labelRun,
   'label inbox': labelInbox,

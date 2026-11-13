@@ -4,25 +4,12 @@
  * naming the command. `--workflow` is sent by its name, a path refused; `--label` each edit as typed. A card names no repository: its
  * words refuse `--repo`, the factory's wiring placing its run.
  */
-import fs from 'node:fs';
 import { DEFAULT_NAMESPACE, INBOX_ADD_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
-import { Refused } from '../../refused.ts';
-import { textOf } from '../files.ts';
 import { listArg, said, textArg } from '../requests.ts';
-import { factoryLine, fileOf, labelsText, workflowNamed } from './card-lines.ts';
+import { factoryLine, fileOf, labelsText, textOrFile, workflowNamed } from './card-lines.ts';
 
 const { name: COMMAND } = INBOX_ADD_WORDS;
-
-/** The idea typed: a file's text, read here, where it names one; else the words. A folder is refused, naming the command. */
-const ideaOf = (idea: string): string => {
-  const at = fs.statSync(idea, { throwIfNoEntry: false });
-  if (at?.isDirectory())
-    throw new Refused(
-      `${idea} is a directory, and nemia inbox add takes the idea as text or as one file: nemia inbox add "<idea>", or nemia inbox add ./idea.md.`,
-    );
-  return at ? textOf(idea, COMMAND) : idea;
-};
 
 /** A line per key the card was filed without, since the runs of its `from:` disagree on it: each run with its value, and how to set it. */
 const leftOutLines = (card: Card): string[] =>
@@ -45,7 +32,7 @@ export const filedLines = (card: Card): string[] => {
 
 /** `nemia inbox add`'s runner, on the words parsed against its words. */
 export async function inboxAdd(args: Args): Promise<number> {
-  const body = ideaOf(textArg(args, 'idea') ?? '');
+  const body = textOrFile(textArg(args, 'idea') ?? '', COMMAND, 'nemia inbox add "<idea>", or nemia inbox add ./idea.md');
   const workflow = workflowNamed(textArg(args, 'workflow'), COMMAND, 'nemia inbox add "<idea>"');
   const factory = textArg(args, 'factory');
   const label = listArg(args, 'label');

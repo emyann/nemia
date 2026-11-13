@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { OpenApi } from 'effect/http-api';
-import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardFile, CardWrite } from 'objects';
+import { API_VERSION, Api, CARD_KEYS, CARD_KEY_MEANINGS, CARD_STATES, Card, CardEdit, CardFile, CardWrite } from 'objects';
 import { answered, taken } from './served.ts';
 
 const filed = {
@@ -91,6 +91,14 @@ test("a card's whole write decodes as the api is sent it, and refuses a spec.fro
   assert.deepEqual(Schema.decodeUnknownSync(CardWrite)({ metadata: {}, spec: {} }), { metadata: {}, spec: {} });
   assert.throws(() => Schema.decodeUnknownSync(CardWrite)({ metadata: {}, spec: { from: [1] } }));
   assert.throws(() => Schema.decodeUnknownSync(CardWrite)({ spec: {} }));
+});
+
+test("a card's edit decodes its text, with or without the version it was read at, and refuses one with no text", () => {
+  const edit = { source: '---\nworkflow: build\n---\nCache the views.\n', resourceVersion: 'd1' };
+  assert.deepEqual(Schema.decodeUnknownSync(CardEdit)(edit), edit);
+  assert.deepEqual(Schema.decodeUnknownSync(CardEdit)({ source: 'x' }), { source: 'x' });
+  assert.throws(() => Schema.decodeUnknownSync(CardEdit)({ resourceVersion: 'd1' }));
+  assert.throws(() => Schema.decodeUnknownSync(CardEdit)({ source: 1 }));
 });
 
 test("a read of one card carries its file as written in status.source; a list's items need none", () => {

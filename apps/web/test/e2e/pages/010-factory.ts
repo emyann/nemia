@@ -323,8 +323,8 @@ export default {
       `a loop out of rounds waits on a person: its card is on the floor by default (${LOOPING.id})`,
     );
     await expectVisible(
-      page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
-      "the Factory counts the runs in flight (NEIGHBOUR, HELD, the diamond's running side and its bottom), the finished, those nobody has decided (ENDING and UNMERGED), and those waiting on you (FAKE, LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off)",
+      page.getByText('4 in flight · 11 finished · 1 to decide · 6 waiting on you'),
+      "the Factory counts the runs in flight (NEIGHBOUR, HELD, the diamond's running side and its bottom), the finished, those nobody has decided among the runs not finished (ENDING; UNMERGED is finished, as the api says), and those waiting on you (FAKE, LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off)",
     );
     await expectVisible(
       cardOf(page, GATED.id),
@@ -352,15 +352,11 @@ export default {
       0,
       'and does not ask for the same step twice: the gate line names it',
     );
-    const unmerged = cardOf(page, UNMERGED.id);
-    await expectVisible(unmerged, `a finished run whose branch nobody merged keeps its card on the floor too (${UNMERGED.id})`);
-    await expectVisible(
-      unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
-      'its card says the branch is ahead, a link to where it is decided',
+    await expectCount(
+      cardOf(page, UNMERGED.id),
+      0,
+      `a finished run whose branch nobody merged is finished, as the api says it: no card on the floor by default (${UNMERGED.id})`,
     );
-    await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no card on the floor says its kind in the old word, git');
-    await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
-    await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
     await expectCount(
       cardOf(page, LANDED.id),
       0,
@@ -370,6 +366,18 @@ export default {
     await photograph(page, path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), { fullPage: true });
 
     await showFinished(page);
+    const unmerged = cardOf(page, UNMERGED.id);
+    await expectVisible(
+      unmerged,
+      `with the finished shown, the newest page of them, a finished run whose branch nobody merged has its card (${UNMERGED.id})`,
+    );
+    await expectVisible(
+      unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
+      'its card says the branch is ahead, a link to where it is decided',
+    );
+    await expectCount(page.locator('[data-to-decide="git"]'), 0, 'and no card on the floor says its kind in the old word, git');
+    await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
+    await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
     for (const run of [top, landed]) {
       await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, landed, is drawn finished, and says what it took`);
     }

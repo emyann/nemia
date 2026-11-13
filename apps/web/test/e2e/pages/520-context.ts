@@ -143,6 +143,8 @@ async function onTheFactory(page: Page): Promise<void> {
   await page.mouse.move(1, 1);
   await expectCount(reads, 0, 'its lines gone once the pointer leaves');
   await showFinished(page);
+  await expectVisible(cardOf(page, DIAMOND.landed.id), `with the finished shown, ${DIAMOND.landed.id}'s card is read onto the floor`);
+  await settled(page);
   await card.hover();
   await expectCount(reads, 2, `with the finished shown, a line from ${DIAMOND.landed.id} too`);
   await shoot(page, floor, 'hovered-finished');

@@ -3,7 +3,7 @@
  * person or an agent beside it, drawn under a gate's approval, a try's answer and a hold, and nothing where the served object carries no
  * actor (a record written before actors were said). And the Tokens page's words of a token (src/lib/tokens.ts) and its reads
  * (src/lib/api/tokens.ts): `GET /api/tokens` decoded, `DELETE /api/tokens/{name}` sent, an agent's 403 rejected as the refusal it is.
- * `npm run e2e` reads them on the pages (`680-tokens.ts`, `690-actor.ts`).
+ * `npm run e2e` reads them on the pages (`700-tokens.ts`, `710-actor.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

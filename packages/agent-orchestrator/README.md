@@ -894,7 +894,7 @@ session cannot load is a name in its prompt (F11); skills or a harness prompt on
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`:
-`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316 and 2.1.322), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316, 2.1.322 and 2.1.323), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -1428,6 +1428,21 @@ filed, it fills in the rest:
   same way into a `node_modules` of that workspace's folder in the worktree. npm's and tools' dot files
   (`.package-lock.json`, `.vite-temp`, `.vite`) are left out. `src/workspace/workspace.ts` decides from names, and `provisionDeps` in `src/workspace/worktree.store.ts`
   does the work.
+- **A clone Nemia keeps is installed first.** A factory's repository named by URL is cloned under the
+  store's `clones/`, and nobody else installs it. Before its worktrees are given their `node_modules`, the
+  run reads the clone: with a `package-lock.json` and no `node_modules`, or one its lockfile parts from
+  (the comparison below, of the clone's lockfile against its own tree), it runs `npm install --no-save
+  --no-audit --no-fund` there (`keepCheckoutInstalled`, decided by `checkoutInstall` in
+  `src/workspace/workspace.ts`, proved by `contracts/checkout-install.contract.ts`). Not `npm ci`, which
+  empties `node_modules` first, under any check or session running in the clone; `--no-save` writes no
+  `package.json` or lockfile, so the clone's working tree stays clean for `follow`. It is read from disk
+  at each cut, so the cut after the clone follows a lockfile change installs it once (about a minute of
+  that pass), and every worktree after is hardlinked rather than paying an `npm ci` each; the clone holds
+  one tree on disk. A failed install is said in the run's notes and tried again at the next cut; where
+  the clone then has no tree, the step is told npm's words and to run `npm ci`. A repository whose
+  install reads an environment variable (a `postinstall` that needs one) needs it in the daemon's
+  environment. A person's checkout is never installed: a checkout with no `node_modules` gives its
+  worktrees none, as before.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's
   `package-lock.json` names, the run looks at what is on disk at that path in the main checkout's
   `node_modules`, because that is the tree the links point at. Main's own `package-lock.json` can be

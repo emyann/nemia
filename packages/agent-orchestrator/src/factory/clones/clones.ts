@@ -130,3 +130,12 @@ export const cloneFolder = (home: string, folder: string): string => {
   const slash = folder.indexOf('/');
   return path.join(home, 'clones', folder.slice(0, slash).toLowerCase() + folder.slice(slash));
 };
+
+/**
+ * Whether `repo` is a clone the store `home` keeps: a folder strictly inside `<home>/clones`, where `cloneFolder` alone puts one. Read by
+ * the path as given, resolved, never through a link.
+ */
+export const isCloneFolder = (home: string, repo: string): boolean => {
+  const rel = path.relative(path.join(home, 'clones'), path.resolve(repo));
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+};

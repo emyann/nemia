@@ -88,6 +88,11 @@ test("a run's row is its cells in the columns' order: its name, its word, its br
   assert.equal(cells.length, RUN_COLUMNS.length, 'a cell per column');
   assert.deepEqual(cells, ['r-1', 'cancelled', 'x'.repeat(56), '$1.20', 'cancelled, pruned', '', 'area=api,team=core', '']);
   assert.deepEqual(runCells(runOf('r-2')), ['r-2', 'running', 'Do it.', '', '', '', '', ''], 'a run with nothing on it');
+  assert.equal(
+    cellOf(runOf('r-3', { brief: '## api: Do it.\n\nThe rest.' }), 'Brief'),
+    'api: Do it.',
+    'a brief that opens with a heading is shown without its mark',
+  );
 });
 
 test('a run whose step signed off blocked says BLOCKED in its status, and waits on you with `nemia decide <run>`', () => {

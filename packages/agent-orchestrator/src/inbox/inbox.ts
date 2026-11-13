@@ -43,7 +43,7 @@
  */
 import { modelsOf, modelsText } from '../start/index.ts';
 import path from 'node:path';
-import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE } from 'objects';
+import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE, headline } from 'objects';
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { factoryNameRefusal, namedRepos, workflowNameRefusal, workflowRepo, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
@@ -58,7 +58,6 @@ import {
   type FrontmatterPair,
 } from '../frontmatter/frontmatter.ts';
 import { labelRefusal, labelsText, type Labels } from '../labels/labels.ts';
-import { firstPiece } from '../piece/piece.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -468,7 +467,7 @@ export function cardsListed(
         return {
           name,
           file,
-          title: firstPiece(card.body, '\n'),
+          title: headline(card.body),
           workflow: card.workflow ?? null,
           repo: card.repo ?? null,
           factory: card.factory ?? null,

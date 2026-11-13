@@ -13,7 +13,7 @@
  * - `query().mcpAuthenticate(name, redirectUri)` answers an authorize URL, and the Claude Code child itself listens on the callback
  *   port until the browser's redirect arrives or the session ends; `mcpServerStatus()` then reads `connected`.
  * - `query().mcpSubmitOAuthCallbackUrl(name, callbackUrl)` hands the child the address the browser was sent back to, for a browser
- *   that runs on another machine than the child, whose redirect never reaches that port (`sdk.mjs` 0.3.322).
+ *   that runs on another machine than the child, whose redirect never reaches that port (`sdk.mjs` 0.3.322 and 0.3.323).
  *
  * The secret rides the child's environment alone: never its argv, never a task's config (which is journalled), and a refusal quoting
  * the child's output has it taken out first.
@@ -178,7 +178,8 @@ export type McpSignInAsk = (
 ) => Promise<McpSignInSession>;
 
 /**
- * The SDK's authenticate and callback methods, which `sdk.mjs` 0.3.322 defines on `query()`'s object and `sdk.d.ts` does not declare:
+ * The SDK's authenticate and callback methods, which `sdk.mjs` 0.3.322 and 0.3.323 define on `query()`'s object and `sdk.d.ts` does not
+ * declare:
  * `mcpAuthenticate(e,t,n)`, a control request of the subtype mcp_authenticate (the third argument, `{ redirectUriOnly }`, new after
  * 0.3.316, is optional and not given here), and `mcpSubmitOAuthCallbackUrl(e,t)`, one of the subtype mcp_oauth_callback_url carrying
  * the server's name and the callback address. Called through this one type, so an SDK that renames either fails here, by name.
@@ -254,7 +255,7 @@ export const claudeMcpSignIn: McpSignInAsk = async (name, server, { cwd, executa
     const handOn = sdk.mcpSubmitOAuthCallbackUrl;
     if (typeof handOn !== 'function') {
       throw new Error(
-        'this Agent SDK has no `mcpSubmitOAuthCallbackUrl` on its query object, which 0.3.322 had. Read its sdk.mjs and change harness/mcp-sign-in.ts.',
+        'this Agent SDK has no `mcpSubmitOAuthCallbackUrl` on its query object, which 0.3.323 had. Read its sdk.mjs and change harness/mcp-sign-in.ts.',
       );
     }
     await handOn.call(q, name, callbackUrl);

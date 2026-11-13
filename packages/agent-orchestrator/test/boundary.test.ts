@@ -1052,7 +1052,7 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
       imports.filter((m) => m.startsWith('src/')).sort(),
     ),
     [
-      ['src/cli/decide/decide.ts', 'src/cli/flags.ts', 'src/cli/runs.ts', 'src/runner.ts'],
+      ['src/cli/flags.ts', 'src/cli/runs.ts', 'src/runner.ts'],
       ['src/runner.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
@@ -1065,9 +1065,9 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
     'REFUSED: the CLI reaching past runner.ts',
   );
   assert.deepEqual(
-    cliBreaks(adding('src/cli/decide/decide.ts', 'src/record/record.store.ts')),
-    ['src/cli/decide/decide.ts imports src/record/record.store.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
-    'REFUSED: a verb in a folder of the CLI reaching past runner.ts',
+    cliBreaks(adding('src/cli/verb/verb.ts', 'src/record/record.store.ts')),
+    ['src/cli/verb/verb.ts imports src/record/record.store.ts: it reaches the package through src/runner.ts and src/workflow.ts'],
+    'REFUSED: a file planted in a folder of the CLI reaching past runner.ts',
   );
   assert.deepEqual(
     cliBreaks(adding('src/cli/main.ts', 'src/tick/tick.verb.ts')),

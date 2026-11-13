@@ -14,7 +14,7 @@
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +24,7 @@ import type { Run } from '../src/record/record.ts';
 import type { FeedLine, Reason, RunLine } from '../src/feed/feed.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { names } from './assessed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import {
@@ -177,20 +178,6 @@ const handedTo = (...argv: string[]) => typed(argv, stage.board().e, undefined, 
 /** The lines of the feed from `from` that `selectors` take (`selects`), as the api's stream serves them to `nemia watch`. */
 const taken = (from: number, ...selectors: string[]): FeedLine[] =>
   readFeed(ROOT, from).lines.filter((l) => selects(parseSelectors(selectors), l));
-
-/** What `nemia <argv>` printed on stdout, a line each. */
-const printedBy = async (t: TestContext, ...argv: string[]): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-};
 
 /** Refused at exit 2, its words naming each of `facts`. */
 const refusedNaming =
@@ -1015,9 +1002,10 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
       .at(-1)!;
     assert.deepEqual({ word: last.word, note: last.note }, { word: 'awaiting approval', note: 'waiting on you: approve ship' });
     assert.equal(words(run.id).includes('failed'), false, `no line of the run says failed: ${words(run.id).join(' → ')}`);
-    const decided = (await printedBy(t, 'decide', run.id)).join('\n');
-    assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'nemia decide says the same run awaits approval');
-    assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
+    const { decision } = await decidedOn(stage, run.id);
+    assert.ok(decision.kind === 'awaiting', JSON.stringify(decision));
+    assert.deepEqual(decision.awaitingApproval, ['ship'], 'the decision says the same run awaits approval');
+    assert.deepEqual([decision.outcome, decision.failed], ['waiting', []], 'and that nothing failed');
   });
   await s.test('a run whose step broke says failed, gate or not', async () => {
     const broke = await stage.runPlaced(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ENDING }));

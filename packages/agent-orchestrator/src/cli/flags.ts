@@ -53,12 +53,6 @@ export function answered<D extends object, I>(
 export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I): readonly string[] =>
   command.print?.(data, input) ?? [];
 
-/**
- * A verb: it takes the environment `main` composes from, what follows it on the command line, the engine and the place, and prints what
- * it did, or throws a refusal.
- */
-export type Verb = (env: Env, rest: string[], e: Engine, place: Place) => void | Promise<void>;
-
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
 

@@ -17,6 +17,7 @@ import type { Run } from '../src/run.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { namesFor } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { advanceRun, cancelRun, decideRun, list, startRun, runWith } from '../src/runner.ts';
@@ -102,9 +103,9 @@ const lsNames = async (id: string): Promise<string[]> => {
   );
   return (runs[0]?.listed.steps ?? []).map((step) => step.name);
 };
-/** The step sections `nemia decide <id>` prints, in its order. */
-const decideNames = async (t: TestContext, id: string, steps: readonly string[]): Promise<string[]> =>
-  (await printedBy(t, () => stage.main(['decide', id]))).filter((l) => steps.includes(l.trim()) && /^ {2}\S/.test(l)).map((l) => l.trim());
+/** The steps the decision of `<id>` reads, in its order: the order the client's `nemia decide` prints them in. */
+const decideNames = async (id: string, steps: readonly string[]): Promise<string[]> =>
+  (await decidedOn(stage, id)).steps.map((x) => x.name).filter((n) => steps.includes(n));
 /** The test place, its `verb` answering `outcome`, each call counted, as the layer a pass is given it by. */
 const placeAnswering = <V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOutcome<V>) => {
   let asked = 0;
@@ -195,7 +196,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.deepEqual(handed, ['review', 'implement', 'plan'], 'one hand-off per finished step');
     const { decision: d } = await stage.runWith(stage.board().e, decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed], ['succeeded', []]);
-    assert.deepEqual(await decideNames(t, id, ORDER), ORDER);
+    assert.deepEqual(await decideNames(id, ORDER), ORDER);
   });
   await s.test(
     "a record keyed in the folder's order, its workflow frozen so or not at all, reads, lists and decides in the steps' order",
@@ -227,7 +228,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
           legacyId,
         );
         assert.deepEqual(await lsNames(legacyId), ORDER, legacyId);
-        if (frozen) assert.deepEqual(await decideNames(t, legacyId, ORDER), ORDER, legacyId);
+        if (frozen) assert.deepEqual(await decideNames(legacyId, ORDER), ORDER, legacyId);
       }
     },
   );

@@ -53,8 +53,7 @@ import {
   withProposalsPass,
   type Env,
 } from '../runner.ts';
-import { printed, answered, HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
-import { decideVerb } from './decide/decide.ts';
+import { printed, answered, HELP, placedIn, usage, WF_HINT, type Engine } from './flags.ts';
 import { admitRun } from './runs.ts';
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
@@ -166,9 +165,6 @@ function upVerb(env: Env, args: Args, e: Engine, place: Place): void | Promise<v
   );
 }
 
-/** Each verb `nemia` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
-export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
-
 /** A runner of the CLI: the environment `main` composes from, the parsed line, the engine and the place. */
 type Runner = (env: Env, args: Args, e: Engine, place: Place) => void | Promise<void>;
 
@@ -230,10 +226,10 @@ function inputOf(command: Served, args: Args): Args {
 const MOVED: readonly string[] = COMMAND_WORDS.map((w) => w.name);
 
 /**
- * The names `nemia` takes, its commands' and its verbs', a name of two words among them: `agents card`; a command the client holds left
- * out, though its entry stays in the table for the api to call.
+ * The names `nemia` takes, its commands', a name of two words among them: `agents card`; a command the client holds left out, though its
+ * entry stays in the table for the api to call.
  */
-const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api' && !MOVED.includes(c.name)).map((c) => c.name), ...VERBS.keys()];
+const NAMES = TABLE.filter((c) => c.only?.side !== 'api' && !MOVED.includes(c.name)).map((c) => c.name);
 
 /**
  * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none, and none where a
@@ -248,7 +244,7 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 }
 
 /**
- * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
+ * Runs the command `argv` names and prints what it did, or prints the help for none and for a name it does not know. `given` is
  * the engine they talk to, which a test hands; else the board under `WF_ROOT`, built once the guard passed. `demand` is the machine a
  * command that ticks starts the daemon on (`ensureDaemon`), which a test hands; else the live one. Refused (`Conflict`) before any command
  * but `version` and a help: a checkout on a store that runs an install (`trialRefusal`).
@@ -269,10 +265,8 @@ export async function main(
   if (trial !== null) throw new Conflict({ message: trial });
   const e = given ?? engine(env);
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
-  if (command) return commanded(env, command, named.rest, e, demand, place);
-  const verb = VERBS.get(named.name);
-  if (verb === undefined) return console.log(HELP);
-  return verb(env, named.rest, e, place);
+  if (command === undefined) return console.log(HELP);
+  return commanded(env, command, named.rest, e, demand, place);
 }
 
 /** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */

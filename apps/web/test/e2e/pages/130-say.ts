@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
@@ -6,12 +5,13 @@ import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { attachedFiles, DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { apiEnv, heard, OUT, REPO, store } from '../world.ts';
+import { heard, OUT, store } from '../world.ts';
 
 export default {
   /**
    * The steering channel: words said to draft's running session from its page go through the api to the session's say file and onto its
-   * record, where the step's detail and wf decide read them back. In a page of its own whose one refusal is the point, words sent after the
+   * record, where the step's detail reads them back; the run's decision, which `nemia decide` prints off the api, says it is still
+   * running. In a page of its own whose one refusal is the point, words sent after the
    * session ended while the page still shows it running are refused in the package's words under the composer, which keeps them to send
    * again, and nothing is said or journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its
    * writes back, draft's task journal,
@@ -101,21 +101,11 @@ export default {
       if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
       await expectVisible(top.locator('[data-note]', { hasText: 'said to 1×' }), "the step's note says it was said to, in wf ls's words");
 
-      let decided: string;
-      try {
-        decided = execFileSync(
-          process.execPath,
-          [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'decide', SAYING.run],
-          { encoding: 'utf8', env: apiEnv, stdio: 'pipe' },
-        );
-      } catch (err) {
-        const { stdout, stderr } = err as { stdout?: string; stderr?: string };
-        throw new Refused(`wf decide ${SAYING.run} runs on the e2e's store — it failed:\n${stdout ?? ''}${stderr ?? ''}`);
-      }
-      const lines = [`    said to try 1, at ${entry.at}:`, '    ```text', `    ${SAYING.words}`, '    ```'].join('\n');
-      if (!decided.includes(`\n  ${SAYING.step}\n`) || !decided.includes(lines))
+      const decision = await page.request.get(new URL(`/api/runs/${SAYING.run}/decision`, page.url()).href);
+      const decided: unknown = decision.ok() ? await decision.json() : await decision.text();
+      if (typeof decided !== 'object' || decided === null || !('running' in decided))
         throw new Refused(
-          `wf decide, on the same store, prints what was said under ${SAYING.step}, fenced, with when it was said — it printed:\n${decided}`,
+          `the api's decision of ${SAYING.run}, read on the same store while its session runs, says it is still running — it answered ${decision.status()}: ${JSON.stringify(decided)}`,
         );
       await settled(page);
       await photograph(page, path.join(OUT, `say-said-${await themeOf(page)}.png`), { fullPage: true });

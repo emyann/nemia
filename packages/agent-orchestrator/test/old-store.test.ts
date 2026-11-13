@@ -26,6 +26,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { runWith, tickRun } from '../src/runner.ts';
 import { listRuns, runRecord, rewriteRun, runFile } from '../src/record/record.store.ts';
 import { ownDenies } from '../src/workflow/index.ts';
@@ -240,9 +241,9 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     assert.doesNotMatch(lines.join('\n'), /unreadable/);
   });
 
-  await s.test('`nemia decide` decides a run of the old store', async (c) => {
-    const lines = await printed(c, ['decide', 'notes']);
-    assert.ok(lines[0].startsWith('notes  take the notes'), lines.join('\n'));
+  await s.test('the decision of a run of the old store is read', async () => {
+    const { run } = await decidedOn(stage, 'notes');
+    assert.deepEqual([run.id, run.brief], ['notes', 'take the notes']);
   });
 
   await s.test(

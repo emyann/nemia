@@ -24,7 +24,7 @@ const RETRY = named('retry');
 const SAY = named('say');
 const REFRESH = named('refresh');
 
-/** `nemia decide`, the CLI's own verb (`CLI_VERBS`), as its line takes the run: its read model is `decisionRead`, no entry of the table. */
+/** `nemia decide`, a verb the api serves beside the table (`CLI_VERBS`), as its line takes the run: its read model is `decisionRead`. */
 const DECIDE: Pick<CommandSpec, 'name' | 'spec'> = {
   name: 'decide',
   spec: {

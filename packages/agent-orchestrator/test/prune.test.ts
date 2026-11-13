@@ -21,7 +21,10 @@ import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import type { Turned } from '../src/runner.ts';
 import { scratch } from 'test-kit/scratch';
-import { decideScreen } from './screens.ts';
+import { decisionOn } from './screens.ts';
+import { prunedWords } from '../src/record/record.ts';
+import { prunedKept } from '../src/forget/prune/prune.ts';
+import { artifactOf } from '../src/resource/files.store.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { placeHeld, placeOver, unreadBy } from './place-over.ts';
@@ -29,6 +32,7 @@ import {
   acceptRun,
   advanceRun,
   approveRun,
+  countsLine,
   decideRun,
   forgetRun,
   idRefusal,
@@ -57,9 +61,15 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1'
 const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const files = filesStoreAt(ROOT);
 
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
-  decideScreen(t, e, argv, as, place, ENV);
+/**
+ * What the run object says of run `id`'s prune under its line, as its decision read it (`status.pruned.said`, `prunedOf` in
+ * object/run.verb.ts): refused where the run is not pruned.
+ */
+const prunedSaid = async (id: string): Promise<string> => {
+  const { run } = await decisionOn(stage, id);
+  assert.ok(run.pruned, `${id} is pruned`);
+  return `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}`;
+};
 const { runWith, runPlaced } = stage;
 /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `decide` reads them off. */
 const aPass = (e: Engine) => runWith(e, passStanding(listRuns(ROOT)));
@@ -271,8 +281,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const d = await runWith(b.e, decideRun(run.id));
       assert.equal(d.decision.kind, 'landed');
       assert.equal((d.closeouts.implement as { summary?: string }).summary, 'did it', "its closeout is the engine's, and still read");
-      const screen = await typed(t, b.e, 'decide', run.id);
-      names(screen.printed.join('\n').split('\n')[1], `pruned at ${pruned.at}`, 'nemia prune', 'its branches, record and files are kept');
+      names(await prunedSaid(run.id), `pruned at ${pruned.at}`, 'nemia prune', 'its branches, record and files are kept');
 
       const filings = [...b.filings];
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -331,22 +340,20 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
 
       await aPass(b.e);
       assert.equal((await runWith(b.e, decideRun(id))).decision.kind, 'landed');
-      const screen = await typed(t, b.e, 'decide', id);
-      assert.equal(screen.error, undefined, 'nemia decide reads it');
-      const text = screen.printed.join('\n');
-      names(text.split('\n')[1], `pruned at ${pruned.at}`, `its files were removed at ${pruned.artifacts.at}`, 'nemia prune --artifacts');
-      assert.doesNotMatch(text, /not kept|missing/, 'a landed run is said landed, as before');
+      const landed = await decisionOn(stage, id);
+      assert.ok('nothing' in landed.decision, `a landed run is said landed, as before: ${JSON.stringify(landed.decision)}`);
+      names(await prunedSaid(id), `pruned at ${pruned.at}`, `its files were removed at ${pruned.artifacts.at}`, 'nemia prune --artifacts');
 
       const open = await aFinished(b, { closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
       const openShot = aShot(open.run.id);
       assert.equal((await runWith(b.e, prune(open.run.id, { artifacts: true, unmerged: true, yes: true }))).kind, 'pruned');
       const openAt = runRecord(ROOT, open.run.id).pruned!.artifacts!.at;
-      const read = await typed(t, b.e, 'decide', open.run.id);
-      assert.equal(read.error, undefined, 'nemia decide reads it');
-      const openText = read.printed.join('\n');
-      const notKept = openText.split('\n').find((l) => l.includes('!! not kept'));
-      names(notKept, openShot, openAt, 'nemia prune --artifacts');
-      assert.doesNotMatch(openText, /!! missing|not there/, 'a file its step named reads as pruned, not as never made');
+      const read = await decisionOn(stage, open.run.id);
+      assert.ok('touched' in read.decision, 'its decision reads it, a run still to decide');
+      const named = artifactOf(ROOT, read.run, 'implement', openShot);
+      assert.ok('pruned' in named, `a file its step named reads as pruned, not as never made: ${JSON.stringify(named)}`);
+      assert.equal(named.prunedAt, openAt);
+      names(named.pruned, 'nemia prune --artifacts');
 
       const again = await runWith(b.e, prune(id, { artifacts: true, yes: true }));
       assert.equal(again.kind, 'nothing');
@@ -403,9 +410,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
         names(err.message, `${inPlace.id} was pruned at ${marked.at}`, 'nemia prune --artifacts', 'a retry');
         return true;
       });
-      const screen = await typed(t, b.e, 'decide', inPlace.id);
-      assert.equal(screen.error, undefined);
-      names(screen.printed.join('\n').split('\n')[1], `pruned at ${marked.at}`, 'nemia prune --artifacts');
+      names(await prunedSaid(inPlace.id), `pruned at ${marked.at}`, 'nemia prune --artifacts');
       names((await runWith(b.e, prune(inPlace.id, { artifacts: true }))).nothing, inPlace.repo!, marked.at, 'nemia prune --artifacts');
     },
   );
@@ -704,7 +709,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
 
   await s.test(
     'REFUSED: a step over its budget is offered no raise once pruned — `decide` and `nemia decide` say the run was pruned where they said it waits on you, as `nemia ls` does — and the whole screen says so, once a pass has read where its branch stands',
-    async (tt) => {
+    async () => {
       const { run, repo } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
       const before = await runWith(b.e, decideRun(run.id));
       names(before.overBudgetLine, 'OVER BUDGET, waiting on you: implement ($3.40 of $3)');
@@ -732,49 +737,69 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
         /was pruned at/,
         'the raise is refused',
       );
-      const screen = (await typed(t, b.e, 'decide', run.id)).printed.join('\n');
-      assert.ok(screen.includes(`\n  ${d.overBudgetLine}\n`), screen);
+      const said = await decisionOn(stage, run.id);
+      const screen = JSON.stringify(said.decision);
+      assert.equal(
+        'overBudget' in said.decision ? said.decision.overBudget : screen,
+        d.overBudgetLine,
+        'the decision says it as the reading does',
+      );
       assert.doesNotMatch(screen, /waiting on you/, screen);
       assert.doesNotMatch(screen, /nemia (retry|round|accept|approve) /, 'no verb a pruned run refuses');
       assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 
       await aPass(b.e);
-      const whole = await screenOn(tt, b.e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': repo, '<at>': at }, placeNow());
-      const timesCut = whole.map((l) => l.replace(/^( *timeline {2}(?:try 1 {2}filed|run {2}queued) ).*$/, '$1<times>'));
+      const whole = await decisionOn(stage, run.id);
+      const decided = whole.decided!;
+      const w = whole.decision;
+      assert.ok('touched' in w && decided.decision.kind === 'awaiting', JSON.stringify(w));
+      names(
+        await prunedSaid(run.id),
+        `pruned at ${at} — its worktrees were removed (nemia prune)`,
+        'its branches, record and files are kept',
+      );
+      assert.deepEqual(decided.decision.awaitingAnswer, ['implement'], 'blocked');
+      assert.equal(
+        w.overBudget,
+        `OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at ${at} — its worktrees were removed (nemia prune); nothing after it ran`,
+      );
       assert.deepEqual(
-        timesCut,
+        w.touched.map((x) => [
+          x.branch,
+          'error' in x.radius ? x.radius.error : x.radius.groups.map((g) => [g.name, g.files, g.added, g.removed]),
+        ]),
+        [[`wf/${run.id}/run`, [['(root)', 1, 1, 0]]]],
+      );
+      assert.deepEqual([w.lesson.state, w.sensitive.map((x) => x.files)], ['nothing', [[]]]);
+      const closeout = decided.closeouts.implement;
+      assert.deepEqual(closeout && !('error' in closeout) ? [closeout.outcome, closeout.summary, closeout.needs] : closeout, [
+        'blocked',
+        'did it',
+        'a word',
+      ]);
+      assert.deepEqual(
+        [w.used.implement?.used, decided.costs.implement, decided.timeline.steps.implement?.length, w.cost],
         [
-          '<id>  add a flag',
-          '  pruned at <at> — its worktrees were removed (nemia prune); its branches, record and files are kept',
-          '',
-          '  BLOCKED: implement',
-          '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (nemia prune); nothing after it ran',
-          '',
-          '  touched  wf/<id>/run',
-          '    (root)  1 file   +1 −0',
-          '  lesson  nothing written where the next agent reads',
-          '',
-          '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-          '  none',
-          '',
-          '  implement  BLOCKED',
-          '    used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',
-          '    cost  $3.40 · budget $3',
-          '    timeline  try 1  filed <times>',
-          '    did it',
-          '    needs: a word',
-          '',
-          '  cost  run $3.40',
-          '  timeline  run  queued <times>',
-          '',
-          '  wf/<id>/run  — 1 file: +1 −0',
-          '',
-          '  branch    wf/<id>/run is ahead of main by 1 commit',
-          '',
-          '  land it   git -C <repo> merge --no-ff wf/<id>/run',
-          '  drop it   git -C <repo> branch -D wf/<id>/run',
+          'responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+          'cost  $3.40 · budget $3',
+          1,
+          'run $3.40',
         ],
-        'the whole screen, in order, each timeline cut where the times the stand-in stamps off the wall clock start',
+      );
+      assert.deepEqual(
+        whole.results.map((r) => [r.branch, 'error' in r.radius ? r.radius.error : countsLine(r.radius)]),
+        [[`wf/${run.id}/run`, '1 file: +1 −0']],
+      );
+      assert.deepEqual(
+        w.standings.map((x) => x.said),
+        [`wf/${run.id}/run is ahead of main by 1 commit`],
+      );
+      assert.deepEqual(
+        w.commands.map((x) => [x.label, x.command]),
+        [
+          ['land it', `git -C ${repo} merge --no-ff wf/${run.id}/run`],
+          ['drop it', `git -C ${repo} branch -D wf/${run.id}/run`],
+        ],
       );
     },
   );

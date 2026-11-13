@@ -111,9 +111,9 @@ export const amountIn = (args: Args, key: string): number | undefined => {
 };
 
 /**
- * The verbs the CLI runs by a hand of its own, outside the table (`VERBS` in `cli/main.ts`), each with its usage and help as `nemia`'s
- * help prints them, its class, and the endpoint that serves it: `nemia decide`, a read, whose screen is printed off the run's decision
- * (`decisionRead`), which the api serves as data (`runs.decision`).
+ * The verbs outside the table the api serves, each with its usage and help as `nemia`'s help prints them, its class, and the endpoint
+ * that serves it: `nemia decide`, a read, which the client prints off the run's decision (`decisionRead`), served as data
+ * (`runs.decision`); this CLI runs none of them, and answers each with its help.
  */
 export const CLI_VERBS: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'class' | 'served'>[] = [
   {
@@ -242,16 +242,14 @@ function toolBreaks(entries: readonly Pick<CommandSpec, 'name' | 'served'>[]): s
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served on both sides — said to be served
  * on neither alone (`only`) — that is not typed (`input`), which the api would have no keys to call it by, so a gap between the CLI and
- * the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that is both a command the CLI
- * serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's
- * name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); its links to the api (`linkBreaks`); a runner of
- * the CLI (`runners`) that runs no entry the CLI serves; and a tool name two links give, of the table and of the CLI's own verbs the api
+ * the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; how an entry runs (`runBreaks`); its
+ * words for its sides (`sideBreaks`); its links to the api (`linkBreaks`); a runner of the CLI (`runners`) that runs no entry the CLI
+ * serves; and a tool name two links give, of the table and of the CLI's own verbs the api
  * serves (`linked`, `CLI_VERBS`), which the port could not tell apart (`toolBreaks`); and, where `kept` is given, a store verb this
  * CLI still serves, which is the client's (`heldBreaks`).
  */
 export function commandBreaks(
   table: readonly Entry[],
-  verbs: readonly string[],
   runners: readonly string[] = [],
   linked: readonly Pick<CommandSpec, 'name' | 'served'>[] = [],
   kept?: readonly string[],
@@ -267,8 +265,6 @@ export function commandBreaks(
       );
     const renamed = RENAMED.get(c.name);
     if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
-    if (c.only?.side !== 'api' && verbs.includes(c.name))
-      breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
     breaks.push(...runBreaks(c, runners), ...sideBreaks(c), ...linkBreaks(c), ...(kept === undefined ? [] : heldBreaks(c, kept)));
   }
   for (const name of runners.filter((r) => !table.some((c) => c.name === r && c.only?.side !== 'api')))

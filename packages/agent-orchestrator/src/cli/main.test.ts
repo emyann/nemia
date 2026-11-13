@@ -17,9 +17,9 @@ import { scratch } from 'test-kit/scratch';
 import { promised } from '../../test/promised.ts';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
-import { advanceRun, CLI, TABLE, startRun, runWith as runEngine } from '../runner.ts';
+import { advanceRun, CLI, CLI_VERBS, TABLE, startRun, runWith as runEngine } from '../runner.ts';
 import { runRecord, writeRun } from '../record/record.store.ts';
-import { aliased, main, VERBS } from './main.ts';
+import { aliased, main } from './main.ts';
 import { HELP, WF_HINT } from './flags.ts';
 import { SHOW } from '../object/commands.verb.ts';
 import { handled, typed as handlerOf } from '../../test/typed.ts';
@@ -183,10 +183,10 @@ test('a handler reads the environment it is handed, not the process’s: `logs` 
   }
 });
 
-test('the verbs the help names are the verbs main runs, and no other', () => {
+test('the verbs the help names are the commands of the table and the verbs the api serves beside it (`CLI_VERBS`), and no other', () => {
   const lines = [...HELP.matchAll(new RegExp(`^ {2}${CLI} (.+)$`, 'gm'))].map((m) => m[1]);
   const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
-  const names = [...VERBS.keys(), ...served];
+  const names = [...CLI_VERBS.map((v) => v.name), ...served];
   const first = (words: string) => words.split(' ')[0];
   assert.deepEqual([...new Set(lines.map(first))].sort(), [...new Set(names.map(first))].sort());
   assert.deepEqual(

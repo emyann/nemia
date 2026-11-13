@@ -2628,8 +2628,8 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
   class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
   *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
-  make it prompt; `none` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
-  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
+  make it prompt; `none` and api-only entries are left out. The verb the api serves beside the table (`decide`, which the client
+  prints) is said once, in `CLI_VERBS` (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
   table, naming the command that regenerates it:
   `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
 - **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for each of what card A's admission counts as waiting on the

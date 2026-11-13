@@ -26,7 +26,8 @@ import { INBOX_ADD, type InboxAddInput } from '../src/inbox/commands.verb.ts';
 import { handled, typed } from './typed.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
-import { decideScreen } from './screens.ts';
+import { decidedOn, decisionOn } from './screens.ts';
+import { runLines } from '../src/object/lines.verb.ts';
 import { names } from './assessed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import {
@@ -91,9 +92,8 @@ const listedLines = async (): Promise<string[]> => {
   return inboxLines(cards, defaultStarts);
 };
 
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
-  decideScreen(t, e, argv, as, place, ENV);
+/** Run `id`'s decision on this file's stage, as the api serves it (`decisionOn`). */
+const decisionNow = async (id: string) => (await decisionOn(stage, id)).decision;
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -257,10 +257,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
   const task = (r: Run) => `${r.id}-implement`;
   let one: Run, two: Run, younger: Run, older: Run;
   const HELD = 'waiting for a run slot (2 of 2 in flight)';
-  const heldDecided = (r: Run) => [
-    `  ${HELD}`,
-    `  nothing of ${r.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
-  ];
+  const heldDecided = { running: true, held: { inFlight: 2, cap: 2 } };
 
   await s.test(
     'at a cap of 2, two runs are filed and the others wait: `nemia tick`, `nemia ls` and `nemia decide` say 2 of 2 in flight, and each record says when the cap first held it',
@@ -288,7 +285,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
         (await printedBy(c, ['ls', older.id])).some((l) => /^ {3}implement +waiting for a run slot \(2 of 2 in flight\)/.test(l)),
         'judged over the store for one run too',
       );
-      assert.deepEqual((await printedBy(c, ['decide', older.id])).slice(2), heldDecided(older));
+      assert.deepEqual(await decisionNow(older.id), heldDecided, 'held at the cap: 2 in flight of 2');
       assert.equal((await runWith(b.e, decideRun(one.id))).held, undefined);
     },
   );
@@ -318,9 +315,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     async (c) => {
       const seen = async () => ({
         listed: (await printedBy(c, ['ls'])).filter((l) => l.includes('waiting for a run slot')).map((l) => l.trim()),
-        decided: (await printedBy(c, ['decide', older.id])).slice(2),
+        decided: await decisionNow(older.id),
       });
-      const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided(older) };
+      const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided };
       try {
         for (const shell of [undefined, '5', '1', 'two']) {
           ENV.WF_MAX_RUNS = shell;
@@ -332,13 +329,10 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     },
   );
 
-  await s.test('the whole screen of a run the cap holds', async (c) => {
-    assert.deepEqual(await screenOn(c, b.e, [older.id], { '<id>': older.id, '<root>': ROOT }, stage.place().place), [
-      '<id>  c the older',
-      '',
-      '  waiting for a run slot (2 of 2 in flight)',
-      '  nothing of <id> is filed until a run in flight settles, oldest held first; nothing to decide yet',
-    ]);
+  await s.test('the whole decision of a run the cap holds', async () => {
+    const read = await decisionOn(stage, older.id);
+    assert.deepEqual(read.decision, heldDecided);
+    assert.deepEqual(read.decided?.held, { inFlight: 2, cap: 2 }, "the package's reading of it, which `nemia ls` says");
   });
 
   await s.test(
@@ -420,16 +414,13 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     assert.deepEqual(b.filings.slice(-1), [task(younger)]);
   });
 
-  await s.test("the timeline counts the wait for a slot as the run's queue, on `nemia decide` too", async (c) => {
+  await s.test("the timeline counts the wait for a slot as the run's queue, on the decision's reading too", async () => {
     b.tasks.get(task(younger))!.filedAt = '2026-09-16T10:15:00.000Z';
     b.settle(task(younger), 'succeeded', SIGNED);
+    const slot = { from: at(4), filedAt: '2026-09-16T10:15:00.000Z', ms: 71 * 60_000, queued: '1h11m' };
     const { timeline } = await runWith(b.e, decideRun(younger.id));
-    assert.deepEqual(
-      timeline.slot,
-      { from: at(4), filedAt: '2026-09-16T10:15:00.000Z', ms: 71 * 60_000, queued: '1h11m' },
-      'created at 09:04 and filed at 10:15: that wait is its queue',
-    );
-    assert.ok((await printedBy(c, ['decide', younger.id])).includes('  timeline  run slot  queued 1h11m'), 'on the screen');
+    assert.deepEqual(timeline.slot, slot, 'created at 09:04 and filed at 10:15: that wait is its queue');
+    assert.deepEqual((await decidedOn(stage, younger.id)).timeline.slot, slot, 'the read the api serves says the same');
   });
 
   await s.test(
@@ -806,8 +797,8 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
     },
   );
 
-  await s.test('`nemia decide` names the card the run came from, under its line', async (c) => {
-    assert.equal((await printedBy(c, ['decide', run.id]))[1], `  from inbox card ${name}`);
+  await s.test("the run's decision names the card the run came from, as its lines say it", async () => {
+    assert.equal(runLines((await decisionOn(stage, run.id)).run).fromNote, `from inbox card ${name}`);
   });
 
   await s.test(

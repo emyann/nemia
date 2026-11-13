@@ -48,7 +48,7 @@ import {
   startRun,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { decidedOf } from './screens.ts';
 import { typed as onHandler } from './typed.ts';
 import { inputsDir, listRuns, markCancelled, readAnswers, readAsks, runRecord, runsDir } from '../src/record/record.store.ts';
 import { sayRun } from '../src/say/say.verb.ts';
@@ -73,8 +73,6 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const runPlaced = runGiven(() => stand().layer, ENV);
 /** `program` given the place of the test running now, and still to be run. */
 const placed = <A, E, R>(program: EffectOf<A, E, R>) => givenPlace(() => stand().layer, ENV)(program);
-/** `nemia`, as a person types it, over the test's place. */
-const main = (argv: string[], e?: Engine) => cli(argv, e, undefined, stand().place, ENV);
 
 /** The paths `checkout` holds uncommitted, a line each. */
 const uncommitted = (checkout: string): string => world().changes(checkout).join('\n');
@@ -834,7 +832,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   assert.equal(fs.readFileSync(roundFile, 'utf8'), '[]');
 });
 
-test('a step whose harness blocked its session says what the harness waits for — on `nemia ls` and on `nemia decide`, read afresh each pass', async (t) => {
+test('a step whose harness blocked its session says what the harness waits for — on `nemia ls` and in its decision, read afresh each pass', async () => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -843,22 +841,14 @@ test('a step whose harness blocked its session says what the harness waits for �
   b.waiting.set(taskId, 'permission prompt');
   const step = async () => (await runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0];
   const status = async () => shownStatus(await step());
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  const decided = async () => {
-    printed.length = 0;
-    await main(['decide', run.id], b.e);
-    return printed.join('\n');
-  };
+  const decided = async () => JSON.stringify((await decidedOf(b.e, run.id, { place: stand().place, env: ENV })).waitingOn);
 
   assert.equal(await status(), 'needs-human: waiting for a permission prompt', '`nemia ls`: beside the phase');
   assert.equal((await step()).message, 'needs-human', 'and the status every reader compares is the bare word');
   assert.match(
     await decided(),
-    new RegExp(`\n {2}implement: waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/${taskId}/1$`, 'm'),
-    '`nemia decide`: the word, and where a person answers it',
+    new RegExp(`^\\{"implement":"waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/${taskId}/1"\\}$`),
+    'the decision: the word, and where a person answers it',
   );
 
   b.waiting.set(taskId, 'workspace trust dialog');

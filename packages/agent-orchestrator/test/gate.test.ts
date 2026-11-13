@@ -37,6 +37,7 @@ import { listRuns, markCancelled, runRecord } from '../src/record/record.store.t
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
+import { decidedOn } from './screens.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { told } from './typed.ts';
 import { RM } from '../src/runner.ts';
@@ -226,18 +227,12 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     const printed = await printedBy(['ls', id], b.e);
     assert.ok(printed.includes(`   → waiting on you: approve plan  —  nemia decide ${id}`), printed.join('\n'));
   });
-  await s.test('`nemia decide` says AWAITING APPROVAL and, under the step, the approval and the send-back to give', async () => {
-    const atGate = await printedBy(['decide', id], b.e);
-    assert.ok(
-      atGate.includes(
-        '  AWAITING APPROVAL, waiting on you: plan  — signed off at its gate; nothing after it is filed until you approve it, or send it back',
-      ),
-      atGate.join('\n'),
-    );
-    const under = atGate.indexOf('  plan');
-    assert.ok(under > 0, atGate.join('\n'));
-    assert.ok(atGate[under + 1].startsWith('    gate  awaiting approval'), atGate.join('\n'));
-    assert.ok(atGate[under + 1].includes(`nemia approve ${id} plan`), atGate.join('\n'));
+  await s.test("the decision is awaiting approval of plan, and plan's gate says the approval and the send-back to give", async () => {
+    const atGate = await decidedOn(stage, id);
+    assert.ok(atGate.decision.kind === 'awaiting', JSON.stringify(atGate.decision));
+    assert.deepEqual(atGate.decision.awaitingApproval, ['plan']);
+    assert.ok(atGate.gates.plan?.startsWith('awaiting approval'), atGate.gates.plan);
+    assert.ok(atGate.gates.plan.includes(`nemia approve ${id} plan`), atGate.gates.plan);
   });
   await s.test("no approval but the try's own opens it: not another try's, not another step's, not a file that is not one", async () => {
     approveByHand(id, 'plan', 2);
@@ -297,11 +292,11 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     await runWith(b.e, approveRun(id, 'review'));
     await tick(b.e, id);
   });
-  await s.test('`nemia decide` of the finished run prints the gate `approved <time> — "<words>"`', async () => {
-    const decided = await printedBy(['decide', id], b.e);
-    assert.ok(!decided.some((l) => l.startsWith('  AWAITING APPROVAL')), decided.join('\n'));
-    const line = decided[decided.indexOf('  plan') + 1];
-    assert.ok(line.startsWith('    gate  approved') && line.includes('Ship the second reading.'), decided.join('\n'));
+  await s.test('the decision of the finished run says the gate `approved <time> — "<words>"`', async () => {
+    const decided = await decidedOn(stage, id);
+    assert.ok(decided.decision.kind !== 'awaiting' || !decided.decision.awaitingApproval.length, JSON.stringify(decided.decision));
+    const line = decided.gates.plan;
+    assert.ok(line?.startsWith('approved') && line.includes('Ship the second reading.'), line);
   });
 });
 
@@ -332,25 +327,20 @@ test("a gate's step proposes the caps of the steps after it, and its approval ma
     b.settle(`${id}-plan`, 'succeeded', proposing(['implement', 7], ['review', 3]));
     assert.deepEqual([(await tick(b.e, id)).status], ['awaiting approval']);
   });
-  await s.test(
-    "`nemia decide` prints both caps under its gate, none above its step's own budget, and the approval's `--budget`",
-    async () => {
-      const printed = await printedBy(['decide', id], b.e);
-      const implement = printed.find((l) => l.trim().startsWith('implement  $7.00'));
-      const review = printed.find((l) => l.trim().startsWith('review     $3.00'));
-      assert.ok(implement !== undefined && review !== undefined, printed.join('\n'));
-      assert.ok(
-        implement.includes('the p90 of implement') && !implement.includes('above') && !review.includes('above'),
-        printed.join('\n'),
-      );
-      assert.ok(
-        printed.some((l) => l.includes('the run has spent')),
-        printed.join('\n'),
-      );
-      const approve = printed.find((l) => l.startsWith('    gate  awaiting approval:'));
-      assert.ok(approve?.includes(`nemia approve ${id} plan [--message "<words>"] [--budget <step>=<amount>]...  — `), printed.join('\n'));
-    },
-  );
+  await s.test("the decision says both caps at plan's gate, none above its step's own budget, and the approval's `--budget`", async () => {
+    const decided = await decidedOn(stage, id);
+    const budgets = decided.budgets.plan;
+    assert.deepEqual(
+      budgets?.steps.map((g) => [g.step, g.usd, g.why, g.above]),
+      [
+        ['implement', 7, 'the p90 of implement', false],
+        ['review', 3, 'the p90 of review', false],
+      ],
+    );
+    assert.ok(budgets.said.includes('the run has spent'), budgets.said);
+    const approve = decided.gates.plan;
+    assert.ok(approve?.includes(`nemia approve ${id} plan [--message "<words>"] [--budget <step>=<amount>]...  — `), approve);
+  });
   await s.test(
     '`nemia approve --budget review=4` writes the caps into the approval, the proposal with the amount given over it',
     async () => {
@@ -391,16 +381,16 @@ test("a cap proposed above a step's own budget is said at the gate and when appr
   const s = story(t);
   const b = stage.board();
   let id = '';
-  await s.test("plan proposes implement $60 against its `budget: 40`: `nemia decide` says it is above the workflow's", async () => {
+  await s.test("plan proposes implement $60 against its `budget: 40`: the decision says it is above the workflow's", async () => {
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: budgeted(), isolate: false }));
     id = run.id;
     await tick(b.e, id);
     b.settle(`${id}-plan`, 'succeeded', proposing(['implement', 60]));
     await tick(b.e, id);
-    const printed = await printedBy(['decide', id], b.e);
-    assert.ok(
-      printed.some((l) => l.includes('implement  $60.00') && l.includes("above the workflow's $40.00")),
-      printed.join('\n'),
+    const budgets = (await decidedOn(stage, id)).budgets.plan;
+    assert.deepEqual(
+      budgets?.steps.map((g) => [g.step, g.usd, g.workflow, g.above]),
+      [['implement', 60, 40, true]],
     );
   });
   await s.test('`nemia approve` says so of the cap it sets', async () => {
@@ -409,7 +399,7 @@ test("a cap proposed above a step's own budget is said at the gate and when appr
   });
 });
 
-test("a gate whose caps pass the run's cost line says so in `nemia decide`; one whose caps stay under it says nothing of it", async (t) => {
+test("a gate whose caps pass the run's cost line says so in the decision; one whose caps stay under it says nothing of it", async (t) => {
   const s = story(t);
   const b = stage.board();
   const atTheGate = async (costLine: number) => {
@@ -419,18 +409,15 @@ test("a gate whose caps pass the run's cost line says so in `nemia decide`; one 
     await tick(b.e, run.id);
     b.settle(`${run.id}-plan`, 'succeeded', proposing(['implement', 60]));
     await tick(b.e, run.id);
-    return printedBy(['decide', run.id], b.e);
+    return (await decidedOn(stage, run.id)).budgets.plan;
   };
   await s.test('implement $60 proposed, at most $82.00 in all, and a line of $80: the gate says the most passes it', async () => {
-    const printed = await atTheGate(80);
-    assert.ok(
-      printed.some((l) => l.includes('$82.00') && l.includes('cost line of $80.00')),
-      printed.join('\n'),
-    );
+    const budgets = await atTheGate(80);
+    assert.deepEqual([budgets?.line?.usd, budgets?.line?.said.includes('$82.00')], [80, true], budgets?.line?.said);
   });
   await s.test('a line of $90: nothing said of it', async () => {
-    const printed = await atTheGate(90);
-    assert.ok(!printed.some((l) => l.includes('cost line')), printed.join('\n'));
+    const budgets = await atTheGate(90);
+    assert.equal(budgets?.line, undefined);
   });
 });
 

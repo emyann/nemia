@@ -22,6 +22,7 @@ import { JournalError } from 'agent-runtime';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { retryRun, runWith, startRun, tickRun } from '../src/runner.ts';
+import { decisionRead } from '../src/decide/decision.verb.ts';
 import { runRecord, runFile } from '../src/record/record.store.ts';
 import { slotsRead } from '../src/cap/slots-read.verb.ts';
 import { readFeed } from '../src/feed/feed.store.ts';
@@ -275,17 +276,19 @@ test('one broken run does not stop the others: each left out and said once, the 
     );
   });
 
-  await s.test("`nemia decide` refuses a broken run in the list's words, and decides a run whose tasks read", async (c) => {
+  await s.test("the decision of a broken run is unjudged in the list's words, and a run whose tasks read is decided", async () => {
     const listed = await lsOf();
     for (const id of [runs.checked, runs.tried]) {
-      const { threw } = await printedBy(c, ['decide', id], e);
+      const read = await stage.runWith(e, decisionRead(id));
+      assert.ok('unjudged' in read, JSON.stringify(read));
       assert.equal(
-        (threw as Error)?.message,
+        read.saidBy('nemia decide'),
         unreadableOf(listingOf(listed, id))?.replace('So nemia ls does not', 'So nemia decide does not'),
       );
     }
-    const good = await printedBy(c, ['decide', runs.good], e);
-    assert.ok(good.out[0].startsWith(`${runs.good}  the good one`), good.out.join('\n'));
+    const good = await stage.runWith(e, decisionRead(runs.good));
+    assert.ok(!('unjudged' in good), JSON.stringify(good));
+    assert.deepEqual([good.run.id, good.run.brief], [runs.good, 'the good one']);
   });
 
   await s.test(

@@ -21,6 +21,7 @@ import type { RepositoryRun, Run } from '../src/run.ts';
 import type { BranchReader } from '../src/branches/branches.store.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story, type Board } from './story.ts';
+import { decisionOn } from './screens.ts';
 import { names, namesFor } from './assessed.ts';
 import {
   advanceRun,
@@ -444,16 +445,16 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
         `nemia cancel ${child.id}`,
         `--after ${p.run.id}`,
       );
-      const screen = (await printedBy(t, () => stage.main(['decide', child.id]))).slice(1);
-      assert.deepEqual(screen.slice(0, 2), ['', `  waiting on ${p.run.id} (cancelled)`]);
+      const { decision } = await decisionOn(stage, child.id);
+      assert.ok('waiting' in decision && !('holding' in decision), JSON.stringify(decision));
+      assert.deepEqual([decision.waiting.word, decision.waiting.waitingOnYou], [`waiting on ${p.run.id} (cancelled)`, true]);
       namesFor(
-        'and so does `nemia decide`',
-        screen[2],
+        'and so does the decision',
+        decision.waiting.advice,
         `${p.run.id} was cancelled at ${at}`,
         `nemia cancel ${child.id}`,
         `--after ${p.run.id}`,
       );
-      assert.equal(screen.length, 3);
 
       assert.equal((await stage.runWith(board().e, cancelRun(child.id))).plan.kind, 'cancel');
       assert.deepEqual(await statuses(child.id), ['pending', 'pending'], 'a person resolves it: the child called off waits on nothing');

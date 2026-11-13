@@ -20,6 +20,8 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { story } from '../../test/story.ts';
+import { decisionOf } from '../../test/screens.ts';
+import { runLines } from '../object/lines.verb.ts';
 import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
 import { inboxDir, parseArgv, START, startedLines, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import type { Started } from '../start/commands.verb.ts';
@@ -306,7 +308,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     },
   );
   await s.test(
-    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in the repository it is typed in, the card naming no factory — writes `from` on the record and keeps the card, listed as started and never started again; `nemia decide` names the card under the run's line",
+    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in the repository it is typed in, the card naming no factory — writes `from` on the record and keeps the card, listed as started and never started again; its decision names the card on the run's line",
     async (t) => {
       emptyInbox();
       const repo = aRepoWith('dev', 'ui');
@@ -346,15 +348,22 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
       await assert.rejects(verb('inbox', 'queue', card.name), refusedWith('Conflict', card.file, id));
       assert.equal(runsWritten(), before, 'a card is started once');
-      const decided = await printedBy(t, 'decide', id);
-      assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
+      const { run: decided } = await decisionOf(noEngine(), id, { place: stand().place, env: ENV });
+      assert.deepEqual(
+        [decided.brief.split('\n')[0], runLines(decided).fromNote],
+        ['Cache the views between passes', `from inbox card ${card.name}`],
+      );
       const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
       assert.equal(
         Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
         false,
         'a run typed at nemia start carries no from',
       );
-      assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
+      assert.equal(
+        runLines((await decisionOf(noEngine(), typed.id, { place: stand().place, env: ENV })).run).fromNote,
+        null,
+        'and its decision names no card',
+      );
     },
   );
   await s.test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does', async (t) => {

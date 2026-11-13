@@ -17,8 +17,21 @@ import path from 'node:path';
 import type { StepRecord } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decisionFacts, decisionOn } from './screens.ts';
 import { names, namesFor } from './assessed.ts';
-import { acceptRun, advanceRun, decideRun, list, retryRun, roundRun, sayRun, PERSON, startRun, runWith } from '../src/runner.ts';
+import {
+  acceptRun,
+  advanceRun,
+  decideRun,
+  list,
+  retryRun,
+  roundDueNote,
+  roundRun,
+  sayRun,
+  PERSON,
+  startRun,
+  runWith,
+} from '../src/runner.ts';
 import { asksDir, markCancelled, runRecord } from '../src/record/record.store.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -443,19 +456,19 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
       const listed = JSON.stringify(runs[0]?.listed);
       assert.doesNotMatch(listed, /over budget|waiting on you|OVER BUDGET/i, listed);
-      const printed: string[] = [];
-      const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-        printed.push(args.join(' '));
+      const read = await decisionOn(stage, id);
+      assert.deepEqual(decisionFacts(read), {
+        decision: { running: true },
+        running: { kind: 'running', waiting: ['review'] },
+        waitingOn: {},
+        retrying: [],
+        rounding: [['review', 'implement', 2, 'ask']],
       });
-      try {
-        await stage.main(['decide', id]);
-      } finally {
-        log.mock.restore();
-      }
-      const out = printed.join('\n');
-      assert.doesNotMatch(out, /over budget|waiting on you|OVER BUDGET/i, out);
-      assert.match(out, /still running: review\n {2}review: round 2 asked \(nemia retry --round --budget 10\)/);
-      assert.match(out, /\n {2}nothing to decide yet/);
+      const { decided } = read;
+      assert.deepEqual(
+        decided?.rounding.map((r) => `${r.step}: ${roundDueNote(decided.steps, r)}`),
+        ['review: round 2 asked (nemia retry --round --budget 10) — the next tick files implement'],
+      );
     },
   );
   await s.test("the next pass files the round, the raised cap on implement's record, handed what is left of it", async () => {

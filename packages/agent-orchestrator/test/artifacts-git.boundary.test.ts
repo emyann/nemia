@@ -28,10 +28,12 @@ import {
   runWith as runEngine,
   gitPlaceLayer,
   builtinGitPlace,
+  artifactLines,
 } from '../src/runner.ts';
+import { decidedOf } from './screens.ts';
+import { lacksTold } from '../src/tick/told.verb.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { main } from '../src/cli/main.ts';
 
 const ROOT = scratch('wf-artifacts-git-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -267,7 +269,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
 });
 
-test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and `nemia decide` names each', async (t) => {
+test('REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — the closeout that names them is not accepted, and the decision names each', async (t) => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -314,29 +316,22 @@ test('REFUSED as findings on the screen, never silently: a path that climbs out 
 
   b.settle(`${run.id}-implement-try2`, 'succeeded', declaring(named));
   assert.deepEqual((await runWith(b.e, advanceRun(runRecord(ROOT, run.id)))).tried, [], 'once a round: it waits on a person');
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    out.push(args.map(String).join(' '));
-  });
-  try {
-    await main(['decide', run.id], b.e, undefined, undefined, ENV);
-  } finally {
-    log.mock.restore();
-  }
-  const lines = out.join('\n').split('\n');
-  const at = lines.indexOf("    implement's closeout named files the run does not have:");
-  assert.ok(at >= 0, lines.join('\n'));
-  assert.deepEqual(lines.slice(at + 1, at + 6), [
-    `      - \`${climbs}\`: it leads out of the workspace, so it was not read.`,
-    '      - `never-written.md`: nothing is at that path in the workspace.',
-    '      - `shots`: it is a directory, and a closeout names each file.',
-    '      - `leak.txt`: it leads out of the workspace, so it was not read.',
-    `      it writes each where its brief says, or takes the name off: nemia retry ${run.id} implement`,
+  const decided = await decidedOf(b.e, run.id, { place: builtinGitPlace, env: ENV });
+  assert.ok(decided.decision.kind === 'awaiting' && decided.decision.unsigned.includes('implement'), JSON.stringify(decided.decision));
+  assert.deepEqual(lacksTold(ROOT, decided.run, 'implement', decided.run.steps.implement).lacks, [
+    `- \`${climbs}\`: it leads out of the workspace, so it was not read.`,
+    '- `never-written.md`: nothing is at that path in the workspace.',
+    '- `shots`: it is a directory, and a closeout names each file.',
+    '- `leak.txt`: it leads out of the workspace, so it was not read.',
   ]);
-  assert.deepEqual(looked(), [], 'nor by nemia decide');
+  assert.ok(
+    decided.commands.some((c) => c.command === `nemia retry ${run.id} implement`),
+    JSON.stringify(decided.commands),
+  );
+  assert.deepEqual(looked(), [], 'nor by the decision');
 });
 
-test('REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and `nemia decide` names the file not collected, though it is on the branch', async () => {
+test('REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and the decision names the file not collected, though it is on the branch', async () => {
   const run = await started(folder('check: npm test'));
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -410,7 +405,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   assert.deepEqual(artifactFiles(ROOT, run, 'implement'), [], 'the branch is where the run reads it');
 });
 
-test("`nemia decide` of a run whose declared file is only on its branch says nothing is missing — the place says the branch has it — and, where the place's report is not heard, that whether it has it is not known, never that it is not there", async (t) => {
+test("the decision of a run whose declared file is only on its branch says nothing is missing — the place says the branch has it — and, where the place's report is not heard, that whether it has it is not known, never that it is not there", async () => {
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -424,17 +419,11 @@ test("`nemia decide` of a run whose declared file is only on its branch says not
   fs.rmSync(artifactsDir(ROOT, run, 'implement'), { recursive: true, force: true });
   b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
   const flagged = async (): Promise<string[]> => {
-    const out: string[] = [];
-    const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-      out.push(args.map(String).join(' '));
-    });
-    try {
-      await main(['decide', run.id], b.e, undefined, undefined, ENV);
-    } finally {
-      log.mock.restore();
-    }
-    const lines = out.join('\n').split('\n');
-    return lines.slice(lines.indexOf('  implement')).filter((l) => l.startsWith('    !! '));
+    const { run: read, closeouts } = await decidedOf(b.e, run.id, { place: builtinGitPlace, env: ENV });
+    const missing = missingArtifacts(ROOT, builtinGitPlace, read, 'implement', closeouts.implement);
+    return artifactLines(artifactsDir(ROOT, read, 'implement'), missing, artifactFiles(ROOT, read, 'implement'), read.pruned)
+      .filter((l) => l.startsWith('!! '))
+      .map((l) => `    ${l}`);
   };
 
   assert.ok(!fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'nowhere but on the branch');

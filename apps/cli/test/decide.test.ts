@@ -13,7 +13,7 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { scratch } from 'test-kit/scratch';
-import { decide, type DecideIo } from '../src/objects/decide.ts';
+import { decide, decisionLines, type DecideIo } from '../src/objects/decide.ts';
 import { Refused } from '../src/refused.ts';
 import { ambient } from './ambient.ts';
 
@@ -161,9 +161,15 @@ test("--sensitive <globs> is sent as the read's ?sensitive=, as typed", async ()
   assert.equal(new URL(read ?? '', 'http://x').searchParams.get('sensitive'), 'src/**,*.json');
 });
 
-test('REFUSED: --sensitive with no glob or twice, no run and an unknown run, each exit 2; all but the last before any read', async () => {
+test('REFUSED: --sensitive with no glob, with only commas or twice, a flag it does not take, no run and an unknown run, each exit 2; all but the last before any read', async () => {
   const before = asked.length;
-  for (const args of [['r-1', '--sensitive'], ['r-1', '--sensitive', 'a', '--sensitive=b'], []]) {
+  for (const args of [
+    ['r-1', '--sensitive'],
+    ['r-1', '--sensitive', 'a', '--sensitive=b'],
+    ['r-1', '--sensitive', ' , '],
+    ['r-1', '--json'],
+    [],
+  ]) {
     const { io } = ioOf(false);
     await assert.rejects(decide(args, io.run, io, env), (err: unknown) => err instanceof Refused && err.code === 2, args.join(' '));
   }
@@ -175,4 +181,44 @@ test('REFUSED: --sensitive with no glob or twice, no run and an unknown run, eac
     assert.match(err.message, /nemia ls/, "the api's words, naming the command");
     return true;
   });
+});
+
+/** A hold on a run, as the api says it (`RunHolding`). */
+const holding = {
+  at: '2026-11-13T10:00:00.000Z',
+  runs: [],
+  word: 'held',
+  advice: 'nemia hold r-3 --off lifts it',
+  waitingOnYou: true,
+};
+
+test('the decision of a run that is no choice yet is said in its words, its hold, the cap that holds it, or why nothing is left', () => {
+  const waiting = { runs: [], word: 'waiting on r-1', advice: 'nothing to decide yet', waitingOnYou: false };
+  assert.deepEqual(decisionLines('r-3', { waiting, holding }), [
+    'r-3',
+    '',
+    '  waiting on r-1',
+    '  nothing to decide yet',
+    '  held as well — nemia hold r-3 --off lifts it',
+  ]);
+  assert.deepEqual(decisionLines('r-3', { holding }), ['r-3', '', '  held', '  nemia hold r-3 --off lifts it']);
+  assert.deepEqual(decisionLines('r-3', { running: true, held: { inFlight: 2, cap: 2 } }), [
+    'r-3',
+    '',
+    '  held at the cap on runs in flight: 2 in flight of 2',
+    '  still running — nothing to decide yet',
+  ]);
+  assert.deepEqual(decisionLines('r-3', { running: true }), ['r-3', '', '  still running — nothing to decide yet']);
+  assert.deepEqual(decisionLines('r-3', { nothing: 'cancelled — nothing to decide' }), ['r-3', '', '  cancelled — nothing to decide']);
+});
+
+test('the decision of a run to decide is said in its order: over budget, touched, the lesson, in full, used, standings, commands', () => {
+  const d = DECISIONS['r-1'] as Parameters<typeof decisionLines>[1] & { commands: unknown[] };
+  const lines = decisionLines('r-1', { ...d, overBudget: 'OVER BUDGET: plan' });
+  const at = (start: string) => lines.findIndex((line) => line.trimStart().startsWith(start));
+  const order = [at('OVER BUDGET'), at('touched  '), at('lesson  '), at('in full  '), at('used  '), at('wf/r-1/plan  ahead'), at('1. ')];
+  assert.ok(
+    order.every((n, i) => n >= 0 && (i === 0 || n > (order[i - 1] ?? -1))),
+    `${JSON.stringify(order)}\n${lines.join('\n')}`,
+  );
 });

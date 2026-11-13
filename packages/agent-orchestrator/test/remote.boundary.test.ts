@@ -26,6 +26,7 @@ import { Effect, Exit, Layer, Logger, ManagedRuntime, References, Stream } from 
 import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from 'test-kit/scratch';
 import { story, staged } from './story.ts';
+import { decidedOf } from './screens.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
@@ -141,7 +142,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
     const id = await started(team(`${name}-team`, `a2a:${name}`));
     const e = engine(ENV);
     await settle(t, e, id);
-    return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
+    return { server, id, e, decided: await decidedOf(e, id, { place: builtinGitPlace, env: ENV }), listed: await printed(['ls'], e) };
   } finally {
     delete process.env[variable];
     await server.close();
@@ -249,7 +250,7 @@ test(
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
         assert.ok(runRecord(ROOT, id).steps.ask?.taskId, 'filed');
-        assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
+        assert.equal(decided.timeline.steps.ask?.length, 1, 'the decision reads its one try');
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
           fs
@@ -274,9 +275,9 @@ test(
           's3cret',
         );
         assert.equal(server.sent.length, 1);
-        const words = decided.join('\n');
-        assert.match(words, /blocked/, words);
-        assert.match(words, /a source for the tide tables/, words);
+        const said = decided.closeouts.ask;
+        assert.ok(said && !('error' in said), JSON.stringify(said));
+        assert.deepEqual([said.outcome, said.needs], ['blocked', 'a source for the tide tables']);
       },
     );
 
@@ -287,15 +288,16 @@ test(
         assert.equal(server.sent.length, 0, 'no message went out without its secret');
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'failed');
-        const words = JSON.stringify(view.state.attempts) + decided.join('\n');
+        const offered = [...decided.offers, ...decided.commands.map((x) => x.command)];
+        const words = JSON.stringify(view.state.attempts) + offered.join('\n');
         assert.ok(words.includes('set WF_A2A_CRITIC_TOKEN to the secret'), words);
         assert.ok(words.includes("the scheme `token` critic's card declares"), words);
         assert.ok(words.includes('`nemia retry`'), words);
         assert.ok(
-          decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
-          `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${decided.join('\n')}`,
+          offered.includes(`ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
+          `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${offered.join('\n')}`,
         );
-        assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
+        assert.doesNotMatch(offered.join('\n'), /--model|Continue its session/);
 
         for (const [flag, asked] of [
           ['--model haiku', { mode: 'fresh', model: 'haiku' }],
@@ -338,7 +340,7 @@ test(
           await tick(e);
           const listed = (await printed(['ls'], e)).join('\n');
           assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
-          const decided = (await printed(['decide', id], e)).join('\n');
+          const decided = `ask: ${(await decidedOf(e, id, { place: builtinGitPlace, env: ENV })).waitingOn.ask}`;
           assert.match(
             decided,
             new RegExp(

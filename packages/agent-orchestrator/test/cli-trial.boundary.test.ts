@@ -62,7 +62,7 @@ test('nemia version and a help run on a store that runs an install, and version 
   assert.equal(version.status, 0, version.stderr);
   assert.match(version.stdout, /^this nemia: checkout at /m);
   assert.match(version.stdout, /^current: v1 \(abcdef1\) at /m);
-  const help = nemia(root, ['decide', '--help']);
+  const help = nemia(root, ['tick', '--help']);
   assert.equal(help.status, 0, help.stderr);
   assert.equal(nemia(root, []).status, 0, 'the help for no command');
 });

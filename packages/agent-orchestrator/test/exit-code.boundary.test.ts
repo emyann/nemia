@@ -40,15 +40,6 @@ test('a refusal exits 2 and prints its sentence: nemia doctor fix of a need noth
   assert.ok(said.includes('nemia doctor'), said);
 });
 
-test("REFUSED: nemia decide of a run that does not exist exits 2, with the store's sentence naming nemia ls", () => {
-  const root = path.join(scratch('wf-exit-code-no-run-'), 'store');
-  const { status, stderr } = wf(root, ['decide', 'r-nope']);
-  assert.equal(status, 2, `nemia decide of no run exits with the refusal's code; it said: ${stderr}`);
-  const [said, ...rest] = stderr.split('\n');
-  assert.deepEqual(rest, [''], `its sentence alone, on one line, and no stack: ${stderr}`);
-  assert.ok(said.includes('r-nope') && said.includes('nemia ls'), said);
-});
-
 test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relative or empty, exits 2 as the package loads, with its sentence alone, and nothing is written', () => {
   for (const root of ['relative/store', '']) {
     const cwd = scratch('wf-exit-code-root-');

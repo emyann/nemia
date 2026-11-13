@@ -1,17 +1,17 @@
 /**
- * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the CLI alone, on
- * the api alone, or on both and typed.
+ * The shipped command table: no rule of the table broken against the CLI's runners, and each command on the CLI alone, on the api
+ * alone, or on both and typed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
 import { COMMAND_WORDS } from 'objects';
-import { RUNS, VERBS } from '../src/cli/main.ts';
+import { RUNS } from '../src/cli/main.ts';
 import { HELD, KEPT } from './held-commands.baseline.ts';
 
-test('the shipped table breaks none of its rules against the CLI’s verbs and runners, nor gives a tool a name its own verbs give', () => {
-  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS, [...KEPT, ...HELD]), []);
+test('the shipped table breaks none of its rules against the CLI’s runners, nor gives a tool a name the verbs the api serves beside it give', () => {
+  assert.deepEqual(commandBreaks(TABLE, [...RUNS.keys()], CLI_VERBS, [...KEPT, ...HELD]), []);
 });
 
 test('the store verbs this CLI still serves only shrink: each one held is an entry it serves whose words the client does not hold yet', () => {

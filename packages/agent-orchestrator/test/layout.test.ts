@@ -129,7 +129,7 @@ test('REFUSED: a folder or a file named for no concept', () => {
 
 test('every file sits at most at src/<concept>/<part>/, and every name says a concept', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('src/cli/decide/decide.ts'), 'the scan reads the parts');
+  assert.ok(files.includes('src/forget/prune/prune.ts'), 'the scan reads the parts');
   assert.deepEqual([...depthBreaks(files, 'src'), ...namelessBreaks(files, 'src')], []);
 });
 

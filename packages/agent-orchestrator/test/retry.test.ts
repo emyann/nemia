@@ -22,6 +22,8 @@ import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
+import { askedQuestions, closeoutRefusals, questionLines } from '../src/question/index.ts';
 import { names } from './assessed.ts';
 import { answerText, approvedAnswerText, type Question } from '../src/question/question.ts';
 import {
@@ -255,11 +257,11 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
     id = await asking();
   });
   await s.test(
-    '`nemia decide` prints them numbered, each option lettered, the recommended marked, and the `--answer` to give',
-    async (sub) => {
-      const screen = await printedBy(sub, ['decide', id]);
+    "the decision's closeout numbers them, each option lettered, the recommended marked, and its reading says the `--answer` to give",
+    async () => {
+      const screen = await questionsSaid(id);
       const at = screen.indexOf('    open:');
-      assert.ok(at > 0, screen.join('\n'));
+      assert.ok(at === 0, screen.join('\n'));
       assert.deepEqual(screen.slice(at, at + 12), [
         '    open:',
         '      1. How is the card cut?',
@@ -315,13 +317,10 @@ test("a gated planner's questions are answered with its approval", async (t) => 
   await s.test('plan signs off done at its gate, asking two questions', async () => {
     id = await asking({ gate: true });
   });
-  await s.test("`nemia decide` says its gate's approval with an `--answer` for each", async (sub) => {
-    const screen = await printedBy(sub, ['decide', id]);
+  await s.test("the decision says its gate's approval with an `--answer` for each", async () => {
+    const gate = (await decidedOn(stage, id)).gates.plan;
     const form = '--answer 1=<letter> --answer 2=<letter> [--message "<note>"]';
-    assert.ok(
-      screen.some((l) => l.startsWith(`    gate  awaiting approval:  nemia approve ${id} plan ${form}  — or send it back:`)),
-      screen.join('\n'),
-    );
+    assert.ok(gate?.startsWith(`awaiting approval:  nemia approve ${id} plan ${form}  — or send it back:`), gate);
   });
   await s.test('`nemia ls` counts the questions asked at the gate', async (sub) => {
     const listed = await printedBy(sub, ['ls']);
@@ -352,22 +351,18 @@ test("a gated planner's questions are answered with its approval", async (t) => 
   });
 });
 
-test('what `nemia decide` and `nemia ls` print of a step asking no question, or one that does not decode', async (t) => {
+test('what the decision and `nemia ls` say of a step asking no question, or one that does not decode', async (t) => {
   await t.test('`nemia ls` says nothing of questions for a blocked step that asks none', async (sub) => {
     const bare = await asking({ open: [] });
     const listed = await printedBy(sub, ['ls']);
     assert.match(planOf(listed, bare) ?? '', /^ {3}plan +succeeded · BLOCKED +main$/, listed.join('\n'));
   });
-  await t.test('a gate whose step asks none is approved with `--message`', async (sub) => {
+  await t.test('a gate whose step asks none is approved with `--message`', async () => {
     const bare = await asking({ gate: true, open: [] });
-    const plain = await printedBy(sub, ['decide', bare]);
-    const offer = `    gate  awaiting approval:  nemia approve ${bare} plan [--message "<words>"]  — or send it back:`;
-    assert.ok(
-      plain.some((l) => l.startsWith(offer)),
-      plain.join('\n'),
-    );
+    const gate = (await decidedOn(stage, bare)).gates.plan;
+    assert.ok(gate?.startsWith(`awaiting approval:  nemia approve ${bare} plan [--message "<words>"]  — or send it back:`), gate);
   });
-  await t.test('a question field that does not decode is refused back once, then printed as a field, saying why', async (sub) => {
+  await t.test('a question field that does not decode is refused back once, then read as a field, saying why', async () => {
     const open = [{ title: 'Half a question' }];
     const half = await asking({ open });
     assert.equal(runRecord(ROOT, half).steps.plan.tries?.at(-1)?.cause, 'signoff', 'the run asks the session to mend it');
@@ -375,15 +370,18 @@ test('what `nemia decide` and `nemia ls` print of a step asking no question, or 
       .board()
       .settle(`${half}-plan-try2`, 'succeeded', { outcome: 'blocked', summary: 'Half.', artifacts: [], needs: 'Two questions.', open });
     await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, half)));
-    const screen = await printedBy(sub, ['decide', half]);
-    assert.ok(screen.includes('    open:'), screen.join('\n'));
-    assert.ok(!screen.some((l) => /^ {6}1\. /.test(l)), screen.join('\n'));
-    const refused = screen.find((l) => l.startsWith('    !! not accepted:'));
-    assert.ok(refused, screen.join('\n'));
-    names(refused, '`open`', 'question 1');
+    const decided = await decidedOn(stage, half);
+    const c = decided.closeouts.plan;
+    assert.ok(c && !('error' in c), JSON.stringify(c));
+    const step = decided.steps.find((x) => x.name === 'plan');
+    assert.deepEqual(c.output?.open, open, 'the field is kept as given');
+    assert.deepEqual(askedQuestions(step, c), [], 'and not read as questions');
+    const refused = closeoutRefusals(step, c, decided.steps);
+    assert.equal(refused.length, 1, refused.join('\n'));
+    names(refused[0], '`open`', 'question 1');
     assert.ok(
-      screen.some((l) => l.includes(`nemia retry ${half} plan`)),
-      screen.join('\n'),
+      decided.commands.some((x) => x.command.includes(`nemia retry ${half} plan`)),
+      JSON.stringify(decided.commands),
     );
   });
 });
@@ -473,7 +471,19 @@ const dataUnder = (brief: string, heading: string) =>
   JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]);
 
 /** What `nemia` printed, joined, over the stage's engine. */
-const printedAll = async (t: TestContext, argv: string[]) => (await printedBy(t, argv)).join('\n');
+/** Run `id`'s plan questions as its decision's closeout numbers them (`questionLines`), then the `--answer` its reading offers. */
+const questionsSaid = async (id: string): Promise<string[]> => {
+  const decided = await decidedOn(stage, id);
+  const c = decided.closeouts.plan;
+  assert.ok(c && !('error' in c), JSON.stringify(c));
+  const asked = questionLines(
+    askedQuestions(
+      decided.steps.find((x) => x.name === 'plan'),
+      c,
+    ),
+  );
+  return [...asked, decided.answering.plan ?? ''].map((l) => `    ${l}`);
+};
 
 /** A declared closeout field set beside the four, as a step's `output:` schema says. */
 const DECLARED = {
@@ -1309,9 +1319,11 @@ test('a step that says `denials: fail`, denied a call, is stopped until a fresh 
       ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']],
     );
   });
-  await s.test('`nemia decide` names the rule for `allowedTools:` and offers `--fresh`', async (sub) => {
-    const decided = await printedAll(sub, ['decide', run.id]);
-    assert.match(decided, /\n {2}DENIED, waiting on you: implement {2}— its harness denied its try a call/);
+  await s.test('the decision names the rule for `allowedTools:` and offers `--fresh`', async () => {
+    const reading = await decidedOn(stage, run.id);
+    assert.ok(reading.decision.kind === 'awaiting', JSON.stringify(reading.decision));
+    assert.deepEqual(reading.decision.denied, ['implement']);
+    const decided = reading.offers.join('\n');
     assert.match(
       decided,
       new RegExp(
@@ -1375,26 +1387,21 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual([told.taskId, told.try, told.said], [taskId(), 1, saidTo()[1]]);
     assert.equal((await stage.runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps[0].note, 'said to 2×');
   });
-  await s.test('signed off blocked, `nemia decide` prints each thing said under the step, before its closeout, fenced', async (sub) => {
+  await s.test("signed off blocked, the decision's reading holds each thing said to the step, by its try and time", async () => {
     ended(taskId(), 'succeeded', {
       closeout: { outcome: 'blocked', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: 'Rename --flag?' },
     });
-    const printed = await printedBy(sub, ['decide', run.id]);
+    const decided = await decidedOn(stage, run.id);
     const [first, second] = saidTo();
-    const under = printed.indexOf(`    said to try 1, at ${first.at}:`);
-    const blocked = printed.indexOf('  implement  BLOCKED');
-    assert.ok(blocked >= 0 && blocked < under, printed.join('\n'));
-    assert.deepEqual(printed.slice(under, under + 8), [
-      `    said to try 1, at ${first.at}:`,
-      '    ```text',
-      '    Widen the scope to apps/api too.',
-      '    ```',
-      `    said to try 1, at ${second.at}:`,
-      '    ````text',
-      '    Keep:',
-      '    ```',
-    ]);
-    assert.ok(under < printed.indexOf('    IMPLEMENTER-SUMMARY'), "before the closeout, the step's own account of it");
+    assert.deepEqual(
+      decided.said.implement?.map((x) => [x.try, x.at, x.text]),
+      [
+        [1, first.at, 'Widen the scope to apps/api too.'],
+        [1, second.at, 'Keep:\n```\n--flag\n```'],
+      ],
+    );
+    const c = decided.closeouts.implement;
+    assert.ok(c && !('error' in c) && c.summary === 'IMPLEMENTER-SUMMARY', "beside the closeout, the step's own account of it");
     assert.equal(recordText(run.id), record, 'and still nothing written');
   });
   await s.test(

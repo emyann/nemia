@@ -4,11 +4,11 @@
  * `.github/workflows/release.yml` keeps the release pull request and makes the release its merge asks for; `release-label.yml` is the
  * `release-label` check; `.github/release.yml` groups the notes by label. Its `archive` matrix builds a release's archive on a runner of
  * each platform `tools/release/archive.ts` names, and its `upload` job attaches every asset `install.sh` and the upgrade read, while the
- * release `tag` names has no `latest.json`. Nothing here can run them: their first real verdict is on
- * GitHub. What drifts is held instead — a job granted a write it does not make, a job outside the concurrency that keeps two runs from
- * writing the release branch at once, a check that takes the labels into its command line, a label check that cannot be dispatched
- * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a
- * pure function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a planted copy.
+ * release `tag` names is a draft or has no `latest.json`, then publishes that draft. Nothing here can run them: their first real verdict
+ * is on GitHub. What drifts is held instead — a job granted a write it does not make, a job outside the concurrency that keeps two runs
+ * from writing the release branch at once, a check that takes the labels into its command line, a label check that cannot be dispatched
+ * with the pull request's number or that does not say the commit it checks, a category for a label the tool no longer has — each a pure
+ * function returning a sentence that names the fix, run once on the shipped files and broken once per clause on a planted copy.
  * The clauses every workflow of the repository keeps (GitHub's own actions, a bound on every job and network step, no trigger that
  * hands a fork a writable token) are `ci-workflow.ts`'s, the ones `ci-workflow.test.ts` holds `ci.yml` to.
  *
@@ -72,6 +72,9 @@ const RUNNERS: Record<(typeof PLATFORMS)[number], string> = {
   'linux-arm64': 'ubuntu-24.04-arm',
   'darwin-arm64': 'macos-15',
 };
+
+/** The call that publishes the tag job's draft release, the upload's last, once every asset is attached. */
+const PUBLISH = 'gh release edit "$TAG" --draft=false';
 
 /** The assets the upload attaches, `latest.json` in the last call, so its presence says the release is whole. */
 const ASSETS = ['nemia-*.tar.gz', 'SHA256SUMS', 'install.sh'];
@@ -156,9 +159,15 @@ function dueDrift(workflow: Workflow): string[] {
     return [
       `the tag job in ${RELEASE} does not output tag and due from a step with id due: add the step that says whether the release lacks ${LAST}, and outputs tag: and due: from it`,
     ];
-  return due.run?.includes(LAST) === true
+  if (due.run?.includes(LAST) !== true)
+    return [
+      `the due step of the tag job in ${RELEASE} does not look for ${LAST}: a release is whole once ${LAST}, attached last, is on it`,
+    ];
+  return due.run.includes('--json isDraft')
     ? []
-    : [`the due step of the tag job in ${RELEASE} does not look for ${LAST}: a release is whole once ${LAST}, attached last, is on it`];
+    : [
+        `the due step of the tag job in ${RELEASE} does not read --json isDraft: a release still a draft is due, or a run cut off before it was published never publishes it`,
+      ];
 }
 
 /** The archive's matrix: built where the tag job says the assets are due, one leg per platform on its runner, at the tag. */
@@ -186,12 +195,17 @@ function archiveDrift(workflow: Workflow): string[] {
   return sentences;
 }
 
-/** The upload: every asset with --clobber onto the tag's release, `latest.json` in the last call. */
+/** The upload: every asset with --clobber onto the tag's release, `latest.json` in the last call, then the draft published. */
 function uploadDrift(workflow: Workflow): string[] {
-  const calls = (workflow.jobs.upload?.steps ?? [])
+  const lines = (workflow.jobs.upload?.steps ?? [])
     .flatMap((step) => (step.run ?? '').split('\n'))
-    .filter((line) => line.includes('gh release upload'));
+    .filter((line) => line.includes('gh release '));
+  const calls = lines.filter((line) => line.includes('gh release upload'));
   if (calls.length === 0) return [];
+  if (lines.at(-1)?.includes(PUBLISH) !== true || lines.filter((line) => line.includes('--draft=false')).length !== 1)
+    return [
+      `the upload job in ${RELEASE} does not end on ${PUBLISH}, once, after every upload: publish the tag job's draft there alone, so no published release names nothing to download`,
+    ];
   const missing = ASSETS.filter((asset) => !calls.slice(0, -1).some((line) => line.includes(asset)));
   const last = calls.at(-1) ?? '';
   if (missing.length > 0 || !last.includes(LAST) || calls.slice(0, -1).some((line) => line.includes(LAST)))
@@ -456,7 +470,7 @@ test('REFUSED: a category drifted from LABELS, internal given a category, and th
   refused(notes(notLast), NOTES, 'the catch-all first');
 });
 
-test("REFUSED: a platform's leg gone or on another runner, the archive built whatever the tag job says or off the tag, latest.json attached before the rest, an upload that cannot rerun, and no due step", () => {
+test("REFUSED: a platform's leg gone or on another runner, the archive built whatever the tag job says or off the tag, latest.json attached before the rest, an upload that cannot rerun, a draft never published or published early, and no due step", () => {
   const all = (release: string) => drift(release, text(LABEL_CHECK), text(NOTES));
   refused(all(planted(RELEASE, '          - platform: darwin-arm64\n            runner: macos-15\n', '')), 'matrix', 'the macOS leg gone');
   refused(all(planted(RELEASE, 'runner: ubuntu-24.04-arm\n', 'runner: ubuntu-24.04\n')), 'matrix', 'the arm leg built on x64');
@@ -494,5 +508,22 @@ test("REFUSED: a platform's leg gone or on another runner, the archive built wha
     'a rerun refused by an asset already there',
   );
   refused(all(planted(RELEASE, '        id: due\n', '')), 'id due', 'no step says the assets are due');
+  refused(
+    all(planted(RELEASE, '          gh release edit "$TAG" --draft=false --latest\n', '')),
+    'gh release edit',
+    'the draft never published',
+  );
+  refused(
+    all(
+      planted(
+        RELEASE,
+        '          gh release upload "$TAG" assets/latest.json --clobber\n          gh release edit "$TAG" --draft=false --latest\n',
+        '          gh release edit "$TAG" --draft=false --latest\n          gh release upload "$TAG" assets/latest.json --clobber\n',
+      ),
+    ),
+    'gh release edit',
+    'published before latest.json is attached',
+  );
+  refused(all(planted(RELEASE, '--json isDraft,assets', '--json assets')), 'isDraft', 'a draft left by a cut-off run never due');
   refused(all(planted(RELEASE, '    needs: [tag, archive]\n', '    needs: [tag]\n')), 'the upload job', 'the upload before the archives');
 });

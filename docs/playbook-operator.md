@@ -245,7 +245,8 @@ rm "$S"/node_modules; git worktree remove "$S"
      pushed `release`, so its pull_request runs wait, and they are not needed. A rebuild after main moves dispatches both again on the
      new head, and so does `gh workflow run release.yml` where a check failed, was cancelled or is missing on the head.
   4. Merge it, with the owner, once both are green. The merge sets the root `package.json` version on main, and the `release` workflow's `tag` job tags
-     `v<x.y.z>` on that commit and makes the GitHub release with the same notes.
+     `v<x.y.z>` on that commit and makes the GitHub release with the same notes, a draft its `upload` job publishes once the archives
+     are attached.
   5. **Once, after the change that made this lands**, in this order: `nemia upgrade`, so the checks pass `WF_LABELS`; move the factory
      onto sdlc 2.1.0 with `pullRequestLabels="work=feature:feature work=fix:fix work=docs:docs work=cleanup:internal
      work=measure:internal"`. Then the owner turns on "Allow GitHub Actions to create and approve pull requests" (Settings → Actions →

@@ -15,11 +15,13 @@ import {
   CELL_HEIGHT,
   CELL_WIDTH,
   GRID_COLUMNS,
+  floorRowsOf,
   floorRuns,
   inFlight,
   keepLayout,
   NARROW_CELL_WIDTH,
   onYouOf,
+  parentsWanted,
   ONE_CELL,
   openSpan,
   placeRuns,
@@ -40,7 +42,7 @@ import {
   type Span,
 } from '../src/lib/factory.ts';
 import { ENDED } from '../src/lib/words.ts';
-import { runsIn } from '../src/lib/factories.ts';
+import type { UnjudgedRun } from '../src/lib/api/judged.ts';
 import { tilesOf } from '../src/lib/flow.ts';
 import { instantWhole } from '../src/lib/instant.ts';
 import type { Point } from '../src/lib/layout.ts';
@@ -1210,7 +1212,10 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
           createdAt: '2026-09-14T00:01:00.000Z',
         }),
       ];
-      const floor = floorRuns(runsIn(runs, { name: 'nemia', default: false }), false);
+      const floor = floorRuns(
+        runs.filter((one) => one.factory === 'nemia'),
+        false,
+      );
       assert.deepEqual(
         floor.map((one) => one.id),
         ['c'],
@@ -1425,6 +1430,75 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
       );
     },
   );
+});
+
+test('parentsWanted and floorRowsOf: the finished runs the floor reads beside the light answer, each once', async (t) => {
+  const unjudged: UnjudgedRun = { id: 'u', factory: 'nemia', unjudged: 'its file does not read' };
+  await t.test('a finished parent an in-flight row waits on is wanted, once; an open parent and a wait that is over are not', () => {
+    const rows = [
+      run(['running (working)'], { id: 'open-parent', moving: true, createdAt: at(0) }),
+      run([], { id: 'b', after: ['done', 'open-parent'], waiting: waitsOn('done', 'open-parent'), createdAt: at(1) }),
+      run([], { id: 'c', after: ['done'], waiting: waitsOn('done'), createdAt: at(2) }),
+      run(['awaiting approval'], {
+        id: 'h',
+        status: 'running',
+        holdUntil: ['held-on'],
+        holding: { ...holdingOn(false), runs: [{ run: 'held-on', missing: false, cancelledAt: null, gone: [], landed: false }] },
+        createdAt: at(3),
+      }),
+      run(['running (working)'], { id: 's', moving: true, after: ['started-after'], createdAt: at(4) }),
+      run(['awaiting approval'], {
+        id: 'gated',
+        status: 'failed',
+        waitingOnYou: ['step-0'],
+        after: ['not-in-flight'],
+        waiting: waitsOn('not-in-flight'),
+        createdAt: at(5),
+      }),
+      unjudged,
+    ];
+    assert.deepEqual(
+      parentsWanted(rows),
+      ['done', 'held-on'],
+      'done, waited on by b and c, is read once; open-parent is a row already; s has started, its wait over; gated is not in flight',
+    );
+    assert.deepEqual(parentsWanted([]), []);
+  });
+  await t.test('a run a row reads as context is wanted too, after the waits, so its chip names it by its title; a row is not', () => {
+    const reader = run(['running (working)'], {
+      id: 'r',
+      moving: true,
+      context: ['source', 'w'],
+      after: ['done'],
+      waiting: waitsOn('done'),
+    });
+    const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], context: ['source'] });
+    assert.deepEqual(parentsWanted([reader, waiting]), ['done', 'source']);
+  });
+  await t.test('the rows are the waiting, then in flight, then the parents read, then the finished page, each id once', () => {
+    const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], createdAt: at(0) });
+    const flying = run([], { id: 'b', after: ['p'], waiting: waitsOn('p'), createdAt: at(1) });
+    const parent = run([], { id: 'p', status: 'succeeded', createdAt: at(2) });
+    const older = run([], { id: 'old', status: 'succeeded', createdAt: at(3) });
+    const rows = floorRowsOf(
+      { waiting: [waiting, waiting], inFlight: [flying, unjudged] },
+      [parent],
+      [{ ...parent }, older, { ...flying }],
+    );
+    assert.deepEqual(
+      rows.map((row) => row.id),
+      ['w', 'b', 'u', 'p', 'old'],
+    );
+    assert.equal(rows[3], parent, 'the first read of an id is the one kept');
+    assert.deepEqual(
+      floorRuns(
+        rows.filter((row): row is RunView => !('unjudged' in row)),
+        false,
+      ).map((r) => r.id),
+      ['w', 'b', 'p'],
+      'with Show finished off, the parent read is a card for its edge, and the finished page brings none',
+    );
+  });
 });
 
 test('runEdges and contextEdges: the edges drawn between cards', async (t) => {

@@ -9,7 +9,7 @@ import { Select, SelectItem } from '@/components/ui/ds/components/Select';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { openRunsQuery, type OpenRuns } from '@/lib/api/runs';
 import { DEFAULT_NAMESPACE } from 'objects';
-import { factoriesShown, namespaceOf } from '@/lib/factories';
+import { factoriesShown, holdsRuns, namespaceOf } from '@/lib/factories';
 import { pickTo } from '../nav/nav';
 
 /** The choice of every factory: a number, where every factory's name is a string. */
@@ -28,10 +28,6 @@ export function pickerFactories(factories: readonly Factory[], held: boolean, pi
   if (picked === undefined || listed.some((item) => item.name === picked)) return listed;
   return [...listed, { name: picked, factory: factories.find((f) => f.name === picked) }];
 }
-
-/** Whether the default factory holds a run, by the counts of its light answer. */
-const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: number; finished: number } }): boolean =>
-  counts.waiting + counts.inFlight + counts.finished > 0;
 
 /**
  * The factories the picker offers after All factories, from what is read so far: none while `factories` is unread, and none while no

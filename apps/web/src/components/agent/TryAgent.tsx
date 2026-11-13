@@ -1,10 +1,11 @@
 import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { readGone } from '../../lib/api/gone.ts';
-import { runsQuery } from '../../lib/api/runs.ts';
+import { finishedPagesQuery, openRunsQuery } from '../../lib/api/runs.ts';
 import { judged } from '../../lib/api/judged.ts';
 import { tryAgent, type AgentListing } from '../../lib/api/agents.ts';
 import { useRunRead } from '../../lib/runView';
+import { pace } from '../../lib/feed.ts';
 import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../../lib/agents';
 import { costText } from '../../lib/cost';
 import { AgentRefused, RouteLink } from './AgentParts';
@@ -28,13 +29,21 @@ export function TryAgent({ agent }: { agent: AgentListing }) {
 /**
  * The brief, the button and the try shown: the one this page started, before the list read again has it, else the agent's latest. A start
  * reads the list of runs again alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state.
+ *
+ * The latest try is looked for among the runs not finished (`openRunsQuery`, the frame's own read) and the newest page of the finished
+ * (`finishedPagesQuery`'s first page, `PICKED_SIZE` runs, the pickers' read, paced here as the frame is since this panel stays open), never
+ * every run: a try that finished before that page is not shown. The button's hold reads a moving try, which is always among the open.
  */
 function TryForm({ agent }: { agent: AgentListing }) {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState('');
   const [started, setStarted] = useState<string | null>(null);
-  const { data: runs } = useQuery(runsQuery);
-  const latest = latestTryOf((runs ?? []).filter(judged), agent.name);
+  const { data: open } = useQuery(openRunsQuery());
+  const { data: finished } = useInfiniteQuery({ ...finishedPagesQuery(), refetchInterval: () => pace(5_000) });
+  const latest = latestTryOf(
+    [...(open?.waiting ?? []), ...(open?.inFlight ?? []), ...(finished?.pages[0]?.runs ?? [])].filter(judged),
+    agent.name,
+  );
   const shown = started ?? latest?.id ?? null;
   const field = useId();
   const start = useMutation({

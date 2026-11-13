@@ -3,7 +3,7 @@ import { Factory as FactoryIcon, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { offerOf, runsOf, type FactoryBlock } from '@/lib/factories';
 
-/** A block on the Factories canvas: one factory, as `factoryBlocks` counts it, and whether the frame's bar shows it (`inspected`). */
+/** A block on the Factories canvas: one factory, as `openBlocks` counts it, and whether the frame's bar shows it (`inspected`). */
 export type FactoryFlowNode = Node<FactoryBlock & { inspected: boolean }, 'factory'>;
 
 /** A block's width and height, in the canvas's pixels: every block is drawn the same size, so the grid never overlaps. */

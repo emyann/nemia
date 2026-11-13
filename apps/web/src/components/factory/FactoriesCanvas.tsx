@@ -54,7 +54,7 @@ const nodesOf = (blocks: readonly FactoryBlock[], inspected: string | null): Fac
 const factoryBar = (factory: string): Bar => ({ kind: 'factory', factory });
 
 /**
- * The Factories: every factory a block on a canvas (`FactoryBlockNode`), laid out on a grid in the order `factoryBlocks` gives, and fitted
+ * The Factories: every factory a block on a canvas (`FactoryBlockNode`), laid out on a grid in the order `openBlocks` gives, and fitted
  * to the frame, never larger than life. The canvas pans and zooms, and a block does not move. A click, a tap or Enter on a block shows its
  * factory in the frame's bar, ringed; the same block again or the empty canvas closes it, and another switches it. A double click on a
  * block, or the bar's Open, goes to its floor (`useCanvasPress`). With no block, it says how to make a factory.

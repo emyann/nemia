@@ -2,14 +2,13 @@
  * The numbers of the Overview's strip (`OverviewStrip`): the factories' day, what is at work against the machine's caps, the agents at
  * work and when the quota runs out. Pure: the instant, the day's start and the time zone are handed in, the browser's own on the page.
  */
-import type { RunOutcome } from 'objects';
 import type { Ceilings } from './api/ceilings.ts';
 import type { Factory } from './api/factories.ts';
 import type { QuotaWindow } from './api/quota.ts';
-import { agentOf, judged, sinceOf, type RunRow, type RunView } from './api/judged.ts';
+import type { FinishedRun, OpenRuns } from './api/runs.ts';
+import { agentOf, judged, sinceOf, type RunView } from './api/judged.ts';
 import type { TokenCounts } from './breakdown.ts';
-import { keptBy } from './factories.ts';
-import { inFlight, titleOf, waitsOnYou } from './factory.ts';
+import { titleOf } from './factory.ts';
 import { durationWords } from './duration.ts';
 import { clockWord } from './quota.ts';
 import { stepState } from './status.ts';
@@ -21,13 +20,13 @@ const ROWS_SHOWN = 3;
 type AgentRow = { agent: string; step: string; run: string; title: string; minutes: number; atWork: string };
 
 /**
- * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
- * `landed` and `failed` the runs whose work stopped since the day began; `spentUsd` what every run worked today cost, whole;
- * `spentTokens` the tokens of the very runs Spent counts, by kind (`tokensOf`), null where none of them measured any;
- * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against
- * their caps, null where the machine has none. `agents` are the agents at work against the agents of the factories in view
- * (`agentsOf`), `hired` null where there are none; `rows` the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many
- * are left out.
+ * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, each in the state the list puts it in (`OpenRuns`), a run that
+ * waits on a person counted with the waiting alone; `landed` and `failed` the runs finished since the day began, by their `outcome`;
+ * `spentUsd` what every run worked today cost, whole; `spentTokens` the tokens of the very runs Spent counts, by kind (`tokensOf`), null
+ * where none of them measured any; `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs`
+ * and `sessions` are at work against their caps, null where the machine has none. `agents` are the agents at work against the agents of
+ * the factories in view (`agentsOf`), `hired` null where there are none; `rows` the steps at work, longest first, the first `ROWS_SHOWN`,
+ * and `more` how many are left out.
  */
 export type Strip = {
   waitsOnYou: number;
@@ -44,9 +43,14 @@ export type Strip = {
   more: number;
 };
 
-/** What the strip reads: the whole list, the factories, the caps, now and the day's start in epoch ms, and the factory in view if any. */
+/**
+ * What the strip reads: the light answer of the runs not finished (`openRunsQuery`) and the runs finished since the day began
+ * (`finishedTodayQuery`), each of the factory in view or of every factory; the factories, the caps, now and the day's start in epoch ms,
+ * and the factory in view if any, whose hires the agents are counted against.
+ */
 type StripIn = {
-  runs: readonly RunRow[];
+  open: Pick<OpenRuns, 'waiting' | 'inFlight'>;
+  finished: readonly FinishedRun[];
   factories: readonly Factory[];
   ceilings: Ceilings | undefined;
   now: number;
@@ -59,19 +63,6 @@ export const dayStartOf = (now: number): number => {
   const day = new Date(now);
   day.setHours(0, 0, 0, 0);
   return day.getTime();
-};
-
-/** When a finished run's work stopped: the later of its last task's end and its cancellation, else its creation (the api's own rule). */
-const finishedAtOf = (run: Pick<RunView, 'atWork' | 'cancelledAt' | 'createdAt'>): string => {
-  const ends = [run.atWork?.endedAt ?? null, run.cancelledAt].filter((at): at is string => at !== null);
-  return ends.sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? run.createdAt;
-};
-
-/** How a finished run ended (the api's own rule): called off, its result undecided, landed, or failed. */
-const outcomeOf = (run: Pick<RunView, 'cancelledAt' | 'toDecide' | 'status'>): RunOutcome => {
-  if (run.cancelledAt) return 'cancelled';
-  if (run.toDecide?.kind === 'result') return 'undecided';
-  return run.status === 'succeeded' ? 'succeeded' : 'failed';
 };
 
 /** A cap as the readout says it: none where it is zero or unknown. */
@@ -155,31 +146,29 @@ const sessionsOf = (open: readonly RunView[]): number =>
   open.reduce((n, run) => n + run.steps.filter((step) => working(run, step)).length, 0);
 
 /**
- * The strip's numbers off what the page reads (`StripIn`), of the factory in view (`keptBy`): a run called off is in no open count, and
- * counts in Spent alone once its work stopped today. A run the list could not judge is in flight, as the tick counts it, and adds to no
- * other number.
+ * The strip's numbers off what the page reads (`StripIn`), both reads already of the factory in view: waiting and in flight are the
+ * list's own states, a run it could not judge counted where the list puts it and in no other number; landed and failed the outcome the
+ * list gives each run finished since the day began, one called off or undecided in neither; and Spent the open runs worked today with
+ * those finished today.
  */
 export function stripOf(given: StripIn): Strip {
-  const kept = given.runs.filter(keptBy(given.factory));
-  const runs = kept.filter(judged);
-  const unjudged = kept.length - runs.length;
-  const waiting = runs.filter((run) => waitsOnYou(run));
-  const flying = runs.filter((run) => !run.cancelledAt && !waitsOnYou(run) && inFlight(run));
-  const finishedToday = runs.filter((run) => !waitsOnYou(run) && !inFlight(run) && Date.parse(finishedAtOf(run)) >= given.dayStart);
-  const landed = finishedToday.filter((run) => outcomeOf(run) === 'succeeded');
+  const waiting = given.open.waiting.filter(judged);
+  const flying = given.open.inFlight.filter(judged);
+  const finishedToday = given.finished.filter((run) => Date.parse(run.finishedAt) >= given.dayStart);
+  const landed = finishedToday.filter((run) => run.outcome === 'succeeded');
   const priced = landed.filter((run) => run.cost !== null);
-  const open = [...waiting, ...flying];
+  const open: RunView[] = [...waiting, ...flying];
   const worked = [...open.filter((run) => workedToday(run, given.dayStart)), ...finishedToday];
   const rows = rowsOf(open, given.now);
   return {
-    waitsOnYou: waiting.length,
-    inFlight: flying.length + unjudged,
+    waitsOnYou: given.open.waiting.length,
+    inFlight: given.open.inFlight.length,
     landed: landed.length,
-    failed: finishedToday.filter((run) => outcomeOf(run) === 'failed').length,
+    failed: finishedToday.filter((run) => run.outcome === 'failed').length,
     spentUsd: worked.reduce((sum, run) => sum + usdOf(run), 0),
     spentTokens: tokensOf(worked),
     perLanding: priced.length ? priced.reduce((sum, run) => sum + usdOf(run), 0) / priced.length : null,
-    runs: { count: flying.length + unjudged, cap: capOf(given.ceilings?.cap) },
+    runs: { count: given.open.inFlight.length, cap: capOf(given.ceilings?.cap) },
     sessions: { count: sessionsOf(open), cap: capOf(given.ceilings?.last?.sessions) },
     agents: agentsOf(rows, hiredIn(given.factories, given.factory)),
     rows: rows.slice(0, ROWS_SHOWN),

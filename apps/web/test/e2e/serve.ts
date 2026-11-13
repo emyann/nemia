@@ -44,6 +44,9 @@ const ANSWER_MS = 90_000;
 /** How often a wait here looks again. */
 const PACE_MS = 200;
 
+/** How many of the holder's last lines a refusal quotes from its log. */
+const SAID_LINES = 40;
+
 /** How many times the holder starts its servers before it gives up on a port it may use. */
 const TRIES = 3;
 
@@ -287,14 +290,21 @@ export async function startHolder(dir: string, tree: string, env: NodeJS.Process
   holder.unref();
   let exited: string | undefined;
   holder.on('exit', (code, signal) => (exited = signal ?? `code ${code}`));
-  const said = (): string => (fs.existsSync(log) ? plain(fs.readFileSync(log, 'utf8')).trimEnd() : '') || '(nothing)';
+  const said = (): string => {
+    const lines = (fs.existsSync(log) ? plain(fs.readFileSync(log, 'utf8')).trimEnd() : '').split('\n').slice(-SAID_LINES);
+    if (lines.join('').trim()) return `the last lines of ${log}:\n${lines.join('\n')}`;
+    return (
+      `it wrote nothing to ${log} before it ended (${exited ?? 'still running'}): a kill or a crash. ` +
+      'Run `node test/e2e/serve.ts serve` again, and read the machine\'s memory pressure if it ends the same way.'
+    );
+  };
   return awaited(
     () => {
-      if (exited !== undefined) throw new Refusal(`the board's holder ended (${exited}) before it served. What it said:\n${said()}`);
+      if (exited !== undefined) throw new Refusal(`the board's holder ended (${exited}) before it served: ${said()}`);
       return servedIn(dir);
     },
     ANSWER_MS,
-    () => `the board's holder (pid ${holder.pid}) did not say where it listens within ${ANSWER_MS / 1000} s. What it said:\n${said()}`,
+    () => `the board's holder (pid ${holder.pid}) did not say where it listens within ${ANSWER_MS / 1000} s: ${said()}`,
   ).catch((err: unknown) => {
     if (holder.pid !== undefined && exited === undefined) holder.kill('SIGTERM');
     throw err;
@@ -303,10 +313,15 @@ export async function startHolder(dir: string, tree: string, env: NodeJS.Process
 
 /** `hold`: seeds and serves the folder's store, says where in `served.json`, and holds until it is asked to stop or its time is up. */
 async function hold(dir: string): Promise<void> {
+  let serving = false;
+  process.on('exit', () => {
+    if (serving) return fs.rmSync(dir, { recursive: true, force: true });
+    for (const entry of fs.readdirSync(dir).filter((entry) => entry !== 'hold.log'))
+      fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+  });
   const { serveStore, servers, startServers, stopOnTheWayOut, stopServers } = await import('./served.ts');
   const store = path.join(dir, 'store');
   fs.mkdirSync(store);
-  process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
   stopOnTheWayOut('board');
   const dist = path.join(dir, 'dist');
   const seat = {};
@@ -322,6 +337,7 @@ async function hold(dir: string): Promise<void> {
   const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}`, stories: stories.at, tree };
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
+  serving = true;
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;
   const gone = (): boolean => servers.some(({ child }) => child.exitCode !== null || child.signalCode !== null);
   await new Promise<void>((resolve) => {
@@ -362,7 +378,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   (verb ? verb(folder()) : Promise.reject(new Refusal('usage: node test/e2e/serve.ts serve | stop'))).then(
     () => process.exit(0),
     (err: unknown) => {
-      console.error(`board: ${err instanceof Error ? err.message : String(err)}`);
+      const holding = process.argv[2] === 'hold' && err instanceof Error;
+      console.error(`board: ${holding ? (err.stack ?? err.message) : err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     },
   );

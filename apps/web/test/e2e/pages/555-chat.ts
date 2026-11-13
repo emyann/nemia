@@ -7,6 +7,7 @@ import {
   expectUncovered,
   expectPanelHeld,
   expectSheetIn,
+  expectStripWhole,
   herChat,
   herFaceOf,
   herSheetOf,
@@ -159,9 +160,11 @@ async function edgeOf(page: Page): Promise<{ colour: string; clip: string }> {
 export default {
   /**
    * Her face first in the rail, her chat closed, on a page of the board (state 1); pressed, her side sheet docked beside the page at 1280,
-   * the rail folded for it without writing the person's fold, and the panel in it with nothing said yet (state 2) — her greeting, her
+   * the rail folded for it without writing the person's fold, the top bar and the Overview's strip whole in the narrower column
+   * (`expectStripWhole`), and the panel in it with nothing said yet (state 2) — her greeting, her
    * level, what is at work and the four chips — a draft written in it (state 3), where Shift+Enter makes a new line and Enter sends, the
-   * words then drawn as the person's own bubble. Then the menu button bringing the rail back beside the sheet, its Close and her face
+   * words then drawn as the person's own bubble. Then the menu button bringing the rail back beside the sheet, the bar and the strip
+   * whole again, its Close and her face
    * closing it; at 1600 the sheet beside an open rail; on a narrow screen the kit's modal sheet from her face in the top bar; and the
    * same panel opened as a page of its own at `/chat`, where her face says the page is hers. Her level, her task and her chat are
    * written by the page and taken back after.
@@ -187,6 +190,7 @@ export default {
       await expectDocked(page);
       await expectRail(page, 'collapsed', 'at 1280 the open rail folds beside her sheet');
       await expectBarWhole(page, 'beside her sheet at 1280 the top bar takes two lines and holds whole');
+      await expectStripWhole(page, "beside her sheet at 1280, the rail folded, the Overview's strip reads whole");
       if ((await railSays(page)) !== rail)
         throw new Refused(`the folded rail keeps the page lit and its badges — ${rail} became ${await railSays(page)}`);
       if ((await railCookie(page)) !== cookie)
@@ -250,6 +254,7 @@ export default {
       await expectDocked(page);
       if ((await railCookie(page)) !== cookie) throw new Refused('asked back, the rail writes no sidebar_state: it was open already');
       await expectBarWhole(page, 'beside her sheet and the rail brought back the top bar holds whole');
+      await expectStripWhole(page, "beside her sheet at 1280 and the rail brought back, the Overview's strip reads whole");
       await settled(page);
       await photograph(page, path.join(OUT, `chat-rail-back-${await themeOf(page)}.png`), { fullPage: true });
 

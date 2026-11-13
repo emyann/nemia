@@ -15,7 +15,7 @@ export const ASKS = container.yours;
 /** One part of what a step gets, under its label. */
 export function Reach({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-x-4 gap-y-1 @md/page:grid-cols-[8rem_minmax(0,1fr)]">
       <p className="text-body-small font-medium text-muted-foreground">{label}</p>
       <div className="min-w-0 space-y-1">{children}</div>
     </div>

@@ -4,9 +4,10 @@ metadata:
   name: argus
 spec:
   role: Janitor
-  description: Reads the factory's stats since its last run, writes a report and proposes one correction per card; never starts one.
+  description: Reads the factory's stats since its last run, writes a report and proposes one correction per card, and says each card in play done, replaced, stale or standing; never starts, removes or changes one.
   skills:
     - read-the-stats
+    - groom-the-inbox
     - git
   overridable:
     - fence
@@ -25,6 +26,7 @@ spec:
         - Glob
         - Bash
         - Skill
+        - Agent
       allowedTools:
         - Bash(nemia stats:*)
         - Bash(nemia inbox)

@@ -14,7 +14,11 @@ const fact = (was: string, now: string) => ({ was, now, why: 'moved' });
 const rows: Array<{ name: string; facts: ReturnType<typeof fact>[]; is: ReturnType<typeof amendment> }> = [
   { name: 'no facts is refused', facts: [], is: { kind: 'refused', reason: 'no-facts', fact: -1 } },
   { name: 'an empty was is refused', facts: [fact('', 'x')], is: { kind: 'refused', reason: 'empty', fact: 0 } },
-  { name: 'a was the same as its now is refused', facts: [fact('src/old.ts', 'src/old.ts')], is: { kind: 'refused', reason: 'unchanged', fact: 0 } },
+  {
+    name: 'a was the same as its now is refused',
+    facts: [fact('src/old.ts', 'src/old.ts')],
+    is: { kind: 'refused', reason: 'unchanged', fact: 0 },
+  },
   {
     name: 'a was the body lacks is refused, by its index',
     facts: [fact('src/old.ts', 'src/new.ts'), fact('line 99', 'line 3')],

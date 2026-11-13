@@ -192,11 +192,10 @@ function amended(v: Verdict): Record<string, unknown> {
 
 /** The report's section on `v`, with the command that acts on it where one does. */
 function section(v: Verdict, card: Served, command: string | null): string {
-  const lines = [`## ${v.card}: ${v.verdict}`, '', `${card.status?.title ?? '(no title)'}`, '', v.why.trim()];
+  const lines = [`## ${v.card}: ${v.verdict}`, '', card.status?.title ?? '(no title)', '', v.why.trim()];
   if (v.verdict === 'done') lines.push('', `Landed by ${v.commit.trim()}.`);
   if (v.verdict === 'replaced') lines.push('', `Replaced by ${v.by.trim()}.`);
-  for (const f of v.verdict === 'stale' ? v.facts : [])
-    lines.push('', `- It says: ${f.was}`, `  Now: ${f.now}`, `  Why: ${f.why}`);
+  for (const f of v.verdict === 'stale' ? v.facts : []) lines.push('', `- It says: ${f.was}`, `  Now: ${f.now}`, `  Why: ${f.why}`);
   if (command) lines.push('', '```', command, '```');
   return lines.join('\n');
 }
@@ -217,7 +216,9 @@ function main(): void {
     .map((c) => c.metadata.name)
     .sort();
   if (unjudged.length)
-    throw new Refusal(`no verdict on ${unjudged.join(', ')}, in play before ${to}: give every card in play a verdict, standing where none moved`);
+    throw new Refusal(
+      `no verdict on ${unjudged.join(', ')}, in play before ${to}: give every card in play a verdict, standing where none moved`,
+    );
   const acted = verdicts.filter((v) => inPlay(v.card));
   const dir = path.resolve(artifacts, 'groom');
   const amendments = new Map(acted.filter((v) => v.verdict === 'stale').map((v) => [v.card, amended(v)]));

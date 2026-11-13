@@ -125,10 +125,10 @@ test('the groom writes the amended card and the report, changes no card, and the
   assert.deepEqual(inbox(root), before, 'no card is changed or removed');
   const files = written(artifacts);
   assert.deepEqual(Object.keys(files), ['groom.md', path.join('groom', 'move-the-reads-st4l.json')]);
-  const amended = JSON.parse(files[path.join('groom', 'move-the-reads-st4l.json')]!);
+  const amended = JSON.parse(files[path.join('groom', 'move-the-reads-st4l.json')]);
   assert.equal(amended.spec.body, 'Move the reads to src/new.ts\n\nThe verb is `nemia ls`, at line 12.', 'the body as served, amended');
   assert.equal(amended.status, undefined, 'the status is the server’s, and dropped');
-  const report = files['groom.md']!;
+  const report = files['groom.md'];
   for (const name of ['land-the-thing-d0n3', 'an-old-idea-r3pl']) {
     assert.ok(report.includes(`nemia inbox rm ${name}`), `the report says how to remove ${name}`);
     assert.ok(ran.out.includes(`nemia inbox rm ${name}`), `stdout says how to remove ${name}`);
@@ -145,7 +145,7 @@ test('the groom writes the amended card and the report, changes no card, and the
 
   const applied = typed(env, ['apply', '-f', path.join(artifacts, 'groom', 'move-the-reads-st4l.json')]);
   assert.equal(applied.code, 0, applied.err);
-  const card = inbox(root)['move-the-reads-st4l.md']!;
+  const card = inbox(root)['move-the-reads-st4l.md'];
   assert.ok(card.trimEnd().endsWith('Move the reads to src/new.ts\n\nThe verb is `nemia ls`, at line 12.'), card);
   assert.ok(card.includes('factory: acme') && card.includes('workflow: build'), 'its frontmatter is kept');
 });

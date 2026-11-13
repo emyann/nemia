@@ -2,15 +2,21 @@
 import { type Hold } from '../record/record.ts';
 import { hold, unhold } from './wait.verb.ts';
 import { Effect, Schema } from 'effect';
-import { HOLD_WORDS, holdRefusal, RunHold } from 'objects';
+import { Actor, HOLD_WORDS, holdRefusal, RunHold } from 'objects';
 import { checked, type Served } from '../command/entry.verb.ts';
 import { saidOf } from '../command/command.ts';
 
 /**
  * What `nemia hold` takes: the run, the hold as the api is sent it (`objects`' `RunHold`: `until`, `why`, `by`), and `off`, its lift — the
- * api's `DELETE …/hold`, never its `POST`.
+ * api's `DELETE …/hold`, never its `POST`; and who puts it (`actor`, objects' `Actor`), which the api hands of its caller and the hold
+ * keeps beside `by` — none from the command line.
  */
-export const HoldInput = Schema.Struct({ runId: Schema.String, ...RunHold.fields, off: Schema.optionalKey(Schema.Boolean) });
+export const HoldInput = Schema.Struct({
+  runId: Schema.String,
+  ...RunHold.fields,
+  off: Schema.optionalKey(Schema.Boolean),
+  actor: Schema.optionalKey(Actor),
+});
 export type HoldInput = typeof HoldInput.Type;
 
 /**
@@ -22,13 +28,15 @@ export const HOLD: Served<{ id: string; lifted: boolean; hold: Hold }, HoldInput
   ...HOLD_WORDS,
   input: HoldInput,
   handler: Effect.fnUntraced(function* (input: HoldInput) {
-    yield* checked(holdRefusal(input));
+    const { actor, ...flags } = input;
+    yield* checked(holdRefusal(flags));
     const { runId } = input;
     if (input.off === true) {
       const { run, hold: lifted } = yield* unhold(runId);
       return { id: run.id, lifted: true, hold: lifted };
     }
-    const { run, hold: put } = yield* hold(runId, [...(input.until ?? [])], { why: saidOf(input, 'why'), by: saidOf(input, 'by') });
+    const said = { why: saidOf(flags, 'why'), by: saidOf(flags, 'by'), ...(actor ? { actor } : {}) };
+    const { run, hold: put } = yield* hold(runId, [...(input.until ?? [])], said);
     return { id: run.id, lifted: false, hold: put };
   }),
 };

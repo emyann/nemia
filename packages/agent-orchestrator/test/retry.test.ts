@@ -310,7 +310,7 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
     const noted = await asking();
     await stage.main(['retry', noted, 'plan', '--answer', '1: neither', '--answer', '2=a', '--message', 'thanks']);
     const message = askRead(noted, asksOf(noted)[0]).message as string;
-    assert.ok(message.endsWith('\n\nNote: thanks\n\nAnswered by: person, at the terminal'), message);
+    assert.ok(message.endsWith('\n\nNote: thanks\n\nAnswered by: the person, at the terminal'), message);
     assert.ok(message.includes('1. How is the card cut?\n   In my own words: neither'), message);
   });
 });

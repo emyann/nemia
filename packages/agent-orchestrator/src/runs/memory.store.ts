@@ -16,6 +16,7 @@ import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
+import type { Actor } from 'objects';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
@@ -46,6 +47,7 @@ type Held = { person: PersonRequest; done: boolean };
 type State = {
   records: Map<string, Run>;
   cancelled: Map<string, string>;
+  cancellers: Map<string, Actor>;
   pruned: Map<string, Pruned>;
   holds: Map<string, Hold>;
   labels: Map<string, Labels>;
@@ -59,6 +61,7 @@ type State = {
 const stateOf = (): State => ({
   records: new Map(),
   cancelled: new Map(),
+  cancellers: new Map(),
   pruned: new Map(),
   holds: new Map(),
   labels: new Map(),
@@ -84,6 +87,7 @@ function readOf(st: State, id: string): Run {
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
+    ...(st.cancellers.has(id) ? { cancelledBy: structuredClone(st.cancellers.get(id)) } : {}),
     ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
     ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
     ...(labels !== undefined ? { labels: { ...labels } } : {}),
@@ -111,6 +115,7 @@ function forgetOf(st: State, id: string): string[] {
     [st.said, `${id}.said/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
+  st.cancellers.delete(id);
   if (card !== undefined) removed.push(`started/${card}.json`);
   st.versions.delete(id);
   return removed;
@@ -141,11 +146,12 @@ function runsOf(st: State): RunsLayer['runs'] {
     exists: (id) => st.records.has(id),
     taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.labels, st.refresh, st.asks, st.said].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
-    cancel: (id) => {
+    cancel: (id, actor) => {
       const at = st.cancelled.get(id);
       if (at !== undefined) return at;
       const now = new Date().toISOString();
       st.cancelled.set(id, now);
+      if (actor) st.cancellers.set(id, structuredClone(actor));
       touch(st, id);
       return now;
     },
@@ -244,9 +250,15 @@ function holdsOf(st: State): RunsLayer['holds'] {
       touch(st, id);
       return true;
     },
-    put: (id, until, { why, by }) => {
+    put: (id, until, { why, by, actor }) => {
       if (st.holds.has(id)) return null;
-      const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
+      const hold: Hold = {
+        at: new Date().toISOString(),
+        until: [...until],
+        ...(why ? { why } : {}),
+        ...(by ? { by } : {}),
+        ...(actor ? { actor: structuredClone(actor) } : {}),
+      };
       st.holds.set(id, hold);
       touch(st, id);
       return structuredClone(hold);

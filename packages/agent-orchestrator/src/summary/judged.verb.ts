@@ -6,6 +6,7 @@
  */
 import type { Settings } from '../config/config.store.ts';
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { listReading } from '../list/list.verb.ts';
@@ -131,6 +132,8 @@ export type RunHolding = {
   word: string;
   advice: string;
   waitingOnYou: boolean;
+  /** Who put the hold (objects' `Actor`), where its file says. */
+  actor?: Actor;
 };
 
 /**
@@ -191,7 +194,10 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
   };
 }
 
-/** A person's hold on a run (`RunHolding`), in the package's words; null for a run nobody holds, and one called off. */
+/**
+ * A person's hold on a run (`RunHolding`), in the package's words, and who put it (`actor`) where its file says; null for a run nobody
+ * holds, and one called off.
+ */
 export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
   if (!run.hold || run.cancelledAt) return null;
   return {
@@ -206,6 +212,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
     waitingOnYou: holdNeedsYou(holds),
+    ...(run.hold.actor ? { actor: run.hold.actor } : {}),
   };
 }
 

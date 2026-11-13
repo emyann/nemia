@@ -514,7 +514,7 @@ export const filesStoreAt = (home: string): RunStore => ({
     exists: (id) => fs.existsSync(runFile(home, id)),
     taken: (id) => runIdTaken(home, id),
     calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(home, id))) || fs.existsSync(pauseFile(home)),
-    cancel: (id) => markCancelled(home, id),
+    cancel: (id, actor) => markCancelled(home, id, actor),
     forget: (id) => removeRunFiles(home, id),
     ids: () => runIds(home),
     filesAt: (id) => filesAt(home, id),

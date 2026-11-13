@@ -54,7 +54,7 @@ import {
 } from './reason.ts';
 import { currentOf } from '../former-reason/former-reason.ts';
 import type { FactoryLevel } from '../level/level.ts';
-import type { EventWaits, Readiness } from 'objects';
+import type { Actor, EventWaits, Readiness } from 'objects';
 import type { ConflictsDue } from '../../contracts/conflicts-said.contract.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
@@ -109,9 +109,10 @@ type Line = {
 
 /**
  * A run's line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside
- * it — and what a v1 line signs it with (`Line`).
+ * it — and what a v1 line signs it with (`Line`). A line of a person's act — an approval, a call-off, a hold put — carries who acted
+ * (`actor`, objects' `Actor`) where the record says, which is no part of what tells one occurrence from another (`onceKey`).
  */
-export type RunLine = { at: string; run: string; step?: string; word: string; note?: string } & Line;
+export type RunLine = { at: string; run: string; step?: string; word: string; note?: string; actor?: Actor } & Line;
 
 /** A daemon's line of the feed: when, its pid, that it started, and how the daemon before it ended. */
 export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string } & Line;
@@ -125,12 +126,12 @@ export const STORE = 'store';
 /**
  * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`), a factory's level in
  * force (`levelLines`), or its readiness (`readinessLines`) — and the note beside it: the moment the pause was put, the factory's level
- * in words, or each missing piece a run waits on with its fix. A put carries who put the
- * pause (`by`) and the person's words for why (`why`), each where the pause's file says it, never in the note, which pairs the put with
- * its lift. Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`) — and a subscription
- * scoped to a factory is handed it as it is handed a daemon's.
+ * in words, or each missing piece a run waits on with its fix. A put carries who put the pause (`by`), the person's words for why
+ * (`why`) and the caller who put it (`actor`), each where the pause's file says it, never in the note, which pairs the put with its lift.
+ * Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`) — and a subscription scoped to
+ * a factory is handed it as it is handed a daemon's.
  */
-export type StoreLine = { at: string; store: string; word: string; note?: string; by?: string; why?: string } & Line;
+export type StoreLine = { at: string; store: string; word: string; note?: string; by?: string; why?: string; actor?: Actor } & Line;
 
 /**
  * A factory's line of the feed: when, which factory, the word — its upgrade's conflicts pending or settled (`conflictLines`) — and the
@@ -422,6 +423,7 @@ const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
  *
  * What identifies one occurrence is its reason, what it is of, its try and its note (`onceKey`) — and, where several share all four, its
  * place among them: nothing in the runtime's journal stamps a denial, and two attempts of one try lost are told apart only by being two.
+ * Who acted (`actor`) rides on the line and is no part of that identity: the same act read with and without its actor is one occurrence.
  */
 export type Once = {
   step?: string;
@@ -432,6 +434,7 @@ export type Once = {
   source?: LineSource;
   by?: string;
   why?: string;
+  actor?: Actor;
 };
 
 /** What a one-shot offered is about: the run it is of, or its step, as `onceInvolved` says it — or the store, for `storeOnce`'s. */
@@ -483,14 +486,16 @@ const holdSince = (at: string): string => `since ${at}`;
  * The tick lifts a hold itself once every run it names has landed (`liftHold`), and by then the hold is already off the record, so the
  * absence rule would read the tick's own deed as a person's. The pass that lifted it says so (`lifted`), and that one put is the
  * absence rule's exception: exactly one lift either way, sourced by whoever took the hold off.
+ *
+ * The put carries who put the hold (`holder`, the record's hold's actor) where the record says; a lift, read off an absence, names none.
  */
-function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined): Once[] {
+function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted: string | undefined, holder: Actor | undefined): Once[] {
   const involved = onceInvolved(run, undefined);
   const standing = held === undefined ? undefined : holdSince(held);
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
   const since = standing ?? lifting;
   const out: Once[] = [
-    ...(since !== undefined ? [{ word: LINE_WORDS.HoldPut, note: since }] : []),
+    ...(since !== undefined ? [{ word: LINE_WORDS.HoldPut, note: since, ...(holder ? { actor: holder } : {}) }] : []),
     ...(lifting !== undefined ? [{ word: LINE_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
   ];
   const puts = onceKey(involved, 'HoldPut', undefined, '');
@@ -511,7 +516,7 @@ const STORE_INVOLVED: Involved = { kind: 'Store', name: STORE };
  * `null` when none does. A caller that did not read it passes nothing, and the feed then offers nothing of the store — no absence read
  * where nobody looked.
  */
-export type FeedPause = { at: string; by?: string; why?: string } | null;
+export type FeedPause = { at: string; by?: string; why?: string; actor?: Actor } | null;
 
 /**
  * The one-shots the store's pause owes the feed: the put, while a pause stands, and a lift for each put the feed holds that is not the one
@@ -525,14 +530,22 @@ export type FeedPause = { at: string; by?: string; why?: string } | null;
  * keeps the standing moment, and so writes no second put. A pause put and lifted between two passes leaves no line: a pass reads what
  * stands.
  *
- * The put carries who put the pause and why, as fields of its own (`by`, `why`), never in its note: the note is what the lift is paired
- * by, and the lift, read off an absence, cannot know them.
+ * The put carries who put the pause and why, as fields of its own (`by`, `why`, and the caller who put it, `actor`), never in its note:
+ * the note is what the lift is paired by, and the lift, read off an absence, cannot know them.
  */
 function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
   const standing = pause === null ? undefined : holdSince(pause.at);
   const out: Once[] =
     pause !== null && standing !== undefined
-      ? [{ word: LINE_WORDS.StorePaused, note: standing, ...(pause.by ? { by: pause.by } : {}), ...(pause.why ? { why: pause.why } : {}) }]
+      ? [
+          {
+            word: LINE_WORDS.StorePaused,
+            note: standing,
+            ...(pause.by ? { by: pause.by } : {}),
+            ...(pause.why ? { why: pause.why } : {}),
+            ...(pause.actor ? { actor: pause.actor } : {}),
+          },
+        ]
       : [];
   const puts = onceKey(STORE_INVOLVED, 'StorePaused', undefined, '');
   for (const key of fold.shots.keys()) {
@@ -554,6 +567,7 @@ const storeLines = (fold: FeedFold, at: string, pause: FeedPause): StoreLine[] =
         ...(o.note !== undefined ? { note: o.note } : {}),
         ...(o.by !== undefined ? { by: o.by } : {}),
         ...(o.why !== undefined ? { why: o.why } : {}),
+        ...(o.actor !== undefined ? { actor: o.actor } : {}),
         involved: STORE_INVOLVED,
         labels: {},
       }) as StoreLine,
@@ -717,7 +731,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
   const offers = [
     ...(words.denials ?? []).map(denialOnce),
     ...(words.acts ?? []),
-    ...holdOnce(fold, run, words.held, words.lifted),
+    ...holdOnce(fold, run, words.held, words.lifted, words.holder),
     ...(words.faults ?? []),
     ...(words.closeouts ?? []).map(closeoutOnce),
   ];
@@ -734,6 +748,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
         ...(o.call !== undefined ? { call: o.call } : {}),
         ...(o.try !== undefined ? { try: o.try } : {}),
         ...(o.source !== undefined ? { source: o.source } : {}),
+        ...(o.actor !== undefined ? { actor: o.actor } : {}),
       }) as RunLine,
   );
 }
@@ -879,7 +894,8 @@ export type FeedSaid = { word: string; note?: string; reason?: Reason; on?: Wait
  * Beside the words, the one-shots the pass read of the run, each written once per occurrence and no part of any word: the calls its
  * steps were denied (`denials`), the acts a person took on it (`acts`, from `actsOf`), the faults the runtime journalled (`faults`, from
  * `faultsOf`), the closeouts its steps' current turns gave (`closeouts`, from `closeoutsOf`), the moment the hold on its record was put
- * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift.
+ * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift, and who put the
+ * hold on the record (`holder`), which its put carries.
  */
 export type FeedWords = {
   run: FeedSaid;
@@ -892,6 +908,7 @@ export type FeedWords = {
   closeouts?: readonly FeedCloseout[];
   held?: string;
   lifted?: string;
+  holder?: Actor;
 };
 
 /**
@@ -983,6 +1000,7 @@ export function feedWords(
     closeouts?: readonly FeedCloseout[];
     held?: string;
     lifted?: string;
+    holder?: Actor;
   } = {},
 ): FeedWords {
   const waitingWords = onYouWords(l);
@@ -996,6 +1014,7 @@ export function feedWords(
     ...(labelled.closeouts?.length ? { closeouts: labelled.closeouts } : {}),
     ...(labelled.held !== undefined ? { held: labelled.held } : {}),
     ...(labelled.lifted !== undefined ? { lifted: labelled.lifted } : {}),
+    ...(labelled.holder !== undefined ? { holder: labelled.holder } : {}),
     run: {
       word: `${status}${run.pruned ? ' (pruned)' : ''}`,
       ...(held && run.hold

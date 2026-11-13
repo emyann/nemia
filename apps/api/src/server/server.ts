@@ -61,6 +61,7 @@
 import { Effect, Metric } from 'effect';
 import type { HttpServerRequest } from 'effect/http';
 import {
+  actorOf,
   eventKept,
   latestRelease,
   leaseRelease,
@@ -171,7 +172,7 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('pauseNow', () => answered((s) => s.inRequest(PAUSE_NOW.handler({}, { records: { pause: s.memo.records.pause } }))))
     .handle('pauseTimeout', () => answered((s) => s.inRequest(PAUSE_TIMEOUT.handler({}))))
     .handle('setPauseTimeout', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE_TIMEOUT.handler(payload))))
-    .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler(payload))))
+    .handle('pause', ({ payload }) => answeredWrite((s) => s.inRequest(PAUSE.handler({ ...payload, actor: actorOf(s.caller) }))))
     .handle('resume', () => answeredWrite((s) => s.inRequest(RESUME.handler({}))))
     .handle('wait', ({ query }) =>
       answered(async (s) =>

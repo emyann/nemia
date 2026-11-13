@@ -215,6 +215,35 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'a daemon with no fold reads the feed and writes none of them again',
     );
   });
+  await t.test("a person's act says who acted where the record says, and who acted is no part of what counts it", () => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const person = { kind: 'person', token: 'laptop' } as const;
+    const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+    const acts = withOnce({
+      acts: [
+        { ...APPROVED, actor: person },
+        { ...CANCELLED, actor: agent },
+      ],
+      held: '2026-10-16T03:45:00.000Z',
+    });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', { ...acts, holder: person }]]), { at: AT, memo });
+    assert.deepEqual([...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length, 3, 'one line per act over three passes');
+    assert.deepEqual(
+      ['Approved', 'CancelAsked', 'HoldPut'].map((reason) => lines().find((l) => l.reason === reason)?.actor),
+      [person, agent, person],
+      'each line carries who acted',
+    );
+    recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [APPROVED, CANCELLED], held: '2026-10-16T03:45:00.000Z' })]]), {
+      at: AT,
+      memo: freshFeedMemo(),
+    });
+    assert.equal(
+      [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length,
+      3,
+      'the same acts read with no actor are the occurrences already said, and a restarted daemon writes none again',
+    );
+  });
   await t.test('a second act of the same kind gets its own line: the try an approval opens is part of what counts it', () => {
     emptyStore();
     const memo = freshFeedMemo();

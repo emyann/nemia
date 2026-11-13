@@ -8,11 +8,18 @@ import { resumePause } from './pause.store.ts';
 import { nowRead, pauseNow, pauseParked } from './pause.verb.ts';
 import { NOW_COST, type Interrupt, type Pause, type Paused, type PausedNow } from './pause.ts';
 import { Effect, Schema } from 'effect';
-import { PAUSE_WORDS, pauseRefusal, PauseWrite, RESUME_WORDS } from 'objects';
+import { Actor, PAUSE_WORDS, pauseRefusal, PauseWrite, RESUME_WORDS } from 'objects';
 import { pausedRead } from '../list/list.verb.ts';
 import { sessionsDrained, tried } from '../runtime-client.ts';
 import type { Command, Served } from '../command/entry.verb.ts';
 import { saidOf } from '../command/command.ts';
+
+/**
+ * What `nemia pause` takes: the pause as the api is sent it (`objects`' `PauseWrite`: `why`, `by`, `timeout`, `now`), and who puts it
+ * (`actor`, objects' `Actor`), which the api hands of its caller and the pause keeps beside `by` — none from the command line.
+ */
+export const PauseInput = Schema.Struct({ ...PauseWrite.fields, actor: Schema.optionalKey(Actor) });
+export type PauseInput = typeof PauseInput.Type;
 
 /** What `nemia pause` answers: the pause put; with `now`, what it did (`PausedNow`). */
 type PauseAnswer = { pause: Pause } | PausedNow;
@@ -21,10 +28,11 @@ type PauseAnswer = { pause: Pause } | PausedNow;
  * `nemia pause`'s handler, by its input: a plain pause, which parks every session at its call's end within `timeout` or the store's
  * timeout (`timeoutAt`), refused while one stands; `now`, which pauses at once. Its input refused first, as `Invalid`, whoever calls it.
  */
-const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home: string) {
-  const wrong = pauseRefusal(input);
+const pauseBy = Effect.fnUntraced(function* (input: PauseInput, home: string) {
+  const { actor, ...written } = input;
+  const wrong = pauseRefusal(written);
   if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
-  const said = { why: saidOf(input, 'why'), by: saidOf(input, 'by') };
+  const said = { why: saidOf(written, 'why'), by: saidOf(written, 'by'), ...(actor ? { actor } : {}) };
   if (input.now !== true) return { pause: yield* pauseParked(said, input.timeout, home) } satisfies PauseAnswer;
   return (yield* pauseNow(said)) satisfies PauseAnswer;
 });
@@ -35,9 +43,9 @@ const pauseBy = Effect.fnUntraced(function* (input: PauseWrite, home: string) {
  * `now` pauses at once (`pauseNow`). The verb takes no yes: `--yes` is the client's, which says what `--now` would cut, as the api's
  * `GET /api/pause/now` reads it (`PAUSE_NOW`), and acts on `--yes` alone.
  */
-export const PAUSE: Served<PauseAnswer, PauseWrite> = {
+export const PAUSE: Served<PauseAnswer, PauseInput> = {
   ...PAUSE_WORDS,
-  input: PauseWrite,
+  input: PauseInput,
   handler: (input) => Effect.flatMap(StoreRoot, (home) => pauseBy(input, home)),
 };
 

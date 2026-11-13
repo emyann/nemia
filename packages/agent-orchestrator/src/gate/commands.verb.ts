@@ -5,7 +5,7 @@
  */
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
-import { APPROVE_WORDS, approveRefusal, RunApprove } from 'objects';
+import { Actor, APPROVE_WORDS, approveRefusal, RunApprove } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun } from '../round/round.verb.ts';
@@ -21,7 +21,8 @@ import { budgetArgs, type StepBudget } from '../budget/budget.ts';
 /**
  * What `nemia approve` takes: the run and the step (none for a run's only loop), and the approval as the api is sent it (`objects`'
  * `RunApprove`) — its words, a person's `answers` by title and label, the caps it sets (`budgets`, by step and dollars) — with what the
- * command line types in their place: `answer`, the `--answer`s by number and letter, and `budget`, the `--budget`s as `<step>=<amount>`.
+ * command line types in their place: `answer`, the `--answer`s by number and letter, and `budget`, the `--budget`s as `<step>=<amount>`;
+ * and who approves (`actor`, objects' `Actor`), which the api hands of its caller and the approval keeps — none from the command line.
  */
 export const ApproveInput = Schema.Struct({
   runId: Schema.String,
@@ -29,6 +30,7 @@ export const ApproveInput = Schema.Struct({
   ...RunApprove.fields,
   answer: Schema.optionalKey(Schema.Array(Schema.String)),
   budget: Schema.optionalKey(Schema.Array(Schema.String)),
+  actor: Schema.optionalKey(Actor),
 });
 export type ApproveInput = typeof ApproveInput.Type;
 
@@ -77,8 +79,24 @@ function budgetsLoopRefusal(input: ApproveInput): string | null {
 }
 
 /**
+ * `nemia approve` of a loop out of rounds: its form refused first where the run is there to read (`budgetsLoopRefusal`, `loopRefusal`),
+ * then the loop accepted as it stands (`acceptRun`), with who accepted it (`actor`) where the caller was handed.
+ */
+const loopAccepted = Effect.fnUntraced(function* (input: ApproveInput, home: string) {
+  const { runId, step, message: words, actor } = input;
+  const refused = runsAtOnce(home).runs.exists(runId) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
+  if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
+  const { acceptance, file } = yield* acceptRun(runId, step, words, actor);
+  const waited = (yield* stepsOf(runsAtOnce(home).runs.read(runId))).some((s) => s.after.includes(acceptance.step));
+  const { step: looping, try: tryNo, at, message } = acceptance;
+  const by = acceptance.actor ? { actor: acceptance.actor } : {};
+  const next: Next = waited ? 'waiting' : 'nothing';
+  return { step: looping, try: tryNo, at, message, file, ...by, next, loop: true, caps: [] };
+});
+
+/**
  * `nemia approve`: a step's try approved at its gate, or a loop out of rounds ended as it stands; what the next tick files because of it,
- * and the file the approval is written to. `loop` says which.
+ * and the file the approval is written to, and who gave it (`actor`) where the caller was handed. `loop` says which.
  */
 export const APPROVE: Served<
   {
@@ -87,6 +105,7 @@ export const APPROVE: Served<
     at: string;
     message: string | null;
     file: string;
+    actor?: Actor;
     next: Next;
     loop: boolean;
     caps: Array<{ step: string; usd: number; above: boolean; workflow: number | null }>;
@@ -97,29 +116,22 @@ export const APPROVE: Served<
   input: ApproveInput,
   handler: Effect.fnUntraced(function* (input: ApproveInput) {
     const home = yield* StoreRoot;
-    const { answers: _answers, budgets: _budgets, ...flags } = input;
+    const { answers: _answers, budgets: _budgets, actor, ...flags } = input;
     yield* checked(approveRefusal(flags));
     const { runId, step } = input;
     const words = input.message;
-    if ((yield* approveForm(runId, step)) === 'loop') {
-      const refused = runsAtOnce(home).runs.exists(runId) ? (budgetsLoopRefusal(input) ?? loopRefusal(input)) : null;
-      if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
-      const { acceptance, file } = yield* acceptRun(runId, step, words);
-      const waited = (yield* stepsOf(runsAtOnce(home).runs.read(runId))).some((s) => s.after.includes(acceptance.step));
-      const { step: looping, try: tryNo, at, message } = acceptance;
-      return { step: looping, try: tryNo, at, message, file, next: waited ? 'waiting' : 'nothing', loop: true, caps: [] };
-    }
+    if ((yield* approveForm(runId, step)) === 'loop') return yield* loopAccepted(input, home);
     const gated = step ?? '';
     const given = givenBudgets(input);
     if (typeof given === 'string') return yield* Effect.fail(new Invalid({ message: given }));
     const typed = input.answer ?? [];
     const message =
       input.answers !== undefined
-        ? yield* givenAnswers(runId, gated, input.answers, { note: words, approval: true, home })
+        ? yield* givenAnswers(runId, gated, input.answers, { note: words, approval: true, home, actor })
         : typed.length
-          ? yield* typedAnswers(runId, gated, typed, { note: words, approval: true })
+          ? yield* typedAnswers(runId, gated, typed, { note: words, approval: true, actor })
           : words;
-    const { approval, file, caps, above } = yield* approveRun(runId, gated, message, given);
+    const { approval, file, caps, above } = yield* approveRun(runId, gated, message, given, actor);
     const after = runsAtOnce(home).runs.read(runId);
     const ceilings = yield* stepsOf(after);
     const next: Next = !after.steps[gated]?.taskId
@@ -138,6 +150,7 @@ export const APPROVE: Served<
       at: approval.at,
       message: approval.message ?? null,
       file,
+      ...(approval.actor ? { actor: approval.actor } : {}),
       next,
       loop: false,
       caps: capped,

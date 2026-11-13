@@ -10,6 +10,7 @@ import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
+import { actorWords, type Actor } from 'objects';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
 export type QuestionOption = { label: string; meaning: string };
@@ -342,10 +343,21 @@ export function answerRefusal(
 }
 
 /**
- * Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered, and
- * where (`from`).
+ * Who answered, as the last of the words a step reads (`Answered by: …`): the caller who sent the answers (objects' `Actor`, in its words,
+ * `actorWords`) — the person under the name of their token, an agent by its token or of its session — or, for answers given in-process,
+ * where the person gave them (`on the board`, `at the terminal`).
  */
-function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note: string | undefined, from: string): string[] {
+export type AnsweredBy = Actor | string;
+
+/** The last line of the words answers become: who answered (`AnsweredBy`). */
+const answeredLine = (by: AnsweredBy): string =>
+  typeof by === 'string' ? `Answered by: ${actorWords({ kind: 'person' })}, ${by}` : `Answered by: ${actorWords(by)}`;
+
+/**
+ * Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered
+ * (`by`).
+ */
+function answerBlocks(asked: readonly Question[], answers: readonly Answer[], note: string | undefined, by: AnsweredBy): string[] {
   const blocks = asked.map((q, i) => {
     const a = answers.find((one) => one.question === q.title);
     const chose = (a?.chose ?? []).map((label) => `   Chose: ${label} — ${q.options.find((o) => o.label === label)?.meaning ?? ''}`);
@@ -353,26 +365,30 @@ function answerBlocks(asked: readonly Question[], answers: readonly Answer[], no
     return [`${i + 1}. ${q.title}`, ...chose, ...own].join('\n');
   });
   const noted = note?.trim() ? [`Note: ${note.trim()}`] : [];
-  return [...blocks, ...noted, `Answered by: person, ${from}`];
+  return [...blocks, ...noted, answeredLine(by)];
 }
 
 /**
  * The words a step's next try reads for `answers` to `asked`, which `answerRefusal` let through: each question in the order asked, what was
- * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered, and where: `from`, on
- * the board unless the terminal says otherwise.
+ * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered (`by`): the caller's actor,
+ * or where the person answered in-process, on the board unless the terminal says otherwise.
  */
-export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string, from = 'on the board'): string =>
-  ['Answers to your questions:', ...answerBlocks(asked, answers, note, from)].join('\n\n');
+export const answerText = (
+  asked: readonly Question[],
+  answers: readonly Answer[],
+  note?: string,
+  by: AnsweredBy = 'on the board',
+): string => ['Answers to your questions:', ...answerBlocks(asked, answers, note, by)].join('\n\n');
 
 /**
  * The words an approval carries for `answers` to the questions `step` asked at its gate, which `answerRefusal` let through: read under
  * `## Approved` by the steps after the gate, so they open naming whose questions they answer; then each answer as `answerText` says it,
- * `note`, and who answered, and where (`from`).
+ * `note`, and who answered (`by`).
  */
 export const approvedAnswerText = (
   step: string,
   asked: readonly Question[],
   answers: readonly Answer[],
   note?: string,
-  from = 'on the board',
-): string => [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note, from)].join('\n\n');
+  by: AnsweredBy = 'on the board',
+): string => [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note, by)].join('\n\n');

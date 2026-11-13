@@ -25,6 +25,9 @@ import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 
+/** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
+const SEATED = { kind: 'person', token: 'harness' } as const;
+
 const T0 = Date.parse('2026-09-30T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 const write = (file: string, text: string) => {
@@ -212,8 +215,8 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
       assert.equal(res.status, 202, await res.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(root, R, 'design', 2), 'utf8')) as { mode: string; message: string };
       assert.equal(written.mode, 'continue');
-      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.'));
-      assert.ok(written.message.endsWith('Answered by: person, on the board'), written.message);
+      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.', SEATED));
+      assert.ok(written.message.endsWith('Answered by: the person, on harness'), written.message);
 
       const plain = await ask('plain', { mode: 'continue', message: 'Postgres.' });
       assert.equal(plain.status, 202, await plain.clone().text());

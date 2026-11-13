@@ -38,9 +38,9 @@ export type Holding = { run: Run; hold: Hold };
  * throws.
  *
  * @param said The person's words for why (`--why`), and who they are (`--by`): without a name, the user this process runs as, and none when
- * the system has no name for it.
+ * the system has no name for it; and the caller who puts it (`actor`), kept beside `by` where it is known.
  */
-export const hold = Effect.fn('hold')(function* (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'> = {}) {
+export const hold = Effect.fn('hold')(function* (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'> = {}) {
   const bad = idRefusal(id, 'hold');
   if (bad) return yield* Effect.fail(new Invalid({ message: bad }));
   for (const named of until) {

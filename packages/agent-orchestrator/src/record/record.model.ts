@@ -3,6 +3,7 @@
  * A declaration in S1: no read path decodes through it yet; the Run door (S2) will.
  */
 import { Schema } from 'effect';
+import { Actor } from 'objects';
 import { foreignId, brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { stepTaskId, type LandingRecord, type RouteBy, type StepRecord } from './record.ts';
@@ -178,10 +179,17 @@ const Approval = Schema.Struct({
   at: Schema.String,
   message: Schema.optional(Schema.String),
   budgets: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+  actor: Schema.optional(Actor),
 });
 
 /** A loop a person ended, composed on read (`Acceptance`, record.ts). */
-const Acceptance = Schema.Struct({ step: Schema.String, try: Schema.Number, at: Schema.String, message: Schema.String });
+const Acceptance = Schema.Struct({
+  step: Schema.String,
+  try: Schema.Number,
+  at: Schema.String,
+  message: Schema.String,
+  actor: Schema.optional(Actor),
+});
 
 /** A person's hold on a run, composed on read (`Hold`, record.ts). */
 const Hold = Schema.Struct({
@@ -189,6 +197,7 @@ const Hold = Schema.Struct({
   until: Schema.Array(Schema.String),
   why: Schema.optional(Schema.String),
   by: Schema.optional(Schema.String),
+  actor: Schema.optional(Actor),
 });
 
 /** What `nemia prune` removed of a run, composed on read (`Pruned`, record.ts). */
@@ -207,6 +216,7 @@ const Pause = Schema.Struct({
   by: Schema.String,
   why: Schema.optional(Schema.String),
   timeoutMs: Schema.optional(Schema.Number),
+  actor: Schema.optional(Actor),
 });
 
 /**
@@ -351,6 +361,11 @@ const runFields = {
    * can hold the second one.
    */
   cancelledAt: Schema.optional(Schema.String),
+  /**
+   * Who called the run off (objects' `Actor`), kept with `cancelledAt` in its file, the first cancellation's: absent on a run cancelled
+   * in-process, and on one cancelled before actors were said.
+   */
+  cancelledBy: Schema.optional(Actor),
   /**
    * A person's labels on the run (`nemia label run`, and what `nemia start` copied once, at creation): free `key=value` pairs, never a
    * closed key (`factory`, `workflow`), which the run's whole map adds itself (`metadataLabels`). Composed onto every read of the store

@@ -6,6 +6,7 @@
 import { type Args, type CommandWords, type Flag, type Spec } from './command.ts';
 import { leftOut } from './commands-flags.ts';
 import { FACTORY_MANUAL } from './commands-factories-manual.ts';
+import { FACTORY_MOVE_WORDS } from './commands-factories-move.ts';
 import {
   FACTORY_FIRE_WORDS,
   FACTORY_HIRE_WORDS,
@@ -273,5 +274,6 @@ export const FACTORY_WORDS = [
   FACTORY_INSTRUCT_WORDS,
   FACTORY_REVISIONS_WORDS,
   FACTORY_TRUST_WORDS,
+  FACTORY_MOVE_WORDS,
   FACTORY_RM_WORDS,
 ] as const satisfies readonly CommandWords[];

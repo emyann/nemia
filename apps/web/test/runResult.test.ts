@@ -1,7 +1,7 @@
 /**
  * The run's result box (src/lib/runResult.ts): the steps it reads off the run's view, final where nothing comes after them on the graph,
- * and the one law of `resultOf` its contract leaves `bounded` (`gaveIsTheFinalSteps`: a filter's result, which tsverify 0.9.0 does not
- * prove whole), held here on runs longer than its search side's four steps.
+ * and the law of `resultOf` its contract holds out (what is drawn as given is exactly the final steps the run will run: a filter's result,
+ * which tsverify 0.9.0 does not prove whole), held here on runs longer than its search side's four steps.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

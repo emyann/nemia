@@ -32,6 +32,7 @@ import { deadlineOf, heldNow, holdFacts } from './deadline.ts';
 import { turnOf } from './turn.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
 import { foldInto } from './attempt-fold.ts';
+import type { AdmissionWait } from './admission.ts';
 import type { Decide } from '../../contracts/decide.contract.ts';
 import type { LifecycleOf } from '../../contracts/lifecycle.contract.ts';
 import type { Observe } from '../../contracts/observe.contract.ts';
@@ -43,8 +44,11 @@ import type { Observe } from '../../contracts/observe.contract.ts';
  */
 type MemoryUse = { limitBytes: number; peakBytes?: number; oomKills: number };
 
-/** What a task asks of its host's resources, as a container's `resources`: a memory limit, a Kubernetes quantity. */
-export type TaskResources = { limits?: { memory?: string } };
+/**
+ * What a task asks of its host's resources, as a container's `resources`: a memory limit and a memory request, each a Kubernetes
+ * quantity. The limit is what its cgroup holds it to; the request what admission counts it at against the machine (`needBytesOf`).
+ */
+export type TaskResources = { limits?: { memory?: string }; requests?: { memory?: string } };
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
@@ -421,6 +425,9 @@ export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadl
  * - `admitted`: the layer above's word that a queued task's current turn may start: the next pass starts it. Names no
  *   turn: it admits the turn current when it is written, and a later turn — a person's answer to a task held open — waits
  *   for one of its own. Written by `admit`, and only while the task waits for it.
+ * - `waits`: why a pass left a queued task waiting (`AdmissionWait`): its pool at the ceiling, or the machine's memory, with the need
+ *   and the room. Written by the pass only when it differs from the one the task holds, as a Pod's PodScheduled condition says
+ *   Unschedulable; `admitted` and `starting` clear it. A status for a person: `decide` and admission never read it.
  * - `gap`: a long-lived attempt's session was first listed live with no process — its harness respawning it — at `at`.
  *   Written once per gap, by the engine off a sighting (`sightingFacts`); `decide` reads when it opened (`gapSince`).
  * - `process`: the same attempt's session was listed held in a process — `pid`, when its harness said — after a gap, or
@@ -535,6 +542,7 @@ export type Event =
   | ({ kind: 'input' } & Input)
   | { kind: 'closed'; at: string }
   | { kind: 'admitted'; at: string }
+  | { kind: 'waits'; at: string; wait?: AdmissionWait }
   | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
 
 /**
@@ -693,6 +701,8 @@ export type State = {
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
   admitted?: number;
+  /** Why the last pass left it queued, until it is admitted or starts. See the `waits` event. `decide` never reads it. */
+  waits?: AdmissionWait;
   /** A person's answers to a task held open, in the order given. Each starts a turn; the current turn is how many there are. */
   inputs: Input[];
   /** A person closed a task held open: it settles once no attempt of it runs. */
@@ -755,6 +765,12 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
   if (e.resources !== undefined) s.resources = e.resources;
 }
 
+/** A `waits` entry into `s`: the wait it says, or none where it says none (a pass that judged nothing took it off). */
+function waitInto(s: State, wait: AdmissionWait | undefined): void {
+  if (wait === undefined) delete s.waits;
+  else s.waits = wait;
+}
+
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
@@ -775,8 +791,13 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       case 'admitted':
         s.admitted = s.inputs.length;
+        delete s.waits;
+        break;
+      case 'waits':
+        waitInto(s, e.wait);
         break;
       case 'starting':
+        delete s.waits;
         s.attempts.push({
           n: e.attempt,
           startedAt: e.at,

@@ -10,6 +10,7 @@ import { Schema } from 'effect';
 import { brandedCount, brandedId, foreignId, type Count, type Id } from './brand.ts';
 import { erDiagram, type ErModel } from './er.ts';
 import {
+  AdmissionWaitSchema,
   FORMER_REASONS,
   HarnessArgsSchema,
   MemoryUseSchema,
@@ -176,6 +177,7 @@ export const Task = Schema.Struct({
   resources: Schema.optional(ResourcesSchema),
   queued: Schema.optional(Schema.Boolean),
   admitted: Schema.optional(Schema.Number),
+  waits: Schema.optional(AdmissionWaitSchema),
   inputs: Schema.Array(Input),
   closed: Schema.Boolean,
   stopRequested: Schema.Boolean,

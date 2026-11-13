@@ -60,6 +60,7 @@ import {
 } from './service.store.ts';
 import { takeOver, takeOverConfirmed, type Started, type TakeoverHost } from './takeover.verb.ts';
 import { sizedFor, sizeRefusal, type MachineSize } from './sizing.ts';
+import { memoryBytesOf } from 'agent-runtime/vocabulary';
 import { BIND_PUBLIC_VARIABLE, bindExposure, kindOfBind, machineAddresses, type MachineAddress } from './address.ts';
 
 /**
@@ -253,10 +254,17 @@ const bindable = (value: string): boolean => isIP(value) !== 0 && !value.include
 
 /**
  * The variables `--size auto` writes, read off the machine's size (`sizedFor`), each but one `--env` gives (`given`): the sessions at once
- * and, but on launchd, which holds no per-session limit, each one's memory limit; and its line. None without `--size`. Refused
- * (`Invalid`): a `--size` other than `auto`, or a machine outside what Nemia sizes (`sizeRefusal`).
+ * and, but on launchd, which holds no per-session limit, each one's memory limit and request — the request left out where a limit `--env`
+ * gives is under it, which the daemon would refuse; and its lines, the first saying the floor kept, its default (`WF_MEMORY_RESERVED`),
+ * which none is written for. None without `--size`. Refused (`Invalid`): a `--size` other than `auto`, or a machine outside what Nemia
+ * sizes (`sizeRefusal`).
  */
-function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlySet<string>): { env: [string, string][]; lines: string[] } {
+function sizedEnv(
+  args: Args,
+  at: Placed,
+  host: ServiceHost,
+  given: ReadonlyMap<string, string>,
+): { env: [string, string][]; lines: string[] } {
   if (args.size === undefined) return { env: [], lines: [] };
   if (args.size !== 'auto')
     throw new Invalid({
@@ -266,19 +274,29 @@ function sizedEnv(args: Args, at: Placed, host: ServiceHost, given: ReadonlySet<
   const wrong = sizeRefusal(machine);
   if (wrong !== null) throw new Invalid({ message: wrong });
   const sized = sizedFor(machine);
+  const held = given.get('WF_MEMORY_LIMIT');
+  const heldBytes = held === undefined ? undefined : memoryBytesOf(held.trim());
+  const asks = heldBytes === undefined ? held === undefined : sized.memoryRequestMiB * 2 ** 20 <= heldBytes;
+  const memory = at.system !== 'launchd';
   const env: [string, string][] = [
     ...(given.has('WF_MAX_CONCURRENT') ? [] : [['WF_MAX_CONCURRENT', String(sized.maxConcurrent)] as [string, string]]),
-    ...(given.has('WF_MEMORY_LIMIT') || at.system === 'launchd'
+    ...(given.has('WF_MEMORY_LIMIT') || !memory ? [] : [['WF_MEMORY_LIMIT', `${sized.memoryLimitMiB}Mi`] as [string, string]]),
+    ...(given.has('WF_MEMORY_REQUEST') || !memory || !asks
       ? []
-      : [['WF_MEMORY_LIMIT', `${sized.memoryLimitMiB}Mi`] as [string, string]]),
+      : [['WF_MEMORY_REQUEST', `${sized.memoryRequestMiB}Mi`] as [string, string]]),
   ];
   const said = env.map(([k, v]) => `${k}=${v}`).join(', ');
+  const kept = given.has('WF_MEMORY_RESERVED')
+    ? 'the floor as --env gives it (WF_MEMORY_RESERVED)'
+    : `${sized.memoryReservedMiB} MiB kept for the daemon and the machine (WF_MEMORY_RESERVED, its default, not written)`;
   return {
     env,
     lines: [
-      `sized for ${machine.memoryMiB} MiB and ${machine.cpus} CPU: ${said || 'each variable as --env gives it'}`,
+      `sized for ${machine.memoryMiB} MiB and ${machine.cpus} CPU: ${said || 'each variable as --env gives it'}; ${kept}`,
       ...(at.system === 'launchd'
-        ? ['launchd holds no per-session memory limit: no WF_MEMORY_LIMIT is written, and a session on macOS runs unbounded']
+        ? [
+            'launchd holds no per-session memory limit: no WF_MEMORY_LIMIT or WF_MEMORY_REQUEST is written, and a session on macOS runs unbounded',
+          ]
         : []),
     ],
   };
@@ -322,7 +340,7 @@ function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec;
   const wrong = envRefusal(given);
   if (wrong !== null) throw new Invalid({ message: wrong });
   const keys = new Set(envPairs(given).map(([k]) => k));
-  const sized = sizedEnv(args, at, host, keys);
+  const sized = sizedEnv(args, at, host, new Map(envPairs(given)));
   const bound = boundEnv(args, keys);
   const daemon = host.daemon();
   const spec: ServiceSpec = {
@@ -538,9 +556,11 @@ const INSTALL: Command<Installed> = {
     'the store; --take-over <pid> pauses the store, waits for the calls',
     'in flight of its sessions, stops that pid and starts the service',
     '(checks and jobs run on, as nemia service restart --help says).',
-    "--size auto: the sessions at once and each one's memory limit, read",
-    'off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT; no limit on',
-    'macOS), each but one --env gives. --bind <addr>: the address the',
+    "--size auto: the sessions at once and each one's memory limit and",
+    'request, read off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT,',
+    'WF_MEMORY_REQUEST; neither memory one on macOS), each but one --env',
+    'gives; the floor kept, WF_MEMORY_RESERVED, is its default (an eighth',
+    'of the machine, 1 GiB at least). --bind <addr>: the address the',
     'daemon listens on (NEMIA_BIND), and the store marked exposed',
     '(WF_EXPOSED=1), so every caller presents a token: nemia pairings',
     'approve and nemia board link hand out the first. A public or',

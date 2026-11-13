@@ -147,7 +147,11 @@ const KINDS: Record<string, string> = {
   input: 'answered',
   closed: 'closed',
   admitted: 'admitted',
+  waits: 'waits',
 };
+
+/** Bytes as a person reads a memory size: in GiB to one place. */
+const gib = (bytes: number): string => `${(bytes / 2 ** 30).toFixed(1)}Gi`;
 
 /** What follows each kind of journal entry's word, for a person; nothing for a kind not named. */
 const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => string } = {
@@ -161,6 +165,12 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
     `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? noStatement(e.closedOut) : ` (${e.reason})`}${e.error ? `: ${firstLine(e.error).slice(0, 160)}` : ''}`,
   spawned: (e) => (e.error ? `  but the call failed: ${firstLine(e.error).slice(0, 160)}` : ''),
   said: (e) => `  to attempt ${e.attempt}: ${firstLine(e.text.trim()).slice(0, 160)}`,
+  waits: ({ wait }) =>
+    wait === undefined
+      ? '  no longer judged: admission is paused or has no ceiling'
+      : wait.for === 'slot'
+        ? `  for a slot of ${wait.pool}: ${wait.ceiling} at work (maxConcurrent)`
+        : `  for memory: needs ${gib(wait.needBytes)}, ${gib(wait.roomBytes)} free`,
   input: (e) =>
     `  ${firstLine(e.text.trim()).slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
 };

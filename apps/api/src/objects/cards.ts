@@ -1,7 +1,7 @@
 /**
  * The cards group's handlers (`objects`' `Api`): the inbox's cards as objects, over the package's entries the inbox's routes and the card
  * start run — a page of them (`cardList`, or `cardTable` as a table), one (`cardObject`) in its namespace or found in any (`getAll`), each
- * with its file as written, written whole (`replaceCard`), filed (`nemia inbox add`), dropped (`inbox rm`), started (`nemia start
+ * with its file as written, written whole (`replaceCard`), written from its text (`nemia inbox edit`), filed (`nemia inbox add`), dropped (`inbox rm`), started (`nemia start
  * <card>`), queued and taken off (`inbox queue`), and its labels edited (`label inbox`).
  *
  * A card started under a factory's namespace is placed in that factory (`placedIn`), as `nemia start <card> --factory <namespace>` is: its
@@ -21,6 +21,7 @@ import {
   cardObject,
   cardTable,
   INBOX_ADD,
+  INBOX_EDIT,
   INBOX_QUEUE,
   INBOX_RM,
   LABEL_CARD,
@@ -120,6 +121,12 @@ export const cardsHandlers = readsBounded(Api, 'cards', (handlers) =>
     .handle('update', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         await s.inRequest(replaceCard(name, namespace, payload));
+        return cardIn(s, namespace, name);
+      }),
+    )
+    .handle('edit', ({ params: { namespace, name }, payload }) =>
+      answered(async (s) => {
+        await s.inRequest(INBOX_EDIT.handler({ name, namespace, ...payload }));
         return cardIn(s, namespace, name);
       }),
     )

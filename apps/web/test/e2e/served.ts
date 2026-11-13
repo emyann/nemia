@@ -279,6 +279,14 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   /** No collector, whatever the shell names: an api served for a test or a look exports nothing (`otlpOf` reads `''` as none). */
   OTEL_EXPORTER_OTLP_ENDPOINT: '',
   /**
+   * No bind, whatever a server's unit sets: the api listens on the loopback, where `startServer` reads its address, as every test seat's
+   * does (`SERVING_VARIABLES`, packages/agent-orchestrator/src/config/config.store.ts). The web app imports no package, so it is
+   * named here.
+   */
+  NEMIA_BIND: '',
+  /** Nor is the store marked exposed, by the same rule; a seat that wants one lays it over this (`serveExposed`). */
+  WF_EXPOSED: '',
+  /**
    * This machine's PATH without a folder that holds a `claude`, the store's or one installed here: the readiness read checks a harness
    * installed by finding its program on PATH, and a fresh seed has none.
    */

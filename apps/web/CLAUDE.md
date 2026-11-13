@@ -67,6 +67,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - Every api route asks for a token, so each browser context the e2e opens on a worker's seat is given the seed's (`SEAT_TOKEN`) as the
   board's cookie before a page loads (`seated`, `e2e/served.ts`; `visitAll` does it for every page), and a request made from Node presents
   it as its bearer (`bearer`); a context meant to meet the token page is opened bare.
+  on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
+  `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 
 ## Writing an e2e page
 

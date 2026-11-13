@@ -6,11 +6,11 @@
  *
  * Prose is not a constraint: a dozen comments across the runtime name a line of the SDK's own declarations, and an SDK bump rewrites
  * that file top to bottom — 0.3.270 to 0.3.308 moved every one of them, some by two hundred lines, 0.3.308 to 0.3.316 every one again,
- * and 0.3.316 to 0.3.322 all but the first two. A citation nobody can check rots into a line that says something else, and a reader who
- * follows it is misled with no warning, which is the same class of fault as a lock that fell behind a range. So each citation is named
- * here with the identifier it stands for, and the cited line — or, for a range, some line of it — must hold that identifier in the
- * installed `sdk.d.ts`. A citation this table does not name is refused too: a new one is added here, at the bump that introduced it, or
- * it is not a citation anybody can trust.
+ * 0.3.316 to 0.3.322 all but the first two, and 0.3.322 to 0.3.323 all but the first three. A citation nobody can check rots into a
+ * line that says something else, and a reader who follows it is misled with no warning, which is the same class of fault as a lock
+ * that fell behind a range. So each citation is named here with the identifier it stands for, and the cited line — or, for a range,
+ * some line of it — must hold that identifier in the installed `sdk.d.ts`. A citation this table does not name is refused too: a new
+ * one is added here, at the bump that introduced it, or it is not a citation anybody can trust.
  *
  * The line numbers belong to `test/sdk-pin.ts`'s `SDK_VERSION` alone, and are re-read at each bump. The one way to do that is to grep
  * the installed file for each identifier below.
@@ -33,29 +33,29 @@ const CLAIMS: Record<string, string> = {
   '228': 'CanUseTool',
   '232-239': 'suggestions',
   '315': 'matchedAskRule',
-  '1237-1253': 'McpHttpServerConfig',
-  '1284': 'McpServerConfigForProcessTransport',
-  '1300-1355': 'McpServerStatus',
-  '1743': 'env',
-  '1945': 'includePartialMessages',
-  '2011-2015': 'maxBudgetUsd',
-  '2040': 'mcpServers',
-  '2103': 'permissionPrompts',
-  '2416': 'strictMcpConfig',
-  '2417-2528': 'systemPrompt',
-  '2518-2528': 'systemPrompt',
-  '3145': 'mcpServerStatus',
-  '4762': 'appendSystemPrompt',
-  '5677': 'SDKMessageOrigin',
-  '5987': 'SDKRateLimitEvent',
-  '6000': 'SDKRateLimitInfo',
-  '6001': 'status',
-  '6182-6185': 'total_cost_usd',
-  '6326': 'SDKStatusMessage',
-  '6354': 'claude_code_version',
-  '6369': 'permissionMode',
-  '9538': 'autoCompactWindow',
-  '9745': 'claudeMdExcludes',
+  '1271-1287': 'McpHttpServerConfig',
+  '1319': 'McpServerConfigForProcessTransport',
+  '1335-1390': 'McpServerStatus',
+  '1778': 'env',
+  '1980': 'includePartialMessages',
+  '2046-2050': 'maxBudgetUsd',
+  '2075': 'mcpServers',
+  '2138': 'permissionPrompts',
+  '2458': 'strictMcpConfig',
+  '2459-2570': 'systemPrompt',
+  '2560-2570': 'systemPrompt',
+  '3190': 'mcpServerStatus',
+  '4842': 'appendSystemPrompt',
+  '5769': 'SDKMessageOrigin',
+  '6080': 'SDKRateLimitEvent',
+  '6093': 'SDKRateLimitInfo',
+  '6094': 'status',
+  '6280-6283': 'total_cost_usd',
+  '6424': 'SDKStatusMessage',
+  '6452': 'claude_code_version',
+  '6467': 'permissionMode',
+  '9671': 'autoCompactWindow',
+  '9878': 'claudeMdExcludes',
 };
 
 /** Every `sdk.d.ts:<n>` and `sdk.d.ts:<n>-<m>` in `text`, by the `<n>` or `<n>-<m>` it cites. */
@@ -118,17 +118,17 @@ test('every sdk.d.ts citation in our prose points at the identifier it claims', 
 });
 
 test('REFUSED: a citation one line off, a citation past the end of the file, and a citation the table does not name', () => {
-  const drifted = citationRefusals(lines, 'a/file.ts', '2102', { '2102': 'permissionPrompts' });
+  const drifted = citationRefusals(lines, 'a/file.ts', '2137', { '2137': 'permissionPrompts' });
   assert.equal(drifted.length, 1, 'a citation one line above the declaration is refused');
-  assert.match(drifted[0], /line 2102 of the installed sdk\.d\.ts/);
+  assert.match(drifted[0], /line 2137 of the installed sdk\.d\.ts/);
   assert.match(drifted[0], /Grep the installed sdk\.d\.ts for permissionPrompts/, 'and says how to correct it');
-  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2103', { '2103': 'permissionPrompts' }), [], 'and the line itself is not');
+  assert.deepEqual(citationRefusals(lines, 'a/file.ts', '2138', { '2138': 'permissionPrompts' }), [], 'and the line itself is not');
 
-  const narrowed = citationRefusals(lines, 'a/file.ts', '1237-1253', { '1237-1253': 'McpServerStatus' });
+  const narrowed = citationRefusals(lines, 'a/file.ts', '1271-1287', { '1271-1287': 'McpServerStatus' });
   assert.equal(narrowed.length, 1, 'a range that holds a different type than the one claimed is refused');
-  assert.match(narrowed[0], /no line of 1237-1253/);
+  assert.match(narrowed[0], /no line of 1271-1287/);
 
-  const unnamed = citationRefusals(lines, 'a/file.ts', '2103', {});
+  const unnamed = citationRefusals(lines, 'a/file.ts', '2138', {});
   assert.equal(unnamed.length, 1);
   assert.match(unnamed[0], /names no identifier for/, 'a citation nobody wrote a claim for is refused');
 

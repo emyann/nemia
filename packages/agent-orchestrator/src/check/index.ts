@@ -21,6 +21,7 @@ export {
   FAILING_LINES,
   failingLines,
   INSTALL,
+  INSTALL_ARGS,
   INSTALL_FAILED,
   LANDING_CHECK_DEADLINE_SECONDS,
   landingContract,

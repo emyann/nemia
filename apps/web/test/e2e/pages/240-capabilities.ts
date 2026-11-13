@@ -63,7 +63,7 @@ async function unread(page: Page): Promise<void> {
     'no-factory': answer({
       reason: 'no-factory',
       message:
-        'No factory is filed in this store, and this api has no repository of its own: file a factory, and the page reads its repository.',
+        'No factory is filed in this store, and the default factory reads no repository: file a factory, and the page reads its repository.',
       factory: null,
       repos: [],
       commands: ['nemia factory add <name> --repo <path>', 'nemia factory apply <name> --template <name> --repo <path>'],

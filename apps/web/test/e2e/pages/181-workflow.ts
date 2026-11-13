@@ -267,6 +267,12 @@ export default {
         await expectVisible(again.getByRole('button', { name: 'Build' }), 'one of yours has Build');
         await expectVisible(again.getByRole('button', { name: 'Remove…' }), 'and Remove');
         await expectCount(again.locator('[data-no-builder]'), 0, 'and no word of having no builder');
+        await expectCount(
+          again.getByRole('button', { name: 'Start', exact: true }),
+          0,
+          'with no factory there is no start: the default factory reads no repository, and the api refuses one there',
+        );
+        await expectVisible(again.locator('[data-starts-in-factory]'), 'it says a run starts in a factory that attaches it');
         await photograph(again, path.join(OUT, `workflow-yours-${await themeOf(again)}.png`), { fullPage: true });
         await again.setViewportSize({ width: 390, height: 844 });
         await again.goto(new URL(`/workflows/repo/${good.name}${IN}`, again.url()).href, { waitUntil: 'load' });

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { AGENTS } from '../seed.ts';
+import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -19,8 +19,45 @@ const CUSTOM = {
 
 const route = `/api/namespaces/default/agents/${CUSTOM.agent}/instructions`;
 
-const answered = (page: Page, method: 'PUT' | 'DELETE') =>
-  page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === route, { timeout: WAIT_MS });
+const answered = (page: Page, method: 'PUT' | 'DELETE', at = route) =>
+  page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname === at, { timeout: WAIT_MS });
+
+/**
+ * A repository's agent's custom instructions, saved and cleared on its page in FACTORIES' `hiring`, the factory on the checkout: the
+ * write goes to `default` with the repository the agent was read from (`?repo=`), since the default namespace reads none of its own,
+ * and the api answers what the page says — saved, the file written; cleared, gone.
+ */
+async function savedForRepoAgent(page: Page): Promise<void> {
+  const { good } = WORKFLOWS;
+  const agent = good.agent.name;
+  const file = path.join(store!, 'custom-instructions', `${agent}.md`);
+  const at = `/api/namespaces/default/agents/${agent}/instructions`;
+  const takeBack = checkoutIn(store!, [good.name]);
+  try {
+    await page.goto(new URL(`/agents/repo/${agent}?factory=${FACTORIES.hiring.name}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    const panel = page.locator('section[data-custom-instructions]');
+    await panel.getByRole('textbox', { name: 'Words' }).fill(CUSTOM.words);
+    const [put] = await Promise.all([answered(page, 'PUT', at), panel.getByRole('button', { name: 'Save' }).click()]);
+    if (put.status() !== 200)
+      throw new Refused(
+        `the api saves a repository's agent's words, as its page offers — it answered ${put.status()}: ${await put.text()}`,
+      );
+    if (!new URL(put.url()).searchParams.get('repo'))
+      throw new Refused(`the write names the repository the agent was read from — it went to ${put.url()}`);
+    if (!fs.existsSync(file)) throw new Refused(`saved, the words are ${file}'s — it is not there`);
+    await expectVisible(panel.locator('[data-custom-done]', { hasText: 'Saved' }), `the panel says ${agent}'s words are saved`);
+    await panel.getByRole('button', { name: 'Clear…' }).click();
+    const asks = panel.locator('[data-custom-clear-asks]');
+    const [cleared] = await Promise.all([answered(page, 'DELETE', at), asks.getByRole('button', { name: 'Clear', exact: true }).click()]);
+    if (cleared.status() !== 200) throw new Refused(`the api clears ${agent}'s words — it answered ${cleared.status()}`);
+    if (fs.existsSync(file)) throw new Refused(`cleared, ${file} is gone`);
+    await idle(page);
+  } finally {
+    fs.rmSync(file, { force: true });
+    takeBack();
+  }
+}
 
 /**
  * On a second page, words opening with a frontmatter block are saved: the api answers 422 with the package's sentence, the panel shows it
@@ -66,7 +103,8 @@ export default {
    * A person's custom instructions for an agent, yours `scribe`, on its page, between the form and Try. The panel says a run already
    * started keeps the words it froze, and that there are none yet, in the store's `custom-instructions/`. Words opening with a frontmatter
    * block are refused in the package's words, on a page of their own. Saved, the words are the file's, and read again on a reload; cleared,
-   * asked twice, the file is gone and the panel says none again — so each visit reads the store as seeded.
+   * asked twice, the file is gone and the panel says none again — so each visit reads the store as seeded. Then a repository's agent's
+   * words are saved and cleared on its page in a factory, as that page offers.
    */
   name: 'custom-instructions',
   route: `/agents/yours/${CUSTOM.agent}`,
@@ -115,6 +153,8 @@ export default {
       if (fs.existsSync(file)) throw new Refused(`cleared, ${file} is gone`);
       await expectVisible(panel.locator('[data-custom-file]', { hasText: 'none yet' }), 'cleared, the panel says none yet again');
       await idle(page);
+
+      await savedForRepoAgent(page);
     } finally {
       fs.rmSync(file, { force: true });
     }

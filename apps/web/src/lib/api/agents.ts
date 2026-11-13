@@ -260,37 +260,50 @@ const NEMIA = 'nemia';
 
 /**
  * A person's custom instructions for the agent `name`, read from the store on each request: Nemia's (`GET /api/nemia/instructions`), or
- * the record of an agent's name, read in `default` (`GET /api/namespaces/default/agents/:name/instructions`).
+ * the record of an agent's name, read in `default` (`GET /api/namespaces/default/agents/:name/instructions`), the name looked for in yours
+ * and, given `repo`, in that repository, which a factory works on (`?repo=`): the default namespace reads none of its own.
  */
-export const customInstructionsQuery = (name: string) =>
+export const customInstructionsQuery = (name: string, repo?: string) =>
   queryOptions({
-    queryKey: ['custom-instructions', name],
+    queryKey: repo === undefined ? ['custom-instructions', name] : ['custom-instructions', name, repo],
     queryFn: () =>
       call(
-        (c) => (name === NEMIA ? c.nemia.instructions() : c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+        (c) =>
+          name === NEMIA
+            ? c.nemia.instructions()
+            : c.agents.instructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(repo) }),
         read(AgentInstructionsAnswer),
       ),
   });
+
+/** The repository an agent of a repository's name is looked for in, sent as `?repo=`; none for an agent of yours. */
+const repoQuery = (repo: string | undefined): { repo?: string } => (repo === undefined ? {} : { repo });
 
 /** What a write of custom instructions may have done, and what to look at before writing them again. */
 const CUSTOM_WRITTEN = "The words may be written: read the agent's page again before saving again.";
 
 /**
  * Write `words` as the custom instructions for the agent `name`: the words as they now read. Rejects with a `WriteRefusal` in the
- * package's words: a name no place has (404), blank words or a frontmatter block (422).
+ * package's words: a name no place has (404), blank words or a frontmatter block (422). `repo`, as the read's.
  */
-export const writeCustomInstructions = (name: string, words: string): Promise<CustomInstructions> =>
+export const writeCustomInstructions = (name: string, words: string, repo?: string): Promise<CustomInstructions> =>
   call(
     (c) =>
       name === NEMIA
         ? c.nemia.writeInstructions({ payload: { words } })
-        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, payload: { words } }),
+        : c.agents.putInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(repo), payload: { words } }),
     write(AgentInstructionsAnswer, CUSTOM_WRITTEN),
   );
 
-/** Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has. */
-export const clearCustomInstructions = (name: string): Promise<CustomInstructionsCleared> =>
+/**
+ * Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has.
+ * `repo`, as the read's.
+ */
+export const clearCustomInstructions = (name: string, repo?: string): Promise<CustomInstructionsCleared> =>
   call(
-    (c) => (name === NEMIA ? c.nemia.clearInstructions() : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name } })),
+    (c) =>
+      name === NEMIA
+        ? c.nemia.clearInstructions()
+        : c.agents.deleteInstructions({ params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(repo) }),
     write(AgentInstructionsClearedAnswer, CUSTOM_WRITTEN),
   );

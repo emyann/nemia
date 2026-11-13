@@ -107,17 +107,32 @@ function Everywhere({ from, name, address, building, factories }: Asked & { fact
   const { data: all } = useSuspenseQuery(workflowsQuery);
   const workflow = all.find((w) => fromMatches(w.from, from) && w.name === name);
   if (!workflow) return <NotListed from={from} name={name} />;
+  const tags = workflowFactories(workflow, factories ?? []);
   return (
     <Workflow
       workflow={workflow}
       own={workflow}
       address={address}
       building={building}
-      tags={workflowFactories(workflow, factories ?? [])}
-      start={<StartRun workflow={workflow} />}
+      tags={tags}
+      start={<StartsInFactory name={name} factories={tags} />}
     >
       <StepRows workflow={workflow} place={address} />
     </Workflow>
+  );
+}
+
+/**
+ * Why a workflow read with no factory has no start: the default factory reads no repository and the api refuses a start there, so a run
+ * starts in a factory that attaches it, on the repository its wiring names; the factories that do, or that none does yet.
+ */
+function StartsInFactory({ name, factories }: { name: string; factories: readonly string[] }) {
+  return (
+    <p data-starts-in-factory className="text-body-medium whitespace-pre-wrap break-words text-muted-foreground">
+      {factories.length
+        ? `A run of ${name} starts in a factory that attaches it: open it in ${factories.join(', ')}.`
+        : `A run of ${name} starts in a factory that attaches it, and none does yet: attach it to one, then open it there.`}
+    </p>
   );
 }
 

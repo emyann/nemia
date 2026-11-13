@@ -1246,6 +1246,12 @@ test('a step of several tries keeps its own try picker, its tries by round and t
     'no closeout',
   ]);
   assert.deepEqual((await shown(1)).slice(0, 5), ['round 1 · try 1', 'r-1-implement', '#1 · 12m 30s', 'check', 'exit 1']);
+  assert.match(
+    await detailOf(run, { ...step, shown: 1 }),
+    /data-now-facts="3"/,
+    'an earlier try shown: the step facts under it are said to be of its current try',
+  );
+  assert.doesNotMatch(await detailOf(run, step), /data-now-facts/, 'the current try shown: no such line');
 
   const once = await partOf(run);
   assert.doesNotMatch(once, /data-try-picker/, 'one try: no picker');

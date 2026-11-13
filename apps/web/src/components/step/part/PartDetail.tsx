@@ -186,6 +186,20 @@ function StepTimeline({ step }: { step: StepView }) {
   );
 }
 
+/**
+ * Where another try than the current one is shown, the line that says the facts under it are of the step now — its current try's sessions,
+ * task and spend — not of the try shown above them.
+ */
+function NowFacts({ step }: { step: StepView }) {
+  const current = step.tries.find((t) => t.current)?.try;
+  if (current === undefined || step.shown === null || step.shown === current) return null;
+  return (
+    <p data-now-facts={current} className="text-label-medium text-on-surface-variant">
+      The step now, on its current try ({current})
+    </p>
+  );
+}
+
 /** The step's detail, folded unless `open`, its folds within it too: what `PartDetail` says, of the try its part shows (`detail.shown`). */
 export function PartDetail({ run, step, detail, open = false }: { run: RunDetail; step: StepView; detail: Detail; open?: boolean }) {
   const ends = endsTheRun(step);
@@ -194,6 +208,7 @@ export function PartDetail({ run, step, detail, open = false }: { run: RunDetail
       <Fold name="detail" title="Detail" open={open}>
         <StepNote note={step.note} />
         <ShownTry step={step} />
+        <NowFacts step={step} />
         <StepFacts run={run} step={step} />
         {run.place === 'folder' && step.taskId !== null && <FolderFiles step={step} />}
         {step.check && <Check check={step.check} />}

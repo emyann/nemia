@@ -22,7 +22,7 @@ import type { StepSpec } from '../step/step.ts';
 import { scratch } from 'test-kit/scratch';
 import { importsIn } from 'test-kit/imports';
 import { provisionDeps } from '../runner.ts';
-import { checkoutParts, lockfileParts } from './worktree.store.ts';
+import { checkoutParts, keepCheckoutInstalled, lockfileParts } from './worktree.store.ts';
 
 const ROOT = scratch('wf-deps-');
 
@@ -661,4 +661,31 @@ test('a workspace folder of the worktree that leads outside it, or whose node_mo
   link(outside, path.join(linkedModules.wt, 'apps/app/node_modules'));
   assert.deepEqual(await provisionDeps(linkedModules.main, linkedModules.wt), { tree: 'hardlinked', made: 10 });
   assert.deepEqual(fs.readdirSync(outside), [], "nor where the app's node_modules leads");
+});
+
+/** A checkout of npm workspaces alone, `packages/x` and its lockfile, so npm installs it reaching no registry, under `at`, uninstalled. */
+function anUninstalled(at: string): string {
+  fs.mkdirSync(at, { recursive: true });
+  const repo = fs.mkdtempSync(path.join(at, 'r-'));
+  write(path.join(repo, 'package.json'), JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
+  write(path.join(repo, 'packages/x/package.json'), JSON.stringify({ name: 'x', version: '1.0.0' }));
+  write(path.join(repo, 'packages/x/index.js'), "module.exports = 'x';\n");
+  npmLockfile(repo);
+  return repo;
+}
+
+test("a clone the store keeps is installed when it has no node_modules, and left alone once it does; a person's checkout is never installed", async () => {
+  const clone = anUninstalled(path.join(ROOT, 'clones', 'localhost', 'o'));
+  const lock = fs.readFileSync(path.join(clone, 'package-lock.json'), 'utf8');
+  assert.deepEqual(await keepCheckoutInstalled(ROOT, clone), { kept: 'installed', because: 'node_modules' });
+  assert.equal(fs.realpathSync(path.join(clone, 'node_modules/x')), fs.realpathSync(path.join(clone, 'packages/x')));
+  assert.equal(fs.readFileSync(path.join(clone, 'package-lock.json'), 'utf8'), lock, 'npm wrote no lockfile: --no-save');
+
+  const once = snapshot(path.join(clone, 'node_modules'));
+  assert.deepEqual(await keepCheckoutInstalled(ROOT, clone), { kept: 'untouched' }, 'a current tree is left as it is');
+  assert.deepEqual(snapshot(path.join(clone, 'node_modules')), once);
+
+  const persons = anUninstalled(path.join(ROOT, 'persons'));
+  assert.deepEqual(await keepCheckoutInstalled(ROOT, persons), { kept: 'untouched' });
+  assert.ok(!fs.existsSync(path.join(persons, 'node_modules')), "a person's checkout is theirs to install");
 });

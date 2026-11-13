@@ -1,6 +1,7 @@
 /**
  * A repository run's step workspaces: the workspace a step runs in, cut by the run's place (`make`, asked off the event loop) and read
- * back only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies).
+ * back only where it was asked for, and the `node_modules` it is given (`workspace.ts` decides, this applies) — after the install of a
+ * checkout Nemia cloned is brought current, which nobody else would do (`keepCheckoutInstalled`).
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
@@ -11,8 +12,10 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { lastLines } from '../check/index.ts';
+import { INSTALL_ARGS, lastLines } from '../check/index.ts';
+import { isCloneFolder } from '../factory/clones/clones.ts';
 import {
+  checkoutInstall,
   cutName,
   depsPlan,
   isModuleKey,
@@ -55,10 +58,10 @@ const execFileAsync = promisify(execFile);
  * Where the worktree's `package-lock.json` asks for a tree the main checkout does not have on disk, or
  * null when links will do: `lockfileParting`, over a look at each package path the lockfile names.
  *
- * A main checkout with no `node_modules` has no tree to part from and none to link, so its lockfile is
- * compared byte for byte instead: a different one is installed in the worktree, and the same
- * one leaves nothing to provision. A worktree without a lockfile parts only from a main checkout that
- * has one — a repository without one is not npm's, and links are all there is.
+ * A main checkout with no `node_modules` has no tree to part from and none to link — a clone Nemia keeps is installed before this is
+ * asked (`keepCheckoutInstalled`), so that is a person's checkout nobody installed, or a clone whose install failed — so its lockfile is
+ * compared byte for byte instead: a different one is installed in the worktree, and the same one leaves nothing to provision. A worktree
+ * without a lockfile parts only from a main checkout that has one — a repository without one is not npm's, and links are all there is.
  */
 export function lockfileParts(mainRoot: string, worktree: string): string | null {
   const read = (file: string): string | null => {
@@ -96,6 +99,53 @@ export function checkoutParts(repo: string): string | null {
   }
   const lock = parsedLock(text);
   return lockfileParting(lock, installedAt(repo, lock));
+}
+
+/**
+ * What became of a checkout's own install at a cut: left as it was, installed (`because`, what made it due: `node_modules` where it had
+ * none, or the first package path its lockfile parted from its tree at), or not installed, with the end of what npm said.
+ */
+export type CheckoutKept =
+  | { readonly kept: 'untouched' }
+  | { readonly kept: 'installed'; readonly because: string }
+  | { readonly kept: 'failed'; readonly because: string; readonly error: string };
+
+/**
+ * A checkout Nemia cloned for the store `home`, installed when `checkoutInstall` says it is due — read from the disk at each call, never
+ * remembered — so the worktrees cut from it are hardlinked from a current tree rather than each paying an `npm ci`, and one cut from a
+ * clone nobody installed is not left with none. `npm install --no-save` (`INSTALL_ARGS`), never `npm ci`, which would empty the tree
+ * under a check or a session running in the clone; npm replaces packages by rename, so a worktree cut before keeps the files it was cut
+ * with. A person's checkout is never written. It does not throw: a failed install is said, and tried again at the next cut.
+ */
+export async function keepCheckoutInstalled(home: string, repo: string): Promise<CheckoutKept> {
+  const tree = fs.statSync(path.join(repo, 'node_modules'), { throwIfNoEntry: false })?.isDirectory() ?? false;
+  const due = checkoutInstall({
+    cloned: isCloneFolder(home, repo),
+    lockfile: fs.statSync(path.join(repo, 'package-lock.json'), { throwIfNoEntry: false })?.isFile() ?? false,
+    tree,
+    parting: tree ? checkoutParts(repo) : null,
+  });
+  if (!due.due) return { kept: 'untouched' };
+  try {
+    countSpawn();
+    await execFileAsync('npm', [...INSTALL_ARGS], { cwd: repo, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+    return { kept: 'installed', because: due.because };
+  } catch (err) {
+    const { stderr, message } = err as { stderr?: string; message?: string };
+    return { kept: 'failed', because: due.because, error: lastLines(stderr?.trim() ? stderr : (message ?? String(err)), 10) };
+  }
+}
+
+/** What the run's log says of a checkout's own install: nothing where it was left as it was. Pure. */
+export function keptNotes(repo: string, kept: CheckoutKept): string[] {
+  const why = (because: string) =>
+    because === 'node_modules' ? 'it had no node_modules' : `its package-lock.json asks for ${because}, which its node_modules lacks`;
+  if (kept.kept === 'installed') return [`node_modules: ${repo} installed with npm install --no-save — ${why(kept.because)}`];
+  if (kept.kept === 'failed')
+    return [
+      `node_modules: ${repo} not installed — ${why(kept.because)}, and npm said: ${kept.error.split('\n').at(-1)}; the next cut tries again`,
+    ];
+  return [];
 }
 
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
@@ -392,7 +442,9 @@ const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string
  * own name for a fork beside it or a fan-in's merge — merged with the line of work of each other step a merge waits on: what stops two
  * concurrent steps from editing the same directory. A workspace already cut is taken up where it stands, by the place. A merge that
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
- * provisioned after, in the workspace the place made, on the merged tree and its lockfile.
+ * provisioned after, in the workspace the place made, on the merged tree and its lockfile — once a checkout Nemia cloned has its own
+ * install brought current (`keepCheckoutInstalled`), so they are hardlinked from it; a clone whose install failed and has no tree to
+ * link gives the step `failed`, which its brief says, rather than nothing.
  *
  * Before any of it, a run that cuts worktrees has its place bring the repository's checkout up to its remote (`follow`): the base a step
  * merges (`main-worktree/HEAD` in git's words) is then the remote's, whoever landed on it, and a checkout that cannot be moved is left
@@ -435,13 +487,15 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   });
   if (!('made' in asked)) return asked;
   const { made } = asked;
-  const deps = yield* Effect.promise(() => provisionDeps(run.repo, made.workspace));
+  const kept = yield* Effect.promise(() => keepCheckoutInstalled(home, run.repo));
+  const provisioned = yield* Effect.promise(() => provisionDeps(run.repo, made.workspace));
+  const deps: Provisioned = kept.kept === 'failed' && provisioned.tree === 'absent' ? { tree: 'failed', error: kept.error } : provisioned;
   return cut({
     workspace: made.workspace,
     branch: made.branch,
     ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: place.declared.say.conflicts } } : {}),
     deps,
-    notes: [...followed, ...made.notes, ...depsNotes(deps)],
+    notes: [...followed, ...made.notes, ...keptNotes(run.repo, kept), ...depsNotes(deps)],
   });
 });
 

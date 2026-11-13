@@ -22,7 +22,7 @@ import { engineOf } from '../../runtime-client.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService, type Place } from '../../place/place.store.ts';
 import { readFactoriesAt } from '../factory.store.ts';
-import { cloneFolder, cloneTarget } from './clones.ts';
+import { cloneFolder, cloneTarget, isCloneFolder } from './clones.ts';
 import { clonesOnce, freshCloneMemory } from './clones.verb.ts';
 import type { Env } from '../../config/config.store.ts';
 
@@ -31,6 +31,18 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 heldUnasked(engine);
+
+test('a checkout read as a clone the store keeps exactly when it lies inside its clones/ folder: never the store, clones/ itself, a sibling or a path that climbs out', async (t) => {
+  const rows: readonly (readonly [string, boolean])[] = [
+    [path.join(ROOT, 'clones', 'h', 'o', 'r'), true],
+    [ROOT, false],
+    [path.join(ROOT, 'clones'), false],
+    [path.join(ROOT, 'clones-x', 'o'), false],
+    [path.join(ROOT, 'clones', '..', 'x'), false],
+  ];
+  for (const [repo, cloned] of rows)
+    await t.test(path.relative(ROOT, repo) || '(the store)', () => assert.equal(isCloneFolder(ROOT, repo), cloned));
+});
 
 test('a --repo value read as a path or as the folder its clone is kept in, one repository named any way one folder, a plain URL kept under its host', async (t) => {
   const rows: readonly (readonly [string, string])[] = [

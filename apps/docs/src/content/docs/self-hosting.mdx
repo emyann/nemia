@@ -224,5 +224,7 @@ nemia start "add a --quiet flag to the export command" --workflows quick --facto
 nemia ls
 ```
 
-The run works in a worktree of the server's clone. Its implement step pushes its branch and opens its pull request with the server's
-GitHub sign-in, and the board shows the run step by step. [How a run lives](/how-a-run-lives/) follows it to its landing.
+The run works in a worktree of the server's clone. Its first cut installs the clone's dependencies (about a minute for an npm
+repository), and nothing is installed by hand ([A repository by its URL](/install/#a-repository-by-its-url)). Its implement step pushes
+its branch and opens its pull request with the server's GitHub sign-in, and the board shows the run step by step. [How a run
+lives](/how-a-run-lives/) follows it to its landing.

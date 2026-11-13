@@ -28,9 +28,14 @@ export type Seam = { base: Semver; forked: Semver; branch: Semver; changed: bool
  */
 export type Landed = { kind: 'kept'; version: Semver } | { kind: 'taken'; version: Semver } | { kind: 'refused'; reason: 'unbumped' };
 
-/** Each part a whole number from 0. */
-const whole = (v: Semver): boolean =>
-  Number.isInteger(v[0]) && v[0] >= 0 && Number.isInteger(v[1]) && v[1] >= 0 && Number.isInteger(v[2]) && v[2] >= 0;
+/** The largest whole number a double holds exactly, `Number.MAX_SAFE_INTEGER`, written out: the verifier reads no global's constant. */
+const MAX_SAFE = 9_007_199_254_740_991;
+
+/** A part a version can hold: a whole number from 0, with room for one more, so the next version is exact. */
+const part = (n: number): boolean => Number.isSafeInteger(n) && n >= 0 && n < MAX_SAFE;
+
+/** Each part a whole number from 0, with room for one more. */
+const whole = (v: Semver): boolean => part(v[0]) && part(v[1]) && part(v[2]);
 
 /** The same version. */
 const same = (a: Semver, b: Semver): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
@@ -57,7 +62,7 @@ const landedVersionSpec = spec<(seam: Seam) => Landed>({
       condition: ({ input: [seam], output }) => (output.kind === 'kept') === !seam.changed,
     },
     keptIsTheBasesVersion: {
-      description: 'A template whose content did not change keeps the version the base records, never the branch\'s',
+      description: "A template whose content did not change keeps the version the base records, never the branch's",
       condition: ({ input: [seam], output }) => (output.kind === 'kept' ? same(output.version, seam.base) : true),
     },
     refusedExactlyWhenChangedUnbumped: {

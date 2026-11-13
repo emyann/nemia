@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["test", "sdlc/**/*.ts"]
+  "include": ["test", "sdlc/**/*.ts", "released.ts", "contracts"]
 }

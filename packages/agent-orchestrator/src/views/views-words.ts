@@ -167,8 +167,8 @@ export const currentTurn = <A extends { turn?: number }>(state: { attempts: read
 
 /**
  * The memory record of the last attempt of a task's current turn (`currentTurn`) in which the kernel's OOM killer ended a process, at
- * its limit or because the machine ran out (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a former journal, or a task under no limit. Read
- * off the view on every pass, never off a transition.
+ * its limit or because the machine ran out (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a
+ * former journal, or a task under no limit. Read off the view on every pass, never off a transition.
  */
 export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
   v

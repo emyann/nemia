@@ -120,7 +120,7 @@ export type AssessRead = {
   readonly asked: (taskId: string) => CloseoutAsked;
   /** What each step's current check exited with (`exitVerdicts`), read only for a check that did not pass. */
   readonly verdictOf: (step: string) => Verdict | undefined;
-  /** What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is run again by `retries:`. */
+  /** What the OOM killer did to each step's current check (`checkKills`): a check the machine killed is run again by `retries:`. */
   readonly checkKillOf: CheckKillOf;
   /** Whether a task's session is blocked by its harness (`harnessBlocked`): what makes a person's try of it due, to stop it first. */
   readonly sessionBlocked: (taskId: string) => boolean;

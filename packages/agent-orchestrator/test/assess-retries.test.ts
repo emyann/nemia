@@ -188,28 +188,39 @@ test("assess and stepStatus of a step's check", async (t) => {
       assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'failed (check)');
     });
-  await t.test('a check the machine killed, with `retries:` left: tried again as a recheck by retries; any other kill, or none, as before', () => {
-    const steps = [{ ...CHECKED[0], retries: 1 }, ...CHECKED.slice(1)];
-    const read = (kill?: 'machine' | 'limit') =>
-      aRead(steps, withCheck('c1'), {
-        phaseOf: phases({ t1: 'succeeded', c1: 'failed' }),
-        signedOff: signedDone,
-        asked,
-        verdictOf: () => 1,
-        checkKillOf: (s) =>
-          s !== 'implement' || kill === undefined
-            ? undefined
-            : kill === 'machine'
-              ? { by: 'machine', kills: 1, limitBytes: 1, peakBytes: null }
-              : { by: 'limit', kills: 1, limitBytes: 1, peakBytes: null, raise: 'default' },
-      });
-    const machine = assess(read('machine'));
-    assert.deepEqual(machine.retry.map((r) => [r.mode, r.by]), [['recheck', 'retries']], 'the filing runs a recheck as a check');
-    for (const kill of ['limit', undefined] as const) {
-      const a = assess(read(kill));
-      assert.deepEqual(a.retry.map((r) => [r.mode, r.by]), [['continue', 'retries']], String(kill));
-    }
-  });
+  await t.test(
+    'a check the machine killed, with `retries:` left: tried again as a recheck by retries; any other kill, or none, as before',
+    () => {
+      const steps = [{ ...CHECKED[0], retries: 1 }, ...CHECKED.slice(1)];
+      const read = (kill?: 'machine' | 'limit') =>
+        aRead(steps, withCheck('c1'), {
+          phaseOf: phases({ t1: 'succeeded', c1: 'failed' }),
+          signedOff: signedDone,
+          asked,
+          verdictOf: () => 1,
+          checkKillOf: (s) =>
+            s !== 'implement' || kill === undefined
+              ? undefined
+              : kill === 'machine'
+                ? { by: 'machine', kills: 1, limitBytes: 1, peakBytes: null }
+                : { by: 'limit', kills: 1, limitBytes: 1, peakBytes: null, raise: 'default' },
+        });
+      const machine = assess(read('machine'));
+      assert.deepEqual(
+        machine.retry.map((r) => [r.mode, r.by]),
+        [['recheck', 'retries']],
+        'the filing runs a recheck as a check',
+      );
+      for (const kill of ['limit', undefined] as const) {
+        const a = assess(read(kill));
+        assert.deepEqual(
+          a.retry.map((r) => [r.mode, r.by]),
+          [['continue', 'retries']],
+          String(kill),
+        );
+      }
+    },
+  );
   await t.test('a cancelled run files no check, however due', () => {
     const a = assess(aRead(CHECKED, withCheck(null, CANCELLED), { phaseOf: phases({ t1: 'succeeded' }), signedOff: signedDone, asked }));
     assert.deepEqual(a.check, []);

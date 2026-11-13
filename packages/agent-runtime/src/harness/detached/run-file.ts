@@ -142,7 +142,12 @@ const RunFileSchema = Schema.StructWithRest(
      * read kept: the run's `Sighting.memory`. Absent where it ran under no limit, or no read found its cgroup.
      */
     memory: Schema.optional(
-      Schema.Struct({ limitBytes: Schema.Finite, peakBytes: Schema.optional(Schema.Finite), oomKills: Schema.Finite, oom: Schema.optional(Schema.Finite) }),
+      Schema.Struct({
+        limitBytes: Schema.Finite,
+        peakBytes: Schema.optional(Schema.Finite),
+        oomKills: Schema.Finite,
+        oom: Schema.optional(Schema.Finite),
+      }),
     ),
     /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
     resumeFrom: Schema.optional(Schema.String),

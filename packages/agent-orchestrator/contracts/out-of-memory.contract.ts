@@ -64,7 +64,8 @@ const outOfMemorySpec = spec<(memory: AttemptMemory | undefined, own: string | u
       condition: ({ input: [memory], output }) => (memory === undefined ? output === undefined : true),
     },
     noKillSaysNothing: {
-      description: 'An attempt in which no process was killed says nothing of memory, whatever its peak and however often its limit was reached',
+      description:
+        'An attempt in which no process was killed says nothing of memory, whatever its peak and however often its limit was reached',
       condition: ({ input: [memory], output }) => (memory !== undefined && memory.oomKills === 0 ? output === undefined : true),
     },
     aKillIsSaid: {
@@ -96,8 +97,10 @@ const outOfMemorySpec = spec<(memory: AttemptMemory | undefined, own: string | u
         output === undefined || memory === undefined || limitReached(memory) || output.by === 'machine',
     },
     raiseTheStepsOwn: {
-      description: "A kill at the limit of a step that names its own memory: tells it to raise that, since the daemon's default does not reach it",
-      condition: ({ input: [, own], output }) => output === undefined || output.by !== 'limit' || own === undefined || output.raise === 'step',
+      description:
+        "A kill at the limit of a step that names its own memory: tells it to raise that, since the daemon's default does not reach it",
+      condition: ({ input: [, own], output }) =>
+        output === undefined || output.by !== 'limit' || own === undefined || output.raise === 'step',
     },
     elseTheDefault: {
       description: "A kill at the limit of a step that names no memory: ran under the daemon's default, and is told of WF_MEMORY_LIMIT",

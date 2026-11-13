@@ -678,14 +678,42 @@ test('retriesDue of a check the machine killed: run again as its check by `retri
       undefined,
       (s) => (s === 'implement' ? o.kill : undefined),
     );
-  const policy: StepSpec[] = [{ ...ONE[0]!, checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [1] } }] } }, ONE[1]!];
+  const [implement, review] = ONE;
+  const policy: StepSpec[] = [
+    { ...implement, checkFailurePolicy: { rules: [{ action: 'FailStep', onExitCodes: { operator: 'In', values: [1] } }] } },
+    review,
+  ];
   const rows: Array<[string, Parameters<typeof due>[0], Retry[]]> = [
-    ['exit 1, the machine’s kill: a recheck by retries', { kill: machine }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
-    ['exit 1, a kill at the limit: the session continued, as before', { kill: limit }, [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }]],
-    ['unfinished, the machine’s kill: a recheck', { kill: machine, verdict: 'unfinished' }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
-    ['a code the policy names a person’s, the machine’s kill: a recheck', { steps: policy, kill: machine }, [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }]],
-    ['retries spent by an earlier recheck the run filed: nothing', { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck', retried: true }] }, []],
-    ['a person’s recheck spends no retry: a recheck still due', { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck' }] }, [{ step: 'implement', try: 3, mode: 'recheck', by: 'retries' }]],
+    [
+      'exit 1, the machine’s kill: a recheck by retries',
+      { kill: machine },
+      [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }],
+    ],
+    [
+      'exit 1, a kill at the limit: the session continued, as before',
+      { kill: limit },
+      [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }],
+    ],
+    [
+      'unfinished, the machine’s kill: a recheck',
+      { kill: machine, verdict: 'unfinished' },
+      [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }],
+    ],
+    [
+      'a code the policy names a person’s, the machine’s kill: a recheck',
+      { steps: policy, kill: machine },
+      [{ step: 'implement', try: 2, mode: 'recheck', by: 'retries' }],
+    ],
+    [
+      'retries spent by an earlier recheck the run filed: nothing',
+      { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck', retried: true }] },
+      [],
+    ],
+    [
+      'a person’s recheck spends no retry: a recheck still due',
+      { kill: machine, tries: [{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck' }] },
+      [{ step: 'implement', try: 3, mode: 'recheck', by: 'retries' }],
+    ],
   ];
   for (const [name, o, is] of rows) await t.test(name, () => assert.deepEqual(due(o), is));
 });

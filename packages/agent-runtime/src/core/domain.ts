@@ -608,7 +608,8 @@ export type Attempt = {
   terminationMessage?: string;
   /**
    * What its cgroup said of its memory as it ended, for a task run under a memory limit: `oomKills` above 0 is the kernel ending a
-   * process of it, at its limit where `oom` is above 0 too, else the machine's own OOM killer. Absent where it ran under none, or its runner read nothing. Carried, never read.
+   * process of it, at its limit where `oom` is above 0 too, else the machine's own OOM killer. Absent where it ran under none, or its
+   * runner read nothing. Carried, never read.
    */
   memory?: MemoryUse;
   /**

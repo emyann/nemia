@@ -686,7 +686,7 @@ export function retryOffers(
       );
       continue;
     }
-    const machine = status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step.name);
+    const machine = machineOffered(step.name, status, modes, checkKillOf);
     const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, () =>
       personsOffered(step, status, modes, verdictOf),
     );
@@ -724,6 +724,10 @@ function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Ver
   if (verdict === undefined || verdict === 'unfinished') return undefined;
   return checkFailureAction(step.checkFailurePolicy, verdict) === 'FailStep' ? verdict : undefined;
 }
+
+/** Whether a `failed (check)` step's check the machine killed is offered `--recheck` first, where `--recheck` is a way to try it. Pure. */
+const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf): boolean =>
+  status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step);
 
 /** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
 const personsOffered = (

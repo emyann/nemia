@@ -202,8 +202,9 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
 const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
 
 /**
- * The tries `retries:` has filed for a step in the round it is on, a recheck it filed (`retried`) among them. A person's do not count: `retries` is what the run may spend on its
- * own word. Nor do an earlier round's: a round is new work for the step, and its check may refuse it afresh — and so is a merge.
+ * The tries `retries:` has filed for a step in the round it is on, a recheck it filed (`retried`) among them. A person's do not
+ * count: `retries` is what the run may spend on its own word. Nor do an earlier round's: a round is new work for the step, and its
+ * check may refuse it afresh — and so is a merge.
  */
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;

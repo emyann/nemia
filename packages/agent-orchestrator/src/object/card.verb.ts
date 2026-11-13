@@ -25,8 +25,12 @@ import {
 import { inboxJudged } from '../inbox/inbox.verb.ts';
 import { cardVersion } from '../card-write/card-write.verb.ts';
 
-/** The Card's whole write, served beside its reads (`update`): the api reads it off the package's entry with them. */
-export { cardWriteRefusal } from '../card-write/index.ts';
+/**
+ * The Card's whole write and its edit from its text, served beside its reads (`update`, `edit`): the api reads them off the package's
+ * entry with them.
+ */
+export { cardEditRefusal, cardWriteRefusal } from '../card-write/index.ts';
+export { editCard } from '../card-write/card-edit.verb.ts';
 export { replaceCard, type CardReplaced } from '../card-write/card-write.verb.ts';
 import type { SummaryHow } from '../summary/summary.verb.ts';
 import type { Engine } from '../runtime-client.ts';

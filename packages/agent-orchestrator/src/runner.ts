@@ -415,7 +415,7 @@ export {
 } from './transcript-page/transcript-page.ts';
 export { runObject, type RunObjectAnswer, type TryCloseout } from './object/run.verb.ts';
 export { runLines, type RunLines, type StepCommands } from './object/lines.verb.ts';
-export { cardList, cardObject, cardTable, cardWriteRefusal, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
+export { cardList, cardObject, cardTable, cardEditRefusal, cardWriteRefusal, editCard, replaceCard, type CardQuery, type CardReplaced } from './object/card.verb.ts';
 export { runIn, runList, runNamespace, type RunQuery } from './run-list/run-list.verb.ts';
 export { RUN_COLUMNS, runCells, runTable } from './run-list/index.ts';
 export {
@@ -442,7 +442,7 @@ export { subscriptionList, subscriptionObject } from './subscription-object/subs
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
 export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
-export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
+export { INBOX, INBOX_ADD, INBOX_EDIT, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
 export { FACTORY_COST_LINE_RM, FACTORY_COST_LINE_SET } from './factory/cost-line/cost-line.verb.ts';

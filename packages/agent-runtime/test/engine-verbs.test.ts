@@ -598,6 +598,19 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       /^`defaultLimits: .*` is not a default limit/,
     ],
     ['a default limit that is a quantity alone', { defaultLimits: '8Gi' as never }, /^`defaultLimits: "8Gi"` is not a default limit/],
+    ['a reserve of a fraction', { reserved: { memory: '2.5Gi' } }, /^`reserved\.memory`.*2560Mi/],
+    ['a reserve that is a quantity alone', { reserved: '1Gi' as never }, /^`reserved: "1Gi"` is not a reserve/],
+    ['a default request that is no quantity', { defaultRequests: { memory: 'lots' } }, /^`defaultRequests\.memory`/],
+    [
+      'a default request above the default limit',
+      { defaultLimits: { memory: '2Gi' }, defaultRequests: { memory: '3Gi' } },
+      /^`defaultRequests\.memory: 3Gi` is above `defaultLimits\.memory: 2Gi`/,
+    ],
+    [
+      'a machine that is no function',
+      { reserved: { memory: '1Gi' }, machine: { totalBytes: 1, availableBytes: 1 } as never },
+      /^`machine` is a function/,
+    ],
     ['a cgroup parent that is no slice', { cgroupParent: 'nemia.service' }, /^`cgroupParent: "nemia\.service"` is not a systemd slice/],
     ['a cgroup parent that is a path', { cgroupParent: '/user.slice/nemia.slice' }, /is not a systemd slice/],
   ];
@@ -614,18 +627,24 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       );
     });
   }
-  await t.test('a default limit a quantity reads, and a slice to make scopes in, are taken', () => {
-    assert.doesNotThrow(() =>
-      builtEngine(
-        EngineService.layer({
-          root: scratch('ae-engine-verbs-root-'),
-          journal: asyncStore(memoryJournal()),
-          defaultLimits: { memory: '6Gi' },
-          cgroupParent: 'sessions.slice',
-        }),
-      ),
-    );
-  });
+  await t.test(
+    'a default limit and request a quantity reads, the request not above the limit, a reserve, a machine to read, and a slice to make scopes in, are taken',
+    () => {
+      assert.doesNotThrow(() =>
+        builtEngine(
+          EngineService.layer({
+            root: scratch('ae-engine-verbs-root-'),
+            journal: asyncStore(memoryJournal()),
+            defaultLimits: { memory: '6Gi' },
+            defaultRequests: { memory: '6Gi' },
+            reserved: { memory: '1Gi' },
+            machine: () => undefined,
+            cgroupParent: 'sessions.slice',
+          }),
+        ),
+      );
+    },
+  );
   await t.test('a whole number from 1, or none, is taken', () => {
     for (const maxConcurrent of [1, 3, undefined]) {
       assert.doesNotThrow(() =>

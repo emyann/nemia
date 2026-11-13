@@ -87,6 +87,8 @@ export { file, FileRefused, StopRefused, answer, close, InputRefused, admit, Adm
 export { view, viewOfState, tick, TickRefused, reconcile, settleTask, ReconcileRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
+/** Why a pass left a queued task waiting, as its view says it (`TaskView.waits`): its pool's ceiling, or the machine's memory. */
+export type { AdmissionWait } from './core/admission.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 
 export { Journal, JournalError, BodyRefused, FEED_LOCK_WAIT_MS, APPEND_REFUSALS, type AppendRefusalReason } from './core/engine/index.ts';

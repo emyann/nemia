@@ -6,9 +6,9 @@
  * (`interrupts`), each drain and sessions' drain put or lifted (`drains`, `sessionDrains`) and each `forget` call by call (`forgets`);
  * `refuseSay(n)` refuses the next `n` says as the runtime refuses a session not running; `keeps(id, sizes)` plants what `kept` answers of
  * a task, and `failKept(n)` fails the next `n` as a store that does not list fails one; `plantTranscript(id, n, events)` plants what
- * `transcript` reads of an attempt, and `restart(id)` starts a task's next; `plantMcpState(name, state)` plants the state a server reads
- * as, `failMcpState(why)` makes the next read a look that failed, and `mcpReads` counts the reads asked, which is how a test proves a pass
- * read a record's states once rather than once per task.
+ * `transcript` reads of an attempt, `plantWait(id, wait)` why a queued task waits to be admitted, and `restart(id)` starts a task's
+ * next; `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed,
+ * and `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
  * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `answer`, `transcript`, `forget`, `kept`,
  * `mcpState`, the four sign-in verbs (`signIns`, `signOuts`, `callbacks` and `settleSignIn` read and move them) and `io`, each
@@ -19,6 +19,7 @@
 import { Effect, Layer } from 'effect';
 import { type Attempt, type Input, type Outcome, type Said, type SessionAsk, type State, type TaskPhase } from '../core/index.ts';
 import type { HarnessDeclared } from '../harness/declaration.ts';
+import type { AdmissionWait } from '../core/admission.ts';
 import { answerRefusalOf, fold, InputRefused, StopRefused, turnOf, unknownTask, type TaskView } from '../core/engine/index.ts';
 import {
   attemptRefusal,
@@ -89,6 +90,8 @@ export type TestTask = {
    * no absence (`Sighting.asks`), so the two are not the same view.
    */
   asksSaid: boolean;
+  /** Why it waits to be admitted, planted by `plantWait`: said by its view while it is queued, as a pass's `waits` entry says it. */
+  waits?: AdmissionWait;
 };
 
 /** The outcome a task settled in, which is its phase once settled, or `null` for a task not settled. */
@@ -121,6 +124,7 @@ const stateOf = (id: string, t: TestTask): State => ({
   inputs: [...t.inputs],
   stopRequested: t.stopRequested,
   settled: settledOf(t.phase),
+  ...(t.waits ? { waits: t.waits } : {}),
 });
 
 /**
@@ -137,6 +141,7 @@ const viewOf = (id: string, t: TestTask | undefined): TaskView => {
     ...(t.attempt?.ended === null && (t.phase === 'working' || t.phase === 'quiescent') ? { session: 'working' as const } : {}),
     sessionId: t.attempt ? sessionOf(id) : null,
     ...(waits ? { admission: 'queued' } : {}),
+    ...(waits && t.waits ? { waits: t.waits } : {}),
     ...(t.asksSaid ? { asks: t.asks.map((ask) => ({ ...ask })) } : {}),
     ...(t.asksTaken.length ? { asksTaken: [...t.asksTaken] } : {}),
   };
@@ -313,6 +318,11 @@ export type TestEngine = {
   /** Plants a question of a task's session waiting on a person, which `view` says and `answerAsk` answers. */
   readonly plantAsk: (id: string, ask: SessionAsk) => void;
   /**
+   * Plants why the queued task `id` waits to be admitted (`AdmissionWait`), in place of what was planted before, as a pass's `waits`
+   * entry says it: `view` and `list` say it while the task is queued, and `undefined` takes it away. Throws for a task never filed.
+   */
+  readonly plantWait: (id: string, wait: AdmissionWait | undefined) => void;
+  /**
    * Cuts every question of the task's session that waits on a person, as a holder that let the session go cuts them: its harness
    * goes on saying what it holds open, and says it holds none. Throws for a task never filed.
    */
@@ -478,6 +488,7 @@ type Held = Omit<
   | 'keeps'
   | 'failKept'
   | 'plantAsk'
+  | 'plantWait'
   | 'cutAsks'
   | 'plantTranscript'
   | 'restart'
@@ -626,6 +637,11 @@ export const testEngine = (options: { readonly harnesses?: readonly HarnessDecla
   };
   const plantAsk = (id: string, ask: SessionAsk) => asking(id, 'planting', (now) => [...now, { ...ask }]);
   const cutAsks = (id: string) => asking(id, 'cutting', () => []);
+  const plantWait = (id: string, wait: AdmissionWait | undefined) => {
+    const t = taskFor(held.tasks, id, 'planting its wait');
+    if (wait === undefined) delete t.waits;
+    else t.waits = wait;
+  };
   const plantTranscript = (id: string, n: number, events: readonly TranscriptEvent[]) =>
     void taskFor(held.tasks, id, 'planting its transcript').transcripts.set(n, [...events]);
   const restart = (id: string): TestTask => restartIn(held.tasks, id);
@@ -642,6 +658,7 @@ export const testEngine = (options: { readonly harnesses?: readonly HarnessDecla
     keeps,
     failKept,
     plantAsk,
+    plantWait,
     cutAsks,
     plantTranscript,
     restart,

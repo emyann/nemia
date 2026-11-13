@@ -37,7 +37,7 @@ import { CEILING_INSTEAD } from './filing.ts';
 import { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
 
 export { ReconcileRefused, reconcileRefusalOf, settleRefusalOf } from './reconcile-refusal.ts';
-import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
+import { ownPool, toAdmit, type AdmissionRule, type AdmissionWait } from '../admission.ts';
 import { notedOf } from './noted.ts';
 import { instantNow } from './now.ts';
 import { spawnedEntry, stamped } from './stamped.ts';
@@ -149,6 +149,12 @@ export type TaskView = {
    * Absent for a task not filed queued, and once its turn has started. Off the record alone.
    */
   admission?: 'queued' | 'admitted';
+  /**
+   * Why a queued task's turn has not been admitted, as the last pass that judged it said (`AdmissionWait`): its pool at the ceiling
+   * (`slot`), or the machine's memory (`memory`), with what it needs and the room there was. Present only while `admission` is
+   * `queued`, and only once a pass under a ceiling has judged it. Off the record (the `waits` entry): a status, never read to decide.
+   */
+  waits?: AdmissionWait;
   /**
    * The link that opens the session in a browser or on a phone, for a task that asked its harness to bridge it there — Claude
    * Code's `claude.remoteControl`, as its runner says (`RunnerOps.bridgeAsked`) — or no link and why: not up yet, refused, or ended
@@ -632,14 +638,49 @@ const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: Read
 });
 
 /**
- * Admits the queued tasks the engine's ceiling has room for (`toAdmit`), off the views the pass built, and journals `admitted` for
- * each: the next pass starts them. Returns the views with those marked admitted, as `view` reads them after the pass.
+ * The grain a memory wait's room is compared in, 256 MiB: a wait whose room lies in the same grain as the one on record is the same
+ * wait, so a busy machine writes a `waits` entry per grain its memory moves, never one per pass.
+ */
+export const ROOM_STEP = 256 * 2 ** 20;
+
+/** Whether two waits say the same to a person: the same pool and ceiling, or the same need and room in one grain (`ROOM_STEP`). */
+const sameWait = (a: AdmissionWait | undefined, b: AdmissionWait): boolean => {
+  if (a === undefined || a.for !== b.for) return false;
+  if (a.for === 'slot' && b.for === 'slot') return a.pool === b.pool && a.ceiling === b.ceiling;
+  return (
+    a.for === 'memory' &&
+    b.for === 'memory' &&
+    a.needBytes === b.needBytes &&
+    Math.floor(a.roomBytes / ROOM_STEP) === Math.floor(b.roomBytes / ROOM_STEP)
+  );
+};
+
+/** `view` with no `waits` of its own: admitted, it waits for nothing. */
+const unwaiting = ({ waits: _, ...view }: TaskView): TaskView => view;
+
+/**
+ * Admits the queued tasks the engine's ceiling and the machine's memory have room for (`toAdmit`), off the views the pass built,
+ * and journals `admitted` for each: the next pass starts them. For each other queued task it judged, it journals why it waits
+ * (`waits`) where that differs from the wait on record (`sameWait`), so the record says it to a reader that never saw this pass.
+ * Returns the views with those marked admitted and the rest carrying their wait as on record, as `view` reads them after the pass.
  */
 const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskView[]) {
-  const ids = new Set(toAdmit(views, yield* Admission));
+  const { admit, waits } = toAdmit(views, yield* Admission);
+  const ids = new Set(admit);
   const journal = yield* Journal;
   for (const id of ids) yield* journal.append(TaskId.read(id), { kind: 'admitted', at: new Date().toISOString() });
-  return views.map((v): TaskView => (ids.has(v.id) ? { ...v, admission: 'admitted' } : v));
+  const recorded = new Map<string, AdmissionWait>();
+  for (const { id, wait } of waits) {
+    const held = views.find((v) => v.id === id)?.waits;
+    if (held !== undefined && sameWait(held, wait)) continue;
+    yield* journal.append(TaskId.read(id), { kind: 'waits', at: new Date().toISOString(), wait });
+    recorded.set(id, wait);
+  }
+  return views.map((v): TaskView => {
+    if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' };
+    const wait = recorded.get(v.id);
+    return wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v;
+  });
 });
 
 /**
@@ -950,6 +991,7 @@ export function viewOfState(
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...carriedOf(sighting, phase),
     ...(admission ? { admission } : {}),
+    ...(admission === 'queued' && state.waits ? { waits: state.waits } : {}),
     ...(bridge ? { bridge } : {}),
     ...(unread ? { unreadWhy: unread } : {}),
   };

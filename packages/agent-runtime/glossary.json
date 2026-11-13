@@ -16,11 +16,16 @@
     },
     {
       "term": "Admission",
-      "meaning": "a queued task's word to start, given by `admit` or by the engine under its ceiling.",
+      "meaning": "a queued task's word to start, given by `admit` or by the engine under its ceiling and, while it keeps a `reserved` floor, the machine's memory: the requests of what holds a slot within its total, and the newcomers within what is available now.",
       "see": {
         "label": "Admission",
         "href": "/runtime/#admission"
       }
+    },
+    {
+      "term": "Admission wait",
+      "meaning": "why a pass left a queued task waiting, journalled as a `waits` entry when it changes and said on its view while it is queued: its pool at the ceiling (`slot`, with the pool and the ceiling) or the machine's memory (`memory`, with its need and the room there was), as a Pod's PodScheduled condition says Unschedulable. A status: no rule reads it (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/engine.ts`).",
+      "type": "AdmissionWait"
     },
     {
       "term": "Append refusal",
@@ -211,6 +216,11 @@
       "type": "TaskResources"
     },
     {
+      "term": "Memory request",
+      "meaning": "a task's `resources.requests.memory`, a Kubernetes quantity, or its engine's `defaultRequests` written onto it at filing: what admission counts it at against the machine's memory, its limit standing for it where it gives none, as Kubernetes gives a container that names a limit and no request. Refused above its limit (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/filing.ts`).",
+      "type": "TaskResources"
+    },
+    {
       "term": "Mount",
       "meaning": "a folder beyond a task's `cwd` its session may reach, and whether it may only read it.",
       "type": "Mount"
@@ -279,6 +289,10 @@
           "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
         }
       ]
+    },
+    {
+      "term": "Reserved memory",
+      "meaning": "the engine's `reserved.memory`, the floor kept off the machine for the daemon and the machine itself, as kubelet's system-reserved: given, each pass reads the machine's memory once (`/proc/meminfo`) and admits by it beside the ceiling (`packages/agent-runtime/src/service/options.ts`, `packages/agent-runtime/src/service/machine.ts`)."
     },
     {
       "term": "Responses",

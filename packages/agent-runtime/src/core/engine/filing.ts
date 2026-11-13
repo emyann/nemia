@@ -6,7 +6,7 @@ import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { awaitsAdmission, fold, verbTakes, type Input, type State, type TaskResources } from '../domain.ts';
-import { memoryQuantityRefusal } from '../memory.ts';
+import { memoryBytesOf, memoryQuantityRefusal } from '../memory.ts';
 import { Journal, type JournalError } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
@@ -82,33 +82,53 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
     ? undefined
     : `\`priority: ${typeof priority === 'number' ? priority : JSON.stringify(priority)}\` is not a priority. Give a whole number from ${-PRIORITY_MOST - 1} to ${PRIORITY_MOST}, higher first, or leave it out for 0.`;
 
+/** A value as a refusal shows it: a number as written, anything else as JSON. */
+const shownValue = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
 /**
- * Why a task's `resources` cannot be held, or `undefined`: anything but an object of `limits` alone, a `limits` that is not an object
- * of `memory` alone, and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words). A container's
- * `requests` and its other limits (`cpu`) are refused rather than dropped: a limit taken and never held is a promise nobody keeps.
+ * Why a task's `resources.<part>` (`limits` or `requests`) cannot be held, or `undefined`: anything but an object of `memory` alone,
+ * and a `memory` that is no quantity `memoryBytesOf` reads (`memoryQuantityRefusal`'s words).
+ */
+const memoryPartRefusalOf = (part: 'limits' | 'requests', given: unknown): string | undefined => {
+  if (given === undefined) return undefined;
+  const noun = part === 'limits' ? 'limit' : 'request';
+  if (!isObject(given))
+    return `\`resources.${part}: ${shownValue(given)}\` is not a set of ${part}. Give \`{ memory: '8Gi' }\`, or leave it out.`;
+  const unheld = Object.keys(given).find((k) => k !== 'memory');
+  if (unheld !== undefined)
+    return `\`resources.${part}.${unheld}\` is not a ${noun} the runtime holds: \`memory\` is its only one. Leave \`${unheld}\` out.`;
+  const { memory } = given;
+  if (memory === undefined) return undefined;
+  if (typeof memory !== 'string')
+    return `\`resources.${part}.memory: ${shownValue(memory)}\` is not a quantity: write it as a string, like \`'8Gi'\` or \`'512Mi'\`.`;
+  const words = memoryQuantityRefusal(memory);
+  return words === undefined ? undefined : `\`resources.${part}.memory\`: ${words}`;
+};
+
+/**
+ * Why a task's `resources` cannot be held, or `undefined`: anything but an object of `limits` and `requests`, either that is not an
+ * object of `memory` alone, a `memory` that is no quantity `memoryBytesOf` reads (`memoryPartRefusalOf`), and a request above the
+ * limit, which Kubernetes refuses too: a task promised more than it may use. A container's other limits (`cpu`) are refused rather
+ * than dropped: a limit taken and never held is a promise nobody keeps.
  */
 const resourcesRefusalOf = (resources: unknown): string | undefined => {
   if (resources === undefined) return undefined;
-  const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringify(v));
-  const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
   if (!isObject(resources))
-    return `\`resources: ${shown(resources)}\` is not a container's resources. Give \`{ limits: { memory: '8Gi' } }\`, or leave it out.`;
-  const other = Object.keys(resources).find((k) => k !== 'limits');
+    return `\`resources: ${shownValue(resources)}\` is not a container's resources. Give \`{ limits: { memory: '8Gi' } }\`, or leave it out.`;
+  const other = Object.keys(resources).find((k) => k !== 'limits' && k !== 'requests');
   if (other !== undefined)
-    return `\`resources.${other}\` is not something the runtime holds: a task takes \`resources.limits\` alone. Leave \`${other}\` out.`;
-  const { limits } = resources;
-  if (limits === undefined) return undefined;
-  if (!isObject(limits))
-    return `\`resources.limits: ${shown(limits)}\` is not a set of limits. Give \`{ memory: '8Gi' }\`, or leave it out.`;
-  const unheld = Object.keys(limits).find((k) => k !== 'memory');
-  if (unheld !== undefined)
-    return `\`resources.limits.${unheld}\` is not a limit the runtime holds: \`memory\` is its only one. Leave \`${unheld}\` out.`;
-  const { memory } = limits;
-  if (memory === undefined) return undefined;
-  if (typeof memory !== 'string')
-    return `\`resources.limits.memory: ${shown(memory)}\` is not a quantity: write it as a string, like \`'8Gi'\` or \`'512Mi'\`.`;
-  const words = memoryQuantityRefusal(memory);
-  return words === undefined ? undefined : `\`resources.limits.memory\`: ${words}`;
+    return `\`resources.${other}\` is not something the runtime holds: a task takes \`resources.limits\` and \`resources.requests\` alone. Leave \`${other}\` out.`;
+  const refused = memoryPartRefusalOf('limits', resources.limits) ?? memoryPartRefusalOf('requests', resources.requests);
+  if (refused !== undefined) return refused;
+  const limit = (resources.limits as { memory?: string } | undefined)?.memory;
+  const request = (resources.requests as { memory?: string } | undefined)?.memory;
+  const limitBytes = limit === undefined ? undefined : memoryBytesOf(limit);
+  const requestBytes = request === undefined ? undefined : memoryBytesOf(request);
+  if (limitBytes !== undefined && requestBytes !== undefined && requestBytes > limitBytes)
+    return `\`resources.requests.memory: ${request}\` is above \`resources.limits.memory: ${limit}\`: a task cannot be promised more than it may use. Lower the request to the limit or under it, or raise the limit.`;
+  return undefined;
 };
 
 /**

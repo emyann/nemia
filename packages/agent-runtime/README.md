@@ -1046,13 +1046,17 @@ today's shape — the cap under `config`, the end `harness` with `limit: 'budget
 
 `resources: { limits: { memory: '8Gi' } }` is the most memory a task's process tree may hold, a container's
 `resources.limits.memory` in Kubernetes' quantity: whole digits and a unit of `Ki`, `Mi`, `Gi`, `Ti` (powers of 1024) or `k`, `M`,
-`G`, `T` (powers of 1000), or none for bytes (`memoryBytesOf`, `src/core/memory.ts`). A fraction (`1.5Gi`), an exponent, `m`, a
-`requests`, a limit other than `memory` (`cpu`) and anything else under `resources` are refused at `file()` (`resourcesRefusalOf`),
-nothing journalled; so is a limit on a remote agent, whose process is the other party's. An engine given
-`defaultLimits: { memory: '6Gi' }` writes it onto every task filed with no `resources` of its own, as a LimitRange's default is
-written into a Pod at admission: the `filed` entry says what each task ran under, and a new default never changes a task already
-filed. A remote agent's task is never given the default, so a default makes no remote task unfileable. `Engine.layer` refuses a
-`defaultLimits.memory` it cannot read, and a `cgroupParent` that is not a slice's unit name (`sessions.slice`).
+`G`, `T` (powers of 1000), or none for bytes (`memoryBytesOf`, `src/core/memory.ts`). `resources.requests.memory`, in the same
+quantity, is what the engine's admission counts the task at against the machine (*Admitted by the machine's memory*, below); a task
+with a limit and no request is counted at its limit, as Kubernetes gives such a container a request equal to its limit. A fraction
+(`1.5Gi`), an exponent, `m`, a request above the limit, a limit or a request other than `memory` (`cpu`) and anything else under
+`resources` are refused at `file()` (`resourcesRefusalOf`), nothing journalled; so is a limit on a remote agent, whose process is the
+other party's. An engine given `defaultLimits: { memory: '6Gi' }` and `defaultRequests: { memory: '2560Mi' }` writes them onto every
+task filed with no `resources` of its own, as a LimitRange's `default` and `defaultRequest` are written into a Pod at admission: the
+`filed` entry says what each task ran under, and a new default never changes a task already filed. A remote agent's task is never
+given the defaults, so a default makes no remote task unfileable. `Engine.layer` refuses a `defaultLimits.memory` or a
+`defaultRequests.memory` it cannot read, a default request above the default limit, and a `cgroupParent` that is not a slice's unit
+name (`sessions.slice`).
 
 The limit is the host's to hold, as the kubelet holds a container's: a limited task's process tree runs in a transient scope of
 systemd's user manager (`scopeArgv`, `src/harness/cgroup.ts`) — `systemd-run --user --scope --quiet --collect
@@ -1186,6 +1190,29 @@ waiting task. A harness counts in a pool named as it is; one given as an object 
 harnesses under one rate limit share one ceiling. With no `maxConcurrent` the pass admits nothing: a queued task waits for
 `admit`, as under `ae`, which builds its engine with no ceiling and refuses `AE_MAX_CONCURRENT` (exit 2, naming the option).
 agent-orchestrator files every task `queued` with its run's momentum as `priority`, and hands the engine its ceiling.
+
+**Admitted by the machine's memory.** `Engine.layer({ root, maxConcurrent, reserved: { memory: '2Gi' } })` admits by the machine's
+memory beside the ceiling, as Kubernetes' scheduler admits a Pod onto a node only while the requests of what runs there fit its
+allocatable memory. `reserved` is the floor kept for the daemon and the machine, kubelet's `system-reserved`. Each pass reads the
+machine once (`machine`, by default `/proc/meminfo`'s `MemTotal` and `MemAvailable`, `src/service/machine.ts`) and admits a queued
+task, in turn, only while both hold (`admitting`, `src/core/admission.ts`, proved by `contracts/admission.contract.ts`):
+
+- the requests of every task holding a slot, its own among them, fit the machine's total less the floor: what is promised, so a
+  session at work that has not yet grown to its request is counted at it;
+- it, and every task holding a slot with no process yet (admitted, or starting), fit the memory available now less the floor: what
+  the machine has, so a process the runtime did not start (a build, a server) is counted.
+
+The machine-wide bound spans every pool, checks among them; the ceiling keeps its per-pool meaning. A task that does not fit stays
+queued, and one behind it that fits may pass it, as a scheduler goes on to the next Pod. With no `reserved`, or a pass whose
+reading answers nothing (not Linux), the ceiling alone admits. `Engine.layer` refuses a `reserved` it cannot read and a `machine`
+that is not a function.
+
+**A queued task says why it waits.** A pass journals a `waits` entry for a queued task it did not admit, as a Pod's `PodScheduled`
+condition says `Unschedulable`: `{ for: 'slot', pool, ceiling }` where its pool is at the ceiling, `{ for: 'memory', needBytes,
+roomBytes }` where the machine had no room (`AdmissionWait`). Its view carries it as `waits` while the task is queued, and `admitted`
+and `starting` clear it. It is written only when it changes, the room compared in grains of 256 MiB (`ROOM_STEP`), so a busy
+machine writes a line per grain its memory moves, never one per pass. A status for a person: neither admission nor `decide` reads it,
+and the next pass reads the machine again.
 
 **An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ root, unschedulable })` is a
 function the pass asks before it admits, every pass, so it is never fixed when the engine is built. While it says true the
@@ -2232,6 +2259,7 @@ of pure code sits beside it.
 | `src/service/kept.ts` | the engine's `kept` verb, `keptVerbOf`, and `KeptRefused`: what the store and the harnesses keep on the disk by task (`KeptReport`), each harness asked once with every session, a path counted once, nothing removed |
 | `src/service/compact.ts` | the engine's `compact` verb, `compactVerbOf`, and `CompactRefused`: each harness with a `compact` asked to count, or with `{ yes: true }` rewrite, its ended sessions' captures (`CompactReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
+| `src/service/machine.ts` | the machine's memory as `/proc/meminfo` says it, its total and what is available now (`machineMemory`, `meminfoOf`): what a pass's admission reads once while the engine keeps a `reserved` floor |
 | `src/service/mcp-state.ts` | the engine's `mcpState` verb, `mcpStateVerbOf`, and `McpStateRefused`: the state of each server a caller hands, read through Claude Code's own `query()` inside one short-lived session at the engine's root, and refused before one is opened where the record is no record of remote servers or no harness reads one |
 | `src/service/mcp-sign-in.ts` | the engine's `mcpSignIn`, `mcpSignInState` and `mcpSignOut`, `mcpSignInVerbsOf`, `mcpSignInCallback`, and `McpSignInRefused`: a waiting sign-in held in the engine's memory by its callback port until it connects or `SIGN_IN_MS` passes, nothing journalled |
 | `src/service/test-kept.ts` | the stand-in's `kept`, which answers the sizes a test planted with `keeps` |

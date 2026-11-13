@@ -48,7 +48,7 @@ const specOf = (read: InboxCard, queued: string | undefined): CardWrite['spec'] 
 
 /**
  * The card `name` of the namespace `namespace` (its factory, `default` for a card that names none) written from `edit.source`, its file
- * as it is to be: read as the card's own file is read (`parseInboxCard`, after a byte order mark and CRLF line ends are taken off), its
+ * as it is to be: read as the card's own file is read (`parseInboxCard`, which takes a byte order mark and CRLF line ends), its
  * `workflow:`, `gate:`, `model:`, `from:` and body written as the text says them — a key it leaves out taken off — and its name, labels,
  * factory and `queued:` kept, a `queued:` left out read as the card's own. Written whole by the Card's whole write (`replaceCard`) at
  * `edit.resourceVersion` where it is sent, and not written at all where the file would read the same.
@@ -72,8 +72,7 @@ export const editCard = Effect.fn('editCard')(function* (name: string, namespace
         message: `no card ${name} in the namespace ${namespace}: list the cards with nemia get cards, a card's namespace being its factory, default for one that names none; file a new one with nemia inbox add "<idea>"`,
       }),
     );
-  const source = edit.source.replace(/^﻿/, '').replace(/\r\n/g, '\n');
-  const parsed = yield* Effect.exit(tried(() => parseInboxCard(`${name}.md`, source)));
+  const parsed = yield* Effect.exit(tried(() => parseInboxCard(`${name}.md`, edit.source)));
   const read = Exit.isSuccess(parsed) ? parsed.value : null;
   const started = (yield* runDoor.runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
   const refusal = cardEditRefusal({

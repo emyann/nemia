@@ -86,7 +86,7 @@ test("a text in the card's own words is written: its factory or its labels sent 
   const rows: { name: string; source: string; planted?: string }[] = [
     { name: 'its factory named as its namespace', source: card(['workflow: build', 'factory: default']) },
     { name: 'its labels sent back', source: card(['workflow: build', 'labels:', '  team: core']) },
-    { name: 'a byte order mark and CRLF lines', source: `﻿${card(['workflow: build']).replace(/\n/g, '\r\n')}` },
+    { name: 'a byte order mark and CRLF lines', source: `\uFEFF${card(['workflow: build']).replace(/\n/g, '\r\n')}` },
     { name: 'a queued card, its queued: left out, stays queued', source: card(['workflow: build']), planted: QUEUED_CARD },
   ];
   for (const row of rows) {
@@ -95,6 +95,8 @@ test("a text in the card's own words is written: its factory or its labels sent 
       assert.equal(Exit.isSuccess(exit), true, String(exit));
       assert.match(text ?? '', /team: core/);
       assert.match(text ?? '', /\nAdd a cache to the views\.\n\nThe lists come later\.\n$/);
+      assert.match(text ?? '', /^---\nworkflow: build\n/, 'its frontmatter read as keys, with no byte order mark or CR written');
+      assert.doesNotMatch(text ?? '', /\r/);
       if (row.planted === QUEUED_CARD) assert.match(text ?? '', new RegExp(`queued: ${QUEUED}`));
     });
   }

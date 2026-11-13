@@ -28,8 +28,7 @@ export type SelectedRun = { readonly state: RunState; readonly outcome: RunOutco
 const FIELD = 'status.outcome';
 
 /** Whether `word` is a finished run's outcome. */
-const isOutcome = (word: string): boolean =>
-  word === 'succeeded' || word === 'failed' || word === 'cancelled' || word === 'undecided';
+const isOutcome = (word: string): boolean => word === 'succeeded' || word === 'failed' || word === 'cancelled' || word === 'undecided';
 
 /** Whether `text` is the field, `operator`, then an outcome. */
 const spelled = (text: string, operator: string): boolean =>
@@ -42,7 +41,8 @@ const runOutcomeSelectorSpec = spec<(text: string) => RunOutcomeSelector | null>
       condition: ({ input: [text], output }) => !(spelled(text, '=') || spelled(text, '==') || spelled(text, '!=')) || output !== null,
     },
     readAsSpelled: {
-      description: 'A selector taken says the outcome its text names, and takes the runs that ended so exactly where its operator is = or ==',
+      description:
+        'A selector taken says the outcome its text names, and takes the runs that ended so exactly where its operator is = or ==',
       condition: ({ input: [text], output }) =>
         output === null ||
         (output.equal
@@ -70,13 +70,11 @@ const selectorTakesSpec = spec<(selector: RunSelector, run: SelectedRun) => bool
     },
     outcomeTakesFinished: {
       description: 'A selector asking for an outcome (= or ==) takes no run that is not finished',
-      condition: ({ input: [selector, run], output }) =>
-        !('outcome' in selector && selector.equal && output) || run.state === 'finished',
+      condition: ({ input: [selector, run], output }) => !('outcome' in selector && selector.equal && output) || run.state === 'finished',
     },
     notOutcomeTakesUnfinished: {
       description: 'A selector refusing an outcome (!=) takes every run that is not finished',
-      condition: ({ input: [selector, run], output }) =>
-        !('outcome' in selector && !selector.equal && run.state !== 'finished') || output,
+      condition: ({ input: [selector, run], output }) => !('outcome' in selector && !selector.equal && run.state !== 'finished') || output,
     },
   },
 });

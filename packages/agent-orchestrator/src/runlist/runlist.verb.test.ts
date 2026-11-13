@@ -76,7 +76,6 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   return run.id;
 };
 
-
 /** One more pass over the run `id`. */
 const advanced = (id: string) => runWith(e(), advanceRun(runRecord(ROOT, id)));
 
@@ -232,7 +231,10 @@ test('an outcome selector takes the finished runs that ended so, or every other 
     'every run carries the seven keys',
   );
   assert.deepEqual(asked.metadata.counts, counts, 'the counts are the namespace\u2019s');
-  assert.deepEqual(rowsOf(await list({ fieldSelector: 'status.outcome==succeeded' })).map((row) => row.id), [merged]);
+  assert.deepEqual(
+    rowsOf(await list({ fieldSelector: 'status.outcome==succeeded' })).map((row) => row.id),
+    [merged],
+  );
   const others = await list({ fieldSelector: 'status.outcome!=undecided' });
   assert.deepEqual(
     others.items.map((item) => item.metadata.name),
@@ -240,9 +242,16 @@ test('an outcome selector takes the finished runs that ended so, or every other 
     'every other run, those not finished among them',
   );
   const first = await list({ fieldSelector: 'status.outcome=undecided', limit: 1 });
-  assert.deepEqual(rowsOf(first).map((row) => row.id), undecided.slice(0, 1));
+  assert.deepEqual(
+    rowsOf(first).map((row) => row.id),
+    undecided.slice(0, 1),
+  );
   const rest = await list({ fieldSelector: 'status.outcome=undecided', limit: 1, continue: first.metadata.continue });
-  assert.deepEqual(rowsOf(rest).map((row) => row.id), undecided.slice(1), 'its continue reads on in the finished order');
+  assert.deepEqual(
+    rowsOf(rest).map((row) => row.id),
+    undecided.slice(1),
+    'its continue reads on in the finished order',
+  );
 });
 
 test('a plain list carries no counts, no asOf and no frame key, and answers each run as the list asked by state does but for them', async (t) => {

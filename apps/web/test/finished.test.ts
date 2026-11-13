@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
-import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage } from '../src/lib/api/runs.ts';
+import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage, UNDECIDED_SELECTOR, undecidedRunsQuery } from '../src/lib/api/runs.ts';
 import { finishedSearch, newerOf, olderTrailOf, pageSaid, pastLast, rowsSaid, trailOf, trailSearch } from '../src/lib/finished.ts';
 import { detail, runList, runObject } from './run-fixtures.ts';
 
@@ -136,4 +136,44 @@ test('finishedRunsQuery: the RunList asked by state read as a page, nine at a ti
     assert.deepEqual(finishedRunsQuery('harbour', ['f.a', 'f.b']).queryKey, ['runs-finished', 'harbour', 'f.b']);
     assert.deepEqual(finishedRunsQuery(undefined, []).queryKey, ['runs-finished', null, null]);
   });
+});
+
+test('undecidedRunsQuery: the finished runs nobody decided, every page of them, under the finished runs’ key', async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  const pages = [answer('f.more'), answer(null)];
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    return new Response(JSON.stringify(pages[asked.length - 1] ?? answer(null)), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const client = new QueryClient();
+  t.after(() => {
+    client.clear();
+    globalThis.fetch = before;
+  });
+  const runs = await client.fetchQuery(undecidedRunsQuery('harbour'));
+  const urls = asked.map((at) => new URL(at, 'http://board'));
+  assert.deepEqual(
+    urls.map((url) => [url.pathname, url.searchParams.get('fieldSelector'), url.searchParams.get('continue')]),
+    [
+      ['/api/namespaces/harbour/runs', UNDECIDED_SELECTOR, null],
+      ['/api/namespaces/harbour/runs', UNDECIDED_SELECTOR, 'f.more'],
+    ],
+    'the outcome selector, then each page its continue names, to the last',
+  );
+  assert.equal(UNDECIDED_SELECTOR, 'status.outcome=undecided');
+  assert.deepEqual(
+    runs.map((run) => run.id),
+    ['r-2', 'r-1', 'r-2', 'r-1'],
+    "every page's runs, each as the finished page reads it",
+  );
+  assert.deepEqual(
+    undecidedRunsQuery('harbour').queryKey,
+    ['runs-finished', 'harbour', 'undecided'],
+    "under ['runs-finished'], which a write and the feed read again",
+  );
+  assert.deepEqual(undecidedRunsQuery().queryKey, ['runs-finished', null, 'undecided']);
 });

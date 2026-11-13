@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { FINISHED_SELECTOR, OPEN_SELECTOR } from '../../../src/lib/api/runs.ts';
+import { FINISHED_SELECTOR, OPEN_SELECTOR, UNDECIDED_SELECTOR } from '../../../src/lib/api/runs.ts';
 import { showFinished } from '../canvas.ts';
 import { expectVisible, idle, Refused } from '../checks.ts';
 import { AGENTS, FACTORIES, GATED, hiringStarts, WORKFLOWS } from '../seed.ts';
@@ -42,7 +42,8 @@ export default {
    * Every reader that once asked for every run asks for the light reads alone: the Overview and its strip, a factory's floor with Show
    * finished on, the start form's Wait for and Reads pickers, a run's Hold popover, and an agent's Try panel. Each asks for the runs not
    * finished (`status.state!=finished`), and those finished (`status.state=finished`) where it shows the finished, and no list of the runs
-   * without a `fieldSelector`. The checkout's `dev` is made able to start in `hiring` (`hiringStarts`) for the start form, and taken back.
+   * without a `fieldSelector`; the floor asks besides for the finished runs nobody decided (`status.outcome=undecided`), which it shows
+   * whether Show finished is on or not. The checkout's `dev` is made able to start in `hiring` (`hiringStarts`) for the start form, and taken back.
    */
   name: 'light-readers',
   route: '/agents',
@@ -65,7 +66,7 @@ export default {
         await expectVisible(page.locator(`[data-factory="${FACTORY}"]`).first(), `the Overview draws ${FACTORY}'s block`);
       });
 
-      await reading("a factory's floor, Show finished on", [OPEN_SELECTOR, FINISHED_SELECTOR], async () => {
+      await reading("a factory's floor, Show finished on", [OPEN_SELECTOR, UNDECIDED_SELECTOR, FINISHED_SELECTOR], async () => {
         await visit(page, `/factories/${FACTORY}`);
         await showFinished(page);
         await expectVisible(page.locator('.react-flow__node').first(), 'the floor draws a card');

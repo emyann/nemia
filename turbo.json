@@ -59,6 +59,7 @@
         "$TURBO_ROOT$/packages/*/place/**",
         "$TURBO_ROOT$/packages/*/contracts/**",
         "$TURBO_ROOT$/.oxlintrc.json",
+        "$TURBO_ROOT$/.oxlintrc.fast.json",
         "$TURBO_ROOT$/.oxfmtrc.json",
         "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/packages/agent-runtime/test/remote-agent.test.ts",

@@ -29,6 +29,9 @@ import {
   nameRefusal,
   plistRead,
   plistText,
+  sessionsSliceOf,
+  slicePathOf,
+  sliceText,
   specRefusal,
   statusLines,
   systemdState,
@@ -61,6 +64,7 @@ import {
 import { takeOver, takeOverConfirmed, type Started, type TakeoverHost } from './takeover.verb.ts';
 import { sizedFor, sizeRefusal, type MachineSize } from './sizing.ts';
 import { memoryBytesOf } from 'agent-runtime/vocabulary';
+import { cgroupParent, memoryReserved } from '../config/config.store.ts';
 import { BIND_PUBLIC_VARIABLE, bindExposure, kindOfBind, machineAddresses, type MachineAddress } from './address.ts';
 
 /**
@@ -258,14 +262,17 @@ const bindable = (value: string): boolean => isIP(value) !== 0 && !value.include
  * gives is under it, which the daemon would refuse; and its lines, the first saying the floor kept, its default (`WF_MEMORY_RESERVED`),
  * which none is written for. None without `--size`. Refused (`Invalid`): a `--size` other than `auto`, or a machine outside what Nemia
  * sizes (`sizeRefusal`).
+ *
+ * On systemd it also holds the sessions together to what the machine allocates (`sessionsCeiling`): the slice to write, and
+ * `WF_CGROUP_PARENT` pointed at it.
  */
 function sizedEnv(
   args: Args,
   at: Placed,
   host: ServiceHost,
   given: ReadonlyMap<string, string>,
-): { env: [string, string][]; lines: string[] } {
-  if (args.size === undefined) return { env: [], lines: [] };
+): { env: [string, string][]; lines: string[]; slice: SliceFile | null } {
+  if (args.size === undefined) return { env: [], lines: [], slice: null };
   if (args.size !== 'auto')
     throw new Invalid({
       message: `nemia service install: --size takes auto, which sizes the sessions to this machine: ${SHAPES.install}.`,
@@ -285,6 +292,8 @@ function sizedEnv(
       ? []
       : [['WF_MEMORY_REQUEST', `${sized.memoryRequestMiB}Mi`] as [string, string]]),
   ];
+  const ceiling = memory ? sessionsCeiling(at, host, machine, sized.memoryReservedMiB, given) : null;
+  if (ceiling !== null) env.push(...ceiling.env);
   const said = env.map(([k, v]) => `${k}=${v}`).join(', ');
   const kept = given.has('WF_MEMORY_RESERVED')
     ? 'the floor as --env gives it (WF_MEMORY_RESERVED)'
@@ -295,10 +304,58 @@ function sizedEnv(
       `sized for ${machine.memoryMiB} MiB and ${machine.cpus} CPU: ${said || 'each variable as --env gives it'}; ${kept}`,
       ...(at.system === 'launchd'
         ? [
-            'launchd holds no per-session memory limit: no WF_MEMORY_LIMIT or WF_MEMORY_REQUEST is written, and a session on macOS runs unbounded',
+            'launchd holds no per-session memory limit and no slice: no WF_MEMORY_LIMIT, WF_MEMORY_REQUEST or WF_CGROUP_PARENT is written, and a session on macOS runs unbounded',
           ]
         : []),
+      ...(ceiling?.lines ?? []),
     ],
+    slice: ceiling?.slice ?? null,
+  };
+}
+
+/** A file install writes beside the unit: the sessions' slice, its path and its text. */
+type SliceFile = { readonly file: string; readonly text: string };
+
+/**
+ * The sessions held together to what the machine allocates, on systemd: its memory less the floor kept, `WF_MEMORY_RESERVED` where
+ * `--env` gives it (read by its own reader, whose refusal is let through) else the default (`reservedMiB`), in bytes. Where `--env`
+ * gives no `WF_CGROUP_PARENT`, the service's own slice (`sessionsSliceOf`) at that ceiling, and `WF_CGROUP_PARENT` pointed at it;
+ * where it gives one, that slice is the person's: no file, and a line naming how to give it its ceiling. Refused (`Invalid`): a floor
+ * at or above the machine's memory, which leaves the sessions nothing.
+ */
+function sessionsCeiling(
+  at: Placed,
+  host: ServiceHost,
+  machine: MachineSize,
+  reservedMiB: number,
+  given: ReadonlyMap<string, string>,
+): { env: [string, string][]; lines: string[]; slice: SliceFile | null } {
+  const totalBytes = machine.memoryMiB * 2 ** 20;
+  const floor = memoryReserved({ WF_MEMORY_RESERVED: given.get('WF_MEMORY_RESERVED') });
+  const floorBytes = (floor === undefined ? undefined : memoryBytesOf(floor)) ?? reservedMiB * 2 ** 20;
+  if (floorBytes >= totalBytes)
+    throw new Invalid({
+      message: `nemia service install: --env WF_MEMORY_RESERVED=${floor ?? ''} keeps all of this machine's ${machine.memoryMiB} MiB, which leaves the sessions nothing: give --env WF_MEMORY_RESERVED a floor under it, or leave it out for an eighth of the machine.`,
+    });
+  const ceilingBytes = totalBytes - floorBytes;
+  const ceilingSaid = `MemoryMax=${Math.floor(ceilingBytes / 2 ** 20)} MiB (${ceilingBytes} bytes), what the machine allocates to them: its memory less the floor kept`;
+  if (given.has('WF_CGROUP_PARENT')) {
+    const named = cgroupParent({ WF_CGROUP_PARENT: given.get('WF_CGROUP_PARENT') });
+    return {
+      env: [],
+      lines: [
+        named === undefined
+          ? `the sessions run in the user manager's own slice (WF_CGROUP_PARENT as --env gives it), which nothing caps: leave --env WF_CGROUP_PARENT out to have install write ${sessionsSliceOf(at.name)}`
+          : `the sessions run under ${named}, as --env gives it, which install does not write: systemctl --user set-property ${named} MemoryMax=${ceilingBytes} holds them together under ${ceilingSaid}`,
+      ],
+      slice: null,
+    };
+  }
+  const slice = sessionsSliceOf(at.name);
+  return {
+    env: [['WF_CGROUP_PARENT', slice]],
+    lines: [`wrote ${slicePathOf(at.name, host.dirs())}: the sessions run under ${slice}, held together under ${ceilingSaid}`],
+    slice: { file: slicePathOf(at.name, host.dirs()), text: sliceText({ name: at.name, ceilingBytes }) },
   };
 }
 
@@ -335,7 +392,7 @@ function boundEnv(args: Args, given: ReadonlySet<string>): [string, string][] {
  * The service's spec: the checkout's daemon under the installer's node (or the one the daemon carries), its store and `PATH`, what
  * `--size auto` and `--bind` write, then each `--env`, in the order given; and the lines the sizing says.
  */
-function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec; lines: string[] } {
+function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec; lines: string[]; slice: SliceFile | null } {
   const given = Array.isArray(args.env) ? (args.env as readonly string[]) : [];
   const wrong = envRefusal(given);
   if (wrong !== null) throw new Invalid({ message: wrong });
@@ -352,7 +409,7 @@ function specOf(at: Placed, args: Args, host: ServiceHost): { spec: ServiceSpec;
   };
   const bad = specRefusal(spec);
   if (bad !== null) throw new Invalid({ message: bad });
-  return { spec, lines: sized.lines };
+  return { spec, lines: sized.lines, slice: sized.slice };
 }
 
 /** What `nemia service install` did: the service and its file, the checkout it runs, how it stands now, and its lines. */
@@ -413,14 +470,15 @@ const lingerLines = (at: Placed, host: ServiceHost): string[] => {
  */
 export const installService = Effect.fn('installService')(function* (args: Args, given?: ServiceHost) {
   const host = given ?? liveHost(yield* StoreRoot);
-  const { at, spec, sizing, pid } = yield* tried(() => {
+  const { at, spec, sizing, slice, pid } = yield* tried(() => {
     const at = placed(args, host);
     const pid = pidOf(args.takeOver);
-    const { spec, lines } = specOf(at, args, host);
-    return { at, spec, sizing: lines, pid };
+    const { spec, lines, slice } = specOf(at, args, host);
+    return { at, spec, sizing: lines, slice, pid };
   });
   if (pid !== undefined) yield* takeOverConfirmed(pid, host);
   yield* tried(() => {
+    if (slice !== null) writeUnit(slice.file, slice.text);
     writeUnit(at.file, at.system === 'systemd' ? unitText(spec) : plistText(spec));
     ops(at, host).installed();
   });
@@ -441,7 +499,8 @@ export const installService = Effect.fn('installService')(function* (args: Args,
 export type Uninstalled = { readonly name: string; readonly file: string; readonly lines: readonly string[] };
 
 /**
- * Removes the service: stops it (SIGTERM, which writes `stoppedAt` where it held the store), disables it and deletes its file. A daemon
+ * Removes the service: stops it (SIGTERM, which writes `stoppedAt` where it held the store), disables it and deletes its file, and the
+ * sessions' slice `--size auto` wrote beside it where there is one. A daemon
  * that is not the service is left alone. Refused (`Missing`): no service of that name installed.
  */
 export const uninstallService = Effect.fn('uninstallService')(function* (args: Args, given?: ServiceHost) {
@@ -455,8 +514,14 @@ export const uninstallService = Effect.fn('uninstallService')(function* (args: A
     const run = ops(at, host);
     run.remove();
     removeUnit(at.file);
+    const slice = at.system === 'systemd' ? slicePathOf(at.name, host.dirs()) : null;
+    const sliceGone = slice !== null && removeUnit(slice);
     run.removed();
-    const lines = [`stopped and removed ${at.unit} (${at.file})`, daemonLine(host.lease(), Date.now())];
+    const lines = [
+      `stopped and removed ${at.unit} (${at.file})`,
+      ...(sliceGone ? [`removed ${sessionsSliceOf(at.name)} (${slice}), the slice its sessions ran under`] : []),
+      daemonLine(host.lease(), Date.now()),
+    ];
     return { name: at.name, file: at.file, lines } satisfies Uninstalled;
   });
 });

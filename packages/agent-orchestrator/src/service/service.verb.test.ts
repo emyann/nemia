@@ -983,3 +983,101 @@ test("nemia service addresses lists this machine's addresses with their kinds, l
   assert.deepEqual(read, { addresses: data.addresses });
   assert.ok(read.addresses.every((a) => ADDRESS_KINDS.includes(a.kind) && (a.family === 4 || a.family === 6)));
 });
+
+/** The sessions' slice `--size auto` writes beside the default service's unit. */
+const SLICE = path.join(HOME, '.config', 'systemd', 'user', 'nemia-sessions.slice');
+
+/** A host over `world` whose `daemon-reload` notes whether the sessions' slice is on disk by then: systemd loads what is there. */
+const reloadedOf = (world: World) => {
+  const { host } = hostOf(world);
+  const seen: boolean[] = [];
+  const call = (argv: readonly string[]) => {
+    if (argv.includes('daemon-reload')) seen.push(fs.existsSync(SLICE));
+    return host.call(argv);
+  };
+  return { host: { ...host, call }, seen };
+};
+
+test('--size auto caps the sessions together: a slice at what the machine allocates, written before the reload, the unit pointed at it, and uninstall takes it away', async (t) => {
+  const GIB16 = { memoryMiB: 16384, cpus: 8 };
+  await t.test('16 GiB less the 2 GiB kept: MemoryMax 14336 MiB, in bytes, and WF_CGROUP_PARENT names the slice', async () => {
+    const { host, seen } = reloadedOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+    const done = await install({ size: 'auto' }, host);
+    const slice = fs.readFileSync(SLICE, 'utf8');
+    assert.match(slice, /^\[Slice\]$/m);
+    assert.match(slice, /^MemoryMax=15032385536$/m);
+    assert.equal(new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env).get('WF_CGROUP_PARENT'), 'nemia-sessions.slice');
+    assert.deepEqual(seen, [true], 'the slice is on disk when systemd reloads its files');
+    assert.ok(
+      done.lines.some((l) => l.includes('nemia-sessions.slice') && l.includes('14336 MiB')),
+      done.lines.join('\n'),
+    );
+  });
+
+  await t.test(
+    'a floor --env gives sets the ceiling; one at or above the machine, or one that does not read, is refused with nothing written',
+    async () => {
+      const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+      await install({ size: 'auto', env: ['WF_MEMORY_RESERVED=4Gi'] }, host);
+      assert.match(fs.readFileSync(SLICE, 'utf8'), /^MemoryMax=12884901888$/m);
+      for (const floor of ['20Gi', '16Gi', 'half']) {
+        fs.rmSync(path.join(HOME, '.config'), { recursive: true, force: true });
+        const { host: again } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+        await assert.rejects(install({ size: 'auto', env: [`WF_MEMORY_RESERVED=${floor}`] }, again), refusedWith('Invalid'), floor);
+        assert.equal(fs.existsSync(UNIT), false, floor);
+        assert.equal(fs.existsSync(SLICE), false, floor);
+      }
+    },
+  );
+
+  await t.test('a slice --env names is the person’s: no file written, the unit names it once, and a line names set-property', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+    const done = await install({ size: 'auto', env: ['WF_CGROUP_PARENT=sessions.slice'] }, host);
+    assert.equal(fs.existsSync(SLICE), false);
+    assert.deepEqual(
+      unitRead(fs.readFileSync(UNIT, 'utf8')).env.filter(([k]) => k === 'WF_CGROUP_PARENT'),
+      [['WF_CGROUP_PARENT', 'sessions.slice']],
+    );
+    assert.ok(
+      done.lines.some((l) => l.includes('systemctl --user set-property sessions.slice MemoryMax=15032385536')),
+      done.lines.join('\n'),
+    );
+  });
+
+  await t.test('no --size, and launchd, write no slice and no WF_CGROUP_PARENT', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+    await install({}, host);
+    assert.equal(fs.existsSync(SLICE), false);
+    assert.equal(new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env).has('WF_CGROUP_PARENT'), false);
+    const machine = { platform: 'darwin', wsl: false, systemd: false };
+    const { host: mac } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: GIB16 });
+    const done = await install({ size: 'auto' }, mac);
+    t.after(() => fs.rmSync(done.file, { force: true }));
+    assert.equal(new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env).has('WF_CGROUP_PARENT'), false);
+    assert.equal(fs.existsSync(SLICE), false);
+  });
+
+  await t.test('a store of its own, named nemia-trial, gets nemia-trial-sessions.slice', async () => {
+    const root = scratch('wf-service-trial-');
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16, root });
+    const done = await install({ size: 'auto', name: 'nemia-trial' }, host);
+    const trial = path.join(HOME, '.config', 'systemd', 'user', 'nemia-trial-sessions.slice');
+    assert.match(fs.readFileSync(trial, 'utf8'), /^MemoryMax=15032385536$/m);
+    assert.equal(new Map(unitRead(fs.readFileSync(done.file, 'utf8')).env).get('WF_CGROUP_PARENT'), 'nemia-trial-sessions.slice');
+  });
+
+  await t.test('uninstall removes the slice with the unit, and succeeds where there is none', async () => {
+    const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: GIB16 });
+    await install({ size: 'auto' }, host);
+    const done = await runWith(engineOf(engine().layer), uninstallService({}, host));
+    assert.equal(fs.existsSync(SLICE), false);
+    assert.equal(fs.existsSync(UNIT), false);
+    assert.ok(
+      done.lines.some((l) => l.includes('nemia-sessions.slice')),
+      done.lines.join('\n'),
+    );
+    await install({}, host);
+    await runWith(engineOf(engine().layer), uninstallService({}, host));
+    assert.equal(fs.existsSync(UNIT), false);
+  });
+});

@@ -4,11 +4,22 @@
  * `WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`; the floor, `WF_MEMORY_RESERVED`, is its default and not written). Each session asks its share
  * of the memory (`MIB_PER_SESSION`), the requests of all of them fit the machine less the floor (`reservedFor`), one CPU is left to the
  * daemon and the machine, and each is held under half the machine. And whether the settings a daemon runs under fit its machine
- * (`memoryFit`), which `nemia doctor` says. Pure: the verbs read the machine (`os.totalmem()`, `os.availableParallelism()`).
+ * (`memoryFit`), and whether the slice its sessions run under holds them to what the machine allocates (`ceilingFit`), each of which
+ * `nemia doctor` says. Pure: the verbs read the machine (`os.totalmem()`, `os.availableParallelism()`).
  */
-import type { Configured, Machine, MemoryFit, MemoryFitOf, Sized, SizedFor } from '../../contracts/sizing.contract.ts';
+import type {
+  CeilingFit,
+  CeilingFitOf,
+  Configured,
+  Machine,
+  MemoryFit,
+  MemoryFitOf,
+  Sized,
+  SizedFor,
+  SliceCeiling,
+} from '../../contracts/sizing.contract.ts';
 
-export type { Configured, Machine as MachineSize, MemoryFit, Sized };
+export type { CeilingFit, Configured, Machine as MachineSize, MemoryFit, Sized, SliceCeiling };
 
 /** The machine's memory each session asks on average, in MiB: the contract's own number, which a law reads. */
 export const MIB_PER_SESSION = 2560;
@@ -46,6 +57,19 @@ export const memoryFit: MemoryFitOf = (configured) => {
   if (configured.limitBytes !== null && configured.limitBytes > room)
     return { verdict: 'limitOver', limitBytes: configured.limitBytes, allocatableBytes: room };
   return { verdict: 'fits' };
+};
+
+/**
+ * Whether the sessions' slice holds them to what the machine allocates: no ceiling (`infinity`, read as null) is `none`; a ceiling more
+ * than the machine allocates (its memory less the floor) is `over`, naming both; any other is `held`, naming the ceiling. `ceiling * 1`
+ * is `ceiling`, read as a number, as `memoryFit` reads `asked`.
+ */
+export const ceilingFit: CeilingFitOf = (slice) => {
+  const ceiling = slice.ceilingBytes;
+  if (ceiling === null) return { verdict: 'none' };
+  const bytes = ceiling * 1;
+  if (bytes > slice.allocatableBytes) return { verdict: 'over', ceilingBytes: bytes, allocatableBytes: slice.allocatableBytes };
+  return { verdict: 'held', ceilingBytes: bytes };
 };
 
 /**

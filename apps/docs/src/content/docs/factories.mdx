@@ -253,6 +253,8 @@ source's runs and callers.
   given with `--repo <source>=<url|path>`, its path in the source's file on the left; one with neither is refused, naming the flag.
 - **Volumes** keep their path where the target takes it, judged as `nemia factory volume add` judges one there. Where it does not, the
   move is refused, naming the `--volume <name>=<path>` to give: the volume's name, or its path on the source where it has none.
+  A folder inside the target's store is refused as `nemia factory volume add` refuses one there, a clone another factory works on
+  included: mount a folder outside the store.
 - **Nothing is written on the target** when the move is refused or fails partway: no file, no folder, no card. A repository already
   cloned may remain on its disk, and a second try reuses it.
 - **The move never trusts the factory.** Type `nemia factory trust <name>` under the target's context once you have read what it

@@ -4,13 +4,15 @@
  * source, its answer sent whole as `POST /api/factories/:name/import` to the target, as `nemia factory move` sends it.
  *
  * The person's case, a factory moved by hand, in its shape: a factory made from a builtin template at an older version than the one
- * the target ships, edits made in its tree since, rules and a level of its own, a volume mounted read-only on the folder another factory
- * works on (`other`, the folder of the factory `quarry`), given a path of the target's with `volumes` (`otherThere`), a card that
- * follows and one a run was started from, which stays. On the target its template, its rules, its instruction, its tree and its rendered
- * base and its level read as the source's, its volume at the path given, its card filed with no `repo:` or `queued:` and naming its old
- * name; the source is unchanged to the byte; and an upgrade to the target's version merges against the base that moved, the tree's edit
- * kept. Refused: a volume the target refuses, a session's token whose session has ended, as create refuses it, and a name the target
- * holds, each leaving the target with no factory file, folder or card of it.
+ * the target ships, edits made in its tree since, rules and a level of its own, a schedule, a cost line and a recorded MCP server, a
+ * volume mounted read-only on the folder another factory works on (`other`, the folder of the factory `quarry`), given a path of the
+ * target's with `volumes` (`otherThere`), a card that follows and one a run was started from, which stays. On the target its template,
+ * its rules, its instruction, its tree and its rendered base, its level, schedule, cost line and server read as the source's, its volume
+ * at the path given, its card filed with no `repo:` or `queued:` and naming its old name; the source is unchanged to the byte; and an
+ * upgrade to the target's version merges against the base that moved, the tree's edit kept. The hand move mounted the volume on another
+ * factory's clone, which lives inside the store: given the target's clone of `quarry`, the import is refused naming `--volume`, as
+ * `nemia factory volume add` refuses any folder inside the store. Refused too: a session's token whose session has ended, as create
+ * refuses it, and a name the target holds, each leaving the target with no factory file, folder or card of it.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -69,6 +71,9 @@ const OLDER = mill(scratch('nemia-api-move-builtins-old-'), '0.1.0', 'You draft.
 const NEWER = mill(scratch('nemia-api-move-builtins-new-'), '0.2.0', 'You draft, and you cite.\n');
 
 const SINCE = '2026-11-01T00:00:00.000Z';
+/** The schedule of `press` the source's factory keeps, and an MCP server it records, signed in to by OAuth. */
+const SCHEDULE = { cron: '0 9 * * 1', brief: 'Press the week.' };
+const SERVER = { type: 'http', url: 'https://mcp.example.com/mcp', oauth: { clientId: 'nemia-move', callbackPort: 8791 } };
 const DRAFT = path.join('workflows', 'press', 'draft.md');
 /** Where the tree renders the agent `drafter`, its instructions the body. */
 const DRAFTER = path.join('workflows', 'agents', 'drafter.md');
@@ -211,6 +216,9 @@ test("a templated factory moved to a store of a later install: its lineage, tree
   );
   await answered(send(source, 'POST', '/api/factories/mill/volumes', { volume: `${other}:ro` }));
   await reconciled(source, OLDER);
+  await answered(send(source, 'PUT', '/api/namespaces/mill/schedules/press', SCHEDULE));
+  await answered(send(source, 'PUT', '/api/factories/mill/costlines/press', { usd: 4 }));
+  await answered(send(source, 'PUT', '/api/namespaces/mill/mcpservers/tracker', SERVER));
   await answered(send(source, 'PUT', '/api/factories/mill/rules', { words: 'Keep drafts short.\n' }));
   const sourceTree = path.join(source.home, 'factories', 'mill', 'tree');
   fs.writeFileSync(path.join(sourceTree, DRAFT), 'Draft it our way.\n');
@@ -240,14 +248,30 @@ test("a templated factory moved to a store of a later install: its lineage, tree
     assert.ok(exp.left[0]?.why.includes('run-pressed'), 'why names the run');
   });
 
-  await s.test("REFUSED: a volume given a folder inside the target's store is a 422, the target left with nothing of it", async () => {
-    const inside = path.join(target.home, 'inside');
-    fs.mkdirSync(inside, { recursive: true });
-    const res = await send(target, 'POST', '/api/factories/mill/import', { export: exp, from: 'laptop', volumes: { [key]: inside } });
-    assert.equal(res.status, 422, await res.text());
-    assert.deepEqual(heldOf(target, 'mill'), NOTHING);
-    assert.equal(fs.existsSync(path.join(target.home, 'clones')), false, 'nothing is cloned');
-  });
+  await s.test(
+    "REFUSED: the volume given the target's clone of another factory, inside its store, is a 422 naming --volume, nothing filed",
+    async () => {
+      const quarryOrigin = path.join(scratch('nemia-api-move-quarry-'), 'acme', 'quarry');
+      fs.mkdirSync(quarryOrigin, { recursive: true });
+      stand().world.repository(quarryOrigin, { 'README.md': 'quarry\n' });
+      const quarry = await answered<{ repos: string[] }>(
+        send(target, 'POST', '/api/factories', { name: 'quarry', repos: [pathToFileURL(quarryOrigin).href], noTrust: true }),
+      );
+      const [quarryClone = ''] = quarry.repos;
+      assert.ok(quarryClone.startsWith(path.join(target.home, 'clones')), quarryClone);
+      const clones = filesOf(path.join(target.home, 'clones'));
+      const res = await send(target, 'POST', '/api/factories/mill/import', {
+        export: exp,
+        from: 'laptop',
+        volumes: { [key]: quarryClone },
+      });
+      const body = await res.text();
+      assert.equal(res.status, 422, body);
+      assert.ok(body.includes(`--volume ${key}=`), body);
+      assert.deepEqual(heldOf(target, 'mill'), NOTHING);
+      assert.deepEqual(filesOf(path.join(target.home, 'clones')), clones, "nothing of mill's is cloned");
+    },
+  );
 
   await s.test("REFUSED: a session's token whose session has ended is a 401 on the import as on a create, nothing filed", async () => {
     const bearer = { authorization: `Bearer ${endedToken(target)}` };
@@ -303,6 +327,16 @@ test("a templated factory moved to a store of a later install: its lineage, tree
       fs.readFileSync(path.join(folder(target), 'level.json'), 'utf8'),
       fs.readFileSync(path.join(folder(source), 'level.json'), 'utf8'),
     );
+  });
+
+  await s.test('its schedule, its cost line and its recorded server read there as here', async () => {
+    const spec = async (st: Store, url: string) => (await answered<{ spec: unknown }>(send(st, 'GET', url))).spec;
+    for (const url of ['/api/namespaces/mill/schedules/press', '/api/namespaces/mill/mcpservers/tracker'])
+      assert.deepEqual(await spec(target, url), await spec(source, url), url);
+    const here = await answered<FactoryObject>(send(source, 'GET', '/api/factories/mill'));
+    const there = await answered<FactoryObject>(send(target, 'GET', '/api/factories/mill'));
+    assert.deepEqual(there.spec.costLines, { press: 4 });
+    assert.deepEqual(there.spec.costLines, here.spec.costLines);
   });
 
   await s.test('its volume is mounted at the path given, read-only as it was', () => {

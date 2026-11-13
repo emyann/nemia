@@ -34,8 +34,8 @@ function personToken(store: string): string {
 
 /**
  * The feed as the api reads it back: `GET /api/feed/wait?from=0` of an api served over the store, ticking nothing, the read `nemia watch
- * --once 0` asks, under a token of the person's. The web imports nothing of the packages, so the store is asked as the board asks it. Answers each line's run, step (`—`
- * for a run's own line) and word, and the cursor.
+ * --once 0` asks, under a token of the person's. The web imports nothing of the packages, so the store is asked as the board asks it.
+ * Answers each line's run, step (`—` for a run's own line) and word, and the cursor.
  */
 async function apiFeed(t: TestContext, store: string): Promise<{ said: string[]; cursor: number }> {
   const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], {

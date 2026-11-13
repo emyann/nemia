@@ -183,6 +183,59 @@ test('PUT a card whole: spec.from set and answered; REFUSED: a stale resourceVer
   assert.equal(fs.readFileSync(path.join(inbox, 'w-started.md'), 'utf8'), before, 'a started card keeps its file');
 });
 
+test("PUT a card's text to its source: the name kept, the text's body and keys; REFUSED: started 409, a bad key 422, another namespace 404, no source 400", async (t) => {
+  const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
+  const runs = path.join(root, 'runs');
+  fs.mkdirSync(runs, { recursive: true });
+  card('e-1', { team: 'core' });
+  card('e-started');
+  fs.writeFileSync(
+    path.join(runs, 'started-e3.json'),
+    JSON.stringify({
+      id: 'started-e3',
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'A brief',
+      workflowDir: '/code/app/workflows',
+      createdAt: '2026-11-05T00:00:00.000Z',
+      workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+      steps: { implement: { taskId: null } },
+      from: { inbox: 'e-started' },
+    }),
+  );
+  t.after(() => {
+    for (const name of ['e-1', 'e-started']) fs.rmSync(path.join(inbox, `${name}.md`), { force: true });
+    fs.rmSync(path.join(runs, 'started-e3.json'), { force: true });
+  });
+  const put = (url: string, body: unknown) => app.request(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+  const at = '/api/namespaces/default/cards/e-1/source';
+  const read = (await (await app.request('/api/namespaces/default/cards/e-1')).json()) as typeof Card.Type;
+
+  const written = await put(at, { source: '---\nworkflow: quick\n---\nDo it, retitled.\n' });
+  assert.equal(written.status, 200);
+  const after = (await written.json()) as typeof Card.Type;
+  assert.equal(after.metadata.name, 'e-1');
+  assert.equal(after.spec.body, 'Do it, retitled.');
+  assert.equal(after.spec.workflow, 'quick');
+  assert.deepEqual(after.metadata.labels?.['team'], 'core', 'its labels kept');
+  assert.notEqual(after.metadata.resourceVersion, read.metadata.resourceVersion);
+
+  const now = fs.readFileSync(path.join(inbox, 'e-1.md'), 'utf8');
+  for (const [url, body, status] of [
+    ['/api/namespaces/default/cards/e-started/source', { source: 'Do it otherwise.\n' }, 409],
+    [at, { source: '---\nworkflow: quick\ngate: a,b\n---\nDo it.\n' }, 422],
+    ['/api/namespaces/a/cards/e-1/source', { source: 'Do it.\n' }, 404],
+    [at, { resourceVersion: 'x' }, 400],
+  ] as const) {
+    const res = await put(url, body);
+    assert.equal(res.status, status, `${url} ${JSON.stringify(body)}`);
+  }
+  assert.equal(fs.readFileSync(path.join(inbox, 'e-1.md'), 'utf8'), now, 'nothing written by a refusal');
+});
+
 test("a card filed from runs that disagree on a label says the key it left out, each run with its value, on the filing's answer alone", async (t) => {
   const headers = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
   const runs = path.join(root, 'runs');

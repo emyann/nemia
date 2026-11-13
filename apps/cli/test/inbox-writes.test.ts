@@ -1,9 +1,9 @@
 /**
- * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox from`, `inbox rm`, `label inbox` and
- * `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's context and under a
- * remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it prints. An idea
- * given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given as a path are refused, exit 2,
- * before anything is asked.
+ * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox from`, `inbox edit`, `inbox rm`,
+ * `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
+ * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines
+ * it prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow
+ * given as a path are refused, exit 2, before anything is asked.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -103,6 +103,27 @@ async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root
   assert.equal(off.out, `${name}  from: taken off (was r-ctx)\n`);
   assert.doesNotMatch(cardOn(root, name) ?? '', /from:/);
 
+  const text = path.join(path.dirname(idea), `${name}-edited.md`);
+  write(text, '---\nworkflow: dev\n---\n# Cache the engine views, retitled\n\nOnly between passes.\n');
+  const edited = await run(['inbox', 'edit', name, text]);
+  ok(edited, 'inbox edit');
+  assert.deepEqual(edited.out.split('\n'), [
+    `${name}  Cache the engine views, retitled  workflow: dev`,
+    `edited: ${name}.md — its name kept, ${name}`,
+    '',
+  ]);
+  assert.match(
+    cardOn(root, name) ?? '',
+    /\nworkflow: dev\n[^]*team: core\n---\n# Cache the engine views, retitled\n\nOnly between passes\.\n$/,
+  );
+  const same = await run(['inbox', 'edit', name, text]);
+  ok(same, 'inbox edit, again');
+  assert.equal(same.out.split('\n')[1], `unchanged: ${name}.md already reads as that text`);
+  const typed = await run(['inbox', 'edit', name, 'Cache the engine views\n\nAs typed.']);
+  ok(typed, 'inbox edit, typed');
+  assert.doesNotMatch(cardOn(root, name) ?? '', /workflow:/, 'a key the text leaves out is taken off');
+  assert.match(cardOn(root, name) ?? '', /team: core\n---\nCache the engine views\n\nAs typed\.\n$/);
+
   const labelled = await run(['label', 'inbox', name, 'tier=one', 'team-']);
   ok(labelled, 'label inbox');
   assert.deepEqual(labelled.out.split('\n'), [
@@ -129,7 +150,7 @@ const ideaFile = (name: string): string => {
   return file;
 };
 
-test("under this machine's context: a card filed from a file, queued, taken back, handed a run, labelled and dropped", async () => {
+test("under this machine's context: a card filed from a file, queued, taken back, handed a run, edited, labelled and dropped", async () => {
   await lifeOfACard((argv) => store.nemia(argv), store.root, ideaFile('here.md'));
 });
 
@@ -146,7 +167,7 @@ test('`nemia label run` edits a run of the store, a line per key, then its label
   assert.equal(changed.out.split('\n')[0], 'run r-ctx  team=infra changed (was core)');
 });
 
-test('REFUSED, exit 2, before anything is asked: a folder as the idea, a workflow given as a path, a label edit missing', async () => {
+test("REFUSED, exit 2, before anything is asked: a folder as the idea or a card's text, a workflow given as a path, a label edit missing", async () => {
   const before = fs.existsSync(path.join(store.root, 'inbox')) ? fs.readdirSync(path.join(store.root, 'inbox')) : [];
   for (const [argv, named] of [
     [['inbox', 'add', IDEAS], /nemia inbox add/],
@@ -154,6 +175,7 @@ test('REFUSED, exit 2, before anything is asked: a folder as the idea, a workflo
     [['inbox', 'queue', 'some-card', '--workflow', '/abs/dev'], /--workflow <name>/],
     [['inbox', 'queue', 'some-card', '--workflow', 'dev', '--off'], /--off/],
     [['inbox', 'from', 'some-card'], /nemia inbox from/],
+    [['inbox', 'edit', 'some-card', IDEAS], /nemia inbox edit/],
     [['label', 'inbox', 'some-card'], /key=value/],
   ] as const) {
     const said = await store.nemia(argv);

@@ -4,7 +4,7 @@
  * where it is in its life (`state`), the runs it was started as, the tick's last missed start of it, its title, and why an entry of the
  * inbox does not read as a card. Its labels are its `metadata.labels`, its factory its `metadata.namespace`.
  *
- * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card written whole (`CardWrite`), a card started (`CardStart`) and its
+ * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card written whole (`CardWrite`), a card written from its text (`CardEdit`), a card started (`CardStart`) and its
  * labels edited (`LabelEdit`), each as the api is sent it. Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
@@ -185,6 +185,19 @@ export const CardWrite = Schema.Struct({
   spec: CardSpec,
 });
 export type CardWrite = typeof CardWrite.Type;
+
+/**
+ * A card written from its text (edit): `source`, the card's file as it is to be, frontmatter and body, as `status.source` serves it and
+ * `nemia inbox edit` sends it, read as the card's own file is read; its name kept, and its labels, which their own verb edits. With the
+ * `resourceVersion` it was read at, the write is refused where the card has changed since (absent: the last writer wins).
+ */
+export const CardEdit = Schema.Struct({
+  source: Schema.String.annotate({
+    description: "The card's file as it is to be, frontmatter and body, as status.source serves it and nemia inbox add reads a file.",
+  }),
+  resourceVersion: Schema.optionalKey(Schema.String),
+});
+export type CardEdit = typeof CardEdit.Type;
 
 /**
  * A card queued (queue), in its query: the workflow it starts on, by its name, written over the card's own; absent, the card's own

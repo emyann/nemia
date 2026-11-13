@@ -164,6 +164,7 @@ export {
   CardStart,
   CardStatus,
   CardWrite,
+  CardEdit,
   type CardKey,
   type CardState,
 } from './card.ts';
@@ -686,6 +687,7 @@ export {
 } from './commands-runs.ts';
 export {
   INBOX_ADD_WORDS,
+  INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_RM_WORDS,

@@ -46,8 +46,42 @@
         "required": ["title", "kind", "correction", "evidence", "agent", "factory", "workflow"],
         "additionalProperties": false
       }
+    },
+    "verdicts": {
+      "type": "array",
+      "description": "One verdict per card in play, read against the repository; the step's check refuses a card in play filed before the period's last day with none, and writes the report and the command that acts on each. Empty when the inbox has no card in play.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "card": { "type": "string", "description": "The card, by its name as `nemia inbox` lists it." },
+          "verdict": {
+            "type": "string",
+            "enum": ["done", "replaced", "stale", "standing"],
+            "description": "done, its work landed on the base; replaced, a later decision or card took its place; stale, facts it says have moved; standing, it holds as written."
+          },
+          "why": { "type": "string", "description": "Why, in a sentence or two: what was read, and for standing, whether it was read closely or untouched by the period." },
+          "commit": { "type": "string", "description": "For done, the commit on the base that landed its work, by its hash; empty otherwise." },
+          "by": { "type": "string", "description": "For replaced, the decision or the card that replaced it; empty otherwise." },
+          "facts": {
+            "type": "array",
+            "description": "For stale, each fact that moved, in the order they are applied to the card's body; empty otherwise.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "was": { "type": "string", "description": "What the card says, quoted exactly as its body reads now, found once in it." },
+                "now": { "type": "string", "description": "What it says once amended, what the repository says now." },
+                "why": { "type": "string", "description": "Where the fact moved: the commit, the path or the decision." }
+              },
+              "required": ["was", "now", "why"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["card", "verdict", "why", "commit", "by", "facts"],
+        "additionalProperties": false
+      }
     }
   },
-  "required": ["period", "against", "report", "cards"],
+  "required": ["period", "against", "report", "cards", "verdicts"],
   "additionalProperties": false
 }

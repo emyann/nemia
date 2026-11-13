@@ -2,7 +2,9 @@
 
 Read how the factory's work went and say what to correct. Argus, the janitor, reads `nemia stats` since the janitor's last run, against
 the same length of time before it, writes a short report, and proposes one correction per card: an allow or a deny by name, a line in an
-agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus proposes and never acts.
+agent's body or a skill, or a refusal kept on purpose, each with the numbers behind it. Argus also reads each card in play against the repository and says, per card, done (the commit on
+the base that landed it), replaced (the decision or card that did), stale (each fact that moved, what it said and what it says now) or
+standing. Argus proposes and never acts.
 
 ```
 argus
@@ -14,6 +16,21 @@ repository is the one the factory wires to the workflow), so it is ready to star
 a card names no factory or workflow, when two cards share a title, or when the period compared with is not as long as the period read
 and does not end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing. Nothing is
 started: the inbox is where a person decides.
+
+The check then grooms the inbox (`groom.ts`, from the same frozen files): the cards of the run's own factory alone, the namespace
+`nemia get runs/<run> -o json` serves the run in, read through `nemia get cards -n <that factory> -o json`; another factory's cards
+are its own janitor's. It checks the verdicts whole before it writes anything, refusing, exit 1, a verdict word not of the four, two verdicts on one card, a done
+card whose commit is not on the base (the run's `WF_BASE_REF`, whether the factory lands on GitHub or in the checkout), a replaced card
+that names nothing replacing it, a stale card whose facts are none or whose `was` it does not find exactly once in the card, and a card of
+the factory in play filed before the period's last day with no verdict, and it refuses where the run is not named (`WF_RUN`). A verdict on a card no longer in play is skipped. It changes no card: it
+writes, in the step's artifacts, `groom.md`, every verdict with its reasons, and for each stale card `groom/<card>.json`, the card as
+the api serves it with each fact amended, and prints the command for each card that has one. A person confirms each by typing it:
+`nemia inbox rm <card>` for a done or replaced card, `nemia apply -f <the file>` for a stale one, which the api refuses where the card
+was written since it was read.
+
+A regular run reads closely only the cards filed or edited in its period, or whose paths, verbs or names the period's commits on the
+base touch; the rest stand. The first groom after upgrading, or after a long gap, reads every card:
+`nemia start "Groom every card" --workflows janitor --factory <factory>`, bounded by the run's budget.
 
 Schedule it in the factory, and the daemon starts it every Monday morning:
 `nemia factory schedule <factory> janitor --cron "0 9 * * 1" --brief "Read the stats" --tz <zone>`. Then `nemia factory ls` and

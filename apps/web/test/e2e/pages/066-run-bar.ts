@@ -174,8 +174,8 @@ async function expectNoConversation(page: Page, assertion: string): Promise<void
 
 /**
  * The bar's Open, and a double click on a node, each open the step's session. The first click opens the sheet beside the page, which
- * narrows the canvas and fits it again under the second click, wherever that lands, and the step's session still opens. The step has no session that
- * started, so neither its Activity tab nor its session page asks for its conversation, and each says it has none.
+ * narrows the canvas and fits it again under the second click, wherever that lands, and the step's session still opens. The step has no
+ * session that started, so neither its Activity tab nor its session page asks for its conversation, and each says it has none.
  */
 async function opens(page: Page): Promise<void> {
   const asked: string[] = [];
@@ -236,10 +236,11 @@ async function keepsTheStart(page: Page): Promise<void> {
 
 export default {
   /**
-   * A run's canvas and the frame's side sheet: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node shows
-   * it, the same node again closes it, another switches it with the tab kept, and the nodes are fitted clear of the bar; the empty canvas
-   * closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus back to the node; Open
-   * and a double click open the step's session, its second click landing where the narrowed canvas put it, and a step with no session asks no conversation.
+   * A run's canvas and the frame's side sheet: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node
+   * shows it, the same node again closes it, another switches it with the tab kept, and the nodes are fitted clear of the bar; the empty
+   * canvas closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus back to the node;
+   * Open and a double click open the step's session, its second click landing where the narrowed canvas put it, and a step with no session
+   * asks no conversation.
    */
   name: 'run-bar',
   route: RUN,

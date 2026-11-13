@@ -90,12 +90,12 @@ async function severalRepos(page: Page, workflow: string, checkout: string, them
 
 export default {
   /**
-   * A run is started from a factory's floor: the sidebar's Start a run opens its bar in the side sheet on the factory's one repository, fixed,
-   * listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's
-   * words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief,
-   * and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires, the
-   * agent hired and the run are taken back. On a second repository the factory then works on two: the bar offers no repository to
-   * pick, the workflow is picked by name, and, unwired, it says why with the attach; wired by the factory's file, it says the wired one.
+   * A run is started from a factory's floor: the sidebar's Start a run opens its bar in the side sheet on the factory's one repository,
+   * fixed, listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the
+   * package's words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the
+   * brief, and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires,
+   * the agent hired and the run are taken back. On a second repository the factory then works on two: the bar offers no repository to pick,
+   * the workflow is picked by name, and, unwired, it says why with the attach; wired by the factory's file, it says the wired one.
    */
   name: 'factory-start',
   route: `/factories/${FACTORIES.hiring.name}`,

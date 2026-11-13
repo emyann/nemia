@@ -25,6 +25,7 @@ import { platformOf, type ReleaseFile } from './release.ts';
 import { currentRelease, releaseDir, releaseFileOf, releasesDir, runningAt, switchCurrent, writeReleaseFile } from './release.store.ts';
 import { assetName, writeStoreFloor } from './archive.store.ts';
 import { parseVersion } from './floor.ts';
+import { linkNemia, toolsNemia } from './nemia-link.store.ts';
 
 const ROOT = fs.realpathSync(scratch('wf-upgrade-archive-'));
 const HOME = scratch('wf-upgrade-archive-home-');
@@ -64,7 +65,10 @@ function published(tag: string, { exit = 0, damaged = false, latest = false } = 
   }
 }
 
-/** The store's first release, v1.0.0, as the installer leaves it: unpacked from an archive of this base, and pointed at. */
+/**
+ * The store's first release, v1.0.0, as the installer leaves it: unpacked from an archive of this base, its launcher in `bin/`, pointed
+ * at, and linked as the tools folder's `nemia`.
+ */
 const FIRST = (() => {
   const dir = releaseDir('v1.0.0', ROOT);
   fs.mkdirSync(dir, { recursive: true });
@@ -76,7 +80,10 @@ const FIRST = (() => {
     from: 'archive',
     platform: PLATFORM,
   });
+  fs.mkdirSync(path.join(dir, 'bin'));
+  fs.writeFileSync(path.join(dir, 'bin', 'nemia'), '#!/bin/sh\n', { mode: 0o755 });
   switchCurrent('v1.0.0', ROOT);
+  assert.equal(linkNemia(ROOT), true, "the tools folder's nemia, as the installer links it");
   return runningAt(dir);
 })();
 
@@ -138,6 +145,11 @@ test('an archive install upgraded from its download base: the newest by default,
       assert.equal(file?.source, SOURCE, 'the download base, for the next upgrade');
       assert.equal(file?.commit, 'c0ffeev110', "the archive's own commit");
       assert.ok(fs.existsSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')), 'unpacked at the root');
+      assert.equal(
+        fs.realpathSync(toolsNemia(ROOT)),
+        fs.realpathSync(path.join(releaseDir('v1.1.0', ROOT), 'bin', 'nemia')),
+        "the tools folder's nemia resolves to the new release's",
+      );
       assert.deepEqual(leftovers(), [], 'the build folder is taken away');
     },
   );

@@ -351,6 +351,46 @@ test('cgroup v2 and the user manager cost a run only where the daemon files its 
   assert.equal(limited.pieces.find((p) => p.name === 'systemd-user')?.cost, 'run');
 });
 
+test("an archive install's tools piece reads its nemia: missing with no link, naming nemia doctor fix tools; met once linked; a checkout reads none", async () => {
+  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+  const link = path.join(toolsBinDir(ROOT), 'nemia');
+  fs.rmSync(link, { force: true });
+  const installed: ReadinessFacts['running'] = {
+    kind: 'install',
+    root: path.join(ROOT, 'releases', 'v1.0.0'),
+    tag: 'v1.0.0',
+    commit: 'c0ffee100',
+    source: 'ci',
+    builtAt: '2026-11-01T00:00:00.000Z',
+    from: 'archive',
+  };
+  const onDisk = (running: ReadinessFacts['running']): ReadinessFacts => ({
+    ...facts({ PATH }),
+    exists: (file) => fs.existsSync(file),
+    running,
+  });
+  const tools = async (running: ReadinessFacts['running']) =>
+    (await read(onDisk(running), identity('exit 0'))).pieces.find((p) => p.name === 'tools');
+
+  const missing = await tools(installed);
+  assert.equal(missing?.state, 'missing');
+  assert.deepEqual(
+    missing?.fixes.map((f) => [f.command, f.startable]),
+    [['nemia doctor fix tools', true]],
+    'the fix the server starts, and not the restart: the folder is made and on the PATH',
+  );
+  assert.equal((await tools({ kind: 'checkout', root: ROOT }))?.state, 'met', "a checkout's person has their own nemia");
+
+  const launcher = path.join(scratch('wf-readiness-release-'), 'nemia');
+  fs.writeFileSync(launcher, '#!/bin/sh\n', { mode: 0o755 });
+  fs.symlinkSync(launcher, link);
+  try {
+    assert.equal((await tools(installed))?.state, 'met');
+  } finally {
+    fs.rmSync(link, { force: true });
+  }
+});
+
 test("the daemon's sweep reads the machine's facts with no command run, so it never blocks the loop it shares with the passes", () => {
   const facts = sweptFacts();
   const marker = path.join(scratch('wf-swept-facts-'), 'ran');

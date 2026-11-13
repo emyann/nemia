@@ -105,13 +105,14 @@ export function chatHeaderLine(nemia: NemiaLevel | undefined, presence: Presence
 }
 
 /**
- * What her chat's composer invites, by where she is: the daemon waited on while this browser keeps a message it would not take, her
+ * What her chat's composer invites, by where she is: while this browser keeps a message the api did not take, the message above acted
+ * on where the api answered and refused it (`refused`), and the daemon waited on where nothing answered; her
  * reading it later while she is down, their own words while one question of hers waits on them,
  * drawn as the form and answered by what they write (`asking`, `askInWords`, the canvas's board 7), the
  * next one or her turn stopped while she answers, else what she is for.
  */
-export function composerWords(presence: Presence, asking = false): string {
-  if (presence.notSent) return 'Waiting for the daemon';
+export function composerWords(presence: Presence, asking = false, refused = false): string {
+  if (presence.notSent) return refused ? 'Send again, edit or discard the message above' : 'Waiting for the daemon';
   if (presence.down) return 'Write now; she reads it when she is up';
   if (asking) return 'Or answer in your own words';
   if (presence.answering) return 'She is answering. Write the next one, or stop her';

@@ -173,7 +173,7 @@ async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<
   const { places, fills } =
     s.factory === undefined
       ? { places: s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home), fills: undefined }
-      : factoryDraftIn(s.home, s.factory, name, repoLayer(s));
+      : factoryDraftIn(s.home, s.factory, name, s.repo);
   const read = await s.inRequest(workflowDraftOfFiles(name, files, places, fills));
   return { metadata: { name }, spec: specRead(read) };
 }

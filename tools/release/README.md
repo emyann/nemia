@@ -113,7 +113,8 @@ and `SHA256SUMS` (the tag from `latest.json` unless `--version`, refused before 
 three numbers, digits and dots alone, as `nemia upgrade` reads a published one, so no tag reaches above `releases/` and no pre-release
 is taken), refuses an archive whose sum differs, unpacks it into
 `$WF_ROOT/releases/<tag>` through a hidden folder renamed into place, points `releases/current` at it by a relative link renamed over
-the old one, and links `~/.local/bin/nemia`. Then it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
+the old one, and links `~/.local/bin/nemia` and the store's `tools/bin/nemia` to `releases/current/bin/nemia`, the second so a step's
+session, whose PATH starts with the tools folder, runs the `nemia` its settings allow. Then it asks, or with `--yes` reads its flags: starting at login (`nemia service install --size auto`, `--no-service` to skip,
 `loginctl enable-linger` on Linux), and the address to bind (`--bind`, after which `nemia token add` prints the first person token).
 `--client --server <url> [--context <name>] [--token-file <file>]` makes a client-only install (`nemia config set-context`, then
 `use-context`) and no service. `--base <url>` takes another download base, a `file://` one read from disk. It never prints a token. It ends, on either side, on

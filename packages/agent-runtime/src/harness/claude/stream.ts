@@ -100,18 +100,18 @@ const PRINTED = {
     cwd: Schema.optional(Schema.NonEmptyString),
     model: Schema.optional(Schema.NonEmptyString),
     /**
-     * The version of Claude Code the process runs, as the SDK's init message names it (`sdk.d.ts:6354`): absent from a capture of an
+     * The version of Claude Code the process runs, as the SDK's init message names it (`sdk.d.ts:6452`): absent from a capture of an
      * older one.
      */
     claude_code_version: Schema.optional(Schema.NonEmptyString),
     /**
-     * The mode the turn runs in, as the SDK's init message names it (`sdk.d.ts:6369`), one per turn: a model that cannot run `auto`
+     * The mode the turn runs in, as the SDK's init message names it (`sdk.d.ts:6467`), one per turn: a model that cannot run `auto`
      * runs in `default`, and its init line says so. Read as written, never matched against the modes Claude Code has.
      */
     permissionMode: Schema.optional(Schema.NonEmptyString),
   }),
   /**
-   * A change of the session's state, as the SDK's status message names it (`SDKStatusMessage`, `sdk.d.ts:6326`), read for its mode
+   * A change of the session's state, as the SDK's status message names it (`SDKStatusMessage`, `sdk.d.ts:6424`), read for its mode
    * alone: the `init` line can name a mode Claude Code has not yet settled, and the `status` line that follows it names the one the
    * session runs in — measured on 2.1.322: on `claude-haiku-4-5` filed in `auto`, 1 run in 10 printed `init` with `auto`
    * and then a `status` with `default`, where the other 9 printed `default` on both. Read as written, as the `init` line's is.

@@ -491,3 +491,107 @@ test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `
   const forgot = await runWith(b.e, forgetRun(run.id));
   assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
 });
+
+/** `aNodeRepo`, as Nemia keeps a factory's repository named by URL: moved under the store's `clones/`, and never installed. */
+const aClone = (): string => {
+  const made = aNodeRepo();
+  const clone = path.join(ROOT, 'clones', 'localhost', 'o', path.basename(made));
+  fs.mkdirSync(path.dirname(clone), { recursive: true });
+  fs.renameSync(made, clone);
+  fs.rmSync(path.join(clone, 'node_modules'), { recursive: true });
+  return clone;
+};
+
+/**
+ * An `npm` first on PATH for the rest of the test, which appends a line to `calls` each time it runs, says `npm error boom` and exits 1:
+ * what an install the run did not need would leave, and an install that fails.
+ */
+const failingNpm = (t: TestContext): { calls: string } => {
+  const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
+  const calls = path.join(bin, 'calls');
+  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\necho "$@" >> '${calls}'\necho 'npm error boom' >&2\nexit 1\n`, { mode: 0o755 });
+  const PATH = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${PATH}`;
+  t.after(() => {
+    process.env.PATH = PATH;
+  });
+  return { calls };
+};
+
+/** Whether a worktree's `node_modules` was made from its checkout's tree — hardlinked, its workspace package its own — and not by npm. */
+const linkedFromCheckout = (wt: string, pkg = 'x'): boolean =>
+  !fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')) &&
+  fs.realpathSync(path.join(wt, 'node_modules', pkg)) === fs.realpathSync(path.join(wt, 'packages', pkg));
+
+test('a clone nobody installed is installed at its first cut, its worktree hardlinked from it; a later cut installs nothing; a lockfile the clone follows to is installed into it, not into each worktree', async (t) => {
+  const clone = aClone();
+  const first = await isolated(clone);
+  const { e, tasks } = board();
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, first.id)));
+  assert.deepEqual(pass.filed, ['implement']);
+  assert.ok(fs.lstatSync(path.join(clone, 'node_modules')).isDirectory(), 'the clone has a node_modules of its own now');
+  const wt = runRecord(ROOT, first.id).steps.implement.workspace!;
+  assert.ok(linkedFromCheckout(wt), "the worktree's is the clone's, hardlinked: no npm ci of its own");
+  assert.equal(pass.notes.length, 1, String(pass.notes));
+  assert.ok(pass.notes[0].startsWith(`implement: node_modules: ${clone} installed`), pass.notes[0]);
+  assert.doesNotMatch(tasks.get(`${first.id}-implement`)!.spec.brief, /npm ci/, 'the step is told nothing to do');
+  assert.equal(gitOut(clone, 'status', '--porcelain'), '', "npm wrote nothing git tracks: the clone's follow still fast-forwards");
+
+  await t.test('a later cut on the current clone runs no npm', async (st) => {
+    const { calls } = failingNpm(st);
+    const again = await isolated(clone);
+    const later = await runWith(e, advanceRun(runRecord(ROOT, again.id)));
+    assert.ok(!fs.existsSync(calls), 'npm was not run');
+    assert.deepEqual(later.notes, []);
+    assert.ok(linkedFromCheckout(runRecord(ROOT, again.id).steps.implement.workspace!));
+  });
+
+  await t.test('a lockfile the clone moved to is installed into the clone, and the worktree hardlinked from it', async () => {
+    fs.mkdirSync(path.join(clone, 'packages/y'), { recursive: true });
+    fs.writeFileSync(path.join(clone, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
+    fs.writeFileSync(path.join(clone, 'packages/y/index.js'), "module.exports = 'y';\n");
+    execFileSync('npm', ['install', '--package-lock-only', '--offline', '--no-audit', '--no-fund'], { cwd: clone, stdio: 'ignore' });
+    gitIn(clone, 'add', '-A');
+    gitIn(clone, 'commit', '-q', '-m', 'add y');
+    const moved = await isolated(clone);
+    const cut = await runWith(e, advanceRun(runRecord(ROOT, moved.id)));
+    assert.equal(cut.notes.length, 1, String(cut.notes));
+    assert.ok(cut.notes[0].includes('node_modules/y'), cut.notes[0]);
+    assert.ok(fs.existsSync(path.join(clone, 'node_modules/y')), "the clone's tree has y");
+    assert.ok(linkedFromCheckout(runRecord(ROOT, moved.id).steps.implement.workspace!, 'y'), 'and the worktree no npm ci of its own');
+  });
+});
+
+test("a clone whose install fails gives its step failed with npm's words and tells it to run npm ci, and the next cut tries again", async (t) => {
+  const clone = aClone();
+  const { calls } = failingNpm(t);
+  const run = await isolated(clone);
+  const { e, tasks } = board();
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  assert.deepEqual(pass.filed, ['implement'], 'the step is filed all the same');
+  assert.ok(!fs.existsSync(path.join(clone, 'node_modules')), 'the clone has no tree, and none was made');
+  assert.ok(
+    pass.notes.some((n) => n.startsWith(`implement: node_modules: ${clone} not installed`) && n.includes('npm error boom')),
+    String(pass.notes),
+  );
+  const brief = tasks.get(`${run.id}-implement`)!.spec.brief;
+  const at = brief.indexOf('## Where to look');
+  assert.ok(at >= 0 && brief.indexOf('npm error boom', at) > at, "npm's words, under Where to look");
+  assert.ok(brief.indexOf('`npm ci`', at) > at, 'and what to run');
+
+  await runWith(e, advanceRun(runRecord(ROOT, (await isolated(clone)).id)));
+  assert.equal(fs.readFileSync(calls, 'utf8').trim().split('\n').length, 2, 'read again at the next cut, and tried again');
+});
+
+test("a person's checkout nobody installed is left as it is: no install, and its worktree has no node_modules", async (t) => {
+  const repo = aNodeRepo();
+  fs.rmSync(path.join(repo, 'node_modules'), { recursive: true });
+  const { calls } = failingNpm(t);
+  const run = await isolated(repo);
+  const { e } = board();
+  const pass = await runWith(e, advanceRun(runRecord(ROOT, run.id)));
+  assert.deepEqual(pass.notes, []);
+  assert.ok(!fs.existsSync(calls), 'npm was not run');
+  assert.ok(!fs.existsSync(path.join(repo, 'node_modules')));
+  assert.ok(!fs.existsSync(path.join(runRecord(ROOT, run.id).steps.implement.workspace!, 'node_modules')));
+});

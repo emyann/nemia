@@ -14,12 +14,12 @@ import { Option, Schema } from 'effect';
 import { decodedFile, writeWhole } from '../../core/engine/drain.ts';
 import type { HeardLimit, HeardQuota } from '../seam.ts';
 
-/** A window's status, as the SDK words the event's own (`SDKRateLimitInfo.status`, `sdk.d.ts:6001`). */
+/** A window's status, as the SDK words the event's own (`SDKRateLimitInfo.status`, `sdk.d.ts:6094`). */
 const Status = Schema.Literals(['allowed', 'allowed_warning', 'rejected']);
 
 /**
  * One window of `unifiedWindows`: its use as a fraction (0.4 is 40%), when it begins again in seconds since the epoch, and its status.
- * The SDK's type (`SDKRateLimitInfo`, `sdk.d.ts:6000`) does not declare `unifiedWindows`; Claude Code sends it all the same (measured,
+ * The SDK's type (`SDKRateLimitInfo`, `sdk.d.ts:6093`) does not declare `unifiedWindows`; Claude Code sends it all the same (measured,
  * `docs/harness.md`, *The plan's utilization a session hears*).
  */
 const UnifiedWindow = Schema.Struct({

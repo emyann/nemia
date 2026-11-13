@@ -174,8 +174,8 @@ export function quotaOfUsage(
 type SdkError = { errorClass?: unknown; exitCode?: unknown; signal?: unknown; message?: unknown };
 
 /**
- * How the SDK joins a child's stderr to the message of a process that exited badly or was killed (read off 0.3.316 and 0.3.322,
- * unchanged).
+ * How the SDK joins a child's stderr to the message of a process that exited badly or was killed (read off 0.3.316, 0.3.322
+ * and 0.3.323, unchanged).
  */
 const STDERR_TAIL = '. stderr: ';
 

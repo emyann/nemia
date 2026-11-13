@@ -833,7 +833,7 @@ the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lo
 a session held to its directory runs in (`held`: `dontAsk`), the modes a session nobody attends runs in without stopping to ask a
 person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
 `CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'claude-haiku-4-5' }`
-is filed in `auto` and runs in `default` (measured on Claude Code 2.1.316 and again on 2.1.322, where the `haiku` alias, now `claude-haiku-5-5`, keeps `auto`). `unruledIn(harness, path)` gives the first character of `path`
+is filed in `auto` and runs in `default` (measured on Claude Code 2.1.316 and again on 2.1.322 and 2.1.323, where the `haiku` alias, now `claude-haiku-5-5`, keeps `auto`). `unruledIn(harness, path)` gives the first character of `path`
 that a permission rule of the harness cannot carry, the set its mounts are refused by (`CLAUDE_UNRULED`), and `undefined` for a path
 every rule carries or a harness whose fence takes no rule naming a path, so a caller that builds a rule from a path refuses it in its
 own words first.
@@ -1141,7 +1141,7 @@ agent-orchestrator gives — `appendSystemPromptFile`, `systemPromptFile`, `plug
 plugin directory of the step's own, and the runtime reads none of it: `domain.ts` and `engine.ts` never open `config`.
 
 An **attached** session has no command line of the runtime's making, so each of those keys reaches it on the Agent SDK's own
-`Options` where the SDK has one (`attachedOptions`, SDK 0.3.322): `appendSystemPromptFile` and `systemPromptFile` as
+`Options` where the SDK has one (`attachedOptions`, SDK 0.3.323): `appendSystemPromptFile` and `systemPromptFile` as
 `systemPrompt` — the file's text, read when the session is spawned, appended to the `claude_code` preset or in place of it, from the
 task's own `cwd` where the path is relative, as Claude Code resolved the flag's path from inside the child and as `pluginDir` is
 resolved —
@@ -1153,7 +1153,7 @@ here — a flag only Claude Code has, which is what this bag is for. The context
 `claude.settings` is a file's path: there is no settings object of the runtime's to put it in, and the runtime rewrites no
 settings file. Both reach the same window (measured against Claude Code on SDK 0.3.270, and carried: 150000 asked either way,
 `rawMaxTokens: 150000`; a session asked for neither got the model's 200000. `Settings.autoCompactWindow` and `--autocompact` are
-both still there on 0.3.322, `sdk.d.ts:9671` and the CLI's own flag, so what moved is neither option).
+both still there on 0.3.323, `sdk.d.ts:9671` and the CLI's own flag, so what moved is neither option).
 
 `file()` refuses a `claude` that is not an object of camelCase keys, two letters or more, whose values each say one thing
 on the command line (`false`, `null`, `''`, an object and an empty list do not); a flag the runtime gives itself

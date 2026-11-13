@@ -890,7 +890,7 @@ session cannot load is a name in its prompt (F11); skills or a harness prompt on
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`:
-`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316 and 2.1.322), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316, 2.1.322 and 2.1.323), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its

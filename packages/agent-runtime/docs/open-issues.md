@@ -46,8 +46,8 @@ of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, wh
 file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
-on 0.3.316 nor 0.3.322, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method, its body unchanged (re-read
-2026-11-01 and 2026-11-11 at the bumps) — yet the object
+on 0.3.316, 0.3.322 nor 0.3.323, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method, its body unchanged (re-read
+2026-11-01, 2026-11-11 and 2026-11-13 at the bumps) — yet the object
 `query()` answers carries it: `enableRemoteControl(enabled, name?, { reattachSessionId?, keepSessionOnExit?, workSecret? })`, which
 sends a `remote_control` control request with `reattach_session_id` and `keep_session_on_exit` at its top level, answers the bridge's
 facts (`session_url`, `connect_url`, `environment_id`, `bridge_epoch`, `bridge_session_id`), and drives `system`/`bridge_state`
@@ -1295,7 +1295,8 @@ the end).
   2.1.322, 2026-11-11, model by model (`test/live-sdk.boundary.test.ts`): the same two say `default`, and `haiku`, `sonnet`, `opus`
   and `fable` keep `auto`; the list is unchanged. Ten runs a model that day: the two listed in `default` every time, `haiku` and
   `sonnet` in `auto` every time; in one run of ten each listed model's `init` line said `auto` and a `status` line after it
-  `default`, the mode it ran in, which the reader now takes (`docs/harness.md`, `auto` on haiku).
+  `default`, the mode it ran in, which the reader now takes (`docs/harness.md`, `auto` on haiku). Read again on 2.1.323, 2026-11-13,
+  off each model's `init` line: the same two `default`, the four aliases `auto`.
 - **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
 - **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
   stopped first). So a job may continue a background session, and the new attempt's mode is the job's.

@@ -149,15 +149,29 @@ export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFligh
  * The daemon's two ceilings, as it says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude`, `codex` and checks
  * each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when none; and the memory limit each
  * session runs under when its step names none (`WF_MEMORY_LIMIT`), in the slice it names (`WF_CGROUP_PARENT`), on a line of its own
- * only where one is set.
+ * only where one is set; and, where the floor of the machine's memory is given (`reserved`), its admission by memory on a line of its
+ * own: what each session asks (`request`, `WF_MEMORY_REQUEST`, else its limit) and the floor kept for the daemon and the machine
+ * (`WF_MEMORY_RESERVED`, else its default), which no session is admitted into.
  */
-export const ceilingLines = (c: { sessions: number; runs: number; memory?: string; cgroupParent?: string }): string[] => [
+export const ceilingLines = (c: {
+  sessions: number;
+  runs: number;
+  memory?: string;
+  cgroupParent?: string;
+  request?: string;
+  reserved?: string;
+}): string[] => [
   `sessions at work per pool: at most ${c.sessions} at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)`,
   `runs in flight: ${c.runs > 0 ? `at most ${c.runs} at once — a run with nothing filed waits for a slot, oldest first` : 'no cap'} (WF_MAX_RUNS)`,
   ...(c.memory === undefined
     ? []
     : [
         `memory per session: at most ${c.memory}, unless its step names its own memory: — a process past it is killed in its session's scope alone${c.cgroupParent === undefined ? '' : `, each scope in ${c.cgroupParent}`} (WF_MEMORY_LIMIT${c.cgroupParent === undefined ? '' : ', WF_CGROUP_PARENT'})`,
+      ]),
+  ...(c.reserved === undefined
+    ? []
+    : [
+        `sessions admitted by memory: a session waits until what it asks — ${c.request ?? (c.memory === undefined ? "its step's memory:, where it names one" : `its limit, ${c.memory}`)} — fits the machine above the ${c.reserved} kept for the daemon and the machine (WF_MEMORY_REQUEST, WF_MEMORY_RESERVED)`,
       ]),
 ];
 

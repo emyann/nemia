@@ -5,7 +5,6 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  getViewportForBounds,
   MiniMap,
   Panel,
   Position,
@@ -18,12 +17,11 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../../lib/runView';
-import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../../lib/canvas';
+import { forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../../lib/canvas';
 import { layout, stepsOf, type Point } from '../../lib/layout';
 import { packetsOfView } from '../../lib/stepPart';
 import { useContent } from '../../lib/useContent';
 import { stepState } from '../../lib/status';
-import { useBarOver } from '../../lib/useBarOver';
 import { useCanvasPress } from '../../lib/useCanvasPress';
 import { useFrameSize } from '../../lib/useFrameSize';
 import { FLOOR_BOX } from '../../lib/classes';
@@ -46,68 +44,24 @@ const FIT = { padding: 0.2, maxZoom: 1.25 };
 type Flow = ReturnType<typeof useReactFlow<StepFlowNode>>;
 
 /**
- * The node of the step `id` on the canvas of `flow`, as `besideOpen` reads it: its right edge as drawn, in pixels from `left`, the
- * canvas's left edge on the screen, and its width at a zoom of 1. Null when the canvas has no such node.
+ * Fits the canvas in `frame` again, with the `fitView` of `flow`, the whole run: when the frame changes width, as when the window does or
+ * the frame's side sheet opens or closes beside the page, and once after each Reset layout's commit (`resets`, its count). A canvas drawn
+ * with no change keeps React Flow's own fit.
  */
-function stepOf(flow: Flow, id: string, left: number) {
-  const node = flow.getInternalNode(id);
-  if (!node) return null;
-  const width = node.measured.width ?? 0;
-  return { right: flow.flowToScreenPosition({ x: node.internals.positionAbsolute.x + width, y: 0 }).x - left, width };
-}
-
-/**
- * How the canvas in `frame` is fitted, with the step `open` in the bar, or null: as `FIT`, where the frame's floating bar is not drawn;
- * clear of the bar where it is (`besideOpen`), the whole run or the open step's node alone, at no more than the zoom it is drawn at and
- * only where every node is still drawn whole on the canvas (`drawnWhole`). Null, to leave the view as it is. Takes the canvas's frame,
- * or null; measures the bar where it is drawn, at each call.
- */
-function fitBeside(frame: HTMLElement | null, flow: Flow, open: string | null) {
-  const bar = document.querySelector('[data-floating-bar]');
-  if (!frame || !bar) return FIT;
-  const box = frame.getBoundingClientRect();
-  const run = flow.getNodesBounds(flow.getNodes());
-  const fit = besideOpen(
-    frame.clientWidth,
-    box.right - bar.getBoundingClientRect().left,
-    run.width,
-    open ? stepOf(flow, open, box.left) : null,
-  );
-  if (!fit) return null;
-  if (!fit.alone || !open) return { ...FIT, padding: fit.padding };
-  const { clientWidth: width, clientHeight: height } = frame;
-  const view = getViewportForBounds(flow.getNodesBounds([open]), width, height, LEAST_ZOOM, flow.getZoom(), fit.padding);
-  return drawnWhole(run, view, width, height) ? { ...FIT, padding: fit.padding, nodes: [{ id: open }], maxZoom: flow.getZoom() } : null;
-}
-
-/**
- * Fits the canvas in `frame` again, with the `fitView` of `flow`, clear of the bar (`fitBeside`): when the frame changes width, as when the
- * window does, and once after each Reset layout's commit (`resets`, its count), the whole run; when the step open in the bar (`open`)
- * changes, as the bar opens, switches or closes, the whole run or that step. A canvas drawn with no step open keeps React Flow's own fit.
- */
-function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { open: string | null; resets: number }, flow: Flow) {
+function useRefit(frame: RefObject<HTMLDivElement | null>, resets: number, flow: Flow) {
   const { width } = useFrameSize(frame, true);
   const wide = useRef(0);
   useEffect(() => {
-    if (wide.current !== 0 && width !== wide.current)
-      void flow.fitView({ ...(fitBeside(frame.current, flow, null) ?? FIT), duration: 200 });
+    if (wide.current !== 0 && width !== wide.current) void flow.fitView({ ...FIT, duration: 200 });
     wide.current = width;
-  }, [width, frame, flow]);
-
-  const was = useRef<string | null>(null);
-  useEffect(() => {
-    if (was.current === open) return;
-    was.current = open;
-    const fit = fitBeside(frame.current, flow, open);
-    if (fit) void flow.fitView({ ...fit, duration: 300 });
-  }, [open, frame, flow]);
+  }, [width, flow]);
 
   const fitted = useRef(0);
   useEffect(() => {
     if (resets === fitted.current) return;
     fitted.current = resets;
-    void flow.fitView({ ...(fitBeside(frame.current, flow, null) ?? FIT), duration: 300 });
-  }, [resets, frame, flow]);
+    void flow.fitView({ ...FIT, duration: 300 });
+  }, [resets, flow]);
 }
 
 const button =
@@ -155,9 +109,6 @@ const nodeAt = (name: string, position: Point): PlacedStep => ({
   data: {},
 });
 
-/** The room React Flow keeps round a panel over the canvas (`.react-flow__panel`), in pixels: kept from the bar's edge too. */
-const PANEL_MARGIN = 15;
-
 /** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; what is selected is the bar's. */
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
@@ -176,15 +127,14 @@ function usePress(run: RunDetail) {
 }
 
 /**
- * The canvas's buttons, at its top right and clear of the frame's bar over the canvas in `frame` (`useBarOver`): Reset layout
- * (`onReset`), and Focus running step, which fits the view to the steps `running`, and is off while none is.
+ * The canvas's buttons, at its top right: Reset layout (`onReset`), and Focus running step, which fits the view to the steps `running`,
+ * and is off while none is.
  */
-function Buttons({ frame, running, onReset }: { frame: RefObject<HTMLElement | null>; running: string[]; onReset: () => void }) {
+function Buttons({ running, onReset }: { running: string[]; onReset: () => void }) {
   const flow = useReactFlow<StepFlowNode>();
-  const over = useBarOver(frame);
   const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
   return (
-    <Panel position="top-right" className="flex gap-2" style={{ marginRight: PANEL_MARGIN + over }}>
+    <Panel position="top-right" className="flex gap-2">
       <button type="button" className={button} onClick={onReset}>
         Reset layout
       </button>
@@ -207,11 +157,11 @@ function Buttons({ frame, running, onReset }: { frame: RefObject<HTMLElement | n
  * - A node's place and size change only through a drag, a move by the arrow keys or React Flow measuring it, a step the workflow folder
  *   gains or loses while the page is open (placed where it belongs, `place`), and Reset layout. What a node shows is read from the run
  *   on every render, so a refetch moves the chips and leaves the nodes where a person put them. A node moved is saved in this browser.
- * - A press shows a step in the frame's bar, which floats over the page, and a double click opens its session (`usePress`); the step the
+ * - A press shows a step in the frame's side sheet, beside the page, and a double click opens its session (`usePress`); the step the
  *   bar shows is drawn selected.
  * - Reset layout lays the nodes out again from `after`, forgets the saved arrangement, and fits the view once, after the commit that
- *   moved them. The view is fitted again when the canvas changes width, as when the window does, and as a step opens in the bar, switches
- *   or closes, each time clear of the bar over the canvas: the whole run, or the open step where the run is too wide (`useRefit`).
+ *   moved them. The view is fitted again, the whole run, when the canvas changes width, as when the window does or the side sheet opens or
+ *   closes beside the page (`useRefit`).
  * - The legend wraps short of the minimap, drawn smaller than React Flow's own so it covers no node; arrowheads take their edges' colour
  *   in both themes.
  */
@@ -270,7 +220,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
     setResets((n) => n + 1);
   };
   const frame = useRef<HTMLDivElement>(null);
-  useRefit(frame, { open: selected, resets }, flow);
+  useRefit(frame, resets, flow);
 
   return (
     <div ref={frame} className={cn(FLOOR_BOX, 'h-[30rem]')}>
@@ -296,7 +246,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         <Panel position="top-left" className="text-body-small text-muted-foreground">
           Drag to arrange · kept in this browser
         </Panel>
-        <Buttons frame={frame} running={running} onReset={resetLayout} />
+        <Buttons running={running} onReset={resetLayout} />
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />
         <CanvasLegend className="mr-40 ml-14" />

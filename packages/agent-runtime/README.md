@@ -1046,13 +1046,17 @@ today's shape — the cap under `config`, the end `harness` with `limit: 'budget
 
 `resources: { limits: { memory: '8Gi' } }` is the most memory a task's process tree may hold, a container's
 `resources.limits.memory` in Kubernetes' quantity: whole digits and a unit of `Ki`, `Mi`, `Gi`, `Ti` (powers of 1024) or `k`, `M`,
-`G`, `T` (powers of 1000), or none for bytes (`memoryBytesOf`, `src/core/memory.ts`). A fraction (`1.5Gi`), an exponent, `m`, a
-`requests`, a limit other than `memory` (`cpu`) and anything else under `resources` are refused at `file()` (`resourcesRefusalOf`),
-nothing journalled; so is a limit on a remote agent, whose process is the other party's. An engine given
-`defaultLimits: { memory: '6Gi' }` writes it onto every task filed with no `resources` of its own, as a LimitRange's default is
-written into a Pod at admission: the `filed` entry says what each task ran under, and a new default never changes a task already
-filed. A remote agent's task is never given the default, so a default makes no remote task unfileable. `Engine.layer` refuses a
-`defaultLimits.memory` it cannot read, and a `cgroupParent` that is not a slice's unit name (`sessions.slice`).
+`G`, `T` (powers of 1000), or none for bytes (`memoryBytesOf`, `src/core/memory.ts`). `resources.requests.memory`, in the same
+quantity, is what the engine's admission counts the task at against the machine (*Admitted by the machine's memory*, below); a task
+with a limit and no request is counted at its limit, as Kubernetes gives such a container a request equal to its limit. A fraction
+(`1.5Gi`), an exponent, `m`, a request above the limit, a limit or a request other than `memory` (`cpu`) and anything else under
+`resources` are refused at `file()` (`resourcesRefusalOf`), nothing journalled; so is a limit on a remote agent, whose process is the
+other party's. An engine given `defaultLimits: { memory: '6Gi' }` and `defaultRequests: { memory: '2560Mi' }` writes them onto every
+task filed with no `resources` of its own, as a LimitRange's `default` and `defaultRequest` are written into a Pod at admission: the
+`filed` entry says what each task ran under, and a new default never changes a task already filed. A remote agent's task is never
+given the defaults, so a default makes no remote task unfileable. `Engine.layer` refuses a `defaultLimits.memory` or a
+`defaultRequests.memory` it cannot read, a default request above the default limit, and a `cgroupParent` that is not a slice's unit
+name (`sessions.slice`).
 
 The limit is the host's to hold, as the kubelet holds a container's: a limited task's process tree runs in a transient scope of
 systemd's user manager (`scopeArgv`, `src/harness/cgroup.ts`) — `systemd-run --user --scope --quiet --collect
@@ -1074,6 +1078,22 @@ reads none of it. The peak counts the worker's own Node process beside its harne
 task's spawn, so its attempt ends `unstartable`, the refusal saying what to set (`scopeRefusal`, a probe run once a process for
 each slice, the same properties around `sh` reading its own `memory.max`). An unlimited task never asks it. What the host measured
 before it was built is in `docs/harness.md`, *A memory limit, held by a scope*.
+
+**A session's scope is its Pod.** Every local session runs in a scope of its own where the host makes one, a limited one as above and
+an unlimited one with no property (`scopeFor`, `src/harness/scope.ts`), so whatever its commands start — a detached server, a test
+runner's workers, a shell its harness opened — sits in its cgroup wherever it was started from. The scope's folder is recorded on the
+run file: the detached worker reads its own in its first write, inside the scope (`cgroup`, `bin/ae-worker.ts`), and a held session's
+holder reads Claude Code's on the first message it sends. Once the session has ended, its stop and its release end the scope whole as
+they end its harness's process group: SIGTERM to each process its `cgroup.procs` lists, then, past the run's stop grace, `1` written to
+its `cgroup.kill` (`endScopeIn`), SIGKILL to each pid where the kernel has none; a held session's scope is killed at once, as its group
+is. The release is refused while anything is left, so the engine asks again on its next pass (level-triggered), and a holder's
+`release` does the same for a held session that has ended. `scopeToEnd` (`contracts/scope-end.contract.ts`) guards what may be ended:
+a `.scope` folder under the cgroup mount, never the cgroup the runtime runs in nor one it runs inside, so a cgroup read too early, a
+daemon run in a terminal's scope, or a holder beside its session never ends itself. An unlimited session whose scope cannot be made
+though the probe passed (`systemd-run` refusing later) still runs, bare, as before scopes, and its run file says why (`unscoped`): it
+never needed a scope to start. Off systemd, nothing changes: an unlimited session runs bare and its process group alone is ended, and
+the orchestrator's sweep of a finished run's processes is the backstop. Measured in `docs/harness.md`, *A session's scope, ended
+whole*.
 
 ## How much a session keeps in mind: `contextTokens`
 
@@ -1186,6 +1206,31 @@ waiting task. A harness counts in a pool named as it is; one given as an object 
 harnesses under one rate limit share one ceiling. With no `maxConcurrent` the pass admits nothing: a queued task waits for
 `admit`, as under `ae`, which builds its engine with no ceiling and refuses `AE_MAX_CONCURRENT` (exit 2, naming the option).
 agent-orchestrator files every task `queued` with its run's momentum as `priority`, and hands the engine its ceiling.
+
+**Admitted by the machine's memory.** `Engine.layer({ root, maxConcurrent, reserved: { memory: '2Gi' } })` admits by the machine's
+memory beside the ceiling, as Kubernetes' scheduler admits a Pod onto a node only while the requests of what runs there fit its
+allocatable memory. `reserved` is the floor kept for the daemon and the machine, kubelet's `system-reserved`. Each pass reads the
+machine once (`machine`, by default `/proc/meminfo`'s `MemTotal` and `MemAvailable`, `src/service/machine.ts`) and admits a queued
+task, in turn, only while both hold (`admitting`, `src/core/admission.ts`, which decides each waiter by `admitOne`, proved
+by `contracts/admission.contract.ts`; what the whole pass keeps, summed over its waiters, is held by `test/admission.test.ts`):
+
+- the requests of every task holding a slot, its own among them, fit the machine's total less the floor: what is promised, so a
+  session at work that has not yet grown to its request is counted at it;
+- it, and every task holding a slot with no process yet (admitted, or starting), fit the memory available now less the floor: what
+  the machine has, so a process the runtime did not start (a build, a server) is counted.
+
+The machine-wide bound spans every pool, checks among them; the ceiling keeps its per-pool meaning. A task that does not fit stays
+queued, and one behind it that fits may pass it, as a scheduler goes on to the next Pod. With no `reserved`, or a pass whose
+reading answers nothing (not Linux), the ceiling alone admits. `Engine.layer` refuses a `reserved` it cannot read and a `machine`
+that is not a function.
+
+**A queued task says why it waits.** A pass journals a `waits` entry for a queued task it did not admit, as a Pod's `PodScheduled`
+condition says `Unschedulable`: `{ for: 'slot', pool, ceiling }` where its pool is at the ceiling, `{ for: 'memory', needBytes,
+roomBytes }` where the machine had no room (`AdmissionWait`). Its view carries it as `waits` while the task is queued, and `admitted`
+and `starting` clear it, as does a `waits` entry with no wait, which a pass that judged nothing (the engine unschedulable, or no
+ceiling) writes for a task whose record still holds one, so a paused engine tells no reason it no longer gives. It is written only when it changes, the room compared in grains of 256 MiB (`ROOM_STEP`), so a busy
+machine writes a line per grain its memory moves, never one per pass. A status for a person: neither admission nor `decide` reads it,
+and the next pass reads the machine again.
 
 **An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ root, unschedulable })` is a
 function the pass asks before it admits, every pass, so it is never fixed when the engine is built. While it says true the
@@ -2099,6 +2144,7 @@ of pure code sits beside it.
 | `src/testing.ts` | the testing entry's export list: what `agent-runtime/testing` gives a test of a layer above, the engine's stand-in and the wait |
 | `src/waits/index.ts` | the wait's face: `until`, `bell` and `WAITED`, as a test of this package and the testing entry read them |
 | `src/waits/waits.ts` | the one copy of the wait a test makes on the event it counts, never on a length of time (`until`), the bell its source rings (`bell`) and the bound a waiting test takes (`WAITED`) |
+| `src/process/processes.ts` | this user's processes read off `/proc`, each with its start, name, working folder and the variables asked for (`processesNow`), and ended by pid and start, never a pid taken since (`endProcesses`): what the orchestrator's sweep of a finished run's processes reads and ends |
 | `src/process/alive.ts` | whether a process is there, as signal 0 finds it (`alive`): it answers, or it is another user's (`EPERM`); the runtime's one copy, a leaf every folder may import |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
@@ -2182,15 +2228,16 @@ of pure code sits beside it.
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/claude/rules.ts` | Claude Code's permission matching (`bashCovers`, `denyingRule`, deny before ask before allow) and the tool sets measured on it, as `CLAUDE_RULES`, `CLAUDE_DECLARATION.rules` |
-| `src/harness/cgroup.ts` | a task's memory limit held by the host: the scope of systemd's user manager its process tree runs in (`scopeArgv`), the probe that says why a host cannot make one (`scopeRefusal`), and what a cgroup's files say of its memory (`cgroupMemoryOf`) |
-| `src/harness/scope.ts` | the scope a spawn asks for, off its request's memory limit (`scopeFor`): its bytes and the argv before its command, or the words that say what to set |
+| `src/harness/cgroup.ts` | a session's scope held by the host: the scope of systemd's user manager its process tree runs in, under a memory limit where it has one (`scopeArgv`), the probe that says why a host cannot make one (`scopeRefusal`), the cgroup a process sits in (`cgroupNow`), what a cgroup's files say of its memory (`cgroupMemoryOf`), which recorded scope may be ended (`scopeToEnd`), what it still holds (`scopeLeftIn`, `scopeLeft`) and its end (`endScopeIn`) |
+| `src/harness/scope.ts` | the scope a spawn asks for (`scopeFor`): every session's where the host makes one, its limit's bytes where it has one, and the argv before its command, or the words that say what to set |
+| `src/harness/claude/scope-fallback.ts` | a held session's Claude Code started behind an unlimited scope's argv, or bare where the scope is refused after the probe passed (`scopedOrBare`) |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, its usage, and what a follow reads of it (`codexPartials`: no pieces of text, its lines decoded) |
 | `src/harness/codex/rollout.ts` | the Codex rollout records the runtime reads, each decoded by its schema in `ROLLOUT`, a record that does not decode refused |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
-| `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where it has one (`startWorker`) |
+| `src/harness/detached/start-worker.ts` | how a detached run's worker is started: what its request must hold before a run file is written (`startable`: a folder, a limit the host can hold) and the worker launched, in its scope where the host makes one, an unlimited run handed the scope's argv to fall back bare where it is refused (`startWorker`) |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them and `release`, `stopRunOf` the stop both take, and `output`, a stream kept whole |
 | `src/harness/detached/detached-options.ts` | how a detached runner's workers run, beside its spec (`DetachedOptions`): their stop grace and heartbeat, each defaulted to the shipped bound, and a beat the lease would read as dead refused (`workerBoundsOf`) |
 | `src/harness/detached/worker-bounds.ts` | the detached worker's two shipped bounds, named once (`WORKER_STOP_GRACE_MS`, `WORKER_BEAT_MS`), importing nothing, as the worker it is read by imports nothing else |
@@ -2232,6 +2279,7 @@ of pure code sits beside it.
 | `src/service/kept.ts` | the engine's `kept` verb, `keptVerbOf`, and `KeptRefused`: what the store and the harnesses keep on the disk by task (`KeptReport`), each harness asked once with every session, a path counted once, nothing removed |
 | `src/service/compact.ts` | the engine's `compact` verb, `compactVerbOf`, and `CompactRefused`: each harness with a `compact` asked to count, or with `{ yes: true }` rewrite, its ended sessions' captures (`CompactReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
+| `src/service/machine.ts` | the machine's memory as `/proc/meminfo` says it, its total and what is available now (`machineMemory`, `meminfoOf`): what a pass's admission reads once while the engine keeps a `reserved` floor |
 | `src/service/mcp-state.ts` | the engine's `mcpState` verb, `mcpStateVerbOf`, and `McpStateRefused`: the state of each server a caller hands, read through Claude Code's own `query()` inside one short-lived session at the engine's root, and refused before one is opened where the record is no record of remote servers or no harness reads one |
 | `src/service/mcp-sign-in.ts` | the engine's `mcpSignIn`, `mcpSignInState` and `mcpSignOut`, `mcpSignInVerbsOf`, `mcpSignInCallback`, and `McpSignInRefused`: a waiting sign-in held in the engine's memory by its callback port until it connects or `SIGN_IN_MS` passes, nothing journalled |
 | `src/service/test-kept.ts` | the stand-in's `kept`, which answers the sizes a test planted with `keeps` |

@@ -16,6 +16,9 @@
  * - **The checkout's own install, first.** A checkout Nemia cloned (under the store's `clones/`) is Nemia's, and nobody else installs
  *   it: before its worktrees are given theirs, its own `node_modules` is installed where it has none, or where its lockfile has moved past
  *   it (`checkoutInstall`, proved by `contracts/checkout-install.contract.ts`). A person's checkout is never written.
+ * - **Kept current, at each filing.** A step merges its base and the branch's lockfile moves while the worktree's tree stays the one the
+ *   cut gave it, so before the run files a step, a try, a round or a check in one of its worktrees, it reads the tree against the
+ *   lockfile again and provisions it anew where they part (`worktreeDeps`, proved by `contracts/worktree-deps.contract.ts`).
  *
  *   Hardlinked, not linked, because a link out of the worktree is a path out of the step's working
  *   directory: Claude Code allows a read through a symlink only when the link and its target both
@@ -30,8 +33,10 @@ import path from 'node:path';
 import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 import type { CheckoutInstallOf } from '../../contracts/checkout-install.contract.ts';
+import type { WorktreeDepsOf } from '../../contracts/worktree-deps.contract.ts';
 
 export type { CheckoutInstall, CheckoutSeen } from '../../contracts/checkout-install.contract.ts';
+export type { WorktreeDeps, WorktreeSeen } from '../../contracts/worktree-deps.contract.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
 export type DepEntry = { name: string; link?: string };
@@ -82,6 +87,17 @@ export const checkoutInstall: CheckoutInstallOf = (seen) => {
   if (!seen.cloned || !seen.lockfile) return { due: false };
   if (!seen.tree) return { due: true, because: 'node_modules' };
   return seen.parting === null ? { due: false } : { due: true, because: seen.parting };
+};
+
+/**
+ * What the run does with one of its worktrees' `node_modules` before it files a step, a try, a round or a check there: provisioned as a
+ * cut provisions it where it has none, cleared and provisioned again where its lockfile parts from it, and left as it is otherwise — and
+ * always where it is not the run's own worktree, not npm's, or one link to a whole tree.
+ */
+export const worktreeDeps: WorktreeDepsOf = (seen) => {
+  if (!seen.ours || !seen.lockfile || seen.tree === 'shared') return { act: 'keep' };
+  if (seen.tree === 'none') return { act: 'provision', because: 'node_modules' };
+  return seen.parting === null ? { act: 'keep' } : { act: 'reprovision', because: seen.parting };
 };
 
 /** `p` relative to `root` when it lies strictly inside it, else null. */
@@ -251,7 +267,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
   if (deps?.tree === 'own') {
     return [
       "Its `node_modules` is its own: this branch's `package-lock.json` asks for packages the main checkout has not",
-      'installed, so the run installed them with `npm ci` when it cut this worktree, before you started. `npm install`',
+      'installed, so the run installed them with `npm ci` before you started. `npm install`',
       "here changes this tree and nobody else's.",
     ];
   }

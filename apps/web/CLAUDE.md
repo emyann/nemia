@@ -62,7 +62,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   build`: `test/e2e/parts.test.ts` presses it, and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
-  on <url>`; `npm run board:stop` ends its holder, which else ends by itself.
+  on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
+  `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 
 ## Writing an e2e page
 
@@ -97,10 +98,15 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   strip, a step card, the quota's keep and the pause's `cut in`.
 - An amount of money has one writer, `dollars` (`lib/money.ts`), by the package's rule: `$0.004` under a cent, `$12.50`, `-$0.13`, `—`
   for none; a budget as its author writes it is `budgetWord` (`$16`, `$2.50`). How a run ended, its word, sentence and hue, is `ENDED`.
-- What this browser keeps (a layout, the open runs, the bar's width, the chat's unsent message) goes through `lib/stored.ts`
+- What this browser keeps (a layout, the open runs, the chat's unsent message) goes through `lib/stored.ts`
   (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
   (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
   read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
+- A page lays out by its column, never by the window: the frame's `<main data-frame-page>` is the named container `@container/page`
+  (`routes/__root.tsx`), narrower than the window beside her docked sheet. A page's or a part's layout variant is `@<size>/page:` by the
+  window's step less the open rail (`sm`→`@md`, `md`→`@lg`, `lg`→`@3xl`, `xl`→`@5xl`), a `max-` one written as its complement (Tailwind
+  writes no named `@max-`); a window breakpoint stays only where `KEPT` says why (the bar, a portaled sheet), held by
+  `test/page-room.test.ts`. The Overview's strip wraps by its frames' own widths (`components/frame/OverviewStrip.tsx`).
 - An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
   the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
   phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).
@@ -137,6 +143,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
   conversation's alone stays in that conversation's folder: hers is `components/nemia/chat/` (her kept message, her asks), a step's session's
   is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
+- How the frame stands around its one side sheet — what it shows (what the address's `?bar=` names, else Nemia's chat), the rail folded
+  for it under 1600, docked or modal — is `frameFold` (`lib/frameFold.ts`, proved by `contracts/frame-fold.contract.ts`), read through
+  `useFrameFold` and never written to the `sidebar_state` cookie; the sheet is `components/frame/FrameSheet.tsx`, a bar's panel in it
+  `components/frame/BarPanel.tsx`, her face `components/nemia/NemiaRailFace.tsx`, her sheet's state and panel
+  `components/frame/HerSheet.tsx`, and her presence for both `useNemiaPresence`.
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by
   `components/nemia/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
   `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.

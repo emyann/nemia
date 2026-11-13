@@ -3,7 +3,7 @@ kind: FactoryTemplate
 metadata:
   name: sdlc
 spec:
-  version: 3.9.0
+  version: 3.11.0
   rules:
     path: RULES.md
   parameters:
@@ -23,6 +23,14 @@ spec:
       type: boolean
       description: "Whether the landing's check, where github is true, waits on the CI context ciCheck names at the merge commit on the base branch, and fails the step where the merge turned the base red. It needs CI to run on pushes to the base branch: set it false, with --set landingWaitsOnCi=false, where CI does not. Read only where github is true."
       default: true
+    landingRefresh:
+      type: string
+      description: "A command of the factory's own that derives files of its own from the tree (a version, a digest), which the landing runs where the run's branch lacks the base: the landing merges the base into the branch in the run's worktree, runs it there from the worktree's root with the merge in progress, and pushes the result for CI to judge, the land step's check merging it once CI is green there. It resolves and git adds each file it derives, changes nothing else, and exits non-zero naming the fix where it cannot. A merge that differs from git's plain merge outside landingDerives is refused. Read only where github is true. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) refreshes nothing: a branch that lacks the base lands only where GitHub says it merges as it is."
+      default: ""
+    landingDerives:
+      type: string
+      description: "The paths landingRefresh derives, apart by spaces, each a git glob from the repository's root (a * matches no /): the only paths where the landed commit may differ from git's plain merge of the reviewed head and the base, and the only files where the review lets a conflict with the base go, since the landing derives them again. Read only where github is true. It is written inside a double-quoted shell word, so it holds no quote, no $ and no backtick. Empty (the default) names none."
+      default: ""
     roundCheck:
       type: string
       description: "The command the implement step's check runs on each round's tree before it waits on CI, from the workspace's root: the quick refusal before CI judges. Read only where github is true; where it is false, localCheck judges."

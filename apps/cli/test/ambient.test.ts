@@ -14,6 +14,8 @@ const DAEMONS: Record<(typeof DROPPED)[number], string> = {
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
+  WF_MEMORY_REQUEST: '2Gi',
+  WF_MEMORY_RESERVED: '1Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
   NEMIA_BIND: '100.126.244.0',
   WF_EXPOSED: '1',

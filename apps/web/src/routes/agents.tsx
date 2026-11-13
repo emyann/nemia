@@ -73,7 +73,7 @@ function Place({ title, agents, empty }: { title: string; agents: LibraryAgent[]
     <section aria-label={title} className="space-y-3">
       <h2 className="text-title-small">{title}</h2>
       {agents.length ? (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-4 @md/page:grid-cols-2 @5xl/page:grid-cols-3">
           {agents.map((agent) => (
             <li key={`${agent.from}:${agent.name}`}>
               <AgentCard agent={agent} />
@@ -106,7 +106,7 @@ function SkillPlaces({ places, library }: { places: readonly SkillPlace[]; libra
         <section key={place.from} aria-label={`Skills: ${PLACE_LABELS[place.from]}`} data-skill-place={place.from} className="space-y-2">
           <h3 className="text-label-medium text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
           {place.skills.length ? (
-            <ul className="grid gap-x-6 gap-y-1.5 lg:grid-cols-2">
+            <ul className="grid gap-x-6 gap-y-1.5 @3xl/page:grid-cols-2">
               {place.skills.map((skill) => (
                 <li key={skill.name} data-skill-row={skill.name} className="min-w-0 text-body-small leading-snug">
                   <SkillLink from={skill.from} name={skill.name} className="font-medium text-foreground" />{' '}

@@ -524,12 +524,12 @@ export const RunStatus = Schema.Struct({
    */
   result: Schema.optionalKey(Strings),
   /**
-   * The parts of the board's frame, present on a list asked by state (`?fieldSelector=status.state…`) alone and measured to its
-   * `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list (`RUN_STATES`); its
-   * wall time in ms, from its creation until its work stopped or until `asOf`; where that time went (`clock`, frozen at its finish
-   * for a finished run, null where a task of it does not read); each step's cost and when its present wait on a person began
-   * (`stepCosts`, `waitingSince`, for a waiting run, null otherwise or where it is not dated); when its work stopped and how it
-   * ended (`finishedAt`, `outcome`, for a finished run, null otherwise).
+   * The parts of the board's frame, present on a list asked by a field (`?fieldSelector=status.state…` or `status.outcome…`) alone and
+   * measured to its `metadata.asOf`: a plain list, a run read alone and their watches never carry them. Its state in the list
+   * (`RUN_STATES`); its wall time in ms, from its creation until its work stopped or until `asOf`; where that time went (`clock`, frozen at
+   * its finish for a finished run, null where a task of it does not read); each step's cost and when its present wait on a person began
+   * (`stepCosts`, `waitingSince`, for a waiting run, null otherwise or where it is not dated); when its work stopped and how it ended
+   * (`finishedAt`, `outcome`, for a finished run, null otherwise).
    */
   state: Schema.optionalKey(Schema.Literals(RUN_STATES)),
   wallMs: Schema.optionalKey(Schema.Finite),
@@ -571,11 +571,11 @@ export type RunUnjudged = typeof RunUnjudged.Type;
 
 /**
  * A page of the runs (`RunList`): `listOf('Run', Run)`, and beside it `unjudged`, each run of the page a task of which does not read, left
- * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with
- * no word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without
- * the reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's
- * `lastLine` is null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a
- * list asked by state (`?fieldSelector=status.state…`) still judges its whole namespace to count it, whatever its `limit`.
+ * out of `items` since it cannot be judged into a `Run`. A departure from Kubernetes, whose list holds objects alone: a run dropped with no
+ * word would read as gone, and a page refused for one journal would blank every other run of it. A run of a list is judged without the
+ * reads a poll should not pay for: no harness is asked for a blocked session's last line and no drift is read, so each step's `lastLine` is
+ * null and `kinds` empty there; the run read alone (`GET …/runs/<name>`) says them. Its metadata is `RunListMeta`, and a list asked by a
+ * field (`?fieldSelector=status.state…` or `status.outcome…`) still judges its whole namespace to count it, whatever its `limit`.
  */
 export const RunList = Schema.Struct({
   ...listOf('Run', Run).fields,

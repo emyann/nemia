@@ -267,7 +267,7 @@ function CardItem({
       data-card={entry.name}
       className="space-y-3 rounded-lg border border-outline-variant bg-card p-4 shadow-sm"
     >
-      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-3 @md/page:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
           {entry.error === null ? (
             <p data-title className="font-medium break-words">

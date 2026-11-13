@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, openFold, openRunMenu, photograph, runMenuActions, themeOf } from '../board.ts';
-import { cardOf, expectClearOfEachOther, photographCard, showFinished } from '../canvas.ts';
+import { cardOf, expectClearOfEachOther, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -15,9 +15,9 @@ export default {
    * /api/namespaces/:namespace/runs/:runId/prune`): UNMERGED, its branch ahead of main and nobody has merged it, given a worktree on that
    * branch and a file in its files directory for the visit. Its page offers three choices, the first two unavailable since nobody merged
    * it, and the third said plainly as leaving its branch the only copy of its work; the prune is asked twice. Then the worktree and the
-   * files are gone, the branch stays, and the run's page and its card on the Factory, with the finished shown, say pruned; its row on
-   * Runs stays, and says how it ended alone. What the api refuses — a run not over, one already pruned, one nobody merged without the
-   * third choice — is proven in its own tests (`apps/api/src/runs/prune.test.ts`), since the e2e's watch counts every 4xx.
+   * files are gone, the branch stays, and the run's page and its card on the Factory say pruned; its row on Runs stays, and says how it
+   * ended alone. What the api refuses — a run not over, one already pruned, one nobody merged without the third choice — is proven in its
+   * own tests (`apps/api/src/runs/prune.test.ts`), since the e2e's watch counts every 4xx.
    */
   name: 'prune',
   route: '/factories/default',
@@ -116,7 +116,6 @@ export default {
 
       await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
       await idle(page);
-      await showFinished(page);
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       const card = cardOf(page, id);

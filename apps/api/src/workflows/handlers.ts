@@ -22,6 +22,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import {
   definitionRevision,
+  factoryDraftIn,
   foldersIn,
   typedGraphOf,
   unattachedRefusal,
@@ -159,8 +160,9 @@ const specRead = ({ steps, readme, description, files }: WorkflowFilesRead): Wor
 /**
  * A folder sent as its files (`POST /api/workflows/read`), read by the package's reader on the request's repository and yours, as a GET
  * of the same folder in yours reads it: its name and its spec, writing nothing. On a request that reads no repository (the default
- * factory with no `?repo=`), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Refused
- * `Invalid` without a name, and as the reader refuses.
+ * factory with no `?repo=`), its steps' agents and skills are looked for in yours alone: a read names no repository it needs. Read for a
+ * factory (`?factory=`), as a run of it there reads it (`factoryDraftIn`): each step the factory hires an agent into read as if its file
+ * named that agent, and a templated factory's agents looked for in its tree. Refused `Invalid` without a name, and as the reader refuses.
  */
 async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<WorkflowCreate> {
   if (name === undefined)
@@ -168,7 +170,11 @@ async function folderRead(s: Served, { name, files }: DefinitionFiles): Promise<
       error:
         'POST /api/workflows/read reads a folder under its name: send `{ "name": "<the folder\'s name>", "files": [{ "path", "text" }] }`.',
     });
-  const read = await s.inRequest(workflowDraftOfFiles(name, files, s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home)));
+  const { places, fills } =
+    s.factory === undefined
+      ? { places: s.repo === undefined ? { home: s.home } : placesOf(s.repo, s.home), fills: undefined }
+      : factoryDraftIn(s.home, s.factory, name, s.repo);
+  const read = await s.inRequest(workflowDraftOfFiles(name, files, places, fills));
   return { metadata: { name }, spec: specRead(read) };
 }
 

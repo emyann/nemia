@@ -1,11 +1,11 @@
 /**
- * The frame's floating bar for one step of a run: the step's part whole and its conversation's tail under it (`StepInspector`), read
+ * The frame's side sheet for one step of a run: the step's part whole and its conversation's tail under it (`StepInspector`), read
  * from the run's record, which a read again keeps current.
  */
 import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 import { RunGone } from '../run/RunGone';
 import { StepInspector } from './StepInspector';
 
@@ -17,9 +17,9 @@ import { StepInspector } from './StepInspector';
 export function StepBar({ run: id, step: name }: { run: string; step: string }) {
   const { view: run, error } = useRunRead(id);
   return (
-    <FloatingBar title={name} description={run ? titleOf(run) : id}>
+    <BarPanel title={name} description={run ? titleOf(run) : id}>
       <StepBody id={id} name={name} run={run} error={error} />
-    </FloatingBar>
+    </BarPanel>
   );
 }
 

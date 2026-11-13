@@ -1,8 +1,9 @@
 /**
  * `nemia upgrade` on an archive install: a scratch store whose current release came from an archive, upgraded from a `file:` download
  * base laid out as a release's (`download/<tag>/nemia-<tag>-<platform>.tar.gz`, its `SHA256SUMS`, `latest/download/latest.json`), each
- * archive a tiny release whose `bin/nemia` is a shell script. No daemon ticks the store, so nothing is restarted; the store is the
- * test's own at `ROOT`, named by `ENV`.
+ * archive a tiny release whose `bin/nemia` is a shell script; and from a stub GitHub on loopback, whose downloads all answer 404 and
+ * whose API (`/api/v3`, as a host other than github.com is read) answers one release published with no archive yet. No daemon ticks the
+ * store, so nothing is restarted; the store is the test's own at `ROOT`, named by `ENV`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +12,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import type { ServiceHost } from '../service/service.verb.ts';
@@ -23,7 +26,7 @@ import { runWith as runEngine, engineOf } from '../runtime-client.ts';
 import { upgrade } from './upgrade.verb.ts';
 import { platformOf, type ReleaseFile } from './release.ts';
 import { currentRelease, releaseDir, releaseFileOf, releasesDir, runningAt, switchCurrent, writeReleaseFile } from './release.store.ts';
-import { assetName, writeStoreFloor } from './archive.store.ts';
+import { assetName, releaseApiUrl, writeStoreFloor } from './archive.store.ts';
 import { parseVersion } from './floor.ts';
 import { linkNemia, toolsNemia } from './nemia-link.store.ts';
 
@@ -204,4 +207,58 @@ test('an archive install upgraded from its download base: the newest by default,
       assert.equal(currentRelease(ROOT)?.tag, 'v1.1.0');
     },
   );
+});
+
+/**
+ * A stub GitHub on loopback: every download answers 404, and the API answers the release of each tag in `published`, with the assets
+ * named, and 404 for any other. Its download base is `<origin>/o/r/releases`, a repository's as github.com lays it out.
+ */
+async function stubGitHub(published: Record<string, readonly string[]>): Promise<{ source: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    const asked = /^\/api\/v3\/repos\/o\/r\/releases\/tags\/([^/]+)$/.exec(req.url ?? '');
+    const assets = asked?.[1] === undefined ? undefined : published[decodeURIComponent(asked[1])];
+    if (assets === undefined) {
+      res.writeHead(404, { 'content-type': 'application/json' }).end('{"message":"Not Found"}');
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ assets: assets.map((name) => ({ name })) }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    source: `http://127.0.0.1:${port}/o/r/releases`,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+test('an archive that answers 404: Conflict where its release is published without it yet, Missing where no release has the tag', async (t) => {
+  const github = await stubGitHub({ 'v1.5.0': ['SHA256SUMS', 'install.sh'] });
+  t.after(github.close);
+  const install = { ...FIRST, source: github.source };
+  const kindOf = async (tag: string): Promise<string> => {
+    const err = await runWith(engineOf(engine().layer), upgrade({ tag }, idle, ENV, install)).then(
+      () => assert.fail('the upgrade was expected to be refused'),
+      (e: Error & { _tag?: string; exitCode?: number }) => e,
+    );
+    assert.equal(err.exitCode, 2, err.message);
+    return err._tag ?? '';
+  };
+  const before = currentRelease(ROOT)?.tag;
+
+  assert.equal(await kindOf('v1.5.0'), 'Conflict', 'a published release whose archive is not attached yet: upgrade again later');
+  assert.equal(await kindOf('v9.8.7'), 'Missing', 'no release by that tag');
+  assert.equal(currentRelease(ROOT)?.tag, before, 'nothing switched');
+  assert.equal(fs.existsSync(releaseDir('v1.5.0', ROOT)), false);
+  assert.deepEqual(leftovers(), []);
+});
+
+test("a download base's release is read from github.com's API, another host's /api/v3, and from no API for a base of another shape", async (t) => {
+  const rows: [string, string | undefined][] = [
+    ['https://github.com/o/r/releases', 'https://api.github.com/repos/o/r/releases/tags/v1.5.0'],
+    ['https://github.com/o/r/releases/', 'https://api.github.com/repos/o/r/releases/tags/v1.5.0'],
+    ['https://git.example.com/o/r/releases', 'https://git.example.com/api/v3/repos/o/r/releases/tags/v1.5.0'],
+    [SOURCE, undefined],
+    ['https://example.com/downloads', undefined],
+  ];
+  for (const [source, api] of rows) await t.test(source, () => assert.equal(releaseApiUrl(source, 'v1.5.0'), api));
 });

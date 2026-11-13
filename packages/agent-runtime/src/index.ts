@@ -78,6 +78,11 @@ export type { EngineOptions, HarnessConfig, Pooled, Resources, TaskSpec, TickRep
 export { memoryBytesOf, memoryQuantityRefusal } from './core/memory.ts';
 export { scopeRefusal } from './harness/cgroup.ts';
 /**
+ * This user's processes as `/proc` reads them now, each with the variables asked for, and their end by pid and start: for a caller
+ * that finds what a finished session left running by what its environment names.
+ */
+export { endProcesses, processesNow, type ProcessNow, type ProcessToEnd } from './process/processes.ts';
+/**
  * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or
  * `undefined`: for a caller that checks a task before it files it, and words the refusal in its own keys.
  */
@@ -87,6 +92,8 @@ export { file, FileRefused, StopRefused, answer, close, InputRefused, admit, Adm
 export { view, viewOfState, tick, TickRefused, reconcile, settleTask, ReconcileRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
+/** Why a pass left a queued task waiting, as its view says it (`TaskView.waits`): its pool's ceiling, or the machine's memory. */
+export type { AdmissionWait } from './core/admission.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 
 export { Journal, JournalError, BodyRefused, FEED_LOCK_WAIT_MS, APPEND_REFUSALS, type AppendRefusalReason } from './core/engine/index.ts';

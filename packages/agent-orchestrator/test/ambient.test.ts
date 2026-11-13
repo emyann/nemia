@@ -174,6 +174,8 @@ test("REFUSED under the daemon's OTEL_EXPORTER_OTLP_ENDPOINT: a test file sees n
 const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIABLES)[number], string> = {
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
+  WF_MEMORY_REQUEST: '2560Mi',
+  WF_MEMORY_RESERVED: '2Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
   NEMIA_BIND: '100.126.244.0',
   WF_EXPOSED: '1',

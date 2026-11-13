@@ -36,7 +36,7 @@ export type RunState = (typeof RUN_STATES)[number];
 
 /**
  * How a finished run ended: `cancelled`, a person called it off; `undecided`, its work is done and nobody has decided its result;
- * `succeeded`; or `failed`, every other end.
+ * `succeeded`; or `failed`, every other end. What a RunList's `?fieldSelector=status.outcome…` selects by.
  */
 export const RUN_OUTCOMES = ['succeeded', 'failed', 'cancelled', 'undecided'] as const;
 
@@ -472,6 +472,7 @@ export const EVENT_REASONS = [
   'Ready',
   'ConflictsPending',
   'ConflictsSettled',
+  'LeftEnded',
 ] as const;
 
 /** One of `EVENT_REASONS`. */

@@ -39,6 +39,7 @@ erDiagram
     object resources "optional"
     boolean queued "optional"
     number admitted "optional"
+    unknown waits "optional"
     list inputs
     boolean closed
     boolean stopRequested

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // `npm run lint:fast`: every rule of .oxlintrc.json but the type-aware ones, for a round check's fast refusal ahead of `ci`, which runs
+  // `npm run lint` whole. Most of the lint's time and memory is the type-aware runner (tsgolint), which this leaves out; oxlint has no
+  // flag that turns it off (`--type-aware=false` is refused), hence this file. `extends` carries the rules, the plugins
+  // and the overrides with their options; it does not carry `ignorePatterns`, so they are repeated here.
+  // tools/guards/test/lint-fast.test.ts holds this file to those four keys, and the two configs to the same diagnostics but the
+  // type-aware rules'.
+  "extends": ["./.oxlintrc.json"],
+  "options": {
+    "typeAware": false
+  },
+  "ignorePatterns": ["apps/web/src/components/ui/ds/**", "apps/web/.claude/**", "apps/web/src/routeTree.gen.ts"]
+}

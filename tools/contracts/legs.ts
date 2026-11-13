@@ -39,6 +39,7 @@ export const ROOTS = [
   'apps/web/src/lib/tryAddress.ts',
   'apps/web/src/lib/upgrade.ts',
   'apps/web/src/lib/viewers.ts',
+  'packages/templates/released.ts',
 ];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */

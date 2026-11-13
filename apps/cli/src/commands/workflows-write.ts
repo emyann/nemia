@@ -1,6 +1,7 @@
 /**
  * `nemia workflows write (yours | factory) <name> --folder <draft> [--factory <f>] [--version <v>]`: the draft folder's own files read
- * here (`folderFiles`), read into the workflow's spec by the api (`workflows.read`, which writes nothing), then written in `default`:
+ * here (`folderFiles`), read into the workflow's spec by the api (`workflows.read`, which writes nothing; on `factory`, read for the
+ * factory, `?factory=`, so a step it hires an agent into reads as a run there reads it), then written in `default`:
  * made (`workflows.create`) with no `--version`, else written whole at it (`workflows.replace`), its files merged first over the ones the
  * workflow has now (`workflows.get`), so a file the draft does not carry is left, as its help says. On `factory`, the same object is
  * proposed to the factory (`proposalMade`).
@@ -27,8 +28,9 @@ export async function workflowsWrite(args: Args): Promise<number> {
   const folder = pathArg(args, 'folder', COMMAND, USAGE, 'the draft folder whose steps and README to write');
   const version = textArg(args, 'version');
   const files = folderFiles(folder, COMMAND);
-  const { spec: drafted } = await asked(COMMAND, (c) => c.workflows.read({ payload: { name, files } }));
   const namespace = namespaceOf(place);
+  const query = place.kind === 'factory' ? { factory: namespace } : {};
+  const { spec: drafted } = await asked(COMMAND, (c) => c.workflows.read({ query, payload: { name, files } }));
   const spec: WorkflowSpec =
     version === undefined
       ? drafted

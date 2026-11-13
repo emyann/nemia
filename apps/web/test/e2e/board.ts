@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { BrowserContext, Locator, Page } from 'playwright';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectCount, expectNone, expectTexts, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { type Card, CARD_KEY_MEANINGS, CARD_KEYS, type FactoryCommands, type FactoryList, type RunList, type ScheduleList } from 'objects';
 import {
   FINISHED_SELECTOR,
@@ -71,17 +71,17 @@ export const sectionsOf = (page: Page): Locator =>
     .getByRole('link')
     .filter({ hasText: /^(Inbox|Runs|Workflows)/ });
 
-/** The rail's FAB, Start a run, which opens the floating bar on the start of a run. */
+/** The rail's FAB, Start a run, which opens the start of a run in the frame's side sheet. */
 export const startOf = (page: Page): Locator => railColumnOf(page).getByRole('button', { name: 'Start a run' });
 
-/** The top bar's gauges button, which opens the machine's gauges in the floating bar. */
+/** The top bar's gauges button, which opens the machine's gauges in the frame's side sheet. */
 export const gaugesButtonOf = (page: Page): Locator => topBarOf(page).locator('[data-gauges-button] button');
 
-/** Opens the machine's gauges in the floating bar, unless they are open, and returns the bar. */
+/** Opens the machine's gauges in the frame's side sheet, unless they are open, and returns the bar. */
 export async function gaugesOf(page: Page): Promise<Locator> {
   const bar = page.locator('aside[data-bar="gauges"]');
   if (!(await bar.isVisible())) await gaugesButtonOf(page).click();
-  await expectVisible(bar, 'the gauges button opens the gauges in the floating bar');
+  await expectVisible(bar, 'the gauges button opens the gauges in the side sheet');
   return bar;
 }
 
@@ -172,7 +172,7 @@ export function fedDaemon(pid: number = process.pid): void {
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
-/** The frame's floating bar while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
+/** The frame's bar, in its side sheet, while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
 export const stepBar = (page: Page, run: string, step: string): Locator => page.locator(`aside[data-bar="step:${run}/${step}"]`);
 
 /**
@@ -891,17 +891,89 @@ export function herStopped(at: string): void {
   fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
 }
 
-/** Her docked face, the cue beside it, and the panel it opens. */
-export const dockOf = (page: Page): Locator => page.locator('[data-nemia-dock]');
-export const dockFaceOf = (page: Page): Locator => page.locator('[data-nemia-dock-face]');
+/** Her face in the rail (or in the top bar on a narrow screen), the frame's side sheet that holds her chat or a bar, and her panel. */
+export const herFaceOf = (page: Page): Locator => page.locator('[data-nemia-face-button]');
+export const herSheetOf = (page: Page): Locator => page.locator('[data-slot="side-sheet"]');
+
+/** The frame's docked sheet's holder, which says how it stands (`data-frame-sheet`) and what it shows (`data-sheet-shows`). */
+export const frameSheetOf = (page: Page): Locator => page.locator('[data-frame-sheet]');
+
+/** The frame's docked sheet comes to show `shows`, within `WAIT_MS`: what the address's `?bar=` names, her chat, or nothing. */
+export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none', assertion: string): Promise<void> {
+  try {
+    await page.locator(`[data-frame-sheet][data-sheet-shows="${shows}"]`).waitFor({ state: 'attached', timeout: WAIT_MS });
+  } catch {
+    const now = await frameSheetOf(page)
+      .getAttribute('data-sheet-shows', { timeout: 1000 })
+      .catch(() => 'no docked sheet');
+    throw new Refused(`${assertion} — the sheet shows ${now}`);
+  }
+}
 export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
 
-/** Opens the panel from her docked face, and waits for it. */
+/**
+ * The words of every cue her face says now, in its order: none where her face counts none (`data-nemia-cues`), else read off the tooltip
+ * a fresh hover of her face opens.
+ */
+export async function herCues(page: Page): Promise<string[]> {
+  const face = herFaceOf(page);
+  const count = Number(await face.getAttribute('data-nemia-cues', { timeout: WAIT_MS }));
+  if (count === 0) return [];
+  await page.mouse.move(0, 0);
+  await face.hover();
+  const cues = page.locator('[data-nemia-cues] [data-cue]');
+  await expectCount(cues, count, 'a hover of her face says every cue that holds in its tooltip');
+  return (await cues.allTextContents()).map((words) => words.trim());
+}
+
+/** Her cues come to hold what `holds` asks of their words, within `timeout`, each read by a fresh hover (`herCues`). */
+export async function expectCues(page: Page, holds: (words: string[]) => boolean, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await expectNone(
+    async () => {
+      const words = await herCues(page);
+      return holds(words) ? null : `her face says ${JSON.stringify(words)}`;
+    },
+    assertion,
+    timeout,
+  );
+}
+
+/**
+ * `element` is in the window and nothing is drawn over it: the element at the centre of its box is it or inside it. What a fixed layer
+ * laid over a page's foot would fail.
+ */
+export async function expectUncovered(element: Locator, assertion: string): Promise<void> {
+  const seen = await element.evaluate((own) => {
+    const box = own.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    if (box.bottom > innerHeight + 1 || box.top < -1)
+      return `it stands from ${Math.round(box.top)} to ${Math.round(box.bottom)} of ${innerHeight}`;
+    const at = document.elementFromPoint(x, y);
+    return at !== null && own.contains(at) ? null : `the element at its centre is ${at?.outerHTML.slice(0, 120) ?? 'none'}`;
+  });
+  if (seen !== null) throw new Refused(`${assertion} — ${seen}`);
+}
+
+/** Opens her side sheet from her face, and waits for the panel in it and for the sheet to have come in whole. */
 export async function openChat(page: Page): Promise<Locator> {
-  await dockFaceOf(page).click();
+  await herFaceOf(page).click();
   const panel = chatPanelOf(page);
-  await expectVisible(panel, "her docked face opens Nemia's chat");
+  await expectVisible(panel, "her face in the rail opens Nemia's chat");
+  await expectSheetIn(page);
   return panel;
+}
+
+/** Her sheet, docked or modal, has come in whole: it stands at the right of the window, its slide or its widening done. */
+export async function expectSheetIn(page: Page): Promise<void> {
+  await expectNone(
+    () =>
+      herSheetOf(page).evaluate((sheet) => {
+        const right = sheet.getBoundingClientRect().right;
+        return Math.abs(right - innerWidth) > 1 ? `its right is at ${right} of ${innerWidth}` : null;
+      }),
+    'her sheet comes to stand at the right of the window',
+  );
 }
 
 /**
@@ -957,4 +1029,37 @@ export async function bannerShown(context: BrowserContext): Promise<void> {
     const read = (await response.json()) as { ready: boolean; pieces: unknown[] };
     return route.fulfill({ response, json: { ...read, ready: false, pieces: [...read.pieces, BANNER_PIECE] } });
   });
+}
+
+/**
+ * The Overview's strip reads whole in the room its page column gives it: its three headings, the readout and the agents' count are cut
+ * by nothing, and each agent's row shows at least the agent's name, the words before its first ` · `, whole inside its row (the rest of
+ * the row may be cut short). The intent's 'A.', 'Q.' and 'd…' at 1280 beside her sheet are what this refuses.
+ */
+export async function expectStripWhole(page: Page, assertion: string): Promise<void> {
+  const strip = page.locator('[data-overview-strip]');
+  await expectCount(strip.locator('[data-strip-heading]'), 3, `${assertion}: the strip shows its three headings`);
+  await expectUncut(strip.locator('[data-strip-heading]'), `${assertion}: each heading is read whole`);
+  await expectUncut(
+    strip.locator('[data-strip-readout], [data-strip-agents]'),
+    `${assertion}: the readout and the agents' count are whole`,
+  );
+  await expectNone(
+    () =>
+      strip.locator('[data-agent-words]').evaluateAll((all) => {
+        const cut = all.flatMap((words) => {
+          const text = document.createTreeWalker(words, NodeFilter.SHOW_TEXT).nextNode();
+          const said = text?.textContent ?? '';
+          const name = said.split(' · ')[0] ?? '';
+          if (!text || !name) return [`a row with no name (${said})`];
+          const range = document.createRange();
+          range.setStart(text, 0);
+          range.setEnd(text, name.length);
+          const right = range.getBoundingClientRect().right;
+          return right > words.getBoundingClientRect().right + 1 ? [name] : [];
+        });
+        return cut.length ? `the agent's name is cut in its row: ${cut.join(', ')}` : null;
+      }),
+    `${assertion}: each agent's row shows the agent's name whole`,
+  );
 }

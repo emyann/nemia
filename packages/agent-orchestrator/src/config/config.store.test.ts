@@ -15,6 +15,8 @@ import {
   maxConcurrent,
   maxRuns,
   memoryLimit,
+  memoryRequest,
+  memoryReserved,
   metricsHourDays,
   metricsMinuteDays,
   releaseCheck,
@@ -69,6 +71,18 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
       ['8 GB', '8gb', '129e6', '100m', '1.5Gi', '0', '-1Gi', 'lots'],
       'WF_MEMORY_LIMIT=8Gi',
     ],
+    'WF_MEMORY_REQUEST not a quantity the runtime reads — a spaced unit, a lower-case one, a fraction, zero': [
+      memoryRequest,
+      'WF_MEMORY_REQUEST',
+      ['2.5 GiB', '2gb', '1.5Gi', '0', 'lots'],
+      'WF_MEMORY_REQUEST=2560Mi',
+    ],
+    'WF_MEMORY_RESERVED not a quantity the runtime reads — a spaced unit, a lower-case one, a fraction, zero': [
+      memoryReserved,
+      'WF_MEMORY_RESERVED',
+      ['2 GiB', '2gb', '1.5Gi', '0', 'lots'],
+      'WF_MEMORY_RESERVED=2Gi',
+    ],
     'WF_CGROUP_PARENT not a slice — a path, a scope, a bare name, an escape': [
       cgroupParent,
       'WF_CGROUP_PARENT',
@@ -91,6 +105,23 @@ test('REFUSED at shipped defaults: each WF_ variable set to what it does not tak
           JSON.stringify(value),
         );
     });
+});
+
+test('REFUSED: WF_MEMORY_REQUEST above WF_MEMORY_LIMIT, which no session could be admitted under, exit 2, naming both', () => {
+  for (const env of [
+    { WF_MEMORY_REQUEST: '9Gi', WF_MEMORY_LIMIT: '8Gi' },
+    { WF_MEMORY_REQUEST: '8193Mi', WF_MEMORY_LIMIT: '8Gi' },
+  ])
+    assert.throws(
+      () => memoryRequest(env),
+      (err: unknown) => {
+        assert.ok(err instanceof Invalid, String(err));
+        assert.equal(err.exitCode, 2);
+        names(err.message, `WF_MEMORY_REQUEST=${env.WF_MEMORY_REQUEST} `, 'WF_MEMORY_LIMIT');
+        return true;
+      },
+      JSON.stringify(env),
+    );
 });
 
 test('each WF_ variable reads its default unset, empty or blank, and the values it takes', async (t) => {
@@ -175,6 +206,35 @@ test('each WF_ variable reads its default unset, empty or blank, and the values 
       'WF_MEMORY_LIMIT a quantity, as written, padding trimmed',
       () => ['8Gi', '512Mi', ' 4G ', '1073741824'].map((value) => memoryLimit({ WF_MEMORY_LIMIT: value })),
       ['8Gi', '512Mi', '4G', '1073741824'],
+    ],
+    [
+      'WF_MEMORY_REQUEST and WF_MEMORY_RESERVED: unset, empty or blank, none — each session asks its limit, and the floor is the default',
+      () => [
+        memoryRequest({}),
+        memoryRequest({ WF_MEMORY_REQUEST: '' }),
+        memoryRequest({ WF_MEMORY_REQUEST: '  ' }),
+        memoryReserved({}),
+        memoryReserved({ WF_MEMORY_RESERVED: ' ' }),
+      ],
+      [undefined, undefined, undefined, undefined, undefined],
+    ],
+    [
+      'WF_MEMORY_REQUEST a quantity, as written, padding trimmed, at or under WF_MEMORY_LIMIT where it is set',
+      () => [
+        memoryRequest({ WF_MEMORY_REQUEST: ' 2560Mi ' }),
+        memoryRequest({ WF_MEMORY_REQUEST: '8Gi', WF_MEMORY_LIMIT: '8Gi' }),
+        memoryRequest({ WF_MEMORY_REQUEST: '2Gi', WF_MEMORY_LIMIT: '7782Mi' }),
+      ],
+      ['2560Mi', '8Gi', '2Gi'],
+    ],
+    ['WF_MEMORY_RESERVED a quantity, as written, padding trimmed', () => memoryReserved({ WF_MEMORY_RESERVED: ' 2Gi ' }), '2Gi'],
+    [
+      'the settings carry the request and the floor',
+      () => {
+        const set = settingsOf({ WF_MEMORY_REQUEST: '2560Mi', WF_MEMORY_RESERVED: '2Gi' });
+        return [set.memoryRequest, set.memoryReserved, settingsOf({}).memoryRequest, settingsOf({}).memoryReserved];
+      },
+      ['2560Mi', '2Gi', undefined, undefined],
     ],
     [
       'WF_CGROUP_PARENT a slice name, as written',

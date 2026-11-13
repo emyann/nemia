@@ -80,7 +80,7 @@ function Result({ run }: { run: RunDetail }) {
 /** The ask beside the result: the run's brief and the card it came from, then what it gave or where it stands (`resultOf`). */
 export function RunResult({ run }: { run: RunDetail }) {
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
+    <div className="grid items-start gap-6 @3xl/page:grid-cols-2">
       <section aria-label="The ask" data-run-ask className="min-w-0 space-y-3">
         <h2 className="text-label-large text-on-surface-variant">The ask</h2>
         <Markdown>{run.brief}</Markdown>

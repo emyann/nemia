@@ -1,18 +1,27 @@
 import path from 'node:path';
+import type { Page } from 'playwright';
 import {
   chatFieldOf,
   chatPanelOf,
-  dockFaceOf,
-  dockOf,
+  expectCues,
+  expectUncovered,
   expectPanelHeld,
+  expectSheetIn,
+  expectSheetShows,
+  gaugesOf,
+  expectStripWhole,
   herChat,
+  herFaceOf,
+  herSheetOf,
+  litOf,
   openAnswered,
   openChat,
   photograph,
+  railColumnOf,
   railPlace,
   themeOf,
 } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 import { cuesOf, dockWords, faceOf, type Presence } from '../../../src/lib/presence.ts';
@@ -21,16 +30,16 @@ import { cuesOf, dockWords, faceOf, type Presence } from '../../../src/lib/prese
 const STARTERS = ['What is waiting on me?', 'What is at work?', 'What did today cost?', 'Start a run'];
 
 /**
- * Her face docked and closed: her expression and every cue beside it are the ones her presence picks (`faceOf`, `cuesOf`) from what the
- * api answers of her and from the run list's runs that wait on the person — the count the rail's Runs badge says beside it, never her
- * presence's own `waitsOnYou` — her face says what pressing it does (`dockWords`), and no panel is drawn until it is pressed. Read against
- * the api rather than against a presence written here: the seed's own waiting runs are hers to show, and their count moves with the seed.
- * Her chat here holds no ask, so none is said.
+ * Her face first in the rail and her chat closed: her expression and every cue said at her face are the ones her presence picks
+ * (`faceOf`, `cuesOf`) from what the api answers of her and from the run list's runs that wait on the person — the count the rail's Runs
+ * badge says below it, never her presence's own `waitsOnYou` — her face says what pressing it does (`dockWords`) and that her chat is
+ * closed (`aria-expanded`), the first Tab from the page's top reaches it before any of the rail's destinations, and no panel is drawn
+ * until it is pressed. Read against the api rather than against a presence written here: the seed's own waiting runs are hers to show,
+ * and their count moves with the seed. Her chat here holds no ask, so none is said.
  */
-async function expectClosed(page: Parameters<PageSpec['expect']>[0]): Promise<void> {
-  const dock = dockOf(page);
-  await expectVisible(dock, 'her face is docked at the bottom right of the page');
-  if ((await dock.getAttribute('data-nemia-dock')) !== 'closed') throw new Refused('the panel is closed until her face is pressed');
+async function expectClosed(page: Page): Promise<void> {
+  const face = herFaceOf(page);
+  await expectVisible(face, 'her face is in the rail');
   const read = (await page.request.get(new URL('/api/nemia/chat', page.url()).href).then((r) => r.json())) as {
     presence: { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
   };
@@ -51,20 +60,79 @@ async function expectClosed(page: Parameters<PageSpec['expect']>[0]): Promise<vo
     [String(waiting)],
     'the rail counts the runs that wait on you as her cue does',
   );
-  const wearing = await dock.locator('[data-nemia-face]').getAttribute('data-nemia-face');
+  const wearing = await face.locator('[data-nemia-face]').getAttribute('data-nemia-face');
   if (wearing !== faceOf(presence))
     throw new Refused(`her face wears the expression her presence picks, ${faceOf(presence)} — it wears ${wearing}`);
-  await expectTexts(
-    dock.locator('[data-cue]'),
-    cuesOf(presence).map((cue) => cue.words),
-    'every cue that holds stands beside her face, in the owner’s order',
+  const words = cuesOf(presence).map((cue) => cue.words);
+  await expectCues(
+    page,
+    (said) => JSON.stringify(said) === JSON.stringify(words),
+    `every cue that holds is said at her face, in the owner’s order: ${words.join(', ')}`,
   );
-  for (const cue of await dock.locator('[data-cue]').all())
-    if ((await cue.evaluate((words) => getComputedStyle(words).pointerEvents)) !== 'none')
-      throw new Refused("a cue takes no press: a page's own control under one is still reached, and her face carries the words");
-  const label = await dockFaceOf(page).getAttribute('aria-label');
-  if (label !== dockWords(presence, false)) throw new Refused(`her face says what pressing it does — it says ${label}`);
+  await page.mouse.move(640, 400);
+  const label = await face.getAttribute('aria-label');
+  if (label !== dockWords(presence, 'closed')) throw new Refused(`her face says what pressing it does — it says ${label}`);
+  if ((await face.getAttribute('aria-expanded')) !== 'false') throw new Refused('her face says her chat is closed');
   await expectCount(chatPanelOf(page), 0, 'no panel is drawn until it is opened');
+  await expectVisible(railColumnOf(page).and(page.locator('[data-state="expanded"]')), 'the rail stands open, as the person keeps it');
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press('Tab');
+  const first = await page.evaluate(() => document.activeElement?.hasAttribute('data-nemia-face-button') ?? false);
+  if (!first) throw new Refused("the first Tab from the page's top reaches her face, before the rail's destinations");
+}
+
+/** This browser's `sidebar_state` pair, as the person's fold of the rail is kept: none where it was never written. */
+const railCookie = (page: Page): Promise<string | undefined> =>
+  page.evaluate(() =>
+    document.cookie
+      .split(';')
+      .map((pair) => pair.trim())
+      .find((pair) => pair.startsWith('sidebar_state=')),
+  );
+
+/** What the rail shows of the page whatever its width: the destination lit, and the Runs badge's count. */
+const railSays = async (page: Page): Promise<string> =>
+  `${await litOf(page).getAttribute('href')} · ${(await railPlace(page, 'Runs').locator('[data-slot="badge"]').allTextContents()).join()}`;
+
+/** The rail stands `state` (`expanded`, `collapsed`). */
+const expectRail = (page: Page, state: string, assertion: string): Promise<void> =>
+  expectVisible(railColumnOf(page).and(page.locator(`[data-state="${state}"]`)), assertion);
+
+/**
+ * The top bar holds whole beside her sheet: it wraps by its own width, not the window's, so its buttons at its right end — the pause,
+ * the gauges and the account — stand in the window with nothing over them, her sheet included.
+ */
+async function expectBarWhole(page: Page, assertion: string): Promise<void> {
+  const bar = page.locator('header[data-frame-header]');
+  for (const [part, name] of [
+    ['button[data-pause]', 'the pause'],
+    ['[data-gauges-button]', 'the gauges'],
+    ['[data-account-to-come]', 'the account'],
+  ] as const)
+    await expectUncovered(bar.locator(part).first(), `${assertion}: ${name} is uncovered`);
+}
+
+/**
+ * Her sheet stands docked in the frame's row: 400 wide, holding her panel, its left at or past the page's right, nothing modal over the
+ * page, and the page's own right edge its own.
+ */
+async function expectDocked(page: Page): Promise<void> {
+  const sheet = herSheetOf(page);
+  await expectVisible(sheet.locator('[data-chat-panel="sheet"]'), 'her sheet holds her panel');
+  await expectCount(page.locator('[data-slot="side-sheet-overlay"]'), 0, 'and is docked, with no scrim over the page');
+  await expectNone(
+    () =>
+      page.evaluate(() => {
+        const sheet = document.querySelector('[data-slot="side-sheet"]')!.getBoundingClientRect();
+        const main = document.querySelector('[data-frame-page]')!.getBoundingClientRect();
+        if (Math.abs(sheet.width - 400) > 1) return `it is ${sheet.width} wide, not 400`;
+        if (Math.abs(sheet.right - innerWidth) > 1) return `its right is at ${sheet.right} of ${innerWidth}`;
+        if (sheet.left < main.right - 1) return `it starts at ${sheet.left}, over the page, which ends at ${main.right}`;
+        const at = document.elementFromPoint(main.right - 2, main.top + main.height / 2);
+        return at?.closest('[data-slot="side-sheet"]') ? "the page's own right edge is the sheet's" : null;
+      }),
+    'her sheet stands 400 wide at the right of the window, beside the page and not over it',
+  );
 }
 
 /** Her greeting, her level and what is at work, and the four chips. */
@@ -82,7 +150,7 @@ async function expectEmpty(panel: ReturnType<typeof chatPanelOf>): Promise<void>
 }
 
 /** The composer's edge, its colour and the shape it is clipped to: the layer the look's cut field draws round the whole box. */
-async function edgeOf(page: Parameters<PageSpec['expect']>[0]): Promise<{ colour: string; clip: string }> {
+async function edgeOf(page: Page): Promise<{ colour: string; clip: string }> {
   const edge = page.locator('[data-chat-composer] [data-cut-edge]');
   await expectVisible(edge, "the composer's edge is a layer of its own");
   return await edge.evaluate((layer) => {
@@ -93,15 +161,21 @@ async function edgeOf(page: Parameters<PageSpec['expect']>[0]): Promise<{ colour
 
 export default {
   /**
-   * Her face docked and closed on a page of the board (state 1), the panel it opens with nothing said yet (state 2) — her greeting, her
+   * Her face first in the rail, her chat closed, on a page of the board (state 1); pressed, her side sheet docked beside the page at 1280,
+   * the rail folded for it without writing the person's fold, the top bar and the Overview's strip whole in the narrower column
+   * (`expectStripWhole`), and the panel in it with nothing said yet (state 2) — her greeting, her
    * level, what is at work and the four chips — a draft written in it (state 3), where Shift+Enter makes a new line and Enter sends, the
-   * words then drawn as the person's own bubble, the panel grown to the whole space, and the same panel opened as a page of its own at
-   * `/chat`, where her face is not docked. Her level, her task and her chat are written by the page and taken back after.
+   * words then drawn as the person's own bubble. Then the menu button bringing the rail back beside the sheet, the bar and the strip
+   * whole again, its Close and her face
+   * closing it; at 1600 the sheet beside an open rail; on a narrow screen the kit's modal sheet from her face in the top bar; and the
+   * same panel opened as a page of its own at `/chat`, where her face says the page is hers. Her level, her task and her chat are
+   * written by the page and taken back after.
    */
   name: 'chat',
   route: '/',
   expect: async (page) => {
     const back = herChat({ session: 'up', said: [] });
+    const was = page.viewportSize();
     try {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -109,9 +183,27 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `chat-closed-${await themeOf(page)}.png`), { fullPage: true });
 
+      const cookie = await railCookie(page);
+      const rail = await railSays(page);
       const panel = await openChat(page);
+      const face = herFaceOf(page);
+      if ((await face.getAttribute('aria-expanded')) !== 'true') throw new Refused('her face says her chat is open');
+      if ((await face.evaluate((own) => getComputedStyle(own).boxShadow)) === 'none') throw new Refused('open, her face is ringed');
+      await expectDocked(page);
+      await expectRail(page, 'collapsed', 'at 1280 the open rail folds beside her sheet');
+      await expectBarWhole(page, 'beside her sheet at 1280 the top bar takes two lines and holds whole');
+      await expectStripWhole(page, "beside her sheet at 1280, the rail folded, the Overview's strip reads whole");
+      if ((await railSays(page)) !== rail)
+        throw new Refused(`the folded rail keeps the page lit and its badges — ${rail} became ${await railSays(page)}`);
+      if ((await railCookie(page)) !== cookie)
+        throw new Refused('the fold for her sheet writes no sidebar_state: the person did not fold the rail');
       await expectVisible(panel.getByRole('heading', { name: 'Nemia' }), 'her name in the header');
       await expectVisible(panel.locator('[data-chat-where]', { hasText: 'Up: her session runs' }), 'where she is');
+      await expectCount(
+        panel.getByRole('button', { name: 'Grow to the whole space' }),
+        0,
+        'a docked sheet does not grow: /chat is the chat grown',
+      );
       await expectEmpty(panel);
       await expectPanelHeld(page);
       await settled(page);
@@ -156,36 +248,87 @@ export default {
         "the words are the person's bubble",
       );
       if ((await field.inputValue()) !== '') throw new Refused('the field is emptied once the words are sent');
-
-      await panel.getByRole('button', { name: 'Grow to the whole space' }).click();
-      const grown = chatPanelOf(page).and(page.locator('[data-chat-panel="grown"]'));
-      await expectVisible(grown, 'the panel grows to the whole space');
-      const room = page.viewportSize();
-      const box = await grown.boundingBox();
-      if (room === null || box === null) throw new Refused('the grown panel has a size to measure');
-      if (box.width < room.width * 0.7 || box.height < room.height * 0.7)
-        throw new Refused(
-          `grown, it takes the whole space — it is ${Math.round(box.width)}×${Math.round(box.height)} of ${room.width}×${room.height}`,
-        );
       await settled(page);
-      await photograph(page, path.join(OUT, `chat-grown-${await themeOf(page)}.png`), { fullPage: true });
+      await photograph(page, path.join(OUT, `chat-open-${await themeOf(page)}.png`), { fullPage: true });
 
-      await panel.getByRole('link', { name: 'Open as a page' }).click();
+      await page.locator('[data-menu-button]').click();
+      await expectRail(page, 'expanded', 'the menu button brings the rail back beside her sheet');
+      await expectDocked(page);
+      if ((await railCookie(page)) !== cookie) throw new Refused('asked back, the rail writes no sidebar_state: it was open already');
+      await expectBarWhole(page, 'beside her sheet and the rail brought back the top bar holds whole');
+      await expectStripWhole(page, "beside her sheet at 1280 and the rail brought back, the Overview's strip reads whole");
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-rail-back-${await themeOf(page)}.png`), { fullPage: true });
+
+      await panel.getByRole('button', { name: 'Close' }).click();
+      await expectCount(chatPanelOf(page), 0, 'its Close closes her sheet');
+      await expectRail(page, 'expanded', 'and the rail stands as the person keeps it');
+      if ((await railCookie(page)) !== cookie) throw new Refused('closing her sheet writes no sidebar_state');
+      await face.click();
+      await expectVisible(chatPanelOf(page), 'her face opens her sheet again');
+      await expectRail(page, 'collapsed', 'and the rail folds for it again: the ask was forgotten when the sheet closed');
+      await face.click();
+      await expectCount(chatPanelOf(page), 0, 'pressed again, her face closes her sheet');
+      await expectRail(page, 'expanded', 'and the rail comes back as it was');
+
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-wide-closed-${await themeOf(page)}.png`), { fullPage: true });
+      await openChat(page);
+      await expectDocked(page);
+      await expectRail(page, 'expanded', 'at 1600 the open rail stays open beside her sheet');
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-wide-${await themeOf(page)}.png`), { fullPage: true });
+      await page.locator('[data-menu-button]').click();
+      await expectRail(page, 'collapsed', 'at 1600 the menu button folds the rail as the person keeps it');
+      await expectDocked(page);
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-wide-folded-${await themeOf(page)}.png`), { fullPage: true });
+      await page.locator('[data-menu-button]').click();
+      await expectRail(page, 'expanded', 'and brings it back');
+      await chatPanelOf(page).getByRole('button', { name: 'Close' }).click();
+      await expectCount(chatPanelOf(page), 0, 'its Close closes her sheet at 1600 too');
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      const top = page.locator('[data-frame-header]').locator('[data-nemia-face-button]');
+      await expectVisible(top, 'on a narrow screen her face is in the top bar, the rail being a drawer');
+      await top.click();
+      await expectVisible(page.locator('[data-slot="side-sheet-overlay"]'), 'and opens the kit’s modal sheet over the page');
+      await expectVisible(page.getByRole('dialog', { name: "Nemia's chat" }), 'a dialog named for her chat');
+      await expectSheetIn(page);
+      await expectPanelHeld(page);
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-narrow-${await themeOf(page)}.png`));
+      await chatPanelOf(page).getByRole('button', { name: 'Close' }).click();
+      await expectCount(page.locator('[data-slot="side-sheet-overlay"]'), 0, 'its Close shuts the modal sheet');
+      if (was) await page.setViewportSize(was);
+
+      const again = await openChat(page);
+      await again.getByRole('link', { name: 'Open as a page' }).click();
       await page.waitForURL((url) => url.pathname === '/chat', { timeout: WAIT_MS });
       await idle(page);
       await expectVisible(page.locator('[data-chat-page] [data-chat-panel="page"]'), 'the same panel, as a page of its own');
-      await expectCount(dockOf(page), 0, 'and her face is not docked over it: the page is the panel');
+      await expectVisible(face.and(page.locator('[aria-current="page"]')), 'her face in the rail says the page is hers');
+      await expectSheetShows(page, 'none', 'and draws no sheet beside it: the page is the panel');
+      const gauges = await gaugesOf(page);
+      await expectSheetShows(page, 'bar', 'on her own page a bar still opens in the sheet');
+      await expectVisible(page.locator('[data-chat-page] [data-chat-panel="page"]'), 'beside her page, which stays');
+      await gauges.getByRole('button', { name: 'Close' }).click();
+      await expectSheetShows(page, 'none', 'and closes, leaving her page alone');
       await expectCount(page.locator('[data-chat-panel] button[aria-label="Close"]'), 0, 'a page closes on nothing, being a page');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-page-${await themeOf(page)}.png`), { fullPage: true });
+      await railPlace(page, 'Runs').click();
+      await page.waitForURL((url) => url.pathname !== '/chat', { timeout: WAIT_MS });
+      await idle(page);
+      await expectCount(chatPanelOf(page), 0, 'left for another page, her sheet is closed: Open as a page closed it');
     } finally {
+      if (was) await page.setViewportSize(was);
       back();
     }
     await page.goto(new URL('/', page.url()).href, { waitUntil: 'load' });
     await idle(page);
-    await expectVisible(
-      dockOf(page).locator('[data-cue]', { hasText: 'Down' }),
-      'taken back, she has no session, and a Down cue stands beside her face',
-    );
+    await expectCues(page, (words) => words.includes('Down'), 'taken back, she has no session, and a Down cue is said at her face');
+    await page.mouse.move(640, 400);
   },
 } satisfies PageSpec;

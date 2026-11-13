@@ -33,8 +33,8 @@ async function says(page: Page): Promise<void> {
 }
 
 /**
- * Pressed, the button opens the machine's gauges in the floating bar — the daemon, the feed, what is at work as the api's runs make it,
- * the quota and the version the api answers — the queue lane giving its room to the floor; pressed again it closes them.
+ * Pressed, the button opens the machine's gauges in the frame's side sheet — the daemon, the feed, what is at work as the api's runs make
+ * it, the quota and the version the api answers — the queue lane giving its room to the floor; pressed again it closes them.
  */
 async function opens(page: Page): Promise<void> {
   await gaugesButtonOf(page).click();
@@ -68,8 +68,8 @@ async function opens(page: Page): Promise<void> {
 export default {
   /**
    * The top bar's gauges button, on the Factory: its dot in the daemon's tone, a money mark while the quota nears its limit, its name
-   * saying both; it opens the machine's gauges in the floating bar, which hold what the bottom bar held, and closes them. The pause is its
-   * own page's (`480-pause.ts`).
+   * saying both; it opens the machine's gauges in the frame's side sheet, which hold what the bottom bar held, and closes them. The pause
+   * is its own page's (`480-pause.ts`).
    */
   name: 'gauges-button',
   route: '/factories/default',

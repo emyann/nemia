@@ -45,7 +45,9 @@ import { listRuns, markCancelled, runRecord } from '../src/record/record.store.t
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told } from './typed.ts';
+import { listedRow, stepRow, told } from './typed.ts';
+import { shownNote, shownStatus, type Listing, type RunsListed } from '../src/list/list.ts';
+import { waitAdvice } from '../src/wait/wait.ts';
 
 const ROOT = scratch('wf-waiting-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -187,6 +189,17 @@ const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<s
   }
   return out.join('\n').split('\n');
 };
+/** `nemia ls <id>`: what it answers (`RunsListed`), run `id`'s row in it, and its listing (`listedRow`). */
+const listedOf = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+  const listed = (await stage.main(['ls', id])) as RunsListed;
+  const listing = listedRow(listed, id);
+  return { run: listed.runs.find((r) => r.run.id === id)!.run, listing };
+};
+/** Step `name`'s row as `nemia ls` words it: its word, its cost, its branch and its note. */
+const wordsOf = (listing: Listing, name: string) => {
+  const row = stepRow(listing, name);
+  return [shownStatus(row), row.cost, row.branch, shownNote(row)];
+};
 /** Refused by kind and exit 2, its message naming each of `facts`. */
 const refusedNaming =
   (tag: string, ...facts: string[]) =>
@@ -273,11 +286,8 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
   await s.test('`nemia ls` says D waits on B and C, and the tick does the waiting: a is filed, and nothing of b, c or d', async () => {
     await aPass();
     assert.deepEqual(await statuses(ids.d), [`waiting on ${ids.b}, ${ids.c}`, 'pending']);
-    const ls = await printedBy(t, () => stage.main(['ls', ids.d]));
-    assert.ok(
-      ls.some((l) => /^ {3}implement +/.test(l) && l.trim().endsWith(`waiting on ${ids.b}, ${ids.c}`)),
-      ls.join('\n'),
-    );
+    const { listing } = await listedOf(ids.d);
+    assert.deepEqual(wordsOf(listing, 'implement'), [`waiting on ${ids.b}, ${ids.c}`, undefined, null, undefined]);
     assert.deepEqual((await tick(ids.a)).filed, ['implement']);
     assert.doesNotMatch(briefOf(`${ids.a}-implement`), /## From run/, 'a run without `after` is handed none');
     for (const card of ['b', 'c', 'd']) assert.deepEqual((await tick(ids[card])).filed, [], `${card} waits`);
@@ -434,13 +444,13 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       assert.equal((await decided(p.run.id)).kind, 'cancelled');
       assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings], 'and the gate says what it says');
 
-      const ls = (await printedBy(t, () => stage.main(['ls', child.id]))).join('\n');
-      assert.match(ls, new RegExp(`^ {3}implement +waiting on ${p.run.id} \\(cancelled\\) *$`, 'm'));
-      assert.match(ls, /^ {3}review +pending *$/m);
-      const onYou = ls.split('\n').find((l) => l.includes('→ waiting on you: '));
+      const ls = await listedOf(child.id);
+      assert.deepEqual(wordsOf(ls.listing, 'implement'), [`waiting on ${p.run.id} (cancelled)`, undefined, null, undefined]);
+      assert.deepEqual(wordsOf(ls.listing, 'review'), ['pending', undefined, null, undefined]);
+      assert.deepEqual(ls.listing.waiting, [{ run: p.run.id, cancelledAt: at }], 'what waits on you: the parent cancelled');
       namesFor(
         '`nemia ls` says how to resolve it',
-        onYou,
+        waitAdvice(ls.run, ls.listing.waiting),
         `${p.run.id} was cancelled at ${at}`,
         `nemia cancel ${child.id}`,
         `--after ${p.run.id}`,

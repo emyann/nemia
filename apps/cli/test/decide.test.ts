@@ -222,3 +222,50 @@ test('the decision of a run to decide is said in its order: over budget, touched
     `${JSON.stringify(order)}\n${lines.join('\n')}`,
   );
 });
+
+test('the questions a step waiting on you asks are said after the collisions and before the commands, numbered and lettered as --answer names them', () => {
+  const d = DECISIONS['r-1'] as Parameters<typeof decisionLines>[1] & { commands: unknown[] };
+  const option = (letter: string, label: string, meaning: string, recommended = false) => ({ letter, label, meaning, recommended });
+  const lines = decisionLines('r-1', {
+    ...d,
+    questions: [
+      {
+        step: 'plan',
+        questions: [
+          {
+            number: 1,
+            field: 'open',
+            title: 'How is the card cut?',
+            body: 'It is big.',
+            options: [option('a', 'small', 'The shape first.', true), option('b', 'whole', 'All of it.')],
+            multiple: false,
+          },
+          {
+            number: 2,
+            field: 'open',
+            title: 'Where do the answers go?',
+            body: '',
+            options: [option('a', 'retry', 'Into the next try.'), option('b', 'gate', '')],
+            multiple: true,
+          },
+        ],
+      },
+    ],
+  });
+  const from = lines.indexOf('  plan asks:');
+  assert.deepEqual(lines.slice(from, from + 11), [
+    '  plan asks:',
+    '  open:',
+    '    1. How is the card cut?',
+    '       It is big.',
+    '       a  small — The shape first.  (recommended)',
+    '       b  whole — All of it.',
+    '       choose one, or answer in your own words',
+    '    2. Where do the answers go?',
+    '       a  retry — Into the next try.',
+    '       b  gate',
+    '       choose one or more, or answer in your own words',
+  ]);
+  assert.ok(from > lines.findIndex((line) => line.startsWith('  wf/r-1/plan  ahead')), lines.join('\n'));
+  assert.ok(from < lines.findIndex((line) => line.startsWith('  1. approve:')), lines.join('\n'));
+});

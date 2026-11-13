@@ -12,4 +12,4 @@ export {
   SHAPE_KEY,
 } from './question.ts';
 export type { Answer, Asked, Question, QuestionOption } from './question.ts';
-export { answerForm, answersOr, numberedAnswers, questionLines } from './numbered.ts';
+export { answerForm, answersOr, numberedAnswers, numberedQuestions, questionLines } from './numbered.ts';

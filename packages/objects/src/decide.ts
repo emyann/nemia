@@ -152,12 +152,43 @@ export type BaseHold = typeof BaseHold.Type;
 export const RunSlot = Schema.Struct({ inFlight: Schema.Finite, cap: Schema.Finite }).annotate({ identifier: 'RunSlot' });
 export type RunSlot = typeof RunSlot.Type;
 
+/** One option of a question a step asks: the letter `nemia decide` prints it by, its label, which an answer chooses, and what it means. */
+export const DecisionOption = Schema.Struct({
+  letter: Schema.String,
+  label: Schema.String,
+  meaning: Schema.String,
+  recommended: Schema.Boolean,
+}).annotate({ identifier: 'DecisionOption' });
+export type DecisionOption = typeof DecisionOption.Type;
+
+/**
+ * One question a step asks, as an answer names it back: its number among the step's questions as `nemia decide` prints them (1, 2… across
+ * the question fields of its output, in their order), the field it was asked under, its title, which an answer names word for word, its
+ * body, its options, and whether several may be chosen together (`multiple`).
+ */
+export const DecisionQuestion = Schema.Struct({
+  number: Schema.Finite,
+  field: Schema.String,
+  title: Schema.String,
+  body: Schema.String,
+  options: List(DecisionOption),
+  multiple: Schema.Boolean,
+}).annotate({ identifier: 'DecisionQuestion' });
+export type DecisionQuestion = typeof DecisionQuestion.Type;
+
+/** The questions a step waiting on a person asks now, in its current closeout: what its approval or its next try answers. */
+export const StepQuestions = Schema.Struct({ step: Schema.String, questions: List(DecisionQuestion) }).annotate({
+  identifier: 'StepQuestions',
+});
+export type StepQuestions = typeof StepQuestions.Type;
+
 /**
  * What there is to decide about a run: where each result branch stands, what each branch read touched, the lesson, the check-affecting
  * diffs, what each filed step consumed and their total, the run's cost and OVER BUDGET line (each the package's words without a screen's
  * label), the commands, the run whose ending holds the base this run's ending waits on (`baseHeldBy`), what the finished run awaits
  * (`direct` for one that worked on its base branch itself; null for a run still running with a step waiting on you), and the collisions
- * read at an ending's decision.
+ * read at an ending's decision; and the questions each step waiting on you asks now (`questions`, a step that asks none left out, and
+ * absent where none asks or from a decision read before them), which `answers` names back by title and label.
  */
 export const Decidable = Schema.Struct({
   standings: List(Standing),
@@ -172,6 +203,7 @@ export const Decidable = Schema.Struct({
   baseHeldBy: Schema.optionalKey(BaseHold),
   awaiting: Schema.NullOr(Schema.Struct({ branches: Strings, direct: Schema.Boolean })),
   collisions: Schema.NullOr(Collisions),
+  questions: Schema.optionalKey(List(StepQuestions)),
 }).annotate({ identifier: 'Decidable' });
 export type Decidable = typeof Decidable.Type;
 

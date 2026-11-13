@@ -183,17 +183,31 @@ function inputOf(endpoint: EndpointRead, name: string): Pick<PortTool, 'inputSch
   };
 }
 
+/** Each key of `input` whose schema says what it takes (its JSON Schema `description`, as `objects` annotates it), with that. */
+const keysSaid = (input: ToolInput): string[] =>
+  Object.entries(input.properties).flatMap(([key, schema]) =>
+    typeof schema.description === 'string' && schema.description.trim() ? [`${key}: ${schema.description}`] : [],
+  );
+
 /**
- * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then how the port answers it — a `Table` as its
- * lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives none.
+ * A tool's description: its verb's help, how the CLI says it, and the endpoint it calls; then what each key of its input says it takes
+ * where its schema says so (`keysSaid`), since the help is the command line's and its forms are not the input's; then how the port answers
+ * it — a `Table` as its lines, a page of `PORT_PAGE` where a call gives no `limit`, and each default its link sends where the call gives
+ * none.
  */
-const describe = (verb: PortVerb, method: string, path: string, how: Pick<PortTool, 'table' | 'defaults' | 'queryKeys'>): string => {
+const describe = (
+  verb: PortVerb,
+  method: string,
+  path: string,
+  how: Pick<PortTool, 'table' | 'defaults' | 'queryKeys' | 'inputSchema'>,
+): string => {
   const usage = `nemia ${[verb.name, verb.usage].filter(Boolean).join(' ')}`;
   return [
     ...verb.help,
     '',
     usage,
     `${method} ${path}`,
+    ...keysSaid(how.inputSchema),
     ...(how.table ? [`Answers a line per item, as \`${verb.name} -o wide\` prints them.`] : []),
     ...(how.queryKeys.includes('limit')
       ? [`Answers ${PORT_PAGE} at most unless limit is given; a last line or metadata.continue names the token for the next page.`]
@@ -234,6 +248,7 @@ export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[]
         table: [...endpoint.success].some(printsTable),
         defaults: defaultsOf(link.tool, link.query, input.queryKeys),
         queryKeys: input.queryKeys,
+        inputSchema: input.inputSchema,
       };
       return {
         name: link.tool,

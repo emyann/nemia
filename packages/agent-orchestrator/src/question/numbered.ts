@@ -4,6 +4,7 @@
  * (`questionLines`), and `--answer 1=a` names them back, resolved to the board's own answers, by question title and option label
  * (`numberedAnswers`), before the package's `answerRefusal` and `answerText` read them. Pure.
  */
+import type { DecisionQuestion } from 'objects';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { askedQuestions, recommendedOf, type Answer, type Asked, type Question } from './question.ts';
@@ -12,26 +13,47 @@ import { askedQuestions, recommendedOf, type Answer, type Asked, type Question }
 export const letterOf = (index: number): string =>
   index < 26 ? String.fromCharCode(97 + index) : `${letterOf(Math.floor(index / 26) - 1)}${letterOf(index % 26)}`;
 
+/**
+ * What a closeout asks, as data an answer names back: each question numbered on across the fields from 1, under the field it was asked in,
+ * each option lettered and marked where it is recommended. What the run's decision carries (`StepQuestions`), and what `questionLines`
+ * prints.
+ */
+export function numberedQuestions(asked: readonly Asked[]): DecisionQuestion[] {
+  let n = 0;
+  return asked.flatMap(({ field, questions }) =>
+    questions.map((q) => ({
+      number: ++n,
+      field,
+      title: q.title,
+      body: q.body,
+      options: q.options.map((o, i) => ({
+        letter: letterOf(i),
+        label: o.label,
+        meaning: o.meaning,
+        recommended: recommendedOf(q).includes(o.label),
+      })),
+      multiple: q.multiple,
+    })),
+  );
+}
+
 /** One question as `nemia decide` prints it: its number and title, its body, each option lettered, each recommended one marked, and how. */
-const questionBlock = (q: Question, n: number): string[] => [
-  `  ${n}. ${q.title}`,
+const questionBlock = (q: DecisionQuestion): string[] => [
+  `  ${q.number}. ${q.title}`,
   ...(q.body.trim()
     ? q.body
         .trim()
         .split('\n')
         .map((line) => `     ${line}`)
     : []),
-  ...q.options.map(
-    (o, i) =>
-      `     ${letterOf(i)}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${recommendedOf(q).includes(o.label) ? '  (recommended)' : ''}`,
-  ),
+  ...q.options.map((o) => `     ${o.letter}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.recommended ? '  (recommended)' : ''}`),
   `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
 ];
 
 /** What a closeout asks, as `nemia decide` prints it: each field's name, then its questions, numbered on across the fields. */
 export function questionLines(asked: readonly Asked[]): string[] {
-  let n = 0;
-  return asked.flatMap(({ field, questions }) => [`${field}:`, ...questions.flatMap((q) => questionBlock(q, ++n))]);
+  const numbered = numberedQuestions(asked);
+  return asked.flatMap(({ field }) => [`${field}:`, ...numbered.filter((q) => q.field === field).flatMap(questionBlock)]);
 }
 
 /** The `--answer` a line that offers the verb shows, one for each question asked: `--answer 1=<letter> --answer 2=<letter>`. */

@@ -292,8 +292,8 @@ function sizedEnv(
       ? []
       : [['WF_MEMORY_REQUEST', `${sized.memoryRequestMiB}Mi`] as [string, string]]),
   ];
-  const ceiling = memory ? sessionsCeiling(at, host, machine, sized.memoryReservedMiB, given) : null;
-  if (ceiling !== null) env.push(...ceiling.env);
+  const ceiling = sessionsCeiling(at, host, machine, sized.memoryReservedMiB, given);
+  env.push(...ceiling.env);
   const said = env.map(([k, v]) => `${k}=${v}`).join(', ');
   const kept = given.has('WF_MEMORY_RESERVED')
     ? 'the floor as --env gives it (WF_MEMORY_RESERVED)'
@@ -307,9 +307,9 @@ function sizedEnv(
             'launchd holds no per-session memory limit and no slice: no WF_MEMORY_LIMIT, WF_MEMORY_REQUEST or WF_CGROUP_PARENT is written, and a session on macOS runs unbounded',
           ]
         : []),
-      ...(ceiling?.lines ?? []),
+      ...ceiling.lines,
     ],
-    slice: ceiling?.slice ?? null,
+    slice: ceiling.slice,
   };
 }
 
@@ -321,7 +321,7 @@ type SliceFile = { readonly file: string; readonly text: string };
  * `--env` gives it (read by its own reader, whose refusal is let through) else the default (`reservedMiB`), in bytes. Where `--env`
  * gives no `WF_CGROUP_PARENT`, the service's own slice (`sessionsSliceOf`) at that ceiling, and `WF_CGROUP_PARENT` pointed at it;
  * where it gives one, that slice is the person's: no file, and a line naming how to give it its ceiling. Refused (`Invalid`): a floor
- * at or above the machine's memory, which leaves the sessions nothing.
+ * at or above the machine's memory, which leaves the sessions nothing. None on launchd, which holds no cgroup.
  */
 function sessionsCeiling(
   at: Placed,
@@ -330,6 +330,7 @@ function sessionsCeiling(
   reservedMiB: number,
   given: ReadonlyMap<string, string>,
 ): { env: [string, string][]; lines: string[]; slice: SliceFile | null } {
+  if (at.system !== 'systemd') return { env: [], lines: [], slice: null };
   const totalBytes = machine.memoryMiB * 2 ** 20;
   const floor = memoryReserved({ WF_MEMORY_RESERVED: given.get('WF_MEMORY_RESERVED') });
   const floorBytes = (floor === undefined ? undefined : memoryBytesOf(floor)) ?? reservedMiB * 2 ** 20;

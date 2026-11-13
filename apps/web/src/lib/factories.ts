@@ -140,6 +140,10 @@ export const factoriesShown = <T extends FactoryPlace>(factories: readonly T[], 
   return named.length || !held ? named : [...factories];
 };
 
+/** Whether a factory holds a run, by the counts of its light answer: the default factory is shown only while it does (`factoriesShown`). */
+export const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: number; finished: number } }): boolean =>
+  counts.waiting + counts.inFlight + counts.finished > 0;
+
 /**
  * The blocks of the machine, one for each factory shown (`factoriesShown`), the default one while `held` (its light answer counts a run),
  * each counted off its own light answer (`openBlockOf`) in `opens`, by its name. A factory whose answer is not in `opens` has no block yet.

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient } from '@tanstack/react-query';
-import { finishedTodayQuery, type FinishedRun } from '../src/lib/api/runs.ts';
+import { finishedTodayQuery, readsOnToday, type FinishedRun } from '../src/lib/api/runs.ts';
 import { detail, runList, runObject } from './run-fixtures.ts';
 
 /** The day the strip counts, from its midnight. */
@@ -61,5 +61,13 @@ test('finishedTodayQuery: reads the finished pages until one reaches into the da
     const asked = answering(tt, { '': runList([], { continue: 'again' }), again: runList([], { continue: 'again' }) });
     assert.equal((await readToday()).length, 0);
     assert.equal(asked.length, 1);
+  });
+  await t.test('a run that finished at the very instant the day began is today\'s: kept, and the read goes on past it', async (tt) => {
+    assert.equal(readsOnToday({ finishedMs: [DAY_START], next: true }, DAY_START), true);
+    answering(tt, { '': runList([finishedRun('r-1', new Date(DAY_START).toISOString())]) });
+    assert.deepEqual(
+      (await readToday()).map((run) => run.id),
+      ['r-1'],
+    );
   });
 });

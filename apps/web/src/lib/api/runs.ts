@@ -1,8 +1,8 @@
 /**
  * The runs as the board reads them off the RunList (`runs.listAll`, `runs.list`), each made the board's one view of a run (`runViewOf`)
  * or said unjudged (`UnjudgedRun`): the light answer of the runs not finished (`openRunsQuery`), the finished runs a page at a time
- * (`finishedRunsQuery`, `finishedPagesQuery`) or those finished today (`finishedTodayQuery`), and a label's runs whole (`runsSelectedQuery`);
- * and a run's named actions, each in the run's namespace. No page reads every run (`test/structure.test.ts`).
+ * (`finishedRunsQuery`, `finishedPagesQuery`) or those finished today (`finishedTodayQuery`), and a label's runs whole
+ * (`runsSelectedQuery`); and a run's named actions, each in the run's namespace. No page reads every run (`test/structure.test.ts`).
  */
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import type { Run, RunHeld, RunList, RunRemoved, RunUnjudged } from 'objects';
@@ -27,13 +27,6 @@ export const rowsOf = (list: RunList): RunRow[] => [...list.items.map(runViewOf)
 
 /** Every run of `query`, the RunList whole: a plain list, no page and no state, so no run's frame is measured. */
 const everyRun = (query: RunListQuery = {}): Promise<RunRow[]> => runs.listAll(query).then(rowsOf);
-
-/** TEMPORARY: every run, until its last reader moves off it; deleted in this run. */
-export const runsQuery = queryOptions({
-  queryKey: ['runs'],
-  queryFn: () => everyRun(),
-  refetchInterval: () => pace(5_000),
-});
 
 /**
  * The runs `selector` takes by their labels (`GET /api/runs?labelSelector=`), every page of them, under `['runs']`: the labels page's,
@@ -202,7 +195,7 @@ export const readsOnToday: ReadsOnToday = (page: FinishedPageRead, dayStart: num
   page.next && page.finishedMs.length > 0 && page.finishedMs.every((ms) => ms >= dayStart);
 
 /** How many finished runs a page of a picker, or of the strip's read of today, holds. */
-export const PICKED_SIZE = 50;
+const PICKED_SIZE = 50;
 
 /** A page of the finished runs as `readsOnToday` reads it. */
 const pageRead = (page: FinishedPage): FinishedPageRead => ({

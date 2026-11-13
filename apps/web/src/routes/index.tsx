@@ -8,7 +8,7 @@ import { daemonQuery } from '@/lib/api/daemon';
 import { factoriesQuery, type Factory } from '@/lib/api/factories';
 import { quotaQuery } from '@/lib/api/quota';
 import { finishedTodayQuery, openRunsQuery } from '@/lib/api/runs';
-import { factorySearch, openBlocks } from '@/lib/factories';
+import { factorySearch, holdsRuns, openBlocks } from '@/lib/factories';
 import { dayStartOf } from '@/lib/strip';
 
 /** The factories whose light answer the blocks read: each the api lists, and the default one, whose answer says whether it is shown. */
@@ -55,8 +55,8 @@ function Factories() {
   const names = answered(factories);
   const answers = useSuspenseQueries({ queries: names.map((name) => openRunsQuery(name)) });
   const opens = new Map(answers.map((answer, i) => [names[i], answer.data] as const));
-  const fallback = opens.get(DEFAULT_NAMESPACE)?.counts;
-  const held = fallback !== undefined && fallback.waiting + fallback.inFlight + fallback.finished > 0;
+  const fallback = opens.get(DEFAULT_NAMESPACE);
+  const held = fallback !== undefined && holdsRuns(fallback);
   return (
     <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines))] flex-col gap-6 pt-5 lg:h-[calc(100svh-var(--frame-top)-var(--frame-lines))]">
       <div className="px-6 max-md:px-3">

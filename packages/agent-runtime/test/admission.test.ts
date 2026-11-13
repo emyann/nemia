@@ -213,7 +213,12 @@ const GI = 2 ** 30;
  * A board of harnesses `a` (pool `claude`) and `checks` under a ceiling of 6, whose machine is what `machine` says on each pass, and
  * which keeps `reserved` off it when given.
  */
-const machineBoard = (reserved: string | undefined, machine: { totalBytes: number; availableBytes: number }, maxConcurrent = 6) => {
+const machineBoard = (
+  reserved: string | undefined,
+  machine: { totalBytes: number; availableBytes: number },
+  maxConcurrent = 6,
+  unschedulable?: () => boolean,
+) => {
   const journal = memoryJournal();
   const sessions = new Map<string, Sighting>();
   const harnesses: Record<string, HarnessConfig> = {
@@ -229,6 +234,7 @@ const machineBoard = (reserved: string | undefined, machine: { totalBytes: numbe
       maxConcurrent,
       ...(reserved ? { reserved: { memory: reserved } } : {}),
       machine: () => ({ ...machine }),
+      ...(unschedulable ? { unschedulable } : {}),
     }),
   );
   return { engine, sessions, journal };
@@ -352,6 +358,26 @@ test('a wait is journalled only when it changes by a grain: passes on a machine 
   machine.availableBytes = 4 * GI;
   await Effect.runPromise(b.engine.tick());
   assert.equal((await b.journal.read('big')).filter((e) => e.kind === 'waits').length, 2, 'a grain moved: a second');
+});
+
+test('a pass that judges nothing takes a recorded wait off: while the engine is unschedulable, a task waiting for memory says no reason it no longer has', async () => {
+  const machine = { totalBytes: 16 * GI, availableBytes: 3 * GI };
+  let paused = false;
+  const b = machineBoard('1Gi', machine, 6, () => paused);
+  await fileLimited(b.journal, 'big', 1, 'a', '4Gi');
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view('big'))).waits?.for, 'memory', 'judged: it waits for memory');
+  paused = true;
+  const pass = await Effect.runPromise(b.engine.tick());
+  assert.equal(pass.views.find((v) => v.id === 'big')?.waits, undefined, 'the pass judged nothing: its view says no wait');
+  assert.equal((await Effect.runPromise(b.engine.view('big'))).waits, undefined, 'nor does the record');
+  assert.equal((await Effect.runPromise(b.engine.view('big'))).admission, 'queued', 'still queued');
+  const cleared = (await b.journal.read('big')).filter((e) => e.kind === 'waits').length;
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await b.journal.read('big')).filter((e) => e.kind === 'waits').length, cleared, 'taken off once, never again while paused');
+  paused = false;
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view('big'))).waits?.for, 'memory', 'judged again: the wait is back');
 });
 
 test('the memory gate under a memo that verifies every task it skips: a pass that journals a wait and an admission skips no change', async () => {

@@ -266,7 +266,7 @@ export const StoredEventSchema = Schema.Union([
   Input,
   event('closed', {}),
   event('admitted', {}),
-  event('waits', { wait: AdmissionWaitSchema }),
+  event('waits', { wait: Schema.optional(AdmissionWaitSchema) }),
   event('settled', {
     outcome: Schema.Literals(['succeeded', 'failed', 'stopped']),
     note: Schema.optional(Schema.String),

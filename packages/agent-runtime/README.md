@@ -1211,7 +1211,8 @@ that is not a function.
 **A queued task says why it waits.** A pass journals a `waits` entry for a queued task it did not admit, as a Pod's `PodScheduled`
 condition says `Unschedulable`: `{ for: 'slot', pool, ceiling }` where its pool is at the ceiling, `{ for: 'memory', needBytes,
 roomBytes }` where the machine had no room (`AdmissionWait`). Its view carries it as `waits` while the task is queued, and `admitted`
-and `starting` clear it. It is written only when it changes, the room compared in grains of 256 MiB (`ROOM_STEP`), so a busy
+and `starting` clear it, as does a `waits` entry with no wait, which a pass that judged nothing (the engine unschedulable, or no
+ceiling) writes for a task whose record still holds one, so a paused engine tells no reason it no longer gives. It is written only when it changes, the room compared in grains of 256 MiB (`ROOM_STEP`), so a busy
 machine writes a line per grain its memory moves, never one per pass. A status for a person: neither admission nor `decide` reads it,
 and the next pass reads the machine again.
 

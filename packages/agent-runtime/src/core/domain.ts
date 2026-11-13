@@ -542,7 +542,7 @@ export type Event =
   | ({ kind: 'input' } & Input)
   | { kind: 'closed'; at: string }
   | { kind: 'admitted'; at: string }
-  | { kind: 'waits'; at: string; wait: AdmissionWait }
+  | { kind: 'waits'; at: string; wait?: AdmissionWait }
   | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
 
 /**
@@ -765,6 +765,12 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
   if (e.resources !== undefined) s.resources = e.resources;
 }
 
+/** A `waits` entry into `s`: the wait it says, or none where it says none (a pass that judged nothing took it off). */
+function waitInto(s: State, wait: AdmissionWait | undefined): void {
+  if (wait === undefined) delete s.waits;
+  else s.waits = wait;
+}
+
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
@@ -788,7 +794,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         delete s.waits;
         break;
       case 'waits':
-        s.waits = e.wait;
+        waitInto(s, e.wait);
         break;
       case 'starting':
         delete s.waits;

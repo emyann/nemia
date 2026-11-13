@@ -662,7 +662,9 @@ const unwaiting = ({ waits: _, ...view }: TaskView): TaskView => view;
  * Admits the queued tasks the engine's ceiling and the machine's memory have room for (`toAdmit`), off the views the pass built,
  * and journals `admitted` for each: the next pass starts them. For each other queued task it judged, it journals why it waits
  * (`waits`) where that differs from the wait on record (`sameWait`), so the record says it to a reader that never saw this pass.
- * Returns the views with those marked admitted and the rest carrying their wait as on record, as `view` reads them after the pass.
+ * A queued task the pass did not judge — the engine unschedulable, or no ceiling — whose record still holds a wait has it taken off
+ * (`waits` with none), so no reader is told a reason the pass no longer gave. Returns the views with those marked admitted and the
+ * rest carrying their wait as on record, as `view` reads them after the pass.
  */
 const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskView[]) {
   const { admit, waits } = toAdmit(views, yield* Admission);
@@ -676,8 +678,19 @@ const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskVi
     yield* journal.append(TaskId.read(id), { kind: 'waits', at: new Date().toISOString(), wait });
     recorded.set(id, wait);
   }
+  const judged = new Set([...ids, ...waits.map((w) => w.id)]);
+  const unjudged = new Set<string>();
+  for (const v of views) {
+    if (v.admission !== 'queued' || v.waits === undefined || judged.has(v.id)) continue;
+    yield* journal.append(TaskId.read(v.id), { kind: 'waits', at: new Date().toISOString() });
+    unjudged.add(v.id);
+  }
   return views.map((v): TaskView => {
     if (ids.has(v.id)) return { ...unwaiting(v), admission: 'admitted' };
+    if (unjudged.has(v.id)) {
+      const { waits: _, ...state } = v.state;
+      return { ...unwaiting(v), state };
+    }
     const wait = recorded.get(v.id);
     return wait ? { ...v, state: { ...v.state, waits: wait }, waits: wait } : v;
   });

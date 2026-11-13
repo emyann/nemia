@@ -166,9 +166,11 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   spawned: (e) => (e.error ? `  but the call failed: ${firstLine(e.error).slice(0, 160)}` : ''),
   said: (e) => `  to attempt ${e.attempt}: ${firstLine(e.text.trim()).slice(0, 160)}`,
   waits: ({ wait }) =>
-    wait.for === 'slot'
-      ? `  for a slot of ${wait.pool}: ${wait.ceiling} at work (maxConcurrent)`
-      : `  for memory: needs ${gib(wait.needBytes)}, ${gib(wait.roomBytes)} free`,
+    wait === undefined
+      ? '  no longer judged: admission is paused or has no ceiling'
+      : wait.for === 'slot'
+        ? `  for a slot of ${wait.pool}: ${wait.ceiling} at work (maxConcurrent)`
+        : `  for memory: needs ${gib(wait.needBytes)}, ${gib(wait.roomBytes)} free`,
   input: (e) =>
     `  ${firstLine(e.text.trim()).slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
 };

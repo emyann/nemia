@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { scratch } from 'test-kit/scratch';
 import { MutationObserver, QueryClient, QueryObserver, type QueryKey } from '@tanstack/react-query';
 import { finishedRunsQuery, openRunsQuery } from '../src/lib/api/runs.ts';
 import { runsMoved } from '../src/lib/runWrites.ts';
@@ -170,15 +171,18 @@ test('the writes that change a run, in src: none invalidates the whole list by h
       assert.ok(text.includes('runsMoved('), `${file} calls runsMoved`);
       assert.equal(byHand(text), false, `${file} invalidates ['runs'] by hand: call runsMoved, which reads the frame's answer too`);
     }
-    assert.deepEqual(
-      byHandIn(SRC),
-      [{ file: 'lib/api/runs.ts', times: 1 }],
-      "only the query's own definition spells the key of the whole list: a write calls runsMoved",
-    );
+    assert.deepEqual(byHandIn(SRC), [], 'no file spells the key of the whole list, which no page reads: a write calls runsMoved');
   });
   await t.test('REFUSED: the scan reads every folder of the source, not the components alone', () => {
     assert.deepEqual(byHandIn(COMPONENTS), [], 'no component spells the key');
-    assert.equal(byHandIn(path.join(SRC, 'lib')).length, 1, "the scan is not deaf: it finds the query's own definition under lib");
+    const planted = scratch('web-run-writes-');
+    fs.mkdirSync(path.join(planted, 'lib', 'api'), { recursive: true });
+    fs.writeFileSync(path.join(planted, 'lib', 'api', 'runs.ts'), "export const q = { queryKey: ['runs'] };\n");
+    assert.deepEqual(
+      byHandIn(planted),
+      [{ file: 'lib/api/runs.ts', times: 1 }],
+      'the scan is not deaf: it finds the key in a folder under lib',
+    );
   });
   await t.test(
     "REFUSED: a hand-written invalidation of the whole list is found, across a line break too; a run's own record is not",

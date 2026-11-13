@@ -7,7 +7,18 @@ description: "Review a change in this repository as a second engineer would: aga
 
 1. **Know what was asked**: the spec handed to you, its goal and constraints. Review the change against that, not against a change you
    would have made.
-2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it.
+2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it,
+   in the first round; from the second, what changed since. Your closeout says what the round read, in `read`: `head`, the commit
+   you reviewed (`git rev-parse HEAD`); `first`, the commit the first round reviewed; `files`, every file of the change you read, by
+   path from the workspace root; and `rules`, each rule you checked it against, by the file that states it and its words.
+   - **The first round reads everything**: the whole change, and lists every finding it can stand on, however small, before it
+     signs off, since a finding a later round makes about code that was there from the start costs a round of its own. Its
+     `read.first` is its own `head`, and each finding's `missed` is false.
+   - **A later round** reads your last round's `closeout.json` in your own files folder first, for its `read.head` and
+     `read.first`, and carries `read.first` over unchanged. Read `git diff <last head>..HEAD`, what the engineer changed since, and
+     check each earlier finding against its reply (step 7). A new finding about code that was there, unchanged, at `read.first` is
+     what the first round missed: mark it `missed` true, so the person sees it; one about code changed since is `missed` false.
+     Where that `closeout.json` is not there, say so at the top of your summary, and take `first` from the replies and `git log`.
    Read a file with Read, list a folder with Glob and search with Grep; never `grep` or a pipe in
    Bash. `cat`, `head`, `tail`, `wc`, `cut` and `ls` read a file or a folder inside the workspace, and your fence refuses each one a path outside it; never `sed`, `awk`, `find`, `sort`, `uniq` or `tee`, which can write a file or run a program, nor `wc --files0-from`, which reads the paths a file lists. Otherwise Bash runs only the checks and reads your step names and git's read-only questions, each bare, one per call, and never a write —
    the change (`git diff`, `git log`, `git show`), the workspace (`git status`), a line's author (`git blame`), what git tracks
@@ -54,4 +65,6 @@ description: "Review a change in this repository as a second engineer would: aga
 6. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
 7. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's
-   replies first: a finding answered `won't fix` with a sound reason is closed.
+   replies first: a finding answered `won't fix` with a sound reason is closed. A finding you raised in an earlier round, which the
+   engineer answered, and which you would raise again is not another round: the rounds would repeat. Sign off `blocked`, with
+   `needs` naming each such finding, the engineer's reply, and why it still holds, for a person to settle.

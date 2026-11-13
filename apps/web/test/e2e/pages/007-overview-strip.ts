@@ -1,11 +1,11 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { factoriesAnswered, photograph, themeOf, rowsAnswered } from '../board.ts';
+import { factoriesAnswered, finishedAnswered, openAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { RunList } from 'objects';
 import type { Ceilings } from '../../../src/lib/api/ceilings.ts';
 import type { Daemon } from '../../../src/lib/api/daemon.ts';
-import { FINISHED_SELECTOR, finishedOf } from '../../../src/lib/api/runs.ts';
+import { FINISHED_SELECTOR, finishedOf, type FinishedRun } from '../../../src/lib/api/runs.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { daemonDot } from '../../../src/lib/footer.ts';
 import { dollars } from '../../../src/lib/money.ts';
@@ -45,10 +45,26 @@ const stickerOf = (strip: Locator, label: string): Locator =>
     .locator('span')
     .last();
 
-/** The strip the board's rule gives for the api's own answer, at the page's instant and from the browser's midnight. */
+/** Every finished run of `factory`, or of every factory, read page by page to the last, as the api answers them. */
+async function everyFinished(page: Page, factory?: string): Promise<FinishedRun[]> {
+  const runs: FinishedRun[] = [];
+  let from: string | undefined;
+  do {
+    const answered = await finishedAnswered(page, factory, from);
+    runs.push(...answered.runs);
+    from = answered.continue ?? undefined;
+  } while (from !== undefined);
+  return runs;
+}
+
+/**
+ * The strip the board's rule gives for the api's own answers (the light answer and every finished run, the rule keeping today's), at the
+ * page's instant and from the browser's midnight.
+ */
 async function expected(page: Page, factory?: string) {
-  const [runs, factories, ceilings] = await Promise.all([
-    rowsAnswered(page),
+  const [open, finished, factories, ceilings] = await Promise.all([
+    openAnswered(page, factory),
+    everyFinished(page, factory),
     factoriesAnswered(page),
     answer<Ceilings>(page, '/api/ceilings'),
   ]);
@@ -57,7 +73,7 @@ async function expected(page: Page, factory?: string) {
     day.setHours(0, 0, 0, 0);
     return { now: Date.now(), dayStart: day.getTime() };
   });
-  return { strip: stripOf({ runs, factories, ceilings, now, dayStart, factory }), dayStart };
+  return { strip: stripOf({ open, finished, factories, ceilings, now, dayStart, factory }), dayStart };
 }
 
 /** The factory whose runs name none, read at `?factory=`: it hires no agent, where every factory hires one. */

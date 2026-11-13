@@ -103,9 +103,9 @@ No design runs in quick, so no page outside the repository is handed to the revi
 reviewer's fence refuses, signs the review off `blocked`, which holds the ungated land until a person answers it with `nemia retry
 <run> review --message "<what the page says>"`.
 
-`rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
+`rounds: 2`, where build's review has 5: a card that a review has to send back twice is a card that wanted `build`, and the
 second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia retry <run> review --round` for a third or
-`nemia approve <run> review --message "<why>"` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads
+`nemia approve <run> review --message "<why>"` to take the work as it stands. `budget: 12`, where build's has 24: there is no spec to read, and the review reads
 one step's closeout rather than two. What review tries cost, per workflow, is `nemia stats --workflow
 <workflow> --by step`. A long mechanical diff costs reading, not judgement; a review that runs out on one says so in the run's
 figures, and the budget is a quick card then.

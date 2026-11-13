@@ -1,18 +1,20 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckboxGroup, Dialog, DialogTrigger, Form, Heading, Label as AriaLabel, Popover, Text, TextField } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { putHold, runsQuery } from '../../lib/api/runs.ts';
-import { judged, type RunView } from '../../lib/api/judged.ts';
+import { putHold } from '../../lib/api/runs.ts';
+import type { RunView } from '../../lib/api/judged.ts';
 import { useRunNamespace } from '@/lib/runNamespace';
 import type { RunDetail } from '../../lib/runView';
 import { titleOf } from '../../lib/factory';
 import { holdable, holdCandidates } from '../../lib/hold.ts';
+import { usePickerRuns } from '../../lib/pickerRuns.ts';
 import { cn } from '../../lib/utils';
 import { Refusal } from '../gate/Ask';
+import { ShowOlder } from '../agent/ContextPicker';
 import { runsMoved } from '@/lib/runWrites';
 import { POPOVER } from '../../lib/classes';
 
@@ -39,9 +41,12 @@ export function HoldRun({ run }: { run: RunDetail }) {
   );
 }
 
-/** The runs a hold may wait on, read off the list the Runs page reads (`holdCandidates`), before the form is drawn. */
+/**
+ * The runs a hold may wait on (`holdCandidates`), read before the form is drawn: those not finished, newest created first, then the
+ * finished, newest finished first, a page at a time with Show older for the next (`usePickerRuns`).
+ */
 function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
-  const { data, error } = useQuery(runsQuery);
+  const { open, finished, more, older, reading, error } = usePickerRuns();
   if (error) {
     return (
       <div className="space-y-3">
@@ -54,20 +59,20 @@ function HoldRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
       </div>
     );
   }
-  if (!data)
+  if (reading)
     return (
       <p data-hold-reading className="text-body-small text-muted-foreground">
         Reading the runs to wait on…
       </p>
     );
-  return <HoldForm id={run.id} runs={holdCandidates(run, data.filter(judged))} onClose={onClose} />;
+  return <HoldForm id={run.id} runs={holdCandidates(run, [...open, ...finished])} older={more ? older : null} onClose={onClose} />;
 }
 
 /**
  * The runs to wait on, ticked, the why, and Hold. The run is read again once held, its record and the list each alone (`exact`), as a lift
  * reads them, and the popover closes; a refusal stays in the form until something is changed.
  */
-function HoldForm({ id, runs, onClose }: { id: string; runs: RunView[]; onClose: () => void }) {
+function HoldForm({ id, runs, older, onClose }: { id: string; runs: RunView[]; older: (() => void) | null; onClose: () => void }) {
   const [until, setUntil] = useState<string[]>([]);
   const [why, setWhy] = useState('');
   const queryClient = useQueryClient();
@@ -96,6 +101,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunView[]; onClose:
       <WaitFor
         runs={runs}
         until={until}
+        older={older}
         isDisabled={hold.isPending}
         onChange={(value) => {
           setUntil(value);
@@ -132,22 +138,27 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunView[]; onClose:
   );
 }
 
-/** The runs a hold may wait on, each a checkbox with its title and id, in a list that scrolls; a sentence where there are none. */
+/**
+ * The runs a hold may wait on, each a checkbox with its title and id, in a list that scrolls; and Show older while there are older
+ * finished runs to read (`older`), else a sentence where there are none.
+ */
 function WaitFor({
   runs,
   until,
+  older,
   isDisabled,
   onChange,
 }: {
   runs: RunView[];
   until: string[];
+  older: (() => void) | null;
   isDisabled: boolean;
   onChange: (until: string[]) => void;
 }) {
   return (
     <CheckboxGroup value={until} onChange={onChange} isDisabled={isDisabled} className="space-y-1.5">
       <AriaLabel className="text-body-small font-medium">Wait for</AriaLabel>
-      {runs.length === 0 ? (
+      {runs.length === 0 && older ? null : runs.length === 0 ? (
         <Text slot="description" data-hold-none className="block text-body-small text-muted-foreground">
           No other run of its repository may still land: it is held until you lift it.
         </Text>
@@ -165,6 +176,7 @@ function WaitFor({
           ))}
         </div>
       )}
+      {older && <ShowOlder onPress={older} />}
     </CheckboxGroup>
   );
 }

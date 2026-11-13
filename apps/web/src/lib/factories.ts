@@ -140,12 +140,19 @@ export const factoriesShown = <T extends FactoryPlace>(factories: readonly T[], 
   return named.length || !held ? named : [...factories];
 };
 
-/** The blocks of the machine, one for each factory shown (`factoriesShown`), the default one while a run of `runs` names no factory. */
-export const factoryBlocks = (factories: readonly Factory[], runs: readonly FactoryRun[]): FactoryBlock[] =>
-  factoriesShown(
-    factories,
-    runs.some((run) => run.factory === null),
-  ).map((f) => blockOf(f, runs));
+/** Whether a factory holds a run, by the counts of its light answer: the default factory is shown only while it does (`factoriesShown`). */
+export const holdsRuns = ({ counts }: { counts: { waiting: number; inFlight: number; finished: number } }): boolean =>
+  counts.waiting + counts.inFlight + counts.finished > 0;
+
+/**
+ * The blocks of the machine, one for each factory shown (`factoriesShown`), the default one while `held` (its light answer counts a run),
+ * each counted off its own light answer (`openBlockOf`) in `opens`, by its name. A factory whose answer is not in `opens` has no block yet.
+ */
+export const openBlocks = (factories: readonly Factory[], opens: ReadonlyMap<string, OpenBlock>, held: boolean): FactoryBlock[] =>
+  factoriesShown(factories, held).flatMap((f) => {
+    const open = opens.get(f.name);
+    return open ? [openBlockOf(f, open)] : [];
+  });
 
 /** Why a factory gives a workflow no repository, closed: several and none named, a name none has, a name two share. */
 type WorkflowRepoRefusal = 'unwired' | 'unknown' | 'shared';

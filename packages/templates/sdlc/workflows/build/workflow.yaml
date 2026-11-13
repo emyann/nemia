@@ -2,7 +2,7 @@ apiVersion: nemia.dev/v1alpha1
 kind: Workflow
 metadata:
   name: build
-  description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
+  description: Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora reviews it and sends it back while a finding is worth a round, five at most; Otto lands it, once a person approves the landing. A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 spec:
   needs:
     - name: gh
@@ -45,7 +45,7 @@ spec:
       input:
         - design
       place: git
-      budget: 40
+      budget: 50
       retries: 2
       checkFailurePolicy: { rules: [ { action: FailStep, onExitCodes: { operator: In, values: [78] } } ] }
       check: "node \"${WF_CARRIED_FILES:?nemia check: probe.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/probe.ts\" check && node \"${WF_CARRIED_FILES:?nemia check: parts.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/parts.ts\" check && { ${{ parameters.implementCheck }}; } && if [ \"${{ parameters.github }}\" = true ]; then node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" push --labels \"${{ parameters.pullRequestLabels }}\" && { ${{ parameters.roundCheck }}; } && node \"${WF_CARRIED_FILES:?nemia check: pull-request.ts is read from the frozen carried files of a run, which sets this: run this check in a run}/pull-request.ts\" wait --check \"${{ parameters.ciCheck }}\"; else { ${{ parameters.localCheck }}; }; fi"
@@ -66,9 +66,10 @@ spec:
       input:
         - design
       place: git
-      budget: 16
+      budget: 24
       loop: implement
-      rounds: 3
+      rounds: 5
       tally:
         - findings
         - findings.kind=placement
+        - findings.missed

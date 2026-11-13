@@ -418,3 +418,92 @@ test("quick's land step is told build's land note, rendered with the same values
     assert.equal(stepIn(treeOf(name), 'quick', 'land').body, build, `${name}: quick/land`);
   }
 });
+
+test("build's review loop ships its numbers: five rounds, the review's budget sized to them, implement's too", () => {
+  for (const name of ['set', 'plain']) {
+    const tree = treeOf(name);
+    const review = stepIn(tree, 'build', 'review').front;
+    assert.equal(review.rounds, 5, `${name}: build/review's rounds`);
+    assert.equal(review.budget, 24, `${name}: build/review's budget`);
+    assert.equal(stepIn(tree, 'build', 'implement').front.budget, 50, `${name}: build/implement's budget`);
+  }
+});
+
+/**
+ * What leaves the review loop of `workflow` without a bound: no positive whole `rounds` on its looping step, or a step of the loop
+ * (the step it loops to, and itself) with no `budget`. Empty when the loop stops on its own: at its rounds, and at each step's cap.
+ */
+function unbounded(fronts: Record<string, Record<string, unknown>>): string[] {
+  const missing: string[] = [];
+  for (const [step, front] of Object.entries(fronts)) {
+    if (typeof front.loop !== 'string') continue;
+    if (!(Number.isInteger(front.rounds) && Number(front.rounds) > 0)) missing.push(`${step}: rounds`);
+    for (const inLoop of [front.loop, step]) {
+      const budget = fronts[inLoop]?.budget;
+      if (!(typeof budget === 'number' && budget > 0)) missing.push(`${inLoop}: budget`);
+    }
+  }
+  return missing;
+}
+
+const loopFronts = (tree: string, workflow: string): Record<string, Record<string, unknown>> =>
+  Object.fromEntries(['implement', 'review'].map((step) => [step, stepIn(tree, workflow, step).front]));
+
+test("build's and quick's review loops stop on their own: at review's rounds, and at implement's and review's budgets", () => {
+  for (const workflow of ['build', 'quick']) {
+    const fronts = loopFronts(treeOf('plain'), workflow);
+    assert.equal(fronts.review?.loop, 'implement', `${workflow}/review loops to implement`);
+    assert.deepEqual(unbounded(fronts), [], `${workflow}'s loop is bounded`);
+  }
+});
+
+test('REFUSED: a loop with a step of it that has no budget, or a looping step with no rounds, is named unbounded', () => {
+  const fronts = loopFronts(treeOf('plain'), 'build');
+  const { budget: _budget, ...implement } = fronts.implement ?? {};
+  assert.deepEqual(unbounded({ ...fronts, implement }), ['implement: budget']);
+  const { rounds: _rounds, ...review } = fronts.review ?? {};
+  assert.deepEqual(unbounded({ ...fronts, review }), ['review: rounds']);
+});
+
+/** Agora's closeout schema, as build's review reads it, rendered. */
+function agoraSchema(): { required: string[]; properties: Record<string, unknown> } {
+  const tree = treeOf('set');
+  const agents = path.join(tree, 'workflows', 'agents');
+  const readAgents = (file: string): string | undefined =>
+    fs.existsSync(path.join(agents, file)) ? fs.readFileSync(path.join(agents, file), 'utf8') : undefined;
+  const agora = parseAgent('agora', fs.readFileSync(path.join(agents, 'agora.md'), 'utf8'), readAgents);
+  const review = parseWorkflow(
+    'review',
+    fs.readFileSync(path.join(tree, 'workflows', 'build', 'review.md'), 'utf8'),
+    (file) => readAgents(file),
+    new Map([['agora', agora]]),
+    undefined,
+    { agent: 'agora', factory: 'set', step: 'build/review' },
+  );
+  const schema = review.output?.schema;
+  assert.ok(schema, "review's output is Agora's");
+  return schema;
+}
+
+type Strict = { type?: unknown; required?: string[]; additionalProperties?: unknown; properties?: Record<string, { type?: unknown }> };
+
+test("Agora's closeout requires what the review read and, on each finding, whether the first round missed it", () => {
+  const schema = agoraSchema();
+  assert.ok(schema.required.includes('read'), 'read is required');
+  const read = schema.properties.read as Strict | undefined;
+  assert.equal(read?.additionalProperties, false, 'read is strict');
+  assert.deepEqual(read?.required, ['head', 'first', 'files', 'rules']);
+  const findings = schema.properties.findings as { items?: Strict } | undefined;
+  assert.ok(findings?.items?.required?.includes('missed'), 'missed is required of each finding');
+  assert.equal(findings?.items?.properties?.missed?.type, 'boolean');
+});
+
+test('review-a-change names what Agora requires a round to say it read and missed, so a review is told what its closeout must say', () => {
+  const schema = agoraSchema();
+  const findings = schema.properties.findings as { items?: Strict } | undefined;
+  const read = schema.properties.read as Strict | undefined;
+  assert.ok(findings?.items?.required?.includes('missed') && schema.required.includes('read'), 'missed and read are required');
+  const names = ['read', ...(read?.required ?? []), 'missed'];
+  const skill = fs.readFileSync(path.join(SDLC, 'skills', 'review-a-change', 'SKILL.md'), 'utf8');
+  for (const name of names) assert.ok(skill.includes(`\`${name}\``) || skill.includes(`\`read.${name}\``), `the skill names \`${name}\``);
+});

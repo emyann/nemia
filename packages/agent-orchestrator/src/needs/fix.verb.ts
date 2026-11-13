@@ -18,6 +18,7 @@ import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
+import { toolsNeed } from '../release/nemia-link.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -52,10 +53,10 @@ export const FIX_FOLLOW_MS = 500;
 export const answerVariable = (name: string): string => `NEMIA_ANSWER_${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
 
 /**
- * Where a fix was declared: a builtin place's machine need, a harness's need, a factory's workflow, or a place's need of a factory's
- * repository (`repository`), run there.
+ * Where a fix was declared: a builtin place's machine need, a harness's need, the store's own (`toolsNeed`), a factory's workflow, or a
+ * place's need of a factory's repository (`repository`), run there.
  */
-type Origin = 'place' | 'harness' | 'workflow' | 'repository';
+type Origin = 'place' | 'harness' | 'store' | 'workflow' | 'repository';
 
 /**
  * A fix found: the need, the fix, its index among the need's fixes, where it was declared, a workflow's live folders for its env, and the
@@ -140,7 +141,8 @@ function repositoryDeclaring(home: string, placeNeeds: readonly Need[], start: F
 
 /**
  * The need `start` names where it is declared, with its fixes: of the workflow named of the factory named (`workflowDeclaring`), of the
- * factory named alone (`repositoryDeclaring`), else a machine need of the builtin places (`placeNeeds`) or of a harness (`harnessNeeds`).
+ * factory named alone (`repositoryDeclaring`), else a machine need of the builtin places (`placeNeeds`), of a harness (`harnessNeeds`)
+ * or of the store itself (`toolsNeed`, the tools folder's `nemia`).
  */
 function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: readonly Need[], start: FixStart): Declaring {
   const { factory, workflow } = start;
@@ -149,6 +151,8 @@ function declaringOf(home: string, placeNeeds: readonly Need[], harnessNeeds: re
   const placed = placeNeeds.find((p) => p.name === start.need && !isRepositoryNeed(p));
   const harnessed = placed === undefined ? harnessNeeds.find((h) => h.name === start.need) : undefined;
   if (harnessed !== undefined) return { need: harnessed, declared: (harnessed.fixes ?? []).map((fix) => ({ fix, origin: 'harness' })) };
+  const stored = placed === undefined ? [toolsNeed(home)].find((n) => n.name === start.need) : undefined;
+  if (stored !== undefined) return { need: stored, declared: (stored.fixes ?? []).map((fix) => ({ fix, origin: 'store' })) };
   return { need: placed, declared: (placed?.fixes ?? []).map((fix) => ({ fix, origin: 'place' })) };
 }
 

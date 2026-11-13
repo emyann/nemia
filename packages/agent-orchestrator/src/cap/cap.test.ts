@@ -191,6 +191,14 @@ test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap`
     assert.match(ceilingLines({ sessions: 2, runs: 0, memory: '8Gi' })[2], /\b8Gi\b.*\(WF_MEMORY_LIMIT\)$/);
     assert.equal(ceilingLines({ sessions: 2, runs: 0 }).length, 2);
   });
+  await t.test('admission by memory, said on a line of its own where a floor is given: the request and the floor', () => {
+    const line = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', request: '2560Mi', reserved: '2048Mi' }).at(-1) ?? '';
+    for (const fact of ['2560Mi', '2048Mi', 'WF_MEMORY_REQUEST', 'WF_MEMORY_RESERVED']) assert.ok(line.includes(fact), fact);
+    const asksItsLimit = ceilingLines({ sessions: 2, runs: 0, memory: '8Gi', reserved: '1024Mi' });
+    assert.equal(asksItsLimit.length, 4);
+    for (const fact of ['8Gi', '1024Mi', 'WF_MEMORY_REQUEST']) assert.ok(asksItsLimit[3]?.includes(fact), fact);
+    assert.equal(ceilingLines({ sessions: 2, runs: 0, memory: '8Gi' }).length, 3, 'no floor given, no line');
+  });
 });
 
 test('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', async (t) => {

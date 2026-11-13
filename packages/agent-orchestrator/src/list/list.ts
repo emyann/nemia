@@ -8,7 +8,7 @@ import { waitingOnNeedsWord, type NeedWaited } from '../needs/index.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, unrunEnding, type ToDecide } from '../ending/ending.ts';
 import type { StepSpec } from '../step/step.ts';
 import type { AttemptMemory, EnginePhase } from '../views/views-words.ts';
-import { outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
+import { memoryBytesWord, outOfMemory, outOfMemoryWords } from '../out-of-memory/out-of-memory.ts';
 import { DENIED_CAP, DENIED_SHOWN, honoursAsks, oneLine, satisfiesAfter, type Run, type StepStatus } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/index.ts';
@@ -175,6 +175,12 @@ export interface ListingInput {
    */
   readonly waitingOf?: (taskId: string) => string | undefined;
   /**
+   * Why the runtime holds each queued task back from its admission (`admissionWaitOf` in views.verb.ts): a slot of its pool, or the memory
+   * it asks and the room there is. Said in the row's note (`admissionWords`), after its own words, for the step's task and its check's;
+   * the word and the codes stay the engine's. Left out, no row says one.
+   */
+  readonly admissionWaitOf?: (taskId: string) => HeldBack | undefined;
+  /**
    * What each task's sessions were denied, as permission rules name them (`deniedOf` in views.verb.ts): the row's `denied`,
    * `denied: Skill(look), Bash(pytest)` (`deniedWords`), for the step's current try, and neither in its status nor its note; `nemia ls`
    * prints it last in the note (`shownNote`), and the api carries the list as a field of its own (`StepNeeds.denied`).
@@ -228,7 +234,7 @@ export function listing(input: ListingInput): Listing {
     standing(step, run, read.phaseOf, read.signedOff, read.asked, read.steps, read.spendOf, read.verdictOf);
   const statuses = new Map(steps.map((s) => [s.name, stoodOf(s).status]));
   const words = steps.some(routes) ? routedWords(steps, run, statuses, read.signedOff) : statuses;
-  const listed = memoryNoted(input, listedSteps(input, assessed, stoodOf, words));
+  const listed = memoryNoted(input, admissionNoted(input, listedSteps(input, assessed, stoodOf, words)));
   const routed = routedRows({ steps, run, closeoutOf: input.closeoutOf }, words);
   if (!routed.size) return listed;
   const rows = listed.steps.map((s) => {
@@ -238,6 +244,46 @@ export function listing(input: ListingInput): Listing {
   });
   return { ...listed, steps: rows };
 }
+
+/**
+ * Why the runtime holds a task queued, as it says so on its view (`TaskView.waits`): a slot of its pool, `pool` at its `ceiling`
+ * (`WF_MAX_CONCURRENT`), or the memory it asks (`needBytes`) and the room the machine has above its floor (`roomBytes`). The
+ * orchestrator's copy, held equal to the runtime's `AdmissionWait` in runtime-client.ts, since a pure file imports no runtime.
+ */
+export type HeldBack =
+  | { readonly for: 'slot'; readonly pool: string; readonly ceiling: number }
+  | { readonly for: 'memory'; readonly needBytes: number; readonly roomBytes: number };
+
+/**
+ * What a queued task the runtime holds waits for, in the words the run cap's wait is said in (`slotWord`): what it waits for, and the
+ * number that decides it — `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: <pool> has 4 at work
+ * (WF_MAX_CONCURRENT)`. Pure.
+ */
+export const admissionWords = (wait: HeldBack): string =>
+  wait.for === 'memory'
+    ? `waits for memory: needs ${memoryBytesWord(wait.needBytes)}, ${memoryBytesWord(wait.roomBytes)} free`
+    : `waits for a session slot: ${wait.pool} has ${wait.ceiling} at work (WF_MAX_CONCURRENT)`;
+
+/**
+ * Each step's note with why the runtime holds its task or its check's queued (`admissionWords`), after the note's own words: read off
+ * the views on every pass, so a step whose tasks wait for nothing reads as it did. In the note and not the word, so the word and the
+ * codes stay the engine's and a room that moves leaves the feed's word alone.
+ */
+const admissionNoted = ({ read, admissionWaitOf }: ListingInput, listed: Listing): Listing => {
+  if (!admissionWaitOf) return listed;
+  const said = (taskId: string | null | undefined, of: string): string => {
+    const wait = taskId ? admissionWaitOf(taskId) : undefined;
+    return wait ? `${of}${admissionWords(wait)}` : '';
+  };
+  return {
+    ...listed,
+    steps: listed.steps.map((s) => {
+      const rec = read.run.steps[s.name];
+      const words = [said(rec?.taskId, ''), said(rec?.check?.taskId, 'check ')].filter(Boolean);
+      return words.length ? { ...s, note: [s.note, ...words].filter(Boolean).join(' · ') } : s;
+    }),
+  };
+};
 
 /**
  * Each step's note with what its current try's session and check say of a kill at the memory limit (`outOfMemoryWords`), after the note's

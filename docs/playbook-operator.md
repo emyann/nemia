@@ -330,6 +330,21 @@ then `systemctl --user daemon-reload` and `systemctl --user restart nemia.servic
 manager's root slice, bounded by its own limit alone. Sessions already at work when the limit is set keep running where they started:
 only tasks filed afterwards are scoped. `nemia up` says the limit, and the slice, on its start lines.
 
+### Admission by memory, and sizing an existing install
+
+The daemon admits a session only while the memory it asks fits the machine above a floor kept for the daemon and the machine. What
+each asks is `WF_MEMORY_REQUEST` (a Kubernetes quantity, `2560Mi`), else its limit; the floor is `WF_MEMORY_RESERVED`, else an eighth of
+the machine, 1 GiB at least. A step that does not fit waits, and `nemia ls` says so in its note: `waits for memory: needs 6Gi, 2.5Gi
+free`. A server already installed keeps the settings its person wrote: nothing rewrites its unit. With a limit and no request, each
+session asks its whole limit, so a machine sized for its sessions' limits may admit fewer than `WF_MAX_CONCURRENT`. To size it:
+
+1. **Read whether it fits**: `nemia doctor`. Its `memory-fit` piece says how many sessions fit, and what to set.
+2. **Size it**, either by `nemia service install --size auto`, which writes `WF_MAX_CONCURRENT`, `WF_MEMORY_LIMIT` and
+   `WF_MEMORY_REQUEST` for this machine (`--env` keeps what you give it), or by setting `WF_MEMORY_REQUEST` yourself, in the unit's
+   `--env` or the drop-in beside `WF_MEMORY_LIMIT`: `Environment=WF_MEMORY_REQUEST=2560Mi`, at or under the limit.
+3. **Restart the daemon** (`systemctl --user daemon-reload`, then `systemctl --user restart nemia.service`), and read `nemia doctor`
+   again: its `memory-fit` piece is met.
+
 ## Moving the factory onto a release
 
 A checklist, run once per machine whose daemon runs a checkout, by the operator after the owner says go: it touches the live store and

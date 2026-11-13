@@ -176,7 +176,7 @@ export default {
       await settled(page);
       await photograph(inspector, path.join(OUT, `questions-asked-${theme}.png`));
       await inspector.getByRole('button', { name: 'Close', exact: true }).click();
-      await expectCount(inspector, 0, "the inspector's Close closes it, and uncovers the Decide it floated over");
+      await expectCount(inspector, 0, "the inspector's Close closes it, and the page widens again");
 
       const row = page.locator(`section[aria-label="Decide"] li[data-offer="answer"][data-questions][data-step="spec"]`);
       const form = row.getByRole('form', { name: 'Answer spec' });

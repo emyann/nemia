@@ -9,7 +9,9 @@ A card that was true when it was filed goes stale as the repository moves: its p
 lands under another card, a later decision replaces it. A design that starts from a stale card designs against a repository that is
 no longer there. You say which is which; a person decides.
 
-1. **List the cards in play**: `nemia inbox`, bare, which lists them with how old each is. Read each card's text in the inbox folder your
+1. **List the cards in play of your run's factory**, and only them: `nemia inbox`, bare, lists the cards in play with how old each
+   is, and a card's file says its factory in its `factory:` line (none: the factory `default`). Another factory's cards are its own
+   janitor's: give them no verdict, since the check grooms the run's factory's cards alone and skips a verdict on any other. Read each card's text in the inbox folder your
    brief names, with Read, Grep and Glob: its name is its file's, without `.md`.
 2. **Take what moved on the base in the period**: `git log --since=<the period's first day> --name-only <the base>`, one call, the period
    being the one `read-the-stats` chose. A brief that says **Groom every card** reads every card closely, whatever the period.

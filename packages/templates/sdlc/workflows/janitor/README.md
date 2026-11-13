@@ -17,11 +17,12 @@ a card names no factory or workflow, when two cards share a title, or when the p
 and does not end the day before it. A card whose title the inbox already has is not filed again, so the check run again files only what is missing. Nothing is
 started: the inbox is where a person decides.
 
-The check then grooms the inbox (`groom.ts`, from the same frozen files): it reads the cards through `nemia get cards -A -o json` and
-checks the verdicts whole before it writes anything, refusing, exit 1, a verdict word not of the four, two verdicts on one card, a done
+The check then grooms the inbox (`groom.ts`, from the same frozen files): the cards of the run's own factory alone, the namespace
+`nemia get runs/<run> -o json` serves the run in, read through `nemia get cards -n <that factory> -o json`; another factory's cards
+are its own janitor's. It checks the verdicts whole before it writes anything, refusing, exit 1, a verdict word not of the four, two verdicts on one card, a done
 card whose commit is not on the base (the run's `WF_BASE_REF`, whether the factory lands on GitHub or in the checkout), a replaced card
-that names nothing replacing it, a stale card whose facts are none or whose `was` it does not find exactly once in the card, and a card
-in play filed before the period's last day with no verdict. A verdict on a card no longer in play is skipped. It changes no card: it
+that names nothing replacing it, a stale card whose facts are none or whose `was` it does not find exactly once in the card, and a card of
+the factory in play filed before the period's last day with no verdict, and it refuses where the run is not named (`WF_RUN`). A verdict on a card no longer in play is skipped. It changes no card: it
 writes, in the step's artifacts, `groom.md`, every verdict with its reasons, and for each stale card `groom/<card>.json`, the card as
 the api serves it with each fact amended, and prints the command for each card that has one. A person confirms each by typing it:
 `nemia inbox rm <card>` for a done or replaced card, `nemia apply -f <the file>` for a stale one, which the api refuses where the card

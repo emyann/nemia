@@ -12,7 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { SDLC } from './template.ts';
-import { CLIENT, inbox, world } from './janitor-world.ts';
+import type { TestContext } from 'node:test';
+import { CLIENT, inbox, nemia, world } from './janitor-world.ts';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'groom.ts');
 
@@ -70,10 +71,10 @@ function closeoutFile(fields: Record<string, unknown>): string {
 type Ran = { code: number | null; out: string; err: string };
 
 /** The script run over `args` in the world `env`, in `repo`, writing under `artifacts`, bounded. */
-function run(env: NodeJS.ProcessEnv, repo: string, artifacts: string, args: string[], over: NodeJS.ProcessEnv = {}): Ran {
+function run(env: NodeJS.ProcessEnv, wf: string, repo: string, artifacts: string, args: string[], over: NodeJS.ProcessEnv = {}): Ran {
   const ran = spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd: repo,
-    env: { ...env, WF_WORKSPACE: repo, WF_BASE_REF: 'main', WF_ARTIFACTS: artifacts, ...over },
+    env: { ...env, WF_WORKSPACE: repo, WF_BASE_REF: 'main', WF_ARTIFACTS: artifacts, WF_RUN: wf, ...over },
     encoding: 'utf8',
     timeout: 120_000,
   });
@@ -85,6 +86,26 @@ const typed = (env: NodeJS.ProcessEnv, argv: string[]): Ran => {
   const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 };
+
+/**
+ * The served world (`janitor-world.ts`) with a janitor run started in the factory acme, never ticked: the run's name, which the check
+ * is handed as `WF_RUN` and reads its factory by. The workflow is a folder step and its agent a stand-in, the run's subject being its
+ * namespace alone.
+ */
+async function groomWorld(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; root: string; wf: string }> {
+  const { env, root } = await world(t);
+  fs.mkdirSync(path.join(root, 'workflows', 'janitor'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'workflows', 'janitor', 'argus.md'), '---\nplace: folder\n---\nRead the stats.\n');
+  fs.writeFileSync(path.join(root, 'workflows', 'agents', 'scout.md'), '---\nharness: claude\n---\nYou are a scout.\n');
+  nemia(env, ['factory', 'attach', 'acme', 'janitor']);
+  nemia(env, ['factory', 'hire', 'acme', 'scout', '--step', 'janitor/argus']);
+  nemia(env, ['start', 'Read the stats', '--workflows', 'janitor', '--factory', 'acme']);
+  const listed = typed(env, ['get', 'runs', '-A', '-o', 'name']);
+  const wf = listed.out.trim().replace(/^runs\//, '');
+  assert.match(wf, /^[\w-]+$/, `one run is started: ${listed.out}${listed.err}`);
+  return { env, root, wf };
+}
 
 /** What the check wrote under `artifacts`, each file by its path from there, with its text. */
 const written = (artifacts: string): Record<string, string> =>
@@ -98,13 +119,13 @@ const written = (artifacts: string): Record<string, string> =>
 const STALE_BODY = 'Move the reads to src/old.ts\n\nThe verb is `wf ls`, at line 12.\n';
 
 test('the groom writes the amended card and the report, changes no card, and the person applies the amendment by one command', async (t) => {
-  const { env, root } = await world(t);
+  const { env, root, wf } = await groomWorld(t);
   const { dir: repo, onBase } = repository();
   const artifacts = scratch('nemia-groom-artifacts-');
   plant(root, 'move-the-reads-st4l', STALE_BODY);
   plant(root, 'land-the-thing-d0n3', 'Land the thing\n');
   plant(root, 'an-old-idea-r3pl', 'An old idea\n');
-  plant(root, 'still-good-st4n', 'Still good\n', LONG_AGO, null);
+  plant(root, 'still-good-st4n', 'Still good\n');
   const before = inbox(root);
   const closeout = closeoutFile({
     verdicts: [
@@ -120,7 +141,7 @@ test('the groom writes the amended card and the report, changes no card, and the
     ],
   });
 
-  const ran = run(env, repo, artifacts, [closeout]);
+  const ran = run(env, wf, repo, artifacts, [closeout]);
   assert.equal(ran.code, 0, ran.err);
   assert.deepEqual(inbox(root), before, 'no card is changed or removed');
   const files = written(artifacts);
@@ -139,7 +160,7 @@ test('the groom writes the amended card and the report, changes no card, and the
   assert.doesNotMatch(report, /nemia (inbox rm|apply -f \S+)still-good/);
   assert.equal(ran.out.match(/still-good-st4n/g), null, 'a standing card gets no command');
 
-  const again = run(env, repo, artifacts, [closeout]);
+  const again = run(env, wf, repo, artifacts, [closeout]);
   assert.equal(again.code, 0, again.err);
   assert.deepEqual(written(artifacts), files, 'the check run again writes the same files');
 
@@ -151,14 +172,14 @@ test('the groom writes the amended card and the report, changes no card, and the
 });
 
 test('REFUSED: an amendment applied after the card was edited by hand exits 1 and leaves the edit', async (t) => {
-  const { env, root } = await world(t);
+  const { env, root, wf } = await groomWorld(t);
   const { dir: repo } = repository();
   const artifacts = scratch('nemia-groom-artifacts-');
   const file = plant(root, 'move-the-reads-st4l', STALE_BODY);
   const closeout = closeoutFile({
     verdicts: [verdict('move-the-reads-st4l', 'stale', { facts: [{ was: 'src/old.ts', now: 'src/new.ts', why: 'moved' }] })],
   });
-  assert.equal(run(env, repo, artifacts, [closeout]).code, 0);
+  assert.equal(run(env, wf, repo, artifacts, [closeout]).code, 0);
   const edited = fs.readFileSync(file, 'utf8').replace('Move the reads', 'Move every read');
   fs.writeFileSync(file, edited);
   const applied = typed(env, ['apply', '-f', path.join(artifacts, 'groom', 'move-the-reads-st4l.json')]);
@@ -166,23 +187,29 @@ test('REFUSED: an amendment applied after the card was edited by hand exits 1 an
   assert.equal(fs.readFileSync(file, 'utf8'), edited);
 });
 
-test('a verdict on a card no longer in play is skipped, and a card filed on the period’s last day may have none', async (t) => {
-  const { env, root } = await world(t);
+test('a verdict on a card no longer in play, or of another factory, is skipped; another factory’s cards and a card filed on the period’s last day may have none', async (t) => {
+  const { env, root, wf } = await groomWorld(t);
   const { dir: repo } = repository();
   const artifacts = scratch('nemia-groom-artifacts-');
   plant(root, 'filed-today-n3w1', 'Filed on the last day\n', new Date('2026-09-28T12:00:00Z'));
   plant(root, 'still-good-st4n', 'Still good\n');
+  plant(root, 'pipao-idea-p1p0', 'Another factory’s idea\n', LONG_AGO, 'pipao');
+  plant(root, 'no-factory-d3f0', 'A card of no factory\n', LONG_AGO, null);
   const closeout = closeoutFile({
-    verdicts: [verdict('gone-away-g0n3', 'replaced', { by: 'nothing' }), verdict('still-good-st4n', 'standing')],
+    verdicts: [
+      verdict('gone-away-g0n3', 'replaced', { by: 'nothing' }),
+      verdict('pipao-idea-p1p0', 'replaced', { by: 'nothing' }),
+      verdict('still-good-st4n', 'standing'),
+    ],
   });
-  const ran = run(env, repo, artifacts, [closeout]);
+  const ran = run(env, wf, repo, artifacts, [closeout]);
   assert.equal(ran.code, 0, ran.err);
-  assert.ok(ran.out.includes('gone-away-g0n3'), 'the skipped verdict is said');
+  assert.ok(ran.out.includes('gone-away-g0n3') && ran.out.includes('pipao-idea-p1p0'), 'each skipped verdict is said');
   assert.ok(!ran.out.includes('nemia inbox rm'), 'nothing to remove');
 });
 
 test('REFUSED: each closeout that breaks a rule writes nothing, and changes no card', async (t) => {
-  const { env, root } = await world(t);
+  const { env, root, wf } = await groomWorld(t);
   const { dir: repo, onBase, aside } = repository();
   plant(root, 'move-the-reads-st4l', STALE_BODY);
   plant(root, 'land-the-thing-d0n3', 'Land the thing\n');
@@ -204,11 +231,12 @@ test('REFUSED: each closeout that breaks a rule writes nothing, and changes no c
     { name: 'a verdict word not of the four', verdicts: [standing, verdict('land-the-thing-d0n3', 'obsolete')] },
     { name: 'a card in play before the last day with no verdict', verdicts: [standing], names: 'land-the-thing-d0n3' },
     { name: 'no closeout', args: [''], names: 'WF_CLOSEOUT' },
+    { name: 'no run named, so no factory', verdicts: [standing, done(onBase)], over: { WF_RUN: '' }, names: 'WF_RUN' },
     { name: 'a closeout with no verdicts list', verdicts: undefined },
   ];
   for (const row of rows) {
     const artifacts = scratch('nemia-groom-artifacts-');
-    const ran = run(env, repo, artifacts, row.args ?? [closeoutFile({ verdicts: row.verdicts })], row.over);
+    const ran = run(env, wf, repo, artifacts, row.args ?? [closeoutFile({ verdicts: row.verdicts })], row.over);
     assert.equal(ran.code, 1, `${row.name}: ${ran.out}${ran.err}`);
     assert.doesNotMatch(ran.err, /^\s+at /m, `${row.name}: a refusal, not a crash`);
     if (row.names) assert.ok(ran.err.includes(row.names), `${row.name}: it names ${row.names}`);

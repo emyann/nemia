@@ -5,7 +5,9 @@
  * Takes the path of Argus's closeout, flat (`WF_CLOSEOUT`): its `period` (`to`, the last day read) and its `verdicts`, one per card in
  * play, each a `card` by its name, a `verdict` (`done`, `replaced`, `stale` or `standing`), its `why`, the `commit` that landed a done
  * card's work, what replaced a replaced one (`by`), and a stale one's `facts`, each what the card says (`was`), what is true now (`now`)
- * and why. It reads the cards with `nemia get cards -A -o json`, run in `WF_WORKSPACE`, and checks the whole closeout before it writes
+ * and why. It grooms the cards of the run's own factory alone: the namespace `nemia get runs/<WF_RUN> -o json` serves the run in, a
+ * card of another factory being neither judged nor asked for. It reads them with `nemia get cards -n <that factory> -o json`, run in
+ * `WF_WORKSPACE`, and checks the whole closeout before it writes
  * anything. Then, under `WF_ARTIFACTS`, it writes `groom/<card>.json` for each stale card, the card as `nemia get cards/<card> -o json`
  * served it with each fact's `was` replaced by its `now` in its body and its `status` dropped, and `groom.md`, every verdict with the
  * command that acts on it: `nemia inbox rm <card>` for a done or replaced card, `nemia apply -f <file>` for a stale one, which the api
@@ -16,7 +18,8 @@
  * Exits 1, naming the fix on stderr and writing nothing, when no closeout reached it, it holds no `verdicts` list, a verdict's word is
  * not one of the four, a card has two verdicts, a done card's commit is not on the base (`WF_BASE_REF`, which must be set, `git
  * merge-base --is-ancestor`), a replaced card says nothing replaced it, a stale card has no facts or one `amendment` cannot place, or a
- * card in play filed before the period's last day has no verdict; and when `WF_ARTIFACTS` is unset or `nemia` fails. Whether the
+ * card of the run's factory in play filed before the period's last day has no verdict; and when `WF_ARTIFACTS` or `WF_RUN` is unset,
+ * the run serves no namespace, or `nemia` fails. Whether the
  * factory lands on GitHub or in the checkout, it reads and writes the same: the base is the branch the run's work lands on.
  */
 import { spawnSync } from 'node:child_process';
@@ -152,9 +155,23 @@ function nemia(args: readonly string[]): unknown {
   }
 }
 
-/** Every card the api serves, across every factory, by name. */
-function cards(): Map<string, Served> {
-  const page = nemia(['get', 'cards', '-A', '-o', 'json']) as { items?: Served[] } | null;
+/**
+ * The factory this run is in: its namespace, as `nemia get runs/<WF_RUN>` serves the run. Refuses where `WF_RUN` is unset or the run
+ * does not read: no other factory's cards are this janitor's to judge.
+ */
+function factory(): string {
+  const run = process.env.WF_RUN;
+  if (!run) throw new Refusal('WF_RUN is not set, so the factory whose cards are groomed is not known: run this check in a run');
+  const served = nemia(['get', `runs/${run}`, '-o', 'json']) as { metadata?: { namespace?: unknown } } | null;
+  const namespace = served?.metadata?.namespace;
+  if (typeof namespace !== 'string' || !namespace)
+    throw new Refusal(`the run ${run} is served with no namespace, so its factory is not known: check nemia get runs/${run} -o yaml`);
+  return namespace;
+}
+
+/** The cards the api serves in the factory `namespace`, by name. */
+function cards(namespace: string): Map<string, Served> {
+  const page = nemia(['get', 'cards', '-n', namespace, '-o', 'json']) as { items?: Served[] } | null;
   return new Map((page?.items ?? []).map((card) => [card.metadata.name, card]));
 }
 
@@ -181,8 +198,8 @@ function checkLanded(verdicts: readonly Verdict[]): void {
 }
 
 /** The stale card `v`, amended, as `nemia apply -f` reads it: refuses a fact `amendment` cannot place. */
-function amended(v: Verdict): Record<string, unknown> {
-  const served = nemia(['get', `cards/${v.card}`, '-o', 'json']) as Served;
+function amended(v: Verdict, namespace: string): Record<string, unknown> {
+  const served = nemia(['get', `cards/${v.card}`, '-n', namespace, '-o', 'json']) as Served;
   const result = amendment(served.spec.body ?? '', v.facts);
   if (result.kind === 'refused')
     throw new Refusal(`the card ${v.card} is stale, and its fact #${result.fact + 1} cannot be placed: ${WHY_NOT[result.reason]}`);
@@ -208,7 +225,8 @@ function main(): void {
   const artifacts = process.env.WF_ARTIFACTS;
   if (!artifacts) throw new Refusal('WF_ARTIFACTS is not set, so there is nowhere to write the report: run this check in a run');
   checkLanded(verdicts);
-  const served = cards();
+  const namespace = factory();
+  const served = cards(namespace);
   const inPlay = (name: string) => served.get(name)?.status?.inPlay === true;
   const judged = new Set(verdicts.map((v) => v.card));
   const unjudged = [...served.values()]
@@ -221,7 +239,7 @@ function main(): void {
     );
   const acted = verdicts.filter((v) => inPlay(v.card));
   const dir = path.resolve(artifacts, 'groom');
-  const amendments = new Map(acted.filter((v) => v.verdict === 'stale').map((v) => [v.card, amended(v)]));
+  const amendments = new Map(acted.filter((v) => v.verdict === 'stale').map((v) => [v.card, amended(v, namespace)]));
 
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });

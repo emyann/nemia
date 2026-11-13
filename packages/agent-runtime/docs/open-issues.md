@@ -1628,7 +1628,7 @@ it, and was refused at design (2026-10-23) as a second cost source drifting from
 bites.
 
 The step's spend cap holds across those processes as far as that total does. The SDK's `maxBudgetUsd` counts only the spend since
-its `query()` call started (`sdk.d.ts:6182-6185`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
+its `query()` call started (`sdk.d.ts:6280-6283`), so `adopt` hands the resumed process the task's `config.budgetUsd` less what the
 attempt has spent so far by its capture (`capLeft`, `src/core/cap.ts`), the run file keeping the whole cap for the next
 take-up to count from; an attempt that has spent it all is not resumed, but ended `failed` with `limit: 'budget'` (the
 harness-updates intent, 2026-11-03). What is left is the same loss: a process killed outright spent what no total saved, so the cap

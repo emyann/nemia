@@ -59,8 +59,8 @@ function Factories() {
   const fallback = opens.get(DEFAULT_NAMESPACE);
   const held = fallback !== undefined && holdsRuns(fallback);
   return (
-    <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines))] flex-col gap-6 pt-5 lg:h-[calc(100svh-var(--frame-top)-var(--frame-lines))]">
-      <div className="px-6 max-md:px-3">
+    <div className="flex min-h-[calc(100svh-var(--frame-top)-var(--frame-lines))] flex-col gap-6 pt-5 @3xl/page:h-[calc(100svh-var(--frame-top)-var(--frame-lines))]">
+      <div className="px-3 @lg/page:px-6">
         <OverviewStrip factory={factory} />
       </div>
       <FactoriesCanvas blocks={openBlocks(factories, opens, held)} />

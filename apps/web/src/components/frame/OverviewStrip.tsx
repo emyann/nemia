@@ -27,8 +27,10 @@ const DAEMON_TAG: Record<DaemonTone, 'secondary' | 'neutral' | 'error'> = {
 const FIGURE = 'shrink-0 font-mono text-body-small whitespace-nowrap text-on-surface-variant';
 
 /**
- * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames in one row
- * that never wraps from `lg` up, each narrowing into it, and stacked below it. It counts the factory in view (`factory`), or every
+ * The Overview's strip, above the factories' canvas: the factories' day, the agents at work and the quota, three cut frames that wrap
+ * by their own widths, never the window's: each asks for its heading row (Today for its six stickers' line), what is cut or wraps by
+ * design asking for no width (`contain-inline-size`), so a frame shares a line only where its heading reads whole, and on a line of its
+ * own takes the whole of it. It counts the factory in view (`factory`), or every
  * factory, off the light answer of the runs not finished and the runs finished since the day began (`stripOf`); the caps, the daemon
  * and the quota are the machine's.
  */
@@ -68,24 +70,24 @@ export function StripView({
   now: number;
 }) {
   return (
-    <section aria-label="Kept in view" data-overview-strip className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap">
-      <Slot basis="lg:flex-[1_1_640px]">
+    <section aria-label="Kept in view" data-overview-strip className="flex flex-wrap gap-3">
+      <Slot>
         <Today strip={strip} dot={dot} />
       </Slot>
-      <Slot basis="lg:flex-[1_1_210px]" hue="alive">
+      <Slot hue="alive">
         <Agents strip={strip} />
       </Slot>
-      <Slot basis="lg:flex-[1_1_280px]">
+      <Slot>
         <QuotaFrame quota={quota} error={quotaError} now={now} />
       </Slot>
     </section>
   );
 }
 
-/** One frame's room in the row: its asked width, from which it narrows, and its cut frame. */
-function Slot({ basis, hue = 'none', children }: { basis: string; hue?: 'none' | 'alive'; children: ReactNode }) {
+/** One frame's room in the row: its own width asked for (its basis `auto`), grown into what its line leaves, and its cut frame. */
+function Slot({ hue = 'none', children }: { hue?: 'none' | 'alive'; children: ReactNode }) {
   return (
-    <div data-strip-frame className={cn('flex min-w-0', basis)}>
+    <div data-strip-frame className="flex min-w-0 flex-auto">
       <CutFrame hue={hue} size={24} className="h-full w-full">
         {children}
       </CutFrame>
@@ -96,7 +98,7 @@ function Slot({ basis, hue = 'none', children }: { basis: string; hue?: 'none' |
 /** A frame's heading, in small caps. */
 function Heading({ children }: { children: ReactNode }) {
   return (
-    <Label component="span" size="medium" className="min-w-0 truncate uppercase">
+    <Label data-strip-heading component="span" size="medium" className="min-w-0 truncate uppercase">
       {children}
     </Label>
   );
@@ -172,7 +174,7 @@ function Agents({ strip }: { strip: Strip }) {
               fallback={row.agent.charAt(0).toUpperCase()}
               className="shrink-0 bg-secondary-container text-on-secondary-container"
             />
-            <span data-agent-words className="min-w-0 flex-1 truncate" title={words}>
+            <span data-agent-words className="min-w-0 flex-1 truncate contain-inline-size" title={words}>
               <Body component="span" size="small">
                 {words}
               </Body>
@@ -182,12 +184,12 @@ function Agents({ strip }: { strip: Strip }) {
         );
       })}
       {strip.more > 0 && (
-        <Body data-agents-more size="small" colorRole="on-surface-variant">
+        <Body data-agents-more size="small" colorRole="on-surface-variant" className="contain-inline-size">
           and {strip.more} more
         </Body>
       )}
       {strip.rows.length === 0 && (
-        <Body size="small" colorRole="on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" className="contain-inline-size">
           No agent at work.
         </Body>
       )}
@@ -223,12 +225,12 @@ function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Er
         )}
       </div>
       {error && (
-        <Body size="small" className="text-failure">
+        <Body size="small" className="text-failure contain-inline-size">
           The quota could not be read: {error.message}
         </Body>
       )}
       {quota && !fresh && (
-        <Body size="small" colorRole="on-surface-variant">
+        <Body size="small" colorRole="on-surface-variant" className="contain-inline-size">
           {quota.said}
           {last && ` The last reading, ${last.asOf}:`}
         </Body>
@@ -237,7 +239,7 @@ function QuotaFrame({ quota, error, now }: { quota: Quota | undefined; error: Er
         <Meter key={w.key} label={meterLabel(w)} value={w.usedPercentage} showValue color="tertiary" />
       ))}
       {fresh && line && (
-        <Body data-quota-line component="span" size="small" className="text-money">
+        <Body data-quota-line component="span" size="small" className="text-money contain-inline-size">
           {line.runsOut && <span className="whitespace-nowrap">{line.runsOut} ·</span>}{' '}
           <span className="whitespace-nowrap">{line.resets}</span>
         </Body>

@@ -530,7 +530,7 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
         <FloorOptions factory={factory} showFinished={showFinished} onShowFinished={toggleFinished} />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
         {laned && !inspecting && <QueueLane cards={queued} />}
         {shown.length ? (
           <div ref={whole} className="flex min-h-0 min-w-0 flex-1">

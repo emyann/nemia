@@ -606,18 +606,23 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                request, read off this machine (WF_MAX_CONCURRENT, WF_MEMORY_LIMIT,
                                WF_MEMORY_REQUEST; neither memory one on macOS), each but one --env
                                gives; the floor kept, WF_MEMORY_RESERVED, is its default (an eighth
-                               of the machine, 1 GiB at least). --bind <addr>: the address the
-                               daemon listens on (NEMIA_BIND), and the store marked exposed
-                               (WF_EXPOSED=1), so every caller presents a token: nemia pairings
-                               approve and nemia board link hand out the first. A public or
+                               of the machine, 1 GiB at least). On systemd it also writes
+                               <name>-sessions.slice, its MemoryMax at the machine less that floor,
+                               and points WF_CGROUP_PARENT at it, so the sessions together are
+                               held to what the machine allocates (none written where --env gives
+                               WF_CGROUP_PARENT: a line names its set-property). --bind <addr>: the
+                               address the daemon listens on (NEMIA_BIND), and the store marked
+                               exposed (WF_EXPOSED=1), so every caller presents a token: nemia
+                               pairings approve and nemia board link hand out the first. A public or
                                wildcard address is refused unless --public acknowledges it
                                (NEMIA_BIND_PUBLIC=1); nemia service addresses lists this machine's.
                                --name: the service name (nemia; required for a store that is not
                                the default)
                                CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service uninstall [--name <name>]
-                               stop the login service, disable it and remove its file; a daemon
-                               started by hand is left alone
+                               stop the login service, disable it and remove its file and the
+                               sessions' slice --size auto wrote; a daemon started by hand is left
+                               alone
                                CLI only: it writes or reads the person's login services, on the machine the command runs on
   nemia service restart [--name <name>] [--timeout <d>]
                                restart the service's daemon on the code it runs: pause the store, give

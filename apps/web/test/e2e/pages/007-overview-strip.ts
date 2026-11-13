@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { factoriesAnswered, finishedAnswered, openAnswered, photograph, themeOf } from '../board.ts';
+import { expectStripWhole, factoriesAnswered, finishedAnswered, openAnswered, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { RunList } from 'objects';
 import type { Ceilings } from '../../../src/lib/api/ceilings.ts';
@@ -16,6 +16,9 @@ import { OUT } from '../world.ts';
 
 /** The window the strip is read in: 1440 pixels wide, the rail open. */
 const WIDE = { width: 1440, height: 1000 };
+
+/** A window between the two, the rail open, where the frames do not all fit one row and wrap by their own widths. */
+const MIDDLE = { width: 1024, height: 900 };
 
 /** A phone's window, under the width the strip holds one row from. */
 const PHONE = { width: 390, height: 844 };
@@ -162,8 +165,9 @@ export default {
    * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
    * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
-   * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. On a phone the
-   * frames stack, one under the other. At `?factory=default` the strip counts that factory's runs alone, and its agents against those
+   * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. At 1024 the
+   * frames wrap by their own widths, and on a phone they stack, one under the other: at each width every heading, the readout, the
+   * agents' count and each agent's name read whole (`expectStripWhole`). At `?factory=default` the strip counts that factory's runs alone, and its agents against those
    * of its own.
    */
   name: 'overview-strip',
@@ -198,11 +202,17 @@ export default {
       await expectTexts(strip.locator('[data-quota-past]'), ['Past 80%'], 'at the mark the api gives');
       await expectCount(strip.getByRole('meter'), 2, 'a meter for each window');
       await expectOneRow(strip);
+      await expectStripWhole(page, 'at 1440, rail open, on one row');
       await expectSpentPreview(page, strip, want);
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-day-${await themeOf(page)}.png`));
+      await page.setViewportSize(MIDDLE);
+      await expectStripWhole(page, 'at 1024, rail open, the frames wrapped by their own widths');
+      await settled(page);
+      await photograph(page, path.join(OUT, `overview-strip-middle-${await themeOf(page)}.png`));
       await page.setViewportSize(PHONE);
       await expectStacked(strip);
+      await expectStripWhole(page, 'on a phone, stacked');
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-phone-${await themeOf(page)}.png`), { fullPage: true });
       await page.setViewportSize(WIDE);

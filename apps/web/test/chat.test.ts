@@ -223,7 +223,7 @@ test('chatOutbox: a message the api would not take is kept in this browser, and 
           () => assert.fail('the api took it'),
           (failure: unknown) => failure,
         );
-      /** Runs `retryKept` on `text` until `until` requests were made or it was refused; answers how many were made, and the refusal. */
+      const aBeatPastTheBound = 30;
       const retried = (text: string, until: number) =>
         new Promise<{ requests: number; refused: unknown }>((resolve) => {
           requests = 0;
@@ -231,8 +231,7 @@ test('chatOutbox: a message the api would not take is kept in this browser, and 
           const done = (refused: unknown) => {
             stop();
             counted = undefined;
-            // A beat past the bound, so a second try that would come is counted.
-            setTimeout(() => resolve({ requests, refused }), 30);
+            setTimeout(() => resolve({ requests, refused }), aBeatPastTheBound);
           };
           counted = () => {
             if (requests >= until) done(undefined);

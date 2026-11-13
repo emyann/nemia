@@ -148,7 +148,6 @@ function useHeldChat(): NemiaChat {
 
   const tryKept = useCallback((text: string) => sendingOnce(() => sendChat(text)).then(took), [took]);
 
-  /** The kept message as a send of `text`, written at `at`, that failed with `failure` leaves it: refused, or lost. */
   const failed = useCallback((text: string, at: string, failure: unknown) => {
     const next = keptAfter(text, at, failure);
     keepUnsent(next.text, next.at, next.refused);

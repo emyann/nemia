@@ -33,7 +33,7 @@ import {
   type SpendOf,
 } from '../status/status.ts';
 import { budgetWord } from '../money/money.ts';
-import { modeWord, retriesDue, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
+import { modeWord, retriesDue, type CheckKillOf, type Retry, type RetryAsk, type RetryMode } from '../retry/index.ts';
 import { refusalSection, type CheckRefusal, type LandingSaid, type Verdict } from '../check/index.ts';
 import { saidBy, type Said } from '../say/say.ts';
 import { loopSpan, upstreamOf } from '../workflow/index.ts';
@@ -675,6 +675,7 @@ function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined): s
  *
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`).
  * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet: the same.
+ * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is due again.
  */
 export function gateLines(
   steps: readonly StepSpec[],
@@ -686,12 +687,13 @@ export function gateLines(
   spendOf: SpendOf = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
+  checkKillOf: CheckKillOf = () => undefined,
 ): Record<string, string> {
   const lines: Record<string, string> = {};
   const waitingAgain = unheld(
     steps,
     run,
-    retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf),
+    retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf, checkKillOf),
     roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf, verdictOf),
   );
   for (const step of steps) {

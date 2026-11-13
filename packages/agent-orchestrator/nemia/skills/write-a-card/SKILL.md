@@ -34,7 +34,8 @@ Keep it short: each part a line or a short list. A card is a brief, not a design
 
 ## File, queue or start
 
-- **File** is park: `nemia inbox add <file> --factory <factory> --workflow <workflow>`. The card waits in the inbox.
+- **File** is park: `nemia inbox add <file> --factory <factory> --workflow <workflow>`. The card waits in the inbox. A card not started is changed where it lives,
+  keeping its name: `nemia inbox edit <name> <file>`, the card's whole text; its labels with `nemia label inbox <name> key=value`.
 - **Queue**: `nemia inbox queue <name>`. The tick starts it once a run slot is free.
 - **Start**: `nemia start <store>/inbox/<name>.md`, the card's own file, with `--after <run>` where it waits on one. It runs in the
   card's factory and workflow, and stays in the inbox, listed as started. To hand it runs as context, `nemia inbox from <name> <run>` first.

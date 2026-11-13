@@ -6,6 +6,8 @@
  *   denies (`read-only.allow.yaml`, `read-only.deny.yaml`): git's questions and the text tools, a proposal of a change, and the denies of
  *   what those would let git write a file, run a program or read outside the repository by, and of every form of gh and of an
  *   assignment before nemia.
+ * - The four read a tool's own help and version (`help.allow.yaml`): gh's by `gh help <core command>`, never `gh <x> --help`, which can
+ *   run an alias or an extension, and claude's by exact lines. These are not gh's reads below: the writers keep every gh refused.
  * - Agora, the reviewer, alone allows `gh pr view` and `gh pr checks` (`GH_READS`), on either way sdlc lands.
  * - An agent that allows the browser's tools denies those that write a file (`browser.deny.yaml`), and every agent that may reach the
  *   browser, the writers among them, denies the one that runs a script in the page (`run-code.deny.yaml`).
@@ -46,6 +48,9 @@ const WRITERS = ['grace', 'otto'];
 
 /** The lines of sdlc's fence file `file`, as shipped. */
 const linesOf = (file: string): string[] => yaml.load(fs.readFileSync(path.join(SDLC, 'fences', file), 'utf8')) as string[];
+
+/** A tool's help and version, which the read-only four take beside the read set; not counted as a read of gh's. */
+const HELP = linesOf('help.allow.yaml');
 
 /** The pull request's reads, which Agora alone allows itself. */
 const GH_READS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
@@ -113,10 +118,11 @@ function shortOf(fences: Record<string, Fence>, root: string): string[] {
         ...(mode === 'dontAsk' ? [] : [`${agent}: runs ${String(mode)}`]),
         ...(skills.includes('git') ? [] : [`${agent}: names no git skill`]),
         ...lacks(agent, linesOf('read-only.allow.yaml'), allowed, 'allows no'),
+        ...lacks(agent, HELP, allowed, 'allows no'),
         ...lacks(agent, linesOf('read-only.deny.yaml'), denied, 'denies no'),
         ...(agent === READS_THE_PULL_REQUEST
           ? lacks(agent, GH_READS, allowed, 'allows no')
-          : allowed.filter((rule) => rule.startsWith('Bash(gh')).map((rule) => `${agent}: allows gh, ${rule}`)),
+          : allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)).map((rule) => `${agent}: allows gh, ${rule}`)),
       ];
     }),
     ...Object.keys(fences)
@@ -153,6 +159,7 @@ const TREES = await rendered([
     name: 'cut',
     template: copyOf(SDLC, {
       'fences/read-only.allow.yaml': cut('Bash(git merge-base:*)'),
+      'fences/help.allow.yaml': cut('Bash(gh help pr:*)'),
       'fences/read-only.deny.yaml': cut('Bash(git *--output*)', 'Bash(*=* nemia *)'),
       'fences/writers.deny.yaml': cut('Bash(git push:*)'),
       'fences/browser.deny.yaml': cut('mcp__playwright__browser_snapshot(filename:*)'),
@@ -177,6 +184,7 @@ test('REFUSED: a line cut from a fence file is named on every agent that takes t
       'agora: allows no Bash(gh pr checks:*)',
       ...READ_ONLY.flatMap((agent) => [
         `${agent}: allows no Bash(git merge-base:*)`,
+        `${agent}: allows no Bash(gh help pr:*)`,
         `${agent}: denies no Bash(*=* nemia *)`,
         `${agent}: denies no Bash(git *--output*)`,
       ]),
@@ -226,10 +234,10 @@ test("sdlc's six agents carry their fences: the read set and its denies, the bro
   );
 });
 
-test("Agora allows gh's two reads and nothing else of gh, on either way sdlc lands", () => {
+test("Agora allows gh's two reads and gh's help, and nothing else of gh, on either way sdlc lands", () => {
   for (const way of ['shipped', 'github'])
     assert.deepEqual(
-      fencesOf(way).agora.allowed.filter((rule) => rule.startsWith('Bash(gh')),
+      fencesOf(way).agora.allowed.filter((rule) => rule.startsWith('Bash(gh') && !HELP.includes(rule)),
       GH_READS,
       way,
     );
@@ -246,6 +254,13 @@ const READS: Call[] = [
   'cat README.md',
   'wc -l README.md',
   'nemia propose -f x.yaml -n f',
+  'gh help',
+  'gh help auth login',
+  'gh help pr merge 1',
+  'gh --version',
+  'claude --help',
+  'claude --version',
+  'claude auth --help',
 ].map(bash);
 
 /** What a read-only agent must never run: a write of git's, a program or a file by an option, a read outside, a move, a dropped token. */
@@ -266,11 +281,21 @@ const NEVER_READ_ONLY: Call[] = [
   'gh pr view 1 --web',
   'gh pr merge 1',
   'WF_SESSION_TOKEN= nemia propose -f x.yaml -n f',
+  'gh auth login --help',
+  'gh pr co --help',
+  'gh pr merge 1 --subject --help',
+  'gh help myext',
+  'gh help copilot',
+  'gh help prx',
+  'GH_PAGER=sh gh help pr',
+  'claude -p x --help',
+  'claude auth status',
+  'claude --help --bg',
 ].map(bash);
 
 /** What a writer, which runs auto, must never run: each refused by its own deny. */
 const NEVER_WRITERS: Call[] = [
-  ...['git push origin x', 'git branch -D x', 'gh pr merge 1', 'pkill -f node', 'claude --bg x'].map(bash),
+  ...['git push origin x', 'git branch -D x', 'gh pr merge 1', 'gh help pr merge', 'pkill -f node', 'claude --bg x'].map(bash),
   { tool: 'Edit', path: '/home/u/.claude.json' },
   { tool: 'mcp__playwright__browser_run_code_unsafe' },
   { tool: 'mcp__github__push_files' },

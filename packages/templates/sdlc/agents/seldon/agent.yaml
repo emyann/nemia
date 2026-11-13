@@ -35,6 +35,7 @@ spec:
         - WebFetch
         - Agent
         - { path: fences/read-only.allow.yaml }
+        - { path: fences/help.allow.yaml }
         - { path: fences/browser.allow.yaml }
       disallowedTools:
         - { path: fences/read-only.deny.yaml }

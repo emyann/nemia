@@ -14,7 +14,7 @@ layout gives a place sits inside a template's folder: the workspace's own files 
   script is never rendered, so a script takes what it needs as a flag (`--check <name>`).
 - `sdlc/fences/` — the fence lines several of sdlc's agents share, each a YAML list of strings with each rule's reason beside it, named
   by an agent's list as `- { path: fences/<file>.yaml }` and written out whole by the render: the read-only four take
-  `read-only.allow.yaml` and `read-only.deny.yaml`, the writers `writers.deny.yaml`, the browser's users `browser.*.yaml` and
+  `read-only.allow.yaml`, `read-only.deny.yaml` and `help.allow.yaml` (a tool's help and version), the writers `writers.deny.yaml`, the browser's users `browser.*.yaml` and
   `run-code.deny.yaml`. A rule many agents keep goes in a file there, never copied into each; `test/fences.test.ts` reads them and
   proves on the rendered fences what each runs. A line holding a `${{ parameters.… }}` stays on the agent: a shared file's lines are not
   rendered with the parameters.

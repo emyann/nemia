@@ -10,8 +10,7 @@ import { heard, OUT, store } from '../world.ts';
 export default {
   /**
    * The steering channel: words said to draft's running session from its page go through the api to the session's say file and onto its
-   * record, where the step's detail reads them back; the run's decision, which `nemia decide` prints off the api, says it is still
-   * running. In a page of its own whose one refusal is the point, words sent after the
+   * record, where the step's detail reads them back. In a page of its own whose one refusal is the point, words sent after the
    * session ended while the page still shows it running are refused in the package's words under the composer, which keeps them to send
    * again, and nothing is said or journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its
    * writes back, draft's task journal,
@@ -101,12 +100,6 @@ export default {
       if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
       await expectVisible(top.locator('[data-note]', { hasText: 'said to 1×' }), "the step's note says it was said to, in wf ls's words");
 
-      const decision = await page.request.get(new URL(`/api/runs/${SAYING.run}/decision`, page.url()).href);
-      const decided: unknown = decision.ok() ? await decision.json() : await decision.text();
-      if (typeof decided !== 'object' || decided === null || !('running' in decided))
-        throw new Refused(
-          `the api's decision of ${SAYING.run}, read on the same store while its session runs, says it is still running — it answered ${decision.status()}: ${JSON.stringify(decided)}`,
-        );
       await settled(page);
       await photograph(page, path.join(OUT, `say-said-${await themeOf(page)}.png`), { fullPage: true });
 

@@ -10,7 +10,7 @@
  * On the stand-ins: the runtime's test engine, each step's task filed and settled with its closeout by hand, and the test place, under
  * the run record this file seeds. The table runs first: the story writes asks beside the run, and they stay.
  */
-import { root } from '../../test/harness.ts';
+import { root, SEATED } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,9 +25,6 @@ import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { actorWords } from 'objects';
-
-/** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
-const SEATED = { kind: 'person', token: 'harness' } as const;
 
 const T0 = Date.parse('2026-09-30T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

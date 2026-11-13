@@ -10,7 +10,7 @@
  * main; `p-cancelled`, called off before anything of it was filed; `p-gone`, signed off on a branch deleted unmerged before any tick
  * recorded its tip. A pass has read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
-import { root } from './harness.ts';
+import { root, SEATED } from './harness.ts';
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
@@ -712,17 +712,21 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
     },
   );
   await s.test(
-    "a hold put on the board is put as `nemia hold --until --why` puts it: its file written with the why and the api's user as `by`, the list and the page say it in `nemia ls`'s words, and the lift takes it back",
+    "a hold put on the board is put as `nemia hold --until --why` puts it: its file written with the why and the api's user as `by` beside the caller as its actor, the list and the page say it in `nemia ls`'s words, and the lift takes it back",
     async () => {
       const res = await put(PUT, { until: ['p-live'], why: 'merge conflicts' });
       assert.equal(res.status, 200);
       const answer = (await res.json()) as {
         id: string;
         lifted: boolean;
-        hold: { at: string; until: string[]; why?: string; by?: string };
+        hold: { at: string; until: string[]; why?: string; by?: string; actor?: unknown };
       };
       const by = os.userInfo().username;
-      assert.deepEqual(answer, { id: PUT, lifted: false, hold: { at: answer.hold.at, until: ['p-live'], why: 'merge conflicts', by } });
+      assert.deepEqual(
+        answer,
+        { id: PUT, lifted: false, hold: { at: answer.hold.at, until: ['p-live'], why: 'merge conflicts', by, actor: SEATED } },
+        'the free-text `by` beside the caller who put it',
+      );
       assert.deepEqual(JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')), answer.hold, 'the file is the hold the answer says');
       const words = `held until p-live lands (why: merge conflicts; by ${by})`;
       const run = runsAtOnce(root).runs.read(PUT);

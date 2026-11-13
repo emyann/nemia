@@ -128,6 +128,9 @@ for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.
  */
 export const PERSON_TOKEN = 'harness-person-token-0123456789abcdefghijklmnopq';
 
+/** Who a request that presents `PERSON_TOKEN` is, as a write the api takes records it: the person, under the token's name. */
+export const SEATED = { kind: 'person', token: 'harness' } as const;
+
 /** The header a request sends that means to present no token at all: the harness takes it off, and adds none. */
 export const NO_TOKEN = { 'x-harness-token': 'none' } as const;
 

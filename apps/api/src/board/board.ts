@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import type { Handler } from 'hono';
 import { runningRelease } from 'agent-orchestrator';
-import { answered, onPort } from '../caller/caller.ts';
+import { answered, onPort } from '../caller/index.ts';
 import { ApiConfig, type ApiEnv } from '../layer.ts';
 
 /** The route the board is served on: every path, after the mount, before the api's 404. */

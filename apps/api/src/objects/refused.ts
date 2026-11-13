@@ -24,7 +24,7 @@ import {
   UnsupportedMediaType,
   WriteFailed,
 } from 'objects';
-import { Unauthorized as TokenRefused } from '../caller/caller.ts';
+import { Unauthorized as TokenRefused } from '../caller/index.ts';
 import type { Refusal } from '../guard.ts';
 import type { Served } from '../layer.ts';
 

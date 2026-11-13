@@ -13,7 +13,7 @@
  */
 import { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from 'agent-orchestrator';
 import { Api } from 'objects';
-import { personOnly } from '../caller/caller.ts';
+import { personOnly } from '../caller/index.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
 import { answeredWrite } from '../objects/refused.ts';
 

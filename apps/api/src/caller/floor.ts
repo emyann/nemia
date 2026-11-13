@@ -43,13 +43,20 @@ const LINKED: ReadonlyMap<string, readonly AdmissionEntry[]> = (() => {
 })();
 
 /**
+ * The endpoints no command links whose write is in an agent's reach, each with its class: words sent to Nemia's chat (`nemia.chatSend`),
+ * which an agent's standing token sends as that agent since `nemia say --as` retired, an act.
+ */
+const UNLINKED: Readonly<Record<string, Resolved>> = { 'nemia.chatSend': 'act' };
+
+/**
  * The command entry the endpoint `endpoint` (`<group>.<endpoint>`) serves, as the floor judges a request of it by `method`: the strictest
- * for an agent of the entries that link it; where none does, one named for the endpoint, a read for a GET and out of reach otherwise.
+ * for an agent of the entries that link it; where none does, one named for the endpoint, of its class in `UNLINKED`, else a read for a
+ * GET and out of reach otherwise.
  */
 export function floorEntryOf(endpoint: string, method: string): AdmissionEntry {
   const linked = LINKED.get(endpoint) ?? [];
   const [first, ...rest] = linked;
-  if (first === undefined) return { name: endpoint, class: method === 'GET' ? 'read' : 'none' };
+  if (first === undefined) return { name: endpoint, class: method === 'GET' ? 'read' : (UNLINKED[endpoint] ?? 'none') };
   return rest.reduce(
     (strictest, entry) => (STRICTNESS[resolvedOf(entry, method)] > STRICTNESS[resolvedOf(strictest, method)] ? entry : strictest),
     first,

@@ -323,17 +323,22 @@ shows none of it yet: a person approves by the CLI or the api.
 Nemia's keeper session, hands it to the session as `WF_SESSION_TOKEN`, and keeps only its sha-256 as the name of its record
 (`<WF_ROOT>/tokens/<digest>.json`: the agent, factory, run, step and attempt, and the engine's task). The client sends it as
 `Authorization: Bearer <token>` whenever the variable is set. Who calls is pure (`callerOf`, `src/token/token.ts`,
-`contracts/session-caller.contract.ts`), judged afresh on every request by `sessionCaller` (`src/token/caller.verb.ts`): **a request
-with no token is the person; a token, even an empty one, is never the person**; a token is its agent while its try is live — its run
-there, not called off, the step's current task the one it was minted for, and that task filed and not settled (Nemia's, while her
-keeper session is the live one) — and refused otherwise, `unknown-token` or `session-ended`, which the api answers 401. A caller the
-deciders refuse is a 403 with its reason. The person has no credential of their own yet: the person is whoever reaches the api with no
-token, which is a process of the same user on the machine, as every verb of the store is today. **So a session that drops its token
-acts as the person.** Every process in a session inherits the variable, and an allow is matched with a leading assignment stripped, so
-`WF_SESSION_TOKEN= nemia proposals approve <p>` would pass an allow of `nemia proposals approve`. Nemia's fence and the four read-only
-agents of sdlc deny any assignment before `nemia`, `Bash(*=* nemia *)` (`ASSIGNED`, `src/admission/fence.ts`;
+`contracts/session-caller.contract.ts`), judged afresh on every request by `sessionCaller` (`src/token/caller.verb.ts`): **no request
+to the api is the person for presenting no token** — every route it answers, loopback included, needs one, and one presenting none is
+refused `token-required`; a token is its agent while its try is live — its run there, not called off, the step's current task the one
+it was minted for, and that task filed and not settled (Nemia's, while her keeper session is the live one) — and refused otherwise,
+`unknown-token` or `session-ended`, which the api answers 401. The person is a standing token they minted (`nemia token add`, kept as
+`<WF_ROOT>/person-tokens/<digest>.json`), under the name of the device it is for: the board's, paired or linked into its HttpOnly
+cookie; an MCP host's; and the store's own, `local`, which the daemon keeps in `<WF_ROOT>/credential` (0600) at its start
+(`credentialKept`) and the person's `nemia` on that machine presents. A standing token the person mints for an agent (`--agent`, bound
+to a factory or store-wide, maybe narrowed to `read` or `act`) is that agent, held to its floor before any handler runs (`floorOf`,
+`src/admission/floor.ts`, `contracts/token-floor.contract.ts`): the classes, levels and confirmed list admission judges a session by,
+what it would ask the person of refused. A caller the deciders refuse is a 403 with its reason. A session that drops its token is
+refused, never the person; and every write the api takes records its caller as an actor (`actorOf`, objects' `Actor`), served beside
+it and on the feed. A program run in-process, which reaches no api, is the person (`PERSON`). Nemia's fence and the four read-only agents of sdlc
+still deny any assignment before `nemia`, `Bash(*=* nemia *)` (`ASSIGNED`, `src/admission/fence.ts`;
 `packages/templates/test/fences.test.ts` and the planted lines of `packages/agent-orchestrator/test/agent-fences.test.ts`), as git's
-and gh's are denied; a writer running `auto`, or a spelling the shell rejoins, is not held by it.
+and gh's are denied.
 
 **In the orchestrator today, a candidate for the runtime**:
 
@@ -379,8 +384,8 @@ entry of the command table names the endpoints that serve it (`served`, an `Endp
 endpoint's Schema and its call that endpoint, made in-process with the caller's own `Authorization`. What it answers fits what a host
 reads: a list that prints a `Table` is answered as its lines (`objects`' `tableLines`, the client's printer), every list pages (a link's
 `query` gives a key's default, `limit` the port's page), and no answer passes the port's bound (`answerFit`). Who a request is from is judged
-before any router (`callerGate`) by the route's need of a token (`TokenNeed`): the port needs a person's token (`nemia token add`); every
-route the api answers (`/api`, `/openapi`) of a store marked exposed (`WF_EXPOSED=1`) needs one; else none is the person. The api
+before any router (`callerGate`) by the route's need of a token (`TokenNeed`): the port needs a standing token (`nemia token add`); every
+route the api answers (`/api`, `/openapi`) needs one, on every store, loopback included; a page of the board and a pairing none. The api
 listens on this machine's loopback unless `NEMIA_BIND` names another address, which it takes on a store marked exposed alone (`bindOf`,
 `apps/api/src/port.ts`); TLS stays outside it. It serves the board's built pages beside `/api` on one origin (`apps/api/src/board/`),
 which need no token: the board's page asks for one where a read is refused for it, and the api keeps the pasted token as this browser's

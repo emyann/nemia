@@ -315,6 +315,11 @@
       "term": "Definition files",
       "meaning": "a workflow's, an agent's or a skill's files as a person keeps them, each by its path and text, sent to `POST /api/{workflows|agents|skills}/read`, which reads them into the kind's spec by the orchestrator's readers and writes nothing (`DefinitionFiles`, `packages/objects/src/workflow.ts`).",
       "type": "DefinitionFiles"
+    },
+    {
+      "term": "Actor",
+      "meaning": "who made a write, as the record keeps it and the api serves it beside the write: the person, under the name of the token they presented, or an agent, under its own name, by a standing token or of its session's run and step (`Actor`, `packages/objects/src/token.ts`). An approval, an answer, a retry, a hold, a pause and a cancel each record theirs, and the board says it in one wording (`actorWords`). Every key but `kind` optional, so a record written before actors were said reads with none.",
+      "type": "Actor"
     }
   ]
 }

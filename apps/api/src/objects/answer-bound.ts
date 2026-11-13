@@ -15,7 +15,7 @@ import { HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { tokenFloor } from 'agent-orchestrator';
 import { Api, type ApiGetName, Forbidden, READS } from 'objects';
-import { floorEntryOf, floorWords } from '../caller/floor.ts';
+import { floorEntryOf, floorWords } from '../caller/index.ts';
 import { answered, type ApiError, bodyOf, ServedNow, statusOf } from './refused.ts';
 
 /** The JSON length of `text` as a JSON string: its quotes, and each character as `JSON.stringify` escapes it. */

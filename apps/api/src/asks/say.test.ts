@@ -243,6 +243,9 @@ test("who says words to a step: a session by its token as its agent, framed; an 
     }).pipe(Effect.provide(tokenDoorFiles(root))),
   );
   const asOperator = { ...BOARD, authorization: `Bearer ${ops}` };
+  /** The store at semi-auto, as `nemia level semi-auto` writes it: the least an agent's standing token acts at (its floor). */
+  fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0) }));
 
   await s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {
     const res = await sayTo('implement', { text: 'Start with the parser.' }, asSession);

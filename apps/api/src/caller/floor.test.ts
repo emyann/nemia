@@ -158,12 +158,13 @@ test('REFUSED 403 other-factory on the MCP port: a tool call reaches its endpoin
   await client.close();
 });
 
-test('floorEntryOf: an endpoint is the entry that links it; one no entry links is a read for a GET and out of reach otherwise', async (t) => {
+test('floorEntryOf: an endpoint is the entry that links it; one no entry links is a read for a GET, an act for a chat send, and out of reach otherwise', async (t) => {
   for (const [endpoint, method, name, cls] of [
     ['runs.approve', 'POST', 'approve', 'answer'],
     ['tokens.mint', 'POST', 'token add', 'none'],
     ['runs.lines', 'GET', 'runs.lines', 'read'],
     ['server.signIn', 'POST', 'server.signIn', 'none'],
+    ['nemia.chatSend', 'POST', 'nemia.chatSend', 'act'],
   ] as const)
     await t.test(`${method} ${endpoint}`, () => {
       const entry = floorEntryOf(endpoint, method);

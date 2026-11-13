@@ -14,7 +14,7 @@
  * the run records this file seeds. Each 409 is asserted equal to what the package's verb says itself. The table runs first: the
  * stories write beside the runs, and what they write stays.
  */
-import { root } from '../../test/harness.ts';
+import { root, SEATED } from '../../test/harness.ts';
 import { actorWords, type DecideCommand, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
@@ -29,9 +29,6 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
-
-/** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
-const SEATED = { kind: 'person', token: 'harness' } as const;
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);

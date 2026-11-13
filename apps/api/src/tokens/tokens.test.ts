@@ -115,20 +115,20 @@ test('a token retired is refused by the gate from then on, and gone from the lis
   assert.equal((await send('DELETE', '/api/tokens/tokens-never-kept', personToken)).status, 404);
 });
 
-test("REFUSED 403 person-only: an agent's standing token and a session's on each route of the group, nothing minted or retired", async () => {
+test("REFUSED 403: an agent's standing token held at its floor on a write (class none: out of reach) and person-only on the list, a read; a session's person-only, on each route of the group, nothing minted or retired", async () => {
   sessionRunning();
-  for (const [bearer, whose] of [
-    [agentToken, "an agent's standing token"],
-    [sessionToken, "a session's token"],
+  for (const [bearer, whose, writes] of [
+    [agentToken, "an agent's standing token", 'out-of-reach'],
+    [sessionToken, "a session's token", 'person-only'],
   ] as const) {
-    for (const [method, url, body] of [
-      ['GET', '/api/tokens', undefined],
-      ['POST', '/api/tokens', { name: 'tokens-by-an-agent' }],
-      ['DELETE', '/api/tokens/tokens-laptop', undefined],
+    for (const [method, url, body, reason] of [
+      ['GET', '/api/tokens', undefined, 'person-only'],
+      ['POST', '/api/tokens', { name: 'tokens-by-an-agent' }, writes],
+      ['DELETE', '/api/tokens/tokens-laptop', undefined, writes],
     ] as const) {
       const res = await send(method, url, bearer, body);
       assert.equal(res.status, 403, `${whose}: ${method} ${url}`);
-      assert.equal(await reasonOf(res), 'person-only', `${whose}: ${method} ${url}`);
+      assert.equal(await reasonOf(res), reason, `${whose}: ${method} ${url}`);
     }
   }
   const { tokens } = (await (await send('GET', '/api/tokens', personToken)).json()) as TokenList;

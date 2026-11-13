@@ -258,6 +258,11 @@
       "type": "CardWrite"
     },
     {
+      "term": "CardEdit",
+      "meaning": "a card written from its text, the body of the Card's edit (`PUT /api/namespaces/<factory>/cards/<name>/source`, what `nemia inbox edit` sends): the card's file as it is to be, read as the card's own file is read, and the `resourceVersion` it was read at; its name and labels kept (`CardEdit`, `packages/objects/src/card.ts`).",
+      "type": "CardEdit"
+    },
+    {
       "term": "Card key meaning",
       "meaning": "one line saying what a key of a card's frontmatter means, in `CARD_KEYS`' order: the description of the Card's field that holds it, which `nemia explain` and the board's card page read (`CARD_KEY_MEANINGS`, `packages/objects/src/card.ts`).",
       "type": "CARD_KEY_MEANINGS"

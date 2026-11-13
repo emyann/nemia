@@ -65,6 +65,7 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['inbox add', 'cli'],
       ['inbox queue', 'cli'],
       ['inbox from', 'cli'],
+      ['inbox edit', 'cli'],
       ['inbox rm', 'cli'],
       ['label run', 'cli'],
       ['label inbox', 'cli'],

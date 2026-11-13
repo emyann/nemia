@@ -164,6 +164,7 @@ export {
   CardStart,
   CardStatus,
   CardWrite,
+  CardEdit,
   type CardKey,
   type CardState,
 } from './card.ts';
@@ -248,6 +249,7 @@ export {
   streamsOf,
 } from './endpoint-keys.ts';
 export { jsonBodied } from './write-body.ts';
+export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';
@@ -697,6 +699,7 @@ export {
 } from './commands-runs.ts';
 export {
   INBOX_ADD_WORDS,
+  INBOX_EDIT_WORDS,
   INBOX_FROM_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_RM_WORDS,

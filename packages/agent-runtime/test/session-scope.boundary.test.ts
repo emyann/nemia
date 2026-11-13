@@ -17,14 +17,14 @@ import { Effect } from 'effect';
 import { Engine as EngineService } from '../src/index.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
-import { scopeRefusal } from '../src/harness/cgroup.ts';
+import { cgroupNow, scopeRefusal } from '../src/harness/cgroup.ts';
 import { RunnerError } from '../src/harness/seam.ts';
 import { scratch } from 'test-kit/scratch';
 import { builtEngine } from './engine.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 import { holder, kept, NAME, run } from './attached-held.ts';
 import { filesOf, writeRun } from '../src/harness/claude/attached-file.ts';
-import { spawn } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 const refused = scopeRefusal();
 const SKIP = refused ? { skip: refused } : {};
@@ -161,17 +161,17 @@ test(
   async (t) => {
     const { root, dir, request } = kept({});
     const left = path.join(dir, 'left');
-    const scoped = spawn(
-      'systemd-run',
-      ['--user', '--scope', '--quiet', '--collect', '--', 'sh', '-c', `echo $$ > '${left}'; exec sleep 600`],
-      {
-        stdio: 'ignore',
-      },
-    );
-    t.after(() => void scoped.kill('SIGKILL'));
-    const child = await pidIn(t, left, 'the scoped sleep wrote its pid');
+    const leaves = `setsid sh -c "trap '' TERM HUP; echo \\$\\$ > '${left}'; exec sleep 600" </dev/null >/dev/null 2>&1 & exit 0`;
+    const made = spawnSync('systemd-run', ['--user', '--scope', '--quiet', '--collect', '--', 'sh', '-c', leaves], {
+      encoding: 'utf8',
+      timeout: 20_000,
+    });
+    assert.equal(made.status, 0, `systemd-run made the scope: ${made.stderr}`);
+    const child = await pidIn(t, left, 'the scoped child wrote its pid');
     bounded(t, child);
-    const scope = `/sys/fs/cgroup${fs.readFileSync(`/proc/${child}/cgroup`, 'utf8').trim().slice(3)}`;
+    const scope = cgroupNow(child);
+    assert.match(String(scope), /^\/sys\/fs\/cgroup\/.+\.scope$/, `the child sits in its scope: ${String(scope)}`);
+    if (scope === undefined) return;
     fs.mkdirSync(path.dirname(filesOf(root, NAME).run), { recursive: true });
     writeRun(root, {
       name: NAME,
@@ -191,7 +191,13 @@ test(
     const again = await Effect.runPromise(Effect.flip(release(seen, {})));
     assert.ok(again instanceof RunnerError, 'refused while its scope held a process, so the next pass asks again');
     await until(t, () => !there(child), 'what its scope held is killed', { everyMs: 20 });
-    await until(t, () => !fs.existsSync(scope), 'the scope is collected', { everyMs: 20 });
+    await until(
+      t,
+      () => !fs.existsSync(scope),
+      () =>
+        `the scope is collected: ${scope} still lists ${fs.existsSync(scope) ? fs.readFileSync(`${scope}/cgroup.procs`, 'utf8').trim() || 'nothing' : 'nothing'}`,
+      { everyMs: 20 },
+    );
     await Effect.runPromise(release(seen, {}));
   },
 );

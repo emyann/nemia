@@ -113,6 +113,9 @@ const saidBeforeOf = (step: StepSpec, run: Run, retry?: RetryBriefing, round?: R
 const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly string[]): string =>
   opened(step) + handed.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '');
 
+/** What a continued session is told of its tree, which the run provisioned again under it: under its own heading, or nothing. */
+const resumedLook = (tree: readonly string[]): string => (tree.length ? ['', '', '## Where to look', '', ...tree, ''].join('\n') : '');
+
 /**
  * What a step is told. THE decision about what one step knows of another.
  *
@@ -171,7 +174,8 @@ const resumedBrief = (step: StepSpec, handed: readonly string[], tree: readonly 
  *
  * @param closeoutOf How each step signed off. Read only for the steps this one names in `input:`.
  * @param artifactsDir The directory the run made for this step's files (`artifactsDir` in record.store.ts).
- * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts).
+ * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts), or before this
+ *   try or round (`keepWorktreeInstalled`): said to a session continued too, since its tree changed under it.
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them land, or was handed runs as context
@@ -215,9 +219,9 @@ export function composeBrief(
   const inFolder = placeOf(run) === 'folder';
   const contracts = contractsOf(step, run, steps, { artifactsDir, round, words: place.words, inFolder });
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
-  if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const tree = depsLines(deps);
+  if (retry?.resumed || round?.resumed) return again.slice(1) + resumedLook(tree) + contracts;
+  const given = givenSections(step, run, steps, closeoutOf, checked, place.say) + again + judgeSection(step, steps, place.targets);
   const handed = handedOf(step, run, steps, closeoutOf, parents, costs, answers);
   const saidBefore = saidBeforeOf(step, run, retry, round);
 

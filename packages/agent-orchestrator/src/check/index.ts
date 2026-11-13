@@ -11,6 +11,7 @@ export {
   checkArgv,
   checkContract,
   type CheckEnv,
+  type CheckFirst,
   checkEnvOf,
   type CheckHanded,
   checkHandedSection,
@@ -34,6 +35,7 @@ export {
   refusalSection,
   REPORTED_LINES,
   reportedLines,
+  UNPROVISIONED,
   type Verdict,
   verdictWord,
 } from './check.ts';

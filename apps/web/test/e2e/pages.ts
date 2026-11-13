@@ -192,7 +192,7 @@ export function planOf<P extends { name: string }>(
   }
   if (look && shard !== undefined)
     throw new Error(
-      '--look runs the look\'s tests once, and a shard is one of several runs of the pages: run them apart ' +
+      "--look runs the look's tests once, and a shard is one of several runs of the pages: run them apart " +
         '(npm run e2e -- --look, and npm run e2e -- --shard 1 --of 4)',
     );
   if (look && !named && (photos || measured || workers !== undefined))

@@ -34,7 +34,9 @@ const boundBreaks = (argv: readonly string[], suite: string): string[] => {
     breaks.push(`the look's tests give no --test-timeout=${WAITED.timeout}: add it to LOOK_TESTS (e2e/look.ts)`);
   const bound = valueOf(suite.split(/\s+/), 'test-concurrency');
   if (bound === null || valueOf(argv, 'test-concurrency') !== bound)
-    breaks.push(`the look's tests run other than --test-concurrency=${bound} at once, as npm test does: set it in LOOK_TESTS (e2e/look.ts)`);
+    breaks.push(
+      `the look's tests run other than --test-concurrency=${bound} at once, as npm test does: set it in LOOK_TESTS (e2e/look.ts)`,
+    );
   return breaks;
 };
 
@@ -63,9 +65,12 @@ test('REFUSED: the look run unbounded, bounded otherwise than npm test, or with 
 test("the e2e script is the runner alone, so npm appends --pages to it, and the runner runs the look's tests first when asked", () => {
   assert.deepEqual(scriptBreaks(scripts().e2e), []);
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  assert.match(runner, /const plan = planOf\(process\.argv\.slice\(2\), pages\);\s*if \(plan\.look\) await lookTests\(children\);[^]*?build\(\);/);
+  assert.match(
+    runner,
+    /const plan = planOf\(process\.argv\.slice\(2\), pages\);\s*if \(plan\.look\) await lookTests\(children\);[^]*?build\(\);/,
+  );
 });
 
-test("REFUSED: the old script, which ran every look test past any --pages", () => {
+test('REFUSED: the old script, which ran every look test past any --pages', () => {
   assert.equal(scriptBreaks('node --test --test-timeout=120000 test/e2e/*.test.ts && node test/e2e/run.ts').length, 1);
 });

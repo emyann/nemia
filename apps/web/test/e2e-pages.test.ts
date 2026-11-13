@@ -357,11 +357,14 @@ test('REFUSED: a flag the e2e does not know', () => {
   assert.throws(
     () => planOf(['--colour'], ABC),
     (e: Error) =>
-      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(e.message),
+      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not --colour\b/.test(
+        e.message,
+      ),
   );
   assert.throws(
     () => planOf(['b'], ABC),
-    (e: Error) => /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not b\b/.test(e.message),
+    (e: Error) =>
+      /^the e2e takes --look, --photos, --contrast, --pages <name,…>, --workers <n> and --shard <i> --of <n>, not b\b/.test(e.message),
   );
 });
 

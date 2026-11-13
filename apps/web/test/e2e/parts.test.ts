@@ -3,7 +3,8 @@
  * story draws. The pager's and the text link's keyboard paths navigate once, a pager's end that leads nowhere takes no focus, and a
  * focus ring inside the cut-corner frame is drawn whole over its cut corner — refused for the same frame cut by a clip; the cut
  * button's shape and its ring, as a link and as a press, and a frame's cut corner and its glow, are each read in a picture, pixel by
- * pixel; a press is pressed by the keyboard, and a disabled one by nothing. `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
+ * pixel; a press is pressed by the keyboard, and a disabled one by nothing.
+ * `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';

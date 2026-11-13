@@ -31,6 +31,7 @@ import {
 } from '../src/core/admission.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { admissionOf, type EngineOptions } from '../src/service/options.ts';
 import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 
@@ -445,12 +446,15 @@ test("a task queued under one default and admitted under a smaller one counts at
   const after = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
   const id = await Effect.runPromise(before.engine.file({ brief: 'land', cwd: '/r', queued: true }));
 
-  await s.test('filed under an 8Gi default and no request, it waits for memory counted at 8Gi, and its filing carries no resources', async () => {
-    const pass = await Effect.runPromise(before.engine.tick());
-    assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 8 * GI, roomBytes: 5 * GI });
-    assert.equal((await journal.read(id)).find((e) => e.kind === 'filed')?.resources, undefined);
-    assert.equal((await Effect.runPromise(before.engine.view(id))).state.resources, undefined);
-  });
+  await s.test(
+    'filed under an 8Gi default and no request, it waits for memory counted at 8Gi, and its filing carries no resources',
+    async () => {
+      const pass = await Effect.runPromise(before.engine.tick());
+      assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 8 * GI, roomBytes: 5 * GI });
+      assert.equal((await journal.read(id)).find((e) => e.kind === 'filed')?.resources, undefined);
+      assert.equal((await Effect.runPromise(before.engine.view(id))).state.resources, undefined);
+    },
+  );
 
   await s.test('the engine resized to a 2560Mi default request: the same queued task now says it needs 2560Mi', async () => {
     machine.availableBytes = 3 * GI;
@@ -464,28 +468,50 @@ test("a task queued under one default and admitted under a smaller one counts at
     assert.equal(pass.views.find((v) => v.id === id)?.admission, 'admitted');
   });
 
-  await s.test('it starts under the defaults in force then: its `starting` entry, its attempt and its spawn request say the same', async () => {
-    await Effect.runPromise(after.engine.tick());
-    const resized = { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } };
-    assert.deepEqual((await journal.read(id)).find((e) => e.kind === 'starting')?.resources, resized);
-    assert.deepEqual((await Effect.runPromise(after.engine.view(id))).state.attempts[0]?.resources, resized);
-    assert.deepEqual(
-      after.asked.map((r) => r.resources),
-      [resized],
-    );
-  });
+  await s.test(
+    'it starts under the defaults in force then: its `starting` entry, its attempt and its spawn request say the same',
+    async () => {
+      await Effect.runPromise(after.engine.tick());
+      const resized = { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } };
+      assert.deepEqual((await journal.read(id)).find((e) => e.kind === 'starting')?.resources, resized);
+      assert.deepEqual((await Effect.runPromise(after.engine.view(id))).state.attempts[0]?.resources, resized);
+      assert.deepEqual(
+        after.asked.map((r) => r.resources),
+        [resized],
+      );
+    },
+  );
 
   await s.test(
     'resized again to a 6Gi request, the running session is still counted at the 2560Mi it started under: a 10Gi task of its own fits the 12.5Gi that leaves, where 9Gi would not hold it',
     async () => {
       machine.availableBytes = 14 * GI;
       const again = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '6Gi' });
-      const big = await Effect.runPromise(again.engine.file({ brief: 'big', cwd: '/r', queued: true, resources: { limits: { memory: '10Gi' } } }));
+      const big = await Effect.runPromise(
+        again.engine.file({ brief: 'big', cwd: '/r', queued: true, resources: { limits: { memory: '10Gi' } } }),
+      );
       const pass = await Effect.runPromise(again.engine.tick());
       assert.equal(pass.views.find((v) => v.id === big)?.admission, 'admitted');
       assert.deepEqual((await Effect.runPromise(again.engine.view(big))).state.resources, { limits: { memory: '10Gi' } }, 'its own kept');
     },
   );
+});
+
+test("the engine's defaults, as its admission holds them: a harness that runs a process here takes them, a remote agent's task and a harness the engine does not have none, and an engine with none gives none", async (t) => {
+  const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(new Map())), remote: { url: 'https://a.example' } };
+  const defaultsOf = (options: Pick<EngineOptions, 'defaultLimits' | 'defaultRequests'>) =>
+    Effect.runSync(Effect.provide(Effect.service(Admission), admissionOf({ root: '/r', ...options }, harnesses))).defaultsOf;
+  const sized = defaultsOf({ defaultLimits: { memory: '8Gi' }, defaultRequests: { memory: '2560Mi' } });
+  await t.test('a harness here', () => assert.deepEqual(sized?.('a'), { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } }));
+  await t.test('a request alone', () =>
+    assert.deepEqual(defaultsOf({ defaultRequests: { memory: '1Gi' } })?.('a'), { requests: { memory: '1Gi' } }),
+  );
+  await t.test("a remote agent's", () => assert.equal(sized?.('remote'), undefined));
+  await t.test('a harness it does not have, and none', () => {
+    assert.equal(sized?.('gone'), undefined);
+    assert.equal(sized?.(undefined), undefined);
+  });
+  await t.test('no defaults', () => assert.equal(defaultsOf({}), undefined));
 });
 
 const T0 = Date.parse('2026-10-04T10:00:00.000Z');

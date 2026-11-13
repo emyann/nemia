@@ -48,8 +48,7 @@ const runsUnderSpec = spec<(task: Sizing) => TaskResources | undefined>({
     anOlderAttemptRunsUnderItsFiling: {
       description:
         'An attempt in flight that recorded nothing at its start, as an older runtime started one, runs under what its filing carried, and the defaults now change nothing',
-      condition: ({ input: [task], output }) =>
-        task.inFlight === null || task.inFlight.resources !== undefined || same(output, task.filed),
+      condition: ({ input: [task], output }) => task.inFlight === null || task.inFlight.resources !== undefined || same(output, task.filed),
     },
     ownResourcesAreKept: {
       description: 'A task with no attempt in flight that was filed with resources runs under them, whatever the engine holds now',

@@ -64,8 +64,8 @@ export type EngineOptions = {
   /**
    * The memory request a task filed with no resources of its own runs under, as a LimitRange's defaultRequest: a Kubernetes
    * quantity, applied beside `defaultLimits` as each attempt starts, and what admission counts the task at against the machine
-   * (`reserved`), as the engine holds it when it admits. Refused at `Engine.layer` unless `memoryBytesOf` reads it, and when above `defaultLimits.memory`. Absent: a task
-   * with no request of its own is counted at its limit, else at nothing.
+   * (`reserved`), as the engine holds it when it admits. Refused at `Engine.layer` unless `memoryBytesOf` reads it, and when above
+   * `defaultLimits.memory`. Absent: a task with no request of its own is counted at its limit, else at nothing.
    */
   defaultRequests?: { memory: string };
   /**
@@ -231,8 +231,9 @@ export type TaskSpec = {
   /**
    * What the task's process tree may use, a container's `resources`: `limits.memory` alone, a Kubernetes quantity (`8Gi`, `512Mi`,
    * `4G`). Its harness and every child it starts run in a cgroup of their own under it, and a process that passes it is ended by the
-   * kernel there alone; the attempt says so (`Attempt.memory`). Absent: the engine's `defaultLimits` as it holds them when each attempt starts, else no limit. Taken by every
-   * harness that runs a process here, refused on a remote agent's; any other key is refused.
+   * kernel there alone; the attempt says so (`Attempt.memory`). Absent: the engine's `defaultLimits` as it holds them when each
+   * attempt starts, else no limit. Taken by every harness that runs a process here, refused on a remote agent's; any other key is
+   * refused.
    */
   resources?: Resources;
 };

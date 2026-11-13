@@ -23,7 +23,9 @@ import {
   type Now,
   type SessionAsk,
   type Sighting,
+  type Attempt,
   type State,
+  type TaskResources,
   type Usage,
 } from '../domain.ts';
 import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
@@ -261,6 +263,10 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
   ...parkedEnd(state, n, seen),
 });
 
+/** What attempt `attempt` of `state` runs under: what its `starting` entry recorded, else the filing's (`runsUnder`). */
+const attemptRuns = (state: State, attempt: Attempt | undefined): TaskResources | undefined =>
+  runsUnder({ filed: state.resources, inFlight: { resources: attempt?.resources }, defaults: undefined });
+
 /**
  * What a harness is asked to start for attempt `n` of task `taskId`, named `name`: its brief (or the words that nudge it), folder,
  * harness and configuration for its turn — handed what is left of its cap where it continues a parked attempt (`continuedCap`) — the
@@ -269,7 +275,7 @@ const endFacts = (state: State, n: number, seen: Sighting | undefined) => ({
  */
 const spawnRequestOf = (taskId: string, state: State, name: string, n: number): SpawnRequest => {
   const attempt = state.attempts.find((a) => a.n === n);
-  const resources = runsUnder({ filed: state.resources, inFlight: { resources: attempt?.resources }, defaults: undefined });
+  const resources = attemptRuns(state, attempt);
   return {
     name,
     brief: attempt?.nudge ?? state.brief,
@@ -285,6 +291,22 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
     ...continuedCap(state, n, configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config)),
   };
 };
+
+/**
+ * The `starting` entry `start` journals, unstamped: the attempt, what it continues and is told, and what it runs under (`runsUnder`):
+ * the task's own resources, else the engine's defaults in force now (`Admission`), as a LimitRange's land on a Pod when it is made.
+ */
+const startingOf = Effect.fn('startingOf')(function* (state: State, action: Extract<Action, { do: 'start' }>) {
+  const defaults = (yield* Admission).defaultsOf?.(state.harness);
+  const resources = runsUnder({ filed: state.resources, inFlight: null, defaults });
+  return {
+    kind: 'starting' as const,
+    attempt: action.attempt,
+    resumeFrom: action.resumeFrom,
+    nudge: action.nudge,
+    ...(resources ? { resources } : {}),
+  };
+});
 
 /**
  * `reconcile`, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `reconcile`'s door does not
@@ -333,22 +355,9 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
     case 'nothing':
       break;
 
-    case 'start': {
-      const resources = runsUnder({
-        filed: state.resources,
-        inFlight: null,
-        defaults: (yield* Admission).defaultsOf?.(state.harness),
-      });
-      yield* journal.append(TaskId.read(taskId), {
-        kind: 'starting',
-        ...stamped(),
-        attempt: action.attempt,
-        resumeFrom: action.resumeFrom,
-        nudge: action.nudge,
-        ...(resources ? { resources } : {}),
-      });
+    case 'start':
+      yield* journal.append(TaskId.read(taskId), { ...(yield* startingOf(state, action)), ...stamped() });
       break;
-    }
 
     case 'spawn': {
       const failed = yield* runner.spawn(spawnRequestOf(taskId, state, action.name, action.attempt)).pipe(

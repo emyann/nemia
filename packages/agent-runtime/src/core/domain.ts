@@ -730,6 +730,24 @@ export type State = {
   settled: Outcome | null;
 };
 
+/** The attempt a `starting` event `e` opens on `s`: not yet spawned, with what it continues, is told and runs under, and its turn. */
+const startedAttempt = (s: State, e: Extract<Event, { kind: 'starting' }>): Attempt => ({
+  n: e.attempt,
+  startedAt: e.at,
+  ...(e.mono ? { startedMono: e.mono } : {}),
+  spawnedAt: null,
+  ended: null,
+  endedAt: null,
+  reason: null,
+  nativeId: null,
+  resumeFrom: e.resumeFrom,
+  ...(e.nudge ? { nudge: e.nudge } : {}),
+  ...(e.resources ? { resources: e.resources } : {}),
+  usage: null,
+  exitCode: null,
+  ...(s.inputs.length ? { turn: s.inputs.length } : {}),
+});
+
 /**
  * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills, files or denials kept — measured, none — though an empty
  * one of denials never takes away a denial seen while it ran (`denied`), and an end with no usage keeping what was counted while it ran
@@ -817,22 +835,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       case 'starting':
         delete s.waits;
-        s.attempts.push({
-          n: e.attempt,
-          startedAt: e.at,
-          ...(e.mono ? { startedMono: e.mono } : {}),
-          spawnedAt: null,
-          ended: null,
-          endedAt: null,
-          reason: null,
-          nativeId: null,
-          resumeFrom: e.resumeFrom,
-          ...(e.nudge ? { nudge: e.nudge } : {}),
-          ...(e.resources ? { resources: e.resources } : {}),
-          usage: null,
-          exitCode: null,
-          ...(s.inputs.length ? { turn: s.inputs.length } : {}),
-        });
+        s.attempts.push(startedAttempt(s, e));
         break;
       case 'stop-requested':
         s.stopRequested = true;

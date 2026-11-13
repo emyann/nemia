@@ -146,9 +146,7 @@ const inFlightOf = (view: AdmissionView): { resources: TaskResources | undefined
 
 /** What admission counts a task at, in bytes: what it runs under (`runsUnder`) as `rule` holds its defaults now (`needBytesOf`). */
 const needOf = (view: AdmissionView, rule: AdmissionRule): number =>
-  needBytesOf(
-    runsUnder({ filed: view.state.resources, inFlight: inFlightOf(view), defaults: rule.defaultsOf?.(view.state.harness) }),
-  );
+  needBytesOf(runsUnder({ filed: view.state.resources, inFlight: inFlightOf(view), defaults: rule.defaultsOf?.(view.state.harness) }));
 
 /**
  * What a task needs of the machine's memory, in bytes, as admission counts it: its request (`resources.requests.memory`), else its

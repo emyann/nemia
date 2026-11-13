@@ -72,7 +72,9 @@ test("REFUSED: no reader of the frame applies the whole list's rule to the light
     'components/frame/GaugesBar.tsx',
     'components/frame/FrameHeader.tsx',
     'components/frame/FrameRail.tsx',
-    'components/nemia/NemiaDock.tsx',
+    'components/nemia/useNemiaPresence.ts',
+    'components/nemia/NemiaRailFace.tsx',
+    'components/frame/HerSheet.tsx',
   ];
   for (const file of [...frame, 'components/factory/FactoryBar.tsx', 'components/run/WaitingBar.tsx']) {
     assert.deepEqual(wholeListRule(read(file)), [], `${file} reads the api's counts, never inFlight nor waitsOnYou`);
@@ -102,9 +104,9 @@ test("REFUSED: Nemia's cue, the rail's Runs badge and the Runs page's plate coun
     assert.notDeepEqual(frameRunsQuery('/runs', { factory: 'kit' }).queryKey, openRunsQuery().queryKey, 'a key that tells them apart');
   });
   await t.test("her cue's runs are that query's counts.waiting, never her presence's own number", () => {
-    const dock = read('components/nemia/NemiaDock.tsx');
+    const dock = read('components/nemia/useNemiaPresence.ts');
     const counted = frameRunsRead(dock);
-    assert.ok(counted, "the dock reads the frame's query");
+    assert.ok(counted, "her presence reads the frame's query");
     assert.match(dock, new RegExp(`presenceOf\\(\\s*chat\\.state\\.presence,[^,]+,\\s*${counted}\\?\\.counts\\.waiting\\b`));
     assert.doesNotMatch(dock, /presence\.waitsOnYou/, "the api's own sum is no part of the cue");
   });
@@ -116,7 +118,7 @@ test("REFUSED: Nemia's cue, the rail's Runs badge and the Runs page's plate coun
     assert.match(page, /useSuspenseQuery\(openRunsQuery\(search\.factory, search\.l\)\)/);
     assert.match(page, /<Plate count=\{counts\.waiting\}/);
   });
-  await t.test('the scan finds a dock that reads another query', () => {
+  await t.test('the scan finds a reader of another query', () => {
     assert.equal(frameRunsRead('const counted = useQuery(openRunsQuery()).data;'), undefined);
   });
 });

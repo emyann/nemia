@@ -15,7 +15,7 @@
  * And the daemon's other sweep, of the store's disk (`disk`): that `up` forks it once its first pass answered and hands its reading on.
  */
 import { configGiven } from './config-given.ts';
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,7 +38,8 @@ import { recentPasses } from '../src/daemon/daemon.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 import { hold, unhold } from '../src/wait/wait.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
-import { told } from './typed.ts';
+import { listedRow, stepRow, told } from './typed.ts';
+import { shownNote, shownStatus, type RunsListed } from '../src/list/list.ts';
 import { forgetTyped } from './forgetting.ts';
 
 const ROOT = scratch('wf-free-');
@@ -219,16 +220,8 @@ async function shipped(id: string, repo: string) {
   return ticked((pass) => rests(pass, id, 'succeeded'), `${id} landed and at rest`);
 }
 
-const printedBy = async (t: TestContext, argv: string[]) => {
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
-  try {
-    await stage.main(argv, engine());
-  } finally {
-    log.mock.restore();
-  }
-  return out;
-};
+/** What `nemia ls` answers (`RunsListed`) over the stage's engine. */
+const listed = async (): Promise<RunsListed> => (await stage.main(['ls'], engine())) as RunsListed;
 
 test(
   'after a landing, the sweeps free what is finished and leave what is not \u2014 and the daemon frees and measures with no person',
@@ -237,7 +230,7 @@ test(
     const s = story(t);
     await s.test(
       'a run lands by its ending, and a later sweep frees its worktree: marked, said, and its record, branch and files kept',
-      async (t) => {
+      async () => {
         const { id, repo } = await started(ENDING);
         await land(id, repo);
         const wt = lane(id);
@@ -280,11 +273,8 @@ test(
         assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
         assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'landed');
-        const ls = await printedBy(t, ['ls']);
-        assert.ok(
-          ls.some((l) => l.startsWith(`${id}  `) && l.includes('(pruned)')),
-          ls.join('\n'),
-        );
+        const row = (await listed()).runs.find((r) => r.run.id === id);
+        assert.ok(row?.run.pruned, `nemia ls answers ${id} pruned`);
         assert.deepEqual(
           (await sweep(await tick(), [id], freshFreeMemory())).verbs,
           [],
@@ -342,17 +332,14 @@ test(
 
     await s.test(
       'a run held, then cancelled at its gate — as ebky was — is freed at shipped defaults, and nemia ls says its gate can never be approved',
-      async (t) => {
+      async () => {
         const { id } = await started(GATED);
         await worked(id);
         await stage.runWith(engine(), hold(id, []));
         await stage.runWith(engine(), cancelRun(id));
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${id}.hold`)), 'the hold stands, cancelled');
-        const ls = await printedBy(t, ['ls']);
-        const at = ls.findIndex((l) => l.startsWith(`${id}  `));
-        const end = ls.findIndex((l, k) => k > at && !/^\s/.test(l));
-        const gate = ls.slice(at + 1, end < 0 ? undefined : end).find((l) => /^\s+work\b/.test(l));
-        assert.ok(gate, ls.join('\n'));
+        const work = stepRow(listedRow(await listed(), id), 'work');
+        const gate = `${shownStatus(work)} · ${shownNote(work) ?? ''}`;
         assert.ok(!gate.includes('nemia approve'), `no verb a cancelled run refuses is offered: ${gate}`);
         assert.match(gate, /never can be/);
 

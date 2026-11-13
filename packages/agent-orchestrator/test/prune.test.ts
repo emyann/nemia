@@ -52,7 +52,8 @@ import { PlaceService } from '../src/place/place.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told } from './typed.ts';
+import { listedRow, told } from './typed.ts';
+import { shownNote, shownStatus, type Listing, type RunsListed } from '../src/list/list.ts';
 import { forgetTyped, type Typed } from './forgetting.ts';
 
 const ROOT = scratch('wf-prune-');
@@ -170,6 +171,22 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]): Promise<Type
   }
 };
 
+/** `nemia ls <id>` over `e`: what it answers (`RunsListed`), run `id`'s row in it, and its listing (`listedRow`). */
+const listedOf = async (e: Engine, id: string): Promise<{ row: RunsListed['runs'][number]; listing: Listing }> => {
+  const listed = (await stage.main(['ls', id], e)) as RunsListed;
+  const listing = listedRow(listed, id);
+  return { row: listed.runs.find((r) => r.run.id === id)!, listing };
+};
+
+/**
+ * Whether a listing says the run waits on a person anywhere: a step it names (`waitingOnYou`), a run its roots wait on that is missing,
+ * cancelled or gone (`waiting`), or a step's own word (`message`), as an over-budget step's is.
+ */
+const waitsOnYou = (l: Listing): boolean =>
+  l.waitingOnYou.length > 0 ||
+  l.waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length) ||
+  l.steps.some((s) => /waiting on you/.test(s.message));
+
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
 const worktreesOf = (repo: string): string[] => {
   const outcome = placeNow().askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
@@ -275,8 +292,8 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
         'the record itself never holds it',
       );
 
-      const ls = await typed(t, b.e, 'ls', run.id);
-      assert.match(ls.printed[0], new RegExp(`^${run.id}  add a flag  \\(pruned\\)`), 'still on the board, with the word beside it');
+      const { row } = await listedOf(b.e, run.id);
+      assert.deepEqual([row.run.brief, row.run.pruned?.at], ['add a flag', pruned.at], 'still on the board, with the word beside it');
       await aPass(b.e);
       const d = await runWith(b.e, decideRun(run.id));
       assert.equal(d.decision.kind, 'landed');
@@ -678,11 +695,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       const { run } = await aFinished(b);
       b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
       assert.ok((await runWith(b.e, decideRun(run.id))).answering.implement !== undefined, 'an answer is offered before the run is pruned');
-      assert.match(
-        (await typed(t, b.e, 'ls', run.id)).printed.join('\n'),
-        /waiting on you: implement/,
-        'and `nemia ls` says it waits on you',
-      );
+      assert.deepEqual((await listedOf(b.e, run.id)).listing.waitingOnYou, ['implement'], 'and `nemia ls` says it waits on you');
       assert.equal((await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).kind, 'pruned');
       const at = runRecord(ROOT, run.id).pruned!.at;
       const refusedNaming = (verb: string) => (err: Error) => {
@@ -695,7 +708,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       await assert.rejects(runWith(b.e, acceptRun(run.id, 'implement', 'as it stands')), refusedNaming('an acceptance'));
       const d = await runWith(b.e, decideRun(run.id));
       assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}], 'and nothing is offered');
-      assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` waits on nobody');
+      assert.equal(waitsOnYou((await listedOf(b.e, run.id)).listing), false, 'and `nemia ls` waits on nobody');
 
       const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
@@ -703,7 +716,10 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       const filings = [...b.filings];
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       assert.deepEqual(b.filings, filings, 'nothing filed of an ask written by hand: the pass is the guard that holds');
-      assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /asked|due|files it/, 'no try is coming of it');
+      const coming = (await listedOf(b.e, run.id)).listing.steps.filter(
+        (step) => step.roundDue || /asked|due|files it/.test(`${shownStatus(step)} ${shownNote(step) ?? ''}`),
+      );
+      assert.deepEqual(coming, [], 'no try is coming of it');
     },
   );
 
@@ -719,7 +735,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
         'its raise is offered before',
       );
       names(before.answering.implement, '$3.40', `nemia retry ${run.id} implement --budget <amount> --message "<answer>"`);
-      assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/);
+      assert.deepEqual((await listedOf(b.e, run.id)).listing.waitingOnYou, ['implement']);
       assert.equal(
         (await runWith(b.e, prune(run.id, { yes: true, unmerged: true }))).kind,
         'pruned',
@@ -746,7 +762,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       );
       assert.doesNotMatch(screen, /waiting on you/, screen);
       assert.doesNotMatch(screen, /nemia (retry|round|accept|approve) /, 'no verb a pruned run refuses');
-      assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
+      assert.equal(waitsOnYou((await listedOf(b.e, run.id)).listing), false, 'and `nemia ls` agrees');
 
       await aPass(b.e);
       const whole = await decisionOn(stage, run.id);

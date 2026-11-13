@@ -1,9 +1,10 @@
 /**
- * The runs a run is handed as context: what a start refuses of them, and what it says of each — pure, as data.
+ * The runs a run is handed as context: what a start refuses of them — pure, as data. What a start says of each is the client's
+ * (`apps/cli/test/runs-lines.test.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { contextLines, contextRefusal } from './context.ts';
+import { contextRefusal } from './context.ts';
 
 const store = new Set(['a-1', 'b-2']);
 const exists = (id: string) => store.has(id);
@@ -48,10 +49,4 @@ test('a context id that is not a name is Invalid before the store is asked, so `
 
 test("a card's refusal names its from: key", () => {
   assert.match(contextRefusal(['x-9'], [], exists, undefined, 'from:')!.message, /^from: x-9: the store has no run x-9/);
-});
-
-test('a start says a context run in flight is handed not landed, not judged, and a landed one is not waited on', () => {
-  const lines = contextLines(['a-1', 'b-2'], (id) => id === 'a-1');
-  assert.match(lines[0], /^reads: a-1 — .*not waited on/);
-  assert.match(lines[1], /^reads: b-2, still in flight — .*not landed, not judged/);
 });

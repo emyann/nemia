@@ -9,7 +9,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in scratch repositories no factory holds.
  */
-import { mock, test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,7 +39,8 @@ import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import { decidedOn } from './screens.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told, type StartedAnswer } from './typed.ts';
+import { listedRow, told, type StartedAnswer } from './typed.ts';
+import { onYouWords, type RunsListed } from '../src/list/list.ts';
 import { RM } from '../src/runner.ts';
 
 /** What `nemia approve` answers, as the client prints it. */
@@ -117,25 +118,6 @@ const asksOf = (id: string, dir = '') =>
     : [];
 /** The record as the tick wrote it, unread by `runRecord`. */
 const recordOf = (id: string) => fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-
-/**
- * What `nemia argv` printed, line by line, over `e`; given none, it is handed one of its own, which it is to file on, stop, say to or
- * forget from nothing.
- */
-const printedBy = async (argv: string[], e?: Engine): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  const own = testEngine();
-  try {
-    await stage.main(argv, e ?? engineOf(own.layer));
-  } finally {
-    log.mock.restore();
-  }
-  unasked(own);
-  return printed.join('\n').split('\n');
-};
 
 /** `nemia start --gate plan` on `plan → implement → review`, the steps in the checkout, run until plan has signed off and waits there. */
 const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
@@ -216,8 +198,9 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     }
   });
   await s.test('`nemia ls` says `waiting on you: approve plan`', async () => {
-    const printed = await printedBy(['ls', id], b.e);
-    assert.ok(printed.includes(`   → waiting on you: approve plan  —  nemia decide ${id}`), printed.join('\n'));
+    const listing = listedRow((await stage.main(['ls', id], b.e)) as RunsListed, id);
+    assert.deepEqual(onYouWords(listing), ['approve plan'], JSON.stringify(listing));
+    assert.equal(listing.toDecide, undefined, "said as waiting on you, not as the run's ending to decide");
   });
   await s.test("the decision is awaiting approval of plan, and plan's gate says the approval and the send-back to give", async () => {
     const atGate = await decidedOn(stage, id);

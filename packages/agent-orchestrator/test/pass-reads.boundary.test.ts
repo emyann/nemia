@@ -56,7 +56,8 @@ import { filesStoreAt } from '../src/record/files.store.ts';
 import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { readStanding, standingFile } from '../src/standing/standing.store.ts';
 import { runsListed } from '../src/list/list.verb.ts';
-import { lsLines } from '../src/list/list.ts';
+import { onYouWords, shownNote, shownStatus, standingLine } from '../src/list/list.ts';
+import { toDecideWords } from '../src/ending/ending.ts';
 import { NOTHING_READ, standingReader, standingSnapshot } from '../src/standing/standing.verb.ts';
 import { statusMemo } from '../src/place/landing.store.ts';
 import { PlaceService } from '../src/place/place.store.ts';
@@ -393,14 +394,30 @@ row(
     await onePass(b);
     const spawned = async () => {
       const { value, tallies } = await metered(() => runWith(b.e, runsListed()));
-      return { lines: lsLines(value, Date.now()).join('\n'), spawned: Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0) };
+      return { value, spawned: Object.values(tallies!.kinds).reduce((n, k) => n + k.spawned, 0) };
     };
     assert.equal((await spawned()).spawned, 0, 'read off the snapshot');
     fs.rmSync(standingFile(ROOT));
-    const { lines, spawned: none } = await spawned();
+    const { value, spawned: none } = await spawned();
     assert.equal(none, 0, 'no snapshot, and still no process');
-    assert.match(lines, /where branches stand: not read/);
-    for (const verdict of ['landed', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
+    assert.deepEqual(value.standing, { none: true }, 'where the branches stand is not read');
+    assert.match(standingLine(value.standing, value.daemon, Date.now()) ?? '', /where branches stand: not read/);
+    const said = JSON.stringify([
+      standingLine(value.standing, value.daemon, Date.now()),
+      ...value.runs.map(({ run, listed, result }) =>
+        'said' in listed
+          ? listed
+          : {
+              steps: listed.steps.map((step) => [shownStatus(step), shownNote(step)]),
+              onYou: onYouWords(listed),
+              waiting: listed.waiting,
+              holding: listed.holding,
+              toDecide: listed.toDecide && toDecideWords(run, listed.toDecide),
+              result,
+            },
+      ),
+    ]);
+    for (const verdict of ['landed', ' is on ', 'ahead of', 'is gone']) assert.ok(!said.includes(verdict), `nemia ls says ${verdict}`);
   },
 );
 

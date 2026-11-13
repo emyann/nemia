@@ -43,11 +43,12 @@ import {
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { askFile, asksDir, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
-import { isRepositoryRun, LINE_NAME, shownNote } from '../src/run.ts';
+import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
+import type { Listing, RunsListed } from '../src/list/list.ts';
 import { verdictWord } from '../src/check/check.ts';
 import { configRefusal, engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told } from './typed.ts';
+import { listedRow, stepRow, told } from './typed.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 
 const ROOT = scratch('wf-retry-');
@@ -246,9 +247,11 @@ const printedBy = async (t: TestContext, argv: string[], e?: Engine) => {
 
 const asksOf = (id: string) => (fs.existsSync(asksDir(ROOT, id)) ? fs.readdirSync(asksDir(ROOT, id)).filter((f) => f !== 'done') : []);
 const askRead = (id: string, name: string) => JSON.parse(fs.readFileSync(path.join(asksDir(ROOT, id), name), 'utf8'));
-/** The line of `listed` for the step `plan` of the run `id`. */
-const planOf = (listed: string[], id: string) =>
-  listed.slice(listed.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
+/** The row of the step `plan` of the run `id` in what `nemia ls` answers (`RunsListed`). */
+const planOf = async (id: string) => stepRow(listedRow((await stage.main(['ls'])) as RunsListed, id), 'plan');
+
+/** A step's row as `nemia ls` words it: its word, its cost, its branch and its note. */
+const wordsOf = (row: Listing['steps'][number]) => [shownStatus(row), row.cost, row.branch, shownNote(row)];
 
 test('a planner blocked on two questions is answered at the terminal', async (t) => {
   const s = story(t);
@@ -283,9 +286,10 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
       );
     },
   );
-  await s.test('`nemia ls` counts the questions in the note of the step waiting on you', async (sub) => {
-    const listed = await printedBy(sub, ['ls']);
-    assert.match(planOf(listed, id) ?? '', /^ {3}plan +succeeded · BLOCKED +main +· asks 2 questions$/, listed.join('\n'));
+  await s.test('`nemia ls` counts the questions in the note of the step waiting on you', async () => {
+    const plan = await planOf(id);
+    assert.equal(plan.asks, 2, JSON.stringify(plan));
+    assert.deepEqual(wordsOf(plan), ['succeeded · BLOCKED', undefined, 'main', 'asks 2 questions']);
   });
   await s.test("`nemia retry --answer` files a try whose message is the board's words for the answers, given at the terminal", async () => {
     const asked = (await stage.main(['retry', id, 'plan', '--answer', '1=b', '--answer', '2=A,b: both'])) as { try?: number };
@@ -322,9 +326,9 @@ test("a gated planner's questions are answered with its approval", async (t) => 
     const form = '--answer 1=<letter> --answer 2=<letter> [--message "<note>"]';
     assert.ok(gate?.startsWith(`awaiting approval:  nemia approve ${id} plan ${form}  — or send it back:`), gate);
   });
-  await s.test('`nemia ls` counts the questions asked at the gate', async (sub) => {
-    const listed = await printedBy(sub, ['ls']);
-    assert.ok(planOf(listed, id)?.includes(' · asks 2 questions'), listed.join('\n'));
+  await s.test('`nemia ls` counts the questions asked at the gate', async () => {
+    const plan = await planOf(id);
+    assert.equal(plan.asks, 2, JSON.stringify(plan));
   });
   await s.test("`nemia approve --answer` approves with the board's words for the answers, given at the terminal", async () => {
     const approved = (await stage.main(['approve', id, 'plan', '--answer', '1=a', '--answer', '2=b', '--message', 'go'])) as {
@@ -344,18 +348,19 @@ test("a gated planner's questions are answered with its approval", async (t) => 
     assert.equal(askRead(id, 'approve-plan-1').message, expected);
     assert.deepEqual([approved.step, approved.try], ['plan', 1]);
   });
-  await s.test('approved, it waits on no one: `nemia ls` says nothing of its questions', async (sub) => {
-    const listed = await printedBy(sub, ['ls']);
-    const line = planOf(listed, id);
-    assert.ok(line !== undefined && !line.includes('asks'), listed.join('\n'));
+  await s.test('approved, it waits on no one: `nemia ls` says nothing of its questions', async () => {
+    const plan = await planOf(id);
+    assert.equal(plan.asks, undefined, JSON.stringify(plan));
+    assert.doesNotMatch(wordsOf(plan).join(' '), /asks/);
   });
 });
 
 test('what the decision and `nemia ls` say of a step asking no question, or one that does not decode', async (t) => {
-  await t.test('`nemia ls` says nothing of questions for a blocked step that asks none', async (sub) => {
+  await t.test('`nemia ls` says nothing of questions for a blocked step that asks none', async () => {
     const bare = await asking({ open: [] });
-    const listed = await printedBy(sub, ['ls']);
-    assert.match(planOf(listed, bare) ?? '', /^ {3}plan +succeeded · BLOCKED +main$/, listed.join('\n'));
+    const plan = await planOf(bare);
+    assert.equal(plan.asks, undefined, JSON.stringify(plan));
+    assert.deepEqual(wordsOf(plan), ['succeeded · BLOCKED', undefined, 'main', undefined]);
   });
   await t.test('a gate whose step asks none is approved with `--message`', async () => {
     const bare = await asking({ gate: true, open: [] });

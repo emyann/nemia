@@ -45,7 +45,8 @@ import { lackedOf } from '../src/record/record.ts';
 import { RUN_LABELS, SESSION_TOKEN, STEP_FILES } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told, type StartedAnswer } from './typed.ts';
+import { listedRow, stepRow, told, type StartedAnswer } from './typed.ts';
+import { shownNote, type RunsListed } from '../src/list/list.ts';
 
 const ROOT = scratch('wf-closeouts-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -954,10 +955,10 @@ test('a blocked step asks questions in two fields, and is answered by their numb
       screen.join('\n'),
     );
   });
-  await s.test('`nemia ls` counts the three', async (sub) => {
-    const listedNow = (await printedBy(sub, ['ls'])).split('\n');
-    const line = listedNow.slice(listedNow.findIndex((l) => l.startsWith(`${id}  `))).find((l) => l.startsWith('   plan '));
-    assert.ok(line?.includes(' · asks 3 questions'), listedNow.join('\n'));
+  await s.test('`nemia ls` counts the three', async () => {
+    const plan = stepRow(listedRow((await stage.main(['ls'])) as RunsListed, id), 'plan');
+    assert.equal(plan.asks, 3);
+    assert.ok(shownNote(plan)?.includes('asks 3 questions'), shownNote(plan));
   });
   await s.test("`--answer 2=a,b` and `3=a` answer them, in the board's words", async (sub) => {
     await printedBy(sub, ['retry', id, 'plan', '--answer', '1=a', '--answer', '2=a,b', '--answer', '3=a']);

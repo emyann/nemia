@@ -9,7 +9,8 @@
  *   (`staged({ runWith, main: typed, engineOf, env })`). A verb whose input the client shapes before it asks (a file read where it is
  *   typed, a card resolved, a person's yes) is called by `handled` with that input said.
  *
- * - `said(argv, …)` runs `typed` and answers the lines a story reads of an `ls` or a `logs`.
+ * - `listedRow(listed, id)` and `stepRow(listing, name)` read a run's listing out of what an `ls` answers (`RunsListed`), and one step's
+ *   row out of it: a story asserts what `nemia ls` reads there, the client's tests the lines it prints of it.
  * - `told(argv, …)` is `main` for a story typed before the move: a verb the client holds on `typed`, any other on `main`.
  * - A `start` through either answers what its handler answered and, as `facts`, what the api words of it (`startedFacts`, `objects`'
  *   `RunStartedFacts`): a test asserts a start's facts there, and the client's tests hold the words it prints of them.
@@ -26,7 +27,7 @@ import { engineOf } from '../src/runtime-client.ts';
 import { Invalid, TABLE, parseArgv, renamedIn, runWith, type Command, type Env, type Place } from '../src/runner.ts';
 import { placedIn, type Engine } from '../src/cli/flags.ts';
 import { main } from '../src/cli/main.ts';
-import { lsLines, type RunsListed } from '../src/list/list.ts';
+import type { Listing, RunsListed } from '../src/list/list.ts';
 import { readFactoriesAt } from '../src/factory/factory.store.ts';
 import { START, StartInput, startedFacts, type Started } from '../src/start/commands.verb.ts';
 import type { RunStartedFacts } from 'objects';
@@ -83,14 +84,6 @@ export async function typed(argv: readonly string[], e?: Engine, _demand?: unkno
 }
 
 /**
- * The lines a story reads of `argv`, run as `typed` runs it: `ls`'s as the table the orchestrator draws (`lsLines`, now), `logs`'s output.
- * Any other verb is refused: read what `typed` answers. The client's own lines are held by its tests (`apps/cli/test`).
- */
-export async function said(argv: readonly string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<string[]> {
-  return linesOf(argv, await answered(argv, e, demand, place, env));
-}
-
-/**
  * What `argv` answers, run as `typed` runs it: a `start` of a card by its card, of a workflow's name by its folder (`foldered`), with its
  * facts beside it (`factsOf`).
  */
@@ -105,17 +98,28 @@ async function answered(argv: readonly string[], e?: Engine, demand?: unknown, p
   return factsOf(started as unknown as Started);
 }
 
-/** The lines of `data`, what `argv` answered: an `ls`'s (`lsLines`, now), a `logs`'s output. */
-function linesOf(argv: readonly string[], data: Data): string[] {
-  if (argv[0] === 'ls') return lsLines(data as unknown as RunsListed, Date.now());
-  if (argv[0] === 'logs') return String(data.output ?? '').split('\n');
-  throw new Invalid({ message: `${argv[0]} has no lines in a test here: read the data typed answers` });
+/**
+ * Run `id`'s listing in what an `ls` answered (`RunsListed`): its steps' rows, what waits on a person, its hold and its ending. Fails the
+ * test where the answer has no run `id`, or holds it unjudged.
+ */
+export function listedRow(listed: RunsListed, id: string): Listing {
+  const row = listed.runs.find((r) => r.run.id === id);
+  if (row === undefined) throw new Error(`nemia ls answered no run ${id}: it answered ${listed.runs.map((r) => r.run.id).join(', ')}`);
+  if ('said' in row.listed) throw new Error(`nemia ls answered run ${id} unjudged: ${row.listed.said}`);
+  return row.listed;
+}
+
+/** Step `name`'s row in a run's listing (`listedRow`). Fails the test where it has none. */
+export function stepRow(listing: Listing, name: string): Listing['steps'][number] {
+  const row = listing.steps.find((s) => s.name === name);
+  if (row === undefined) throw new Error(`the listing has no step ${name}: it has ${listing.steps.map((s) => s.name).join(', ')}`);
+  return row;
 }
 
 /**
  * `argv` as a story typed it at `main` before the client held its verb: a verb the client holds (`objects`' `COMMAND_WORDS`) run as
- * `typed` runs it, its answer answered (a `start`'s with its `facts`) and, of an `ls` or a `logs`, its lines printed (`said`); a verb of
- * this machine on `main`. It takes what `main` takes, so a story's stage is given it as its `main`.
+ * `typed` runs it, its answer answered (a `start`'s with its `facts`, an `ls`'s as its `RunsListed`) and, of a `logs`, its output
+ * printed; a verb of this machine on `main`. It takes what `main` takes, so a story's stage is given it as its `main`.
  */
 export async function told(argv: string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<Data | undefined> {
   const words = renamedIn(argv).words;
@@ -124,7 +128,7 @@ export async function told(argv: string[], e?: Engine, demand?: unknown, place?:
     return undefined;
   }
   const data = await answered(argv, e, demand, place, env);
-  if (['ls', 'logs'].includes(argv[0] ?? '')) for (const line of linesOf(argv, data)) console.log(line);
+  if (argv[0] === 'logs') for (const line of String(data.output ?? '').split('\n')) console.log(line);
   return data;
 }
 

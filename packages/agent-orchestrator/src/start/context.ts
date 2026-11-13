@@ -1,6 +1,6 @@
 /**
- * The runs a run is handed as context (`nemia start --from`, a card's `from:`): what a start refuses of them (`contextRefusal`) and what it
- * says of each (`contextLines`). Pure. Context is no wait: nothing here is read by what decides whether a run's steps are filed.
+ * The runs a run is handed as context (`nemia start --from`, a card's `from:`): what a start refuses of them (`contextRefusal`). Pure.
+ * Context is no wait: nothing here is read by what decides whether a run's steps are filed.
  */
 import { idRefusal } from '../forget/forget.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
@@ -37,14 +37,3 @@ export function contextRefusal(
   }
   return null;
 }
-
-/**
- * What a start says of each run it is handed as context: `reads <id>`, and for one that has not landed (`landed`), that it is still in
- * flight and what that means for what is handed.
- */
-export const contextLines = (context: readonly string[], landed: (runId: string) => boolean): string[] =>
-  context.map((id) =>
-    landed(id)
-      ? `reads: ${id} — handed what it concluded, as context; not waited on`
-      : `reads: ${id}, still in flight — what it has when this run's steps are filed is handed, not landed, not judged`,
-  );

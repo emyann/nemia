@@ -92,16 +92,4 @@ test('scheduleLines and `nemia ls`: each schedule with its next fire and last ru
   await t.test('a fire past, as the instant and how long ago', () =>
     assert.equal(fireWord('2026-10-05T13:00:00.000Z', now), '2026-10-05T13:00:00.000Z, 2d23h ago'),
   );
-  await t.test('`nemia ls` lists the schedules after the runs, before its last line', async () => {
-    const { lsLines } = await import('../../list/list.ts');
-    const listed = { runs: [], daemon: { kind: 'none' as const }, standing: { none: true as const } };
-    const without = lsLines(listed, now);
-    const row = { ...ROW, tz: null, last: null, refused: 'janitor is not attached' };
-    assert.deepEqual(lsLines({ ...listed, schedules: [row] }, now), [
-      ...without.slice(0, -1),
-      'scheduled  nemia/janitor  0 9 * * 1  next 2026-10-12T13:00:00.000Z, in 4d01h  last none',
-      '  refused: janitor is not attached',
-      ...without.slice(-1),
-    ]);
-  });
 });

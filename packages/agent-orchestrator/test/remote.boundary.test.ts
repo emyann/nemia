@@ -32,7 +32,8 @@ import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, run
 import { engineOf } from '../src/runtime-client.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
-import { handled, told, type StartedAnswer } from './typed.ts';
+import { handled, listedRow, stepRow, told, type StartedAnswer } from './typed.ts';
+import { shownNote, shownStatus, type RunsListed } from '../src/list/list.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -57,23 +58,30 @@ const FILE = path.join(ROOT, 'a2a-agents.json');
 const declare = (agents: Record<string, { url: string }>): void =>
   fs.writeFileSync(FILE, JSON.stringify({ ...(fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : {}), ...agents }));
 
-/** What `run` printed on stdout, line by line, and on stderr, while it ran. */
-async function said(run: () => Promise<unknown>): Promise<{ out: string[]; err: string }> {
+/** What `run` answered, and what it printed on stdout, line by line, and on stderr, while it ran. */
+async function said(run: () => Promise<unknown>): Promise<{ answered: unknown; out: string[]; err: string }> {
   const out: string[] = [];
   const err: string[] = [];
   const { log, error } = console;
   console.log = (...args: unknown[]) => void out.push(args.join(' '));
   console.error = (...args: unknown[]) => void err.push(args.join(' '));
+  let answered: unknown;
   try {
-    await run();
+    answered = await run();
   } finally {
     Object.assign(console, { log, error });
   }
-  return { out: out.join('\n').split('\n'), err: err.join('\n') };
+  return { answered, out: out.join('\n').split('\n'), err: err.join('\n') };
 }
 
 /** `nemia argv` on the stage's place over the engine `e`, and what it printed on stdout. */
 const printed = async (argv: string[], e: Engine): Promise<string[]> => (await said(() => stage.main(argv, e))).out;
+
+/** `nemia ls` over the engine `e`: step `step` of run `id` as it words it — its word, its cost, its branch and its note. */
+const listedStep = async (e: Engine, id: string, step = 'ask') => {
+  const row = stepRow(listedRow((await stage.main(['ls'], e)) as RunsListed, id), step);
+  return [shownStatus(row), row.cost, row.branch, shownNote(row)];
+};
 
 /** A folder team of one step `step` on `harness`, telling it `told`. */
 function team(name: string, harness: string, step = 'ask', told = 'Read the note and say whether it is right.'): string {
@@ -142,7 +150,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
     const id = await started(team(`${name}-team`, `a2a:${name}`));
     const e = engine(ENV);
     await settle(t, e, id);
-    return { server, id, e, decided: await decidedOf(e, id, { place: builtinGitPlace, env: ENV }), listed: await printed(['ls'], e) };
+    return { server, id, e, decided: await decidedOf(e, id, { place: builtinGitPlace, env: ENV }), listed: await listedStep(e, id) };
   } finally {
     delete process.env[variable];
     await server.close();
@@ -251,7 +259,7 @@ test(
         assert.equal(view.phase, 'succeeded');
         assert.ok(runRecord(ROOT, id).steps.ask?.taskId, 'filed');
         assert.equal(decided.timeline.steps.ask?.length, 1, 'the decision reads its one try');
-        assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
+        assert.deepEqual(listed, ['unverified', undefined, null, undefined]);
         const everything = (dir: string): string[] =>
           fs
             .readdirSync(dir, { withFileTypes: true })
@@ -338,8 +346,7 @@ test(
             { everyMs: 100 },
           );
           await tick(e);
-          const listed = (await printed(['ls'], e)).join('\n');
-          assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
+          assert.deepEqual(await listedStep(e, id), ['needs-human: waiting for an input', undefined, null, undefined]);
           const decided = `ask: ${(await decidedOf(e, id, { place: builtinGitPlace, env: ENV })).waitingOn.ask}`;
           assert.match(
             decided,
@@ -359,7 +366,7 @@ test(
           await settle(c, e, id);
           assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
           assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
-          assert.match((await printed(['ls'], e)).join('\n'), /^\s+ask\s+unverified\s+· said to 1×\s*$/m);
+          assert.deepEqual(await listedStep(e, id), ['unverified', undefined, null, 'said to 1×']);
         } finally {
           await server.close();
         }
@@ -450,7 +457,7 @@ test(
   },
 );
 
-/** `nemia argv` with the engine `main` makes itself, as a restarted `nemia up` would, and what it printed. */
+/** `nemia argv` with the engine `main` makes itself, as a restarted `nemia up` would: what it answered, and what it printed. */
 const own = (argv: string[]) => said(() => told(argv, engine(ENV), undefined, builtinGitPlace, ENV));
 
 const LOCAL = team('local', 'claude', 'work', 'Write a note on tides.');
@@ -532,7 +539,8 @@ test(
             const local = await start(LOCAL);
             fs.writeFileSync(FILE, text);
             const made = await own(['ls']);
-            assert.match(made.out.join('\n'), new RegExp(local), made.out.join('\n'));
+            const listedIds = (made.answered as RunsListed).runs.map((r) => r.run.id);
+            assert.ok(listedIds.includes(local), listedIds.join(', '));
             if (why !== undefined) {
               assert.match(made.err, why, 'the engine says why it left the file or the entry out');
               assert.ok(made.err.includes('until the file is fixed and this process restarts'), made.err);

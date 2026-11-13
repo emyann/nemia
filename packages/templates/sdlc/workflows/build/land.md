@@ -8,13 +8,21 @@ branch in this checkout. Both acts are the one frozen script this step's check a
 every `git push`. Run it from the run's frozen carried files (`$WF_CARRIED_FILES`):
 
 ```
-node "$WF_CARRIED_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}"
+node "$WF_CARRIED_FILES/landing.ts" merge --run "<this run's id>" --subject "<the subject line>" --body-file "$WF_STEP_FILES/merge-message.md" --check "${{ parameters.ciCheck }}" --refresh "${{ parameters.landingRefresh }}" --derives "${{ parameters.landingDerives }}"
 ```
 
 Write that body first, in a file of your files directory: what landed and why, read off `git log` and `git diff --stat` of the result
 branch against the base. The script refuses anything but this run's own green pull request — not a draft, based on the base branch, its
 head the commit the review read, mergeable, and `${{ parameters.ciCheck }}` green at that commit, with no result branch of the run left
 out — then merges it with `--merge` and fast-forwards this checkout onto what it merged. It deletes no branch and stages no merge here.
+
+Where the factory names a refresh (`${{ parameters.landingRefresh }}`, the command that derives `${{ parameters.landingDerives }}`;
+empty, it names none) and the branch lacks the base, the script first brings the branch up to it: it merges the base into the branch
+in the run's worktree, runs that command there, and pushes the result for `${{ parameters.ciCheck }}` to judge. It refuses where the
+merge leaves anything unmerged, the command fails, or the result differs from git's plain merge outside those paths, and takes the
+merge back. A merge that answers it refreshed and pushed the branch has merged nothing yet: sign off `done` all the same, with your
+subject and body in `message`. This step's check merges that head once `${{ parameters.ciCheck }}` is green at it, with that subject
+and body, and refuses where it is red, naming the `nemia retry` line that sends the work back.
 
 Sign off `done` with that subject and body in `message`, the record of what landed. On a refusal, change nothing in this checkout: sign
 off `blocked`, quoting it whole and naming the exact `nemia retry` line it printed. The run then executes this step's check, which is

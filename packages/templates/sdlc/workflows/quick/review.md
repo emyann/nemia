@@ -59,9 +59,13 @@ two hunks touch where no line of the merge base that neither changed lies betwee
 loads, globs or counts — what the other side changed in a file, or the change's code that uses a name, a signature or a text the base
 changed. Three: a contract, a baseline, a count that only shrinks or another measure either side wrote over files the other changed.
 Four: a merge that does not go clean — `git merge-tree --write-tree --name-only HEAD main-worktree/HEAD` exits 1 and names the files
-that conflict — or, on GitHub, a pull request whose `mergeable` is anything but `MERGEABLE`, an `UNKNOWN` read once more first. Any
-other branch behind is no finding: say in your summary the base, how far behind, and each file both changed whose hunks are apart, and
-let the land go. On GitHub, nothing runs the suite on the merged tree — the landing's check is a receipt, and the base's own
+that conflict — or, on GitHub, a pull request whose `mergeable` is anything but `MERGEABLE`, an `UNKNOWN` read once more first.
+On GitHub, where the factory names a refresh (its `landingRefresh`, here `${{ parameters.landingRefresh }}`; empty, it names none), a
+file of `${{ parameters.landingDerives }}` is no finding of reasons one, three and four, nor a `mergeable` that is not `MERGEABLE` where
+those files alone conflict: the landing merges the base into the branch and derives them again, and refuses a result that differs from
+git's plain merge anywhere else. A conflict in any other file still is one. Any other branch behind is no finding: say in your summary
+the base, how far behind, and each file both changed whose hunks are apart, and let the land go.
+On GitHub, nothing runs the suite on the merged tree — the landing's check is a receipt, and the base's own
 `${{ parameters.ciCheck }}` at the merge commit catches a break only after it lands — so what covers the rest is GitHub's own
 `mergeable` on the pull request and the `${{ parameters.ciCheck }}` context required of the commit you read: a base that moved under a
 green pull request makes the landing refuse rather than land. In this checkout, the landing's check runs the local check

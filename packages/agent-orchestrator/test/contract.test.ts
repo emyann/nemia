@@ -5,8 +5,8 @@
  * alone. `./workflow` is the pure format, and what reads a folder from disk, the controllers and the refusals by kind are exported from
  * `agent-orchestrator`. Spawning `bin/wf.ts` is the package's CLI, not an import, and prose that names a file in src/ is not a route
  * to it. The client (`apps/cli`) spawns that CLI through two entries of its own, `agent-orchestrator/bin` and
- * `agent-orchestrator/bin/wf`, which are resolved, never imported, and by `apps/cli/src/local.ts` and the templates' test helper alone
- * (`binBreaches`, `SPAWNERS`).
+ * `agent-orchestrator/bin/wf`, which are resolved, never imported, and by `apps/cli/src/local.ts`, the templates' test helper and the
+ * templates' record tool alone (`binBreaches`, `SPAWNERS`).
  *
  * The scan reads every file git lists outside this package, tracked or not yet added. Turbo caches this package's pass by this package's
  * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy
@@ -58,10 +58,11 @@ const SPAWNED = ['agent-orchestrator/bin', 'agent-orchestrator/bin/wf'];
 const SPAWNER = 'apps/cli/src/local.ts';
 
 /**
- * Every file that may resolve `SPAWNED`: the client's, and the templates' tests' helper, which applies and renders a shipped template
- * through the CLI as a person does, the templates being reached by no import of the orchestrator's.
+ * Every file that may resolve `SPAWNED`: the client's; the templates' tests' helper, which applies and renders a shipped template
+ * through the CLI as a person does, the templates being reached by no import of the orchestrator's; and the templates' record tool,
+ * which digests a template by `nemia template lint` as the record's test does.
  */
-const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts'];
+const SPAWNERS = [SPAWNER, 'packages/templates/test/template.ts', 'packages/templates/released.ts'];
 
 /** What in `file` reaches `guarded` other than by its entries: each breach, worded with what to do instead. */
 function breaches(file: string, text: string, guarded: Guarded): string[] {

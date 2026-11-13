@@ -35,6 +35,7 @@ export const ROOTS = [
   'apps/web/src/lib/proposals.ts',
   'apps/web/src/lib/setup.ts',
   'apps/web/src/lib/upgrade.ts',
+  'packages/templates/released.ts',
 ];
 
 /** A leg of the `contracts` job: one runner, its own verdict cache. */

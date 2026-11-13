@@ -29,14 +29,10 @@ import { LANDING_CHECK_DEADLINE_SECONDS, checkArgv } from 'agent-orchestrator/ru
 import { scratch } from 'test-kit/scratch';
 import { copyOf, rendered } from './template.ts';
 import { type Called, type Gh, type Rule, bareOrigin, ghStub, gitIn } from './origin.ts';
+import { CARRIED, type Ran, SCRIPT, asked, body, landIn, stands } from './land.ts';
 
 /** The template these scripts ship in. */
 const SDLC = path.join(import.meta.dirname, '..', 'sdlc');
-
-/** The carried folder, where the landing and the helpers it shares with the pull-request script are kept once. */
-const CARRIED = path.join(SDLC, 'carried');
-
-const SCRIPT = path.join(CARRIED, 'landing.ts');
 
 /** sdlc as a factory gets it: the factory's rendered tree, and the scratch store it is in. */
 type Rendered = { tree: string; store: string };
@@ -237,41 +233,9 @@ function afterMerge(): World {
   return w;
 }
 
-type Ran = { code: number | null; out: string; err: string; calls: Called[] };
-
 /** Run the script's `verb` in `w` with `args`, bounded; its exit, its streams and the calls the stub `gh` was given. */
-function land(w: World, verb: string, args: string[] = [], more: Record<string, string> = {}): Ran {
-  const ran = spawnSync(process.execPath, [SCRIPT, verb, ...args], {
-    cwd: w.repo,
-    env: {
-      PATH: `${w.gh.bin}${path.delimiter}${process.env.PATH ?? ''}`,
-      HOME: w.repo,
-      WF_STEP: 'land',
-      GIT_CONFIG_GLOBAL: '/dev/null',
-      GIT_CONFIG_NOSYSTEM: '1',
-      GIT_AUTHOR_NAME: 't',
-      GIT_AUTHOR_EMAIL: 't@t',
-      GIT_COMMITTER_NAME: 't',
-      GIT_COMMITTER_EMAIL: 't@t',
-      ...w.gh.env(),
-      ...more,
-    },
-    encoding: 'utf8',
-    timeout: 60_000,
-  });
-  return { code: ran.status, out: ran.stdout, err: ran.stderr, calls: w.gh.calls() };
-}
-
-/** The calls of the stub `gh` that begin with `words`. */
-const asked = (calls: readonly Called[], ...words: string[]): Called[] =>
-  calls.filter((call) => words.every((word, i) => call.argv[i] === word));
-
-/** A file holding the merge commit's body: its path. */
-function body(text = 'What landed, and why.\n\nRun r-1: 1 commit.\n'): string {
-  const file = path.join(scratch('wf-land-files-'), 'merge-body.md');
-  fs.writeFileSync(file, text);
-  return file;
-}
+const land = (w: World, verb: string, args: string[] = [], more: Record<string, string> = {}): Ran =>
+  landIn(w.repo, w.gh, verb, args, more);
 
 /** The merge verb's arguments, with the body in a file of its own, reading the CI context `check`. */
 const args = (file = body(), subject = "Land a run's change through its pull request", check = 'ci'): string[] => [
@@ -284,14 +248,6 @@ const args = (file = body(), subject = "Land a run's change through its pull req
   '--check',
   check,
 ];
-
-/** Where the checkout stands: the branch it is on, its HEAD, whether it is clean, and whether a merge is in progress. */
-const stands = (repo: string): { branch: string; head: string; clean: boolean; merging: boolean } => ({
-  branch: gitIn(repo, 'symbolic-ref', '--short', 'HEAD').trim(),
-  head: gitIn(repo, 'rev-parse', 'HEAD').trim(),
-  clean: gitIn(repo, 'status', '--porcelain', '--untracked-files=no').trim() === '',
-  merging: fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD')),
-});
 
 test("merge merges the run's own green pull request with a merge commit at the head the review read, and fast-forwards the checkout", () => {
   const w = world();

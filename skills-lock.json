@@ -1,24 +1,31 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
+    "code-review": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-review/SKILL.md",
+      "computedHash": "ce86b40a3d1648a0018b712f0c70704e6c2316b2a9b9e915ab116916a31273dc",
+      "installMode": "copy"
+    },
     "react-aria": {
       "source": "react-aria.adobe.com",
       "sourceUrl": "https://react-aria.adobe.com",
       "sourceType": "well-known",
-      "computedHash": "69a333ca4abfc4c5fd674ef3d505bc74014ee8b1be6e89b44eaa855c81536661",
+      "computedHash": "d633a69f70c56e9ed3bbb998e9860f0fbda45f9a0e9a798bf239ff679a095818",
       "wellKnownDigest": "sha256:ffc7cd806e4e648bf353d5a5538946bbc882560444a5fae24176e68f239337a3"
     },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",
       "skillPath": "skills/shadcn/SKILL.md",
-      "computedHash": "f615de216e085a84e31593ad0fa9062232adc40cd87b7c7ab2b8e49abf6500be"
+      "computedHash": "c60d0a14a6c6f798b07e51093d9627917ca3425b92f5d419eaa57b9b15be89de"
     },
     "tsverify": {
       "source": "emyann/tsverify",
       "sourceType": "github",
       "skillPath": "skills/tsverify/SKILL.md",
-      "computedHash": "9c88c72260019e8dc8978d74b4ad5013c93b42fbdb71dac3100ffaffec2eb419",
+      "computedHash": "79c2c8a0d29059456f8d6422d520c2b68896e9f2212bd909a2113d80ccfc03a0",
       "installMode": "copy"
     }
   }

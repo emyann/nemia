@@ -106,7 +106,7 @@ export function ChatPanel({ chat, nemia, presence, atWork, now, mode, onGrow, on
           <Composer
             marks="chat"
             label="Message to Nemia"
-            placeholder={composerWords(presence, inWords !== undefined)}
+            placeholder={composerWords(presence, inWords !== undefined, kept?.refused !== undefined)}
             off={presence.notSent}
             sendLabel="Send"
             onSend={(text) => (inWords === undefined ? chat.send(text) : chat.answer(inWords.call, wordsAnswer(inWords, text)))}

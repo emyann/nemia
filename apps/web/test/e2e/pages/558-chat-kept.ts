@@ -23,8 +23,8 @@ const REFUSED_WHY = 'The message came with no token: paste one on the token page
 /** What the person writes that the api refuses. */
 const REFUSED_WROTE = 'Land the kit cards once they are green.';
 
-/** Past two of the board's beats of trying a lost message again (`CHAT_RETRY_MS`, 3 s): a refused one is tried on neither. */
-const PAST_TWO_BEATS_MS = 7_000;
+/** Past the first of the board's beats of trying a lost message again (`CHAT_RETRY_MS`, 3 s): a refused one is not tried on it. */
+const PAST_ONE_BEAT_MS = 3_500;
 
 /** What the person writes, and what they change it to before the api is back. */
 const WROTE = 'Start the two kit cards as one batch.';
@@ -151,7 +151,9 @@ export default {
       await expectCount(kept.locator('[data-chat-kept-why="lost"]'), 0, 'never that the board lost the daemon');
       await expectTexts(kept.getByRole('button'), ['Send again', 'Edit', 'Discard'], 'the person may still act on what it says');
       await expectCount(refused.locator('[data-band="lost"]'), 0, 'a refusal raises no band of its own');
-      await down.waitForTimeout(PAST_TWO_BEATS_MS);
+      if ((await chatFieldOf(down).getAttribute('placeholder')) === 'Waiting for the daemon')
+        throw new Refused('the composer waits on no daemon: the api answered, and refused');
+      await down.waitForTimeout(PAST_ONE_BEAT_MS);
       if (refusals !== 1) throw new Refused(`a refused message is never sent again on its own — it was sent ${refusals} times`);
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-refused-${await themeOf(down)}.png`), { fullPage: true });

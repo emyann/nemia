@@ -628,6 +628,11 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
     assert.equal(composerWords({ ...UP, down: true }), 'Write now; she reads it when she is up');
     assert.equal(composerWords({ ...UP, notSent: true }), 'Waiting for the daemon');
     assert.equal(composerWords({ ...UP, notSent: true, down: true, answering: true }), 'Waiting for the daemon', 'nowhere to send it');
+    assert.equal(
+      composerWords({ ...UP, notSent: true }, false, true),
+      'Send again, edit or discard the message above',
+      'the api answered and refused it: no daemon is waited on',
+    );
     assert.equal(composerWords({ ...UP, asksWaiting: 1 }, true), 'Or answer in your own words', 'a question of hers waits on them');
     assert.equal(composerWords({ ...UP, answering: true }, true), 'Or answer in your own words', 'her turn is held by the question');
     assert.equal(composerWords({ ...UP, down: true }, true), 'Write now; she reads it when she is up', 'no session holds the question');

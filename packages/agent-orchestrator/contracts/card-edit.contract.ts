@@ -50,7 +50,7 @@ const cardEditRefusalSpec = spec<(ask: CardEditAsk) => CardEditRefusal | null>({
       condition: ({ input: [ask], output }) => ask.started || movesFactory(ask) || !relabels(ask) || output === 'labels',
     },
     editedOtherwise: {
-      description: "A text that leaves the factory and the labels out, or sends them back as the card has them, is let through",
+      description: 'A text that leaves the factory and the labels out, or sends them back as the card has them, is let through',
       condition: ({ input: [ask], output }) => ask.started || movesFactory(ask) || relabels(ask) || output === null,
     },
   },

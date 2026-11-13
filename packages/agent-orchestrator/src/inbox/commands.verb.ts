@@ -7,7 +7,15 @@
  * `replaceCard`), and reads one card with its file as written (`get`); a card's text (`nemia inbox edit`) it writes through the Card's
  * `edit`, which calls the handler of `inbox edit` (`editCard`).
  */
-import { INBOX_READ_WORDS, INBOX_ADD_WORDS, INBOX_EDIT_WORDS, INBOX_FROM_WORDS, INBOX_QUEUE_WORDS, INBOX_RM_WORDS, runsNamed } from 'objects';
+import {
+  INBOX_READ_WORDS,
+  INBOX_ADD_WORDS,
+  INBOX_EDIT_WORDS,
+  INBOX_FROM_WORDS,
+  INBOX_QUEUE_WORDS,
+  INBOX_RM_WORDS,
+  runsNamed,
+} from 'objects';
 import { Effect, Schema } from 'effect';
 import { type Args } from '../command/command.ts';
 import { tableEntry, type Command, type Served } from '../command/entry.verb.ts';

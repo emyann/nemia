@@ -1,9 +1,9 @@
 /**
- * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox from`, `inbox edit`, `inbox rm`, `label inbox` and
- * `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's context and under a
- * remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines it prints. An idea
- * given as a file is read on the machine it is typed on and its text sent; a folder and a workflow given as a path are refused, exit 2,
- * before anything is asked.
+ * The inbox's writes and the labels the client holds — `nemia inbox add`, `inbox queue`, `inbox from`, `inbox edit`, `inbox rm`,
+ * `label inbox` and `label run` — told as a person types them, against a store served by the api (`served.ts`), under this machine's
+ * context and under a remote one pointed at another: each exit code, the card's file on the store as the verb leaves it, and the lines
+ * it prints. An idea or a card's text given as a file is read on the machine it is typed on and its text sent; a folder and a workflow
+ * given as a path are refused, exit 2, before anything is asked.
  *
  * Each refusal asserts its exit code and the command or name it names, never its sentence.
  */
@@ -112,7 +112,10 @@ async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root
     `edited: ${name}.md — its name kept, ${name}`,
     '',
   ]);
-  assert.match(cardOn(root, name) ?? '', /\nworkflow: dev\n[^]*team: core\n---\nCache the engine views, retitled\n\nOnly between passes\.\n$/);
+  assert.match(
+    cardOn(root, name) ?? '',
+    /\nworkflow: dev\n[^]*team: core\n---\nCache the engine views, retitled\n\nOnly between passes\.\n$/,
+  );
   const same = await run(['inbox', 'edit', name, text]);
   ok(same, 'inbox edit, again');
   assert.equal(same.out.split('\n')[1], `unchanged: ${name}.md already reads as that text`);

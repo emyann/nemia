@@ -71,7 +71,10 @@ test('a card retitled and cut keeps its name and labels, and takes the text: its
   const { exit, text, others } = over(editCard('add-a-cache-x1y2', 'default', edit(source)));
   assert.equal(Exit.isSuccess(exit), true, String(exit));
   assert.deepEqual(others, [], 'no other card filed');
-  assert.equal(text, ['---', 'workflow: quick', 'labels:', '  team: core', '---', 'Add a cache to the views.', '', 'The lists come later.', ''].join('\n'));
+  assert.equal(
+    text,
+    ['---', 'workflow: quick', 'labels:', '  team: core', '---', 'Add a cache to the views.', '', 'The lists come later.', ''].join('\n'),
+  );
   if (Exit.isSuccess(exit)) {
     assert.equal(exit.value.card.name, 'add-a-cache-x1y2');
     assert.equal(exit.value.written, true);
@@ -115,14 +118,35 @@ test('REFUSED, each by its kind, and the file left as it was', async (t) => {
     says: [string, number];
     names?: string;
   }[] = [
-    { name: 'a started card is a Conflict naming inbox add', source: card(['workflow: build']), started: true, says: ['Conflict', 2], names: 'nemia inbox add' },
-    { name: 'a started card, its text not reading, is a Conflict still', source: card(['gate: a,b']), started: true, says: ['Conflict', 2] },
+    {
+      name: 'a started card is a Conflict naming inbox add',
+      source: card(['workflow: build']),
+      started: true,
+      says: ['Conflict', 2],
+      names: 'nemia inbox add',
+    },
+    {
+      name: 'a started card, its text not reading, is a Conflict still',
+      source: card(['gate: a,b']),
+      started: true,
+      says: ['Conflict', 2],
+    },
     { name: 'a gate of two steps is Invalid', source: card(['workflow: build', 'gate: a,b']), says: ['Invalid', 2] },
     { name: 'a queued: that is no time is Invalid', source: card(['workflow: build', 'queued: soon']), says: ['Invalid', 2] },
     { name: 'a model: that does not read is Invalid', source: card(['workflow: build', 'model: implement']), says: ['Invalid', 2] },
     { name: 'a key no card has is Invalid', source: card(['workflow: build', 'owner: me']), says: ['Invalid', 2] },
-    { name: 'another factory is Invalid naming inbox add', source: card(['workflow: build', 'factory: other']), says: ['Invalid', 2], names: 'nemia inbox add' },
-    { name: 'other labels are Invalid naming label inbox', source: card(['workflow: build', 'labels:', '  team: x']), says: ['Invalid', 2], names: 'nemia label inbox' },
+    {
+      name: 'another factory is Invalid naming inbox add',
+      source: card(['workflow: build', 'factory: other']),
+      says: ['Invalid', 2],
+      names: 'nemia inbox add',
+    },
+    {
+      name: 'other labels are Invalid naming label inbox',
+      source: card(['workflow: build', 'labels:', '  team: x']),
+      says: ['Invalid', 2],
+      names: 'nemia label inbox',
+    },
     { name: 'labels taken off are Invalid', source: card(['workflow: build', 'labels: {}']), says: ['Invalid', 2] },
     {
       name: 'a queued: other than the card has is Invalid naming inbox queue',

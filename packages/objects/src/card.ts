@@ -4,8 +4,9 @@
  * where it is in its life (`state`), the runs it was started as, the tick's last missed start of it, its title, and why an entry of the
  * inbox does not read as a card. Its labels are its `metadata.labels`, its factory its `metadata.namespace`.
  *
- * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card written whole (`CardWrite`), a card written from its text (`CardEdit`), a card started (`CardStart`) and its
- * labels edited (`LabelEdit`), each as the api is sent it. Plain Schemas of JSON, as every object of this package is.
+ * Beside it, the bodies of its verbs: a card filed (`CardFile`), a card written whole (`CardWrite`), a card written from its text
+ * (`CardEdit`), a card started (`CardStart`) and its labels edited (`LabelEdit`), each as the api is sent it. Plain Schemas of JSON, as
+ * every object of this package is.
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';

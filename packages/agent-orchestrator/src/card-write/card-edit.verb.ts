@@ -4,7 +4,7 @@
  * controller: an Effect program over the Card and Run doors.
  */
 import { Effect, Exit } from 'effect';
-import { type CardEdit, DEFAULT_NAMESPACE } from 'objects';
+import { type CardEdit, type CardWrite, DEFAULT_NAMESPACE } from 'objects';
 import type { CardEditRefusal } from '../../contracts/card-edit.contract.ts';
 import { CardDoor } from '../cards/cards.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -30,6 +30,20 @@ const refusalOf = (refusal: CardEditRefusal, card: InboxCard, read: InboxCard | 
         message: `the card ${card.name}'s labels are ${labelsText(card.labels ?? {})}, and its text says ${labelsText(read?.labels ?? {})}: labels are edited by their own verb. Leave the labels: lines out, and set them with nemia label inbox ${card.name} key=value (key- takes one off). Nothing was written.`,
       });
   }
+};
+
+/** The Card's spec a card's text says (`read`): its keys and body, and its `queued:` as the card has it (`queued`) where it says none. */
+const specOf = (read: InboxCard, queued: string | undefined): CardWrite['spec'] => {
+  const at = read.queued ?? queued;
+  return {
+    ...(read.workflow !== undefined ? { workflow: read.workflow } : {}),
+    ...(read.gate !== undefined ? { gate: read.gate } : {}),
+    ...(read.model !== undefined ? { model: read.model } : {}),
+    ...(read.from !== undefined ? { from: read.from } : {}),
+    ...(read.repo !== undefined ? { repo: read.repo } : {}),
+    ...(at !== undefined ? { queued: at } : {}),
+    body: read.body,
+  };
 };
 
 /**
@@ -71,17 +85,8 @@ export const editCard = Effect.fn('editCard')(function* (name: string, namespace
   });
   if (refusal !== null) return yield* Effect.fail(refusalOf(refusal, card, read, file, started));
   if (Exit.isFailure(parsed)) return yield* Effect.failCause(parsed.cause);
-  const { value } = parsed;
   return yield* replaceCard(name, namespace, {
     metadata: edit.resourceVersion !== undefined ? { resourceVersion: edit.resourceVersion } : {},
-    spec: {
-      ...(value.workflow !== undefined ? { workflow: value.workflow } : {}),
-      ...(value.gate !== undefined ? { gate: value.gate } : {}),
-      ...(value.model !== undefined ? { model: value.model } : {}),
-      ...(value.from !== undefined ? { from: value.from } : {}),
-      ...(value.repo !== undefined ? { repo: value.repo } : {}),
-      ...((value.queued ?? card.queued) !== undefined ? { queued: value.queued ?? card.queued } : {}),
-      body: value.body,
-    },
+    spec: specOf(parsed.value, card.queued),
   });
 });

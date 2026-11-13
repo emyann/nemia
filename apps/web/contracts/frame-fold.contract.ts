@@ -2,9 +2,9 @@
  * How the frame stands around its one side sheet (`frameFold`, src/lib/frameFold.ts), from what holds now: how wide the window is, whether
  * the person keeps the rail open (the `sidebar_state` cookie's fold, as the sidebar provider holds it), whether the address's `?bar=`
  * names a thing, whether they opened her sheet, whether they asked for the rail back while it was folded for the sheet, and whether the
- * page is her chat's own (`/chat`). One sheet at a time: what the bar names takes the sheet, her chat lying under it until the bar closes.
- * Level-triggered: the rail folded for the sheet is never written as the person's fold, so it comes back as it was the moment the sheet
- * closes.
+ * page is her chat's own (`/chat`). One sheet at a time: what the bar names takes the sheet, and naming one closes her chat
+ * (`HerSheetProvider`). Level-triggered: the rail folded for the sheet is never written as the person's fold, so it comes back as it was
+ * the moment the sheet closes.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -35,7 +35,9 @@ export type SheetForm = 'none' | 'docked' | 'modal';
 /** What the one sheet shows: nothing, what the address's `?bar=` names, or her chat. */
 export type SheetShows = 'none' | 'bar' | 'her';
 
-/** How the frame stands, what its sheet shows, and whether the rail is narrow only for the sheet (the menu button then asks for it back). */
+/**
+ * How the frame stands, what its sheet shows, and whether the rail is narrow only for the sheet (the menu button then asks for it back).
+ */
 export type FrameFold = {
   readonly rail: RailForm;
   readonly sheet: SheetForm;
@@ -83,7 +85,8 @@ const frameFoldSpec = spec<(at: FrameAt) => FrameFold>({
       condition: ({ input: [at], output }) => (at.width !== 'narrow' && !at.railOpen ? output.rail === 'collapsed' : true),
     },
     railFoldsBesideTheSheetBelowWide: {
-      description: 'Narrower than 1600, an open rail folds while the docked sheet is open, whatever it shows, unless the person asked for it back',
+      description:
+        'Narrower than 1600, an open rail folds while the docked sheet is open, whatever it shows, unless the person asked for it back',
       condition: ({ input: [at], output }) => (at.railOpen && foldsForSheet(at) ? output.rail === 'collapsed' : true),
     },
     anOpenRailStaysOpenOtherwise: {

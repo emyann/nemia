@@ -1,5 +1,5 @@
 /**
- * The frame's floating bar for a step of a workflow: what its node on the workflow's canvas says, in a bar beside it — what it runs on,
+ * The frame's side sheet for a step of a workflow: what its node on the workflow's canvas says, in a bar beside it — what it runs on,
  * its keys, and the steps it waits on — read from the workflows listed in the place the page under it is read in, the address's `factory`
  * and `repo` (`listPlace`). Its page, which Open visits, has what it is told and its keys explained.
  */
@@ -8,7 +8,7 @@ import { useSearch } from '@tanstack/react-router';
 import { factoriesQuery } from '@/lib/api/factories';
 import { fromMatches, workflowsInQuery, type WorkflowListing } from '@/lib/api/workflows';
 import { fromWord, listPlace, pagePlaceOf, type ListPlace } from '@/lib/factories';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 import { runsOn, specLines } from './StepNode';
 
 /**
@@ -26,7 +26,7 @@ export function SpecBar({ from, workflow, step }: { from: WorkflowListing['from'
   const workflows = useQuery({ ...workflowsInQuery(where?.kind === 'in' ? where.place : null), enabled: listed });
   const listing = listed ? workflows.data?.find((w) => fromMatches(w.from, from) && w.name === workflow) : undefined;
   return (
-    <FloatingBar
+    <BarPanel
       title={<span className="break-all">{step}</span>}
       description={
         <span className="break-all">
@@ -43,7 +43,7 @@ export function SpecBar({ from, workflow, step }: { from: WorkflowListing['from'
           <Unread workflow={workflow} error={factories.error ?? workflows.error} read={listed && workflows.data !== undefined} />
         )}
       </div>
-    </FloatingBar>
+    </BarPanel>
   );
 }
 

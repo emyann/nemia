@@ -302,7 +302,7 @@
 }
 
 /*
- * The height of the frame's top bar, which a page that fills the window and the floating bar stand under: one line where the bar is wide
+ * The height of the frame's top bar, which a page that fills the window stands under: one line where the bar is wide
  * enough, two where it says it takes two (`data-lines`, `FrameHeader.tsx`, which decides by its own width beside the rail and Nemia's
  * sheet), the page's name then standing over the factory switcher and the bar's buttons. Under it, the frame's lines
  * (a newer release, the setup banner, a refused link) are as tall as `--frame-lines`, which the frame measures and sets on the column

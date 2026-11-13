@@ -1,6 +1,7 @@
 /**
- * The frame's floating bar, as the address and this browser keep it: what it shows, read from and written to the root's search key `bar`,
- * what a press beside it does, how wide it is drawn, and what Escape does. Pure, for `useBar`, the bar (`FloatingBar`) and its node test.
+ * The frame's bar, what the address's `?bar=` names, which the frame's side sheet shows: what it shows, read from and written to the
+ * root's search key `bar`, what a press beside it does, what the modal sheet is named by for it, and what Escape does. Pure, for `useBar`,
+ * the bar's panel (`BarPanel`), the sheet (`FrameSheet`) and its node test.
  */
 import { DEFINITION_ORIGINS, type DefinitionOrigin } from 'objects';
 import type { PagePlace } from './api/workflows.ts';
@@ -20,16 +21,16 @@ export type Bar =
   | { kind: 'gauges' }
   | { kind: 'waiting' };
 
-/** The key this browser keeps the bar's one width under, for every page. */
-export const BAR_KEY = 'nemia:bar-width';
-/** The narrowest the bar is drawn, in pixels. */
-export const BAR_MIN = 320;
-/** The width of a bar never resized. */
-export const BAR_DEFAULT = 576;
-/** The strip of page a resized bar always leaves in view at its left, in pixels. */
-export const BAR_GAP = 96;
-/** How far one arrow key moves the bar's edge, in pixels. */
-export const BAR_STEP = 16;
+/** The name of the modal sheet that shows each kind of bar, on a narrow screen: the sheet is a dialog, read by this name. */
+export const BAR_NAMES: Record<Bar['kind'], string> = {
+  start: 'Start a run',
+  factory: 'Factory',
+  run: 'Run',
+  step: 'Step',
+  spec: "Workflow's step",
+  gauges: 'Gauges',
+  waiting: 'Waiting on you',
+};
 
 /** The step of a run `name` names, `<run>/<step>`, split at its first `/`; none without a run or a step. */
 function stepOf(name: string): Bar | undefined {
@@ -185,25 +186,6 @@ export const specStep = (open: Bar | undefined, from: string, workflow: string):
  */
 export const inspects = (open: Bar | undefined): boolean => open !== undefined && open.kind !== 'start';
 
-/** The width `raw`, as this browser stored it, in pixels: `BAR_DEFAULT` for nothing stored and for anything not a positive number. */
-export function parseWidth(raw: string | null): number {
-  const width = raw === null || raw.trim() === '' ? Number.NaN : Number(raw);
-  return Number.isFinite(width) && width > 0 ? width : BAR_DEFAULT;
-}
-
-/**
- * `width` drawn in a window `viewport` pixels wide: no narrower than `BAR_MIN`, and no wider than the window less `BAR_GAP`; the whole
- * window when it is too narrow for both.
- */
-export function barWidth(width: number, viewport: number): number {
-  const most = viewport - BAR_GAP;
-  if (most < BAR_MIN) return viewport;
-  return Math.min(Math.max(width, BAR_MIN), most);
-}
-
-/** The widest `barWidth` draws the bar in a window `viewport` pixels wide, for its edge to say. */
-export const barMost = (viewport: number): number => barWidth(Number.POSITIVE_INFINITY, viewport);
-
 /** An Escape pressed while the bar is open: whether a menu or a modal took it, whether it ends a composition, the text of its field. */
 type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: string | null };
 
@@ -220,16 +202,9 @@ export function escapeDoes(key: EscapeKey): 'ignore' | 'leave' | 'close' {
 export type FocusPlace = 'in' | 'out' | 'nothing';
 
 /**
- * Whether the bar gives the focus back to what opened it as it closes (`FloatingBar`): only while it still holds the focus — `now` is
+ * Whether the bar gives the focus back to what opened it as it closes (`BarPanel`): only while it still holds the focus — `now` is
  * `in` it, or on `nothing`, what held the focus inside it having gone with it — and never once the focus has `left` the bar for the
  * page. A press on the page, on a canvas's empty drawing, takes the focus off on purpose and leaves it on nothing: a close that then
  * gave it back would put the keyboard on a node nobody pressed, and the next Enter would open that node's bar.
  */
 export const focusGoesBack = ({ left, now }: { left: boolean; now: FocusPlace }): boolean => !left && now !== 'out';
-
-/**
- * How many pixels of a frame whose right edge is at `frameRight` the bar covers, its left edge at `barLeft` (null with no bar drawn): none
- * on a `narrow` screen, where the bar is the whole width and a frame narrowed by it would have no room left, and never fewer than none.
- */
-export const barOver = (frameRight: number, barLeft: number | null, narrow: boolean): number =>
-  barLeft === null || narrow ? 0 : Math.max(0, frameRight - barLeft);

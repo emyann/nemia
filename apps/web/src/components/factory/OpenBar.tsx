@@ -1,6 +1,6 @@
 /**
- * What the frame's floating bar shows, read from the address (`useBar`): nothing while it is closed, else the bar for the thing it names,
- * drawn afresh for each thing, or for each run for its steps.
+ * What the frame's side sheet shows (`FrameSheet`) where the address names a bar, read from the address (`useBar`): nothing while it is
+ * closed, else the bar for the thing it names, drawn afresh for each thing, or for each run for its steps.
  */
 import { barValue } from '@/lib/bar';
 import type { FeedStatus } from '@/lib/feed';

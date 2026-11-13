@@ -1,19 +1,17 @@
 /**
- * The frame's floating bar: a panel at the right of every page, under the top bar to the window's foot, over the page, so the page keeps
- * its whole width and the top bar stays in view. It is as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge
- * or with the arrow keys on it, and the whole width of a narrow screen. Its Close button and Escape close it (`useBar`), and closing it
- * gives the focus back to what held it before, unless the focus had already left it for the page (`focusGoesBack`). Beside Close, its
- * Open button visits the page of what it shows, for everything that has one (`barOpens`), read in the place the page under it is read
+ * What the address's `?bar=` names, as the frame's side sheet holds it (`FrameSheet`), in place of Nemia's chat: a panel the sheet's whole
+ * height, its title and buttons at its head and its body scrolling under them. Its Close button and Escape close it (`useBar`), and closing
+ * it gives the focus back to what held it before, unless the focus had already left it for the page (`focusGoesBack`). Beside Close, its
+ * Open button visits the page of what it shows, for everything that has one (`barOpens`), read in the place the page beside it is read
  * in, the address's `factory` and `repo`.
  */
-import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { useSearch } from '@tanstack/react-router';
 import { XIcon } from 'lucide-react';
 import { Button, LinkButton } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { BAR_MIN, BAR_STEP, barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
+import { barOpens, barValue, escapeDoes, focusGoesBack, type FocusPlace } from '@/lib/bar';
 import { pagePlaceOf } from '@/lib/factories';
-import { useBar, useBarWidth } from '@/lib/useBar';
+import { useBar } from '@/lib/useBar';
 import { routeLink } from '../nav/routeLink';
 
 const RouterLinkButton = routeLink(LinkButton);
@@ -87,47 +85,12 @@ function useFocusReturn(bar: RefObject<HTMLElement | null>) {
 }
 
 /**
- * The bar's left edge, a separator a person drags, or moves with the arrow keys once focused, to set the bar's width `width` (`onWidth`),
- * between `BAR_MIN` and `most`: the bar ends where the pointer is.
- */
-function ResizeEdge({ width, most, onWidth }: { width: number; most: number; onWidth: (width: number) => void }) {
-  const down = (event: PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  };
-  const move = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) onWidth(window.innerWidth - event.clientX);
-  };
-  const key = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'ArrowLeft') onWidth(width + BAR_STEP);
-    else if (event.key === 'ArrowRight') onWidth(width - BAR_STEP);
-    else return;
-    event.preventDefault();
-  };
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize the bar"
-      aria-valuenow={Math.round(width)}
-      aria-valuemin={BAR_MIN}
-      aria-valuemax={Math.round(most)}
-      tabIndex={0}
-      onPointerDown={down}
-      onPointerMove={move}
-      onKeyDown={key}
-      className="absolute inset-y-0 left-0 z-10 w-2 -translate-x-1/2 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 hover:after:w-1 hover:after:bg-ring focus-visible:after:w-1 focus-visible:after:bg-ring"
-    />
-  );
-}
-
-/**
  * The bar, titled `title`, with `description` under its title and `children` in a body that scrolls: an `aside` named by its title, which
  * takes the focus as it opens, so Tab reaches what it holds next, and gives it back as it closes (`useFocusReturn`). It carries the address
  * of what it shows (`data-bar`), and an Open button wherever that has a page (`barOpens`), so no bar can leave it out; `actions`, outside
- * its title so they are no part of its name, sit before Open.
+ * its title so they are no part of its name, sit before Open. It draws no frame of its own: the sheet is its frame, and it fills it.
  */
-export function FloatingBar({
+export function BarPanel({
   title,
   description,
   actions,
@@ -141,8 +104,6 @@ export function FloatingBar({
   const { open, close } = useBar();
   const place = pagePlaceOf(useSearch({ strict: false }));
   const page = open ? barOpens(open, place) : null;
-  const [width, setWidth, most] = useBarWidth();
-  const narrow = useIsMobile();
   const bar = useRef<HTMLElement>(null);
   const heading = useId();
   useEscape(bar, close);
@@ -153,12 +114,9 @@ export function FloatingBar({
       ref={bar}
       aria-labelledby={heading}
       tabIndex={-1}
-      data-floating-bar
       data-bar={open ? barValue(open) : undefined}
-      style={narrow ? undefined : { width }}
-      className={`fixed top-(--frame-top) right-0 bottom-0 z-40 flex flex-col bg-popover text-body-medium text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
+      className="-m-4 flex h-[calc(100%+2rem)] min-w-0 flex-col text-body-medium text-foreground outline-none"
     >
-      {!narrow && <ResizeEdge width={width} most={most} onWidth={setWidth} />}
       <div className="flex items-start gap-2 border-b p-4">
         <div className="min-w-0 flex-1 space-y-0.5">
           <h2 id={heading} className="font-heading text-title-medium text-foreground">

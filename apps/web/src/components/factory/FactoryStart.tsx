@@ -1,5 +1,5 @@
 /**
- * A run's start: the rail's FAB that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
+ * A run's start: the rail's FAB that opens it in the frame's side sheet (`BarPanel`), and what the bar then shows — with no
  * factory yet, the factories to start it in; then the repository the run starts on — the factory's one, or, where it has several, the
  * one its wiring gives the workflow picked (`startRepo`), said and never picked — the workflows the factory offers there, each that
  * cannot start saying why, and `StartRun` in the factory for the one picked, as the CLI's `start --factory` starts it.
@@ -14,7 +14,7 @@ import { factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/a
 import { floorPlace, startRepo, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 import { StartRun } from '../run/StartRun';
 import { FIELD } from '../workflow/WorkflowOptions';
 
@@ -66,7 +66,7 @@ function StartIn({ name }: { name: string }) {
   const factory = factories.data?.find((f) => f.name === name);
   const place = factory ? floorPlace(factory) : null;
   return (
-    <FloatingBar
+    <BarPanel
       title={<>Start a run in {name}</>}
       description="A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on its floor."
     >
@@ -85,7 +85,7 @@ function StartIn({ name }: { name: string }) {
       ) : (
         <OnRepo place={place} />
       )}
-    </FloatingBar>
+    </BarPanel>
   );
 }
 
@@ -93,7 +93,7 @@ function StartIn({ name }: { name: string }) {
 function AskFactory() {
   const factories = useQuery(factoriesQuery);
   return (
-    <FloatingBar title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
+    <BarPanel title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
       {factories.error ? (
         <p className="text-body-medium text-failure">Could not read the factories: {factories.error.message}</p>
       ) : !factories.data ? (
@@ -101,7 +101,7 @@ function AskFactory() {
       ) : (
         <FactoryChoice factories={factories.data} />
       )}
-    </FloatingBar>
+    </BarPanel>
   );
 }
 

@@ -9,7 +9,6 @@ import { storeQuery } from '@/lib/api/store';
 import type { Bar } from '@/lib/bar';
 import type { FactoryBlock } from '@/lib/factories';
 import { revealView, sizeOf } from '@/lib/frame';
-import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { anyAbove, sessionOf } from '@/lib/nemia';
@@ -69,8 +68,7 @@ export function FactoriesCanvas({ blocks }: { blocks: readonly FactoryBlock[] })
 }
 
 /**
- * The canvas of `blocks`, its frame narrowed by what the bar covers of it (`useBarOver`), so the block inspected and the canvas's controls
- * stay clear of the bar, the block brought into view as the bar shows it (`useKeepClear`).
+ * The canvas of `blocks`, the block inspected brought into view as the frame's side sheet shows it beside the page (`useKeepClear`).
  */
 function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   const navigate = useNavigate();
@@ -78,13 +76,11 @@ function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   const inspected = shown?.kind === 'factory' ? shown.factory : null;
   const content = useContent(blocks);
   const nodes = useMemo(() => nodesOf(content, inspected), [content, inspected]);
-  const whole = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
-  const over = useBarOver(whole);
   useKeepClear(frame, inspected);
   return (
-    <div ref={whole} className="flex min-h-96 flex-1" aria-label="The factories">
-      <div ref={frame} className="min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
+    <div className="flex min-h-96 flex-1" aria-label="The factories">
+      <div ref={frame} className="min-h-0 min-w-0 flex-1">
         <ReactFlow
           id="factories"
           nodes={nodes}

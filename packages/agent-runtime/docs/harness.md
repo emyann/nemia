@@ -52,7 +52,11 @@ the orchestrator's code holds a fact today, it is named beside it.
   session ran in, which Claude Code settles after printing `init` (its bundled code refuses `auto` on a model before
   `claude-opus-4-6` in its list, a local check, no flag fetched). So `ranIn` is the last mode an `init` or a `status` line names
   (`claudeStreamOutput`), and the case reads it so. A case that fails is a change of Claude Code's: measure the model ten times, as
-  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own.
+  here, before `CLAUDE_AUTO_DROPPED` moves, on a card of its own. Read again on **SDK 0.3.323, Claude Code 2.1.323, 2026-11-13**,
+  off the `init` line the bundled binary prints for each model asked with `--permission-mode auto`, before it refuses to run unsigned
+  in the implement step's session: `claude-haiku-4-5` and `claude-sonnet-4-5` say `default`, `haiku` (`claude-haiku-5-5`), `sonnet`
+  (`claude-sonnet-5-5`), `opus` (`claude-opus-5-5`) and `fable` (`claude-fable-5-2`) say `auto`; the list stands. The live case
+  makes the same measurement on a signed-in run of the step's check.
 - **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
@@ -101,7 +105,7 @@ the orchestrator's code holds a fact today, it is named beside it.
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` composes onto `Options.env` inside the job's bin, since the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1743`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
+  entirely (`sdk.d.ts:1778`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
   tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06, then `claude -p`; `claudeTelemetryEnv`).
 - **`OTEL_LOG_TOOL_DETAILS=1` puts a tool's inputs on its `claude_code.tool` span (`full_command`, `file_path`) and on the
   `tool_decision` and `tool_result` events (`tool_parameters`, `tool_input`, `error`)** (2.1.293, 2026-10-07, `claude -p`): without it no
@@ -129,8 +133,11 @@ the orchestrator's code holds a fact today, it is named beside it.
   Measured again on **SDK 0.3.322, Claude Code 2.1.322, 2026-11-11**: still `claude-opus-5-5`, on the bundled Claude Code's `init`
   line (`sdk-0.3.322-init.json`, `claude_code_version` 2.1.322), on the attempt (`ranOn`, `harnessVersion` 2.1.322), and on the
   owner's own `claude -p --model opus --output-format stream-json --verbose`, whose `claude --version` said 2.1.322 and whose `init`
-  line said `claude-opus-5-5`.
-- **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6369`), and the runtime reads it as the attempt's
+  line said `claude-opus-5-5`. Measured again on **SDK 0.3.323, Claude Code 2.1.323, 2026-11-13**: still `claude-opus-5-5`, on the
+  `init` line of `bin/ae-claude-job.ts` run on the bundled Claude Code (`sdk-0.3.323-init.json`, `claude_code_version` 2.1.323),
+  which the implement step's session printed unsigned; the attempt's `ranOn` and `harnessVersion` are the live case's, on a signed-in
+  run of the step's check.
+- **The mode a session ran in is its `init` line's `permissionMode`** (`sdk.d.ts:6467`), and the runtime reads it as the attempt's
   `ranIn` (`harness/detached/output.ts`): what was asked is the task's `permissionMode`, what ran is what Claude Code printed. The SDK
   prints one `init` per turn, so the last one is read, as `claude_code_version` is, and the capture keeps a later `init` that names
   another mode (`initKept`): on a model that drops `auto` the mode can change from one turn to the next (`auto` on haiku ran as
@@ -147,17 +154,28 @@ the orchestrator's code holds a fact today, it is named beside it.
   here sets `DISABLE_TELEMETRY` or `CLAUDE_CODE_DISABLE_FEATURE_FLAGS`; a daemon whose own environment sets one would see every `auto`
   step's calls asked about, so denied, after it restarts.
 - **The `fable` alias is `claude-fable-5-2`** (Claude Code 2.1.321 from its changelog, measured on 2.1.322 on the `init` line of
-  `sdk-0.3.322-auto-fable.json`, 2026-11-11), where it was Fable 5.1 before; it keeps `auto`.
+  `sdk-0.3.322-auto-fable.json`, 2026-11-11, and on 2.1.323, 2026-11-13), where it was Fable 5.1 before; it keeps `auto`.
+- **While a hook holds a call, Claude Code prints a `tool_progress` heartbeat** (SDK 0.3.323, Claude Code 2.1.323, from its changelog,
+  not measured here): a line typed `SDKToolProgressMessage` whose `tool_name` is the hook's event, whose `tool_use_id` begins `hook-`
+  and whose `heartbeat` is `true`. A job held at its `PreToolUse` hook by a drain prints one each beat; the runtime reads it as no
+  kind it reads (`printedKindOf`: `other`) and the kept capture drops it (`claudeStreamKept`, `test/compact.test.ts`). The live
+  capture holds them as printed, and the changelog gives no cadence.
+- **A `PreToolUse` allow whose permission check then fails with an error goes to `canUseTool`, or is refused where there is none**
+  (SDK 0.3.323, from its changelog, not measured here). A job has no `canUseTool`, so a call its admission hook allowed and whose
+  check then errs is now refused, where it ran before: the first sign would be a run's denials after the server upgrades.
+- **`canUseTool`'s suggestions no longer carry a Bash allow rule for a command that writes `.git` or `.claude`** (SDK 0.3.323, from
+  its changelog, not measured here): the permission ask a person answers offers "always allow" less often for such a command.
 - **A hook matcher takes `onFailure`** (SDK 0.3.317, read off `sdk.d.ts` on 0.3.322): `continue`, the default, reports a callback that
   throws or answers nothing valid and lets the action go on; `block` blocks it. The runtime's hold hooks leave the default
   (`harness/claude/job-hooks.ts`): a hold is not a fence, and a failed read of the drain must not stop every call of a step. A
   callback that returns nothing counts as failing, so each returns on every path.
 - **A job resumed on the bundled Claude Code is started with `--await-initialize`** (SDK 0.3.321, read off `sdk.mjs` on 0.3.322,
-  2026-11-11): the SDK adds it where a resume or a continue runs the bundled binary with no `pathToClaudeCodeExecutable` and no
+  2026-11-11, and on 0.3.323, 2026-11-13): the SDK adds it where a resume or a continue runs the bundled binary with no `pathToClaudeCodeExecutable` and no
   `spawnClaudeCodeProcess`, so a job on the stand-in (`AE_CLAUDE_EXECUTABLE`) and an attached session, which spawns its own child,
-  never see it.
+  never see it. On 0.3.323 the SDK also adds it for a new option, `managedSettingsViaInitialize`, which nothing here sets.
 - **The SDK joins most of the flags it builds for Claude Code as `--flag=value`, and a few as two arguments** (0.3.308, read off
-  `sdk.mjs`, 2026-10-22, and re-read on 0.3.316, 2026-11-01, and on 0.3.322, 2026-11-11, unchanged; the change landed in 0.3.295): joined for the mode, the prompts, the tool lists, the setting sources,
+  `sdk.mjs`, 2026-10-22, and re-read on 0.3.316, 2026-11-01, and on 0.3.322, 2026-11-11, and on 0.3.323, 2026-11-13, unchanged; the change landed in 0.3.295): joined for the mode,
+  the prompts, the tool lists, the setting sources,
   `--add-dir`, `--plugin-dir`, `--resume`, `--model`, `--effort`; two arguments for `--mcp-config`, `--managed-settings` and every
   `extraArgs` key, `--settings` among them — those it joins only where the value itself opens with a dash — beside the four it opens
   with (`--output-format stream-json --verbose --input-format stream-json`). A test that read such a value as
@@ -261,7 +279,7 @@ repository.
 
 **A session signed in by that same token is told the plan's utilization with its model turns, in a `rate_limit_event`, whatever the
 token's scopes** (Claude Code on SDK 0.3.322, measured on the server on v1.6.0, 2026-11-12). The SDK's type calls it "Rate limit
-information for claude.ai subscription users" (`SDKRateLimitEvent`, `sdk.d.ts:5987`). In the last 60 sessions' stdout under
+information for claude.ai subscription users" (`SDKRateLimitEvent`, `sdk.d.ts:6080`). In the last 60 sessions' stdout under
 `~/.agent-workflows/engine/runs/claude/` there were 5 such events, each
 
 ```
@@ -270,7 +288,7 @@ information for claude.ai subscription users" (`SDKRateLimitEvent`, `sdk.d.ts:59
  "unifiedWindows":{"seven_day":{"utilization":0.4,"resetsAt":1794999600,"status":"allowed"}}}
 ```
 
-`unifiedWindows` is in no SDK type (`SDKRateLimitInfo`, `sdk.d.ts:6000`, declares a single `utilization` beside `rateLimitType`), and its
+`unifiedWindows` is in no SDK type (`SDKRateLimitInfo`, `sdk.d.ts:6093`, declares a single `utilization` beside `rateLimitType`), and its
 `utilization` is a fraction (0.4 is 40%), where `get_usage`'s is in percent. The event carries no time of its own. So the runtime keeps
 the newest event any session of its store received, with when it was received, in one file (`harness/claude/heard.ts`,
 `claudeHeardFile`): a job's own process keeps it, and so does a session held in the holder, and a token's quota carries it as `heard`.
@@ -298,11 +316,11 @@ own (public) client id. It stopped at the authorize URL: no browser, no token ex
 
 | affordance | declared in `sdk.d.ts`? | there? | what it answered |
 | --- | --- | --- | --- |
-| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3145` | yes | one row for the inline server, `status: 'pending'` at the first call |
+| `Query.mcpServerStatus()` | **yes**, `sdk.d.ts:3190` | yes | one row for the inline server, `status: 'pending'` at the first call |
 | `Query.mcpAuthenticate(name, redirectUri)` | no | yes | `{ authUrl, requiresUserAction: true, callbackExpected: true, redirectScheme: 'localhost', state, callbackPort: 8791 }` |
 | `Query.mcpSubmitOAuthCallbackUrl(name, url)` | no | yes | refuses a URL with no code or a mismatched state, in a sentence that says to submit the redirect URL from the sign-in's own page |
 | `Query.mcpClearAuth(name)` | no | yes | resolves with `{}`, and the sign-in in flight stays in flight |
-| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1237-1253` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
+| the inline http server's `oauth: { clientId, callbackPort }` | **no**, `sdk.d.ts:1271-1287` declares `type`, `url`, `headers`, `tools`, `timeout`, `alwaysLoad` and no `oauth` | yes, and **validated** | echoed back whole on `McpServerStatus.config.oauth`, and the authorize URL is built from it |
 
 What moved from 0.3.270, for the card that designs the GitHub sign-in on this:
 
@@ -359,12 +377,12 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.
 
-What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, off the installed
-files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):
+What the paste-back of a sign-in rests on, read **2026-11-11 on Agent SDK 0.3.322 and the Claude Code it bundles, 2.1.322**, and again on
+0.3.323 and 2.1.323, 2026-11-13, with the same bodies, off the installed files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):
 
 - **`Query.mcpSubmitOAuthCallbackUrl(name, callbackUrl)` is now relied on**, for a browser that runs on another machine than the
   daemon, whose redirect to `http://localhost:<callbackPort>/callback` never reaches the Claude Code child listening there: the person
-  pastes the address the browser landed on, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322
+  pastes the address the browser landed on, and the held sign-in hands it on. It is read in `sdk.mjs` 0.3.322 and 0.3.323
   (`mcpSubmitOAuthCallbackUrl(e,t)`, a control request of the subtype `mcp_oauth_callback_url` carrying `serverName` and
   `callbackUrl`), and it is absent from `sdk.d.ts` and from the SDK's TypeScript reference, so it is called through the one
   `Authenticating` type, as `mcpAuthenticate` is, and a missing method throws naming `sdk.mjs`. The table above measured it refusing a
@@ -379,7 +397,7 @@ files and not by a probe (`harness/mcp-sign-in.ts`, `harness/mcp-callback.ts`):
 What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
 2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's
 cost*, `AE_LIVE=1`). `total_cost_usd` is the running total of one `query()` call, and a resumed one "continues from the total its
-transcript saved, when it has one" (`sdk.d.ts:6182-6185`); this is what that saving takes:
+transcript saved, when it has one" (`sdk.d.ts:6280-6283`); this is what that saving takes:
 
 - **A process that ends cleanly saves its total, and a resumed query carries it on.** A session that ran to its result and whose
   input was closed exited 0 and appended a `cost-state` line (`totalCostUSD` equal to its result's `total_cost_usd`) to its
@@ -408,6 +426,9 @@ install run as declared, by `bash -c`, under an environment of `HOME`, `NEMIA_TO
   `$NEMIA_TOOLS/harnesses/claude/2.1.322`, exit 0, 2 s with the machine's cache and 6 s with an empty one; it takes **327 MB** on
   disk, nearly all of it the native `claude`. `$NEMIA_TOOLS/bin/claude` is a link to it, and `claude --version` answers
   `2.1.322 (Claude Code)`: the pin is the SDK's `claudeCodeVersion` (`test/harness-needs.test.ts`).
+- **Claude Code 2.1.323**, the same way on 2026-11-13: `@anthropic-ai/claude-agent-sdk-linux-x64@0.3.323` into
+  `$NEMIA_TOOLS/harnesses/claude/2.1.323`, exit 0, 4 s with the machine's cache and 4 s with an empty one, **346 MB** on disk, and
+  `claude --version` answers `2.1.323 (Claude Code)`; its remove exits 0 and leaves `bin/` empty.
 - **Codex 0.154.0**: `npm install -g --prefix "$NEMIA_TOOLS/harnesses/codex/0.154.0" @openai/codex@0.154.0`, exit 0, 6 s with the
   machine's cache and 4 s with an empty one (npm said `added 2 packages`: the CLI and its platform binary); **324 MB** on disk.
   `$NEMIA_TOOLS/bin/codex` links to the prefix's `bin/codex`, a Node script, and `codex --version` answers `codex-cli 0.154.0`.

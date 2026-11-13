@@ -10,7 +10,9 @@ import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type Sto
 export type { ObserveCount } from '../core/engine/index.ts';
 import { claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
-import { memoryQuantityRefusal } from '../core/memory.ts';
+import { memoryBytesOf, memoryQuantityRefusal } from '../core/memory.ts';
+import { machineMemory, type MachineReading } from './machine.ts';
+import type { AdmissionRule } from '../core/admission.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { CAPABILITIES, type HarnessDeclaration } from '../harness/declaration.ts';
 import { CLAUDE_DECLARATION } from '../harness/claude/vocabulary.ts';
@@ -57,6 +59,27 @@ export type EngineOptions = {
    * default never changes a task already filed. Refused at `Engine.layer` unless `memoryBytesOf` reads it. Absent: no default.
    */
   defaultLimits?: { memory: string };
+  /**
+   * The memory request a task filed with no resources of its own is filed with, as a LimitRange's defaultRequest: a Kubernetes
+   * quantity, written onto its `filed` event beside `defaultLimits`, and what admission counts the task at against the machine
+   * (`reserved`). Refused at `Engine.layer` unless `memoryBytesOf` reads it, and when above `defaultLimits.memory`. Absent: a task
+   * with no request of its own is counted at its limit, else at nothing.
+   */
+  defaultRequests?: { memory: string };
+  /**
+   * The memory kept off the machine for the daemon and the machine itself, as kubelet's system-reserved: a Kubernetes quantity.
+   * Given, each pass admits a queued task only while the memory requests of every task holding a slot, the newcomer's among them,
+   * fit the machine's total less it, and the newcomers with what holds a slot and has no process yet fit the memory available now
+   * less it (`admitting`); a task that does not fit waits, its view saying so (`TaskView.waits`). Refused at `Engine.layer` unless
+   * `memoryBytesOf` reads it. Absent: the ceiling alone admits.
+   */
+  reserved?: { memory: string };
+  /**
+   * The machine's memory as one reading gives it, asked once per pass while `reserved` is given: its total and what is available
+   * now, in bytes, or `undefined` where it cannot be read, and that pass admits by the ceiling alone. Absent: `/proc/meminfo`
+   * (`machineMemory`). A test plants its own.
+   */
+  machine?: () => MachineReading | undefined;
   /**
    * The systemd slice each limited task's scope is made in (`systemd-run --slice=`), as Docker's `--cgroup-parent`: the slice an
    * operator caps to bound every limited session together. A unit name ending `.slice`. Absent: the user manager's root slice.
@@ -212,8 +235,11 @@ export type TaskSpec = {
   resources?: Resources;
 };
 
-/** A task's resources, a container's: its limits, of memory alone, as a Kubernetes quantity. */
-export type Resources = { limits?: { memory?: string } };
+/**
+ * A task's resources, a container's: its limits and its requests, of memory alone, each a Kubernetes quantity. The request is what
+ * admission counts it at against the machine (`EngineOptions.reserved`); absent, its limit stands for it. Refused when above the limit.
+ */
+export type Resources = { limits?: { memory?: string }; requests?: { memory?: string } };
 
 /**
  * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its
@@ -269,18 +295,27 @@ export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'obje
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
 
 /**
- * `task` with the engine's default limits written on where it was filed with no `resources` of its own, as a LimitRange's default is
- * written into a Pod at admission: none on a remote agent's, whose process is the other party's and no cgroup of ours holds, so a
- * default never makes a remote task unfileable (a limit the task asks for itself there is refused, `harnessRefusalOf`).
+ * `task` with the engine's default limits and requests written on where it was filed with no `resources` of its own, as a
+ * LimitRange's defaults are written into a Pod at admission: none on a remote agent's, whose process is the other party's and no
+ * cgroup of ours holds, so a default never makes a remote task unfileable (a limit the task asks for itself there is refused,
+ * `harnessRefusalOf`).
  */
 export const limitedBy = <T extends TaskSpec & { harness: string }>(
-  defaults: EngineOptions['defaultLimits'],
+  defaults: Pick<EngineOptions, 'defaultLimits' | 'defaultRequests'>,
   task: T,
   harnesses: Record<string, HarnessConfig>,
 ): T => {
+  const { defaultLimits, defaultRequests } = defaults;
   const h = own(harnesses, task.harness);
-  if (defaults === undefined || task.resources !== undefined || h === undefined || isRemote(h)) return task;
-  return { ...task, resources: { limits: { memory: defaults.memory } } };
+  if ((defaultLimits === undefined && defaultRequests === undefined) || task.resources !== undefined || h === undefined || isRemote(h))
+    return task;
+  return {
+    ...task,
+    resources: {
+      ...(defaultLimits ? { limits: { memory: defaultLimits.memory } } : {}),
+      ...(defaultRequests ? { requests: { memory: defaultRequests.memory } } : {}),
+    },
+  };
 };
 
 /**
@@ -420,18 +455,44 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const SLICE = /^[A-Za-z0-9:_.\\-]+\.slice$/;
 
 /**
- * Why `defaultLimits` or `cgroupParent` cannot be held, or `undefined`: a `defaultLimits` that is not `{ memory }` alone, its quantity
- * one `memoryBytesOf` does not read (`memoryQuantityRefusal`'s words); a `cgroupParent` that is not a slice's unit name.
+ * Why the option `name`, a `{ memory }` of one quantity, cannot be held, or `undefined`: anything but `{ memory }` alone, its quantity
+ * one `memoryBytesOf` does not read (`memoryQuantityRefusal`'s words). `what` says what the quantity is for, in the refusal's words.
+ */
+const memoryOptionRefusalOf = (name: string, given: unknown, what: string): string | undefined => {
+  if (given === undefined) return undefined;
+  const memory = isRecord(given) ? given.memory : undefined;
+  if (!isRecord(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
+    return `\`${name}: ${JSON.stringify(given) ?? typeof given}\` is not ${what}. Give \`{ memory: '8Gi' }\`, or leave it out.`;
+  const words = memoryQuantityRefusal(memory);
+  return words ? `\`${name}.memory\`: ${words}` : undefined;
+};
+
+/**
+ * Why `defaultLimits`, `defaultRequests`, `reserved`, `machine` or `cgroupParent` cannot be held, or `undefined`: a `defaultLimits`,
+ * a `defaultRequests` or a `reserved` that is not `{ memory }` of a quantity (`memoryOptionRefusalOf`); a default request above the
+ * default limit, which would file every task promised more than it may use; a `machine` that is not a function; a `cgroupParent`
+ * that is not a slice's unit name.
  */
 const limitsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
-  const given: unknown = options.defaultLimits;
-  if (given !== undefined) {
-    const memory = isRecord(given) ? given.memory : undefined;
-    if (!isRecord(given) || typeof memory !== 'string' || Object.keys(given).some((k) => k !== 'memory'))
-      return `\`defaultLimits: ${JSON.stringify(given) ?? typeof given}\` is not a default limit. Give \`{ memory: '8Gi' }\`, a quantity every task filed with no limit of its own is held to, or leave it out.`;
-    const words = memoryQuantityRefusal(memory);
-    if (words) return `\`defaultLimits.memory\`: ${words}`;
-  }
+  const refused =
+    memoryOptionRefusalOf(
+      'defaultLimits',
+      options.defaultLimits,
+      'a default limit, a quantity every task filed with no limit of its own is held to',
+    ) ??
+    memoryOptionRefusalOf(
+      'defaultRequests',
+      options.defaultRequests,
+      'a default request, a quantity every task filed with no resources of its own is counted at',
+    ) ??
+    memoryOptionRefusalOf('reserved', options.reserved, 'a reserve, the memory kept off the machine for the daemon and the machine');
+  if (refused) return refused;
+  const limit = options.defaultLimits === undefined ? undefined : memoryBytesOf(options.defaultLimits.memory);
+  const request = options.defaultRequests === undefined ? undefined : memoryBytesOf(options.defaultRequests.memory);
+  if (limit !== undefined && request !== undefined && request > limit)
+    return `\`defaultRequests.memory: ${options.defaultRequests?.memory}\` is above \`defaultLimits.memory: ${options.defaultLimits?.memory}\`: every task filed with neither would be promised more than it may use. Lower the default request to the limit or under it, or raise the limit.`;
+  if (options.machine !== undefined && typeof options.machine !== 'function')
+    return '`machine` is a function, `() => { totalBytes, availableBytes } | undefined`, asked once per pass: give one, or leave it out for `/proc/meminfo`.';
   const parent: unknown = options.cgroupParent;
   if (parent !== undefined && (typeof parent !== 'string' || !SLICE.test(parent) || parent === '-.slice')) {
     return `\`cgroupParent: ${JSON.stringify(parent) ?? typeof parent}\` is not a systemd slice. Give a unit name ending \`.slice\`, like \`sessions.slice\`, or leave it out for the user manager's own.`;
@@ -495,18 +556,36 @@ export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string |
 };
 
 /**
- * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, and the pool each of `harnesses`
- * counts in — the `pool` it names, else its own name; a task with no harness counts in `default`.
+ * The machine an engine over `options` admits against, as one pass reads it (`AdmissionRule.machine`): its `machine`'s reading, else
+ * `/proc/meminfo`'s, with the floor `reserved` keeps off it — and nothing where `reserved` is not given, or the reading answers none.
  */
-export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
-  Layer.succeed(Admission)({
+const machineOf = (options: EngineOptions): AdmissionRule['machine'] => {
+  const reservedBytes = options.reserved === undefined ? undefined : memoryBytesOf(options.reserved.memory);
+  if (reservedBytes === undefined) return undefined;
+  const read = options.machine ?? machineMemory;
+  return () => {
+    const reading = read();
+    return reading === undefined ? undefined : { totalBytes: reading.totalBytes, availableBytes: reading.availableBytes, reservedBytes };
+  };
+};
+
+/**
+ * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, the machine it reads while
+ * `reserved` is given (`machineOf`), and the pool each of `harnesses` counts in — the `pool` it names, else its own name; a task with
+ * no harness counts in `default`.
+ */
+export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) => {
+  const machine = machineOf(options);
+  return Layer.succeed(Admission)({
     ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
     ...(options.unschedulable !== undefined ? { unschedulable: options.unschedulable } : {}),
+    ...(machine !== undefined ? { machine } : {}),
     poolOf: (harness) => {
       const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
       return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');
     },
   });
+};
 
 /** Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`. */
 export const mcpStateRefusal = (servers: unknown): string | undefined => {

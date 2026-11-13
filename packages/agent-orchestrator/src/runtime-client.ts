@@ -15,9 +15,11 @@
  * defect it dies of.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, References, Scope } from 'effect';
 import {
+  type AdmissionWait,
   BEARER,
   commandHarness,
   DEFAULT_HARNESSES,
@@ -42,6 +44,7 @@ import { type Env, type Settings, settingsOf, wfRoot } from './config/config.sto
 import { toolsBinDir } from './config/root.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
+import { reservedFor } from './service/index.ts';
 import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
@@ -50,6 +53,7 @@ import { fromThrow } from './door/door.store.ts';
 import type { SaidAfterKind } from './say/say.ts';
 import type { StepSessionState } from './following/following.ts';
 import type { AttemptReason } from './timeline/index.ts';
+import type { HeldBack } from './list/list.ts';
 
 /**
  * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
@@ -77,9 +81,13 @@ export const attemptReasonHeld: Same<AttemptReason, EndReason> = true;
 /** The orchestrator's copy of an attempt's memory record (`AttemptMemory`), held equal to the runtime's `MemoryUse`. */
 export const attemptMemoryHeld: Same<AttemptMemory, NonNullable<TaskView['state']['attempts'][number]['memory']>> = true;
 
+/** The orchestrator's copy of why a queued task waits (`HeldBack`, which `nemia ls` words), held equal to the runtime's `AdmissionWait`. */
+export const heldBackHeld: Same<HeldBack, AdmissionWait> = true;
+
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
 export type {
+  AdmissionWait,
   ClaudeFlags,
   CodexArgs,
   Denial,
@@ -216,7 +224,10 @@ export const quotaHarnesses = (): string[] => Object.keys(HARNESSES).filter((nam
  *
  * Each task it files without a memory limit of its own is filed under `WF_MEMORY_LIMIT`'s (`defaultLimits`), its scope made in
  * `WF_CGROUP_PARENT`'s slice where one is set (`cgroupParent`): a value either variable refuses gives the engine neither, and the tick
- * refuses its pass on the same read (`ceilings`), so nothing is filed without the limit it was set to hold.
+ * refuses its pass on the same read (`ceilings`), so nothing is filed without the limit it was set to hold. Each is filed asking
+ * `WF_MEMORY_REQUEST`'s memory where set (`defaultRequests`), else its limit, and admitted only while what it asks fits the machine's
+ * memory above the floor kept for the daemon and the machine (`reserved`: `WF_MEMORY_RESERVED`, else an eighth of the machine, 1 GiB
+ * at least); a queued task the floor holds says so on its view (`TaskView.waits`), which `nemia ls` words.
  *
  * Each harness's program is looked for first in the store's tools folder's `bin/` (`harnessBin`, `toolsBinDir`), where `nemia doctor
  * fix` activates one, read by the runtime at every spawn.
@@ -342,14 +353,36 @@ export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
   Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
 
 /**
- * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), and `unschedulable`, asked by
- * the runtime's pass before it admits, true while the store's pause's file is there (`pauseFile`), whatever it holds, as `readPause`
- * reads a file that is there as a pause.
+ * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), `unschedulable`, asked by the
+ * runtime's pass before it admits, true while the store's pause's file is there (`pauseFile`), whatever it holds, as `readPause` reads a
+ * file that is there as a pause, and the floor of the machine's memory no session is admitted into (`reserved`, `floorOf`), which turns
+ * the runtime's admission by memory on.
+ *
+ * @param totalBytes The machine's memory, read for the default floor alone: `os.totalmem`, a test's planted total.
  */
-export const storeAdmission = (root: string, config: Settings): { maxConcurrent?: number; unschedulable: () => boolean } => ({
+export const storeAdmission = (
+  root: string,
+  config: Settings,
+  totalBytes: () => number = os.totalmem,
+): { maxConcurrent?: number; unschedulable: () => boolean; reserved?: { memory: string } } => ({
   unschedulable: () => fs.existsSync(pauseFile(root)),
   ...ceilingOf(config),
+  ...floorOf(config, totalBytes),
 });
+
+/**
+ * The floor of the machine's memory the engine keeps for the daemon and the machine: `WF_MEMORY_RESERVED` as written, else an eighth of
+ * the machine, 1 GiB at least (`reservedFor`), in Mi; none when the variable is refused (`memoryReserved`), as `ceilingOf` gives no
+ * ceiling, so the engine admits by its ceiling alone.
+ */
+const floorOf = (config: Settings, totalBytes: () => number): { reserved?: { memory: string } } => {
+  try {
+    return { reserved: { memory: config.memoryReserved ?? `${reservedFor(Math.floor(totalBytes() / 2 ** 20))}Mi` } };
+  } catch (err) {
+    if (isRefusal(err)) return {};
+    throw err;
+  }
+};
 
 /** The engine's ceiling, `WF_MAX_CONCURRENT`'s sessions per pool, or none when the variable is refused (`maxConcurrent`). */
 const ceilingOf = (config: Settings): { maxConcurrent?: number } => {
@@ -363,14 +396,22 @@ const ceilingOf = (config: Settings): { maxConcurrent?: number } => {
 
 /**
  * What the store's engine limits its tasks by, as `engine()` hands it to the runtime: `WF_MEMORY_LIMIT` as the default limit
- * (`defaultLimits`), and `WF_CGROUP_PARENT` as the slice each limited task's scope is made in (`cgroupParent`); neither when unset, and
- * neither when either is refused, as `ceilingOf` gives no ceiling.
+ * (`defaultLimits`), `WF_MEMORY_REQUEST` as the default request, which the runtime admits a task by (`defaultRequests`), and
+ * `WF_CGROUP_PARENT` as the slice each limited task's scope is made in (`cgroupParent`); each absent when unset, and none when any is
+ * refused, as `ceilingOf` gives no ceiling.
  */
-export const storeLimits = (config: Settings): { defaultLimits?: { memory: string }; cgroupParent?: string } => {
+export const storeLimits = (
+  config: Settings,
+): { defaultLimits?: { memory: string }; defaultRequests?: { memory: string }; cgroupParent?: string } => {
   try {
     const memory = config.memoryLimit;
+    const request = config.memoryRequest;
     const parent = config.cgroupParent;
-    return { ...(memory === undefined ? {} : { defaultLimits: { memory } }), ...(parent === undefined ? {} : { cgroupParent: parent }) };
+    return {
+      ...(memory === undefined ? {} : { defaultLimits: { memory } }),
+      ...(request === undefined ? {} : { defaultRequests: { memory: request } }),
+      ...(parent === undefined ? {} : { cgroupParent: parent }),
+    };
   } catch (err) {
     if (isRefusal(err)) return {};
     throw err;

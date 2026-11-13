@@ -159,7 +159,8 @@ const wholeFacts = (head: Head): Array<{ key: string; value: string }> => [
  * (L), its agent, its time, its facts — whole, its check and gate too — its spend, its note and its action, a link to the step's page
  * (`action`: the card's always, the whole part's where it stands off the step's page).
  */
-export function PartHead({ head, size, action = size === 'M' }: { head: Head; size: PartSize; action?: boolean }) {
+export function PartHead({ head, size, action: asked }: { head: Head; size: PartSize; action?: boolean }) {
+  const action = asked ?? size === 'M';
   if (size === 'S')
     return (
       <div data-step-head="S" data-step-kind={head.kind} className="flex min-w-0 flex-col gap-1">

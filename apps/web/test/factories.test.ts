@@ -110,8 +110,8 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
     },
   );
   await t.test('a factory shown whose answer is not read yet has no block, and hides no other', () => {
-    const nemia = factory('nemia');
-    assert.deepEqual(names(openBlocks([fallback, nemia, factory('pipao')], answers([nemia]), false)), ['nemia']);
+    const harbour = factory('harbour');
+    assert.deepEqual(names(openBlocks([fallback, harbour, factory('quay')], answers([harbour]), false)), ['harbour']);
   });
   await t.test(
     "each run is in the factory its record names, the default factory's naming none: a pipao run in neither default nor nemia",
@@ -133,15 +133,15 @@ test('openBlocks, blockOf, factoriesShown: the machine split into a block a fact
     "a block's runs, in flight and waiting on you are its own answer's counts, never another factory's; its workflows and hires its file's",
     () => {
       const opens = new Map([
-        ['nemia', answer(1, 3, 4)],
+        ['harbour', answer(1, 3, 4)],
         ['default', answer(2, 5, 7)],
       ]);
-      const [nemia] = openBlocks([fallback, factory('nemia')], opens, true);
+      const [harbour] = openBlocks([fallback, factory('harbour')], opens, true);
       const [def] = openBlocks([fallback], opens, true);
       assert.deepEqual(
-        { ...nemia },
+        { ...harbour },
         {
-          name: 'nemia',
+          name: 'harbour',
           default: false,
           repos: ['nemia'],
           runs: 8,

@@ -224,9 +224,9 @@ test('stripOf and readoutOf: the factory in view, its agents at work, and the re
       ],
       { id: 'r-gate-moves', waitingOnYou: ['plan'] },
     );
-    const atGate = waitingRun(atWorkBy(twoSteps, 'design', 'iris', NOW - 4 * MIN));
+    const atGate = waitingRun(atWorkBy(twoSteps, 'design', 'designer', NOW - 4 * MIN));
     const s = bare({ open: open([atGate]) });
-    assert.deepEqual([s.waitsOnYou, s.inFlight, s.sessions.count, s.rows.map((r) => r.agent)], [1, 0, 1, ['iris']]);
+    assert.deepEqual([s.waitsOnYou, s.inFlight, s.sessions.count, s.rows.map((r) => r.agent)], [1, 0, 1, ['designer']]);
   });
 });
 

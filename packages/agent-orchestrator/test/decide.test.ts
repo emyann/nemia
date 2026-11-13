@@ -11,7 +11,7 @@
  */
 import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -47,8 +47,9 @@ import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
-import { lsLines, type RunsListed } from '../src/list/list.ts';
-import { typed } from './typed.ts';
+import { onYouWords, shownNote, shownStatus, type Listing, type RunsListed } from '../src/list/list.ts';
+import { toDecideWords } from '../src/ending/ending.ts';
+import { listedRow, stepRow, typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-decide-');
@@ -196,9 +197,29 @@ const offered = (d: Decidable, label: Decidable['commands'][number]['label']): s
   assert.ok(command !== undefined, `${label} is offered: ${JSON.stringify(d.commands)}`);
   return command;
 };
-/** What `nemia ls <id>` reads of the run, in the lines the list's own words make of it (`lsLines`). */
-const listed = async (_t: TestContext, id: string): Promise<string[]> =>
-  lsLines((await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed, Date.now());
+/** What `nemia ls <id>` answers of the run: its record and its listing (`listedRow`). */
+const listed = async (id: string): Promise<{ run: Run; listing: Listing }> => {
+  const answered = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
+  const row = answered.runs.find((r) => r.run.id === id);
+  assert.ok(row, `nemia ls ${id} answers the run`);
+  return { run: row.run, listing: listedRow(answered, id) };
+};
+/**
+ * The values `nemia ls` gives a person of a run, in one text: each step's word, note, cost and branch, who it waits on, what it holds
+ * for, what is to decide and its cost; not the run's record or its assessment, which the listing carries for the doors.
+ */
+const lsSaid = ({ run, listing }: { run: Run; listing: Listing }): string =>
+  JSON.stringify({
+    steps: listing.steps.map((step) => [step.name, shownStatus(step), shownNote(step), step.cost, step.branch]),
+    onYou: onYouWords(listing),
+    waiting: listing.waiting,
+    holding: listing.holding,
+    toDecide: decideSaid({ run, listing }),
+    cost: listing.cost,
+  });
+/** What `nemia ls` decides of a run's ending (`toDecide`), in the words of the decision (`toDecideWords`); none where nothing is. */
+const decideSaid = ({ run, listing }: { run: Run; listing: Listing }): string | undefined =>
+  listing.toDecide && toDecideWords(run, listing.toDecide);
 
 /** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {
@@ -208,12 +229,6 @@ const approveByHand = (id: string, step: string, n: number) => {
     path.join(dir, `approve-${step}-${n}`),
     `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`,
   );
-};
-
-const indexOf = (lines: string[], want: string | RegExp): number => {
-  const i = lines.findIndex((l) => (typeof want === 'string' ? l === want : want.test(l)));
-  assert.ok(i >= 0, `${want} is on the screen:\n${lines.join('\n')}`);
-  return i;
 };
 
 test('a run waiting on you, read and landed: its screens, and what approving its ending does', async (t) => {
@@ -305,12 +320,15 @@ test('a run waiting on you, read and landed: its screens, and what approving its
 
   await s.test(
     "the decision and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control, whether the engine's record carries them or not",
-    async (c) => {
-      const screens = async () => ({ decide: JSON.stringify((await decisionOn(stage, a.run.id)).decision), ls: await listed(c, a.run.id) });
+    async () => {
+      const screens = async () => ({
+        decide: JSON.stringify((await decisionOn(stage, a.run.id)).decision),
+        ls: lsSaid(await listed(a.run.id)),
+      });
       const carried = await screens();
       for (const task of stage.board().tasks.values()) task.spec = { ...task.spec, queued: false, config: undefined, priority: undefined };
       assert.deepEqual(await screens(), carried);
-      assert.ok(![carried.decide, ...carried.ls].some((l) => /priority|momentum|remote|bridge/i.test(l)), JSON.stringify(carried));
+      assert.ok(![carried.decide, carried.ls].some((l) => /priority|momentum|remote|bridge/i.test(l)), JSON.stringify(carried));
     },
   );
 
@@ -345,7 +363,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
 
   await s.test(
     "a measured cost on both reads: the decision's beside what each step used, with the api and tool time, and the run's; `nemia ls` beside each step's word and on the run's line — and a run nobody measured says no dollar",
-    async (c) => {
+    async () => {
       const run = await stage.runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false }));
       await tick(run.id);
       settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED, usage: { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 } });
@@ -366,12 +384,17 @@ test('a run waiting on you, read and landed: its screens, and what approving its
       );
       assert.equal(d.cost, 'run $3.51', "the run's cost, every step's tries together");
 
-      const ls = await listed(c, run.id);
-      assert.equal(ls[0], `${run.id}  add sub  $3.51`);
-      assert.match(ls[1], /^ {3}implement {6}verified ✓ {2}\$3\.01 +\S/);
-      assert.match(ls[2], /^ {3}review {9}unverified · done {2}\$0\.50 +\S/);
+      const { listing } = await listed(run.id);
+      assert.equal(listing.cost, '$3.51', "the run's cost");
+      assert.deepEqual(
+        listing.steps.map((step) => [step.name, step.message, step.cost, step.branch !== null]),
+        [
+          ['implement', 'verified ✓', '$3.01', true],
+          ['review', 'unverified · done', '$0.50', true],
+        ],
+      );
 
-      assert.ok(!(await listed(c, a.run.id)).some((l) => l.includes('$')), 'the awaiting run measured no cost: no dollar on `nemia ls`');
+      assert.ok(!lsSaid(await listed(a.run.id)).includes('$'), 'the awaiting run measured no cost: no dollar on `nemia ls`');
       const { d: bare } = await decidable(a.run.id);
       assert.equal(bare.cost, 'run not measured', "nor on the decision, where the run's cost says not measured");
       assert.ok(!JSON.stringify([bare.used, bare.total, bare.cost]).includes('$'), JSON.stringify(bare.used));
@@ -441,7 +464,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
 
   await s.test(
     "a folder whose last step is an ending: the decision, once a pass has read where its branch stands, says what that step would do in the folder's words, and the word that runs it — and offers no command of the branch, since the step is the one that merges",
-    async (c) => {
+    async () => {
       const run = await stage.runPlaced(
         startRun({ brief: 'add sub', repo: aRepo(), workflowDir: ending('ship', `${SHIP_IT}\n\nAbort on any failure.\n`) }),
       );
@@ -467,13 +490,14 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         'the folder says what landing is, so nobody is told to type it',
       );
 
-      const said = await listed(c, run.id);
-      indexOf(said, `   → to decide: ${SHIP_IT} — nemia approve ${run.id} ship`);
-      assert.ok(
-        !said.some((l) => l.includes('waiting on you')),
+      const said = await listed(run.id);
+      assert.equal(decideSaid(said), `${SHIP_IT} — nemia approve ${run.id} ship`);
+      assert.deepEqual(
+        [onYouWords(said.listing).filter((w) => w !== 'approve ship'), said.listing.waiting],
+        [[], []],
         '`nemia ls` says it in one line, where it says who the run waits on: the ending is not said twice',
       );
-      indexOf(said, /^ {3}ship {11}awaiting approval/);
+      assert.match(stepRow(said.listing, 'ship').message, /^awaiting approval/);
     },
   );
 
@@ -525,7 +549,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
 
   await s.test(
     "REFUSED: an ending led by an agent that says `You are …` — the decision and `nemia ls` say the step's own note, or with none, that approving runs it, and never quote the agent",
-    async (c) => {
+    async () => {
       const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
       fs.mkdirSync(path.join(team, 'agents'));
       fs.writeFileSync(
@@ -544,7 +568,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         settle(`${run.id}-implement`, 'succeeded', { closeout: SIGNED });
         await tick(run.id);
         const { d, decided } = await decidable(run.id);
-        return { id: run.id, d, toDecide: decided.toDecide, said: await listed(c, run.id) };
+        return { id: run.id, d, toDecide: decided.toDecide, said: await listed(run.id) };
       };
       const approving = (d: Decidable) => d.commands.filter((x) => x.label === 'approve').map((x) => x.command);
 
@@ -555,18 +579,18 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         "the step's own note, its first paragraph",
       );
       assert.deepEqual(approving(noted.d), [`nemia approve ${noted.id} land`]);
-      indexOf(noted.said, `   → to decide: ${LANDS} — nemia approve ${noted.id} land`);
+      assert.equal(decideSaid(noted.said), `${LANDS} — nemia approve ${noted.id} land`);
 
       const bare = await atGate('');
       assert.deepEqual(bare.toDecide, { kind: 'approve', step: 'land', says: null, filed: false }, 'with none, nothing is quoted');
       assert.deepEqual(approving(bare.d), [`nemia approve ${bare.id} land`]);
-      indexOf(bare.said, `   → to decide: land has not run: approving runs it — nemia approve ${bare.id} land`);
+      assert.equal(decideSaid(bare.said), `land has not run: approving runs it — nemia approve ${bare.id} land`);
 
       for (const shown of [
         JSON.stringify([noted.d, noted.toDecide]),
-        ...noted.said,
+        lsSaid(noted.said),
         JSON.stringify([bare.d, bare.toDecide]),
-        ...bare.said,
+        lsSaid(bare.said),
       ]) {
         assert.ok(!shown.includes('You are'), shown);
       }
@@ -575,7 +599,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
 
   await s.test(
     'a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its commands',
-    async (c) => {
+    async () => {
       const repo = aRepo();
       const run = await stage.runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
       await tick(run.id);
@@ -607,7 +631,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         ['approve', 'send back'],
         'the gate is offered first; the branch commands the read model lists beside it come after',
       );
-      indexOf(await listed(c, run.id), `   → to decide: review has signed off at its gate — nemia approve ${run.id} review`);
+      assert.equal(decideSaid(await listed(run.id)), `review has signed off at its gate — nemia approve ${run.id} review`);
 
       approveByHand(run.id, 'review', 1);
       const { d } = await decidable(run.id);
@@ -617,7 +641,7 @@ test('a run waiting on you, read and landed: its screens, and what approving its
         "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
       );
       await aPass();
-      indexOf(await listed(c, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — nemia decide ${run.id}`);
+      assert.equal(decideSaid(await listed(run.id)), `${branch} is ahead of main, and nothing has merged it — nemia decide ${run.id}`);
     },
   );
 
@@ -848,7 +872,7 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
 
   await s.test(
     "UNSIGNED after the run's own nudge: the decision and `nemia ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours",
-    async (c) => {
+    async () => {
       const run = await stage.runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
       await tick(run.id);
       settle(`${run.id}-implement`, 'succeeded', { closedOut: false });
@@ -862,11 +886,9 @@ test('a step retried, answered, over its budget and nudged: what `nemia decide` 
       const decided = await decidedOn(stage, run.id);
       assert.deepEqual(awaitingOf(decided).unsigned, ['implement']);
       assert.equal(signoffsSpent(decided.run.steps.implement), 1, 'asked to sign off once by the run, and unsigned again');
-      const ls = await listed(c, run.id);
-      assert.ok(
-        ls.some((l) => /^ {3}implement +unsigned .*try 2, asked to sign off by the run/.test(l)),
-        ls.join('\n'),
-      );
+      const implement = stepRow((await listed(run.id)).listing, 'implement');
+      assert.match(shownStatus(implement), /^unsigned/);
+      assert.match(shownNote(implement) ?? '', /try 2, asked to sign off by the run/);
     },
   );
 });

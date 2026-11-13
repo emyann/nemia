@@ -51,6 +51,8 @@ import { readStoreFloor, storeFile, writeStoreFloor } from '../release/archive.s
 import { STORE_READABLE_FROM } from '../release/floor.ts';
 import type { Env } from '../config/config.store.ts';
 import { told } from '../../test/typed.ts';
+import { daemonLine } from './daemon.ts';
+import type { RunsListed } from '../list/list.ts';
 
 const ROOT = scratch('wf-daemon-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
@@ -205,6 +207,12 @@ const typed = async (t: TestContext, argv: string[], e: Engine) => {
   return { printed, threw };
 };
 
+/** What `nemia ls` answers (`RunsListed`), and its line on who ticks the store, in the daemon's own words (`daemonLine`), now. */
+const listed = async (e: Engine): Promise<{ runs: RunsListed['runs']; daemon: string }> => {
+  const answered = (await told(['ls'], e, undefined, stand().place, ENV)) as RunsListed;
+  return { runs: answered.runs, daemon: daemonLine(answered.daemon, Date.now()) };
+};
+
 const clear = () => fs.rmSync(FILE, { force: true });
 
 test(
@@ -262,13 +270,13 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       undefined,
     );
     assert.equal(fs.existsSync(FILE), false, "the daemon is the file's one writer");
-    const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
+    const lastLine = async () => (await listed(engineOf())).daemon;
     assert.equal(
       await lastLine(),
       'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served — or any nemia command that files work starts one',
     );
     holdBy(LIVE, { passedAt: minutesAgo(20) });
-    const stalled = (await lastLine())!;
+    const stalled = await lastLine();
     assert.ok(
       stalled.startsWith(
         `nemia up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (${at(-20 * 60_000)}); `,
@@ -276,7 +284,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       `silent, and last passed, 20m ago:\n${stalled}`,
     );
     holdBy(GONE);
-    assert.match((await lastLine())!, new RegExp(`^nemia up: none ticking — pid ${GONE} is gone, its last pass `));
+    assert.match(await lastLine(), new RegExp(`^nemia up: none ticking — pid ${GONE} is gone, its last pass `));
     clear();
   });
 
@@ -427,10 +435,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
         assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
       }
       holdBy(LIVE);
-      const { printed } = await typed(t, ['ls'], engineOf());
-      assert.equal(printed[0], 'no runs');
+      const { runs, daemon } = await listed(engineOf());
+      assert.deepEqual(runs, [], 'no runs');
       assert.equal(
-        printed.at(-1),
+        daemon,
         `nemia up: ticking, pid ${LIVE}, every 4000ms — last pass 3s ago (${at(-3000)})`,
         '`nemia ls` says who ticks, last, and its pass 3s ago',
       );
@@ -445,8 +453,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^nemia tick: ${ROOT} is held by the nemia up of pid ${LIVE}, `)));
     assert.equal(e.passes, 0, 'neither ticked');
     assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
-    const { printed } = await typed(t, ['ls'], engineOf());
-    assert.match(printed.at(-1)!, new RegExp(`^nemia up: ticking, pid ${LIVE}, every 4000ms — `));
+    assert.match((await listed(engineOf())).daemon, new RegExp(`^nemia up: ticking, pid ${LIVE}, every 4000ms — `));
     clear();
   });
 
@@ -547,10 +554,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
     assert.equal(typeof procStartOf(LIVE), 'number', 'this test needs /proc');
     const text = holdBy(LIVE, { procStart: procStartOf(LIVE)! + 1 });
     const kill = new RegExp(`kill ${LIVE}\\b`);
-    const ls = await typed(t, ['ls'], engineOf());
+    const ls = await listed(engineOf());
     assert.equal(
-      ls.printed.at(-1),
-      `nemia up: none ticking — the nemia up of pid ${LIVE} is gone, that pid another process's now; its ${ls.printed.at(-1)!.split('; its ')[1]}`,
+      ls.daemon,
+      `nemia up: none ticking — the nemia up of pid ${LIVE} is gone, that pid another process's now; its ${ls.daemon.split('; its ')[1]}`,
       'the sleeper under a start that is not its own: a live pid, a fresh pass, and not the process that wrote the file',
     );
     const tick = engineOf(() => {});
@@ -577,7 +584,7 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
       ),
       up.printed.join('\n'),
     );
-    for (const line of [...ls.printed, ...byHand.printed, ...up.printed]) assert.doesNotMatch(line, kill, line);
+    for (const line of [ls.daemon, JSON.stringify(ls.runs), ...byHand.printed, ...up.printed]) assert.doesNotMatch(line, kill, line);
     clear();
   });
 
@@ -653,8 +660,10 @@ test('one daemon per store: taken, beaten, refused to a second, taken over when 
         ),
       );
       await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^nemia tick: ${ROOT} is held by the api of pid ${LIVE} at `)));
-      const { printed } = await typed(t, ['ls'], engineOf());
-      assert.equal(printed.at(-1), `api: ticking, pid ${LIVE} at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (${at(-3000)})`);
+      assert.equal(
+        (await listed(engineOf())).daemon,
+        `api: ticking, pid ${LIVE} at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (${at(-3000)})`,
+      );
       holdBy(LIVE);
       const api = await runPlaced(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
       assert.ok(

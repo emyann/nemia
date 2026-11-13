@@ -68,8 +68,25 @@ export function factoryWriteOf(home: string, name: string, workflow: string): { 
  * name.
  */
 export function factoryDraftOf(home: string, name: string, workflow: string): { places: Places; fills: Fills } {
-  const { places, fills } = factoryWriteOf(home, name, workflow);
-  return { places: { ...places, home: templatedTreeOf(home, name, 'nemia workflows write') }, fills };
+  return factoryDraftIn(home, templatedAtOnce(home, name, 'nemia workflows write').factory, workflow);
+}
+
+/**
+ * Where a draft folder of the workflow `workflow`, read in the factory `factory` of the store `home`, looks for its agents and skills,
+ * and the hires it is filled with, as a run of it in that factory would read it (`factoryFills`): each step the factory hires an agent
+ * into read as if its file named that agent. A factory made from a template looks in its tree, as the store, whose `workflows/` holds the
+ * agents its hires name, and in the repository `repo` — else its first, else its tree; any other in `repo` and `home`. What
+ * `POST /api/workflows/read` reads a draft with under `?factory=`, and `factoryDraftOf` for a templated factory named.
+ */
+export function factoryDraftIn(
+  home: string,
+  factory: Pick<Factory, 'name' | 'hires' | 'tree' | 'repos'>,
+  workflow: string,
+  repo?: string,
+): { places: Places; fills: Fills } {
+  const { fills } = factoryFills(home, factory, workflow);
+  if (factory.tree === undefined) return { places: repo === undefined ? { home } : { repo, home }, fills };
+  return { places: { repo: repo ?? factory.repos[0] ?? factory.tree, home: factory.tree }, fills };
 }
 
 /** Where a write's folder looks for its agents and skills, and the hires it is filled with: for the place `factory`, `factoryWriteOf`. */

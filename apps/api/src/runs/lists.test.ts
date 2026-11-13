@@ -1,7 +1,8 @@
 /**
- * The board's list of the runs, the RunList asked by a field (`GET /api/runs?fieldSelector=status.state…` or `status.outcome…`): the
- * runs not finished by name and the finished newest first by when their work stopped, those of one outcome too, a page at a time by their own token, each kept to its namespace; a plain list
- * carries no frame; a selector that is none is a 422; and the three reads it replaced are gone, 404.
+ * The board's list of the runs, the RunList asked by a field (`GET /api/runs?fieldSelector=status.state…` or `status.outcome…`): the runs
+ * not finished by name and the finished newest first by when their work stopped, those of one outcome too, a page at a time by their own
+ * token, each kept to its namespace; a plain list carries no frame; a selector that is none is a 422; and the three reads it replaced are
+ * gone, 404.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';

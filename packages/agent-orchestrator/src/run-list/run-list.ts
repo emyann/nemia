@@ -1,10 +1,10 @@
 /**
  * The pure parts of a run's list on the generic path: a run's namespace (`runNamespace`, proved by contracts/run-namespace.contract.ts),
- * the factory its record names, `default` for one that names none, as a card's is; the list's `?fieldSelector=`, one term on
- * `status.state` (`runStateSelector`, proved by contracts/run-state-selector.contract.ts) or on a finished run's `status.outcome`
- * (`runOutcomeSelector`), and the runs it takes (`selectorTakes`), both proved by contracts/run-outcome-selector.contract.ts; and the
- * order of the finished runs a list asked by `status.state=finished` or by an outcome answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with the `continue` token
- * that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
+ * the factory its record names, `default` for one that names none, as a card's is; the list's `?fieldSelector=`, one term on `status.state`
+ * (`runStateSelector`, proved by contracts/run-state-selector.contract.ts) or on a finished run's `status.outcome` (`runOutcomeSelector`),
+ * and the runs it takes (`selectorTakes`), both proved by contracts/run-outcome-selector.contract.ts; and the order of the finished runs a
+ * list asked by `status.state=finished` or by an outcome answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with
+ * the `continue` token that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
 import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_OUTCOMES, RUN_STATES, type RunOutcome, type RunState } from 'objects';
 import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';

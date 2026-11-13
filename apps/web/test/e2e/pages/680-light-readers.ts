@@ -43,7 +43,8 @@ export default {
    * finished on, the start form's Wait for and Reads pickers, a run's Hold popover, and an agent's Try panel. Each asks for the runs not
    * finished (`status.state!=finished`), and those finished (`status.state=finished`) where it shows the finished, and no list of the runs
    * without a `fieldSelector`; the floor asks besides for the finished runs nobody decided (`status.outcome=undecided`), which it shows
-   * whether Show finished is on or not. The checkout's `dev` is made able to start in `hiring` (`hiringStarts`) for the start form, and taken back.
+   * whether Show finished is on or not. The checkout's `dev` is made able to start in `hiring` (`hiringStarts`) for the start form, and
+   * taken back.
    */
   name: 'light-readers',
   route: '/agents',

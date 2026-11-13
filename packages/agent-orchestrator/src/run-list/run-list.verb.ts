@@ -6,10 +6,10 @@
  * of `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in
  * `unjudged` with why, never dropped with no word.
  *
- * A list asked by a field (`?fieldSelector=status.state…`, `runStateSelector`, or `status.outcome…`, `runOutcomeSelector`) is the
- * board's: it judges every run its namespace and labels keep, to count them by state (`metadata.counts`) before it selects
- * (`selectorTakes`) and pages, orders by name — or, for a selector that takes finished runs alone (`status.state=finished`,
- * `status.outcome=<outcome>`), newest first by when their work stopped (`finishedBefore`, its own token) — and lays the frame's parts on each run's status, measured to
+ * A list asked by a field (`?fieldSelector=status.state…`, `runStateSelector`, or `status.outcome…`, `runOutcomeSelector`) is the board's:
+ * it judges every run its namespace and labels keep, to count them by state (`metadata.counts`) before it selects (`selectorTakes`) and
+ * pages, orders by name — or, for a selector that takes finished runs alone (`status.state=finished`, `status.outcome=<outcome>`), newest
+ * first by when their work stopped (`finishedBefore`, its own token) — and lays the frame's parts on each run's status, measured to
  * `metadata.asOf` (`framePartsOf`). A plain list carries none of it.
  */
 import { isDeepStrictEqual } from 'node:util';

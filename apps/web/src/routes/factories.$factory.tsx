@@ -9,20 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { factoriesQuery } from '@/lib/api/factories';
 import { inboxQuery } from '@/lib/api/inbox';
 import { proposalsQuery } from '@/lib/api/proposals';
-import { runsQuery } from '@/lib/api/runs';
+import { openRunsQuery } from '@/lib/api/runs';
 import { storeQuery } from '@/lib/api/store';
-import { runsIn } from '@/lib/factories';
 
 export const Route = createFileRoute('/factories/$factory')({
   /**
-   * Waits for the factories and the runs, and prefetches the inbox for the queue's ghosts beside the floor, so the floor is fitted beside
+   * Waits for the factories and the factory's runs that are not finished (`openRunsQuery`, its namespace its name, `default` the runs of
+   * no factory), and prefetches the inbox for the queue's ghosts beside the floor, so the floor is fitted beside
    * them with the first cards, and the proposals of a factory a person made, listed above the floor before it is fitted. A prefetch never
    * throws: what cannot be read says so over the floor, and the runs are drawn all the same.
    */
   loader: async ({ context, params }) => {
     const [factories] = await Promise.all([
       context.queryClient.ensureQueryData(factoriesQuery),
-      context.queryClient.ensureQueryData(runsQuery),
+      context.queryClient.ensureQueryData(openRunsQuery(params.factory)),
       context.queryClient.prefetchQuery(inboxQuery),
     ]);
     if (factories.some((f) => f.name === params.factory && !f.default))
@@ -47,7 +47,7 @@ export const Route = createFileRoute('/factories/$factory')({
 function FactoryPage() {
   const { factory: name } = Route.useParams();
   const { data: factories } = useSuspenseQuery(factoriesQuery);
-  const { data: runs } = useSuspenseQuery(runsQuery);
+  const { data: open } = useSuspenseQuery(openRunsQuery(name));
   const factory = factories.find((f) => f.name === name);
   if (!factory) return <NoSuchFactory name={name} />;
   const above = (
@@ -56,7 +56,7 @@ function FactoryPage() {
       {factory.default ? null : <FactoryProposals factory={factory.name} />}
     </>
   );
-  return <FactoryCanvas runs={runsIn(runs, factory)} factory={factory} above={above} />;
+  return <FactoryCanvas open={open} factory={factory} above={above} />;
 }
 
 /** A button to a route, as the router draws its links (`routeLink`). */

@@ -2,7 +2,7 @@
  * What the Factory works out about the runs, without React Flow: which are in flight, what a card
  * says, where a card goes, and how many cells an open card takes. Pure.
  */
-import type { AtWork, RunToDecide } from './api/judged.ts';
+import { judged, type AtWork, type RunToDecide, type UnjudgedRun } from './api/judged.ts';
 import type { RunView } from './api/judged.ts';
 import type { EdgeState } from './canvas.ts';
 import { durationWords } from './duration.ts';
@@ -229,6 +229,34 @@ type FloorRun = Pick<RunView, 'id' | 'createdAt' | 'status' | 'moving' | 'waitin
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
   const waitedOn = new Set(runs.filter(inFlight).flatMap(liveWaits));
   return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitsOnYou(run) || waitedOn.has(run.id));
+}
+
+/**
+ * The runs the floor reads by id beside the light answer: each a row in flight still waits on (`liveWaits`), and each a row reads as
+ * context (its chip names it by its title, `readsLines`), that is no row of it — a finished run, since the light answer holds every run
+ * of the factory not finished, or a run of another factory. Each once, the waits first, in the order the rows name them; a row the list
+ * could not judge names nothing. One level, as `floorRuns` draws them; a run read only for its title is no card unless it is finished
+ * and Show finished is on.
+ */
+export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context'>) | UnjudgedRun)[]): string[] {
+  const listed = new Set(rows.map((row) => row.id));
+  const judgedRows = rows.filter((row): row is FloorRun & Pick<RunView, 'context'> => judged(row));
+  const waits = judgedRows.filter(inFlight).flatMap(liveWaits);
+  const reads = judgedRows.flatMap((row) => row.context);
+  return [...new Set([...waits, ...reads])].filter((id) => !listed.has(id));
+}
+
+/**
+ * The rows the floor is drawn from (`floorRuns` picks its cards): the light answer's waiting, then its in flight, then the parents read
+ * by id (`parentsWanted`), then the page of the finished runs while Show finished is on, each run once, the first read of it kept.
+ */
+export function floorRowsOf<T extends { id: string }>(
+  open: { waiting: readonly T[]; inFlight: readonly T[] },
+  parents: readonly T[],
+  finished: readonly T[],
+): T[] {
+  const seen = new Set<string>();
+  return [...openRows(open), ...parents, ...finished].filter((row) => !seen.has(row.id) && Boolean(seen.add(row.id)));
 }
 
 /** What a card's live waits are read off: the runs its roots still wait on, and a person's hold. */

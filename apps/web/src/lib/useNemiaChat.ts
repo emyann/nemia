@@ -22,7 +22,7 @@ import {
   type ChatSent,
 } from './api/chat.ts';
 import { changedChat, followChat, mergeChatEvents, unreadChat, type ChatFollowed } from './chatFollowing.ts';
-import { forgetKept, keepUnsent, readKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
+import { forgetKept, keepUnsent, keptAfter, readKept, retryKept, sendingOnce, editKept as writeKept, type ChatKept } from './chatOutbox.ts';
 import { animationFrames } from './follow.ts';
 import { browserSharing, sharedStream, type Sharing } from './sharedStream.ts';
 
@@ -116,8 +116,10 @@ export function reading({ setState, tryAgain }: Reader, sharing: Sharing | undef
  * reload.
  *
  * What the person writes goes to her outbox (`sendChat`), and is drawn as their own bubble at once under the id her chat gives it, which
- * the stream replaces by (`mergeChatEvents`). One the api would not take is kept in this browser (`lib/chatOutbox.ts`), survives a
- * reload, and is tried again every `CHAT_RETRY_MS` through `sendingOnce`, so the api coming back takes it once and no more.
+ * the stream replaces by (`mergeChatEvents`). One the api did not take is kept in this browser (`lib/chatOutbox.ts`) and survives a
+ * reload. One the api refused (a 4xx) keeps the api's words of why and is never sent again on its own: the person sends it again, changes
+ * it or throws it away. One the board lost (nothing answered, or a 5xx) is tried again every `CHAT_RETRY_MS` through `sendingOnce`, so
+ * the api coming back takes it once and no more.
  *
  * The read mark is posted for the event the panel says is on screen (`markRead`), once for each: the api never moves it back, and a
  * refusal lets the panel ask again.
@@ -146,29 +148,28 @@ function useHeldChat(): NemiaChat {
 
   const tryKept = useCallback((text: string) => sendingOnce(() => sendChat(text)).then(took), [took]);
 
+  const failed = useCallback((text: string, at: string, failure: unknown) => {
+    const next = keptAfter(text, at, failure);
+    keepUnsent(next.text, next.at, next.refused);
+    setKept(next);
+  }, []);
+
   useEffect(() => {
-    if (kept === null) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const retry = () => {
-      tryKept(kept.text).catch(() => {
-        timer = setTimeout(retry, CHAT_RETRY_MS);
-      });
-    };
-    timer = setTimeout(retry, CHAT_RETRY_MS);
-    return () => clearTimeout(timer);
-  }, [kept, tryKept]);
+    if (kept === null || kept.refused !== undefined) return;
+    return retryKept(
+      () => tryKept(kept.text),
+      CHAT_RETRY_MS,
+      (failure) => failed(kept.text, kept.at, failure),
+    );
+  }, [kept, tryKept, failed]);
 
   const send = useCallback(
     (text: string) => {
       const words = text.trim();
       if (!words) return;
-      sendChat(words).then(took, () => {
-        const at = new Date().toISOString();
-        keepUnsent(words, at);
-        setKept({ text: words, at });
-      });
+      sendChat(words).then(took, (failure: unknown) => failed(words, new Date().toISOString(), failure));
     },
-    [took],
+    [took, failed],
   );
 
   const answer = useCallback((id: string, picks: readonly AskPick[]) => {
@@ -180,8 +181,8 @@ function useHeldChat(): NemiaChat {
   }, []);
 
   const sendKept = useCallback(() => {
-    if (kept !== null) tryKept(kept.text).catch(() => undefined);
-  }, [kept, tryKept]);
+    if (kept !== null) tryKept(kept.text).catch((failure: unknown) => failed(kept.text, kept.at, failure));
+  }, [kept, tryKept, failed]);
 
   const edit = useCallback((text: string) => {
     const words = text.trim();

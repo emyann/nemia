@@ -118,6 +118,7 @@ const PINNED: Record<string, string[]> = {
     'HARNESS_CHOICES',
     'INBOX',
     'INBOX_ADD',
+    'INBOX_EDIT',
     'INBOX_QUEUE',
     'INBOX_RM',
     'INBOX_KEYS',

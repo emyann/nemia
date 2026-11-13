@@ -290,6 +290,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
                                on the port: inbox_from
+  nemia inbox edit <name> "<card>"|<file>
+                               replace a card's body and keys with a card's text, typed or a file;
+                               the card keeps its name, and its labels: nemia label inbox edits those
+                               on the port: inbox_edit
   nemia label run <runId> <key=value|key->... [--overwrite]
                                edit a run's labels: key=value sets a key, key- removes it; changing a
                                value takes --overwrite. nemia ls -l selects by them, and the feed's

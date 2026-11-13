@@ -252,6 +252,37 @@ taken from the root by `npx skills add emyann/tsverify -a claude-code --copy -y`
 release it was taken from; the package this repository pins, `@emyann/tsverify`, installs the pages it cites under
 `node_modules/@emyann/tsverify/docs/`. Its author and its licence, MIT, are this repository's own (`LICENSE`).
 
+## code-review — Matt Pocock
+
+A two-axis review of a diff, Standards and Spec, each in a sub-agent of its own, from
+[mattpocock/skills](https://github.com/mattpocock/skills) (`skills/engineering/code-review`): `.claude/skills/code-review`, taken from
+the repository's root by `npx skills add https://github.com/mattpocock/skills --skill code-review -a claude-code --copy -y` and
+refreshed by `npx skills update`. On trial on the build team's review, given to its step by the nemia factory's overlay.
+
+```
+MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## The design system kit — french-tech-homies
 
 From [french-tech-homies/design-system](https://github.com/french-tech-homies/design-system), through its shadcn registry (`@ds` in

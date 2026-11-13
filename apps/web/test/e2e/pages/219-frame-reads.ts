@@ -1,6 +1,6 @@
 import type { Page } from 'playwright';
 import { LIST_PAGE } from 'objects';
-import { OPEN_SELECTOR, type OpenRuns } from '../../../src/lib/api/runs.ts';
+import { FINISHED_SELECTOR, OPEN_SELECTOR, type OpenRuns } from '../../../src/lib/api/runs.ts';
 import { barValue } from '../../../src/lib/bar.ts';
 import { openBlockOf, runsOf } from '../../../src/lib/factories.ts';
 import { atWork, atWorkWords } from '../../../src/lib/footer.ts';
@@ -36,7 +36,8 @@ export default {
   /**
    * The frame's reads, on two pages that hold no reader of the whole list, Agents and a factory's Workflows with its bar open: the rail's
    * Runs badge, the gauges and the factory's bar are drawn, the page asked for the light answer, and it made no request for the whole
-   * list of the runs. The Overview, which reads the whole list, is then heard asking for it by the same listener.
+   * list of the runs. The Overview's strip is then heard asking for the runs finished today by the same listener, and still never for
+   * the whole list: the listener is not deaf.
    */
   name: 'frame-reads',
   route: '/agents',
@@ -78,9 +79,10 @@ export default {
 
       await visit(page, '/');
       await expectNone(
-        async () => (heard.includes(WHOLE) ? null : `it has not asked for ${WHOLE}`),
-        `the Overview, which reads the whole list, is heard asking for ${WHOLE}: the listener is not deaf`,
+        async () => (heard.some((p) => p.includes(`fieldSelector=${FINISHED_SELECTOR}`)) ? null : 'it has not asked for them'),
+        `the Overview's strip is heard asking for the runs finished today (${FINISHED_SELECTOR}): the listener is not deaf`,
       );
+      if (heard.includes(WHOLE)) throw new Refused(`the Overview asks no more for ${WHOLE}`);
     } finally {
       page.off('request', hear);
       await visit(page, '/agents');

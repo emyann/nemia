@@ -1,14 +1,18 @@
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
-import { concludedQuery, runsQuery } from '../../lib/api/runs.ts';
-import { judged, type RunRow, type RunView } from '../../lib/api/judged.ts';
+import { concludedQuery } from '../../lib/api/runs.ts';
+import type { RunView } from '../../lib/api/judged.ts';
 import { standingOf, titleOf } from '../../lib/factory';
+import { usePickerRuns } from '../../lib/pickerRuns.ts';
+import { BUTTON_SECONDARY, BUTTON_SMALL } from '../../lib/classes';
+import { cn } from '../../lib/utils';
 import { Markdown } from '../markdown/Markdown';
 
 /**
- * The runs a run reads as context (the CLI's `start --from`, a card's `from:`): every run in the store, newest first, each by its title and
- * id, picked as many as it reads. Reading is no wait: a run picked here holds nothing of the new run back. Which runs it may read is the
+ * The runs a run reads as context (the CLI's `start --from`, a card's `from:`): the runs not finished, newest created first, then the
+ * finished, newest finished first, a page of them and Show older for the next (`usePickerRuns`), each by its title and id, picked as many
+ * as it reads. Reading is no wait: a run picked here holds nothing of the new run back. Which runs it may read is the
  * package's to say (`contextRefusal`), and its refusal is shown with the start's or the card's write. Each pick shows what it would hand
  * (`ConcludedPreview`). `label` names the list for a person and a page.
  */
@@ -23,9 +27,9 @@ export function ContextPicker({
   label?: string;
   disabled?: boolean;
 }) {
-  const runs = useQuery({ ...runsQuery, refetchInterval: false });
+  const runs = usePickerRuns();
   const legend = useId();
-  const listed = runs.data ? newestFirst(runs.data) : null;
+  const listed = runs.reading ? null : [...runs.open, ...runs.finished].map(listedOf);
 
   return (
     <fieldset aria-labelledby={legend} data-context-picker className="min-w-0 space-y-1.5">
@@ -66,6 +70,7 @@ export function ContextPicker({
           ))}
         </ul>
       )}
+      {!runs.error && runs.more && <ShowOlder onPress={runs.older} />}
       {selected.map((id) => (
         <ConcludedPreview key={id} run={id} />
       ))}
@@ -107,17 +112,14 @@ export function ConcludedPreview({ run }: { run: string }) {
 /** A run to read as the list draws it: its id, its title, where it stands in a word, and what to do about its wait on hover. */
 type Listed = { id: string; title: string; standing: string; advice: string | undefined };
 
-/**
- * Every run to read, newest first, then each run the list could not judge, by its id, in flight as the tick counts it: a run whose
- * record reads hands what it concluded all the same.
- */
-const newestFirst = (runs: readonly RunRow[]): Listed[] => [
-  ...runs
-    .filter(judged)
-    .sort((a: RunView, b: RunView) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
-    .map((run) => ({ id: run.id, title: titleOf(run), standing: standingOf(run), advice: run.waiting?.advice })),
-  ...runs
-    .filter((run) => !judged(run))
-    .sort((a, b) => b.id.localeCompare(a.id))
-    .map((run) => ({ id: run.id, title: run.id, standing: 'in flight', advice: undefined })),
-];
+/** A run to read, as the list draws it. */
+const listedOf = (run: RunView): Listed => ({ id: run.id, title: titleOf(run), standing: standingOf(run), advice: run.waiting?.advice });
+
+/** Show older, under a picker's list: asks for the next, older page of the finished runs (`usePickerRuns`'s `older`). */
+export function ShowOlder({ onPress }: { onPress: () => void }) {
+  return (
+    <button type="button" data-picker-older onClick={onPress} className={cn(BUTTON_SMALL, BUTTON_SECONDARY)}>
+      Show older
+    </button>
+  );
+}

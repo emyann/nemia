@@ -3,7 +3,7 @@
  * labels kept. A file is read here and its text sent; a folder is refused, naming the command. The card is found across namespaces
  * first (`cards.getAll`) and its text sent with no version: the last writer wins, as a write that names none.
  */
-import { DEFAULT_NAMESPACE, INBOX_EDIT_WORDS, type Args, type Card } from 'objects';
+import { DEFAULT_NAMESPACE, headline, INBOX_EDIT_WORDS, type Args, type Card } from 'objects';
 import { asked } from '../../objects.ts';
 import { said, textArg } from '../requests.ts';
 import { fileOf, textOrFile } from './card-lines.ts';
@@ -13,7 +13,7 @@ const { name: COMMAND } = INBOX_EDIT_WORDS;
 /** What `nemia inbox edit` prints of the card written, beside the card as it was read (`before`): its name kept and its title now. */
 export const editedLines = (card: Card, before: Card): string[] => {
   const { name } = card.metadata;
-  const title = (card.spec.body ?? '').split('\n')[0] ?? '';
+  const title = headline(card.spec.body ?? '');
   const unchanged = card.metadata.resourceVersion === before.metadata.resourceVersion;
   return [
     `${name}  ${title.slice(0, 56)}${card.spec.workflow ? `  workflow: ${card.spec.workflow}` : ''}`,

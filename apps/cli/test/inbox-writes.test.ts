@@ -104,7 +104,7 @@ async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root
   assert.doesNotMatch(cardOn(root, name) ?? '', /from:/);
 
   const text = path.join(path.dirname(idea), `${name}-edited.md`);
-  write(text, '---\nworkflow: dev\n---\nCache the engine views, retitled\n\nOnly between passes.\n');
+  write(text, '---\nworkflow: dev\n---\n# Cache the engine views, retitled\n\nOnly between passes.\n');
   const edited = await run(['inbox', 'edit', name, text]);
   ok(edited, 'inbox edit');
   assert.deepEqual(edited.out.split('\n'), [
@@ -114,7 +114,7 @@ async function lifeOfACard(run: (argv: readonly string[]) => Promise<Said>, root
   ]);
   assert.match(
     cardOn(root, name) ?? '',
-    /\nworkflow: dev\n[^]*team: core\n---\nCache the engine views, retitled\n\nOnly between passes\.\n$/,
+    /\nworkflow: dev\n[^]*team: core\n---\n# Cache the engine views, retitled\n\nOnly between passes\.\n$/,
   );
   const same = await run(['inbox', 'edit', name, text]);
   ok(same, 'inbox edit, again');

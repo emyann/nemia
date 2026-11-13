@@ -9,7 +9,7 @@
  * laptop), so each asks 2.5 GiB of the machine; one CPU is left to the daemon and the machine; a limit is a ceiling, not a reservation,
  * so each session may take half the machine before the kernel stops it, never the whole; and the requests of every session at once fit
  * what the machine allocates — its memory less the floor — as Kubernetes' scheduler admits a Pod only while the requests of what runs on
- * a node fit its capacity (2026-11-13: six sessions under 7.6 GiB each, on 16 GB with no swap, took the machine).
+ * a node fit its capacity (six sessions under 7.6 GiB each, on 16 GB with no swap, took the machine).
  *
  * And whether the settings a daemon runs under fit its machine (`memoryFit`), which `nemia doctor` says.
  */
@@ -136,6 +136,13 @@ export type MemoryFit =
 /** What a session asks where its step names nothing: its request, else its limit, as Kubernetes defaults a request; null for neither. */
 const perSession = (c: Configured): number | null => c.requestBytes ?? c.limitBytes;
 
+/**
+ * The most each session may ask with every session at once in what the machine allocates, in whole bytes: the sessions together ask
+ * more than it allocates exactly when each asks more than this (`n × p > r` of whole numbers is `p > ⌊r / n⌋`), said without the
+ * product, which a double may round.
+ */
+const eachMayAsk = (c: Configured): number => Math.floor((c.totalBytes - c.reservedBytes) / c.maxConcurrent);
+
 /** A whole number of bytes above nothing, up to a pebibyte. */
 const someBytes = (n: number): boolean => Number.isInteger(n) && n >= 1 && n <= 2 ** 50;
 
@@ -159,7 +166,7 @@ const memoryFitSpec = spec<(configured: Configured) => MemoryFit>({
       description: 'The sessions at once are over exactly when what they ask together is more than the machine allocates',
       condition: ({ input: [c], output }) => {
         const per = perSession(c);
-        return (output.verdict === 'over') === (per !== null && c.maxConcurrent * per > c.totalBytes - c.reservedBytes);
+        return (output.verdict === 'over') === (per !== null && per > eachMayAsk(c));
       },
     },
     overSaysHowManyFit: {
@@ -167,8 +174,16 @@ const memoryFitSpec = spec<(configured: Configured) => MemoryFit>({
       condition: ({ input: [c], output }) => {
         if (output.verdict !== 'over') return true;
         const per = perSession(c);
+        if (per === null) return false;
         const room = c.totalBytes - c.reservedBytes;
-        return per !== null && output.perSessionBytes === per && output.allocatableBytes === room && output.sessionsFit === Math.floor(room / per);
+        const fit = output.sessionsFit;
+        return (
+          output.perSessionBytes === per &&
+          output.allocatableBytes === room &&
+          Number.isInteger(fit) &&
+          fit * per <= room &&
+          (fit + 1) * per > room
+        );
       },
     },
     limitOverWhenOneSessionCouldTakeMore: {
@@ -176,10 +191,12 @@ const memoryFitSpec = spec<(configured: Configured) => MemoryFit>({
       condition: ({ input: [c], output }) => {
         const room = c.totalBytes - c.reservedBytes;
         const per = perSession(c);
-        const sessionsFit = per !== null && c.maxConcurrent * per <= room;
+        const sessionsFit = per !== null && per <= eachMayAsk(c);
         const limitOver = c.limitBytes !== null && c.limitBytes > room;
-        return (output.verdict === 'limitOver') === (sessionsFit && limitOver) &&
-          (output.verdict !== 'limitOver' || (output.limitBytes === c.limitBytes && output.allocatableBytes === room));
+        return (
+          (output.verdict === 'limitOver') === (sessionsFit && limitOver) &&
+          (output.verdict !== 'limitOver' || (output.limitBytes === c.limitBytes && output.allocatableBytes === room))
+        );
       },
     },
   },

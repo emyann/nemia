@@ -6,18 +6,19 @@
  * of `limit` costs at most `limit` judgements. A run a task of which does not read is no `Run`: it is left out of `items` and named in
  * `unjudged` with why, never dropped with no word.
  *
- * A list asked by state (`?fieldSelector=status.state…`, `runStateSelector`) is the board's: it judges every run its namespace and labels
- * keep, to count them by state (`metadata.counts`) before it selects and pages, orders by name — or, for `status.state=finished`, newest
- * first by when their work stopped (`finishedBefore`, its own token) — and lays the frame's parts on each run's status, measured to
+ * A list asked by a field (`?fieldSelector=status.state…`, `runStateSelector`, or `status.outcome…`, `runOutcomeSelector`) is the
+ * board's: it judges every run its namespace and labels keep, to count them by state (`metadata.counts`) before it selects
+ * (`selectorTakes`) and pages, orders by name — or, for a selector that takes finished runs alone (`status.state=finished`,
+ * `status.outcome=<outcome>`), newest first by when their work stopped (`finishedBefore`, its own token) — and lays the frame's parts on each run's status, measured to
  * `metadata.asOf` (`framePartsOf`). A plain list carries none of it.
  */
 import { isDeepStrictEqual } from 'node:util';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { Effect } from 'effect';
-import { type Run as RunObject, type RunList, type RunState, type RunUnjudged } from 'objects';
+import { type Run as RunObject, type RunList, type RunOutcome, type RunState, type RunUnjudged } from 'objects';
 import type { Run } from '../run.ts';
 import type { Engine } from '../runtime-client.ts';
-import { finishedAtOf, kindOf } from '../run-state/run-state.ts';
+import { finishedAtOf, kindOf, outcomeOf } from '../run-state/run-state.ts';
 import { selectedRuns } from '../labels/labels.ts';
 import { framed, framePartsOf, unjudgedStateOf } from '../runlist/runlist.verb.ts';
 import { storeRunsListed, summaryOf, type SummaryHow } from '../summary/summary.verb.ts';
@@ -25,7 +26,15 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { parseSelectors } from '../watch/selector.ts';
 import { listOf, selectorsRefused } from '../object/listed.verb.ts';
 import { pageOf } from '../object/page.ts';
-import { finishedPageOf, runNamespace, runStateSelector, type RunStateSelector, byFinishedPlace } from './run-list.ts';
+import {
+  byFinishedPlace,
+  finishedPageOf,
+  runNamespace,
+  runOutcomeSelector,
+  type RunSelector,
+  runStateSelector,
+  selectorTakes,
+} from './run-list.ts';
 
 export { runNamespace };
 import { diskPartsOf, type RunObjectAnswer, runObjectCore, type RunReads, withDiskParts } from '../object/run.verb.ts';
@@ -36,7 +45,7 @@ import type { Judgement, Judgements, JudgedOrWhy } from '../summary/judgement.ve
 
 /**
  * What a list of runs is asked: its namespace (none for every run), `?limit=`, `?continue=`, its label selectors, OR'd, and its
- * `?fieldSelector=`, the runs in one state (`runStateSelector`).
+ * `?fieldSelector=`, the runs in one state (`runStateSelector`) or the finished runs of one outcome (`runOutcomeSelector`).
  */
 export type RunQuery = {
   readonly namespace?: string | undefined;
@@ -65,13 +74,14 @@ const keptOf = <R extends Listed>(runs: readonly R[], query: RunQuery): readonly
   return [...selectedRuns(inNamespace, parseSelectors(selectors))].sort(byName);
 };
 
-/** The selector `query.fieldSelector` spells, none where it is not given, or `Invalid` naming the three forms it takes. */
-const fieldSelectorOf = (query: RunQuery): RunStateSelector | undefined | Invalid => {
+/** The selector `query.fieldSelector` spells, none where it is not given, or `Invalid` naming every form it takes. */
+const fieldSelectorOf = (query: RunQuery): RunSelector | undefined | Invalid => {
   if (query.fieldSelector === undefined) return undefined;
   return (
     runStateSelector(query.fieldSelector) ??
+    runOutcomeSelector(query.fieldSelector) ??
     new Invalid({
-      message: `fieldSelector ${JSON.stringify(query.fieldSelector)} is no selector of the runs: pass one term on the run's state, status.state=<state>, status.state==<state> or status.state!=<state>, the state one of waiting, inFlight or finished, or leave fieldSelector out to list every run`,
+      message: `fieldSelector ${JSON.stringify(query.fieldSelector)} is no selector of the runs: pass one term, on the run's state, status.state=<state>, status.state==<state> or status.state!=<state>, the state one of waiting, inFlight or finished, or on a finished run's outcome, status.outcome=<outcome>, status.outcome==<outcome> or status.outcome!=<outcome>, the outcome one of succeeded, failed, cancelled or undecided; or leave fieldSelector out to list every run`,
     })
   );
 };
@@ -186,12 +196,16 @@ type ByStateReads<E, R, O = R> = {
   readonly objectOf: (run: Run, judgement: Judgement) => Effect.Effect<RunObjectAnswer, E, O>;
 };
 
-/** A run a list asked by state keeps: its record, its judgement or why it has none, its state, and when it finished for a finished one. */
+/**
+ * A run a list asked by a field keeps: its record, its judgement or why it has none, its state, its outcome (null but for a finished run
+ * the list judged), and when it finished for a finished one.
+ */
 type Stated = {
   run: Run;
   one: JudgedOrWhy;
   summary: ReturnType<typeof summaryOf> | undefined;
   state: RunState;
+  outcome: RunOutcome | null;
   name: string;
   finishedAt: string;
 };
@@ -227,19 +241,29 @@ const countsOf = (stated: readonly Stated[]) => {
 const statedOf = (run: Run, one: JudgedOrWhy, home: string): Stated => {
   const summary = 'judgement' in one ? summaryOf(one.judgement, home) : undefined;
   const state = summary ? kindOf(summary) : unjudgedStateOf(run);
-  return { run, one, summary, state, name: run.id, finishedAt: summary && state === 'finished' ? finishedAtOf(summary) : run.createdAt };
+  const finished = summary !== undefined && state === 'finished';
+  return {
+    run,
+    one,
+    summary,
+    state,
+    outcome: finished ? outcomeOf(summary) : null,
+    name: run.id,
+    finishedAt: finished ? finishedAtOf(summary) : run.createdAt,
+  };
 };
 
 /**
- * The list asked by state (`field`): every run the namespace and labels keep judged at once, counted by state, then those `field` selects,
- * by name, or newest first for `status.state=finished` (`finishedPageOf`), cut by the page; each of the page answered as the plain list
+ * The list asked by a field (`field`): every run the namespace and labels keep judged at once, counted by state, then those `field`
+ * takes (`selectorTakes`), by name, or newest first for a selector that takes finished runs alone (`status.state=finished`,
+ * `status.outcome=<outcome>`; `finishedPageOf`), cut by the page; each of the page answered as the plain list
  * answers it, with the frame's parts laid on its status (`framePartsOf`), measured to `metadata.asOf`. A run left unjudged is named in
  * `unjudged` with its state.
  */
 const byState = Effect.fnUntraced(function* <E, R, O>(
   all: readonly Run[],
   query: RunQuery,
-  field: RunStateSelector,
+  field: RunSelector,
   reads: ByStateReads<E, R, O>,
 ) {
   const kept = keptOf(all, query);
@@ -249,9 +273,9 @@ const byState = Effect.fnUntraced(function* <E, R, O>(
   const stated: Stated[] = [];
   for (const run of kept) stated.push(statedOf(run, judged.runs.get(run.id) ?? (yield* notJudged(run)), reads.home));
   const counts = countsOf(stated);
-  const selected = stated.filter(({ state }) => (state === field.state) === field.equal);
+  const selected = stated.filter((one) => selectorTakes(field, one));
   const asked = { limit: query.limit ?? null, continue: query.continue };
-  const finishedOrder = field.equal && field.state === 'finished';
+  const finishedOrder = field.equal && ('outcome' in field || field.state === 'finished');
   const page = finishedOrder ? finishedPageOf([...selected].sort(byFinishedPlace), asked) : pageOf(selected, ({ name }) => name, asked);
   if (page instanceof Invalid) return yield* Effect.fail(page);
   const items: RunObject[] = [];

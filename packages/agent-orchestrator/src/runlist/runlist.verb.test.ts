@@ -1,6 +1,7 @@
 /**
- * The RunList asked by state (`runList` with `fieldSelector`, run-list.verb.ts), on a store of runs started and advanced over the
- * stand-ins: each selector takes exactly the runs `kindOf` puts in its state, the counts ignore the selector and the page, the finished
+ * The RunList asked by a field (`runList` with `fieldSelector`, run-list.verb.ts), on a store of runs started and advanced over the
+ * stand-ins: each selector takes exactly the runs `kindOf` puts in its state, an outcome selector the finished runs that ended so (or
+ * every other run), the counts ignore the selector and the page, the finished
  * runs come newest first by when their work stopped, each run carries the frame's parts measured to `metadata.asOf` (`framePartsOf`,
  * runlist.verb.ts), and a warm read costs no record of a finished run (the big quiet store of rest-store.test.ts says the same on the
  * runtime itself); a plain list carries none of it, and a selector that is none is refused before any run is judged.
@@ -22,7 +23,8 @@ import { kindOf } from '../run-state/run-state.ts';
 import { judgedNow } from '../summary/summary.verb.ts';
 import { advanceRun, approveRun, startRun, runWith as runEngine } from '../runner.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { runRecord } from '../record/record.store.ts';
+import { listRuns, runRecord } from '../record/record.store.ts';
+import { passStanding } from '../standing/standing.verb.ts';
 import { engineOf } from '../runtime-client.ts';
 import { metered } from '../meter/tally.store.ts';
 import { informerMemo, type InformerMemo } from '../rest/informer.verb.ts';
@@ -74,6 +76,7 @@ const started = async (steps: Record<string, string | null>, gates: string[] = [
   return run.id;
 };
 
+
 /** One more pass over the run `id`. */
 const advanced = (id: string) => runWith(e(), advanceRun(runRecord(ROOT, id)));
 
@@ -82,6 +85,22 @@ const aFinished = async () => {
   const id = await started({ work: null });
   engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED });
   await advanced(id);
+  return id;
+};
+
+/**
+ * A run of one step that signed off with a commit on its branch nobody merged: finished, its result left to a person (outcome
+ * `undecided`) once a pass has read where its branch stands (`passStanding`), as the tick's does.
+ */
+const anUndecided = async () => {
+  const id = await started({ work: null }, [], true);
+  const record = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${id}.json`), 'utf8')) as { steps: { work: { workspace: string } } };
+  const { workspace } = record.steps.work;
+  fs.writeFileSync(path.join(workspace, 'result.txt'), 'the work\n');
+  stand().world.commit(workspace, 'the work');
+  engine().settle(`${id}-work`, 'succeeded', { closeout: SIGNED });
+  await advanced(id);
+  await runWith(e(), passStanding(listRuns(ROOT)));
   return id;
 };
 
@@ -192,6 +211,40 @@ test('each selector takes exactly the runs kindOf puts in its state; the counts 
   assert.deepEqual(done.metadata.counts, counts, 'the counts ignore the limit');
 });
 
+test('an outcome selector takes the finished runs that ended so, or every other run; newest first, the counts the namespace\u2019s', async (t) => {
+  seeded(t);
+  const merged = await aFinished();
+  t.mock.timers.tick(MIN);
+  const undecided = [await anUndecided()];
+  t.mock.timers.tick(MIN);
+  undecided.unshift(await anUndecided());
+  const waiting = await aWaiting();
+  const inFlight = await anInFlight();
+  const counts = (await list({ fieldSelector: 'status.state!=finished' })).metadata.counts;
+  const asked = await list({ fieldSelector: 'status.outcome=undecided' });
+  assert.deepEqual(
+    rowsOf(asked).map((row) => [row.id, row.outcome]),
+    undecided.map((id) => [id, 'undecided']),
+    'the undecided runs alone, newest first',
+  );
+  assert.ok(
+    asked.items.every((item) => FRAME.every((key) => key in item.status)),
+    'every run carries the seven keys',
+  );
+  assert.deepEqual(asked.metadata.counts, counts, 'the counts are the namespace\u2019s');
+  assert.deepEqual(rowsOf(await list({ fieldSelector: 'status.outcome==succeeded' })).map((row) => row.id), [merged]);
+  const others = await list({ fieldSelector: 'status.outcome!=undecided' });
+  assert.deepEqual(
+    others.items.map((item) => item.metadata.name),
+    [merged, waiting, inFlight].sort(),
+    'every other run, those not finished among them',
+  );
+  const first = await list({ fieldSelector: 'status.outcome=undecided', limit: 1 });
+  assert.deepEqual(rowsOf(first).map((row) => row.id), undecided.slice(0, 1));
+  const rest = await list({ fieldSelector: 'status.outcome=undecided', limit: 1, continue: first.metadata.continue });
+  assert.deepEqual(rowsOf(rest).map((row) => row.id), undecided.slice(1), 'its continue reads on in the finished order');
+});
+
 test('a plain list carries no counts, no asOf and no frame key, and answers each run as the list asked by state does but for them', async (t) => {
   seeded(t);
   await aFinished();
@@ -222,10 +275,18 @@ test('a run left unjudged is named in unjudged with its state on a list asked by
   assert.deepEqual(answer.metadata.counts, { waiting: 0, inFlight: 1, finished: 0 });
 });
 
-test('REFUSED Invalid, before any record is read: a field that is no state, a state that is none, a chain of terms', async (t) => {
+test('REFUSED Invalid, before any record is read: a field that is no state or outcome, a word that is none, a chain of terms', async (t) => {
   seeded(t);
   await aWaiting();
-  for (const fieldSelector of ['spec.repo=x', 'status.state=done', 'status.state=waiting,status.state=inFlight', 'status.state']) {
+  for (const fieldSelector of [
+    'spec.repo=x',
+    'status.state=done',
+    'status.state=waiting,status.state=inFlight',
+    'status.state',
+    'status.outcome=done',
+    'status.outcome',
+    'status.outcome=undecided,status.state=finished',
+  ]) {
     const refused = await metered(() =>
       assert.rejects(list({ fieldSelector }), (err: Error & { exitCode?: number }) => {
         assert.ok(err instanceof Invalid, String(err));

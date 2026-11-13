@@ -1,19 +1,26 @@
 /**
  * The pure parts of a run's list on the generic path: a run's namespace (`runNamespace`, proved by contracts/run-namespace.contract.ts),
  * the factory its record names, `default` for one that names none, as a card's is; the list's `?fieldSelector=`, one term on
- * `status.state` (`runStateSelector`, proved by contracts/run-state-selector.contract.ts); and the order of the finished runs a list
- * asked by `status.state=finished` answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with the `continue` token
+ * `status.state` (`runStateSelector`, proved by contracts/run-state-selector.contract.ts) or on a finished run's `status.outcome`
+ * (`runOutcomeSelector`), and the runs it takes (`selectorTakes`), both proved by contracts/run-outcome-selector.contract.ts; and the
+ * order of the finished runs a list asked by `status.state=finished` or by an outcome answers (`finishedBefore`, proved by contracts/finished-order.contract.ts), with the `continue` token
  * that names a place in it (`finishedToken`, `finishedAfter`) and the page it cuts (`finishedPageOf`).
  */
-import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_STATES, type RunState } from 'objects';
+import { DEFAULT_NAMESPACE, LIST_PAGE, type PageBounds, RUN_OUTCOMES, RUN_STATES, type RunOutcome, type RunState } from 'objects';
 import type { FinishedBefore, FinishedKey } from '../../contracts/finished-order.contract.ts';
 import type { RunNamespace } from '../../contracts/run-namespace.contract.ts';
+import type {
+  RunOutcomeSelector,
+  RunOutcomeSelectorOf,
+  RunSelector,
+  SelectorTakes,
+} from '../../contracts/run-outcome-selector.contract.ts';
 import type { RunStateSelector, RunStateSelectorOf } from '../../contracts/run-state-selector.contract.ts';
 import { badLimit, listPage, type PageAsked, type Paged } from '../object/page.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { nameFirst } from './name-order.ts';
 
-export type { FinishedKey, RunStateSelector };
+export type { FinishedKey, RunOutcomeSelector, RunSelector, RunStateSelector };
 
 /** The namespace of a run whose record names `factory`: that factory, or `default` for none. */
 export const runNamespace: RunNamespace = (factory) => factory ?? DEFAULT_NAMESPACE;
@@ -33,6 +40,32 @@ export const runStateSelector: RunStateSelectorOf = (text) => {
   const state = stateOf(rest.slice(operator.length));
   return state === null ? null : { state, equal: operator !== '!=' };
 };
+
+/** The field a run's list is selected by on a finished run's outcome. */
+const OUTCOME_FIELD = 'status.outcome';
+
+/** `word` as a finished run's outcome, or null where it is none. */
+const outcomeOf = (word: string): RunOutcome | null => RUN_OUTCOMES.find((o) => o === word) ?? null;
+
+/**
+ * The selector `text` spells on a finished run's outcome (`RunOutcomeSelector`): `status.outcome`, then `==`, `!=` or `=`, then an
+ * outcome; null for anything else.
+ */
+export const runOutcomeSelector: RunOutcomeSelectorOf = (text) => {
+  if (!text.startsWith(OUTCOME_FIELD)) return null;
+  const rest = text.slice(OUTCOME_FIELD.length);
+  const operator = rest.startsWith('==') ? '==' : rest.startsWith('!=') ? '!=' : rest.startsWith('=') ? '=' : null;
+  if (operator === null) return null;
+  const outcome = outcomeOf(rest.slice(operator.length));
+  return outcome === null ? null : { outcome, equal: operator !== '!=' };
+};
+
+/**
+ * Whether a list asked by `selector` takes `run`: on the state, the runs in it (or every other, for `!=`); on the outcome, the finished
+ * runs that ended so (or every other run, one not finished among them, since it has no outcome).
+ */
+export const selectorTakes: SelectorTakes = (selector, run) =>
+  'state' in selector ? (run.state === selector.state) === selector.equal : (run.outcome === selector.outcome) === selector.equal;
 
 /** Whether the finished run at `a` comes before the one at `b`: newest first by when its work stopped, two together by name. */
 export const finishedBefore: FinishedBefore = (a, b) =>
@@ -54,7 +87,7 @@ export const finishedToken = (run: Finished): string =>
 /** The token's refusal: it names the fix. */
 const badFinishedToken = (token: string): Invalid =>
   new Invalid({
-    message: `continue ${JSON.stringify(token)} is no token of the finished runs' list (fieldSelector=status.state=finished): pass the continue its last page's metadata answered, as it is, or leave continue out to read from the newest`,
+    message: `continue ${JSON.stringify(token)} is no token of the finished runs' list (fieldSelector=status.state=finished, or status.outcome=<outcome>): pass the continue its last page's metadata answered, as it is, or leave continue out to read from the newest`,
   });
 
 /** The place `token` was made of (`finishedToken`), or `Invalid` where it is none: a name-order token among them. */

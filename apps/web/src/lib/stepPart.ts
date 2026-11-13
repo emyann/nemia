@@ -335,9 +335,9 @@ type PartAsks = {
 };
 
 /**
- * What the step asks of a person while its state waits on one, or the run says it waits on one for it (`waitedOn`, a check refused
+ * What the step asks of a person while its state waits on one, or the run says it waits on one for it (`waitedOn`, a check failed
  * among them), and what it waits for whatever its state; none where it asks nothing. A step that waits on a person asks even where none
- * of the five says what (a check refused, a loop out of rounds, a budget past): its part answers it there (`offersOf`).
+ * of the five says what (a check failed, a loop out of rounds, a budget past): its part answers it there (`offersOf`).
  */
 export function asksOf(step: StepView, state: StepState, waitedOn: boolean): PartAsks | None {
   const yours = waitsOnYou(state) || waitedOn;

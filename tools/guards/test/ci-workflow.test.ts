@@ -581,6 +581,102 @@ function cancelDrift(workflow: Workflow): string[] {
       ];
 }
 
+/**
+ * The value of an Actions expression body under `github`, read as Actions reads it: string literals, `github.<name>` contexts, `==` and
+ * `!=` (case-insensitive, as Actions compares strings), `&&` and `||` (each giving back one of its operands) and parentheses.
+ * `undefined` where the body holds anything else, so a group the clause cannot evaluate is drift rather than a pass.
+ */
+export function evaluate(body: string, github: Record<string, string>): string | boolean | undefined {
+  const tokens = [...body.matchAll(/\s*('(?:[^']|'')*'|[A-Za-z_][\w.-]*|==|!=|&&|\|\||\(|\)|\S)/g)].map(([, token]) => token);
+  let at = 0;
+  const truthy = (value: string | boolean): boolean => value !== '' && value !== false;
+  const primary = (): string | boolean | undefined => {
+    const token = tokens[at++];
+    if (token === undefined) return undefined;
+    if (token === '(') {
+      const inner = or();
+      return tokens[at++] === ')' ? inner : undefined;
+    }
+    if (token.startsWith("'")) return token.slice(1, -1).replaceAll("''", "'");
+    if (token === 'true' || token === 'false') return token === 'true';
+    const name = /^github\.([\w-]+)$/.exec(token)?.[1];
+    return name !== undefined && name in github ? github[name] : undefined;
+  };
+  const equality = (): string | boolean | undefined => {
+    const left = primary();
+    if (tokens[at] !== '==' && tokens[at] !== '!=') return left;
+    const operator = tokens[at++];
+    const right = primary();
+    if (left === undefined || right === undefined) return undefined;
+    const same = String(left).toLowerCase() === String(right).toLowerCase();
+    return operator === '==' ? same : !same;
+  };
+  const and = (): string | boolean | undefined => {
+    let left = equality();
+    while (tokens[at] === '&&') {
+      at++;
+      const right = equality();
+      if (left === undefined || right === undefined) return undefined;
+      left = truthy(left) ? right : left;
+    }
+    return left;
+  };
+  const or = (): string | boolean | undefined => {
+    let left = and();
+    while (tokens[at] === '||') {
+      at++;
+      const right = and();
+      if (left === undefined || right === undefined) return undefined;
+      left = truthy(left) ? left : right;
+    }
+    return left;
+  };
+  const value = or();
+  return at === tokens.length ? value : undefined;
+}
+
+/** The concurrency group `group` names for a run of `ref` at `sha`, or `undefined` where an expression in it cannot be evaluated. */
+export function groupOf(group: string, ref: string, sha: string): string | undefined {
+  let unreadable = false;
+  const named = group.replace(/\$\{\{([^}]*)\}\}/g, (_, body: string) => {
+    const value = evaluate(body, { ref, sha });
+    if (value === undefined) unreadable = true;
+    return String(value);
+  });
+  return unreadable ? undefined : named;
+}
+
+/** Two commits and the refs the clause runs the group for: main's push, and a branch's pull request. */
+const MAIN_REF = 'refs/heads/main';
+const BRANCH_REF = 'refs/pull/1/merge';
+const SHAS = ['1ae76136c0000000000000000000000000000000', '4d2da905e0000000000000000000000000000000'] as const;
+
+/**
+ * A concurrency group that does not give each push to main a group of its own while a branch's runs share one. GitHub keeps one run
+ * pending per group and cancels the older pending one whatever `cancel-in-progress` says, so a group main's pushes share cancels a
+ * landing's run before it starts; a branch's group that names the commit would never cancel a superseded run.
+ */
+export function groupDrift(workflow: Workflow): string[] {
+  const group = workflow.concurrency?.group ?? '';
+  const [first, second] = SHAS;
+  const main = SHAS.map((sha) => groupOf(group, MAIN_REF, sha));
+  const branch = SHAS.map((sha) => groupOf(group, BRANCH_REF, sha));
+  if ([...main, ...branch].includes(undefined))
+    return [
+      `concurrency.group in ${FILE} reads ${group}, which this guard cannot evaluate: write it from github.ref and github.sha alone, with ==, !=, && and ||, such as ci-\${{ github.ref == '${MAIN_REF}' && github.sha || github.ref }}`,
+    ];
+  const drift: string[] = [];
+  if (main[0] === main[1] || !main[0]?.includes(first) || !main[1]?.includes(second))
+    drift.push(
+      `concurrency.group in ${FILE} gives two pushes to main the group ${main[0]} and ${main[1]}: name the commit (github.sha) in main's group, since GitHub cancels a group's older pending run whatever cancel-in-progress says and the ${GATE} gate would read a landing that was never tested as red`,
+    );
+  if (branch[0] !== branch[1] || branch.some((name) => name?.includes(first) || name?.includes(second)))
+    drift.push(
+      `concurrency.group in ${FILE} gives two pushes to one branch the group ${branch[0]} and ${branch[1]}: leave the commit out of a branch's group, so its superseded run is cancelled`,
+    );
+  return drift;
+}
+
 /** The expression the shard's run must be given its shard by: the leg's own, never a literal, or every leg would run shard 1. */
 const SHARD_FLAG = '--shard ${{ matrix.shard }}';
 
@@ -992,6 +1088,7 @@ const drift = (
   ...verdictDrift(workflow),
   ...statusDrift(workflow, GATE, GATE, VERDICT),
   ...cancelDrift(workflow),
+  ...groupDrift(workflow),
   ...targetDrift(text),
   ...shardDrift(workflow, pages),
   ...boundDrift(workflow),
@@ -1045,7 +1142,7 @@ test('the shipped CI workflow runs on the three events, reads alone, and caches 
   assert.deepEqual(cached, [], 'setup-node caches no install here: the lockfile install is part of what is tested');
 });
 
-test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job pinned off the floor and one unpinned, a hidden path uploaded as if it were not, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a fork with a writable token', () => {
+test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor adrift, an unquoted node, a job pinned off the floor and one unpinned, a hidden path uploaded as if it were not, a job outside the gate, a third party, a timezone untested, a run unforced, a landing cancelled, a landing superseded while pending, a fork with a writable token', () => {
   const workspaces = readWorkspaces();
   const engine = readEngine();
   const text = workflowText();
@@ -1260,6 +1357,21 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
     assert.deepEqual(cancelDrift(cancelled), [
       `concurrency.cancel-in-progress in .github/workflows/ci.yml reads ${String(value)}: write it ${SPARED} so a branch's superseded run is cancelled and every push to main keeps its own run, since the ci gate reads a cancelled job as a failure and a landing that was never tested would report red`,
     ]);
+  }
+
+  assert.deepEqual(groupDrift(shipped), [], "the shipped group gives each push to main its own and a branch's pushes one");
+  for (const [group, refused] of [
+    ['ci-${{ github.ref }}', 'main'],
+    ['ci-${{ github.ref }}-${{ github.sha }}', 'branch'],
+    ['ci-${{ github.ref }}-${{ github.run_id }}', 'unreadable'],
+  ] as const) {
+    const regrouped = structuredClone(shipped);
+    assert.ok(regrouped.concurrency !== undefined, 'the workflow sets concurrency today');
+    regrouped.concurrency.group = group;
+    assert.equal(groupDrift(regrouped).length, 1, `${group} is refused for one reason: ${refused}`);
+    const [a, b] = [groupOf(group, 'refs/heads/main', 'a'), groupOf(group, 'refs/heads/main', 'b')];
+    if (refused === 'unreadable') assert.equal(a, undefined, `${group} reads a context the clause does not evaluate`);
+    else assert.equal(a === b, refused === 'main', `${group}: main's two pushes share a group exactly where that is the refusal`);
   }
 
   const target = ['pull', 'request', 'target'].join('_');

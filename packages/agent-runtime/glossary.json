@@ -319,6 +319,10 @@
       "type": "SessionId"
     },
     {
+      "term": "Session scope",
+      "meaning": "the transient scope of systemd's user manager a local session's process tree runs in, wherever the host makes one, under its memory limit where it has one: every process its commands start sits in it, wherever started from, and is ended with it — SIGTERM, then `cgroup.kill` past the stop grace — the release refused while anything is left. Its folder is recorded on the session's run file (`cgroup`), and only a scope `scopeToEnd` allows is ended, never the cgroup the runtime runs in. An unlimited session whose scope is refused runs bare and says why (`unscoped`) (`packages/agent-runtime/src/harness/cgroup.ts`, `packages/agent-runtime/src/harness/scope.ts`)."
+    },
+    {
       "term": "Store",
       "meaning": "where the runtime keeps its tasks' journals and feed (`AE_ROOT`).",
       "retired": [

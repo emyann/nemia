@@ -18,8 +18,11 @@ const underTheMount = (folder: string): boolean => folder.startsWith(CGROUP_ROOT
 /** Whether `folder` is a transient scope's: systemd names a scope's unit, and so its cgroup, `<name>.scope`. */
 const aScope = (folder: string): boolean => folder.endsWith('.scope');
 
-/** Whether ending `folder` would end `own`: the same cgroup, or one of its ancestors. */
-const holds = (folder: string, own: string): boolean => own === folder || own.startsWith(`${folder}/`);
+/**
+ * Whether ending `folder` would end `own`: the same cgroup, or one of its ancestors. Joined with `+`, never a template: the verifier
+ * reads a template string as an unknown string of its parts, which no law can tie to the code's own.
+ */
+const holds = (folder: string, own: string): boolean => own === folder || own.startsWith(folder + '/');
 
 const scopeToEndSpec = spec<(recorded: string | undefined, own: string | undefined) => boolean>({
   ensures: {
@@ -45,7 +48,7 @@ const scopeToEndSpec = spec<(recorded: string | undefined, own: string | undefin
         recorded !== undefined && own !== undefined && holds(recorded, own) ? output === false : true,
     },
     aSessionsScopeIsEnded: {
-      description: "A recorded scope under the mount, that the runtime does not run in, is ended: what a session left never runs on",
+      description: 'A recorded scope under the mount, that the runtime does not run in, is ended: what a session left never runs on',
       condition: ({ input: [recorded, own], output }) =>
         recorded !== undefined && own !== undefined && underTheMount(recorded) && aScope(recorded) && !holds(recorded, own)
           ? output === true

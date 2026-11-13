@@ -101,6 +101,12 @@ function SheetPanel({ path, search, onClose }: { path: string; search: Record<st
   );
 }
 
+/**
+ * The modal sheet stands at the window's right, leaving the kit's 56 pixels of scrim at its left: the kit's own floor of 360 pixels is
+ * wider than that on a phone, and its sheet then stands short of the right edge, so the floor is lifted and the sheet pushed right.
+ */
+const MODAL_AT_THE_RIGHT = 'ml-auto min-w-0';
+
 /** Her sheet at the page at `path` with `search`: docked beside the page, modal on a narrow screen, none on her own page. */
 export function HerSheet({ path, search }: { path: string; search: Record<string, unknown> }) {
   const { close } = useHerSheet();
@@ -110,7 +116,7 @@ export function HerSheet({ path, search }: { path: string; search: Record<string
   if (ownsChat) return null;
   if (narrow)
     return (
-      <SideSheet variant="modal" isOpen={fold.sheet === 'modal'} onClose={close} aria-label="Nemia's chat">
+      <SideSheet variant="modal" isOpen={fold.sheet === 'modal'} onClose={close} aria-label="Nemia's chat" className={MODAL_AT_THE_RIGHT}>
         {fold.sheet === 'modal' && <SheetPanel path={path} search={search} onClose={close} />}
       </SideSheet>
     );

@@ -58,7 +58,13 @@ export function NemiaRailFace({
     </>
   );
   const trigger = ownsChat ? (
-    <RouterLink to="/chat" data-nemia-face-button={at} data-nemia-cues={cues.length} aria-label={dockWords(presence, at)} className={pressed(true)}>
+    <RouterLink
+      to="/chat"
+      data-nemia-face-button={at}
+      data-nemia-cues={cues.length}
+      aria-label={dockWords(presence, at)}
+      className={pressed(true)}
+    >
       {face}
     </RouterLink>
   ) : (

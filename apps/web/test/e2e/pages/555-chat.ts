@@ -5,6 +5,7 @@ import {
   chatPanelOf,
   expectCues,
   expectPanelHeld,
+  expectSheetIn,
   herChat,
   herFaceOf,
   herSheetOf,
@@ -16,7 +17,7 @@ import {
   railPlace,
   themeOf,
 } from '../board.ts';
-import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectNone, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 import { cuesOf, dockWords, faceOf, type Presence } from '../../../src/lib/presence.ts';
@@ -101,17 +102,19 @@ async function expectDocked(page: Page): Promise<void> {
   const sheet = herSheetOf(page);
   await expectVisible(sheet.locator('[data-chat-panel="sheet"]'), 'her sheet holds her panel');
   await expectCount(page.locator('[data-slot="side-sheet-overlay"]'), 0, 'and is docked, with no scrim over the page');
-  const [box, main] = await Promise.all([sheet.boundingBox(), page.locator('[data-frame-page]').boundingBox()]);
-  if (box === null || main === null) throw new Refused('the sheet and the page have sizes to measure');
-  if (Math.abs(box.width - 400) > 1) throw new Refused(`her sheet is 400 wide — it is ${box.width}`);
-  if (box.x < main.x + main.width - 1)
-    throw new Refused(`her sheet stands beside the page, not over it — it starts at ${box.x}, the page ends at ${main.x + main.width}`);
-  const edge = await page.evaluate(() => {
-    const main = document.querySelector('[data-frame-page]')!.getBoundingClientRect();
-    const at = document.elementFromPoint(main.right - 2, main.top + main.height / 2);
-    return at?.closest('[data-slot="side-sheet"]') ? 'her sheet' : null;
-  });
-  if (edge !== null) throw new Refused("the page's own right edge is the page's, not the sheet's");
+  await expectNone(
+    () =>
+      page.evaluate(() => {
+        const sheet = document.querySelector('[data-slot="side-sheet"]')!.getBoundingClientRect();
+        const main = document.querySelector('[data-frame-page]')!.getBoundingClientRect();
+        if (Math.abs(sheet.width - 400) > 1) return `it is ${sheet.width} wide, not 400`;
+        if (Math.abs(sheet.right - innerWidth) > 1) return `its right is at ${sheet.right} of ${innerWidth}`;
+        if (sheet.left < main.right - 1) return `it starts at ${sheet.left}, over the page, which ends at ${main.right}`;
+        const at = document.elementFromPoint(main.right - 2, main.top + main.height / 2);
+        return at?.closest('[data-slot="side-sheet"]') ? "the page's own right edge is the sheet's" : null;
+      }),
+    'her sheet stands 400 wide at the right of the window, beside the page and not over it',
+  );
 }
 
 /** Her greeting, her level and what is at work, and the four chips. */
@@ -245,7 +248,7 @@ export default {
       await expectRail(page, 'expanded', 'and the rail comes back as it was');
 
       await page.setViewportSize({ width: 1600, height: 900 });
-      await face.click();
+      await openChat(page);
       await expectDocked(page);
       await expectRail(page, 'expanded', 'at 1600 the open rail stays open beside her sheet');
       await settled(page);
@@ -259,6 +262,7 @@ export default {
       await top.click();
       await expectVisible(page.locator('[data-slot="side-sheet-overlay"]'), 'and opens the kit’s modal sheet over the page');
       await expectVisible(page.getByRole('dialog', { name: "Nemia's chat" }), 'a dialog named for her chat');
+      await expectSheetIn(page);
       await expectPanelHeld(page);
       await settled(page);
       await photograph(page, path.join(OUT, `chat-narrow-${await themeOf(page)}.png`));

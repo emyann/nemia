@@ -901,12 +901,25 @@ export async function expectUncovered(element: Locator, assertion: string): Prom
   if (seen !== null) throw new Refused(`${assertion} — ${seen}`);
 }
 
-/** Opens her side sheet from her face, and waits for the panel in it. */
+/** Opens her side sheet from her face, and waits for the panel in it and for the sheet to have come in whole. */
 export async function openChat(page: Page): Promise<Locator> {
   await herFaceOf(page).click();
   const panel = chatPanelOf(page);
   await expectVisible(panel, "her face in the rail opens Nemia's chat");
+  await expectSheetIn(page);
   return panel;
+}
+
+/** Her sheet, docked or modal, has come in whole: it stands at the right of the window, its slide or its widening done. */
+export async function expectSheetIn(page: Page): Promise<void> {
+  await expectNone(
+    () =>
+      herSheetOf(page).evaluate((sheet) => {
+        const right = sheet.getBoundingClientRect().right;
+        return Math.abs(right - innerWidth) > 1 ? `its right is at ${right} of ${innerWidth}` : null;
+      }),
+    'her sheet comes to stand at the right of the window',
+  );
 }
 
 /**

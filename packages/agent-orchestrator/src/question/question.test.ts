@@ -138,10 +138,21 @@ test('expandShapes and questionFields: the `x-shape` marker of a step’s `outpu
   await t.test('REFUSED: a marker deeper than a field', () =>
     loaderRefuses(() => stepWith({ open: { type: 'array', items: { 'x-shape': 'questions' } } }), '`open`', 'holds `x-shape` inside it'),
   );
-  await t.test('expandShapes leaves a field without the marker as it is', () => {
+  await t.test('expandShapes leaves a field without the marker as it is, and reports no shape for it', () => {
     const field = { type: 'array', items: { type: 'string' } };
-    assert.deepEqual(expandShapes({ open: field }), { properties: { open: field } });
+    assert.deepEqual(expandShapes({ open: field }), { properties: { open: field }, shapes: {} });
   });
+  await t.test('a `link` and a `commit` expand to a nullable string, each reported with its shape', () => {
+    assert.deepEqual(expandShapes({ u: { 'x-shape': 'link' }, c: { 'x-shape': 'commit', description: 'd' }, n: { type: 'number' } }), {
+      properties: { u: { type: ['string', 'null'] }, c: { type: ['string', 'null'], description: 'd' }, n: { type: 'number' } },
+      shapes: { u: 'link', c: 'commit' },
+    });
+    const step = stepWith({ u: { 'x-shape': 'link' }, open: { 'x-shape': 'questions' } });
+    assert.deepEqual(step.output!.shapes, { u: 'link', open: 'questions' });
+  });
+  await t.test('REFUSED: a `link` with a key beside the marker', () =>
+    loaderRefuses(() => stepWith({ u: { 'x-shape': 'link', format: 'uri' } }), '`u`', '`format`', '`x-shape`'),
+  );
   await t.test('a field frozen with the schema as it was before a list could be recommended still reads as questions', () => {
     const items = QUESTIONS_SCHEMA.items;
     const recommended = { type: ['string', 'null'], description: 'The label of the option you recommend, or null for none.' };

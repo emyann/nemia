@@ -26,7 +26,8 @@ import {
   type SpendOf,
   stepSpend,
 } from '../run.ts';
-import { loopSpan, type StepSpec } from '../workflow.ts';
+import { LOOP_REPLIES, loopSpan, outputFields, type StepSpec } from '../workflow.ts';
+import type { FieldShape } from 'objects';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Retry } from '../retry/index.ts';
 import { stepRaise } from '../retry/index.ts';
@@ -101,7 +102,17 @@ const specStepOf = (s: StepSpec): RunSpec['steps'][number] => ({
   tools: s.tools ?? null,
   deadlineSeconds: s.deadlineSeconds ?? null,
   ...(s.agent?.name !== undefined ? { agent: s.agent.name } : {}),
+  ...(s.output ? { fields: declaredFields(s) } : {}),
 });
+
+/**
+ * The fields a step's declared output gives, in its schema's order, each with the shape its `x-shape` marked or null, as its closeout
+ * serves them (`closeoutIn`): the loop's `replies` aside.
+ */
+const declaredFields = (s: StepSpec): Array<{ name: string; shape: FieldShape | null }> =>
+  outputFields(s)
+    .filter((name) => name !== LOOP_REPLIES)
+    .map((name) => ({ name, shape: s.output?.shapes?.[name] ?? null }));
 
 /**
  * The frozen record as the object's `spec`: each step as the run froze it, its brief, where it works — its place, repository, base
@@ -164,11 +175,18 @@ function roundSpend(clock: Timeline, steps: readonly StepSpec[], total: Timeline
 /**
  * Every file a folder run's step folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. A
  * folder that cannot be read answers with why instead of a list, since the board words an empty list as the step having made nothing.
+ * And every file of the step's artifacts folder (`artifactsDir`), on every place, named by its closeout or not, linked under the
+ * artifacts route: absent where the step has no such folder, as one not filed yet has none.
  */
-function filesOf(run: Run, step: string): Pick<RunStepStatus, 'files' | 'filesError'> {
+function filesOf(run: Run, home: string, step: string): Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'> {
   const dir = workFolderOf(run, step);
-  const { files, error } = dir ? folderFiles(run, step, dir) : { files: [], error: null };
-  return { files, filesError: error };
+  const { files, error } = dir ? folderFiles(run, step, dir, 'files') : { files: [], error: null };
+  const artifacts = artifactsDir(home, run, step);
+  return {
+    files,
+    filesError: error,
+    ...(fs.existsSync(artifacts) ? { artifactsFolder: folderFiles(run, step, artifacts, 'artifacts') } : {}),
+  };
 }
 
 /** What the engine filed a try with (`filedOf`), its fence in this layer's word. */
@@ -384,12 +402,13 @@ export const runObjectCore = Effect.fnUntraced(function* (
 /**
  * The parts of a run's object that rest on the disk and on no input the informer checks, read on every request: what `nemia prune` would
  * find (`onDisk`, which a prune, the free sweep or a hand removes with no stamp moved), each step's files in a folder run's step folder
- * (`files`, `filesError`), and what the workflow folder as it loads now says against the run (`warning`).
+ * (`files`, `filesError`) and in its artifacts folder (`artifactsFolder`), and what the workflow folder as it loads now says against
+ * the run (`warning`).
  */
 export type RunDiskParts = {
   readonly onDisk: RunStatus['onDisk'];
   readonly warning: RunStatus['warning'];
-  readonly files: (step: string) => Pick<RunStepStatus, 'files' | 'filesError'>;
+  readonly files: (step: string) => Pick<RunStepStatus, 'files' | 'filesError' | 'artifactsFolder'>;
 };
 
 /** Whether two types are one. */
@@ -402,7 +421,7 @@ export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>>
 export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']): RunDiskParts => ({
   onDisk: onDiskOf(run, home),
   warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-  files: (step) => filesOf(run, step),
+  files: (step) => filesOf(run, home, step),
 });
 
 /**

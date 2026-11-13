@@ -8,7 +8,7 @@
 import { Invalid } from '../refusal/refusal.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import type { CheckFailurePolicy } from '../../contracts/check-failure-policy.contract.ts';
-import type { PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
+import type { FieldShape, PlaceKind, STEP_KEY_FORM, STEP_KEYS as SERVED_STEP_KEYS } from 'objects';
 
 export type StepSpec = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
@@ -347,7 +347,21 @@ export type RouteEval =
   | { readonly kind: 'script'; readonly script: string }
   | { readonly kind: 'judge' };
 
-export type StepOutput = { file: string; schema: OutputSchema; owners?: Record<string, OutputOwner> };
+/**
+ * A step's declared output: the schema file its `output:` line names, the schema as the loader expanded it, who declares each field
+ * where an agent's output is merged with the step's (`owners`), and the shape (objects' `FIELD_SHAPES`) of each field its `x-shape`
+ * marked (`shapes`; absent where it marked none, and on a run frozen before shapes were kept).
+ */
+export type StepOutput = {
+  file: string;
+  schema: OutputSchema;
+  owners?: Record<string, OutputOwner>;
+  shapes?: Record<string, FieldShape>;
+};
+
+/** `shapes` as a step's output keeps them (`StepOutput.shapes`): none where no field was marked. */
+export const shapesKept = (shapes: Record<string, FieldShape>): Pick<StepOutput, 'shapes'> =>
+  Object.keys(shapes).length ? { shapes } : {};
 
 /** Who declares a field of a merged output: the agent or the step, by its name and the schema file its `output:` line names. */
 export type OutputOwner = { by: 'agent' | 'step'; name: string; file: string };

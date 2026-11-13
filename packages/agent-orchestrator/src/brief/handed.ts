@@ -6,7 +6,8 @@
 import { outputFields, type StepSpec } from '../step/step.ts';
 import { dataBlock, fenced } from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/index.ts';
-import type { HandedHow } from 'objects';
+import type { HandedHow, TaskSource } from 'objects';
+import { headingOf, TASK_HEADINGS, type TaskHeading } from './brief-sections.ts';
 
 /**
  * A terminal step of a run another waited on: its step and how it signed off — or its name, and why that cannot be given. Its folders,
@@ -65,7 +66,7 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
  * account below is all it is given of it, never that the change is on disk beside it.
  */
 export function fromRunSection(parent: ParentCloseout, remote = false): string {
-  const head = ['', `## From run ${parent.run}`, ''];
+  const head = ['', headingOf('From run <id>', parent.run), ''];
   if ('unreadable' in parent) {
     return [
       ...head,
@@ -105,7 +106,7 @@ function landedLabel(parent: ParentCloseout, remote: boolean): string {
  * read says so and why. `remote` for a step on a remote A2A agent, told its work stays on this machine.
  */
 export function contextSection(parent: ParentCloseout, remote = false): string {
-  const head = ['', `## From run ${parent.run}`, ''];
+  const head = ['', headingOf('From run <id>', parent.run), ''];
   const handed = `This run was handed ${parent.run} as context (\`--from\`); it did not wait on it.`;
   const label = landedLabel(parent, remote);
   if ('unreadable' in parent) {
@@ -125,10 +126,13 @@ export const handedSection = (parent: ParentCloseout, remote = false): string =>
   parent.how === 'read' ? contextSection(parent, remote) : fromRunSection(parent, remote);
 
 /**
- * A part of a step's task: its own text, or a `## From run <id>` section — the run, the first line it was asked as the section quotes it
- * (empty where the section says it cannot be read), and the section's body under its heading.
+ * A part of a step's task: a section's text, with whose words it carries (`source`, `TASK_HEADINGS`) and, for a step's or a check's, the
+ * step that gave it (`step`); or a `## From run <id>` section — the run, the first line it was asked as the section quotes it (empty where
+ * the section says it cannot be read), and the section's body under its heading.
  */
-export type HandedPart = { kind: 'text'; text: string } | { kind: 'from'; run: string; asked: string; body: string };
+export type HandedPart =
+  | { kind: 'text'; text: string; source: TaskSource; step?: string }
+  | { kind: 'from'; run: string; asked: string; body: string };
 
 /** The first line a section quotes as what its run was asked: the fenced text after its label, or empty where it has none. */
 function askedOf(lines: readonly string[]): string {
@@ -140,35 +144,96 @@ function askedOf(lines: readonly string[]): string {
   return lines.slice(open + 1, close < 0 ? undefined : close).join('\n');
 }
 
-/** A part made of the lines gathered under one heading, or none for text that is only blank lines. */
-function partOf(run: string | null, lines: readonly string[]): HandedPart[] {
-  const text = lines.join('\n').replace(/^\n+|\n+$/g, '');
-  if (run !== null) return [{ kind: 'from', run, asked: askedOf(lines), body: text }];
-  return text.trim() ? [{ kind: 'text', text }] : [];
-}
+/** What a heading opens: another run's section, or text whose words are its `source`'s, given by `step` for a step's or a check's. */
+type Opened = { run: string } | { source: TaskSource; step?: string };
+
+/** `words` as a pattern that matches them alone. */
+const literal = (words: string): string => words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Each heading of `TASK_HEADINGS` as a whole line, its `<step>` caught; in the table's order, as a heading is tried. */
+const HEADING_LINES = (Object.keys(TASK_HEADINGS) as TaskHeading[]).map((heading) => {
+  const words = heading
+    .split(/(<[a-z]+>)/)
+    .map((piece) =>
+      piece === '<step>' ? '(?<step>.+)' : piece === '<id>' ? '(?<run>\\S+)' : /^<[a-z]+>$/.test(piece) ? '.+' : literal(piece),
+    );
+  return { heading, line: new RegExp(`^## ${words.join('')}\\s*$`) };
+});
 
 /**
- * A step's task split into its own text and each `## From run <id>` section it was handed, in order. Fence-aware: a heading inside a fence
- * — a closeout that quotes one, which `fenced` wraps in a fence longer than any run of backticks inside it — is the fence's text, never a
- * section. A section runs to the next `## ` heading outside a fence.
+ * What the heading `line` opens, or null where it is no heading the run writes: the first of `TASK_HEADINGS` it is, a `<step>` in it
+ * naming one of `steps` (a `## From <word>` naming no step is no heading of the run's); `What the check said` given by `self`, the step
+ * whose own check it was.
  */
-export function handedParts(task: string): HandedPart[] {
+function openedBy(line: string, steps: ReadonlySet<string>, self: string | undefined): Opened | null {
+  for (const { heading, line: shape } of HEADING_LINES) {
+    const match = shape.exec(line);
+    if (!match) continue;
+    const caught = match.groups ?? {};
+    if (caught.run !== undefined) return { run: caught.run };
+    if (caught.step !== undefined && !steps.has(caught.step)) continue;
+    const source = TASK_HEADINGS[heading];
+    const step = caught.step ?? (heading === 'What the check said' ? self : undefined);
+    return step === undefined ? { source } : { source, step };
+  }
+  return null;
+}
+
+/** The part made of the lines gathered under one heading, what it opened saying whose they are. */
+function partOf(opened: Opened, lines: readonly string[]): HandedPart {
+  if ('run' in opened) return { kind: 'from', run: opened.run, asked: askedOf(lines), body: lines.slice(1).join('\n') };
+  return { kind: 'text', text: lines.join('\n'), ...opened };
+}
+
+/** The fence open after `line`, `fence` being the one open before it: closed by its own run of backticks, opened by three or more. */
+const fenceAfter = (line: string, fence: string | null): string | null => {
+  if (fence !== null) return line.trim() === fence ? null : fence;
+  return /^`{3,}/.test(line) ? (/^`+/.exec(line)?.[0] ?? null) : null;
+};
+
+/**
+ * What the heading `line` opens, after a part `opened`: what the run writes it as (`openedBy`); else, inside a person's section,
+ * nothing, the line being the person's; else text of the run's.
+ */
+const cutAt = (line: string, opened: Opened, steps: ReadonlySet<string>, self: string | undefined): Opened | null =>
+  openedBy(line, steps, self) ?? ('source' in opened && opened.source === 'person' ? null : { source: 'run' });
+
+/**
+ * Whether the lines gathered so far are a part before `next`: always after the first, and the first unless it is only blank lines,
+ * which go with the part after them — but not into a `from` part, whose heading is its first line.
+ */
+const endsPart = (parts: readonly HandedPart[], lines: readonly string[], next: Opened): boolean =>
+  parts.length > 0 || lines.some((l) => l.trim()) || ('run' in next && lines.length > 0);
+
+/**
+ * A step's task cut into its sections, in order: at each heading the run writes (`TASK_HEADINGS`), each part saying whose words it
+ * carries, and each `## From run <id>` section it was handed, a part of its own. The text before the first heading is the run's. Every
+ * part keeps its lines whole, its heading the first, so the parts joined by a newline give the task back (a `from` part's heading being
+ * `## From run <run>`); text that is only blank lines before the first heading goes with the part after it, unless that is a `from` part.
+ *
+ * Fence-aware: a heading inside a fence — a closeout that quotes one, which `fenced` wraps in a fence longer than any run of backticks
+ * inside it — is the fence's text, never a section. A `<step>` of a heading is a step only where it names one of `steps`, the steps the run
+ * froze: a card's own `## From <word>` stays in what was asked for. Inside a person's section a heading the run does not write is the
+ * person's text; after any other it opens a part of the run's, as a section the run wrote under a heading this table has not learned.
+ * `self` is the step told: its own check's verdict is a check part given by it.
+ */
+export function handedParts(task: string, steps: readonly string[] = [], self?: string): HandedPart[] {
+  const named = new Set(steps);
   const parts: HandedPart[] = [];
-  let run: string | null = null;
+  let opened: Opened = { source: 'run' };
   let lines: string[] = [];
   let fence: string | null = null;
   for (const line of task.split('\n')) {
-    if (fence !== null) {
-      if (line.trim() === fence) fence = null;
-    } else if (/^`{3,}/.test(line)) {
-      fence = /^`+/.exec(line)?.[0] ?? null;
-    } else if (line.startsWith('## ')) {
-      parts.push(...partOf(run, lines));
-      run = /^## From run (\S+)\s*$/.exec(line)?.[1] ?? null;
-      lines = run === null ? [line] : [];
-      continue;
+    const next: Opened | null = fence === null && line.startsWith('## ') ? cutAt(line, opened, named, self) : null;
+    fence = fenceAfter(line, fence);
+    if (next !== null) {
+      if (endsPart(parts, lines, next)) {
+        parts.push(partOf(opened, lines));
+        lines = [];
+      }
+      opened = next;
     }
     lines.push(line);
   }
-  return [...parts, ...partOf(run, lines)];
+  return parts.length || lines.some((l) => l.trim()) ? [...parts, partOf(opened, lines)] : [];
 }

@@ -34,7 +34,7 @@ import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
-import type { Outcome } from 'objects';
+import type { FieldShape, Outcome } from 'objects';
 
 /**
  * A person's approval of the try a gated step is on (`approvalOf`), off their file (`nemia approve`): the try, when, and the words given
@@ -78,6 +78,9 @@ export type StepReply = { finding: string; answer: string; why: string };
  * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
  * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
  *
+ * `shapes` is the shape (objects' `FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`, absent where it marked
+ * none — as on a run frozen before shapes were kept.
+ *
  * `questions` is what it asks a person through its question fields (`askedQuestions`): each field whose schema is the package's shape
  * of questions and whose value decodes as them, in the schema's order. Empty for a closeout that asks none; a field that does not decode
  * is in `output` alone, drawn as any other, and `refused` says why.
@@ -95,6 +98,7 @@ export type StepCloseout = {
   missing: string[];
   replies: StepReply[] | null;
   schema: Record<string, unknown>;
+  shapes?: Record<string, FieldShape>;
   questions: Asked[];
   raw: unknown;
 };
@@ -218,9 +222,17 @@ export function closeoutIn(
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
     schema: Object.fromEntries(fields.map((field) => [field, declared[field]])),
+    ...shapesServed(step, fields),
     questions: askedQuestions(step, c),
     raw: said,
   };
+}
+
+/** The shape of each of `fields` its step's output marked (`StepOutput.shapes`), as a closeout serves it: none where it marked none. */
+function shapesServed(step: StepSpec, fields: readonly string[]): Pick<StepCloseout, 'shapes'> {
+  const marked = step.output?.shapes ?? {};
+  const shapes = Object.fromEntries(fields.flatMap((field) => (marked[field] === undefined ? [] : [[field, marked[field]]])));
+  return Object.keys(shapes).length ? { shapes } : {};
 }
 
 /** A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched. */

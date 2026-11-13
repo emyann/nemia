@@ -124,7 +124,7 @@ export function AgentForm({
 
       <fieldset className="space-y-3">
         <legend className="mb-2 text-label-medium text-muted-foreground uppercase">How its sessions run</legend>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 @md/page:grid-cols-2 @3xl/page:grid-cols-3">
           {choice('harness')}
           {text('model')}
           {choice('effort')}
@@ -248,7 +248,7 @@ function ResultSchema({
   return (
     <fieldset className="space-y-3">
       <legend className="mb-2 text-label-medium text-muted-foreground uppercase">Result schema</legend>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 @md/page:grid-cols-3">
         <Field
           label="Schema file"
           hint={`output: — a JSON Schema beside the agent. Pasting one with no file names it ${schemaFileFor(form.name)}.`}
@@ -259,7 +259,7 @@ function ResultSchema({
           placeholder={listing ? undefined : schemaFileFor(form.name)}
         />
         <Field
-          className="sm:col-span-2"
+          className="@md/page:col-span-2"
           label="Its fields"
           hint="What the closeout of each node that names it declares, for a node that reads it with input:. Empty, it declares none."
           value={form.schemaText}
@@ -289,7 +289,7 @@ function Identity({
   readOnly: boolean;
 }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 @md/page:grid-cols-2">
       <Field
         label="Name"
         hint={
@@ -514,7 +514,7 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
   return (
     <RadioGroup value={known ? shown : null} onChange={onChange} isDisabled={readOnly} className="space-y-2">
       <Label className="text-body-small">Claude Code&apos;s prompt</Label>
-      <div className="grid gap-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
+      <div className="grid gap-2 @md/page:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
       {!known && (
         <p className="text-body-small text-failure">
           Its file says <code className="font-mono">harnessPrompt: {value}</code>, which is none of these.
@@ -528,7 +528,7 @@ function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange:
             </CollapsibleTrigger>
             <CollapsibleContent>
               {isExpanded && (
-                <div className="grid gap-2 pt-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
+                <div className="grid gap-2 pt-2 @md/page:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
               )}
             </CollapsibleContent>
           </>

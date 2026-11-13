@@ -61,7 +61,7 @@ export function ContextPicker({
                 <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={run.title}>
                   {run.title}
                 </span>
-                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground sm:inline">{run.id}</span>
+                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
                 <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.advice}>
                   {run.standing}
                 </span>

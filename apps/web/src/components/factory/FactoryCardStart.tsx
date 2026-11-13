@@ -69,7 +69,7 @@ export function UnassignedStart({ entry, onStarted, onRefused }: { entry: InboxE
           <label htmlFor={field} className="block text-body-medium font-medium">
             Factory
           </label>
-          <select id={field} value={picked} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
+          <select id={field} value={picked} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
             <option value="" disabled>
               Pick the factory it runs in
             </option>
@@ -117,7 +117,7 @@ function Placed({ entry, place, onStarted, onRefused }: { entry: InboxEntry; pla
             The factory {code(factory.name)} offers no workflow yet: attach one with {code(factory.commands.attach)}.
           </p>
         ) : (
-          <select id={field} value={workflow ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
+          <select id={field} value={workflow ?? ''} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
             <option value="" disabled>
               Pick what runs it
             </option>

@@ -393,7 +393,7 @@ function AtGate({ run, step, acts }: { run: RunDetail; step: StepView; acts: boo
     <>
       <StepPolicy layers={step.layers} />
       {acts ? (
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+        <div className="grid items-start gap-4 @3xl/page:grid-cols-2">
           <ActsOn run={run} step={step} />
           <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} onto={run.branch} />
         </div>

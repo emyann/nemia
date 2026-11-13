@@ -113,7 +113,7 @@ export function Gate({
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
-      <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
+      <div className={cn('space-y-4', closeout && '@3xl/page:grid @3xl/page:grid-cols-2 @3xl/page:items-start @3xl/page:gap-4 @3xl/page:space-y-0')}>
         {closeout && (
           <section aria-label={`What ${step} handed on`} className="min-w-0 space-y-2 rounded border border-outline-variant bg-card p-3">
             <h3 className="text-label-medium text-muted-foreground">

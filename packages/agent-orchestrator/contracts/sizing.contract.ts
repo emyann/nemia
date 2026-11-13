@@ -11,7 +11,8 @@
  * what the machine allocates — its memory less the floor — as Kubernetes' scheduler admits a Pod only while the requests of what runs on
  * a node fit its capacity (six sessions under 7.6 GiB each, on 16 GB with no swap, took the machine).
  *
- * And whether the settings a daemon runs under fit its machine (`memoryFit`), which `nemia doctor` says.
+ * And whether the settings a daemon runs under fit its machine (`memoryFit`), and whether the slice its sessions run under holds them
+ * to what the machine allocates (`ceilingFit`), each of which `nemia doctor` says.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
@@ -204,3 +205,51 @@ const memoryFitSpec = spec<(configured: Configured) => MemoryFit>({
 
 /** `memoryFit`'s type, which `src/service/sizing.ts` takes. */
 export type MemoryFitOf = Implementation<typeof memoryFitSpec>;
+
+/**
+ * The slice the sessions run under (`WF_CGROUP_PARENT`), against its machine, as `nemia doctor` reads it, in bytes: the slice's
+ * ceiling (`MemoryMax=`, as `systemctl --user show <slice> -p MemoryMax --value` answers it), null where it has none (`infinity`); and
+ * what the machine allocates to sessions, its memory less the floor kept (`WF_MEMORY_RESERVED`, or its default).
+ *
+ * Why: admission (`memoryFit`, the runtime's admission by request) bounds what starts, not what grows. Sessions admitted by their
+ * requests can grow together toward their limits; a ceiling on their slice at what the machine allocates kills a burst inside the
+ * slice, never the daemon, sshd or the machine, as the kubelet holds every Pod together to the node's allocatable memory.
+ */
+export type SliceCeiling = { readonly ceilingBytes: number | null; readonly allocatableBytes: number };
+
+/**
+ * Whether the slice holds the sessions to what the machine allocates: it does (`held`), with its ceiling; it has no ceiling (`none`);
+ * or its ceiling is more than the machine allocates (`over`), with both.
+ */
+export type CeilingFit =
+  | { readonly verdict: 'held'; readonly ceilingBytes: number }
+  | { readonly verdict: 'none' }
+  | { readonly verdict: 'over'; readonly ceilingBytes: number; readonly allocatableBytes: number };
+
+const ceilingFitSpec = spec<(slice: SliceCeiling) => CeilingFit>({
+  requires: ({ input: [s] }) => someBytes(s.allocatableBytes) && (s.ceilingBytes === null || someBytes(s.ceilingBytes)),
+  ensures: {
+    noneExactlyWithoutACeiling: {
+      description: 'A slice with no ceiling is said to have none, and only such a slice',
+      condition: ({ input: [s], output }) => (output.verdict === 'none') === (s.ceilingBytes === null),
+    },
+    overExactlyAboveWhatIsAllocated: {
+      description: 'A ceiling is over exactly when it is more than the machine allocates to sessions, its memory less the floor',
+      condition: ({ input: [s], output }) =>
+        (output.verdict === 'over') === (s.ceilingBytes !== null && s.ceilingBytes > s.allocatableBytes),
+    },
+    overNamesBoth: {
+      description: 'An over verdict names the slice’s ceiling and what the machine allocates',
+      condition: ({ input: [s], output }) =>
+        output.verdict !== 'over' || (output.ceilingBytes === s.ceilingBytes && output.allocatableBytes === s.allocatableBytes),
+    },
+    heldNamesTheCeiling: {
+      description: 'A held verdict names the ceiling the slice holds the sessions to, at or under what the machine allocates',
+      condition: ({ input: [s], output }) =>
+        output.verdict !== 'held' || (output.ceilingBytes === s.ceilingBytes && output.ceilingBytes <= s.allocatableBytes),
+    },
+  },
+});
+
+/** `ceilingFit`'s type, which `src/service/sizing.ts` takes. */
+export type CeilingFitOf = Implementation<typeof ceilingFitSpec>;

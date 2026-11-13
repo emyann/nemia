@@ -113,6 +113,12 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
 /** The steps of the run object of `id` (`GET /api/runs/:id`, `status.steps`). */
 const detailSteps = async (id = R): Promise<readonly ObjectStep[]> => (await objectOf(app(), id)).status.steps;
 
+/** The store at semi-auto, as `nemia level semi-auto` writes it: the least an agent's standing token acts at (its floor). */
+const storeAtSemiAuto = (): void => {
+  fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0) }));
+};
+
 /** The error a refused request answered with, its status `status`. */
 const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
   assert.equal(res.status, status, said);
@@ -243,9 +249,7 @@ test("who says words to a step: a session by its token as its agent, framed; an 
     }).pipe(Effect.provide(tokenDoorFiles(root))),
   );
   const asOperator = { ...BOARD, authorization: `Bearer ${ops}` };
-  /** The store at semi-auto, as `nemia level semi-auto` writes it: the least an agent's standing token acts at (its floor). */
-  fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0) }));
+  storeAtSemiAuto();
 
   await s.test("a live session's token: 202, its words framed under its agent, and the answer says who and the words", async () => {
     const res = await sayTo('implement', { text: 'Start with the parser.' }, asSession);

@@ -13,6 +13,9 @@
  *   `node_modules`, where npm nests a package one workspace needs a copy of (`workspaceModules`). When
  *   the branch's lockfile asks for a tree main has not installed, main's would lie, and the runner runs
  *   `npm ci` instead (`lockfileParting`).
+ * - **The checkout's own install, first.** A checkout Nemia cloned (under the store's `clones/`) is Nemia's, and nobody else installs
+ *   it: before its worktrees are given theirs, its own `node_modules` is installed where it has none, or where its lockfile has moved past
+ *   it (`checkoutInstall`, proved by `contracts/checkout-install.contract.ts`). A person's checkout is never written.
  *
  *   Hardlinked, not linked, because a link out of the worktree is a path out of the step's working
  *   directory: Claude Code allows a read through a symlink only when the link and its target both
@@ -26,6 +29,9 @@
 import path from 'node:path';
 import { endsOnBase, type StepSpec } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
+import type { CheckoutInstallOf } from '../../contracts/checkout-install.contract.ts';
+
+export type { CheckoutInstall, CheckoutSeen } from '../../contracts/checkout-install.contract.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
 export type DepEntry = { name: string; link?: string };
@@ -67,6 +73,16 @@ export type Provisioned =
   | { tree: 'failed'; error: string }
   | { tree: 'absent' }
   | { tree: 'shared' };
+
+/**
+ * Whether a repository's own checkout is installed before its worktrees are given their `node_modules`, and why: a clone Nemia keeps,
+ * with a lockfile, and no `node_modules` or one its lockfile parts from. A person's checkout, and one that is not npm's, never.
+ */
+export const checkoutInstall: CheckoutInstallOf = (seen) => {
+  if (!seen.cloned || !seen.lockfile) return { due: false };
+  if (!seen.tree) return { due: true, because: 'node_modules' };
+  return seen.parting === null ? { due: false } : { due: true, because: seen.parting };
+};
 
 /** `p` relative to `root` when it lies strictly inside it, else null. */
 export const inside = (root: string, p: string): string | null => {

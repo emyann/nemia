@@ -244,6 +244,24 @@ test('claudeStreamKept keeps no line twice, and each line it keeps as its reader
           total_cost_usd: 0.3,
         }),
     ],
+    [
+      'a hook’s heartbeat, which Claude Code 2.1.323 prints while a hook holds a call, is not kept: nothing reads it',
+      [
+        initOf('2.1.323'),
+        JSON.stringify({
+          type: 'tool_progress',
+          tool_use_id: 'hook-1',
+          tool_name: 'PreToolUse',
+          parent_tool_use_id: null,
+          elapsed_time_seconds: 30,
+          uuid: 'b1',
+          session_id: 's1',
+          heartbeat: true,
+        }),
+        stream.calls(['toolu_1', 'Read', { file_path: '/w/a.ts' }]),
+      ].join('\n'),
+      (kept) => assert.equal(kept.includes('"tool_progress"'), false, 'keeps no `tool_progress` line'),
+    ],
   ];
   for (const [name, whole, says] of rows)
     await t.test(name, () => {

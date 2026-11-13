@@ -2,11 +2,13 @@
  * The runners of the group's commands (`objects`' `FACTORY_WORDS`), by name: each takes its words parsed against its spec, asks the api
  * through `asked`, prints what it answers, and answers its exit code. The table is total over the group's names, so one left out does not
  * compile: the listing (`listing.ts`), a factory's own writes (`writes.ts`), its parts in its namespace (`parts.ts`), what it gives its
- * runs (`settings.ts`), what it says in words (`words.ts`) and what a template makes of it (`templated.ts`).
+ * runs (`settings.ts`), what it says in words (`words.ts`), what a template makes of it (`templated.ts`) and its move to another
+ * store (`move.ts`).
  */
 import type { FactoryCommand } from 'objects';
 import type { Runner } from '../runner.ts';
 import { factoryListed } from './listing.ts';
+import { factoryMove } from './move.ts';
 import { factoryServerAdd, factoryServerRm, factoryServers, factorySchedule, factoryUnschedule } from './parts.ts';
 import {
   factoryCostLineRm,
@@ -51,4 +53,5 @@ export const FACTORY_RUNNERS: Readonly<Record<FactoryCommand, Runner>> = {
   'factory revisions': factoryRevisions,
   'factory trust': factoryTrust,
   'factory rm': factoryRm,
+  'factory move': factoryMove,
 };

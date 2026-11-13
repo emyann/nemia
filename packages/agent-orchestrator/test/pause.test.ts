@@ -44,7 +44,6 @@ import { recordMemo } from '../src/rest/index.ts';
 import { metered } from '../src/meter/tally.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { told } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 
 /** What `nemia pause --now --yes` answers: whether the pause stood as it was, and the tasks it cut and left at work. */
@@ -262,12 +261,9 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.match(standing ?? '', /^Paus/, 'the pause as the pass reads it, which `nemia watch` opens with (apps/cli/test)');
       const free = fs.mkdtempSync(path.join(ROOT, 'free-'));
       world().repository(free, {});
-      const started = startedLines(
-        (await stage.main(['start', 'a paused start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started,
-      );
-      const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
-      assert.ok(at > 0, started.join('\n'));
-      assert.equal(started[at + 1], `${standing}: nothing of this run is filed until then`);
+      const started = (await stage.main(['start', 'a paused start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started;
+      assert.ok(started.paused !== undefined, 'the start answers the pause that stands, which the client says nothing is filed until');
+      assert.equal(pausedWords(started.paused), standing, 'the pause as the pass reads it');
     },
   );
   await s.test(
@@ -391,14 +387,8 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.equal(words.startsWith('Paus'), false, words);
       const free = fs.mkdtempSync(path.join(ROOT, 'free-'));
       world().repository(free, {});
-      const started = startedLines(
-        (await stage.main(['start', 'a free start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started,
-      );
-      assert.equal(
-        started.some((l) => l.includes('nothing of this run is filed')),
-        false,
-        started.join('\n'),
-      );
+      const started = (await stage.main(['start', 'a free start', '--workflows', ONE, '--repo', free, '--no-worktree'])) as Started;
+      assert.equal(started.paused, undefined, 'resumed, the start answers no pause');
     },
   );
   await s.test('REFUSED: `nemia resume` with no pause standing, naming the verb that puts one', async () => {

@@ -1,17 +1,22 @@
 /**
  * `nemia rm` and `nemia prune` as the client (`apps/cli`, `src/commands/runs/forget.ts`) runs them over the api, a run at a time on each
- * entry's handler (`RM`, `PRUNE`), for a test of what they do to the store and the engine: each run named judged on its own, its line
- * said — `forgetLine` of a removal, the prune's own lines — and a refusal or a failure said `<id>  not forgotten: …` (`not pruned`); a
+ * entry's handler (`RM`, `PRUNE`), for a test of what they do to the store and the engine: each run named judged on its own, a removal
+ * answered as the handler's data (`forgot`, what the api answers the client to word), the prune's own lines said, and a refusal or a
+ * failure said `<id>  not forgotten: …` (`not pruned`); a
  * prune of no run named judges the runs that are over, as the client lists them (`status.state=finished`), and says nothing of one with
  * nothing to prune. A prune previews each run first
  * (nothing removed), says the space they hold together, and removes them on `--yes` alone: no person answers here. Once every run has
  * had its say, the error it ends with names those left, exit 2, or 1 where one failed otherwise than by a refusal.
  */
 import type { Effect } from 'effect';
-import { type Args, forgetLine, Invalid, parseArgv, PRUNE, RM, runsAtOnce, sizeOf } from '../src/runner.ts';
+import { type Args, Invalid, parseArgv, PRUNE, RM, runsAtOnce, sizeOf } from '../src/runner.ts';
+import type { Forgot } from '../src/run.ts';
 
-/** What a command typed printed, a line each, and the error it ended with, if it did. */
-export type Typed = { printed: string[]; error: (Error & { exitCode?: number; _tag?: string }) | undefined };
+/**
+ * What a command typed printed, a line each; of `nemia rm`, what the handler answered of each run it forgot, in the order named
+ * (`forgot`); and the error it ended with, if it did.
+ */
+export type Typed = { printed: string[]; forgot: Forgot[]; error: (Error & { exitCode?: number; _tag?: string }) | undefined };
 
 /** What the two handlers need, the same of each: the store, its engine and its place, which a stage's `runWith` gives. */
 type Needs = Effect.Services<ReturnType<typeof RM.handler>>;
@@ -40,9 +45,9 @@ function read(entry: typeof RM | typeof PRUNE, rest: readonly string[]): { args:
   try {
     const args = parseArgv(entry.spec, [...rest]) ?? {};
     const wrong = entry.check?.(args);
-    return wrong ? { refused: { printed: [], error: new Invalid({ message: wrong }) } } : { args };
+    return wrong ? { refused: { printed: [], forgot: [], error: new Invalid({ message: wrong }) } } : { args };
   } catch (err) {
-    return { refused: { printed: [], error: new Invalid({ message: err instanceof Error ? err.message : String(err) }) } };
+    return { refused: { printed: [], forgot: [], error: new Invalid({ message: err instanceof Error ? err.message : String(err) }) } };
   }
 }
 
@@ -53,6 +58,7 @@ async function rmTyped(run: Run, rest: readonly string[]): Promise<Typed> {
   const { args } = typed;
   const ids = Array.isArray(args.runId) ? args.runId : [];
   const printed: string[] = [];
+  const forgot: Forgot[] = [];
   const left: string[] = [];
   let failed = false;
   for (const runId of ids) {
@@ -60,7 +66,7 @@ async function rmTyped(run: Run, rest: readonly string[]): Promise<Typed> {
       const done = await run(
         RM.handler({ runId, deleteBranches: args.deleteBranches === true, forceUnmerged: args.forceUnmerged === true, refuses: true }),
       );
-      printed.push(...forgetLine(done.forgot).split('\n'));
+      forgot.push(done.forgot);
     } catch (err) {
       const { words, refusal } = saidOf(err);
       printed.push(lineOf(runId, 'forgotten', words));
@@ -68,7 +74,7 @@ async function rmTyped(run: Run, rest: readonly string[]): Promise<Typed> {
       failed ||= !refusal;
     }
   }
-  return { printed, error: ended('rm', 'forgotten', left, failed) };
+  return { printed, forgot, error: ended('rm', 'forgotten', left, failed) };
 }
 
 /** `nemia prune [<runId>...] [--unmerged] [--artifacts] [--yes]`, previewed a run at a time on `PRUNE`, then removed on `--yes`. */
@@ -105,13 +111,13 @@ async function pruneTyped(run: Run, home: string, rest: readonly string[]): Prom
   }
   if (!ready.length) {
     if (!left.length) printed.push(named.length ? 'nothing to prune' : 'nothing to prune: no run that is over has a worktree left');
-    return { printed, error: ended('prune', 'pruned', left, failed) };
+    return { printed, forgot: [], error: ended('prune', 'pruned', left, failed) };
   }
   printed.push(`${ready.length} run${ready.length > 1 ? 's' : ''} to prune, ${sizeOf(ready.reduce((sum, r) => sum + r.bytes, 0))} in all`);
   if (args.yes !== true) {
     const flags = [...(how.unmerged ? ['--unmerged'] : []), ...(how.artifacts ? ['--artifacts'] : []), '--yes'];
     printed.push(`nothing removed: nemia prune ${[...(named.length ? ready.map((r) => r.runId) : []), ...flags].join(' ')} removes them`);
-    return { printed, error: ended('prune', 'pruned', left, failed) };
+    return { printed, forgot: [], error: ended('prune', 'pruned', left, failed) };
   }
   for (const { runId } of ready) {
     try {
@@ -125,7 +131,7 @@ async function pruneTyped(run: Run, home: string, rest: readonly string[]): Prom
       failed ||= !refusal;
     }
   }
-  return { printed, error: ended('prune', 'pruned', left, failed) };
+  return { printed, forgot: [], error: ended('prune', 'pruned', left, failed) };
 }
 
 /** `nemia rm …` or `nemia prune …` (`argv`, its verb first), as the client runs it, on the store `home` over `run`. */

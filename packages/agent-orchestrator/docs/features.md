@@ -1884,9 +1884,10 @@ it by hand left git's worktree list stale and a record pointing at nothing.
 
 What was built:
 
-- **`wf rm <runId> [<runId> ...]`**, each run judged on its own, one line each (`forgetLine`). A run refused, or held by a worktree git
-  would not remove, makes the verb exit 2 once every run has had its line. The CLI refuses `--force-unmerged` without `--delete-branches`,
-  a flag it does not take, and flags with no run, before any run is read.
+- **`wf rm <runId> [<runId> ...]`**, each run judged on its own, one line each (a run forgotten worded by the client's `forgottenLine`,
+  one not forgotten by `notForgottenLine`). A run refused, or held by a worktree git would not remove, makes the verb exit 2 once every
+  run has had its line. The CLI refuses `--force-unmerged` without `--delete-branches`, a flag it does not take, and flags with no run,
+  before any run is read.
 - **The pure part, in forget/forget.ts.** `forgetRefusal` names every reason at once, each with what to do. It refuses a task in flight (a step or its
   check, pending or running), anything a pass would file (a step ready, a check, try or round due, roots waiting on runs), an ask no pass
   has spent, and a run another run waits on and has not started on (`gated`), naming the runs it would strand. The last two apply to a run
@@ -1958,7 +1959,7 @@ What was measured:
   started, were cancelled or wait on another; every reason at once; a record whose folder does not read; `parseWorktrees` and
   `runWorktrees` against the repository, a longer id's directory and the run's own, with `HEAD` and `detached`; `heldWorktree`;
   `branchFates`; `checkLogsOf`, sparing a stored run whose id the given one starts with; `idRefusal`, an id with a file's suffix told the id;
-  `forgetLine`'s words, for a detached worktree and a hand-off refused too.
+  `notForgottenLine`'s words, for a detached worktree and a hand-off refused too.
 - `test/store.test.ts` (14 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
   last pass committed on its branch and nothing git ignores, a link in `node_modules` not followed, the record and every file under its id
   removed, another run's check log left, the board untouched, and a second `wf rm` saying `no such run`, exit 0. Four refusals in one `wf rm`

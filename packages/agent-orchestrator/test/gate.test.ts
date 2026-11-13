@@ -39,10 +39,8 @@ import { engineOf } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import { decidedOn } from './screens.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told } from './typed.ts';
+import { told, type StartedAnswer } from './typed.ts';
 import { RM } from '../src/runner.ts';
-import { startedLines } from '../src/runner.ts';
-import type { Started } from '../src/start/commands.verb.ts';
 
 /** What `nemia approve` answers, as the client prints it. */
 type Approved = {
@@ -203,17 +201,11 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
         '--gate=implement',
       ];
       const own = testEngine();
-      const started = (await stage.main(argv, engineOf(own.layer))) as Started;
+      const started = (await stage.main(argv, engineOf(own.layer))) as StartedAnswer;
       unasked(own);
-      const printed = startedLines(started);
       id = started.id;
       assert.deepEqual(runRecord(ROOT, id).gates, ['plan', 'implement']);
-      assert.ok(
-        printed.includes(
-          `gated at: plan, implement, review — nothing after each is filed until nemia approve ${id} <step>, once it has signed off`,
-        ),
-        printed.join('\n'),
-      );
+      assert.deepEqual(started.facts.gated, ['plan', 'implement', 'review'], 'the start says each step gated, in order');
     },
   );
   await s.test('the tick holds the gated step that signed off, pass after pass, whatever its closeout says', async () => {

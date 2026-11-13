@@ -161,7 +161,7 @@ const finished = async () => {
 
 const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 
-/** `nemia rm <args>`, as the client runs it over the api, on the engine `engine`: the lines it printed, and its error. */
+/** `nemia rm <args>`, as the client runs it over the api, on the engine `engine`: what it answered of each run, and its error. */
 const typedOn = (_t: TestContext, engine: Engine, ...args: string[]) => forgetTyped((effect) => runWith(engine, effect), ROOT, args);
 
 test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed then read with the lines forgotten counted, the kept run's filings on it", async () => {
@@ -199,10 +199,15 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   const said = await typedOn(t, lacking, 'rm', run.id);
   assert.equal(said.error, undefined, 'exit 0: the run is removed');
   const marker = markerOf(run.id);
-  const words = `the engine refused to forget 1 task of it: task ${task} ran on the \`codex\` harness, which this engine does not have`;
-  assert.ok(said.printed[0].includes(words), said.printed.join('\n'));
-  assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
-  assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
+  const why = `task ${task} ran on the \`codex\` harness, which this engine does not have`;
+  const words = `the engine refused to forget 1 task of it: ${why}`;
+  const engine = said.forgot[0]?.engine;
+  assert.deepEqual(
+    [said.forgot.length, engine?.refused, engine?.refusedWhy.length, engine?.marker, engine?.waiting],
+    [1, [task], 1, marker, []],
+    'removed, the engine refusing the task by name, the marker kept, and none waits',
+  );
+  assert.ok(engine?.refusedWhy[0]?.startsWith(why), `in the runtime's words: ${engine?.refusedWhy[0]}`);
   assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
 
   const before = lackingForgets.length;

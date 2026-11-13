@@ -18,7 +18,7 @@ import { readFactoryAt } from '../factory/factory.store.ts';
 import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
 import { runRecord } from '../record/record.store.ts';
 import { advanceRun, startRun } from '../runner.ts';
-import { told } from '../../test/typed.ts';
+import { told, type StartedAnswer } from '../../test/typed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
 import { FACTORY_PLAN } from '../factory/upgrade/upgrade.verb.ts';
 import { FACTORY_ADOPT } from './adopt.verb.ts';
@@ -55,6 +55,9 @@ async function printedBy(t: { mock: { method: Function } }, ...argv: string[]): 
   }
   return printed.flatMap((p) => p.split('\n'));
 }
+
+/** The id of the run `nemia start <argv>` answered. */
+const startedId = async (...argv: string[]): Promise<string> => ((await stage.main(['start', ...argv])) as StartedAnswer).id;
 
 /** Refused by kind and exit 2, its message matching each of `patterns`. */
 const refusedWith =
@@ -134,7 +137,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
-      run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo))[0].split(' ')[0];
+      run = await startedId('Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo);
       runBefore = JSON.stringify(runRecord(ROOT, run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
@@ -171,8 +174,8 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.ok(read.workflows.includes('dev'), "it reads the tree's wiring");
   });
 
-  await s.test('the card filed before the takeover starts, on the workflow in the tree', async (t) => {
-    const started = (await printedBy(t, 'start', cardFile))[0].split(' ')[0];
+  await s.test('the card filed before the takeover starts, on the workflow in the tree', async () => {
+    const started = await startedId(cardFile);
     assert.ok(runRecord(ROOT, started).workflowDir.startsWith(treeDir(ROOT, 'crew')), runRecord(ROOT, started).workflowDir);
   });
 

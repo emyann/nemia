@@ -310,6 +310,27 @@ test('nemia start prints the run it started, worded off the answer, line for lin
       ],
     ],
     [
+      'a step with no agent beside one with, two gated and two endings, each said in the plural',
+      {
+        id: 'r-5',
+        run: {
+          ...DEV,
+          steps: [{ name: 'build', agent: 'plain' }, { name: 'judge' }],
+          gated: ['build', 'judge'],
+          ends: ['ship', 'docs'],
+        },
+      },
+      [
+        'r-5  2 step(s): build (plain) → judge',
+        'factory: acme, on /r',
+        'workspace: /r',
+        'workflow files: copied into /s/runs/r-1/workflow/5b5d',
+        'gated at: build, judge — nothing after each is filed until nemia approve r-5 <step>, once it has signed off',
+        'ends at: ship, docs — nothing of them runs until nemia approve r-5 ship, which is what files them',
+        "run 'nemia tick' (or 'nemia up') to start it",
+      ],
+    ],
+    [
       'an api that says nothing of the run',
       { id: 'r-4' },
       ["r-4  started on the daemon — nemia show r-4 reads it, and the daemon's next pass files its first step"],
@@ -404,6 +425,39 @@ test('nemia rm prints the run it forgot in one line, worded off the answer, as i
       'a folder run',
       { id: 'r-4', removed: true, engine: null, files: ['runs/r-4.json'], folder: true, unfrozen: 'its folder does not read' },
       'r-4  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches; removed runs/r-4.json; its workflow was never frozen, and its folder does not read',
+    ],
+    [
+      'a run whose workflow was never frozen, its folder not read',
+      {
+        id: 'r-5',
+        removed: true,
+        engine: null,
+        worktrees: [],
+        handedOff: [],
+        gone: [],
+        files: ['runs/r-5.json'],
+        branches: [],
+        unfrozen: 'no workflow folder at /wf/dev',
+      },
+      'r-5  forgotten: no worktrees; removed runs/r-5.json; no branches left; its workflow was never frozen, and no workflow folder at /wf/dev',
+    ],
+    [
+      'an engine that refused the whole call: the marker kept, for a person to remove',
+      {
+        id: 'r-6',
+        removed: true,
+        engine: { ...NO_TASKS, refusal: 'forget: the store is read-only.', marker: 'runs/r-6.forgetting' },
+        worktrees: [],
+        handedOff: [],
+        gone: [],
+        files: [],
+        branches: [],
+      },
+      [
+        'r-6  forgotten: no worktrees',
+        'no branches left',
+        'the engine refused to forget its tasks: forget: the store is read-only. runs/r-6.forgetting keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm runs/r-6.forgetting',
+      ].join('; '),
     ],
   ];
   for (const [what, answer, line] of rows) assert.equal(forgottenLine(answer), line, what);

@@ -17,7 +17,15 @@ import { scratch } from 'test-kit/scratch';
 import { isRepositoryRun } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
-import { advanceRun, forgetRun, forgetLine as forgetLineOf, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { advanceRun, forgetRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
+import { forgetRefusal } from '../src/forget/commands.verb.ts';
+import type { Forgot } from '../src/run.ts';
+
+/** What the api refuses a removal that removed nothing with, in its words (`forgetRefusal`): its kind, and its message. */
+const refusedWith = (f: Forgot): [string | undefined, string | undefined] => {
+  const refusal = forgetRefusal(f);
+  return [refusal?._tag, refusal?.message];
+};
 import { markCancelled, runRecord } from '../src/record/record.store.ts';
 import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -255,10 +263,10 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   fs.mkdirSync(odd);
   fs.writeFileSync(path.join(odd, 'mine.txt'), 'mine\n');
   const f = await runWith(b.e, forgetRun(stray.run.id));
-  assert.equal(
-    forgetLineOf(f),
+  assert.deepEqual(refusedWith(f), [
+    'Conflict',
     `${stray.run.id}  not forgotten: ${odd} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: nemia rm ${stray.run.id} again then.`,
-  );
+  ]);
   assert.ok(
     fs.existsSync(path.join(odd, 'mine.txt')) && under('runs', `${stray.run.id}.json`),
     "something in the run's directory that git does not list is never deleted behind git's back",
@@ -285,10 +293,10 @@ test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-comm
   );
 
   const held = await runWith(b.e, forgetRun(p.run.id));
-  assert.equal(
-    forgetLineOf(held),
+  assert.deepEqual(refusedWith(held), [
+    'Conflict',
     `${p.run.id}  not forgotten: ${p.wt} holds what implement left uncommitted, and the hand-off could not commit it — lint: flag.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${p.wt} commit), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
-  );
+  ]);
   assert.equal(gitIn(p.wt, 'status', '--porcelain'), 'A  flag.ts', 'the work is where it was, staged');
   assert.ok(worktreesOf(repo).includes(p.wt) && under('runs', `${p.run.id}.json`));
 
@@ -319,10 +327,10 @@ test('REFUSED at shipped defaults: a worktree on no branch — its session stopp
   const sha = gitIn(p.wt, 'rev-parse', 'HEAD');
 
   const held = await runWith(b.e, forgetRun(p.run.id));
-  assert.equal(
-    forgetLineOf(held),
+  assert.deepEqual(refusedWith(held), [
+    'Conflict',
     `${p.run.id}  not forgotten: ${p.wt} is on no branch at its tip ${sha.slice(0, 7)} — as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${p.wt} switch -c <branch>, or finish or abort what left it there), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
-  );
+  ]);
   assert.ok(worktreesOf(repo).includes(p.wt) && gitIn(p.wt, 'rev-parse', 'HEAD') === sha, 'the worktree, and its commit, where they were');
 
   gitIn(p.wt, 'checkout', '-q', '--detach', p.branch);

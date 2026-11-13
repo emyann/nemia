@@ -31,6 +31,7 @@ import { StoreRoot } from '../src/config/root.store.ts';
 import { TemplateDoor } from '../src/template/door/templates.store.ts';
 import { TemplateSource } from '../src/template/door/templates.model.ts';
 import { factoryTyped } from './factory-typed.ts';
+import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -288,9 +289,9 @@ test("a template's round trip: the team exported, checked, packed, unpacked, app
     },
   );
 
-  await s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async (t) => {
-    const printed = await printedBy(t, 'start', 'Cache the views', '--factory', 'trip', '--workflows', 'dev');
-    const run = runRecord(ROOT, printed[0].split(' ')[0]);
+  await s.test("a bare workflow name started is the tree's, and the run is told the tree's step as the person changed it", async () => {
+    const started = (await stage.main(['start', 'Cache the views', '--factory', 'trip', '--workflows', 'dev'])) as StartedAnswer;
+    const run = runRecord(ROOT, started.id);
     assert.equal(run.workflowDir, path.join(treeDir(ROOT, 'trip'), 'workflows', 'dev'));
     assert.equal(run.workflow?.find((step) => step.name === 'review')?.budget, 9);
     assert.equal(run.factory, 'trip');

@@ -8,7 +8,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +28,7 @@ import { runDoorMemory } from '../src/runs/memory.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { told } from './typed.ts';
+import { told, type StartedAnswer } from './typed.ts';
 import type { RunsListed } from '../src/list/list.ts';
 import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -80,19 +80,6 @@ const subjects = (checkout: string): string[] => {
   }
   return seen.map((id) => world().read(checkout, id).message.split('\n')[0]);
 };
-/** What `console.log` printed while `run` ran, a line each. */
-const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<string[]> => {
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    out.push(args.map(String).join(' '));
-  });
-  try {
-    await run();
-  } finally {
-    log.mock.restore();
-  }
-  return out.join('\n').split('\n');
-};
 /** The step names `nemia ls <id>` reads of the run, in its order. */
 const lsNames = async (id: string): Promise<string[]> => {
   const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
@@ -123,10 +110,9 @@ test('a chain runs to success: plan → implement → review, on one line of wor
   const ORDER = ['plan', 'implement', 'review'];
   await s.test('`nemia start` says the steps in the order they run, and keys the record so, whose files sort another way', async () => {
     const dir = folderOf({ implement: ['after: plan'], plan: [], review: ['after: implement', 'check: npm test'] });
-    const printed = await printedBy(t, () => stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', aRepo()]));
-    const [started, said] = printed[0].split('  ');
-    id = started;
-    assert.equal(said, '3 step(s): plan → implement → review');
+    const started = (await stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', aRepo()])) as StartedAnswer;
+    id = started.id;
+    assert.deepEqual(started.facts.steps, [{ name: 'plan' }, { name: 'implement' }, { name: 'review' }], 'in the order they run');
     const run = runRecord(ROOT, id);
     assert.deepEqual([Object.keys(run.steps), run.workflow?.map((x) => x.name)], [ORDER, ORDER]);
   });

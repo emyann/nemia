@@ -1,15 +1,16 @@
 /**
  * `nemia rm`'s pure half (`forget.ts`), as tables: why a run is not forgotten (`forgetRefusal`), and the one order its reasons and fixes
  * are said in; which worktrees are a run's (`runWorktrees`), which of them a removal leaves (`heldWorktree`) and what becomes of each
- * branch (`branchFates`); what is taken as a run's id (`idRefusal`); and the line that says what was done (`forgetLine`). A refusal is
- * read by the facts it names — the step, the run, the command its fix names — in the order it names them, never by its sentence.
+ * branch (`branchFates`); what is taken as a run's id (`idRefusal`); and the line a refusal says of a run not forgotten
+ * (`notForgottenLine`). A refusal is read by the facts it names — the step, the run, the command its fix names — in the order it names
+ * them, never by its sentence.
  * `nemia rm` over a store, a place and the engine's stand-in is told in `test/forget.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   branchFates,
-  forgetLine,
+  notForgottenLine,
   forgetRefusal,
   heldWorktree,
   idRefusal,
@@ -628,10 +629,10 @@ test("`idRefusal` takes only what `runId` mints — lowercase letters, digits an
   });
 });
 
-test('`forgetLine` says in one line what happened to each run: forgotten, with what was handed off and became of each branch; not forgotten, with why and what to do; no such run', async (t) => {
-  const forgotten: Forgot = {
+test('`notForgottenLine` says in one line what kept a run `nemia rm` did not forget: why, and what to do; or that there is no such run', async (t) => {
+  const run1: Forgot = {
     id: 'r-1',
-    kind: 'forgotten',
+    kind: 'held',
     repo: '/repo',
     base: 'main',
     isolate: true,
@@ -645,58 +646,9 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       { branch: 'wf/r-1/review', deleted: false, why: 'default' },
     ],
   };
-  await t.test('forgotten: its worktrees, the hand-off by its short commit, its files, and each branch kept unless asked', () => {
-    const line = forgetLine(forgotten);
-    inOrder(
-      line,
-      'r-1  forgotten: ',
-      'removed 2 worktrees',
-      'review',
-      'wf/r-1/review as 1a2b3c4',
-      'removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr',
-      'kept wf/r-1/implement, wf/r-1/review',
-      '--delete-branches',
-      'main',
-    );
-    lacks(line, '1a2b3c4d');
-  });
-  await t.test("forgotten: each branch's fate — merged, forced, unmerged, git's words, a remove unread — and a folder never frozen", () => {
-    const gitSaid = 'error: it is checked out elsewhere';
-    const unfrozen = 'no workflow folder at /wf/dev';
-    const fates = forgetLine({
-      ...forgotten,
-      removed: [],
-      handedOff: [],
-      gone: ['/wf/worktrees/r-1/implement'],
-      branches: [
-        { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
-        { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
-        { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
-        { branch: 'wf/r-1/odd', deleted: false, why: { git: gitSaid } },
-        { branch: 'wf/r-1/plan', deleted: false, why: { unread: 'it exited 1' } },
-      ],
-      unfrozen,
-    });
-    assert.ok(fates.startsWith('r-1  forgotten: 1 worktree was already gone; '), fates);
-    names(fates, 'removed runs/r-1.json', 'runs/r-1/', 'checks/r-1-implement-check.stderr');
-    names(fates, 'deleted wf/r-1/implement (merged into main)', 'wf/r-1/fix (not merged into main, forced)');
-    names(fates, 'kept wf/r-1/review: not merged into main', '--force-unmerged');
-    names(fates, 'kept wf/r-1/odd:', gitSaid, 'kept wf/r-1/plan:', 'it exited 1', 'nemia rm r-1 again');
-    names(fates, 'never frozen', unfrozen);
-  });
-  await t.test('forgotten: a run that worked in its repository itself had no worktree and no branch of its own', () => {
-    inOrder(
-      forgetLine({ ...forgotten, isolate: false, removed: [], handedOff: [], branches: [], files: ['runs/r-1.json'] }),
-      'r-1  forgotten: ',
-      'no worktrees',
-      '/repo',
-      'removed runs/r-1.json',
-      'no branch of its own',
-    );
-  });
   await t.test("not forgotten: a worktree held, one git would not remove, a stray, each with its fix; and the record's fate", () => {
-    const line = forgetLine({
-      ...forgotten,
+    const line = notForgottenLine({
+      ...run1,
       kind: 'held',
       handedOff: [],
       removed: ['/wf/worktrees/r-1/review'],
@@ -728,8 +680,8 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
     );
   });
   await t.test('not forgotten: one on no branch at its short commit, a hand-off refused in its words, a handoff unread', () => {
-    const line = forgetLine({
-      ...forgotten,
+    const line = notForgottenLine({
+      ...run1,
       kind: 'held',
       handedOff: [],
       removed: [],
@@ -780,19 +732,20 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       branches: [],
       files: [],
     };
-    assert.equal(forgetLine(refused), `r-1  not forgotten: ${refusedFor}`);
+    assert.equal(notForgottenLine({ ...refused, kind: 'refused' }), `r-1  not forgotten: ${refusedFor}`);
   });
   await t.test('no such run: nothing, or what was left under its id removed, or its orphaned worktrees named with what to do', () => {
     const missing: Forgot = { id: 'r-9', kind: 'missing', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
-    assert.equal(forgetLine(missing), 'r-9  no such run — nothing to forget');
+    assert.equal(notForgottenLine({ ...missing, kind: 'missing' }), 'r-9  no such run — nothing to forget');
     inOrder(
-      forgetLine({ ...missing, files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }),
+      notForgottenLine({ ...missing, kind: 'missing', files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }),
       'r-9  no such run',
       'removed runs/r-9.asks/, runs/r-9.cancelled',
     );
     inOrder(
-      forgetLine({
+      notForgottenLine({
         ...missing,
+        kind: 'missing',
         left: [{ path: '/wf/worktrees/r-9', orphaned: true, fix: 'git worktree list, and git worktree remove each' }],
       }),
       'r-9  no such run',

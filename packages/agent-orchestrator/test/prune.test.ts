@@ -162,9 +162,9 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]): Promise<Type
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void printed.push(a.join(' ')));
   try {
     await stage.main(argv, e);
-    return { printed, error: undefined };
+    return { printed, forgot: [], error: undefined };
   } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number; _tag?: string } };
+    return { printed, forgot: [], error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
     log.mock.restore();
   }

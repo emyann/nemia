@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { forgetLine, type Forgot } from './forget.ts';
+import { notForgottenLine, type Forgot } from './forget.ts';
 import type { Pruning } from './prune/prune.ts';
 import { commandLine, parseArgv } from '../command/command.ts';
 import { forgetRefusal, PRUNE, pruneRefusal, RM } from './commands.verb.ts';
@@ -50,10 +50,10 @@ test('REFUSED on the api (`refuses`): a removal that removed nothing is thrown i
   const refused = forgot({ kind: 'refused', refusal: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   assert.deepEqual(rmRefusal(refused), { tag: 'Conflict', message: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   const held = forgot({ kind: 'held', left: [{ path: '/w/r-1/implement', heldBy: 'in use' }], removed: ['/w/r-1/plan'] });
-  assert.deepEqual(rmRefusal(held), { tag: 'Conflict', message: forgetLine(held) });
-  assert.match(forgetLine(held), /^r-1 {2}not forgotten:.*nemia rm r-1 again then\.$/);
+  assert.deepEqual(rmRefusal(held), { tag: 'Conflict', message: notForgottenLine({ ...held, kind: 'held' }) });
+  assert.match(notForgottenLine({ ...held, kind: 'held' }), /^r-1 {2}not forgotten:.*nemia rm r-1 again then\.$/);
   const missing = forgot({ kind: 'missing', files: ['runs/r-1.asks'] });
-  assert.deepEqual(rmRefusal(missing), { tag: 'Missing', message: forgetLine(missing) });
+  assert.deepEqual(rmRefusal(missing), { tag: 'Missing', message: notForgottenLine({ ...missing, kind: 'missing' }) });
   assert.equal(rmRefusal(forgot({ kind: 'forgotten' })), null);
 });
 

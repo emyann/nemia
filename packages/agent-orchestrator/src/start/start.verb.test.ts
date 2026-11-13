@@ -12,7 +12,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
-import { startedFacts, startedLines } from './commands.verb.ts';
+import { startedFacts } from './commands.verb.ts';
 import { filesStoreAt } from '../record/files.store.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -68,7 +68,7 @@ test("a start copies the labels its --after and --from runs agree on, the card's
   assert.equal('labels' in JSON.parse(fs.readFileSync(path.join(RUNS_DIR, `${run.id}.json`), 'utf8')), false, 'never in it');
 });
 
-test('a key two named runs disagree on is left out, and `nemia start` names it, the runs, their values and `nemia label run`', async () => {
+test('a key two named runs disagree on is left out, and `nemia start` answers it, with the runs and their values', async () => {
   const repo = aRepo();
   const a = await parent(repo, { team: 'core', area: 'inbox' });
   const b = await parent(repo, { team: 'infra', area: 'inbox' });
@@ -83,8 +83,6 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
       ],
     },
   ]);
-  const line = startedLines({ home: ROOT, id: run.id, run }).find((l) => l.includes('team') && l.includes('not inherited'));
-  names(line, 'team', a, 'core', b, 'infra', `nemia label run ${run.id} team=`);
   const facts = startedFacts({ home: ROOT, run });
   assert.deepEqual([facts.labels, facts.labelsLeftOut], [run.labels, run.labelsLeftOut], 'what the api answers the client to say it by');
   const typed = await runPlaced(
@@ -93,14 +91,10 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
   assert.deepEqual([typed.labels, typed.labelsLeftOut], [{ area: 'inbox', team: 'ops' }, undefined], 'a typed key settles it');
 });
 
-test('a run started with no labels writes no .labels file, and its start prints no label line', async () => {
+test('a run started with no labels writes no .labels file, and its start answers no label', async () => {
   const run = await runPlaced(startRun({ brief: 'bare', repo: aRepo(), workflowDir: folder() }));
   assert.equal(fs.existsSync(labelsFile(run.id)), false);
   assert.equal(run.labels, undefined);
-  assert.equal(
-    startedLines({ home: ROOT, id: run.id, run }).some((l) => l.startsWith('label')),
-    false,
-  );
   const facts = startedFacts({ home: ROOT, run });
   assert.deepEqual([facts.labels, facts.labelsLeftOut], [undefined, undefined], 'nor a key of them in what the api answers');
 });

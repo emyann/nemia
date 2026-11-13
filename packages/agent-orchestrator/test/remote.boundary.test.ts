@@ -32,7 +32,7 @@ import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, run
 import { engineOf } from '../src/runtime-client.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
-import { handled, told } from './typed.ts';
+import { handled, told, type StartedAnswer } from './typed.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
@@ -92,7 +92,7 @@ async function startedBy(start: (argv: string[]) => Promise<unknown>, dir: strin
   process.chdir(ROOT);
   try {
     const argv = ['start', 'a note on tides', '--workflows', dir, ...(given ? ['--input', GIVEN] : [])];
-    return (await said(() => start(argv))).out[0].split(/\s+/)[0];
+    return ((await start(argv)) as StartedAnswer).id;
   } finally {
     process.chdir(cwd);
   }

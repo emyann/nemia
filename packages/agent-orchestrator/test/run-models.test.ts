@@ -17,8 +17,7 @@ import { main as cli } from '../src/cli/main.ts';
 import { engineOf, type Engine } from '../src/runtime-client.ts';
 import { story, staged } from './story.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
+import { factsOf, typed, type StartedAnswer } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -80,12 +79,12 @@ const SIGNED = { outcome: 'done', summary: 'the plan', artifacts: [], needs: nul
 /** The model each step is frozen on in the run `id`'s record, by name. */
 const frozenModels = (id: string) => Object.fromEntries((runRecord(ROOT, id).workflow ?? []).map((s) => [s.name, s.model]));
 
-/** What `nemia argv` printed, line by line, over an engine of its own that is asked nothing. */
-const printedBy = async (argv: string[]): Promise<string[]> => {
+/** What `nemia start` answered, with the facts the client words, over an engine of its own that is asked nothing. */
+const startedBy = async (argv: string[]): Promise<StartedAnswer> => {
   const own = testEngine();
-  const started = (await stage.main(argv, engineOf(own.layer))) as Started;
+  const started = factsOf((await stage.main(argv, engineOf(own.layer))) as Started);
   unasked(own);
-  return startedLines(started);
+  return started;
 };
 
 /** Refused `Invalid`, exit 2, its words naming each of `facts`. */
@@ -104,7 +103,7 @@ test("a step's model named at start, from `nemia start --model` to the step file
   const dir = planned();
   let id = '';
   await s.test('`nemia start --model implement=fable` freezes it on the record and on implement alone, and says so', async () => {
-    const printed = await printedBy([
+    const started = await startedBy([
       'start',
       'plan the flag',
       '--workflows',
@@ -115,13 +114,10 @@ test("a step's model named at start, from `nemia start --model` to the step file
       '--model',
       'implement=fable',
     ]);
-    id = printed[0].split(' ')[0];
+    id = started.id;
     assert.deepEqual(runRecord(ROOT, id).models, { implement: 'fable' });
     assert.deepEqual(frozenModels(id), { plan: 'opus', implement: 'fable', review: 'opus' });
-    assert.ok(
-      printed.some((line) => line.startsWith('models: implement=fable')),
-      printed.join('\n'),
-    );
+    assert.deepEqual(started.facts.models, { implement: 'fable' }, 'the start says the model it named, for implement alone');
   });
   await s.test('another run of the same folder keeps its agents’ models, and its record has no `models`', async () => {
     const other = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: dir, isolate: false }));

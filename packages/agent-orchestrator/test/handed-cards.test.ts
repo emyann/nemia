@@ -20,8 +20,7 @@ import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { readsAt, writesAt, type Filed } from './mounted.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
+import { factsOf, typed } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -67,8 +66,8 @@ const fileCard = (name: string, text: string): void => {
   fs.writeFileSync(path.join(inboxAt(ROOT), `${name}.md`), text);
 };
 
-/** What `nemia <argv>` printed. */
-const printedBy = async (argv: string[]) => startedLines((await stage.main(argv)) as Started).join('\n');
+/** What `nemia start` answered, with the facts the client words. */
+const startedBy = async (argv: string[]) => factsOf((await stage.main(argv)) as Started);
 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
@@ -93,7 +92,7 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
   let id = '';
 
   await s.test("the cards are copied into the run's inputs/cards byte for byte, their names frozen on the record", async () => {
-    const printed = await printedBy([
+    const started = await startedBy([
       'start',
       'untangle the lists',
       '--workflows',
@@ -105,13 +104,17 @@ test('nemia start --card hands the run inbox cards: copied at start, mounted rea
       'lists-lbpq',
       '--card=rows-qeyh',
     ]);
-    id = printed.split(' ')[0] ?? '';
+    id = started.id;
     const run = runRecord(ROOT, id);
     assert.deepEqual(run.cards, ['lists-lbpq', 'rows-qeyh'], 'by name, in the order given');
     assert.equal(run.inputs, undefined, 'no --input was given');
     assert.equal(fs.readFileSync(path.join(cardsDir(ROOT, run), 'lists-lbpq.md'), 'utf8'), LQ);
     assert.equal(fs.readFileSync(path.join(cardsDir(ROOT, run), 'rows-qeyh.md'), 'utf8'), QE);
-    assert.ok(printed.includes(cardsDir(ROOT, run)), 'the start says where it copied them');
+    assert.deepEqual(
+      started.facts.cards,
+      { names: ['lists-lbpq', 'rows-qeyh'], dir: cardsDir(ROOT, run) },
+      'the start says the cards, in order, and where it copied them',
+    );
   });
 
   const handed = (name: string) => {

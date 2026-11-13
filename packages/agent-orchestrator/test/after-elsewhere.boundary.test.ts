@@ -20,8 +20,8 @@ import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { markCancelled, runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed as onHandler } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
+import { factsOf, typed as onHandler } from './typed.ts';
+import type { Started } from '../src/start/commands.verb.ts';
 import { builtinGitPlace, engine } from '../src/runner.ts';
 
 const ROOT = scratch('wf-after-elsewhere-');
@@ -308,14 +308,12 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   const second = await aParent(repo, b, { work: 'second.txt' });
   const started = await typed('--after', p.run.id, `--after=${second.run.id}`);
   const { id } = started;
-  const printed = startedLines(started as Parameters<typeof startedLines>[0]);
+  const { facts } = factsOf(started as unknown as Started);
   assert.deepEqual(runRecord(ROOT, id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
-  assert.match(
-    printed.join('\n'),
-    new RegExp(
-      `^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until nemia decide says each has landed on ${escaped(p.run.branch)}$`,
-      'm',
-    ),
+  assert.deepEqual(
+    [facts.after, facts.branch],
+    [[p.run.id, second.run.id], p.run.branch],
+    'the start says each run it waits on, in order, and the branch each lands on',
   );
   const bare = await typed();
   assert.equal(

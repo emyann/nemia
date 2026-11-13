@@ -187,8 +187,6 @@ const board = () => {
 };
 
 /** What `nemia rm` says the board's `forget` did with a run's one task. */
-const FORGOT_ONE = '; the engine forgot 1 task of it (1.0 KB of journal, 2 feed lines)';
-
 /** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -247,16 +245,38 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
   const filings = [...b.filings];
 
-  const { printed, error } = await rmTyped(t, b.e, run.id);
+  const { printed, forgot, error } = await rmTyped(t, b.e, run.id);
   assert.equal(error, undefined);
   const branch = `wf/${run.id}/${LINE_NAME}`;
   const commit = gitIn(repo, 'rev-parse', branch);
-  assert.deepEqual(printed, [
-    `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; ` +
-      `removed runs/${run.id}.json, runs/${run.id}.asks/, runs/${run.id}/, checks/${run.id}-implement-check.stderr, worktrees/${run.id}/; ` +
-      `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}` +
-      FORGOT_ONE,
-  ]);
+  assert.deepEqual(printed, [], 'a removal is answered as data, which the client words');
+  assert.deepEqual(
+    forgot.map((f) => [f.id, f.kind, f.removed, f.handedOff, f.gone, f.files, f.branches, f.base]),
+    [
+      [
+        run.id,
+        'forgotten',
+        [wt],
+        [{ step: 'implement', branch, commit }],
+        [],
+        [
+          `runs/${run.id}.json`,
+          `runs/${run.id}.asks/`,
+          `runs/${run.id}/`,
+          `checks/${run.id}-implement-check.stderr`,
+          `worktrees/${run.id}/`,
+        ],
+        [{ branch, deleted: false, why: 'default' }],
+        run.branch,
+      ],
+    ],
+    'its worktree removed, what implement left committed on its branch first, its own files alone, its branch kept unless asked',
+  );
+  assert.deepEqual(
+    [forgot[0].engine?.forgotten.length, forgot[0].engine?.journalBytes, forgot[0].engine?.feedLines],
+    [1, 1024, 2],
+    'the engine forgot its 1 task, 1.0 KB of journal and 2 feed lines',
+  );
 
   assert.ok(!worktreesOf(repo).includes(wt), 'git lists the worktree no more');
   assert.ok(!fs.existsSync(wt) && !under('worktrees', run.id));

@@ -54,9 +54,9 @@ import {
 } from '../src/runner.ts';
 import * as verbs from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
-import { forgetLine, sentBack, stepTaskId } from '../src/run.ts';
-import { builtinGitPlace, engine, START, startedLines, type StartInput } from '../src/runner.ts';
-import { handled } from './typed.ts';
+import { sentBack, stepTaskId } from '../src/run.ts';
+import { builtinGitPlace, engine, START, type StartInput } from '../src/runner.ts';
+import { factsOf, handled } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-folder-');
@@ -126,7 +126,7 @@ const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
 /** `nemia start` on its entry's handler, as the api calls it once the client has sent what it read: the run started, or its refusal. */
-const started = (input: StartInput) => handled(START, input, { e: engine(ENV), place: builtinGitPlace, env: ENV });
+const started = async (input: StartInput) => factsOf(await handled(START, input, { e: engine(ENV), place: builtinGitPlace, env: ENV }));
 
 const SIGNED = { outcome: 'done', summary: 'wrote it', artifacts: ['note.md'], needs: null };
 
@@ -328,9 +328,10 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
-  assert.match(
-    forgetLine(forgot),
-    new RegExp(`^${run.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`),
+  assert.deepEqual(
+    [forgot.removed, forgot.gone, forgot.handedOff, forgot.branches],
+    [[], [], [], []],
+    'a folder run, whose steps worked in its own directory: no worktrees, no branches',
   );
   assert.deepEqual(gitAsked(), [], 'and nothing asked git');
 });
@@ -360,12 +361,13 @@ test('nemia start from a directory that is no repository: a folder team starts, 
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
-    const out = startedLines(await started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO }));
-    const id = out[0].split(' ')[0];
+    const out = await started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO });
+    const id = out.id;
     assert.equal(runRecord(ROOT, id).place?.kind, 'folder');
-    assert.ok(
-      out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`),
-      out.join('\n'),
+    assert.deepEqual(
+      [out.facts.workspace, out.facts.repository],
+      [path.join(ROOT, 'runs', id, 'work'), false],
+      'the start says where it works: a folder per step, with no git repository',
     );
     await assert.rejects(
       started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO, repoNamed: true }),
@@ -412,17 +414,14 @@ test('an old inbox card of a folder team: --repo at its start is refused, as on 
       (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes('--repo'),
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
-    const out = startedLines(await started({ card: 'a-note-on-tides-old', at: NOT_A_REPO }));
-    const run = runRecord(ROOT, out[0].split(' ')[0]);
+    const out = await started({ card: 'a-note-on-tides-old', at: NOT_A_REPO });
+    const run = runRecord(ROOT, out.id);
     assert.deepEqual(
       [run.place?.kind, run.from?.inbox, 'repo' in run],
       ['folder', 'a-note-on-tides-old', false],
       'the repository is ignored: the record has none',
     );
-    assert.ok(
-      out.some((line) => line.includes(`repo: ${NOT_A_REPO}`) && line.includes('retired')),
-      `the start says so, rather than leaving a person to look for the work in it:\n${out.join('\n')}`,
-    );
+    assert.equal(out.ignoredRepo, NOT_A_REPO, 'the start says so, rather than leaving a person to look for the work in it');
     assert.ok(fs.existsSync(file), 'started, the card stays in the inbox');
   } finally {
     process.chdir(cwd);

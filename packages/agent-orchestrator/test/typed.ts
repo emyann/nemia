@@ -9,8 +9,10 @@
  *   (`staged({ runWith, main: typed, engineOf, env })`). A verb whose input the client shapes before it asks (a file read where it is
  *   typed, a card resolved, a person's yes) is called by `handled` with that input said.
  *
- * - `said(argv, …)` runs `typed` and answers the lines a story reads of a `start` or an `ls`.
+ * - `said(argv, …)` runs `typed` and answers the lines a story reads of an `ls` or a `logs`.
  * - `told(argv, …)` is `main` for a story typed before the move: a verb the client holds on `typed`, any other on `main`.
+ * - A `start` through either answers what its handler answered and, as `facts`, what the api words of it (`startedFacts`, `objects`'
+ *   `RunStartedFacts`): a test asserts a start's facts there, and the client's tests hold the words it prints of them.
  *
  * Each answers the handler's data and throws its refusal as it is; none starts a daemon nor reads `--help`, and `told` alone prints.
  */
@@ -26,10 +28,17 @@ import { placedIn, type Engine } from '../src/cli/flags.ts';
 import { main } from '../src/cli/main.ts';
 import { lsLines, type RunsListed } from '../src/list/list.ts';
 import { readFactoriesAt } from '../src/factory/factory.store.ts';
-import { START, StartInput, startedLines, type Started } from '../src/start/commands.verb.ts';
+import { START, StartInput, startedFacts, type Started } from '../src/start/commands.verb.ts';
+import type { RunStartedFacts } from 'objects';
 
 /** What a handler answers. */
 type Data = Readonly<Record<string, unknown>>;
+
+/** What a `start` answers here: what its handler answered, and the facts the api answers of the run (`startedFacts`). */
+export type StartedAnswer = Started & { readonly facts: RunStartedFacts };
+
+/** `started`, what a start's handler answered, with the facts the api answers of its run beside it (`startedFacts`). */
+export const factsOf = (started: Started): StartedAnswer => ({ ...started, facts: startedFacts(started) });
 
 /**
  * The engine, place and store a call is made over: the store `env` names, and the engine and place the test gives, each a fresh
@@ -74,25 +83,30 @@ export async function typed(argv: readonly string[], e?: Engine, _demand?: unkno
 }
 
 /**
- * The lines a story reads of `argv`, run as `typed` runs it: `start`'s as its entry says them (`startedLines`, what the api answers the
- * client as its lines), `ls`'s as the table the orchestrator draws (`lsLines`, now). Any other verb is refused: read what `typed`
- * answers. The client's own lines are held by its tests (`apps/cli/test`).
+ * The lines a story reads of `argv`, run as `typed` runs it: `ls`'s as the table the orchestrator draws (`lsLines`, now), `logs`'s output.
+ * Any other verb is refused: read what `typed` answers. The client's own lines are held by its tests (`apps/cli/test`).
  */
 export async function said(argv: readonly string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<string[]> {
   return linesOf(argv, await answered(argv, e, demand, place, env));
 }
 
-/** What `argv` answers, run as `typed` runs it: a `start` of a card by its card, of a workflow's name by its folder (`foldered`). */
+/**
+ * What `argv` answers, run as `typed` runs it: a `start` of a card by its card, of a workflow's name by its folder (`foldered`), with its
+ * facts beside it (`factsOf`).
+ */
 async function answered(argv: readonly string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<Data> {
-  const card = argv[0] === 'start' ? cardNamed(argv[1] ?? '', env ?? process.env) : undefined;
-  if (card === undefined) return typed(argv[0] === 'start' ? foldered(argv, env ?? process.env) : argv, e, demand, place, env);
+  if (argv[0] !== 'start') return typed(argv, e, demand, place, env);
+  const card = cardNamed(argv[1] ?? '', env ?? process.env);
   const over = { ...(e && { e }), ...(place && { place }), ...(env && { env }) };
-  return handled(START, { card, at: process.cwd(), ...cardFlags(argv.slice(2)) }, over);
+  const started =
+    card === undefined
+      ? await typed(foldered(argv, env ?? process.env), e, demand, place, env)
+      : await handled(START, { card, at: process.cwd(), ...cardFlags(argv.slice(2)) }, over);
+  return factsOf(started as unknown as Started);
 }
 
-/** The lines of `data`, what `argv` answered: a `start`'s (`startedLines`), an `ls`'s (`lsLines`, now), a `logs`'s output. */
+/** The lines of `data`, what `argv` answered: an `ls`'s (`lsLines`, now), a `logs`'s output. */
 function linesOf(argv: readonly string[], data: Data): string[] {
-  if (argv[0] === 'start') return startedLines(data as unknown as Started);
   if (argv[0] === 'ls') return lsLines(data as unknown as RunsListed, Date.now());
   if (argv[0] === 'logs') return String(data.output ?? '').split('\n');
   throw new Invalid({ message: `${argv[0]} has no lines in a test here: read the data typed answers` });
@@ -100,8 +114,8 @@ function linesOf(argv: readonly string[], data: Data): string[] {
 
 /**
  * `argv` as a story typed it at `main` before the client held its verb: a verb the client holds (`objects`' `COMMAND_WORDS`) run as
- * `typed` runs it, its answer answered and, of a `start`, an `ls` or a `logs`, its lines printed (`said`); a verb of this machine on
- * `main`. It takes what `main` takes, so a story's stage is given it as its `main`.
+ * `typed` runs it, its answer answered (a `start`'s with its `facts`) and, of an `ls` or a `logs`, its lines printed (`said`); a verb of
+ * this machine on `main`. It takes what `main` takes, so a story's stage is given it as its `main`.
  */
 export async function told(argv: string[], e?: Engine, demand?: unknown, place?: Place, env?: Env): Promise<Data | undefined> {
   const words = renamedIn(argv).words;
@@ -110,7 +124,7 @@ export async function told(argv: string[], e?: Engine, demand?: unknown, place?:
     return undefined;
   }
   const data = await answered(argv, e, demand, place, env);
-  if (['start', 'ls', 'logs'].includes(argv[0] ?? '')) for (const line of linesOf(argv, data)) console.log(line);
+  if (['ls', 'logs'].includes(argv[0] ?? '')) for (const line of linesOf(argv, data)) console.log(line);
   return data;
 }
 

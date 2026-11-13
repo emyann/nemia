@@ -41,6 +41,7 @@ import { approveProgram, declineProgram } from '../src/approval/approve.verb.ts'
 import { PERSON } from '../src/caller/caller.ts';
 import { mintToken } from '../src/token/token.store.ts';
 import { factoryTyped } from './factory-typed.ts';
+import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -191,7 +192,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     });
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--repo', repo, '--set', 'budget=7');
     assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
-    run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
+    run = ((await stage.main(['start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'])) as StartedAnswer).id;
     assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
     rewrite(tree(), REVIEW, 'rounds: 3', 'rounds: 4');
     rewrite(tree(), REVIEW, 'budget: 7', 'budget: 9');

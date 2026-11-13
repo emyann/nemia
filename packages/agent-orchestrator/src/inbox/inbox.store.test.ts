@@ -23,14 +23,14 @@ import { story } from '../../test/story.ts';
 import { decisionOf } from '../../test/screens.ts';
 import { runLines } from '../object/lines.verb.ts';
 import type { StoreRoot as StoreRootNeeded } from '../config/root.store.ts';
-import { inboxDir, parseArgv, START, startedLines, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
+import { inboxDir, parseArgv, START, StartInput, startRun, startFromInbox, StoreRoot } from '../runner.ts';
 import type { Started } from '../start/commands.verb.ts';
 import * as verbs from '../runner.ts';
 import { runRecord } from '../record/record.store.ts';
 import { informerMemo } from '../rest/informer.verb.ts';
 import { INBOX as INBOX_LIST, INBOX_ADD, type InboxAddInput } from './commands.verb.ts';
 import { inboxLines, type InboxListing } from './inbox.ts';
-import { handled, typed } from '../../test/typed.ts';
+import { factsOf, handled, typed, type StartedAnswer } from '../../test/typed.ts';
 import { runWith as runEngine } from '../runtime-client.ts';
 import { main as cli } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
@@ -54,10 +54,10 @@ const filed = filesStoreAt(ROOT);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
 /**
  * `nemia`, as a person types it, its commands given this test's place: `start` run on its entry's handler (`typed`), a card of the
- * inbox named by its file or its name sent as the card it is (`card`), as the client sends a card it names, and its lines said as the
- * client says them (`startedLines`); `decide`, the old path's screen.
+ * inbox named by its file or its name sent as the card it is (`card`), as the client sends a card it names, answering what the handler
+ * answered with the facts the client words (`factsOf`); `decide`, the old path's screen.
  */
-const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<void> => {
+const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<StartedAnswer | void> => {
   if (argv[0] !== 'start') return cli(argv, e, undefined, stand().place, ENV);
   const [, given = '', ...rest] = argv;
   const named = !given.includes('/') && fs.existsSync(path.join(INBOX, given.endsWith('.md') ? given : `${given}.md`));
@@ -70,7 +70,7 @@ const main = async (argv: string[], e?: Parameters<typeof cli>[1]): Promise<void
           { ...(e && { e }), place: stand().place, env: ENV },
         )
       : await typed(['start', given, ...rest], e, undefined, stand().place, ENV);
-  for (const line of startedLines(data as Started)) console.log(line);
+  return factsOf(data as Started);
 };
 
 /** The flags of a `start` read by its words, beside a card's name: what the handler takes of them (`--brief` its `instead`, a file's
@@ -120,32 +120,12 @@ const refusedWith =
   };
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-/** What `main` printed, line by line, for one verb. */
-const printedBy = async (
-  t: { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } },
-  ...argv: string[]
-): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await main(argv, noEngine());
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-};
-
-/**
- * What `main` printed for one verb typed in `cwd`: a card of the default factory is started on the folder `nemia start` is typed in, its
- * `repo:` retired and never read.
- */
-const printedIn = async (t: Parameters<typeof printedBy>[0], cwd: string, ...argv: string[]): Promise<string[]> => {
+/** What `nemia start <argv>` typed in `cwd` answered, with the facts the client words. */
+const startedIn = async (cwd: string, ...argv: string[]): Promise<StartedAnswer> => {
   const was = process.cwd();
   process.chdir(cwd);
   try {
-    return await printedBy(t, ...argv);
+    return (await main(['start', ...argv], noEngine())) as StartedAnswer;
   } finally {
     process.chdir(was);
   }
@@ -309,15 +289,15 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
   );
   await s.test(
     "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in the repository it is typed in, the card naming no factory — writes `from` on the record and keeps the card, listed as started and never started again; its decision names the card on the run's line",
-    async (t) => {
+    async () => {
       emptyInbox();
       const repo = aRepoWith('dev', 'ui');
       const { card, file } = addToInbox({
         text: 'Cache the views between passes\n\nThe tick reads each task twice.',
         workflow: 'dev',
       });
-      const printed = await printedIn(t, repo, 'start', file);
-      const id = printed[0].split(' ')[0];
+      const started = await startedIn(repo, file);
+      const { id } = started;
       assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
       const run = runRecord(ROOT, id);
       assert.deepEqual(
@@ -329,11 +309,11 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
           { inbox: card.name },
         ],
       );
-      assert.deepEqual(printed.slice(0, 3), [
-        `${id}  1 step(s): implement`,
-        `from inbox card ${card.name} — kept in the inbox, listed as started`,
-        `workspace: ${repo}`,
-      ]);
+      assert.deepEqual(
+        [started.facts.steps, started.card, started.facts.from, started.facts.factory, started.facts.workspace, started.facts.repository],
+        [[{ name: 'implement' }], card.name, card.name, undefined, repo, true],
+        'the start says its one step, the card it came from, kept in the inbox, and where it works',
+      );
       assert.ok(fs.existsSync(file), 'the card stays in the inbox');
       assert.deepEqual(
         (await judgedInbox()).map((l) => [l.name, l.state, l.startedAs]),
@@ -366,37 +346,41 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
     },
   );
-  await s.test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does', async (t) => {
+  await s.test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does', async () => {
     emptyInbox();
     const repo = aRepoWith('dev');
     const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' });
     const other = addToInbox({ text: 'Show the flag', workflow: 'dev' });
 
-    const printed = await printedIn(t, repo, 'start', path.join(INBOX, card.name));
-    const run = runRecord(ROOT, printed[0].split(' ')[0]);
+    const started = await startedIn(repo, path.join(INBOX, card.name));
+    const run = runRecord(ROOT, started.id);
     assert.deepEqual(
       [run.brief, run.workflowDir, run.from],
       ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
     );
-    assert.equal(printed[1], `from inbox card ${card.name} — kept in the inbox, listed as started`);
+    assert.deepEqual(
+      [started.card, started.facts.from, started.queueLeft],
+      [card.name, card.name, undefined],
+      'the start says the card it came from, kept in the inbox',
+    );
     assert.ok(fs.existsSync(file), 'the card stays in the inbox');
     assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
   });
   await s.test(
     '`nemia start <name>` and `nemia start <name>.md`, the card named with or without its .md, each start the card',
-    async (t) => {
+    async () => {
       emptyInbox();
       const repo = aRepoWith('dev');
       for (const named of [(name: string) => name, (name: string) => `${name}.md`]) {
         const { card } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' });
-        const run = runRecord(ROOT, (await printedIn(t, repo, 'start', named(card.name)))[0].split(' ')[0]);
+        const run = runRecord(ROOT, (await startedIn(repo, named(card.name))).id);
         assert.deepEqual([run.brief, run.from], ['Cache the views between passes', { inbox: card.name }], named(card.name));
       }
     },
   );
   await s.test(
     "a start says what the card does not, over what it does: --workflows over `workflow:`, by name, the caller's repository, --brief in place of the body, and --after to wait on",
-    async (t) => {
+    async () => {
       emptyInbox();
       const repo = aRepoWith('dev', 'ui');
       const other = aRepoWith('ui');
@@ -404,18 +388,8 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const over = addToInbox({ text: 'Show the flag', workflow: 'dev' });
       const run = runRecord(
         ROOT,
-        (
-          await printedIn(
-            t,
-            repo,
-            'start',
-            over.file,
-            '--workflows',
-            'ui',
-            '--brief',
-            'Show the flag on the settings page, beside the theme toggle.',
-          )
-        )[0].split(' ')[0],
+        (await startedIn(repo, over.file, '--workflows', 'ui', '--brief', 'Show the flag on the settings page, beside the theme toggle.'))
+          .id,
       );
       assert.deepEqual(
         [run.workflowDir, run.repo, run.brief, run.from],
@@ -429,7 +403,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.match(run.id, /^show-the-flag-on-the-setting-[a-z0-9]{4}$/, 'the id from the brief it was started with');
 
       const bare = addToInbox({ text: 'Store the flag', workflow: 'ui' });
-      const here = runRecord(ROOT, (await printedIn(t, other, 'start', bare.file))[0].split(' ')[0]);
+      const here = runRecord(ROOT, (await startedIn(other, bare.file)).id);
       assert.deepEqual(
         [here.repo, here.workflowDir],
         [other, path.join(other, 'workflows', 'ui')],
@@ -442,10 +416,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'mine-')), 'work.md');
       fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
       const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev' });
-      const child = runRecord(
-        ROOT,
-        (await printedIn(t, repo, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0].split(' ')[0],
-      );
+      const child = runRecord(ROOT, (await startedIn(repo, waits.file, '--brief', brief, '--after', byBoard.run.id)).id);
       assert.deepEqual(
         [child.brief, child.after, child.from],
         ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }],
@@ -710,7 +681,7 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
 test(
   "a queued card started has its `queued:` line taken off, every other line kept; one whose line cannot be taken off is started all the same, says so, and stays out of the queue while its run's record stands",
   { skip: process.getuid?.() === 0 && 'root writes a folder it may not write' },
-  async (t) => {
+  async () => {
     emptyInbox();
     const repo = aRepoWith('dev');
     const queuedCard = (name: string) => {
@@ -730,15 +701,16 @@ test(
 
     const left = queuedCard('left-c3d4');
     fs.chmodSync(INBOX, 0o555);
-    let printed: string[];
+    let kept: StartedAnswer;
     try {
-      printed = await printedIn(t, repo, 'start', left);
+      kept = await startedIn(repo, left);
     } finally {
       fs.chmodSync(INBOX, 0o755);
     }
-    const id = printed[0].split(' ')[0];
+    const id = kept.id;
     assert.deepEqual(runRecord(ROOT, id).from, { inbox: 'left-c3d4' });
-    assert.ok(printed[2].includes('nemia inbox queue left-c3d4 --off'), printed[2]);
+    assert.deepEqual([kept.card, kept.facts.from], ['left-c3d4', 'left-c3d4'], 'the card it came from');
+    assert.ok(kept.queueLeft, "the start says why the card's queued: line is still on it");
     const listed = (await judgedInbox()).find((l) => l.name === 'left-c3d4')!;
     assert.deepEqual([listed.state, listed.queued], ['running', { at: '2026-09-16T10:00:00.000Z', place: null }]);
     assert.match(

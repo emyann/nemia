@@ -12,7 +12,8 @@ in-process CLI, the old path, which serves the verbs about this machine (`object
 --json`, which the client spawns to start this machine's daemon on demand): exported as `agent-orchestrator/bin` and `/bin/wf`,
 resolved and spawned by `apps/cli/src/local.ts` alone, and no package declares them as its bins. `commandBreaks` refuses a store verb
 this CLI serves that `KEPT` does not name (`heldBreaks`). A test reaches a store verb's handler through `test/typed.ts` (`typed(argv,
-…)`, read by the entry's own words; `handled(ENTRY, input, …)`; `told`, a story's `main`), and asserts the data it answers; the
+…)`, read by the entry's own words; `handled(ENTRY, input, …)`; `told`, a story's `main`), and asserts the data it answers — of a
+start, the `facts` the api answers the client to word (`factsOf`, `startedFacts`), of a removal its `forgot` (`test/forgetting.ts`); the
 lines a person reads are the client's, held by its tests.
 
 ## Folders

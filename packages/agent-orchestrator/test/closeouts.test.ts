@@ -45,9 +45,7 @@ import { lackedOf } from '../src/record/record.ts';
 import { RUN_LABELS, SESSION_TOKEN, STEP_FILES } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { told } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
-import type { Started } from '../src/start/commands.verb.ts';
+import { told, type StartedAnswer } from './typed.ts';
 
 const ROOT = scratch('wf-closeouts-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -751,14 +749,13 @@ test('a run given inputs', async (t) => {
         '--input',
         path.join(given, 'mock.png'),
         `--input=${path.join(given, 'notes', 'brief notes.md')}`,
-      ])) as Started;
-      const printed = startedLines(started).join('\n');
+      ])) as StartedAnswer;
       id = started.id;
       dir = path.join(ROOT, 'runs', id, 'inputs');
       assert.deepEqual(runRecord(ROOT, id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
       assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
       assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
-      assert.ok(printed.split('\n').includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed);
+      assert.deepEqual(started.facts.inputs, { names: ['mock.png', 'brief notes.md'], dir }, 'the start says them, in order, and where');
       assert.deepEqual(stage.place().world.changes(repo), [], 'nothing written into the workspace');
     },
   );

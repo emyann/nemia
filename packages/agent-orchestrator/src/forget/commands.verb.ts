@@ -3,7 +3,7 @@
  * the CLI's runners walk the many runs each takes.
  */
 import { StoreRoot } from '../config/root.store.ts';
-import { forgetLine, type Forgot } from './forget.ts';
+import { notForgottenLine, type Forgot } from './forget.ts';
 import { forgetRun } from './forget.verb.ts';
 import type { EngineForgetting } from './forgetting/forgetting.ts';
 import { pruneLines, type Pruning } from './prune/prune.ts';
@@ -47,9 +47,11 @@ const tryAlone = Effect.fnUntraced(function* (runId: string, home: string) {
 
 /** What removed nothing, as a refusal: refused or held, a `Conflict` in `forget`'s words; a record gone since, `Missing`; else none. */
 export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
-  if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
-  if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });
-  return forgot.kind === 'missing' ? new Missing({ message: forgetLine(forgot) }) : null;
+  const { kind } = forgot;
+  if (kind === 'forgotten') return null;
+  const message = notForgottenLine({ ...forgot, kind });
+  if (kind === 'missing') return new Missing({ message });
+  return new Conflict({ message: kind === 'refused' ? (forgot.refusal ?? message) : message });
 };
 
 /**

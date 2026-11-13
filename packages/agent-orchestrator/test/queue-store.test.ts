@@ -624,14 +624,14 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
     const promise = checkoutPromiseLine(runningRelease());
     const promised = promise ? [`   ${promise}`] : [];
-    const startedLines = printed.filter((l) => / {2}daemon started {2}· /.test(l));
+    const daemonStarts = printed.filter((l) => / {2}daemon started {2}· /.test(l));
     assert.deepEqual(
-      startedLines.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
+      daemonStarts.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
       [`pid ${process.pid}  daemon started  · first daemon on this store`, `pid ${process.pid}  daemon started  · last stopped at …`],
       'each start writes the feed its daemon started line, the second saying when the first stopped',
     );
     assert.deepEqual(
-      printed.filter((l) => !startedLines.includes(l)),
+      printed.filter((l) => !daemonStarts.includes(l)),
       [
         'up — every 4000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',

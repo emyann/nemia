@@ -26,8 +26,7 @@ import { PRECEDENCE } from '../src/brief/index.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { WorkflowError } from '../src/workflow.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
-import { startedLines } from '../src/runner.ts';
+import { factsOf, typed } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -126,8 +125,12 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
         judge: '---\nafter: build\nplace: git\nagent: coder\n---\n',
         wrap: '---\nafter: judge\nplace: git\n---\nWrap it up.\n',
       });
-      const printed = startedLines((await stage.main(['start', 'build it', '--workflows', named, '--repo', repo])) as Started);
-      assert.equal(printed[0].split('  ')[1], '3 step(s): build (plain) → judge (coder) → wrap', printed.join('\n'));
+      const started = factsOf((await stage.main(['start', 'build it', '--workflows', named, '--repo', repo])) as Started);
+      assert.deepEqual(
+        started.facts.steps,
+        [{ name: 'build', agent: 'plain' }, { name: 'judge', agent: 'coder' }, { name: 'wrap' }],
+        'each step in order, with its agent where it has one',
+      );
       id = (await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }))).id;
     },
   );

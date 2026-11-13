@@ -1,7 +1,7 @@
 /**
  * `nemia start`, an entry of the command table, whose words the client holds (`objects`' `START_WORDS`): the api's route finds the
  * workflow and the brief from its body and hands the handler what it found; the client reads the person's files where they are typed and
- * sends their text. The lines `nemia start` prints of a run it started are made here (`startedLines`), which the api answers beside it.
+ * sends their text. What `nemia start` says of a run it started is answered here as data (`startedFacts`), which the client words.
  */
 import path from 'node:path';
 import { type RunStartedFacts, START_WORDS } from 'objects';
@@ -13,7 +13,6 @@ import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { WorkflowDoor } from '../workflows/workflows.store.ts';
 import { WorkflowDir } from '../folder/folder.model.ts';
-import { ignoredRepoLine } from '../inbox/index.ts';
 import { startFromInbox } from '../inbox/inbox.verb.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { cardsDir, inputsDir } from '../record/record.store.ts';
@@ -21,18 +20,15 @@ import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { frozenStepsOf } from '../steps/steps.ts';
 import type { StepSpec } from '../workflow.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
-import { fromNote } from './inputs.ts';
 import { leftOutMounts, leftOutVolumes, startRun, type StartedRun } from './start.verb.ts';
-import { modelsOf, modelsText, type RunModels } from './models.ts';
+import { modelsOf, type RunModels } from './models.ts';
 import { volumeMounts } from '../factory/volume/volume.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
-import { labelsText } from '../labels/labels.ts';
 import { pausedRead } from '../list/list.verb.ts';
-import { pausedWords, type Paused } from '../pause/pause.ts';
+import type { Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
 import { EngineService } from '../runtime-client.ts';
 import { standingLive } from '../standing/standing.verb.ts';
-import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../brief/handed.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -69,32 +65,6 @@ export type Started = {
 /** The steps of a run just started: the workflow `nemia start` froze on its record, which every run it writes has (`frozenStepsOf`). */
 const startedSteps = (run: Run): StepSpec[] => frozenStepsOf(run) ?? [];
 
-/**
- * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.
- */
-function mountLines({ run, notMounted: missing = [], notVolumes = [] }: Started): string[] {
-  const written = writersOf(startedSteps(run), run.mounts);
-  return [
-    ...(run.mounts?.length
-      ? [
-          `mounts: ${run.mounts.map((m) => m.path).join(', ')} — read-only, for every local step${written.length ? ' but where written below' : ''}`,
-        ]
-      : []),
-    ...written.map((w) => `writable: ${w.path} — for ${w.steps.join(', ')} alone`),
-    ...(missing.length
-      ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
-      : []),
-    ...volumeLines(run, notVolumes),
-    ...settingsLine(run),
-  ];
-}
-
-/** The harness settings a run froze from its factory, by name, as each of its steps on their harness is given them. */
-function settingsLine(run: Run): string[] {
-  const named = settingsNamed(run.harnessSettings).map((s) => s.name);
-  return named.length ? [`harness settings: ${named.join(', ')} — for every step on their harness, beneath its agent's own`] : [];
-}
-
 /** The factory's volumes a run mounts: the paths of those read-only, and each writable one with the local steps whose fence writes it. */
 function volumesOf(run: Run): { reads: string[]; writes: { path: string; steps: string[] }[] } {
   const volumes = run.volumes ?? [];
@@ -107,24 +77,6 @@ function volumesOf(run: Run): { reads: string[]; writes: { path: string; steps: 
   };
 }
 
-/**
- * The factory's volumes a run mounts: those read-only, then each writable one with the steps whose fence writes it (`volumeMounts`), and
- * that it is not the run's workspace; then those left out because they were no directory.
- */
-function volumeLines(run: Run, missing: readonly string[]): string[] {
-  const { reads, writes } = volumesOf(run);
-  return [
-    ...(reads.length ? [`volumes: ${reads.join(', ')} — read-only, for every local step`] : []),
-    ...writes.map(
-      (w) =>
-        `volume: ${w.path} — ${w.steps.length ? `writable for ${w.steps.join(', ')}, read-only for every other local step` : 'writable, and read-only for every step here, since none writes'}; not the run's workspace: nothing commits or lands what a step writes there`,
-    ),
-    ...(missing.length
-      ? [`not mounted: ${missing.join(', ')} — of the factory's volumes, and no directory now; start again once it is there`]
-      : []),
-  ];
-}
-
 /** The steps of a run just started that wait on a person: those gated (`held`), and the endings a person approves first (`ends`). */
 function gatesHeld(run: Run): { held: string[]; ends: string[] } {
   const steps = startedSteps(run);
@@ -134,103 +86,14 @@ function gatesHeld(run: Run): { held: string[]; ends: string[] } {
   return { held: gatesOf(steps, run).filter((name) => !ends.includes(name)), ends };
 }
 
-/** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
-function gateLines(run: Run): string[] {
-  const { held, ends } = gatesHeld(run);
-  return [
-    ...(held.length
-      ? [
-          `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until nemia approve ${run.id} <step>, once it has signed off`,
-        ]
-      : []),
-    ...(ends.length
-      ? [
-          `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until nemia approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
-        ]
-      : []),
-  ];
-}
-
-/** The models the run names for its steps, for it alone (`models`): a line where it names any. */
-const modelLines = (run: Run): string[] =>
-  run.models !== undefined && Object.keys(run.models).length
-    ? [`models: ${modelsText(run.models)} — for this run alone; its other steps run on their agents'`]
-    : [];
-
-/**
- * The labels a run was created with, and a line per key it was not given since the runs it names disagree on it: the key, each run with
- * its value, and how to set it.
- */
-const labelLines = (run: StartedRun): string[] => [
-  ...(run.labels !== undefined && Object.keys(run.labels).length ? [`labels: ${labelsText(run.labels)}`] : []),
-  ...(run.labelsLeftOut ?? []).map(
-    ({ key, values }) =>
-      `label ${key} not inherited: ${values.map((v) => `${v.run} has ${key}=${v.value}`).join(', ')} — set it with nemia label run ${run.id} ${key}=<value>`,
-  ),
-];
-
-/** Where an inbox card's run came from, the card kept in the inbox as started, as `nemia start` says it. */
-const fromLines = ({ run, card, queueLeft }: Started): string[] =>
-  card === undefined
-    ? []
-    : [
-        `${fromNote(run)} — kept in the inbox, listed as started`,
-        ...(queueLeft !== undefined
-          ? [
-              `${queueLeft}: the tick does not start it again while ${run.id}'s record stands; take the line off with nemia inbox queue ${card} --off`,
-            ]
-          : []),
-      ];
-
-/**
-/**
- * That `--repo` (`given`, as typed) only found the factory the run is started in: the run works on the repository its wiring names for its
- * workflow, the folder `run.workflowDir` names.
- */
-const foundFactoryLine = (given: string, run: StartedRun): string =>
-  `--repo ${given} only found the factory ${run.factory ?? ''}: ${path.basename(run.workflowDir)} works on ${run.repo}`;
-
-/**
- * What `nemia start` prints of a run it started: its steps, where it came from, its factory and a `--repo` that only found it, the folders
- * it mounts, where it works, where
- * it copied its inputs and its workflow's files, and what it waits on, what it reads as context, landed or in flight, and ends at; while
- * the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:` not taken.
- */
-export function startedLines(started: Started): string[] {
-  const { run, home } = started;
-  const steps = startedSteps(run);
-  return [
-    `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
-    ...fromLines(started),
-    ...(run.factory ? [`factory: ${run.factory}${isRepositoryRun(run) ? `, on ${run.repo}` : ''}`] : []),
-    ...(started.repoFoundFactory !== undefined ? [foundFactoryLine(started.repoFoundFactory, run)] : []),
-    ...mountLines(started),
-    `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
-    ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(home, run)}`] : []),
-    ...(run.cards?.length ? [`cards: ${run.cards.join(', ')} — copied into ${cardsDir(home, run)}`] : []),
-    ...(run.workflowFiles === undefined ? [] : [`workflow files: copied into ${workflowFilesDir(home, run, run.workflowFiles)}`]),
-    ...(run.carriedFiles === undefined ? [] : [`carried files: copied into ${carriedFilesDir(home, run, run.carriedFiles)}`]),
-    ...(run.after?.length
-      ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has landed on ${run.branch}`]
-      : []),
-    ...contextLines(run.context ?? [], (id) => started.landed?.includes(id) === true),
-    ...gateLines(run),
-    ...modelLines(run),
-    ...labelLines(run),
-    `run 'nemia tick' (or 'nemia up') to start it`,
-    ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
-    ...(started.hints ?? []),
-    ...(started.ignoredRepo !== undefined ? [ignoredRepoLine(started.ignoredRepo)] : []),
-  ];
-}
-
 /** `list` under `key` where it holds any, else nothing: a key an answer leaves out rather than send empty. */
 const some = <K extends string, V>(key: K, list: readonly V[] | undefined): Partial<Record<K, V[]>> =>
   list?.length ? ({ [key]: [...list] } as Record<K, V[]>) : {};
 
 /**
- * What `nemia start` prints of a run it started, as data (`objects`' `RunStartedFacts`), which the api answers and the client words: the
- * facts `startedLines` says, each read as it reads them.
+ * What `nemia start` says of a run it started, as data (`objects`' `RunStartedFacts`), which the api answers and the client words
+ * (`apps/cli`, `startedLines`): its steps, where it came from, its factory and repository, the folders and volumes it mounts, where it
+ * works and copied its files, what it waits on and reads, the steps a person approves, its models and labels.
  */
 export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>): RunStartedFacts {
   const steps = startedSteps(run);

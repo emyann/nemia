@@ -19,7 +19,7 @@ import { engineOf } from '../src/runtime-client.ts';
 import { main } from '../src/cli/main.ts';
 import { mountHolds, readsAt, writesAt, type Filed } from './mounted.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { typed } from './typed.ts';
+import { factsOf, typed } from './typed.ts';
 import type { Started } from '../src/start/commands.verb.ts';
 import { COMMAND_WORDS } from 'objects';
 import type { Place } from '../src/runner.ts';
@@ -59,8 +59,11 @@ const folderOf = (steps: Record<string, string>): string => {
   return dir;
 };
 
+/** What `nemia start <argv>` answered, with the facts the client words. */
+const answeredBy = async (argv: string[]) => factsOf((await stage.main(argv)) as Started);
+
 /** The id `nemia <argv>` started. */
-const startedBy = async (argv: string[]) => ((await stage.main(argv)) as Started).id;
+const startedBy = async (argv: string[]) => (await answeredBy(argv)).id;
 
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
@@ -87,7 +90,7 @@ test('a run started --from an earlier run reads its artifacts and inputs on ever
   await s.test(
     "every step's first filing reads the earlier run's design closeout and its input, writes neither, and is told where",
     async () => {
-      id = await startedBy([
+      const started = await answeredBy([
         'start',
         'build what it designed',
         '--workflows',
@@ -98,7 +101,13 @@ test('a run started --from an earlier run reads its artifacts and inputs on ever
         '--from',
         earlier,
       ]);
+      id = started.id;
       assert.deepEqual(runRecord(ROOT, id).context, [earlier]);
+      assert.deepEqual(
+        [started.facts.context, started.landed ?? []],
+        [[earlier], []],
+        'the start says the run it reads as context, still in flight, not landed',
+      );
       assert.deepEqual((await pass(id)).filed, ['implement']);
       stage.board().settle(`${id}-implement`, 'succeeded', { outcome: 'done', summary: 'built', artifacts: [], needs: null });
       assert.deepEqual((await pass(id)).filed, ['review']);

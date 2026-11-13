@@ -48,7 +48,7 @@ import {
   isRepositoryRun,
   runWith as runEngine,
 } from '../src/runner.ts';
-import { told } from './typed.ts';
+import { told, type StartedAnswer } from './typed.ts';
 import { staged, story } from './story.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { runFile, runRecord } from '../src/record/record.store.ts';
@@ -404,15 +404,16 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
   let branch = '';
   let base = '';
 
-  await s.test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async (st) => {
-    const printed = await at.printedBy(st, ['start', 'add sub', '--repo', repo, '--workflows', at.folder()]);
-    id = printed[0].split(' ')[0];
-    assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, "the team's ship.md names its agent");
-    assert.ok(
-      printed.includes(`ends at: ship — nothing of it runs until nemia approve ${id} ship, which is what files it`),
-      printed.join('\n'),
+  await s.test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async () => {
+    const started = (await stage.main(['start', 'add sub', '--repo', repo, '--workflows', at.folder()])) as StartedAnswer;
+    id = started.id;
+    assert.deepEqual(
+      started.facts.steps,
+      [{ name: 'implement' }, { name: 'ship', agent: 'shipper' }],
+      "the team's ship.md names its agent",
     );
-    assert.ok(!printed.some((l) => l.startsWith('gated at:')), 'an ending is not a handoff waiting to be let through');
+    assert.deepEqual(started.facts.ends, ['ship'], 'the ending a person approves before it is filed');
+    assert.equal(started.facts.gated, undefined, 'an ending is not a handoff waiting to be let through');
   });
 
   await s.test(

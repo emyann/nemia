@@ -86,6 +86,7 @@ erDiagram
     list acceptances "optional"
     object pruned "optional"
     object hold "optional"
+    object unheld "optional"
     object pause "optional"
     list pinned "optional"
     string createdAt
@@ -130,6 +131,7 @@ erDiagram
     list acceptances "optional"
     object pruned "optional"
     object hold "optional"
+    object unheld "optional"
     object pause "optional"
     list pinned "optional"
     string createdAt

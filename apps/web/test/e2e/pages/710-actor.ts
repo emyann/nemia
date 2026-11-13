@@ -49,6 +49,7 @@ export default {
       await idle(page);
     } finally {
       fs.rmSync(holdFile(), { force: true });
+      fs.rmSync(holdFile().replace(/\.hold$/, '.unheld'), { force: true });
       for (const file of regatedFiles(store!)) fs.rmSync(file, { recursive: true, force: true });
       fed(REGATED.id, 'gone');
     }

@@ -249,6 +249,7 @@ export default {
     } finally {
       await page.unroute('**/api/pause');
       fs.rmSync(file, { force: true });
+      fs.rmSync(`${file}.lifted`, { force: true });
       if (size) await page.setViewportSize(size);
       await idle(page);
     }

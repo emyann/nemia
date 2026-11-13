@@ -125,11 +125,12 @@ export const STORE = 'store';
 
 /**
  * The store's line of the feed: when, which store (`STORE`), the word — its pause put or lifted (`storeOnce`), a factory's level in
- * force (`levelLines`), or its readiness (`readinessLines`) — and the note beside it: the moment the pause was put, the factory's level
- * in words, or each missing piece a run waits on with its fix. A put carries who put the pause (`by`), the person's words for why
- * (`why`) and the caller who put it (`actor`), each where the pause's file says it, never in the note, which pairs the put with its lift.
- * Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`) — and a subscription scoped to
- * a factory is handed it as it is handed a daemon's.
+ * force (`levelLines`), its readiness (`readinessLines`), or the processes of a finished run the daemon's free sweep ended
+ * (`leftEndedLine`) — and the note beside it: the moment the pause was put, the factory's level in words, each missing piece a run
+ * waits on with its fix, or the run and each process ended. A put carries who put the pause (`by`), the person's words for why
+ * (`why`) and the caller who put it (`actor`), each where the pause's file says it, never in the note, which pairs the put with its
+ * lift. Of no run, so it carries no run's labels — a level's line carries its factory's alone (`labels.factory`), and a line of
+ * processes ended the run's id alone (`labels.run`) — and a subscription scoped to a factory is handed it as it is handed a daemon's.
  */
 export type StoreLine = { at: string; store: string; word: string; note?: string; by?: string; why?: string; actor?: Actor } & Line;
 
@@ -273,6 +274,22 @@ export function startedLine(pid: number, replaced: DaemonStanding, at: string, n
 }
 
 /**
+ * The line the daemon's free sweep writes once it has ended the processes a finished run `run` left running, at `at`, `note` naming the
+ * run and each process (`leftLineNote`): the store's, labelled with the run alone, so a subscription scoped to that run is handed it.
+ * Built from its own fields. Pure.
+ */
+export const leftEndedLine = (run: string, note: string, at: string): StoreLine =>
+  upgraded({
+    at,
+    store: STORE,
+    word: LINE_WORDS.LeftEnded,
+    note,
+    involved: { kind: 'Store', name: STORE },
+    labels: { run },
+    reason: 'LeftEnded',
+  }) as StoreLine;
+
+/**
  * What the feed has said last of each thing it has not said is removed (`said`, keyed by what the line is about), and how many one-shots
  * it holds of each step's try (`shots`): a one-shot is counted and never becomes a step's last word, or the next pass would say the
  * step's real word again.
@@ -379,7 +396,8 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
 
 /**
  * The store's line `l` folded: a one-shot counted, a factory's level and the store's readiness each kept as the last word said of it,
- * any other passed.
+ * any other passed — the processes a finished run left running that the free sweep ended (`LeftEnded`) among them, a deed with no
+ * word to stand, so it moves no pause, level or readiness.
  */
 function foldStore(fold: FeedFold, l: StoreLine): void {
   const involved = involvedOf(l);

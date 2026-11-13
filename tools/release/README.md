@@ -67,9 +67,10 @@ at the same place as a checkout, and `tools/guards/test/release.test.ts` holds t
   token's push creates wait for approval and are left alone. The label goes on before the dispatch, so the dispatched check reads
   it. A rebuild pushes a new head and dispatches both on it. With nothing to release it
   closes the open release pull request. GitHub refuses the workflow's token a pull request until the repository turns on **"Allow GitHub Actions to create and approve pull requests"**; `pr` then exits 1 naming it.
-- **`tag`** runs where the root `package.json` on main names a version `V` with no tag `vV` on the origin: it finds the first-parent
-  commit of main that set `V` (the release pull request's merge commit), and makes the GitHub release `vV` there with the notes
-  generated since the previous release. Nothing is published to npm; the assets are attached by the jobs after it (*The assets*).
+- **`tag`** runs where the root `package.json` on main names a version `V` with no tag `vV` on the origin, or a tag with no release
+  on it: it finds the first-parent commit of main that set `V` (the release pull request's merge commit), tags it `vV`, and makes the
+  GitHub release `vV` on the tag as a draft, with the notes generated since the previous release. Nothing is published to npm; the
+  assets are attached by the jobs after it, and the draft published once they are (*The assets*).
 
 ## The assets
 
@@ -87,8 +88,8 @@ Each release carries what a machine installs from (`install.sh`) and what `nemia
 GitHub serves the newest release's assets at `https://github.com/<owner>/<repo>/releases/latest/download/<asset>`, and any release's
 at `.../releases/download/<tag>/<asset>`; that `releases` URL is the download base an archive's `release.json` names as its `source`.
 
-**How one is built.** The `tag` job's step `due` reads the release of the version main names and says `due=true` where it has no
-`latest.json`. Then the `archive` job runs on a runner of each platform (`ubuntu-24.04` x64, `ubuntu-24.04-arm`, `macos-15` arm64,
+**How one is built.** The `tag` job's step `due` reads the release of the version main names and says `due=true` where it is still
+a draft or has no `latest.json`. Then the `archive` job runs on a runner of each platform (`ubuntu-24.04` x64, `ubuntu-24.04-arm`, `macos-15` arm64,
 GitHub's standard runners) at the tag:
 
 ```sh
@@ -104,7 +105,11 @@ platform, wherever npm put one; the SDK itself stays), `node/`, `bin/nemia` (sh:
 of another platform is refused: `npm ci` takes the binaries of the machine it runs on. Given `--tree <dir> --node <dir>`, it packs that
 tree with that Node and builds nothing, which is how `tools/guards/test/install.test.ts` makes a release. The `upload` job merges the
 three `SHA256SUMS`, writes `latest.json`, and attaches every asset with `gh release upload --clobber`, `latest.json` in a call of its
-own after the rest; a run cut off before it leaves the release without `latest.json`, so the next run builds and attaches them again.
+own after the rest, then publishes the draft and makes it the latest (`gh release edit --draft=false --latest`): a release is never
+published with nothing to download, so neither its page nor `latest/download/latest.json` names one too early. A run cut off before
+the end leaves the release a draft, so the next run builds, attaches and publishes it again. An upgrade asked while a release already
+published lacks its archive — one published by hand, or before this order — is told to wait for it and upgrade again, not that no
+release exists.
 To move Node, set `version` in `node.json` and the three sums from `https://nodejs.org/dist/v<version>/SHASUMS256.txt`.
 
 **What `install.sh` does.** It reads the platform from `uname`, refuses where `git`, `tar`, `curl` or `wget`, or `sha256sum` or `shasum`

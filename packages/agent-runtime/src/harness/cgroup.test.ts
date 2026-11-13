@@ -1,7 +1,8 @@
 /**
- * The argv a limited task's process tree is run behind (`scopeArgv`, `harness/cgroup.ts`), golden: a transient scope of systemd's
- * user manager under `MemoryMax=`, no swap, and `OOMPolicy=continue`, so the kernel's kill of the largest process leaves the worker
- * that writes the end; in the slice an operator names where one is given. The command goes after its `--`.
+ * The argv a session's process tree is run behind (`scopeArgv`, `harness/cgroup.ts`), golden: a transient scope of systemd's user
+ * manager, and under a limit `MemoryMax=`, no swap, and `OOMPolicy=continue`, so the kernel's kill of the largest process leaves the
+ * worker that writes the end; in the slice an operator names where one is given. The command goes after its `--`.
+ * What is left in a scope, read and ended, is `cgroup.boundary.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,6 +46,16 @@ test('scopeArgv: the scope a limited task runs in, with and without a slice, and
         'OOMPolicy=continue',
         '--',
       ],
+    },
+    {
+      name: 'with no limit, in the user manager’s own slice: no property',
+      argv: scopeArgv(undefined),
+      is: ['systemd-run', '--user', '--scope', '--quiet', '--collect', '--'],
+    },
+    {
+      name: 'with no limit, in a slice an operator names',
+      argv: scopeArgv(undefined, 'sessions.slice'),
+      is: ['systemd-run', '--user', '--scope', '--quiet', '--collect', '--slice=sessions.slice', '--'],
     },
     { name: 'by another program', argv: scopeArgv(1024, undefined, 'false').slice(0, 2), is: ['false', '--user'] },
   ];

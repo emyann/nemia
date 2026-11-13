@@ -454,6 +454,7 @@ export const EVENT_REASONS = [
   'Ready',
   'ConflictsPending',
   'ConflictsSettled',
+  'LeftEnded',
 ] as const;
 
 /** One of `EVENT_REASONS`. */

@@ -34,6 +34,7 @@ import { lookedFor } from './looked.ts';
 import { firstRunFile, leased, runFileIn, stateOfWord, type Carried, type Run, type RunFile, type WorkerSeen } from './run-file.ts';
 import { workerSeen, writeLaunched } from './launched.ts';
 import { firstAsked, groupLeft, leftSignal } from './left.ts';
+import { endScopeIn, scopeLeft, type ScopeLeft } from '../cgroup.ts';
 import type { LeftSignal } from '../../../contracts/left.contract.ts';
 import { carriedOf, lessCarried } from './carried.ts';
 import { sightedOf } from './sighted.ts';
@@ -704,13 +705,14 @@ const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({
  *      state is the worker's to write, as the one that saw it happen. It hears SIGTERM from the moment its pid is on
  *      disk, and a worker already gone is no error.
  *   3. For a run that has ended — its worker wrote its end, or is gone — sends what is left in its harness's process group
- *      (`harness`, `groupLeft`) SIGTERM, and SIGKILL once the run's stop grace has passed since the first ask (`leftSignal`).
- *      Nothing is written or sent for an ended run that left nothing.
+ *      (`harness`, `groupLeft`) and in the scope its worker recorded (`cgroup`, `scopeLeft`) SIGTERM, and SIGKILL once the run's stop
+ *      grace has passed since the first ask (`leftSignal`), the scope's by its `cgroup.kill` (`endScopeIn`). Nothing is written or
+ *      sent for an ended run that left nothing.
  *
  *   Whichever came first, one of the two sees the other — a worker that read no stop published its pid before the stop
  *   was written, so the second read finds it — and a stop that lands at any moment is heard, on the pass that sends it.
  * - `release`: nothing for a run still at work (its worker's own exit writes what it cost); otherwise `stop`'s, failing with a
- *   `RunnerError` while its harness's group still holds a process, so the engine asks again on its next pass. No run file is
+ *   `RunnerError` while its harness's group or its scope still holds a process, so the engine asks again on its next pass. No run file is
  *   removed: they are the record `logs` reads.
  * - `logs`: the last 8000 characters of the harness's output.
  * - `output` (a spec with `streams`): one stream of the run under a name, whole or its last bytes, read from its own file
@@ -746,11 +748,33 @@ const signalGroup = (group: number, signal: LeftSignal): void => {
   } catch {}
 };
 
+/** What an ended run left that still runs, and was signalled: its harness's process group, its scope, or both. */
+type Left = { group?: number; scope?: ScopeLeft };
+
+/** The worker of `run` that wrote its end, spared by `scopeLeft` and `endScopeIn`: it exits on its own within its stop grace. */
+const endedWorker = (run: RunFile): number | undefined => (run.state !== 'working' && run.pid > 0 ? run.pid : undefined);
+
+/** What the ended `run` left that still runs, in its harness's group and in its scope (`groupLeft`, `scopeLeft`); `undefined` for none. */
+const leftBy = (run: RunFile): Left | undefined => {
+  const group = groupLeft(run.harness);
+  const scope = scopeLeft(run.cgroup, endedWorker(run));
+  return group === undefined && scope === undefined
+    ? undefined
+    : { ...(group === undefined ? {} : { group }), ...(scope === undefined ? {} : { scope }) };
+};
+
+/** `signal` sent to what the ended `run` `left`: its harness's group, and its scope, the latter by `cgroup.kill` for SIGKILL. */
+const endLeft = (run: RunFile, { group, scope }: Left, signal: LeftSignal): void => {
+  if (group !== undefined) signalGroup(group, signal);
+  if (scope !== undefined && signal !== 'none') endScopeIn(scope.folder, signal, endedWorker(run));
+};
+
 /**
- * A stop of the run of `spec` under `name`, whatever its word, and whether it left a process behind, still to end (`stop`, `release`),
- * its stop grace the run's own, else `graceMs`:
+ * A stop of the run of `spec` under `name`, whatever its word, and what it left behind, still to end (`stop`, `release`), its stop
+ * grace the run's own, else `graceMs`:
  *
- * 1. Nothing to do for no run, or a run whose worker is gone and whose harness's group is empty (`groupLeft`).
+ * 1. Nothing to do for no run, or a run whose worker is gone and whose harness's group and scope are empty (`groupLeft`,
+ *    `scopeLeft`).
  * 2. The first ask is kept in `.stop` (`firstAsked`): the worker reads the file by its existence, before it starts its harness, and
  *    the grace below is measured from the instant it holds. A run whose beat is stale and whose worker cannot be told (`unknown`: no
  *    `.launched`, as a run spawned before it was written, or no `/proc`) gets the file alone, so a worker that starts late starts
@@ -758,32 +782,34 @@ const signalGroup = (group: number, signal: LeftSignal): void => {
  * 3. A run whose word is `working` (a fresh beat: somebody beats it, a worker started again by hand that its spawn's `.launched` does
  *    not name included; or a stale one whose worker is seen running, by pid, start and boot): SIGTERM to the worker
  *    (`signalWorker`). The worker ends its harness's group and writes `stopped`.
- * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group, which nobody else will stop, is
- *    sent what `leftSignal` picks, SIGTERM within the stop grace since the first ask and SIGKILL after.
+ * 4. A run whose word is not `working` (its worker wrote its end, or is gone): its harness's group and its scope, which nobody else
+ *    will stop, are sent what `leftSignal` picks, SIGTERM within the stop grace since the first ask and SIGKILL after; the scope is
+ *    killed whole by its `cgroup.kill` (`endScopeIn`), so a process that left the group, or forked meanwhile, goes with it. A worker
+ *    that wrote its end is spared the count and the SIGTERM: it exits on its own within the stop grace.
  */
 const stopRunOf =
   (spec: HarnessSpec, root: string, graceMs: number) =>
-  (name: string): boolean => {
+  (name: string): Left | undefined => {
     const hit = runNamed(spec, root, name);
-    if (!hit) return false;
+    if (!hit) return undefined;
     const now = instantNow();
     let seen: WorkerSeen | undefined;
     const worker = () => (seen ??= workerSeen(besideRun(spec, root, name, LAUNCHED_END)));
     const word = leased(hit.run, now, worker);
-    const group = word === 'working' ? undefined : groupLeft(hit.run.harness);
     const atWork = word === 'working';
+    const left = atWork ? undefined : leftBy(hit.run);
     const mayStartLate = hit.run.state === 'working' && !atWork && worker() === 'unknown';
-    if (!atWork && !mayStartLate && group === undefined) return false;
+    if (!atWork && !mayStartLate && left === undefined) return undefined;
     const asked = firstAsked(besideRun(spec, root, name, 'stop'), now);
     if (atWork) signalWorker(spec, root, name);
-    if (group === undefined) return false;
-    signalGroup(group, leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), hit.run.stopGraceMs ?? graceMs));
-    return true;
+    if (left === undefined) return undefined;
+    endLeft(hit.run, left, leftSignal(true, asked.first ? undefined : elapsedMs(asked.at, now), hit.run.stopGraceMs ?? graceMs));
+    return left;
   };
 
 /**
  * A detached runner's `release`: nothing for a run still at work, whose worker's own exit writes what it cost; else its stop
- * (`stopRunOf`), failing while its harness's group still holds a process, so the engine asks again on its next pass.
+ * (`stopRunOf`), failing while its harness's group or its scope still holds a process, so the engine asks again on its next pass.
  */
 const releaseOf =
   (spec: HarnessSpec, root: string, graceMs: number): NonNullable<RunnerOps['release']> =>
@@ -793,16 +819,25 @@ const releaseOf =
         const name = session.sessionId;
         const hit = runNamed(spec, root, name);
         if (!hit || wordOf(spec, root, name, hit.run, instantNow()) === 'working') return;
-        if (stopRunOf(spec, root, graceMs)(name)) throw new Error(LEFT_RUNNING(name, hit.run.harness?.pid ?? 0));
+        const left = stopRunOf(spec, root, graceMs)(name);
+        if (left) throw new Error(LEFT_RUNNING(name, left));
       },
       catch: (cause) =>
         new RunnerError({ verb: 'release', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
     });
 
-/** Why a release of the run under `name` is asked again: what its harness's group `group` left still runs, and has been signalled. */
-const LEFT_RUNNING = (name: string, group: number): string =>
-  `\`${name}\` has ended, and its harness's process group ${group} still holds a process: it was sent SIGTERM, and SIGKILL once its` +
-  ` stop grace has passed, on the passes that ask again. A process that outlives SIGKILL is stuck in the kernel: \`ps -o pid,stat,cmd -g ${group}\` names it.`;
+/** Why a release of the run under `name` is asked again: what it `left` still runs, and has been signalled. */
+const LEFT_RUNNING = (name: string, { group, scope }: Left): string => {
+  const held = [
+    ...(group === undefined ? [] : [`its harness's process group ${group}`]),
+    ...(scope === undefined ? [] : [`its scope ${scope.folder} (pids ${scope.pids.join(', ')})`]),
+  ].join(' and ');
+  const look = scope === undefined ? `-g ${group ?? 0}` : `-p ${scope.pids.join(',')}`;
+  return (
+    `\`${name}\` has ended, and ${held} still holds a process: it was sent SIGTERM, and SIGKILL once its stop grace has passed, on` +
+    ` the passes that ask again. A process that outlives SIGKILL is stuck in the kernel: \`ps -o pid,stat,cmd ${look}\` names it.`
+  );
+};
 
 /** `detachedOps`, its workers' bounds read. */
 const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof workerBoundsOf>, at: ScopeAt): RunnerOps => {
@@ -908,7 +943,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
           };
           fs.writeFileSync(runFile(r.name), firstRunFile({ ...plan, ...terminationOf(spec, r), ...bounds, ...limit, ranIn }));
 
-          const pid = startWorker(runFile(r.name), r.cwd, argv);
+          const pid = startWorker(runFile(r.name), r.cwd, argv, { log: logFile(r.name), bareIfRefused: limit.memoryLimit === undefined });
           if (pid !== undefined) writeLaunched(launchedFile(r.name), pid);
         },
         catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),

@@ -67,6 +67,7 @@ import {
   GONE_POLL_MS,
   hear,
   HELD_POLL_MS,
+  endScopeOf,
   interruptTurn,
   killGroup,
   startSession,
@@ -76,6 +77,7 @@ import {
   type Live,
 } from './attached-session.ts';
 import type { ScopeAt } from '../scope.ts';
+import { endScopeIn, scopeLeft } from '../cgroup.ts';
 import { sessionDrainFile, sessionDrainOf } from '../../core/engine/drain.ts';
 import { cutWords } from '../../core/restart.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
@@ -89,7 +91,7 @@ import { claudeExecutableOf } from '../mcp-sign-in.ts';
 export type Attached = {
   readonly ops: Pick<
     RunnerOps,
-    'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt' | 'follow' | 'answer'
+    'spawn' | 'observe' | 'observeFor' | 'stop' | 'logs' | 'transcript' | 'say' | 'interrupt' | 'follow' | 'answer' | 'release'
   >;
   readonly hold: Effect.Effect<void, never, Scope.Scope>;
   readonly holding: () => boolean;
@@ -289,8 +291,9 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
   ).pipe(Effect.uninterruptible);
 
 /**
- * What is left of each session `parked` let go, ended: its query aborted, its Claude Code's process group killed where it outlived the
- * waits, and its run file written without the process's facts, so a let-go never leaves a process behind. The group it kills is the
+ * What is left of each session `parked` let go, ended: its query aborted, its Claude Code's process group and its scope killed where
+ * they outlived the waits (`endScopeOf`), and its run file written without the process's facts, so a let-go never leaves a process
+ * behind. The group it kills is the
  * one `childOf` answers, so a pid another process has taken since is left alone, and a run file another holder has taken since is
  * not written. Uninterruptible as one, like the park.
  */
@@ -300,7 +303,8 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
       if (!l.abort || !l.letGo || l.run.state !== 'parked') continue;
       l.abort.abort();
       killGroup(childOf(l.run));
-      const { childPid: _, childStart: __, ...rest } = l.run;
+      endScopeOf(l.run.cgroup);
+      const { childPid: _, childStart: __, cgroup: ___, ...rest } = l.run;
       l.run = rest;
       const now = readRun(filesOf(root, l.run.name).run);
       if (now?.state === 'parked' && now.owner === l.run.owner && now.ownerStart === l.run.ownerStart) writeRun(root, l.run);
@@ -346,7 +350,8 @@ export const letGoOf = (
   });
 
 /**
- * How a holder takes up a session left behind under `root` (*Taken up*): what is left of its Claude Code's process group killed, then
+ * How a holder takes up a session left behind under `root` (*Taken up*): what is left of its Claude Code's process group and of its
+ * scope killed (`endScopeOf`), then
  * ended `canceled` where it was stopped, `failed` where it never named its session, `failed` with `limit: 'budget'` where its attempt
  * has spent its cap (`resumedRequest`), and else resumed by `start` under the same session id, with what is left of its cap — or
  * ended `failed` where `start` refuses it (a memory limit this host can no longer hold), so the next look does not take it up again.
@@ -362,8 +367,9 @@ const adoptIn =
     cutAsks(root, run.name);
     const child = childOf(run);
     killGroup(child);
+    endScopeOf(run.cgroup);
     await gone(child, gonePollMs);
-    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, cut: _____, hold: ______, ...rest } = run;
+    const { childPid: _, childStart: __, calling: ___, ownerStart: ____, cut: _____, hold: ______, cgroup: _______, ...rest } = run;
     const mine: AttachedRun = { ...rest, ...thisHolder() };
     if (stopped(run) || !run.sessionId) return writeRun(root, { ...mine, state: stopped(run) ? 'canceled' : 'failed' });
     const resumed = resumedRequest(root, run);
@@ -480,7 +486,7 @@ export const attachedSessions = (
     holding: () => holding,
     has: (name) => fs.existsSync(filesOf(root, name).run),
     following: pushes.following,
-    ops: opsOf(root, live, start, runs, pushes),
+    ops: { ...opsOf(root, live, start, runs, pushes), release: releaseOn(root) },
   };
 };
 
@@ -515,11 +521,36 @@ const failed = (verb: string) => (cause: unknown) =>
     ...(cause instanceof Refusal ? { refused: true } : {}),
   });
 
+/** The states of a session that has ended, whose scope `release` ends whole: never one a holder may still run or resume. */
+const ENDED: readonly AttachedRun['state'][] = ['completed', 'failed', 'canceled'];
+
+/**
+ * The holder's `release`: of a session that has ended (`ENDED`), what is left in its scope (`scopeLeft`) killed, failing while it
+ * held anything, so the engine asks again on its next pass and lets the session go once its scope is empty.
+ */
+const releaseOn =
+  (root: string): NonNullable<RunnerOps['release']> =>
+  (session) =>
+    Effect.try({
+      try: () => {
+        const run = readRun(filesOf(root, session.sessionId).run);
+        if (run === undefined || !ENDED.includes(run.state)) return;
+        const left = scopeLeft(run.cgroup);
+        if (left === undefined) return;
+        endScopeIn(left.folder, 'SIGKILL');
+        throw new Error(
+          `\`${run.name}\` has ended, and its scope ${left.folder} still held pids ${left.pids.join(', ')}: they were killed, and the next` +
+            ` pass asks again until it is empty. A process that outlives SIGKILL is stuck in the kernel: \`ps -o pid,stat,cmd -p ${left.pids.join(',')}\` names it.`,
+        );
+      },
+      catch: failed('release'),
+    });
+
 /**
  * The runner's verbs over the sessions under `root`: `live`, those at work in this process, and `start`, how one is started. A name is
  * the engine's (`ae/<task>/<n>`), and every verb reads the session's run file, so another process reads and stops what the holder runs.
  * `follow` is answered from `pushes`, the fan-out the holder's own message loop feeds: a session this process does not hold is
- * followed by no one here, and is read through `transcript`.
+ * followed by no one here, and is read through `transcript`. Its `release` is `releaseOn`'s.
  */
 const opsOf = (
   root: string,
@@ -527,7 +558,7 @@ const opsOf = (
   start: (r: SpawnRequest, run: AttachedRun, first: string, resume?: string) => void,
   runs: (names?: readonly string[]) => Map<string, Sighting>,
   pushes: Pushes,
-): Attached['ops'] => ({
+): Omit<Attached['ops'], 'release'> => ({
   spawn: (r) =>
     Effect.try({
       try: () => {

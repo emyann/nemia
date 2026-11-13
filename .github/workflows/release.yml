@@ -1,8 +1,9 @@
 # Nemia's releases: a pull request this workflow keeps open, and the tag and GitHub release its merge makes (tools/release/README.md).
 # Each job runs one verb of tools/release/release.ts, which decides from the tags, main, the release branch, the merged pull requests
-# and the release pull request as they are, so a rerun with nothing changed does nothing. Nothing is published to npm. A release whose
-# assets are not all attached (its latest.json, attached last, is missing) is built for each platform by tools/release/archive.ts and
-# its assets attached by the upload job, so a run cut off mid-way attaches them on the next. tools/guards/test/release-workflow.test.ts
+# and the release pull request as they are, so a rerun with nothing changed does nothing. Nothing is published to npm. The tag job
+# tags the release and makes its GitHub release a draft; a release still a draft, or whose assets are not all attached (its latest.json,
+# attached last, is missing), is built for each platform by tools/release/archive.ts, its assets attached by the upload job, and only
+# then published, so no published release names nothing to download, and a run cut off mid-way finishes on the next. tools/guards/test/release-workflow.test.ts
 # holds this file.
 name: release
 
@@ -76,9 +77,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: node tools/release/release.ts tag
-      - name: Say whether the release of the version main names lacks its assets
-        # due=true where that release exists and has no latest.json, the asset attached last; false where it has, or where there is
-        # no release to attach to.
+      - name: Say whether the release of the version main names lacks its assets or is a draft
+        # due=true where that release exists and is a draft, or has no latest.json, the asset attached last; false where it is
+        # published with it, or where there is no release to attach to.
         id: due
         timeout-minutes: 3
         env:
@@ -87,9 +88,9 @@ jobs:
         run: |
           tag="v$(node -p "require('./package.json').version")"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          if ! assets=$(gh release view "$tag" --json assets --jq '.assets[].name'); then
+          if ! assets=$(gh release view "$tag" --json isDraft,assets --jq '(if .isDraft then "(draft)" else "(published)" end), .assets[].name'); then
             echo "due=false" >> "$GITHUB_OUTPUT"
-          elif printf '%s\n' "$assets" | grep -qx latest.json; then
+          elif printf '%s\n' "$assets" | grep -qx '(published)' && printf '%s\n' "$assets" | grep -qx latest.json; then
             echo "due=false" >> "$GITHUB_OUTPUT"
           else
             echo "due=true" >> "$GITHUB_OUTPUT"
@@ -173,6 +174,8 @@ jobs:
 
   # Every asset onto the release: the three archives, their SHA256SUMS merged, install.sh, and latest.json last, which says the
   # release is whole and names the release's page as its notes, the link the board's Settings shows beside an upgrade. --clobber makes a rerun replace what an earlier one attached.
+  # Then the draft is published, and made the latest: until then no upgrade, install.sh nor latest/download reads a release whose
+  # archives are not there yet.
   upload:
     needs: [tag, archive]
     runs-on: ubuntu-latest
@@ -202,7 +205,7 @@ jobs:
           cp tools/release/install.sh assets/
           notes="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
           printf '{ "tag": "%s", "version": "%s", "notes": "%s" }\n' "$TAG" "${TAG#v}" "$notes" > assets/latest.json
-      - name: Attach the assets to the release, latest.json last
+      - name: Attach the assets to the release, latest.json last, then publish it
         timeout-minutes: 10
         env:
           GH_TOKEN: ${{ github.token }}
@@ -211,3 +214,4 @@ jobs:
         run: |
           gh release upload "$TAG" assets/nemia-*.tar.gz assets/SHA256SUMS assets/install.sh --clobber
           gh release upload "$TAG" assets/latest.json --clobber
+          gh release edit "$TAG" --draft=false --latest

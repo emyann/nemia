@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { chatFieldOf, chatPanelOf, dockOf, herChat, openChat, photograph, themeOf } from '../board.ts';
+import { chatFieldOf, chatPanelOf, expectCues, herChat, herFaceOf, openChat, photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -39,7 +39,7 @@ export default {
     try {
       await page.reload({ waitUntil: 'load' });
       await idle(page);
-      await expectVisible(dockOf(page).locator('[data-cue]', { hasText: 'Down' }), 'a Down cue stands beside her face');
+      await expectCues(page, (words) => words.includes('Down'), 'a Down cue is said at her face');
       await expectDown(page, 'Filed: her session is starting.');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-down-filed-${await themeOf(page)}.png`), { fullPage: true });
@@ -68,14 +68,10 @@ export default {
         await page.reload({ waitUntil: 'load' });
         await idle(page);
         await expectVisible(
-          dockOf(page).locator('[data-nemia-face]:not([data-nemia-face="sleepy"])'),
+          herFaceOf(page).locator('[data-nemia-face]:not([data-nemia-face="sleepy"])'),
           'at Manual with her session still up, before the keeper ends it, her face is not asleep',
         );
-        await expectCount(
-          dockOf(page).locator('[data-cue]', { hasText: 'Down' }),
-          0,
-          'and no Down cue stands: her face reads her session, never the level',
-        );
+        await expectCues(page, (words) => !words.includes('Down'), 'and no Down cue is said: her face reads her session, never the level');
       } finally {
         stopping();
       }

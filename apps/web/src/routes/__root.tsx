@@ -7,10 +7,10 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FrameHeader } from '@/components/frame/FrameHeader';
 import { FrameRail } from '@/components/frame/FrameRail';
 import { FrameTabs } from '@/components/frame/FrameTabs';
+import { HerSheet, HerSheetProvider } from '@/components/frame/HerSheet';
 import { LinkRefusal } from '@/components/frame/LinkRefusal';
 import { NewerRelease } from '@/components/frame/NewerRelease';
 import { SetupBanner } from '@/components/frame/SetupBanner';
-import { DOCK_ROOM, NemiaDock } from '@/components/nemia/NemiaDock';
 import { OpenBar } from '@/components/factory/OpenBar';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
@@ -18,6 +18,9 @@ import { useFeed } from '@/lib/useFeed';
 import { NemiaChatProvider } from '@/lib/useNemiaChat';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { useScrollMark } from '@/lib/useScrollMark';
+
+/** Where the router's devtools button stands in a dev build: at the rail's foot beside the query's, over neither her face nor her sheet. */
+const ROUTER_TOOLS_AT: CSSProperties = { left: '4.5rem' };
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   validateSearch: barSearch,
@@ -35,16 +38,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * the top bar, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to another page,
  * which carries no `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again at once, the
  * polls slow while it is open, and the gauges say which. Her chat is held over the whole frame too (`NemiaChatProvider`), one stream of
- * hers for the visit, which her docked face and the chat page both read, so a navigation neither closes it nor opens another; her docked
- * face is drawn on every page but one whose route's `staticData` says it `ownsChat`, the chat page, which is the panel itself. Under every
- * page it is drawn over, the page ends on room as tall as her face and its gap to the window's foot (`DOCK_ROOM`), so a page scrolled to
- * its end shows its last line above her. React Aria's `RouterProvider` sends every React Aria link, pressed with Enter or clicked,
- * through the router, so no link loads the whole page again.
+ * hers for the visit, which her side sheet and the chat page both read, so a navigation neither closes it nor opens another. Her face,
+ * first in the rail, opens her side sheet (`HerSheet`), held over the whole frame too (`HerSheetProvider`), so it stays open across
+ * pages: docked at the right of the frame's row, the page narrowing beside it and the rail folding for it under 1600 (`frameFold`), or
+ * the kit's modal sheet on a narrow screen; on a page whose route's `staticData` says it `ownsChat`, the chat page, none is drawn, the
+ * page being the panel itself. The devtools of a dev build sit at the rail's foot, over neither her face nor her sheet. React Aria's
+ * `RouterProvider` sends every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
-  const ownsChat = useMatches({ select: (matches) => matches.some((match) => match.staticData?.ownsChat) });
   const search: Record<string, unknown> = useRouterState({ select: (state) => state.location.search });
   const router = useRouter();
   const feed = useFeed();
@@ -55,39 +58,37 @@ function Root() {
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <NemiaChatProvider>
-        <SidebarProvider defaultOpen={sidebarOpenOf(document.cookie)}>
-          <FrameRail path={path} search={search} />
-          <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
-            <FrameHeader path={path} search={search} feed={feed} />
-            <main
-              data-frame-page
-              style={ownsChat ? undefined : { paddingBottom: DOCK_ROOM }}
-              className="relative flex min-w-0 flex-1 flex-col bg-background"
-            >
-              <div ref={lines} data-frame-lines>
-                <NewerRelease />
-                <SetupBanner path={path} />
-                <div className="px-4 py-2 empty:hidden">
-                  <LinkRefusal />
-                </div>
-              </div>
-              <FrameTabs path={path}>
-                {fullBleed ? (
-                  <Outlet />
-                ) : (
-                  <div className="mx-auto w-full max-w-4xl px-4 py-6">
-                    <Outlet />
+        <HerSheetProvider>
+          <SidebarProvider defaultOpen={sidebarOpenOf(document.cookie)}>
+            <FrameRail path={path} search={search} />
+            <div className="flex min-w-0 flex-1 flex-col" style={{ '--frame-lines': `${linesHeight}px` } as CSSProperties}>
+              <FrameHeader path={path} search={search} feed={feed} />
+              <main data-frame-page className="relative flex min-w-0 flex-1 flex-col bg-background">
+                <div ref={lines} data-frame-lines>
+                  <NewerRelease />
+                  <SetupBanner path={path} />
+                  <div className="px-4 py-2 empty:hidden">
+                    <LinkRefusal />
                   </div>
-                )}
-              </FrameTabs>
-            </main>
-          </div>
-        </SidebarProvider>
+                </div>
+                <FrameTabs path={path}>
+                  {fullBleed ? (
+                    <Outlet />
+                  ) : (
+                    <div className="mx-auto w-full max-w-4xl px-4 py-6">
+                      <Outlet />
+                    </div>
+                  )}
+                </FrameTabs>
+              </main>
+            </div>
+            <HerSheet path={path} search={search} />
+          </SidebarProvider>
+        </HerSheetProvider>
         <OpenBar feed={feed} />
-        {!ownsChat && <NemiaDock path={path} search={search} />}
       </NemiaChatProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />
-      <TanStackRouterDevtools position="bottom-right" />
+      <TanStackRouterDevtools position="bottom-left" toggleButtonProps={{ style: ROUTER_TOOLS_AT }} />
     </AriaRouterProvider>
   );
 }

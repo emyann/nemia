@@ -61,19 +61,31 @@
  * A plan with `terminationMessagePath` has that file read once, at the harness's exit, and what it held written as `terminationMessage`
  * beside the exit code (`terminationMessageAt`).
  *
- * A plan with `memoryLimit` was started in a scope of its own under that limit (`scopeArgv`, `harness/cgroup.ts`), this worker
- * beside its harness in it: on each beat and at the harness's exit it reads its own cgroup's files (`cgroupMemoryOf('self')`) and
- * writes what they say as `memory`, the last read kept where a read finds nothing. It outlives the harness in the cgroup, so the OOM
- * kill that ended a runaway child is still counted there when it writes the end.
+ * A plan with `scoped` was started in a scope of its own (`scopeArgv`, `harness/cgroup.ts`), this worker the one process in it: its first
+ * write records the scope's folder (`cgroup`), read off its own cgroup with no race, for the runner to end the scope whole once the run
+ * has ended, from outside it. The worker never ends its own scope. A worker started again on a run file its worker left keeps the
+ * folder the first recorded, and reads none of its own.
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?, inputAt?, stopGraceMs?, beatMs?,
- * terminationMessagePath?, memoryLimit? }
+ * A plan with `memoryLimit` was started in such a scope under that limit, this worker beside its harness in it: on each beat and at the
+ * harness's exit it reads its own cgroup's files (`cgroupMemoryOf('self')`) and writes what they say as `memory`, the last read kept
+ * where a read finds nothing. It outlives the harness in the cgroup, so the OOM kill that ended a runaway child is still counted there
+ * when it writes the end.
+ *
+ * A worker started with `--scope-by <argv> --` (a run with no limit, `startWorker`'s `bareIfRefused`) is started bare and starts the
+ * worker that runs the session behind that argv, on the same run file, then waits. Once that worker has published its pid (its first
+ * write), it names it in the run's `.launched`, as the spawn named this one, and exits, writing nothing on the run file: from then on
+ * there is one worker, in its scope. Where the scope's program exits before any worker published a pid (`systemd-run` refusing, a user
+ * manager gone since the probe passed), it runs the session itself, bare, as a worker with no scope does, and writes why (`unscoped`)
+ * with no folder: a session with no limit never needed a scope to run.
+ *
+ * argv: <runFile> [--scope-by <scope argv> --]  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, start?, input?,
+ * inputAt?, stopGraceMs?, beatMs?, terminationMessagePath?, memoryLimit?, scoped? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
 import { terminationMessageAt } from '../src/harness/detached/termination-message.ts';
-import { cgroupMemoryOf, type CgroupMemory } from '../src/harness/cgroup.ts';
+import { cgroupMemoryOf, cgroupNow, type CgroupMemory } from '../src/harness/cgroup.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 import { processStart } from '../src/process/alive.ts';
 
@@ -99,7 +111,59 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   beatMs?: number;
   terminationMessagePath?: string;
   memoryLimit?: number;
+  scoped?: true;
+  cgroup?: string;
+  unscoped?: string;
 };
+
+/** The argv this worker was handed to start the session's worker behind (`--scope-by`), its `--` last; absent with none. */
+const scopeBy = process.argv[3] === '--scope-by' ? process.argv.slice(4) : undefined;
+/** How often a worker handed `--scope-by` reads the run file for the pid of the worker it started. */
+const SCOPED_POLL_MS = 20;
+/** The pid the run file says its worker published: 0 before any did, or where it cannot be read yet. */
+const publishedPid = (): number => {
+  try {
+    const pid: unknown = (JSON.parse(fs.readFileSync(runFile, 'utf8')) as { pid?: unknown }).pid;
+    return typeof pid === 'number' && Number.isInteger(pid) ? pid : 0;
+  } catch {
+    return 0;
+  }
+};
+/**
+ * Starts the session's worker behind `scope`, and answers whether it runs: `true` once it published its pid, which is then named in the
+ * run's `.launched` in this process's place (its pid, start and boot, as `harness/detached/launched.ts` reads them); `false` where the
+ * process started exited before any pid was published, the scope refused.
+ */
+const startedIn = async (scope: readonly string[]): Promise<boolean> => {
+  const [program, ...args] = scope;
+  if (program === undefined) return false;
+  const inner = spawn(program, [...args, process.execPath, import.meta.filename, runFile], {
+    detached: true,
+    stdio: ['ignore', 'ignore', 'inherit'],
+  });
+  let exited = false;
+  inner.on('exit', () => (exited = true));
+  inner.on('error', () => (exited = true));
+  inner.unref();
+  for (;;) {
+    const was = exited;
+    const pid = publishedPid();
+    if (pid > 0) {
+      const start = processStart(pid);
+      const boot = monoNow()?.boot;
+      fs.writeFileSync(
+        runFile.replace(/\.json$/, '.launched'),
+        JSON.stringify({ pid, ...(start ? { start } : {}), ...(boot ? { boot } : {}) }),
+      );
+      return true;
+    }
+    if (was) return false;
+    await new Promise((resolve) => setTimeout(resolve, SCOPED_POLL_MS));
+  }
+};
+if (scopeBy !== undefined && (await startedIn(scopeBy))) process.exit(0);
+/** Run bare though handed a scope (`--scope-by`): the scope was refused, so it records why, and no folder. */
+const unscoped = scopeBy !== undefined;
 
 let status = {
   ...plan,
@@ -118,6 +182,9 @@ let status = {
   /** The harness this worker started, once it has: none yet, whatever the one before it was. */
   harness: undefined as { pid: number; start?: string } | undefined,
 };
+/** Why a run with no limit runs bare: its scope's program refused, in the words it wrote to the run's log just before. */
+const UNSCOPED =
+  "its scope could not be made (the scope program's words are in the run's log), so it runs with no scope: what it leaves is ended with its harness's process group alone. Check that `systemctl --user` answers where the engine runs.";
 /**
  * How long a harness told to stop has to end on SIGTERM before what is left of its group is killed: the plan's, which the spawn
  * writes, or the shipped bound for a run file written before plans carried it.
@@ -209,7 +276,9 @@ const leave = async (code: number) => {
   process.exit(code);
 };
 for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, stop);
-write();
+/** The scope this worker was started in, read in its first write, before it starts anything: absent where it was started in none. */
+const scope = plan.scoped && !plan.pid && !unscoped ? cgroupNow('self') : undefined;
+write(unscoped ? { unscoped: UNSCOPED } : scope === undefined ? {} : { cgroup: scope });
 if (!plan.pid && plan.stopFile && fs.existsSync(plan.stopFile)) {
   write({ state: 'stopped', exitCode: -1 });
   process.exit(0);

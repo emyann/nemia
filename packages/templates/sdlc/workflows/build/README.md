@@ -144,7 +144,8 @@ it, and each waits on a person:
   run of the workflow cuts nothing, but a gate whose caps would let the run pass it says so;
 - a finding raised again: a review that would raise a finding a second time, after the engineer answered it, signs off `blocked`
   rather than asking for another round, its `needs` naming each such finding, the reply, and why it still holds
-  (`review-a-change`, step 7); a person settles it with `nemia retry <run> review --message "<answer>"` or `nemia approve`.
+  (`review-a-change`, step 7); a person settles it with `nemia retry <run> review --message "<answer>"`, whose answer tells the
+  review to pass or to send the work back (a blocked step has nothing to approve).
 
 The rounds converge: the first reads the whole change and lists every finding it can stand on, and says what it read (`read`: the
 commit, the files and the rules); a later round reads only the diff since the last round's commit, checks each earlier finding against

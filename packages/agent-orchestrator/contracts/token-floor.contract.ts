@@ -9,9 +9,15 @@
  * session is judged at its harness, where the person can answer an ask, and the person is the floor's owner. Pure: the verb reads the
  * levels, the wait and the list (`floor.verb.ts`), afresh on each request.
  */
-import { type Implementation, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { CommandClass } from 'objects';
 import { atLeast, type Level } from '../src/level/level.ts';
+
+/**
+ * How the levels order (`atLeast`), some pure function to the verifier, which does not read its `indexOf`: the laws and the code read
+ * the same one.
+ */
+export const levelsOrder = assume(atLeast, { pure: true });
 
 /** The highest class a narrowed token reaches: `read` (reads alone), or `act` (reads and writes that run unasked). */
 export type FloorNarrowing = 'read' | 'act';

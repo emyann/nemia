@@ -16,7 +16,7 @@ import { levelOfFactory, runFactory } from '../level/levels.verb.ts';
 import { agentNameRefusal } from '../agents/agents.ts';
 import { RULE_ANSWERS, factsOf, listInForce, type PolicyRule, type Facts } from '../auto/index.ts';
 import { readConfirmed } from '../auto/auto.store.ts';
-import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope } from './admission.ts';
+import { admissionOf, answerOf, namedIn, typedIn, type PolicyReads, type Scope, type Typed } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -57,7 +57,7 @@ export const ADMIT: Ran = {
 };
 
 /** Why `step` of `runId` waits on the person, as `nemia retry` would judge it, or undefined where it waits on no one. */
-const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string) {
+export const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const steps = yield* stepsOf(run);
   const step = steps.find((s) => s.name === stepName);
@@ -132,11 +132,23 @@ const levelRead = Effect.fnUntraced(function* (runId: string) {
  * level and its facts at the moment of the call, and for an approval the yes it gives (`approveForm`); a run that does not read has none of
  * them, and is asked.
  */
-const policyRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], agent: string, home: string) {
+const policyRead = (line: string, table: Parameters<typeof admissionOf>[1], agent: string, home: string) =>
+  policyReadOf(typedIn(line, table), table, agent, home);
+
+/**
+ * What admission reads at `auto` for the typed `commands`, read by `table`'s specs, as `policyRead` reads them off a shell line: what the
+ * floor of an agent's standing token reads of the one command its request serves (`floor.verb.ts`).
+ */
+export const policyReadOf = Effect.fnUntraced(function* (
+  commands: readonly Typed[],
+  table: Parameters<typeof admissionOf>[1],
+  agent: string,
+  home: string,
+) {
   const levels = new Map<string, Level | undefined>();
   const facts = new Map<string, Facts | undefined>();
   const forms = new Map<string, ApproveForm | undefined>();
-  for (const typed of typedIn(line, table).filter((t) => (RULE_ANSWERS as readonly string[]).includes(t.name))) {
+  for (const typed of commands.filter((t) => (RULE_ANSWERS as readonly string[]).includes(t.name))) {
     const answer = answerOf(typed, table);
     if (answer === undefined) continue;
     if (!levels.has(answer.runId)) levels.set(answer.runId, yield* levelRead(answer.runId));

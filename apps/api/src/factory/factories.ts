@@ -13,7 +13,8 @@
  * And the writes that name a template or a folder, each answered with what its entry answers: a factory filed (`nemia factory add`), a
  * volume mounted and taken off (`nemia factory volume add`, `rm`), a factory made from a template (`nemia factory apply`), a hand-made one
  * taken over (`nemia factory adopt`), either previewed (`nemia factory diff`), an upgrade filed (`nemia factory upgrade`) and a
- * conflict's choice, sent as its text (`nemia factory resolve`). A repository's or a volume's path names a folder of this machine by its
+ * conflict's choice, sent as its text (`nemia factory resolve`); and a factory exported whole and filed from another store's export, the
+ * two halves of `nemia factory move`. A repository's or a volume's path names a folder of this machine by its
  * whole path, and a repository may be a git URL instead, which this machine clones under its store with its own git credentials
  * (`cloneTarget`, then the verb's clone, refused on the spot with the setup to do); a template sent packed is kept under the store
  * while a factory is made from it (`withTemplateTaken`), and a preview's or a refused request's is removed as the request ends.
@@ -46,6 +47,8 @@ import {
   FACTORY_UPGRADE,
   FACTORY_VOLUME_ADD,
   FACTORY_VOLUME_RM,
+  factoryExported,
+  factoryImported,
   Invalid as Refused,
   withResolutionProposerAs,
   withTemplateTaken,
@@ -56,6 +59,8 @@ import {
   type FactoryApplyWrite,
   type FactoryCreate,
   type FactoryDiffWrite,
+  type FactoryImportWrite,
+  type MoveCards,
   type FactoryPlan,
   type FactoryWritten,
   type FactoryResolveWrite,
@@ -219,6 +224,26 @@ const applied = (name: string, { template, repos, sets, noTrust }: FactoryApplyW
     return s.inRequest(withTemplate(template, 'made', (source) => FACTORY_APPLY.handler({ name, template: source, repos, sets, noTrust })));
   });
 
+/** A factory's export (`nemia factory move`'s read of the source): the factory `name` whole, its cards following unless `cards` is `stay`. */
+const exported = (name: string, cards: MoveCards | undefined) =>
+  answered((s: Served) => {
+    factoryNamed(`GET /api/factories/${name}/export`, name);
+    return s.inRequest(factoryExported(name, cards === undefined ? {} : { cards }));
+  });
+
+/**
+ * A factory's import (`nemia factory move`'s write on the target): the export sent filed here as `name`, its template kept under the store
+ * once it is filed, each repository given by its whole path or a git URL this machine clones, each volume by its whole path.
+ */
+const imported = (name: string, write: FactoryImportWrite) =>
+  answeredWrite(async (s: Served) => {
+    const route = `POST /api/factories/${name}/import`;
+    factoryNamed(route, name);
+    wholeRepos(route, Object.values(write.repos ?? {}));
+    wholePaths(route, 'volumes', Object.values(write.volumes ?? {}));
+    return s.inRequest(withTemplate(write.export.template, 'made', (source) => factoryImported(name, write, source)));
+  });
+
 /** `nemia factory adopt`: the hand-made `factory` taken over by the template sent, by the plan its preview printed. */
 const adopted = (factory: string, { template, sets, plan }: FactoryAdoptWrite) =>
   answeredWrite(async (s: Served) => {
@@ -325,6 +350,8 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('addVolume', ({ params: { factory }, payload: { volume } }) => volumeAdded(factory, volume))
     .handle('removeVolume', ({ params: { factory }, query: { path: at } }) => volumeRemoved(factory, at))
     .handle('apply', ({ params: { name }, payload }) => applied(name, payload))
+    .handle('export', ({ params: { name }, query }) => exported(name, query.cards))
+    .handle('import', ({ params: { name }, payload }) => imported(name, payload))
     .handle('adopt', ({ params: { factory }, payload }) => adopted(factory, payload))
     .handle('diff', ({ params: { factory }, payload }) => previewed(factory, payload))
     .handle('upgrade', ({ params: { factory }, payload }) => upgraded(factory, payload))

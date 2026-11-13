@@ -79,7 +79,8 @@ const volumeOnTargetSpec = spec<(volume: MovedVolume, typed: string | undefined,
     },
     refusalSaysWhy: {
       description: "A refused volume says the target's reason",
-      condition: ({ input: [, , refusal], output }) => output.kind !== 'refused' || (refusal !== undefined && output.message.includes(refusal)),
+      condition: ({ input: [, , refusal], output }) =>
+        output.kind !== 'refused' || (refusal !== undefined && output.message.includes(refusal)),
     },
     refusalNamesTheFlag: {
       description: 'A refused volume names the flag that gives it another path on the target',

@@ -46,6 +46,7 @@ const PINNED: Record<string, string[]> = {
     'TOKEN_ADD',
     'TOKEN_LS',
     'TOKEN_RM',
+    'credentialKept',
     'COMMANDS',
     'Conflict',
     'DEFAULT_EVERY_MS',

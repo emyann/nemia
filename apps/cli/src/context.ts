@@ -30,7 +30,7 @@ export type Context = { readonly name: string; readonly server: string; readonly
 
 /**
  * The client's config as read: its contexts, the name of the one in use, if any, and a person's token for this machine's own daemon
- * (`localToken`, `local-token` in the file), which a store marked exposed asks of every caller, its own machine's included.
+ * (`localToken`, `local-token` in the file), presented there over the store's credential (`storeCredential`, where.ts).
  */
 export type ClientConfig = {
   readonly contexts: readonly Context[];
@@ -125,8 +125,9 @@ export function configWritten(config: ClientConfig, env: NodeJS.ProcessEnv = pro
 export const chosenOf = (env: NodeJS.ProcessEnv = process.env): Chosen => contextOf(configRead(env), env[CONTEXT_VARIABLE]?.trim());
 
 /**
- * The token a command run with `env` presents, where `WF_SESSION_TOKEN` is not set: the remote context's, or under this machine's
- * context the person's token for its own daemon where the config keeps one (`set-context local --token-file`); none otherwise.
+ * The token of the config a command run with `env` presents, where `WF_SESSION_TOKEN` is not set: the remote context's, or under this
+ * machine's context the person's token for its own daemon where the config keeps one (`set-context local --token-file`); none otherwise,
+ * where the client presents the store's credential under this machine's context (`callerToken`, client.ts).
  */
 export function chosenToken(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const config = configRead(env);
@@ -146,7 +147,7 @@ const USAGE = [
   'nemia config set-context <name> --server <url> --token-file <file>',
   '                                         add or change a context: a remote daemon and a token of yours for it',
   'nemia config set-context local --token-file <file>',
-  '                                         keep a token of yours for this machine’s own daemon, where its store is exposed',
+  '                                         keep a token of yours for this machine’s own daemon, over the store’s credential',
   'nemia config get-contexts                list the contexts, the one in use marked *',
   'nemia config current-context             say the context a command uses now',
   'nemia config headers [--context <name>]  print the Authorization header a harness sends (Claude Code’s headersHelper)',
@@ -209,9 +210,9 @@ function setContext(args: readonly string[], env: NodeJS.ProcessEnv): number {
 }
 
 /**
- * `nemia config set-context local --token-file <file>`: a token of the person's kept for this machine's own daemon, which a store marked
- * exposed asks of every caller; `local` keeps naming this machine's store, so the verbs of the store still run in process. Refused: a
- * `--server`, since `local` is always this machine's.
+ * `nemia config set-context local --token-file <file>`: a token of the person's kept for this machine's own daemon, presented there
+ * over the credential its store keeps (`storeCredential`, where.ts); `local` keeps naming this machine's store, so the verbs of the
+ * store still run in process. Refused: a `--server`, since `local` is always this machine's.
  */
 function setLocal(rest: readonly string[], config: ClientConfig, env: NodeJS.ProcessEnv): number {
   if (rest.includes('--server'))

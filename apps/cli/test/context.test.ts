@@ -219,21 +219,46 @@ test('under a remote context that takes no connection, a read is refused naming 
   assert.equal(fs.existsSync(root), false, 'no daemon started here');
 });
 
-test("on an exposed store's own machine, a token kept for `local` lets its reads in, and its store verbs still run in process", async (t) => {
-  const server = await servedStore('nemia-context-own-', () => {}, { WF_EXPOSED: '1' });
+test("on the store's own machine, the person's `nemia` presents the store's credential with nothing typed and reaches a store verb", async (t) => {
+  const server = await servedStore('nemia-context-seat-', () => {});
+  t.after(server.stop);
+  const env = { ...server.env, XDG_CONFIG_HOME: scratch('nemia-context-seat-config-') };
+  const added = await nemia(['inbox', 'add', 'a card from this machine'], env);
+  assert.equal(added.code, 0, `the credential is presented, no token typed: ${added.err}`);
+  const minted = await nemia(['token', 'add', 'laptop'], env);
+  assert.equal(minted.code, 0, `a person-only verb takes the credential as the person: ${minted.err}`);
+  const listed = await nemia(['token', 'ls'], env);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /\blocal\b/, 'the credential is the person-held token named local');
+  assert.match(listed.out, /\blaptop\b/);
+  const session = await nemia(['ls'], { ...env, WF_SESSION_TOKEN: 'a-session-token-never-minted' });
+  assert.equal(session.code, 2, `WF_SESSION_TOKEN wins over the credential, and one never minted is refused: ${session.err}`);
+  const typed = tokenFile(scratch('nemia-context-seat-token-'), 'not-minted');
+  const remote = await nemia(['config', 'set-context', 'vps', '--server', server.url, '--token-file', typed], env);
+  assert.equal(remote.code, 0, remote.err);
+  const elsewhere = await nemia(['ls'], { ...env, NEMIA_CONTEXT: 'vps' });
+  assert.equal(elsewhere.code, 2, `a remote context presents its own token, never this machine's credential: ${elsewhere.err}`);
+  fs.rmSync(path.join(server.root, 'credential'));
+  const none = await nemia(['ls'], env);
+  assert.equal(none.code, 2, `with no credential and no token the api refuses the read: ${none.err}`);
+});
+
+test("on the store's own machine, a token kept for `local` is presented over the store's credential, and its store verbs still run", async (t) => {
+  const server = await servedStore('nemia-context-own-', () => {});
   t.after(server.stop);
   const env = { ...server.env, XDG_CONFIG_HOME: scratch('nemia-context-own-config-') };
-  const asked = await nemia(['ls'], env);
-  assert.equal(asked.code, 2, `with no token the exposed store refuses its own machine's read: ${asked.err}`);
   const minted = await nemia(['token', 'add', 'here'], env);
   const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1];
   assert.ok(token, minted.out);
+  fs.writeFileSync(path.join(server.root, 'credential'), 'a-credential-never-minted\n');
+  const asked = await nemia(['ls'], env);
+  assert.equal(asked.code, 2, `a credential the store never minted is refused: ${asked.err}`);
   const set = await nemia(['config', 'set-context', 'local', '--token-file', tokenFile(scratch('nemia-context-own-token-'), token)], env);
   assert.equal(set.code, 0, set.err);
   assert.equal(fs.statSync(configFileOf(env)).mode & 0o777, 0o600);
   assert.doesNotMatch(set.out, new RegExp(token), 'the token is printed by no verb');
   const read = await nemia(['ls'], env);
-  assert.equal(read.code, 0, read.err);
+  assert.equal(read.code, 0, `the token kept for local is presented, not the credential: ${read.err}`);
   const current = await nemia(['config', 'current-context'], env);
   assert.equal(current.out.trim(), 'local', 'the context stays this machine’s');
   const added = await nemia(['inbox', 'add', 'a card kept here'], env);

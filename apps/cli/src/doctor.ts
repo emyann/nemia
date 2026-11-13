@@ -162,8 +162,8 @@ export async function doctorRead(env: NodeJS.ProcessEnv = process.env): Promise<
         piece(
           'token-accepted',
           'missing',
-          'this machine’s store is exposed and asks a token of its own machine too: keep one for it',
-          'nemia config set-context local --token-file <file>',
+          'this machine’s store refuses the token presented here: its daemon writes the person’s credential to <store>/credential at its start, so restart it to put one in place, or keep a token of yours for this machine with nemia config set-context local --token-file <file>',
+          'nemia service restart',
         ),
       );
     else {

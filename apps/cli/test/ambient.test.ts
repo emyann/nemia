@@ -1,12 +1,14 @@
 /**
  * The environment the cli's tests hand their children (`ambient`) is CI's, whatever the session that runs them: with the daemon's
  * per-session variables and the telemetry in this process's environment, a child built on it sees none of them, and a test that means
- * one sets it on top. Under a server's serving variables, the api a test serves listens on the loopback and its store reads as not
- * exposed, where a test that means it exposed says so.
+ * one sets it on top. Under a server's serving variables, the api a test serves listens on the loopback, and asks a token of its own
+ * machine as every store does: the store's credential lets the test's `nemia` in, and with none it is refused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 import { ambient, DROPPED } from './ambient.ts';
 import { servedStore } from './served.ts';
 
@@ -53,7 +55,7 @@ test('`ambient` drops each name it is also given, and leaves the rest of the env
 });
 
 test(
-  "under a server's serving variables, a served store's api listens on the loopback and lets a request with no token through",
+  "under a server's serving variables, a served store's api listens on the loopback, the store's credential let in and none refused",
   { timeout: 120_000 },
   async (t) => {
     const was = { NEMIA_BIND: process.env.NEMIA_BIND, WF_EXPOSED: process.env.WF_EXPOSED };
@@ -68,10 +70,9 @@ test(
     t.after(served.stop);
     assert.match(served.url, /^http:\/\/127\.0\.0\.1:\d+$/);
     const listed = await served.nemia(['ls']);
-    assert.equal(listed.code, 0, `the store reads as not exposed: ${listed.err}`);
-    const exposed = await servedStore('nemia-ambient-exposed-', () => {}, { WF_EXPOSED: '1' });
-    t.after(exposed.stop);
-    const refused = await exposed.nemia(['ls']);
-    assert.equal(refused.code, 2, `a test that means it exposed sets it, and its api refuses a request with no token: ${refused.err}`);
+    assert.equal(listed.code, 0, `the store's credential is presented with nothing typed: ${listed.err}`);
+    fs.rmSync(path.join(served.root, 'credential'));
+    const refused = await served.nemia(['ls']);
+    assert.equal(refused.code, 2, `a store not exposed asks a token of its own machine too, and refuses none: ${refused.err}`);
   },
 );

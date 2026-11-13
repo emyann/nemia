@@ -229,7 +229,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
     { file: 'parse-the-flag-1x2y.md', text: '---\nworkflow: dev\n---\nParse the flag.\n\nIn cli.ts.\n' },
     { file: 'README.md', text: '# ideas\n' },
     { file: '.cache-the-views-k2q9.md.swp', text: '' },
-    { file: 'cache-the-views-k2q9.md', text: '---\nrepo: /home/me/code/app\n---\nCache the views between passes.\n' },
+    { file: 'cache-the-views-k2q9.md', text: '---\nrepo: /home/me/code/app\n---\n# Cache the views between passes.\n' },
     { file: 'broken-a1b2.md', text: '---\nafter: parse-the-flag-1x2y\n---\nx\n' },
     { file: 'notes.txt', text: '' },
     { file: 'drafts/', text: '' },

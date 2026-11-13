@@ -1,6 +1,6 @@
 /**
- * GET /api/capabilities (capabilities.ts, reach.ts): the skills, agents, MCP servers and permission rules of a scratch checkout, and what
- * each step of its workflows gets of them.
+ * GET /api/capabilities (capabilities.ts, reach.ts): the skills, agents, MCP servers and permission rules of a scratch checkout, read in a
+ * factory filed on it (`?factory=`), and what each step of its workflows gets of them; and `repoOf`, the folder the daemon's pass ticks in.
  */
 import '../../test/harness.ts';
 import { test } from 'node:test';
@@ -14,6 +14,7 @@ import { ApiConfig } from '../layer.ts';
 import { CLAUDE_RULES } from 'agent-orchestrator/workflow';
 import { HOME_REPO, capabilitiesOf, describedAt, repoOf, serverAsk } from './capabilities.ts';
 import { DISALLOW, askDenierOf } from './reach.ts';
+import { addFactory, removeFactory } from 'agent-orchestrator/testing';
 
 const { measuredTools: MEASURED_TOOLS, readOnlyCommands: READ_ONLY_COMMANDS } = CLAUDE_RULES;
 
@@ -41,16 +42,26 @@ const write = (file: string, content: string | object): void => {
   fs.writeFileSync(file, typeof content === 'string' ? content : JSON.stringify(content, null, 2));
 };
 
-/** GET /api/capabilities, with the api serving the repository at `repo`. */
-const served = async (repo: string) => {
-  process.env.HKB_REPO = repo;
+/** How many factories `inFactory` has filed: each gets a name of its own. */
+let filed = 0;
+
+/** `read` of the name of a factory filed on `repo` for it alone, removed once it has answered. */
+const inFactory = async <A>(repo: string, read: (factory: string) => Promise<A>): Promise<A> => {
+  const factory = `caps-${++filed}`;
+  addFactory({ name: factory, repos: [repo] });
   try {
-    const res = await app.request('/api/capabilities');
-    return { status: res.status, body: (await res.json()) as CapabilitiesWithSteps };
+    return await read(factory);
   } finally {
-    delete process.env.HKB_REPO;
+    removeFactory(factory);
   }
 };
+
+/** GET /api/capabilities of the repository at `repo`, in a factory filed on it. */
+const served = (repo: string) =>
+  inFactory(repo, async (factory) => {
+    const res = await app.request(`/api/capabilities?factory=${factory}`);
+    return { status: res.status, body: (await res.json()) as CapabilitiesWithSteps };
+  });
 
 /** The fixture server as an `.mcp.json` entry: node on its file, with `env`. */
 const fixture = (env: Record<string, string> = {}) => ({ command: process.execPath, args: [FIXTURE_SERVER], env });
@@ -147,9 +158,13 @@ test('skills and agents, with frontmatter and without: named by it or by their d
 });
 
 test('a repository with none of it — or no repository at all, or `.claude/skills` a file and not a directory — is empty lists and a 200, never an error', async () => {
-  const gone = path.join(scratch('nemia-api-nowhere-'), 'no-such-repo');
+  const gone = repoWith({});
   for (const repo of [repoWith({}), gone, repoWith({ '.claude/skills': 'a file', '.claude/agents': 'a file' })]) {
-    const { status, body } = await served(repo);
+    const { status, body } = await inFactory(repo, async (factory) => {
+      if (repo === gone) fs.rmSync(gone, { recursive: true });
+      const res = await app.request(`/api/capabilities?factory=${factory}`);
+      return { status: res.status, body: (await res.json()) as CapabilitiesWithSteps };
+    });
     assert.equal(status, 200, repo);
     assert.deepEqual(
       body,
@@ -321,21 +336,24 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `${pid}: no start of the server is left running`);
 });
 
-test("each server is asked once while an app runs: requests after the first, and requests at once, read that answer, the app's environment naming the repository", async () => {
+test('each server is asked once while an app runs: requests after the first, and requests at once, read that answer, in the factory filed on the repository', async (t) => {
   const starts = path.join(scratch('nemia-api-starts-'), 'starts');
   const repo = repoWith({
     '.mcp.json': { mcpServers: { fixture: fixture({ HKB_TEST_STARTS: starts }) } },
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'] },
   });
-  const { app: own } = appOf(Layer.merge(liveOf(), ApiConfig.layer({ ...process.env, HKB_REPO: repo })));
+  const { app: own } = appOf(Layer.merge(liveOf(), ApiConfig.layer(process.env)));
+  const factory = 'caps-asked-once';
+  addFactory({ name: factory, repos: [repo] });
+  t.after(() => removeFactory(factory));
   const capabilitiesOf = async (): Promise<CapabilitiesWithSteps> => {
-    const res = await own.request('/api/capabilities');
+    const res = await own.request(`/api/capabilities?factory=${factory}`);
     assert.equal(res.status, 200);
     return (await res.json()) as CapabilitiesWithSteps;
   };
   const [first, second] = await Promise.all([capabilitiesOf(), capabilitiesOf()]);
   const third = await capabilitiesOf();
-  assert.equal(first.repo, repo, "the repository the app's environment names, not the process's");
+  assert.equal(first.repo, repo, 'the repository the factory works on');
   assert.equal(startsIn(starts).length, 2, 'asked once: started twice, the era probe and the connection');
   for (const answer of [second, third]) assert.deepEqual(answer.mcp, first.mcp);
 
@@ -564,7 +582,7 @@ test("HOME_REPO, built from capabilities.ts's own place, is the checkout: a `..`
   );
 });
 
-test("unset, the api serves its own checkout: Playwright's server lists browser_run_code_unsafe, which the settings deny no session", async () => {
+test("unset, repoOf is the api's own checkout; read in a factory on it, Playwright's server lists browser_run_code_unsafe, which the settings deny no session", async () => {
   assert.equal(repoOf({}), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: '  ' }), HOME_REPO);
   assert.equal(repoOf({ HKB_REPO: 'elsewhere' }), path.resolve('elsewhere'));
@@ -578,10 +596,11 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   assert.equal(repoOf({}, { kind: 'checkout', root: '/elsewhere' }), HOME_REPO, 'a checkout serves its own');
   assert.ok(fs.existsSync(path.join(HOME_REPO, 'CLAUDE.md')), `${HOME_REPO} is the checkout`);
 
-  delete process.env.HKB_REPO;
-  const res = await app.request('/api/capabilities');
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as CapabilitiesWithSteps;
+  const body = await inFactory(HOME_REPO, async (factory) => {
+    const res = await app.request(`/api/capabilities?factory=${factory}`);
+    assert.equal(res.status, 200);
+    return (await res.json()) as CapabilitiesWithSteps;
+  });
   const playwright = body.mcp.find((server) => server.name === 'playwright');
   assert.ok(playwright, JSON.stringify(body.mcp.map((server) => server.name)));
   assert.equal(playwright.enabled, true);

@@ -3101,6 +3101,15 @@ test("on a step's page, what it will be told is drawn open, each layer beside wh
   const home = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(html)?.[0] ?? '';
   assert.match(home('instructions'), /href="\/agents\/yours\/writer"/);
   assert.match(home('custom'), /href="\/agents\/yours\/writer#custom-instructions"/);
+  const theirs = await routedWith(
+    createElement(StepTold, { page: { ...(await hiredPage()), from: 'repo' }, place: { factory: 'hiring' } }),
+  );
+  const theirHome = (name: string): string => new RegExp(`<span data-home="${name}"[^]*?</span>`).exec(theirs)?.[0] ?? '';
+  assert.match(
+    theirHome('custom'),
+    /href="\/agents\/repo\/writer\?factory=hiring#custom-instructions"/,
+    "a repository's agent's page, in the factory the step is read in: the default reads no repository",
+  );
   assert.match(home('policy'), /href="\/workflows\/yours\/w\?factory=hiring&amp;build=true"/, 'one of yours: its builder, in the place');
   assert.match(html, /data-skill="alpha"[^>]*><a[^>]*href="\/agents\/skills\/yours\/alpha"/, 'a skill found: linked to its page');
   assert.match(html, /data-skill="gamma"[^>]*>gamma</, 'a skill found nowhere: its name alone');

@@ -475,7 +475,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory fire <factory> --step <workflow>/<step>
                                take a step's hire back
                                on the port: factory_fire
-  nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
+  nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--tz <zone>]
                                start a run of an attached workflow at each fire of a cron, by the
                                daemon, at every level; a second replaces the first
                                on the port: factory_schedule

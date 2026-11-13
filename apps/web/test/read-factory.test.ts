@@ -168,7 +168,6 @@ const millView: Factory = {
       cron: '0 9 * * 1',
       tz: null,
       brief: 'The weekly build',
-      repo: null,
       next: '2026-10-05T09:00:00.000Z',
       last: { run: 'r-1', at: '2026-09-28T09:00:00.000Z' },
       refused: null,
@@ -193,6 +192,12 @@ const millView: Factory = {
 test("the factories are read as objects and made the pages' view: the Factory, its lines and its schedules", async (t) => {
   await t.test('factoryViewOf: a key the object leaves out is null, a volume its line by name, a schedule its own', () => {
     assert.deepEqual(factoryViewOf(factoryObject(), factoryCommands(), [scheduleObject()]), millView);
+    const old = scheduleObject();
+    assert.deepEqual(
+      factoryViewOf(factoryObject(), factoryCommands(), [{ ...old, spec: { ...old.spec, repo: '/work/elsewhere' } }]).schedules,
+      millView.schedules,
+      "a schedule's retired repository is not carried: the factory's wiring places its runs",
+    );
     assert.deepEqual(
       factoryViewOf(factoryObject({ spec: { costLines: { build: 80 } } }), factoryCommands()).costLines,
       { build: 80 },

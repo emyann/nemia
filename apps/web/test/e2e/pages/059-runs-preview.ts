@@ -146,9 +146,7 @@ async function expected(page: Page, run: string, step: string): Promise<StepCard
     rowsAnswered(page),
     answer<RunObject.Run>(page, at),
     answer<RunLines>(page, `${at}/lines`),
-    Promise.all(
-      (['repo', 'yours'] as const).map((origin) => answer<RunObject.AgentList>(page, `/api/namespaces/default/agents?origin=${origin}`)),
-    ).then((lists) => lists.flatMap((list) => list.items.map(agentViewOf))),
+    answer<RunObject.AgentList>(page, '/api/namespaces/default/agents?origin=yours').then((list) => list.items.map(agentViewOf)),
   ]);
   const row = runs.find((r) => r.id === run);
   if (!row) throw new Refused(`the api lists the run in flight ${run}`);

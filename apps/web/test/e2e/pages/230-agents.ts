@@ -3,16 +3,18 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { expectAlive, filesIn, photograph, sidebar, themeOf, railPlace, litOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { AGENTS, WORKFLOWS } from '../seed.ts';
+import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it,
-   * linked. Each says what its agent can do, its card generated from its skills in A2A's words: an entry for each skill it gives, read off
-   * its SKILL.md, or one from its description when it gives none. The repository's `implementer` read, and the node that names it followed
-   * to its step's page, which shows the same skills and links back; `scribe`'s form read with its result schema and its card shown
+   * The agents beside the workflows: yours, which the board writes, each with the nodes that name it, linked, and no section of this
+   * repository's, the default factory working on none. Each says what its agent can do, its card generated from its skills in A2A's
+   * words: an entry for each skill it gives, read off its SKILL.md, or one from its description when it gives none. The checkout's
+   * `implementer` read on its page in FACTORIES' `hiring`, the factory on the checkout, made to offer `dev` with no hire and taken back
+   * after: its face, role and skill, read-only, and the node that names it followed to its step's page, which shows the same skills and
+   * links back; `scribe`'s form read with its result schema and its card shown
    * read-only, one entry, for it gives no skills; an agent made with a skill picked from your library, its card that skill's entry, edited
    * and removed, each on disk as the package writes it, and no card file anywhere. And, in a page of its own, a removal refused because a
    * node still names the agent; the workflow that names it is removed before that page closes, so the list, focused again, reads the store
@@ -29,15 +31,17 @@ export default {
     const before = filesIn(agentsDir);
     const card = (p: Page, from: string, name: string) => p.locator(`section[data-agent="${name}"][data-from="${from}"]`);
     const agentPath = (from: string, name: string) => `/agents/${from}/${name}`;
+    const { hiring } = FACTORIES;
+    const IN = `?factory=${hiring.name}`;
 
     await expectVisible(
       page.locator('article > div > p').getByText(`${agentsDir}/`, { exact: true }),
       `the page says where yours are, as the api reads its store: ${agentsDir}/`,
     );
     const yours = page.locator('section[aria-label="Yours"]');
-    const theirs = page.locator('section[aria-label="This repository"]');
     await expectCount(yours.locator('section[data-agent]'), 1, `yours lists one agent, ${seeded.name}`);
-    await expectCount(theirs.locator('section[data-agent]'), 1, `the repository's lists one, ${good.agent.name}`);
+    await expectCount(page.locator('section[aria-label="This repository"]'), 0, 'and no section is drawn of this repository');
+    await expectCount(card(page, 'repo', good.agent.name), 0, `nor ${good.agent.name}, the checkout's: the default factory reads none`);
     const scribe = card(page, 'yours', seeded.name);
     await expectVisible(scribe.getByText(seeded.description, { exact: true }), `${seeded.name} with its description`);
     await expectTexts(
@@ -60,98 +64,93 @@ export default {
       `${seeded.name}, given no skills, says what it can do in one entry made from itself: its name and its description, its tag left to its page`,
     );
     await expectVisible(says(scribe, seeded.skill).getByText(seeded.skill.description, { exact: true }), 'with what it is for');
-    const implementer = card(page, 'repo', good.agent.name);
-    await expectVisible(
-      implementer
-        .getByRole('img', { name: good.agent.person, exact: true })
-        .and(implementer.locator(`svg[data-agent-face="${good.agent.name}"]`)),
-      `${good.agent.name}'s face, a drawing its eyes can move in, named ${good.agent.person}`,
-    );
-    await expectTexts(
-      implementer.locator('[data-agent-role]'),
-      [`${good.agent.role} · ${good.agent.name}`],
-      `${good.agent.person} holds the job its role line says, beside the name a node gives it`,
-    );
-    await expectVisible(
-      says(implementer, good.agent.skill).getByText(good.agent.skill.name, { exact: true }),
-      `${good.agent.name} says what it can do too, its skill's title as the entry's name`,
-    );
     await expectCount(page.locator('[data-card-error]'), 0, 'and every card is made');
-    const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
-    await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
-    if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`)
-      throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
 
-    await node.click();
-    await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
-    await page.goBack({ waitUntil: 'load' });
-    await idle(page);
-    await expectCount(
-      implementer.getByRole('link', { name: good.agent.person, exact: true }),
-      1,
-      `${good.agent.person}'s card holds one link to its page, its name`,
-    );
-    const role = await implementer.locator('[data-agent-role]').boundingBox();
-    if (!role) throw new Refused(`${good.agent.person}'s role line is laid out`);
-    await page.mouse.click(role.x + role.width / 2, role.y + role.height / 2);
-    await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
-    const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
-    await expectVisible(repoForm, `${good.agent.name}'s form`);
-    if ((await repoForm.getByRole('textbox', { name: 'Model' }).inputValue()) !== 'opus')
-      throw new Refused(`${good.agent.name}'s model reads opus, as its file sets it`);
-    for (const field of ['Name', 'Model']) {
-      if ((await repoForm.getByRole('textbox', { name: field }).getAttribute('readonly')) === null)
-        throw new Refused(`the repository's agent is read-only: its ${field} is not`);
-    }
-    const read = repoForm.getByRole('region', { name: 'Instructions', exact: true });
-    await expectCount(repoForm.getByRole('textbox', { name: 'Instructions' }), 0, 'its instructions are read, not a box to type in');
-    await expectVisible(read.locator('[data-markdown] h4', { hasText: 'How you work' }), 'its instructions, read as markdown');
-    await expectVisible(read.locator('[data-markdown] strong', { hasText: 'test' }), 'its bold drawn bold');
-    await expectCount(read.locator('[data-markdown] li'), 2, 'its list drawn as one');
-    await expectCount(read.getByText('**', { exact: false }), 0, 'and no mark printed as it is written');
-    await photograph(read, path.join(OUT, `agents-repo-instructions-${await themeOf(page)}.png`));
-    await expectCount(repoForm.getByRole('button', { name: 'Save' }), 0, 'and it offers no Save');
-    await expectVisible(
-      repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
-      'its form shows its card, generated from its skill',
-    );
-    for (const tag of good.agent.skill.tags)
+    const takeBack = checkoutIn(store!, [good.name]);
+    try {
+      await page.goto(new URL(`${agentPath('repo', good.agent.name)}${IN}`, page.url()).href, { waitUntil: 'load' });
+      await idle(page);
+      const implementer = page.locator('header').filter({ has: page.locator('[data-agent-role]') });
       await expectVisible(
-        repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(tag, { exact: true }),
-        `with the skill's tag ${tag}, which the card on the list leaves to this page`,
+        implementer
+          .getByRole('img', { name: good.agent.person, exact: true })
+          .and(implementer.locator(`svg[data-agent-face="${good.agent.name}"]`)),
+        `${good.agent.name}'s face, a drawing its eyes can move in, named ${good.agent.person}`,
       );
-    await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
-    await expectVisible(
-      page.locator('[data-read-only]', {
-        hasText: `mkdir -p '${agentsDir}' && cp '${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)}' '${agentsDir}/'`,
-      }),
-      "and says how to start one of yours from it, in the api's line: into your store's agents folder, absolute",
-    );
-    const file = page.locator('section[aria-label="The file"]');
-    await file.getByRole('button', { name: 'Source' }).click();
-    const shown = await file.locator('pre[data-source]').textContent();
-    const onDisk = fs.readFileSync(path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`), 'utf8');
-    if (shown !== onDisk) throw new Refused(`Source is the agent's file byte for byte — it shows ${JSON.stringify(shown)}`);
-    await file.getByRole('button', { name: 'Source' }).click();
-    await settled(page);
-    await photograph(page, path.join(OUT, `agents-repo-${await themeOf(page)}.png`), { fullPage: true });
+      await expectTexts(
+        implementer.locator('[data-agent-role]'),
+        [`${good.agent.role} · agent: ${good.agent.name}`],
+        `${good.agent.person} holds the job its role line says, beside the name a node gives it`,
+      );
+      const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
+      await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
+      if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement${IN}`)
+        throw new Refused(`the node's link is its step's page in ${hiring.name} — it is ${await node.getAttribute('href')}`);
+      const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
+      await expectVisible(repoForm, `${good.agent.name}'s form`);
+      if ((await repoForm.getByRole('textbox', { name: 'Model' }).inputValue()) !== 'opus')
+        throw new Refused(`${good.agent.name}'s model reads opus, as its file sets it`);
+      for (const field of ['Name', 'Model']) {
+        if ((await repoForm.getByRole('textbox', { name: field }).getAttribute('readonly')) === null)
+          throw new Refused(`the repository's agent is read-only: its ${field} is not`);
+      }
+      const read = repoForm.getByRole('region', { name: 'Instructions', exact: true });
+      await expectCount(repoForm.getByRole('textbox', { name: 'Instructions' }), 0, 'its instructions are read, not a box to type in');
+      await expectVisible(read.locator('[data-markdown] h4', { hasText: 'How you work' }), 'its instructions, read as markdown');
+      await expectVisible(read.locator('[data-markdown] strong', { hasText: 'test' }), 'its bold drawn bold');
+      await expectCount(read.locator('[data-markdown] li'), 2, 'its list drawn as one');
+      await expectCount(read.getByText('**', { exact: false }), 0, 'and no mark printed as it is written');
+      await photograph(read, path.join(OUT, `agents-repo-instructions-${await themeOf(page)}.png`));
+      await expectCount(repoForm.getByRole('button', { name: 'Save' }), 0, 'and it offers no Save');
+      await expectVisible(
+        repoForm
+          .locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`)
+          .getByText(good.agent.skill.description, { exact: true }),
+        'its form shows its card, generated from its skill',
+      );
+      for (const tag of good.agent.skill.tags)
+        await expectVisible(
+          repoForm.locator(`[data-card] [data-agent-skill="${good.agent.skill.id}"]`).getByText(tag, { exact: true }),
+          `with the skill's tag ${tag}, which the card on the list leaves to this page`,
+        );
+      await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
+      await expectVisible(
+        page.locator('[data-read-only]', {
+          hasText: `mkdir -p '${agentsDir}' && cp '${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)}' '${agentsDir}/'`,
+        }),
+        "and says how to start one of yours from it, in the api's line: into your store's agents folder, absolute",
+      );
+      const file = page.locator('section[aria-label="The file"]');
+      await file.getByRole('button', { name: 'Source' }).click();
+      const shown = await file.locator('pre[data-source]').textContent();
+      const onDisk = fs.readFileSync(path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`), 'utf8');
+      if (shown !== onDisk) throw new Refused(`Source is the agent's file byte for byte — it shows ${JSON.stringify(shown)}`);
+      await file.getByRole('button', { name: 'Source' }).click();
+      await settled(page);
+      await photograph(page, path.join(OUT, `agents-repo-${await themeOf(page)}.png`), { fullPage: true });
 
-    await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
-    await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
-    const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
-    await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
-    const small = `[data-step-agent] svg[data-agent-face="${good.agent.name}"]`;
-    await expectVisible(
-      page.locator('[data-step-agent]').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(small)),
-      `and its small face beside the link is a drawing, named ${good.agent.person}`,
-    );
-    await expectAlive(page, small, `${good.agent.person}, beside the link,`);
-    await expectVisible(
-      page.locator(`[data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
-      `and what that agent says it can do, beneath it: ${good.agent.skill.name}`,
-    );
-    await back.click();
-    await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+      await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
+      await page.waitForURL(
+        (url) => url.pathname === `/workflows/repo/${good.name}/implement` && url.searchParams.get('factory') === hiring.name,
+        { timeout: WAIT_MS },
+      );
+      const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
+      await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
+      const small = `[data-step-agent] svg[data-agent-face="${good.agent.name}"]`;
+      await expectVisible(
+        page.locator('[data-step-agent]').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(small)),
+        `and its small face beside the link is a drawing, named ${good.agent.person}`,
+      );
+      await expectAlive(page, small, `${good.agent.person}, beside the link,`);
+      await expectVisible(
+        page.locator(`[data-agent-skill="${good.agent.skill.id}"]`).getByText(good.agent.skill.description, { exact: true }),
+        `and what that agent says it can do, beneath it: ${good.agent.skill.name}`,
+      );
+      await back.click();
+      await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+    } finally {
+      takeBack();
+    }
 
     await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'load' });
     await idle(page);

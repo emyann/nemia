@@ -20,17 +20,29 @@ import { skillTurnCost, type SkillDraft } from 'agent-orchestrator/workflow';
 import { scratch } from 'test-kit/scratch';
 import { Effect, Layer } from 'effect';
 import { AgentDoor, SkillDoor, type AgentDoorShape, type SkillDoorShape } from 'agent-orchestrator';
-import { agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';
-import { app, appOf, liveOf } from '../app.ts';
+import { addFactory, agentDoorMemory, skillDoorMemory } from 'agent-orchestrator/testing';
+import { app as served, appOf, liveOf } from '../app.ts';
 import { foundInOf, listSkills, BUILTIN_SKILLS, yourSkillsRead } from './skills.ts';
 import { StoreRoot } from '../store.ts';
 import { TEAM } from '../../test/team.ts';
 import { asAgentListing } from '../../test/definitions.ts';
 import { TABLE_ACCEPT, tableLines, type SkillList, type Table } from 'objects';
 import { runWith } from '../../test/builtin-place.ts';
+/** The scratch repository, read in `default` by its `?repo=` (`ON_REPO`), which the factory `bench`, filed on it, lets the api read. */
 const repo = scratch('nemia-api-skills-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+addFactory({ name: 'bench', repos: [repo] });
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
+
+/** `url` with the scratch repository's `?repo=`, where it asks the default factory and names no repository. */
+const onRepoUrl = (url: string): string =>
+  !/^\/api\/namespaces\/default(?:[/?]|$)/.test(url) || /[?&]repo=/.test(url) ? url : `${url}${url.includes('?') ? '&' : '?'}${ON_REPO}`;
+
+/** `on`, each request it is asked read on the scratch repository (`onRepoUrl`). */
+const onRepo = (on: typeof served) => ({
+  request: (url: string, init?: RequestInit) => on.request(onRepoUrl(url), init),
+});
+const app = onRepo(served);
 
 /** Each skill folder of `dirs` read through the table's `skills`, at the harness's root, as a request reads them. */
 const readSkills = (dirs: readonly string[]) => runWith(engine(process.env), SKILLS_LIST.handler({ skills: dirs }));
@@ -684,7 +696,7 @@ test("the picker finds a skill and the agents of yours that give it through the 
     }),
   );
   assert.equal(fs.existsSync(path.join(LIBRARY, kept)), false, 'the skill is held by the door, not on disk');
-  const res = { status: 200, json: async () => listed(own) };
+  const res = { status: 200, json: async () => listed(onRepo(own)) };
   assert.equal(res.status, 200);
   const places = await res.json();
   assert.deepEqual(

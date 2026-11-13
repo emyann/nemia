@@ -2,9 +2,9 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectAlive, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
-import { AGENTS, WORKFLOWS } from '../seed.ts';
+import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT } from '../world.ts';
+import { OUT, store } from '../world.ts';
 
 /** How far a face's eyes go, in units of its hundred: what `AgentFace` gives Blobatar's gaze driver. */
 const TRAVEL = 3;
@@ -119,17 +119,15 @@ export default {
   /**
    * The agents' faces are alive and follow the pointer: each face on the list, and the face at the head of an agent's own page, breathes
    * and blinks with nothing hovering it, and turns its eyes toward the pointer, measured, not pictured. Each is still named as a person is,
-   * and a person who asks for reduced motion sees it still. Read-only.
+   * and a person who asks for reduced motion sees it still. The list, in the default factory, holds yours alone; the checkout's
+   * `implementer` is read on its own page in FACTORIES' `hiring`, the factory on the checkout, made to offer `dev` and taken back after.
    */
   name: 'faces',
   route: '/agents',
   expect: async (page) => {
     await sidebar(page);
     const { good } = WORKFLOWS;
-    const people = [
-      [AGENTS.seeded.name, 'Scribe'],
-      [good.agent.name, good.agent.person],
-    ] as const;
+    const people = [[AGENTS.seeded.name, 'Scribe']] as const;
     await expectCount(page.locator('section[data-agent] svg[data-agent-face]'), people.length, 'every face on the list is a drawing');
     await expectCount(page.locator('section[data-agent] img[data-agent-face]'), 0, 'and none is a still image');
     for (const [name, person] of people) {
@@ -147,15 +145,20 @@ export default {
     const theme = await themeOf(page);
     await photograph(page, path.join(OUT, `faces-list-${theme}.png`), { fullPage: true });
 
-    await page.goto(new URL(`/agents/repo/${good.agent.name}`, page.url()).href, { waitUntil: 'load' });
-    await idle(page);
-    const head = `header svg[data-agent-face="${good.agent.name}"]`;
-    await expectVisible(
-      page.locator('header').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(head)),
-      `the face at the head of ${good.agent.name}'s page is a drawing, named ${good.agent.person}`,
-    );
-    await expectAlive(page, head, `${good.agent.person}, at the head of its page,`);
-    await follows(page, head, 96, `${good.agent.person}, at the head of its page,`);
-    await photograph(page, path.join(OUT, `faces-head-${theme}.png`), { fullPage: true });
+    const takeBack = checkoutIn(store!, [good.name]);
+    try {
+      await page.goto(new URL(`/agents/repo/${good.agent.name}?factory=${FACTORIES.hiring.name}`, page.url()).href, { waitUntil: 'load' });
+      await idle(page);
+      const head = `header svg[data-agent-face="${good.agent.name}"]`;
+      await expectVisible(
+        page.locator('header').getByRole('img', { name: good.agent.person, exact: true }).and(page.locator(head)),
+        `the face at the head of ${good.agent.name}'s page is a drawing, named ${good.agent.person}`,
+      );
+      await expectAlive(page, head, `${good.agent.person}, at the head of its page,`);
+      await follows(page, head, 96, `${good.agent.person}, at the head of its page,`);
+      await photograph(page, path.join(OUT, `faces-head-${theme}.png`), { fullPage: true });
+    } finally {
+      takeBack();
+    }
   },
 } satisfies PageSpec;

@@ -21,7 +21,8 @@
  * Beside the store, the sessions at work, each an attached one as the daemon's holder writes its run file (`attachedRun`), held by the
  * e2e's own process: HELD's `implement`, and NEIGHBOUR's `draft`, whose words said run.ts reads off its say file (SAYING).
  *
- * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
+ * Beside the store, a checkout, read by the pages through FACTORIES' `hiring`, the factory filed on it: CHECKOUT. The api's
+ * `HKB_REPO` names it too, the folder its tick works in, which places no request.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
  * lists, in the store's `inbox/`: CARDS, and the queued ones the Factory draws as ghosts, with the cap the daemon last ran with: QUEUE.
  * And the factories the Factories canvas draws, in the store's `factories/`: FACTORIES, FOLDER's run started in one of them.
@@ -981,6 +982,19 @@ export function hiringStarts(root: string): () => void {
     fs.rmSync(agent, { force: true });
     fs.writeFileSync(file, found);
   };
+}
+
+/**
+ * Makes FACTORIES.hiring, the one factory on the checkout, offer `workflows` with `hires` in the store at `root`: what a page reads of
+ * the checkout is read in that factory, the default one working on no repository. With no hire, `dev` reads there (the seed's hire into
+ * `dev/implement`, whose file names its agent, leaves it unread) and cannot start, `review` naming no agent. Returns the function that
+ * writes the factory's file back as it was found.
+ */
+export function checkoutIn(root: string, workflows: readonly string[], hires: Readonly<Record<string, string>> = {}): () => void {
+  const file = path.join(root, 'factories', `${FACTORIES.hiring.name}.json`);
+  const found = fs.readFileSync(file, 'utf8');
+  fs.writeFileSync(file, JSON.stringify({ ...(JSON.parse(found) as object), workflows, hires }, null, 2));
+  return () => fs.writeFileSync(file, found);
 }
 
 /**

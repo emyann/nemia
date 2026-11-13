@@ -21,6 +21,7 @@ import { keyFormQuery } from '../lib/api/builder.ts';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
 import { FACTORY_WAY, pagePlaceOf } from '../lib/factories';
+import { factoriesQuery, type Factory } from '../lib/api/factories.ts';
 import { BackToAgents } from './agents_.new';
 
 /**
@@ -35,7 +36,7 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
     Promise.all([
       context.queryClient.ensureQueryData(agentQuery(params.from, params.agent, deps)),
       context.queryClient.prefetchQuery(keyFormQuery),
-      params.from === 'factory' ? null : context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
+      params.from === 'yours' ? context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)) : null,
     ]),
   component: AgentPage,
   errorComponent: ({ error }) => (
@@ -62,6 +63,7 @@ function AgentPage() {
   const place = Route.useSearch();
   const { data: agent } = useSuspenseQuery(agentQuery(from, name, place));
   const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: factories } = useQuery({ ...factoriesQuery, enabled: agent.from === 'repo' && place.repo === undefined });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const mine = agent.from === 'yours';
@@ -132,7 +134,8 @@ function AgentPage() {
         {form}
       </FormIn>
 
-      {agent.from !== 'factory' && <CustomInstructions name={agent.name} />}
+      {agent.from === 'yours' && <CustomInstructions name={agent.name} />}
+      {agent.from === 'repo' && <RepoInstructions name={agent.name} repo={repoOfPlace(place, factories)} />}
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
@@ -240,4 +243,22 @@ function Remove({ agent, pending, onRemove }: { agent: AgentListing; pending: bo
       </Button>
     </span>
   );
+}
+
+/**
+ * The repository a repository's agent was read from: the page's `?repo=`, else the only one of the factory it was read in. Undefined while
+ * the factories are read, or where the factory names several and the page none.
+ */
+const repoOfPlace = (place: { factory?: string; repo?: string }, factories: readonly Factory[] | undefined): string | undefined => {
+  if (place.repo !== undefined) return place.repo;
+  const repos = factories?.find((f) => f.name === place.factory)?.repos ?? [];
+  return repos.length === 1 ? repos[0] : undefined;
+};
+
+/**
+ * A repository's agent's custom instructions, looked for by name on the repository it was read from (`?repo=`): the default namespace,
+ * where they are written, reads no repository of its own. None drawn until that repository is known.
+ */
+function RepoInstructions({ name, repo }: { name: string; repo: string | undefined }) {
+  return repo === undefined ? null : <CustomInstructions name={name} repo={repo} />;
 }

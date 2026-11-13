@@ -45,32 +45,22 @@ export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string,
  * The servers of the factory `namespace`, read now at `home`; none for the default factory, which the door answers with no listing;
  * `Missing` where no factory has the name.
  */
-const serversOf = Effect.fn('serversOf')(function* (home: string, repo: string | undefined, namespace: string) {
-  const { factory, listing: filed } = yield* factoryFiled(home, repo, namespace);
+const serversOf = Effect.fn('serversOf')(function* (home: string, namespace: string) {
+  const { factory, listing: filed } = yield* factoryFiled(home, namespace);
   if (filed === undefined) return [];
   const listing: ServersListing = yield* FACTORY_SERVERS.handler({ factory: namespace });
   return listing.servers.map((s) => mcpServerOf(s, namespace, factory.metadata.creationTimestamp, listing.unread));
 });
 
 /** A page of the servers of the factory `namespace` (`McpServerList`), read now at the store `home`. */
-export const mcpServerList = Effect.fn('mcpServerList')(function* (
-  home: string,
-  repo: string | undefined,
-  namespace: string,
-  query: ObjectQuery,
-) {
-  const listed: McpServerList = yield* objectsListed('McpServer', yield* serversOf(home, repo, namespace), query, 'server');
+export const mcpServerList = Effect.fn('mcpServerList')(function* (home: string, namespace: string, query: ObjectQuery) {
+  const listed: McpServerList = yield* objectsListed('McpServer', yield* serversOf(home, namespace), query, 'server');
   return listed;
 });
 
 /** The server `name` of the factory `namespace` as an object; `Missing` where it records none of that name. */
-export const mcpServerObject = Effect.fn('mcpServerObject')(function* (
-  home: string,
-  repo: string | undefined,
-  namespace: string,
-  name: string,
-) {
-  const found = (yield* serversOf(home, repo, namespace)).find((s) => s.metadata.name === name);
+export const mcpServerObject = Effect.fn('mcpServerObject')(function* (home: string, namespace: string, name: string) {
+  const found = (yield* serversOf(home, namespace)).find((s) => s.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

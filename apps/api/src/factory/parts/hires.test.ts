@@ -7,7 +7,6 @@
 import { root } from '../../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Layer } from 'effect';
@@ -18,9 +17,6 @@ import { story } from 'test-kit/checkpoints';
 import { app, appOf, liveOf } from '../../app.ts';
 import { StoreRoot } from '../../store.ts';
 
-const own = scratch('nemia-api-hires-own-');
-process.env.HKB_REPO = own;
-execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: own });
 const folder = scratch('nemia-api-hires-folder-');
 addFactory({ name: 'mill', repos: [folder] });
 attachWorkflow({ factory: 'mill', workflow: 'make' });
@@ -119,7 +115,7 @@ test('the Hire writes: what a hire or a fire refuses, the factory file as it was
     assert.match(await refused(() => send('DELETE', '/api/namespaces/gone/hires/make.code', {}), 404), /gone/);
   });
   await t.test("the default factory's step is a 409 naming the verb that does not take it", async () => {
-    stepIn(own, WORKFLOW, 'code');
+    stepIn(root, WORKFLOW, 'code');
     const said = await refused(() => send('PUT', '/api/namespaces/default/hires/make.code', { agent: 'implementer' }), 409);
     assert.ok(said.startsWith('`default` is the default factory'), said);
     assert.ok(said.includes('nemia factory hire does not take it'), said);

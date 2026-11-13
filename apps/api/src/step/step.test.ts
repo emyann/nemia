@@ -28,7 +28,7 @@ const runOf = (id: string, dir: string, createdAt: string, factory?: string, tas
     ...(factory && { factory }),
   }) as unknown as Run;
 
-test("a run's workflow page: yours in its factory, its repository's in its factory or on the api's own, and none for a folder the board does not page", () => {
+test("a run's workflow page: yours in its factory, its repository's in its factory or on the repository the request reads, and none for a folder the board does not page", () => {
   assert.deepEqual(workflowPageOf({ workflowDir: '/store/workflows/build', repo: '/r', factory: 'nemia' }, served, home), {
     from: 'yours',
     workflow: 'build',
@@ -50,7 +50,17 @@ test("a run's workflow page: yours in its factory, its repository's in its facto
   assert.deepEqual(
     workflowPageOf({ workflowDir: '/own/workflows/build', repo: '/own', factory: 'default' }, served, home),
     { from: 'repo', workflow: 'build', factory: null, repo: null },
-    "the default factory, on the api's own repository",
+    'the default factory, on the repository the request reads',
+  );
+  assert.equal(
+    workflowPageOf({ workflowDir: '/own/workflows/make', repo: '/own', factory: 'default' }, undefined, home),
+    null,
+    'the default factory, on a request that reads no repository: the board pages it on no address',
+  );
+  assert.deepEqual(
+    workflowPageOf({ workflowDir: '/store/workflows/make', repo: '/r', factory: 'nemia' }, undefined, home),
+    { from: 'yours', workflow: 'make', factory: 'nemia', repo: '/r' },
+    'yours in its factory, whatever repository the request reads',
   );
   assert.equal(
     workflowPageOf({ workflowDir: '/r/workflows/build', repo: '/r' }, served, home),

@@ -1,6 +1,6 @@
 /**
  * The factories group's handlers (`objects`' `Api`): the factories as objects, cluster-scoped — a page of them (`factoryList`), the
- * default first on the api's own repository, and one (`factoryObject`) — and a factory's sub-resources over the package's entries the
+ * default first, on no repository, and one (`factoryObject`) — and a factory's sub-resources over the package's entries the
  * command line runs, each entry called by its `input` through `inRequest`: its rules (`nemia factory rules`), read, written and cleared;
  * its instruction, where it is kept (`nemia factory instruction`) and the words the store keeps (`nemia factory instruct`); its command
  * lines (`factoryCommandsOf`), built off the command table; its cost line per workflow, set and taken back (`nemia factory
@@ -61,8 +61,7 @@ import {
   type TemplateGiven,
 } from 'objects';
 import type { Served } from '../layer.ts';
-import { repoNeeded } from './place.ts';
-import { defaultRepo, factoryNamed, queryOf } from './parts/index.ts';
+import { factoryNamed, queryOf } from './parts/index.ts';
 import { answered, answeredWrite } from '../objects/refused.ts';
 import { wantsTable } from '../objects/table.ts';
 import { readsBounded } from '../objects/answer-bound.ts';
@@ -100,7 +99,7 @@ const costLine = (method: string, name: string, workflow: string, usd?: number) 
         ? FACTORY_COST_LINE_RM.handler({ factory: name, workflow })
         : FACTORY_COST_LINE_SET.handler({ factory: name, workflow, usd }),
     );
-    return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+    return s.inRequest(factoryObject(s.home, name));
   });
 
 /**
@@ -111,7 +110,7 @@ const writtenThen = (route: string, name: string, write: (s: Served) => Promise<
   answeredWrite(async (s: Served) => {
     factoryNamed(route, name);
     await write(s);
-    return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+    return s.inRequest(factoryObject(s.home, name));
   });
 
 /**
@@ -241,7 +240,7 @@ const upgraded = (factory: string, { to, template, sets, plan, downgrade }: Fact
 const resolved = (factory: string, { conflict, ours, theirs, text }: FactoryResolveWrite) =>
   answeredWrite(async (s: Served) => {
     factoryNamed(`POST /api/factories/${factory}/resolve`, factory);
-    const proposing = withResolutionProposerAs(s.caller, { home: s.home, repo: repoNeeded(s) });
+    const proposing = withResolutionProposerAs(s.caller, { home: s.home });
     return s.inRequest(proposing(FACTORY_RESOLVE.handler({ factory, conflict, ours, theirs, text })));
   });
 
@@ -250,7 +249,7 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('listAll', ({ query }) =>
       Effect.flatMap(wantsTable, (table) =>
         answered(async (s) => {
-          const list = await s.inRequest(factoryList(s.home, defaultRepo(s), queryOf(query)));
+          const list = await s.inRequest(factoryList(s.home, queryOf(query)));
           return table ? factoryTable(list) : list;
         }),
       ),
@@ -258,7 +257,7 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('get', ({ params: { name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/factories/${name}`, name);
-        return s.inRequest(factoryObject(s.home, defaultRepo(s), name));
+        return s.inRequest(factoryObject(s.home, name));
       }),
     )
     .handle('rules', ({ params: { name } }) => rules('GET', name, {}))
@@ -314,7 +313,7 @@ export const factoriesHandlers = readsBounded(Api, 'factories', (handlers) =>
     .handle('commands', ({ params: { name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/factories/${name}/commands`, name);
-        return s.inRequest(factoryCommandsOf(s.home, defaultRepo(s), name));
+        return s.inRequest(factoryCommandsOf(s.home, name));
       }),
     )
     .handle('create', ({ payload }) => created(payload))

@@ -23,6 +23,13 @@ const START_REFUSALS = [Missing, Conflict, Invalid] as const;
 /** Why a start with no card and no brief is not one (422). */
 const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
 
+/**
+ * Why the card `card` is not started in the default factory, naming no factory and asked with none: the two places a factory is named,
+ * and that nothing was started.
+ */
+const noFactoryRefusal = (card: string): string =>
+  `${card}: this card names no factory, and the default factory reads no repository to start it on. Name its factory at start, ?factory=<name>, or write \`factory: <name>\` on the card. Nothing was started.`;
+
 /** What a start of a run from a brief starts: a workflow's folder, with a brief. */
 export type Asked = {
   dir: string;
@@ -64,12 +71,12 @@ function startOf(body: RunStart, repo: string, home: string, tree?: string): Ask
  * The card `card` started as `nemia start <card> --factory <namespace>` starts it: what the Card's `start` verb runs (src/objects), the
  * request placed in its namespace's factory. On the workflow `body` names, by its name, or, where it names none, the card's own
  * `workflow:`, each found as `nemia start` finds it (`startFromInbox`), on the repository the factory's wiring names for it: never one the
- * request names, a `?repo=` being refused (`cardRepoRefusal`, `Invalid`), and `from` read and ignored. In the factory `factory` where one
- * is named over the card's own: one that names none either way is refused, its fix `?factory=<name>`. With the request's repository as the
- * repository of a card of the default factory, `instead` the brief given in place of the card's body, which may be left out, for the body
- * as it is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is. Answered with the run's id and the card's name —
- * the card kept in the inbox, listed as started — and the card's `repo:` the run did not look at, as `ignoredRepo`, as `nemia start` prints
- * it.
+ * request names, a `?repo=` being refused (`cardRepoRefusal`, `Invalid`), and `from` read and ignored. In the factory `factory`: the
+ * card's namespace's, or, for a card in `default`, which names none, the request's `?factory=`. With none either way it is refused,
+ * `Invalid`, before the package is called, naming `?factory=<name>` and `factory:` on the card (`noFactoryRefusal`): the default factory
+ * reads no repository to start it on. `instead` is the brief given in place of the card's body, which may be left out, for the body as it
+ * is; a blank one is the package's to refuse, as `nemia start <card> --brief ""` is. Answered with the run's id and the card's name — the
+ * card kept in the inbox, listed as started — and the card's `repo:` the run did not look at, as `ignoredRepo`, as `nemia start` prints it.
  */
 export async function cardStart(
   s: Served,
@@ -78,10 +85,10 @@ export async function cardStart(
   factory: string | undefined,
 ): Promise<{ id: string; card: string; ignoredRepo?: string }> {
   if (s.repoNamed) throw new Refused({ message: cardRepoRefusal(card) });
+  if (factory === undefined) throw new Refused({ message: noFactoryRefusal(card) });
   const handed = handedOf(body);
   const given: StartInput = {
     card,
-    ...(s.repo !== undefined ? { at: s.repo } : {}),
     factory,
     fix: '?factory=<name>',
     workflows: body.workflow,
@@ -111,8 +118,9 @@ export async function cardStart(
  * (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a repository outside it, each
  * an `Invalid`. In a factory named, the run works on the repository its wiring names for the workflow (`wiredRepoFor`), `?repo=` having
  * only found the factory; one it names none for is refused, `Invalid`, naming the attach. Every run is started in a factory: a start in
- * `default`, which names none, runs in the one factory whose repository holds the api's repository, or `?repo=`, on that repository
- * (`startFactoryAtOnce`, as `nemia start` finds it), and is refused, `Invalid`, where none or two do, naming the namespace to start it in.
+ * `default`, which names none and reads no repository, runs in the one factory whose repository holds `?repo=`, on that repository
+ * (`startFactoryAtOnce`, as `nemia start` finds it), and is refused, `Invalid`, where none or two do, naming the namespace to start it in;
+ * with no `?repo=` it is refused as `repoNeeded` refuses it, naming `?factory=`, never started on the api's own repository.
  */
 export async function runStart(s: Served, body: RunStart): Promise<{ id: string }> {
   const { home, factory } = s;

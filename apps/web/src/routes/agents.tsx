@@ -29,24 +29,25 @@ const RouterLinkButton = routeLink(LinkButton);
 const code = (text: string) => <code className="font-mono text-body-small">{text}</code>;
 
 /**
- * The agents beside the workflows: yours, which the board writes, then this repository's, which it only reads. An agent is one kind of
- * thing a workflow's node may have attached — what that node's work is told first and runs with — and each lists the nodes that name it.
- * Then the skills an agent can be given, by place, each linked to its page. Your folders are the api's (`storeQuery`).
+ * Your agents, beside the workflows, which the board writes: the default factory works on no repository, so a repository's agents are
+ * read on their own pages in the factory that works on it, never listed here. An agent is one kind of thing a workflow's node may have
+ * attached — what that node's work is told first and runs with — and each lists the nodes that name it. Then the skills an agent can be
+ * given, by place, each linked to its page. Your folders are the api's (`storeQuery`).
  */
 function AgentsPage() {
   const { data: agents } = useSuspenseQuery(agentsQuery);
   const { data: store } = useSuspenseQuery(storeQuery);
   const { data: skills } = useQuery(skillsQuery);
   const yours = agents.filter((a) => a.from === 'yours');
-  const theirs = agents.filter((a) => a.from === 'repo');
 
   return (
     <article className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-body-medium text-muted-foreground">
           An agent is a file in the {code('agents/')} folder beside the workflows: what a node that names it ({code('agent: <name>')}) is
-          told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; this repository's are under{' '}
-          {code('workflows/agents/')}, read-only. An edit changes what a run started later freezes, never a run already started.
+          told first, and how its sessions run. Yours are under {code(`${store.agents}/`)} and are edited here; a repository's, under its{' '}
+          {code('workflows/agents/')}, are read in the factory that works on it. An edit changes what a run started later freezes, never a
+          run already started.
         </p>
         <div className="flex flex-wrap gap-2">
           <RouterLinkButton to="/agents/new" variant="outline">
@@ -61,7 +62,6 @@ function AgentsPage() {
       </div>
 
       <Place title="Yours" agents={yours} empty={<>None yet. New agent makes one in {code(`${store.agents}/`)}.</>} />
-      <Place title="This repository" agents={theirs} empty={<>None: the repository has no {code('workflows/agents/')}.</>} />
       {skills && <SkillPlaces places={skills} library={store.skills} />}
     </article>
   );

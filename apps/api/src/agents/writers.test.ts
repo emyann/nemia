@@ -152,7 +152,7 @@ test("a name yours has taken, a workflow or a file, is refused in workflowTaken'
 });
 
 test("REFUSED on the api: a write in a factory's namespace, whose own definitions the command line alone writes, is 422 the factory's way before any handler", async (t) => {
-  addFactory({ name: 'writers', repos: [process.env.HKB_REPO ?? root] });
+  addFactory({ name: 'writers', repos: [root] });
   const skill = { description: 'Use this when notes need tidying.', body: 'Tidy them.' };
   const F = '/api/namespaces/writers';
   for (const [name, method, url, body] of [

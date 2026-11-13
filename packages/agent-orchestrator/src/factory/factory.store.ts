@@ -19,6 +19,9 @@ import {
   unhiredFireRefusal,
   unrenderedTreeRefusal,
   unscheduledRefusal,
+  scheduleRepoRefusal,
+  scheduleRepoRefusalWords,
+  wiredRepo,
   defaultFactoryRefusal,
   defaultStartRefusal,
   factoriesHolding,
@@ -663,21 +666,29 @@ export function setInstructionAt(home: string, opts: { factory: string; at: Inst
 }
 
 /**
- * Why the schedule `opts` cannot be written into `factory`, or undefined, beyond what `wiringRefusal` judges: a cron or zone `Cron` does
- * not read, or a cron that never fires, quoting it (`firesOf`); an empty brief; a repository that is not one of the factory's; and none
- * named in a factory of two or more, where a scheduled start would not know which.
+ * Why the schedule `opts` cannot be written into `factory`, or undefined, beyond what `wiringRefusal` judges, each ending in what was not
+ * done: a cron or zone `Cron` does not read, or a cron that never fires, quoting it (`firesOf`); an empty brief; and what
+ * `scheduleRepoRefusal` refuses of its repository — a `repo` set or changed, which is retired, or a workflow the factory's wiring places
+ * on none of its repositories (`wiredRepo`) — naming the `nemia factory attach` that places its runs.
  */
 function scheduleRefusal(
   factory: Factory,
   opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
 ): string | undefined {
+  const notDone = 'Nothing was scheduled.';
   const fires = firesOf(opts, Date.now());
-  if ('error' in fires) return `--cron ${JSON.stringify(opts.cron)}${opts.tz ? ` --tz ${opts.tz}` : ''}: ${fires.error}.`;
-  if (!opts.brief.trim()) return 'A scheduled run is asked what --brief says, and it is empty: give the brief its runs start with.';
-  const repos = factory.repos.map((r) => path.resolve(r)).sort();
-  if (opts.repo === undefined ? repos.length > 1 : !repos.includes(path.resolve(opts.repo)))
-    return `${opts.repo === undefined ? '' : `${opts.repo}: `}${factory.name} works on ${repos.join(', ')}: name the one its scheduled runs work on with --repo.`;
-  return undefined;
+  if ('error' in fires) return `--cron ${JSON.stringify(opts.cron)}${opts.tz ? ` --tz ${opts.tz}` : ''}: ${fires.error}. ${notDone}`;
+  if (!opts.brief.trim())
+    return `A scheduled run is asked what --brief says, and it is empty: give the brief its runs start with. ${notDone}`;
+  const wired = wiredRepo(factory, opts.workflow);
+  const repoNow = factory.schedules[opts.workflow]?.repo;
+  const refused = scheduleRepoRefusal({
+    ...(repoNow === undefined ? {} : { repoNow: path.resolve(repoNow) }),
+    ...(opts.repo === undefined ? {} : { repoSent: path.resolve(opts.repo) }),
+    wired: 'repo' in wired,
+  });
+  if (refused === null) return undefined;
+  return scheduleRepoRefusalWords(factory, opts.workflow, refused, 'refused' in wired ? wired.refused : undefined);
 }
 
 /**
@@ -698,7 +709,10 @@ export function setScheduleAt(
   return { file, schedule, ...(replaced ? { replaced } : {}) };
 }
 
-/** The schedule `opts` asks for, stamped with when it was written (`since`), its repository resolved. */
+/**
+ * The schedule `opts` asks for, stamped with when it was written (`since`); a retired `repo`, which `scheduleRefusal` lets through only
+ * as an old schedule's sent back as it is, kept resolved.
+ */
 export const scheduleOf = (opts: { cron: string; brief: string; repo?: string; tz?: string }): Schedule => ({
   cron: opts.cron,
   brief: opts.brief,
@@ -713,7 +727,7 @@ export function scheduleRefused(
   opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
 ): Invalid | undefined {
   const bad = scheduleRefusal(factory, opts);
-  return bad === undefined ? undefined : new Invalid({ message: `${bad} Nothing was scheduled.` });
+  return bad === undefined ? undefined : new Invalid({ message: bad });
 }
 
 /**

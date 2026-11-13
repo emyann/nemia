@@ -18,16 +18,20 @@ import { addFactory } from 'agent-orchestrator/testing';
 import { scratch } from 'test-kit/scratch';
 import { app } from '../app.ts';
 import { story } from 'test-kit/checkpoints';
+/**
+ * The scratch repository, which the factory `elsewhere` works on: read in `default` by its `?repo=`, which that factory lets the api
+ * read.
+ */
 const repo = scratch('nemia-api-custom-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 addFactory({ name: 'elsewhere', repos: [repo] });
 
 type CustomInstructionsAnswer = import('objects').AgentInstructions;
 type CustomInstructionsCleared = import('objects').AgentInstructionsCleared;
 
-/** Where an agent's custom instructions are, in `namespace` (`default` unless said). */
-const at = (name: string, namespace = 'default') => `/api/namespaces/${namespace}/agents/${name}/instructions`;
+/** Where an agent's custom instructions are, in `namespace` (`default` unless said), read on the scratch repository. */
+const at = (name: string, namespace = 'default') =>
+  `/api/namespaces/${namespace}/agents/${name}/instructions?repo=${encodeURIComponent(repo)}`;
 
 const CUSTOM = path.join(root, 'custom-instructions');
 
@@ -163,6 +167,19 @@ test('what the instructions refuse — a name no place has, blank words, a front
       const frontmatter = await refused(() => send('PUT', at('scribe'), { words: keyed }), 422);
       assert.ok(frontmatter.includes('opens with a frontmatter block'), frontmatter);
       assert.deepEqual(held(), {});
+    },
+  );
+
+  await t.test(
+    'REFUSED: in `default` with no `?repo=`, an agent of a repository is a name no place has (404), never looked for in the api’s folder; yours is written',
+    async () => {
+      const bare = (name: string) => `/api/namespaces/default/agents/${name}/instructions`;
+      const missed = await refused(() => send('PUT', bare('scribe'), { words: 'Write it.' }), 404);
+      assert.ok(missed.includes('The agents there: archivist.'), missed);
+      assert.ok(!missed.includes(process.cwd()), 'the api’s own folder is not where an agent is looked for');
+      const put = await send('PUT', bare('archivist'), { words: 'File it.' });
+      assert.equal(put.status, 200);
+      assert.equal((await send('DELETE', bare('archivist'), {})).status, 200);
     },
   );
 

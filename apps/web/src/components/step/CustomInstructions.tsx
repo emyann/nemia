@@ -66,23 +66,23 @@ export const SESSION: Reach = {
 /**
  * A person's custom instructions for every agent named `name`: what they are and when they reach the agent, in the words of its `reach`
  * (`HIRED` unless given), the file the api keeps them in, the words to write, and Clear. They are the person's, not the agent's file's, so
- * the repository's agents take them too. A save or a clear sets what the page shows from the api's answer and reads the words again; a
- * refusal is shown in the api's words.
+ * the repository's agents take them too, the name looked for in `repo`, the repository the agent is read from (none for yours). A save
+ * or a clear sets what the page shows from the api's answer and reads the words again; a refusal is shown in the api's words.
  */
-export function CustomInstructions({ name, reach = HIRED }: { name: string; reach?: Reach }) {
+export function CustomInstructions({ name, repo, reach = HIRED }: { name: string; repo?: string; reach?: Reach }) {
   const queryClient = useQueryClient();
-  const query = customInstructionsQuery(name);
+  const query = customInstructionsQuery(name, repo);
   const { data, error } = useQuery(query);
   const settle = (now: Words) => {
     queryClient.setQueryData(query.queryKey, now);
     void queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true });
   };
   const save = useMutation({
-    mutationFn: (words: string) => writeCustomInstructions(name, words),
+    mutationFn: (words: string) => writeCustomInstructions(name, words, repo),
     onSuccess: settle,
   });
   const clear = useMutation({
-    mutationFn: () => clearCustomInstructions(name),
+    mutationFn: () => clearCustomInstructions(name, repo),
     onSuccess: (cleared) => settle({ name, file: cleared.file, words: null, error: null }),
   });
   const done = save.isSuccess ? reach.saved : clear.isSuccess ? reach.cleared : null;

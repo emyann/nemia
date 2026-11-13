@@ -13,9 +13,8 @@ import type { StoreConfig } from '../config/config.store.ts';
 import type { Run } from '../record/record.ts';
 import type { RunState } from './apply.ts';
 
-/** What the tick hands the proposals pass: where a queued card starts, the runs it listed, and each judged run's status. */
+/** What the tick hands the proposals pass: the runs it listed, and each judged run's status. */
 export type ProposalsActed = (
-  repo: string | undefined,
   runs: readonly Pick<Run, 'id'>[],
   judged: ReadonlyMap<string, { readonly status: RunState }>,
 ) => Effect.Effect<void, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>;

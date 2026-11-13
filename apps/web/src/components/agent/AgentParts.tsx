@@ -41,12 +41,17 @@ export function FromBadge({ from }: { from: AgentListing['from'] }) {
   );
 }
 
-/** A node that names an agent, linked to its step's page: `workflow › step`. */
+/**
+ * A node that names an agent, linked to its step's page: `workflow › step`; a repository's, in the factory and repository the page is
+ * in, the default factory reading no repository.
+ */
 function NodeLink({ user }: { user: AgentUser }) {
+  const here = usePlaceHere();
   return (
     <RouteLink
       to="/workflows/$from/$workflow/$step"
       params={{ from: user.from, workflow: user.workflow, step: user.step }}
+      search={user.from === 'repo' ? here : {}}
       data-node={`${user.workflow}/${user.step}`}
       className={cn('font-mono text-body-small text-foreground', LINK)}
     >
@@ -192,11 +197,12 @@ function FollowingFace({ name, size, plate, expression, className }: Omit<FacePr
 }
 
 /**
- * The search a link to a definition's page carries: for a factory's own, which only its factory serves, the place it is read in, `place`,
- * else the one the page is in (`here`); none for any other, which `default` serves whatever factory the link is drawn in.
+ * The search a link to a definition's page carries: for a factory's own or a repository's, which only a factory serves — the default one
+ * reading no repository — the place it is read in, `place`, else the one the page is in (`here`); none for yours or Nemia's, which
+ * `default` serves whatever factory the link is drawn in.
  */
 const definitionSearch = (from: string, place: PagePlace | undefined, here: PagePlace = {}): PagePlace => {
-  if (from !== 'factory') return {};
+  if (from !== 'factory' && from !== 'repo') return {};
   const { factory, repo } = place ?? here;
   return { ...(factory !== undefined && { factory }), ...(repo !== undefined && { repo }) };
 };
@@ -212,7 +218,7 @@ function usePlaceHere(): PagePlace {
 
 /**
  * A link to an agent's page, by name, its face beside it: what a node's form and a step's page link its agent with, in `place` where the
- * agent is a factory's own (`definitionSearch`).
+ * agent is a factory's own or a repository's (`definitionSearch`).
  */
 export function AgentLink({
   from,
@@ -286,7 +292,7 @@ export function SkillRefused({ message }: { message: string }) {
 
 /**
  * A link to a skill's page, by its origin and name: what an agent's skills and the Agents page's skills link a skill with, in `place` where
- * the skill is a factory's own (`definitionSearch`).
+ * the skill is a factory's own or a repository's (`definitionSearch`).
  */
 export function SkillLink({ from, name, className, place }: { from: SkillSource; name: string; className?: string; place?: PagePlace }) {
   const here = usePlaceHere();

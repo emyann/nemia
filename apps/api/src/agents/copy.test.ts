@@ -20,7 +20,6 @@ import { app } from '../app.ts';
 import { listedIn } from '../../test/definitions.ts';
 import { story } from 'test-kit/checkpoints';
 const repo = scratch('nemia-api-copy-repo-');
-process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 addFactory({ name: 'elsewhere', repos: [repo] });
 

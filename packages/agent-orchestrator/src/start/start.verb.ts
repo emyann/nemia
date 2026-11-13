@@ -630,9 +630,10 @@ const factoryNamed = (home: string, name: string | undefined): Factory | undefin
   name === undefined ? undefined : filedAtOnce(home, name);
 
 /**
- * The repository a run of a schedule started in the factory `name` works on (`factoryRepo`): `named`, else the factory's one repository,
- * else `fallback`. Kept for schedules alone: a card and a brief are placed by the factory's wiring (`wiredRepoFor`). Refused as `start`
- * refuses the factory: none by that name, or one whose file does not read (`readFactory`).
+ * The repository a run started by `nemia start` in the factory `name` works on where no wiring places it (`factoryRepo`): `named`, else
+ * the factory's one repository, else `fallback`. Kept for the command line's start in the default factory alone: a card, a brief and a
+ * schedule are placed by the factory's wiring (`wiredRepoFor`). Refused as `start` refuses the factory: none by that name, or one whose
+ * file does not read (`readFactory`).
  */
 export const repoFor = (home: string, name: string | undefined, named: string | undefined, fallback: string): string =>
   factoryRepo(factoryNamed(home, name), named, fallback);

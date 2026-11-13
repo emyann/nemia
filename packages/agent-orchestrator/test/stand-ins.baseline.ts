@@ -13,8 +13,6 @@ export const REAL_REACH: Baseline = {
   'apps/api/src/decide/decision.test.ts': ['git', 'process'],
   'apps/api/src/decide/to-decide.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/factory/factories.test.ts': ['git', 'process'],
-  'apps/api/src/factory/instruction.test.ts': ['git', 'process'],
-  'apps/api/src/factory/parts/hires.test.ts': ['git', 'process'],
   'apps/api/src/inbox/inbox.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/inbox/queue.test.ts': ['git', 'process', 'place', 'engine'],
   'apps/api/src/runs/actions.test.ts': ['git', 'process', 'place', 'engine'],

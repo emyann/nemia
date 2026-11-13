@@ -7,7 +7,6 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { factoryInstruction } from 'agent-orchestrator';
@@ -18,9 +17,6 @@ import { app } from '../app.ts';
 
 type FactoryInstruction = import('agent-orchestrator').FactoryInstruction;
 
-const own = scratch('nemia-api-instruction-own-');
-process.env.HKB_REPO = own;
-execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: own });
 const folder = scratch('nemia-api-instruction-folder-');
 addFactory({ name: 'mill', repos: [folder] });
 

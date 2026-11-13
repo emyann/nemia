@@ -6,7 +6,7 @@
 import { informerMemo, type SummaryHow, verifiesRest, volumeList, volumeObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
+import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
@@ -22,13 +22,13 @@ export const volumesHandlers = readsBounded(Api, 'volumes', (handlers) =>
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/volumes`, namespace);
-        return s.inRequest(volumeList(s.e, howOf(s), defaultRepo(s), namespace, queryOf(query)));
+        return s.inRequest(volumeList(s.e, howOf(s), namespace, queryOf(query)));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/volumes/${name}`, namespace);
-        return s.inRequest(volumeObject(s.e, howOf(s), defaultRepo(s), namespace, name));
+        return s.inRequest(volumeObject(s.e, howOf(s), namespace, name));
       }),
     ),
 );

@@ -279,7 +279,7 @@ test("the table's help is today's, word for word", () => {
       "                               hire an agent into a workflow's step: one a step, a second replaces it",
       '  nemia factory fire <factory> --step <workflow>/<step>',
       "                               take a step's hire back",
-      '  nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]',
+      '  nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--tz <zone>]',
       '                               start a run of an attached workflow at each fire of a cron, by the',
       '                               daemon, at every level; a second replaces the first',
       '  nemia factory unschedule <factory> <workflow>',

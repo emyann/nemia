@@ -32,8 +32,8 @@ export function originAsked(asked: string | undefined): Origin | undefined {
 
 /**
  * `asked`, the `?origin=` of a read in `place`, as an origin (`originAsked`): the repository's own layer asked for where the request is
- * answered on no repository (an install, no factory named) is refused as `repoNeeded` refuses it, naming the factory to pick; any other
- * layer needs none.
+ * answered on no repository — any request in the default factory with no `?repo=` — is refused as `repoNeeded` refuses it, naming the
+ * factory to pick; any other layer needs none.
  */
 export function originIn(place: Pick<Place, 'repo' | 'factory'>, asked: string | undefined): Origin | undefined {
   const origin = originAsked(asked);

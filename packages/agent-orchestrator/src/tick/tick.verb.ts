@@ -297,14 +297,14 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify, 
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
   const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   if (informer) yield* informed(e, informer, runs, judging, verify);
-  yield* withinEffect('act', (yield* ProposalsAct)(repo, runs, judging.done));
+  yield* withinEffect('act', (yield* ProposalsAct)(runs, judging.done));
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
       ? yield* withinEffect('act', startQueued(repo, runs))
       : undefined;
   const scheduled =
     !(queue && 'run' in queue) && slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause(home)))
-      ? yield* withinEffect('act', startDue(repo, runs))
+      ? yield* withinEffect('act', startDue(runs))
       : undefined;
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });

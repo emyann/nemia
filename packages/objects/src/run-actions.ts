@@ -22,8 +22,17 @@ const Strings = Schema.Array(Schema.String);
 /** A text that is not blank: a name, an id, a label's edit. */
 const NotBlank = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
 
-/** A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. */
-const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) }));
+/**
+ * A person's answers to the questions a step's closeout asks: the question, the options chosen, and their own words. Its description says
+ * what each key is matched against, for a caller that reads the schema alone (the MCP port's tools): the questions as the run's decision
+ * lists them (`Decidable`'s `questions`, decide.ts).
+ */
+const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) })).annotate({
+  description:
+    "One answer to each question the step asks now, as the run's decision lists them under questions (GET /api/runs/:runId/decision): " +
+    "question is the question's title, word for word; chose the labels of the options chosen, never their letters, several only where " +
+    'the question takes several (multiple); own your own words, beside a choice or instead of one.',
+});
 
 /**
  * A file handed to a run's steps (`nemia start --input <file>`), read where the start is typed and sent by its name, never its path: its

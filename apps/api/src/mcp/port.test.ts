@@ -20,11 +20,12 @@ import { Hono } from 'hono';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { approvalFile, CLI_VERBS, storeConfigLayer, TABLE, TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
+import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { until } from '../../test/waits.ts';
 import { Beats } from '../layer.ts';
-import { Api, EventList, RUN_STATES } from 'objects';
+import { Api, type Decidable, EventList, RUN_STATES } from 'objects';
 import { INSTRUCTIONS_BOUND } from './instructions.ts';
 import { mcpPort, PORT_LIST_TTL_MS } from './port.ts';
 import { portTools } from './tools.ts';
@@ -67,6 +68,75 @@ const planted = (id: string) => {
       steps: { implement: { taskId: null } },
     }),
   );
+};
+
+/**
+ * A run of `design → implement`, started `--gate design`, whose design signed off asking two questions under its `open` field, one of which
+ * takes several: it waits at its gate.
+ */
+const askingAtGate = (id: string) => {
+  const file = path.join(root, 'runs', `${id}.json`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const design = parseWorkflow('design', '---\nplace: git\noutput: spec.schema.json\n---\nDesign it.\n', () =>
+    JSON.stringify({
+      type: 'object',
+      properties: { open: { 'x-shape': 'questions', description: 'What is undecided.' } },
+      required: ['open'],
+      additionalProperties: false,
+    }),
+  );
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      id,
+      repo: '/code/app',
+      workspace: '/code/app',
+      baseRef: 'abc123',
+      branch: 'main',
+      isolate: true,
+      brief: 'Ask at the gate',
+      workflowDir: path.join(root, 'no-such-workflow'),
+      createdAt: '2026-11-11T09:00:00.000Z',
+      gates: ['design'],
+      workflow: [
+        { ...design, after: [] },
+        { name: 'implement', after: ['design'], body: 'Implement it.' },
+      ],
+      steps: { design: { taskId: `${id}-design`, branch: `wf/${id}/design` }, implement: { taskId: null } },
+    }),
+  );
+  Effect.runSync(engineFor(standIn()).file({ id: `${id}-design`, brief: 'Design it.', cwd: '/code/app', harness: 'codex' }));
+  standIn().settle(`${id}-design`, 'succeeded', {
+    exitCode: 0,
+    closeout: {
+      outcome: 'done',
+      summary: 'The design.',
+      needs: null,
+      artifacts: [],
+      open: [
+        {
+          title: 'How is the card cut?',
+          body: 'It is big.',
+          options: [
+            { label: 'small', meaning: 'The shape and the board first.' },
+            { label: 'whole', meaning: 'All of it at once.' },
+          ],
+          recommended: 'small',
+          multiple: false,
+        },
+        {
+          title: 'Where do the answers go?',
+          body: 'Either or both.',
+          options: [
+            { label: 'retry', meaning: 'Into the next try.' },
+            { label: 'gate', meaning: 'With the approval.' },
+          ],
+          recommended: null,
+          multiple: true,
+        },
+      ],
+    },
+  });
 };
 
 /** A fetch of `on`, as a client off this machine's loopback sends it. */
@@ -184,6 +254,63 @@ for (const era of ERAS)
     for (const state of RUN_STATES) assert.ok(instructions.includes(state), `the instructions say the state ${state}`);
     await client.close();
   });
+
+test("an agent answers a gate's questions over the port as the tools say: decide lists them, an approval of their titles and labels is taken", async () => {
+  const id = 'r-port-asks';
+  askingAtGate(id);
+  const client = await connected(app);
+  const { tools } = await client.listTools();
+  for (const name of ['approve', 'retry']) {
+    const said = (tools.find((t) => t.name === name)?.description ?? '').split('\n').find((line) => line.startsWith('answers: '));
+    assert.ok(said?.includes('title') && said.includes('labels'), `${name}'s description says what answers is matched against`);
+  }
+  const decided = await client.callTool({ name: 'decide', arguments: { runId: id } });
+  assert.notEqual(decided.isError, true, textOf(decided));
+  const { questions } = decided.structuredContent as Decidable;
+  assert.deepEqual(
+    questions?.map((s) => ({
+      step: s.step,
+      asked: s.questions.map((q) => [q.number, q.title, q.options.map((o) => [o.letter, o.label])]),
+    })),
+    [
+      {
+        step: 'design',
+        asked: [
+          [
+            1,
+            'How is the card cut?',
+            [
+              ['a', 'small'],
+              ['b', 'whole'],
+            ],
+          ],
+          [
+            2,
+            'Where do the answers go?',
+            [
+              ['a', 'retry'],
+              ['b', 'gate'],
+            ],
+          ],
+        ],
+      },
+    ],
+  );
+  const [cut, where] = questions?.[0]?.questions ?? [];
+  assert.deepEqual([cut?.options.map((o) => o.recommended), cut?.multiple, where?.multiple], [[true, false], false, true]);
+  const answers = (questions?.[0]?.questions ?? []).map((q) => ({
+    question: q.title,
+    chose: q.options.filter((o) => o.recommended || q.multiple).map((o) => o.label),
+  }));
+  const approved = await client.callTool({
+    name: 'approve',
+    arguments: { namespace: 'default', name: id, step: 'design', answers },
+  });
+  assert.notEqual(approved.isError, true, textOf(approved));
+  const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'design', 1), 'utf8')) as { message: string };
+  for (const q of answers) assert.ok(written.message.includes(q.question), `the approval carries the answer to ${q.question}`);
+  await client.close();
+});
 
 test("every listed tool's description opens with its one-line summary, never a flag", async () => {
   const client = await connected(app);

@@ -266,20 +266,29 @@ async function serve(dir: string): Promise<void> {
   fs.mkdirSync(dir, { recursive: true });
   build(path.join(dir, 'dist'));
   await buildStories(path.join(dir, 'stories'));
+  const served = await startHolder(dir, tree);
+  console.log(linesOf(served).join('\n'));
+}
+
+/**
+ * Starts the holder of the board built in `dir` from the tree `tree`, detached, under the environment `env`, and resolves with where it
+ * serves once it says so in `served.json`; rejects with why when it ends before that or says nothing within `ANSWER_MS`.
+ */
+export async function startHolder(dir: string, tree: string, env: NodeJS.ProcessEnv = process.env): Promise<ServedBoard> {
   const log = path.join(dir, 'hold.log');
   const out = fs.openSync(log, 'a');
   const holder = spawn(process.execPath, [import.meta.filename, 'hold'], {
     cwd: WEB,
     detached: true,
     stdio: ['ignore', out, out],
-    env: { ...process.env, BOARD_SERVE_DIR: dir, BOARD_SERVE_TREE: tree },
+    env: { ...env, BOARD_SERVE_DIR: dir, BOARD_SERVE_TREE: tree },
   });
   fs.closeSync(out);
   holder.unref();
   let exited: string | undefined;
   holder.on('exit', (code, signal) => (exited = signal ?? `code ${code}`));
   const said = (): string => (fs.existsSync(log) ? plain(fs.readFileSync(log, 'utf8')).trimEnd() : '') || '(nothing)';
-  const served = await awaited(
+  return awaited(
     () => {
       if (exited !== undefined) throw new Refusal(`the board's holder ended (${exited}) before it served. What it said:\n${said()}`);
       return servedIn(dir);
@@ -290,7 +299,6 @@ async function serve(dir: string): Promise<void> {
     if (holder.pid !== undefined && exited === undefined) holder.kill('SIGTERM');
     throw err;
   });
-  console.log(linesOf(served).join('\n'));
 }
 
 /** `hold`: seeds and serves the folder's store, says where in `served.json`, and holds until it is asked to stop or its time is up. */

@@ -1,12 +1,12 @@
 {
   "type": "object",
   "properties": {
-    "needsDesign": {
+    "handsOver": {
       "type": "string",
-      "enum": ["yes", "no"],
-      "description": "Whether the intent needs a design before it is built. yes: a decision is still open — a shape, a contract, a choice between ways — and someone has to write a spec a person approves: it goes to build. no: the intent settles its change and leaves nothing to decide, whatever its size: it goes to quick. The person sees your answer as the proposed route and may change it at the gate."
+      "enum": ["design", "change", "nothing"],
+      "description": "What the intent hands over to be built. design: a decision is still open — a shape, a contract, a choice between ways — and someone has to write a spec a person approves: it goes to build. change: the intent settles its change and leaves nothing to decide, whatever its size: it goes to quick. nothing: the intent hands over no code — its deliverable is the intent itself, a plan, cards for someone to file, a decision: the run ends on it, and no build or quick run starts. The person sees your answer as the proposed route and may change it at the gate."
     }
   },
-  "required": ["needsDesign"],
+  "required": ["handsOver"],
   "additionalProperties": false
 }

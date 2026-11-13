@@ -11,9 +11,9 @@ import { container, ink } from '@/lib/meaning';
 import type { ChatKept } from '@/lib/chatOutbox';
 
 /**
- * The message this browser kept because the api would not take it: its tag and its line in the failure's colour, and the three things
- * the person may do with it — send it again, change its words, throw it away. It is drawn as theirs, at the right, as every message of
- * theirs is.
+ * The message this browser kept because the api did not take it: its tag and its line in the failure's colour, and the three things
+ * the person may do with it — send it again, change its words, throw it away. Its line is the api's own words where the api refused it,
+ * and the board having lost the daemon where nothing answered. It is drawn as theirs, at the right, as every message of theirs is.
  */
 export function ChatKeptMessage({
   kept,
@@ -43,7 +43,9 @@ export function ChatKeptMessage({
       ) : (
         <Textarea aria-label="Change the message" value={draft} onChange={(event) => setDraft(event.target.value)} />
       )}
-      <span className={`text-body-small ${ink.failure}`}>The board lost the daemon. Nothing reached her.</span>
+      <span data-chat-kept-why={kept.refused === undefined ? 'lost' : 'refused'} className={`text-body-small ${ink.failure}`}>
+        {kept.refused ?? 'The board lost the daemon. Nothing reached her.'}
+      </span>
       <div className="flex flex-wrap justify-end gap-2">
         {draft === null ? (
           <>

@@ -34,11 +34,23 @@ import {
   type ChatCall,
 } from '../src/lib/chatFollowing.ts';
 import { turnWords } from '../src/lib/conversation.ts';
-import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
+import {
+  CHAT_OUTBOX_KEY,
+  editKept,
+  forgetKept,
+  keepUnsent,
+  keptAfter,
+  parseKept,
+  readKept,
+  retryKept,
+  sendingOnce,
+} from '../src/lib/chatOutbox.ts';
+import { sendChat } from '../src/lib/api/chat.ts';
 import { anyAbove, composerButton, composerWords } from '../src/lib/nemia.ts';
 import { cuesOf, faceOf, UP, type Presence } from '../src/lib/presence.ts';
 import type { StreamLike } from '../src/lib/follow.ts';
 import type { AskQuestion, ChatEvent, ChatPresence, PermissionFacts } from '../src/lib/api/chat.ts';
+import type { ChatKept } from '../src/lib/chatOutbox.ts';
 import type { FactoryLevel } from '../src/lib/api/nemia.ts';
 
 const at = (second: number): string => new Date(Date.UTC(2026, 9, 15, 17, 40, second)).toISOString();
@@ -175,7 +187,88 @@ test('chatOutbox: a message the api would not take is kept in this browser, and 
     for (const raw of [null, 'not json', '[]', '{}', '{"text":"","at":"x"}', '{"text":"x"}'])
       assert.equal(parseKept(raw), null, JSON.stringify(raw));
     assert.deepEqual(parseKept('{"text":"x","at":"y","more":1}'), { text: 'x', at: 'y' });
+    assert.deepEqual(parseKept('{"text":"x","at":"y","refused":""}'), { text: 'x', at: 'y' }, 'a refusal with no words is none');
   });
+  await t.test('a refused message keeps the api’s words through a change of its own and a reload', () => {
+    storage();
+    keepUnsent('Approve the land', at(0), 'Say who you are first.');
+    editKept('Approve the land of the runs page');
+    assert.deepEqual(readKept(), { text: 'Approve the land of the runs page', at: at(0), refused: 'Say who you are first.' });
+    forgetKept();
+  });
+  await t.test(
+    'a message the api refused says why and is not sent again; one nothing answered, or a 5xx, is lost and tried again',
+    async () => {
+      await import('./tsx.ts');
+      const { createElement } = await import('react');
+      const { renderToStaticMarkup } = await import('react-dom/server');
+      const { ChatKeptMessage } = await import('../src/components/nemia/chat/ChatKept.tsx');
+      const draw = (kept: ChatKept) =>
+        renderToStaticMarkup(
+          createElement(ChatKeptMessage, { kept, onAgain: () => undefined, onEdit: () => undefined, onDiscard: () => undefined }),
+        );
+      const WHY = 'The words came with no token: sign in on the token page.';
+      const before = globalThis.fetch;
+      let requests = 0;
+      let answer: () => Promise<Response> = async () => new Response(null, { status: 204 });
+      let counted: (() => void) | undefined;
+      globalThis.fetch = async () => {
+        requests += 1;
+        counted?.();
+        return answer();
+      };
+      const json = { 'content-type': 'application/json' };
+      const failureOf = (text: string) =>
+        sendChat(text).then(
+          () => assert.fail('the api took it'),
+          (failure: unknown) => failure,
+        );
+      /** Runs `retryKept` on `text` until `until` requests were made or it was refused; answers how many were made, and the refusal. */
+      const retried = (text: string, until: number) =>
+        new Promise<{ requests: number; refused: unknown }>((resolve) => {
+          requests = 0;
+          let stop = () => undefined as void;
+          const done = (refused: unknown) => {
+            stop();
+            counted = undefined;
+            // A beat past the bound, so a second try that would come is counted.
+            setTimeout(() => resolve({ requests, refused }), 30);
+          };
+          counted = () => {
+            if (requests >= until) done(undefined);
+          };
+          stop = retryKept(() => sendChat(text), 2, done);
+        });
+      try {
+        answer = async () => new Response(JSON.stringify({ error: WHY }), { status: 422, headers: json });
+        const refused = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
+        assert.deepEqual(refused, { text: 'Approve the land', at: at(0), refused: WHY }, 'a 4xx is a refusal, in the api’s words');
+        const html = draw(refused);
+        assert.match(html, new RegExp(`data-chat-kept-why="refused"[^>]*>${WHY}<`), 'its line is the api’s own words');
+        assert.doesNotMatch(html, /lost the daemon/);
+        for (const button of ['Send again', 'Edit', 'Discard']) assert.match(html, new RegExp(`>${button}<`), button);
+        const once = await retried('Approve the land', 2);
+        assert.equal(once.requests, 1, 'a refused message is never sent again on its own');
+        assert.ok(once.refused !== undefined, 'and its refusal is handed back');
+
+        for (const [why, lost] of [
+          ['nothing answered', async () => Promise.reject(new TypeError('Failed to fetch'))],
+          ['a 5xx', async () => new Response(JSON.stringify({ error: 'The store is busy.' }), { status: 503, headers: json })],
+        ] as const) {
+          answer = lost;
+          const kept = keptAfter('Approve the land', at(0), await failureOf('Approve the land'));
+          assert.deepEqual(kept, { text: 'Approve the land', at: at(0) }, `${why}: the board lost the daemon`);
+          assert.match(draw(kept), /data-chat-kept-why="lost"[^>]*>The board lost the daemon/, `${why}: today’s words`);
+          const again = await retried('Approve the land', 3);
+          assert.ok(again.requests >= 3, `${why}: it is tried again on its own`);
+          assert.equal(again.refused, undefined);
+        }
+      } finally {
+        globalThis.fetch = before;
+        counted = undefined;
+      }
+    },
+  );
   await t.test(
     'a kept message reaches her once: a second try while the first is in flight is the first, and the next call tries again',
     async () => {

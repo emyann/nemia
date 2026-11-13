@@ -14,6 +14,18 @@ const READ = '/api/nemia/chat';
 /** The line Chromium writes to the console for a resource it could not reach at all, which names no address. */
 const REFUSED_LINE = 'console error: Failed to load resource: net::ERR_CONNECTION_REFUSED';
 
+/** The line Chromium writes to the console for an answer of the api's that refused, which names no address. */
+const REFUSAL_LINE = 'console error: Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)';
+
+/** What the api answers a message it refuses, in its own words. */
+const REFUSED_WHY = 'The message came with no token: paste one on the token page, then send it again.';
+
+/** What the person writes that the api refuses. */
+const REFUSED_WROTE = 'Land the kit cards once they are green.';
+
+/** Past two of the board's beats of trying a lost message again (`CHAT_RETRY_MS`, 3 s): a refused one is tried on neither. */
+const PAST_TWO_BEATS_MS = 7_000;
+
 /** What the person writes, and what they change it to before the api is back. */
 const WROTE = 'Start the two kit cards as one batch.';
 const CHANGED = 'Start the two kit cards as one batch, and tell me when their checks are green.';
@@ -45,7 +57,8 @@ async function wrote(page: Page, words: string, open = false): Promise<ReturnTyp
 export default {
   /**
    * A message the api would not take: kept in this browser, drawn as not sent with the daemon said unreachable, changed, kept through a
-   * reload, and taken exactly once when the api answers again — the board trying it on its own, with no press of the person's.
+   * reload, and taken exactly once when the api answers again — the board trying it on its own, with no press of the person's. Then a
+   * message the api answers and refuses: kept with the api's own words, no band, and never sent again but on the person's press.
    *
    * The refusal is this page's own: the send is aborted, as a daemon that is gone aborts it, so it runs on a page of its own whose watch
    * expects exactly those failures. Her task and her level are the page's, taken back after; the message the api finally takes goes with
@@ -126,8 +139,39 @@ export default {
       await settled(down);
       await photograph(down, path.join(OUT, `chat-kept-taken-${await themeOf(down)}.png`), { fullPage: true });
 
+      let refusals = 0;
+      await down.route(isSend, (route) => {
+        refusals += 1;
+        return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: REFUSED_WHY }) });
+      });
+      const refused = await wrote(down, REFUSED_WROTE, true);
+      const kept = refused.locator('[data-chat-kept]');
+      await expectTexts(kept.locator('[data-chat-bubble="kept"]'), [REFUSED_WROTE], 'the api refusing the message, it is kept');
+      await expectTexts(kept.locator('[data-chat-kept-why="refused"]'), [REFUSED_WHY], 'and its line is the api’s own words');
+      await expectCount(kept.locator('[data-chat-kept-why="lost"]'), 0, 'never that the board lost the daemon');
+      await expectTexts(kept.getByRole('button'), ['Send again', 'Edit', 'Discard'], 'the person may still act on what it says');
+      await expectCount(refused.locator('[data-band="lost"]'), 0, 'a refusal raises no band of its own');
+      await down.waitForTimeout(PAST_TWO_BEATS_MS);
+      if (refusals !== 1) throw new Refused(`a refused message is never sent again on its own — it was sent ${refusals} times`);
+      await settled(down);
+      await photograph(down, path.join(OUT, `chat-kept-refused-${await themeOf(down)}.png`), { fullPage: true });
+      await kept.getByRole('button', { name: 'Send again' }).click();
+      await expectNone(
+        async () => (refusals === 2 ? null : `it was sent ${refusals} times`),
+        'Send again sends it, once, on the person’s press',
+      );
+      await expectTexts(kept.locator('[data-chat-kept-why="refused"]'), [REFUSED_WHY], 'refused again, it says so again');
+      await kept.getByRole('button', { name: 'Discard' }).click();
+      await expectCount(refused.locator('[data-chat-kept]'), 0, 'Discard throws it away');
+      await down.unroute(isSend);
+
       const unexpected = problems().filter(
-        (problem) => !problem.includes(SEND) && !problem.includes(`${READ} `) && !problem.endsWith(READ) && problem !== REFUSED_LINE,
+        (problem) =>
+          !problem.includes(SEND) &&
+          !problem.includes(`${READ} `) &&
+          !problem.endsWith(READ) &&
+          problem !== REFUSED_LINE &&
+          problem !== REFUSAL_LINE,
       );
       if (unexpected.length > 0)
         throw new Refused(`the only failures are the sends this page refused — it also saw:\n${unexpected.join('\n')}`);

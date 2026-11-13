@@ -503,7 +503,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         brief: command,
         cwd: workspace,
         deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
-        config: { command: checkArgv(command, install !== undefined), env, niceness: CHECK_NICENESS },
+        config: { command: checkArgv(command, install === undefined ? undefined : 'install'), env, niceness: CHECK_NICENESS },
       }),
     );
     const { factory, workflow } = keysOf(run);

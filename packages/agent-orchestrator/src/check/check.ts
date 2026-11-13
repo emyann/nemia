@@ -160,25 +160,45 @@ export const INSTALL = `npm ${INSTALL_ARGS.join(' ')}`;
 export const INSTALL_FAILED = '[nemia check] install failed, exit';
 
 /**
+ * What the pass found of a worktree's `node_modules` it could not install from its `package-lock.json`, before the check filed in it: the
+ * check runs no command on that tree, and ends with no verdict on the work.
+ */
+export const UNPROVISIONED =
+  '[nemia check] the node_modules of this worktree could not be installed from its package-lock.json: no verdict on the work; the notes of the run say what npm said';
+
+/**
+ * What a check's script runs before its command: an install of the checkout's own (`install`), or nothing at all, where the pass could not
+ * install the worktree's tree (`unprovisioned`).
+ */
+export type CheckFirst = 'install' | 'unprovisioned';
+
+/**
  * The argv a check runs: `sh -c`, and the shell line the run froze.
  *
  * - **The command on a line of its own**, last, so `exit 3` is the script's status and a command ending in a `# comment` comments out
  *   nothing after it.
- * - **An install first, when `install` is set** (`INSTALL`): an ending's check whose staged merge asks for packages the checkout has not
- *   installed (`checkoutParts`), into the checkout's own `node_modules`, both its streams on stdout. An install that fails is no verdict on
- *   the work, so the script says so and kills itself: the runtime records no exit code for a process a signal ended, and the run reads a
- *   check that did not finish (`attemptVerdict`). The text is fixed here: nothing of the checkout's reaches the script.
+ * - **An install first, when `first` is `install`** (`INSTALL`): an ending's check whose staged merge asks for packages the checkout has
+ *   not installed (`checkoutParts`), into the checkout's own `node_modules`, both its streams on stdout. An install that fails is no
+ *   verdict on the work, so the script says so and kills itself: the runtime records no exit code for a process a signal ended, and the
+ *   run reads a check that did not finish (`attemptVerdict`).
+ * - **No command at all, when `first` is `unprovisioned`**: the pass could not install the worktree's `node_modules` from its lockfile
+ *   (`keepWorktreeInstalled`), so a verdict there would judge the workspace, not the work. The script says so (`UNPROVISIONED`) and kills
+ *   itself the same way: the check ends unfinished, and the step's next session is told.
+ *
+ * The text is fixed here: nothing of the checkout's reaches the script.
  */
-export const checkArgv = (command: string, install = false): string[] => [
+export const checkArgv = (command: string, first?: CheckFirst): string[] => [
   'sh',
   '-c',
   [
-    ...(install
+    ...(first === 'install'
       ? [
           `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`,
           `${INSTALL} 2>&1 || { printf '\\n${INSTALL_FAILED} %d: no verdict on the work\\n' "$?"; kill -s KILL $$; }`,
         ]
-      : []),
+      : first === 'unprovisioned'
+        ? [`echo '${UNPROVISIONED}'`, 'kill -s KILL $$']
+        : []),
     command,
   ].join('\n'),
 ];

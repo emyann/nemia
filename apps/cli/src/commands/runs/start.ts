@@ -186,7 +186,7 @@ export async function start(args: Args): Promise<number> {
   const brief = plan ? plan.body : (text?.trim() ?? arg);
   const factory = textArg(args, 'factory');
   const namespace = factory ?? DEFAULT_NAMESPACE;
-  const query = repoQueryOf(textArg(args, 'repo'), factory, 'folder');
+  const query = repoQueryOf(textArg(args, 'repo'), factory);
   const payload: RunStart = { ...extrasOf(args), workflow, brief };
   said(startedLines(await asked(COMMAND, (c) => c.runs.create({ params: { namespace }, query, payload }))));
   return 0;

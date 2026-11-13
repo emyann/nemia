@@ -1,6 +1,6 @@
 /**
  * The agents' reads and copy, each asked of the api's Agent group in `default`: `nemia agents` (every page of the listing, on the
- * repository `--repo` names, else the one it is typed in, `repoQuery`), `nemia agents card` (the A2A card on stdout, what it is not on
+ * repository `--repo` names, else the one it is typed in, `onRepo`), `nemia agents card` (the A2A card on stdout, what it is not on
  * stderr), `nemia agents sources` (the agent files the store knows of) and `nemia agents copy` (one copied into yours: its file a path on
  * the daemon's machine); and the lines each prints of what the api answers.
  */
@@ -18,7 +18,7 @@ import {
 } from 'objects';
 import { asked, everyPage, pageOf } from '../../objects.ts';
 import { listArg, pathSent, said, textArg } from '../requests.ts';
-import { repoQuery } from './sent.ts';
+import { onRepo } from './sent.ts';
 
 /** The line of an agent copied in: the file and version it came from, and whether that file has changed since or is gone. */
 const copiedLine = ({ source, version, now }: NonNullable<Agent['status']['copied']>): string =>
@@ -49,9 +49,10 @@ export const agentsLines = (agents: readonly Agent[]): string[] =>
 
 /** `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in. */
 export async function agentsListed(args: Args): Promise<number> {
-  const repo = repoQuery(args);
   const list = await asked(AGENTS_WORDS.name, (c) =>
-    pageOf(everyPage((page) => c.agents.list({ params: { namespace: DEFAULT_NAMESPACE }, query: { ...page, ...repo } }))),
+    onRepo(args, (repo) =>
+      pageOf(everyPage((page) => c.agents.list({ params: { namespace: DEFAULT_NAMESPACE }, query: { ...page, ...repo } }))),
+    ),
   );
   said(agentsLines(list.items));
   return 0;
@@ -61,8 +62,10 @@ export async function agentsListed(args: Args): Promise<number> {
 export async function agentsCard(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const origin = textArg(args, 'from');
-  const query = { ...repoQuery(args), ...(origin !== undefined && { origin }) };
-  const answer = await asked(AGENTS_CARD_WORDS.name, (c) => c.agents.card({ params: { namespace: DEFAULT_NAMESPACE, name }, query }));
+  const from = origin !== undefined ? { origin } : {};
+  const answer = await asked(AGENTS_CARD_WORDS.name, (c) =>
+    onRepo(args, (repo) => c.agents.card({ params: { namespace: DEFAULT_NAMESPACE, name }, query: { ...repo, ...from } })),
+  );
   said([JSON.stringify(answer.card, null, 2)]);
   process.stderr.write(
     `${name} (${answer.from ?? origin ?? 'repo'}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.\n`,

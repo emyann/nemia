@@ -4,7 +4,6 @@
  * label selector a query takes, a path sent to the daemon, and the repository a command is about, typed or the one it is typed in. A
  * request is the client's concern: the api decodes it by the endpoint's Schema.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { type Args, DEFAULT_NAMESPACE } from 'objects';
 import { chosenOf } from '../context.ts';
@@ -62,32 +61,20 @@ export const selectorQuery = (args: Args): { readonly labelSelector?: string } =
 export const pathSent = (typed: string, env: NodeJS.ProcessEnv = process.env): string =>
   chosenOf(env).kind === 'remote' ? typed : path.resolve(typed);
 
-/** The nearest folder from `from` up that holds `.git` — a repository's root, or a worktree's — or none where no folder up to `/` does. */
-export function repositoryHolding(from: string): string | undefined {
-  for (let at = path.resolve(from); ; at = path.dirname(at)) {
-    if (fs.existsSync(path.join(at, '.git'))) return at;
-    if (path.dirname(at) === at) return undefined;
-  }
-}
-
 /**
  * The `repo` query of a command about a repository: the one `--repo` names (`typed`), sent as `pathSent` sends a path; none where
  * `--factory` names the factory (`factory`), which places it, or under a remote context, whose daemon answers on its own repository;
- * else, under this machine's context, the repository the command is typed in (`repositoryHolding` of `here`), as the command line read
- * it before it asked the api, whose `?repo=` names a repository's root. In a folder of no repository, `outside` says: the folder itself
- * (`folder`), which the api refuses as a repository it does not serve, naming how to file a factory on it; or none (`none`).
+ * else, under this machine's context, the folder the command is typed in (`here`), which the api places on the repository it knows that
+ * holds it, and refuses where it knows none, naming how to file a factory on it.
  */
 export function repoQueryOf(
   typed: string | undefined,
   factory: string | undefined,
-  outside: 'folder' | 'none',
   env: NodeJS.ProcessEnv = process.env,
   here: string = process.cwd(),
 ): { readonly repo?: string } {
   if (typed !== undefined) return { repo: pathSent(typed, env) };
-  if (factory !== undefined || chosenOf(env).kind !== 'local') return {};
-  const repo = repositoryHolding(here) ?? (outside === 'folder' ? path.resolve(here) : undefined);
-  return repo === undefined ? {} : { repo };
+  return factory !== undefined || chosenOf(env).kind !== 'local' ? {} : { repo: path.resolve(here) };
 }
 
 /** `lines` printed on stdout, one each; nothing for none. */

@@ -35,6 +35,15 @@ function knownRepos(env: NodeJS.ProcessEnv, home: string, running?: Running): st
   return [...new Set([...(own === undefined ? [] : [own]), ...named])];
 }
 
+/**
+ * The repository of `known` that holds the folder `named`: itself where it is one, else the deepest one it is under, as a command typed
+ * in a subfolder of a repository is about that repository; none where no known repository holds it.
+ */
+const holdingOf = (named: string, known: readonly string[]): string | undefined =>
+  known
+    .filter((repo) => named === repo || named.startsWith(repo.endsWith(path.sep) ? repo : `${repo}${path.sep}`))
+    .sort((a, b) => b.length - a.length)[0];
+
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
 const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
   new Invalid({
@@ -56,7 +65,8 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  * The factory and the repository a request is answered in, read off its query.
  *
  * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else the api's own repository, none where
- *   the api has none (`repoOf`). A `?repo=` that is not the api's own nor any factory's (`knownRepos`) is refused, `Invalid`.
+ *   the api has none (`repoOf`). A `?repo=` is the api's own or a factory's (`knownRepos`), or a folder under one, read as the
+ *   repository that holds it (`holdingOf`); any other is refused, `Invalid`.
  * - A factory named: read from the store at `home`, as a start reads it (`filedAtOnce`: `Invalid` for a name that is no slug or a file that
  *   does not read, `Missing` for none of that name). Its repository is `?repo=`, else its only one, else the api's own where that is one
  *   of its repositories, else none; a `?repo=` that is not among its repositories (`outsideRefusal`) is refused, `Invalid`.
@@ -74,8 +84,9 @@ function placeOf(query: PlaceQuery, env: NodeJS.ProcessEnv, home: string, runnin
   if (query.factory === undefined || query.factory === DEFAULT_NAMESPACE) {
     if (named === undefined) return { repo: repoOf(env, running), factory: undefined, named: query.factory !== undefined };
     const known = knownRepos(env, home, running);
-    if (!known.includes(named)) throw unknownRepo(named, known);
-    return { repo: named, factory: undefined, named: true };
+    const holding = holdingOf(named, known);
+    if (holding === undefined) throw unknownRepo(named, known);
+    return { repo: holding, factory: undefined, named: true };
   }
   const factory = filedAtOnce(home, query.factory);
   if (factory === undefined) return { repo: named ?? repoOf(env, running), factory: undefined, named: true };

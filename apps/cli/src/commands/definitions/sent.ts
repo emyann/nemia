@@ -5,16 +5,31 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Args } from 'objects';
+import { Effect } from 'effect';
+import { type Args, Invalid } from 'objects';
 import { Refused } from '../../refused.ts';
 import { repoQueryOf, textArg } from '../requests.ts';
 
+/** A `repo` query, or none. */
+type RepoQuery = { readonly repo?: string };
+
 /**
- * The `repo` query of what `--repo` named, sent as `pathSent` sends a path; none typed, under this machine's context the repository the
- * command is typed in, and none in a folder of no repository or under a remote context, which the api answers on its own repository
- * (`repoQueryOf`).
+ * `ask` made on the repository a definitions' command is about: the one `--repo` names, sent as `pathSent` sends a path; none typed,
+ * under this machine's context the folder the command is typed in, which the api places on the repository it knows that holds it
+ * (`repoQueryOf`), and where it knows none (`Invalid`) asked again with no repository, which the api answers on its own. Under a remote
+ * context no repository is sent.
  */
-export const repoQuery = (args: Args): { readonly repo?: string } => repoQueryOf(textArg(args, 'repo'), undefined, 'none');
+export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
+  const typed = textArg(args, 'repo');
+  const query = repoQueryOf(typed, undefined);
+  if (typed !== undefined || query.repo === undefined) return ask(query);
+  return ask(query).pipe(
+    Effect.catchIf(
+      (err): err is E & Invalid => err instanceof Invalid,
+      () => ask({}),
+    ),
+  );
+};
 
 /** The words `file` holds, or stdin's for `-`, for `nemia <command>`; refused, exit 2, naming the file, where it cannot be read. */
 export function wordsRead(file: string, command: string): string {

@@ -8,7 +8,7 @@ import { AGENTS_CUSTOM_WORDS, DEFAULT_NAMESPACE, type AgentInstructions, type Ag
 import { Refused } from '../../refused.ts';
 import { asked } from '../../objects.ts';
 import { said, switchArg, textArg } from '../requests.ts';
-import { repoQuery, wordsRead } from './sent.ts';
+import { onRepo, wordsRead } from './sent.ts';
 
 const COMMAND = AGENTS_CUSTOM_WORDS.name;
 
@@ -48,20 +48,32 @@ export async function agentsCustom(args: Args): Promise<number> {
   const name = textArg(args, 'name') ?? '';
   const file = textArg(args, 'file');
   const hers = name === STORE_AGENT;
-  const at = { params: { namespace: DEFAULT_NAMESPACE, name }, query: repoQuery(args) };
+  const params = { namespace: DEFAULT_NAMESPACE, name };
   if (switchArg(args, 'clear')) {
-    said(clearedLines(await asked(COMMAND, (c) => (hers ? c.nemia.clearInstructions() : c.agents.deleteInstructions(at)))));
+    said(
+      clearedLines(
+        await asked(COMMAND, (c) =>
+          hers ? c.nemia.clearInstructions() : onRepo(args, (query) => c.agents.deleteInstructions({ params, query })),
+        ),
+      ),
+    );
     return 0;
   }
   if (file !== undefined) {
     const payload = { words: wordsRead(file, COMMAND) };
     said(
       writtenLines(
-        await asked(COMMAND, (c) => (hers ? c.nemia.writeInstructions({ payload }) : c.agents.putInstructions({ ...at, payload }))),
+        await asked(COMMAND, (c) =>
+          hers ? c.nemia.writeInstructions({ payload }) : onRepo(args, (query) => c.agents.putInstructions({ params, query, payload })),
+        ),
       ),
     );
     return 0;
   }
-  said(readLines(await asked(COMMAND, (c) => (hers ? c.nemia.instructions() : c.agents.instructions(at)))));
+  said(
+    readLines(
+      await asked(COMMAND, (c) => (hers ? c.nemia.instructions() : onRepo(args, (query) => c.agents.instructions({ params, query })))),
+    ),
+  );
   return 0;
 }

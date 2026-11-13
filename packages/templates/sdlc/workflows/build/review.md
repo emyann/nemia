@@ -35,14 +35,22 @@ tree, and its verdict is in the check you are handed.
 from your workspace git names its tip `main-worktree/HEAD`, whatever that branch is called:
 `git merge-base --is-ancestor main-worktree/HEAD HEAD` answers by its exit code alone, and
 `git log --oneline HEAD..main-worktree/HEAD` lists what the branch lacks. Say in your summary the base's commit,
-`git rev-parse main-worktree/HEAD`, and that the branch holds it or how many commits it lacks. A branch that lacks some is a finding
-with `again: true` only where the base moved under the change: a file both changed, named by
-`git diff --name-only HEAD...main-worktree/HEAD` and by `git diff --name-only main-worktree/HEAD...HEAD`; a file the base changed that
-the change's code or tests read; or a measure the change wrote, a baseline or a count that only shrinks, over files the base changed.
-Name those files in the finding, its `kind` `other`. Any other branch behind is no finding: say so in your summary. On GitHub,
-nothing runs the suite on the merged tree — the landing's check is a receipt — so what covers the rest is GitHub's own `mergeable` on
-the pull request and the `${{ parameters.ciCheck }}` context required of the commit you read: a base that moved under a green pull
-request makes the landing refuse rather than land. In this checkout, the landing's check runs the local check
+`git rev-parse main-worktree/HEAD`, and that the branch holds it or how many commits it lacks. A branch that lacks some costs a round,
+a finding with `again: true`, its `kind` `other`, naming the files and the reason, only where what it lacks can change your verdict,
+for one of four reasons. One: a file both changed, named by `git diff --name-only HEAD...main-worktree/HEAD` and by
+`git diff --name-only main-worktree/HEAD...HEAD`, whose hunks overlap or touch: read each side's with
+`git diff -U0 HEAD...main-worktree/HEAD -- <file>` and `git diff -U0 main-worktree/HEAD...HEAD -- <file>`, both counting the merge
+base's lines in `@@ -<start>,<count>` (a count of 0 is an insertion after line `<start>`, and touches the lines on both sides of it);
+two hunks touch where no line of the merge base that neither changed lies between them. Two: a test of either side that reads — imports,
+loads, globs or counts — what the other side changed in a file, or the change's code that uses a name, a signature or a text the base
+changed. Three: a contract, a baseline, a count that only shrinks or another measure either side wrote over files the other changed.
+Four: a merge that does not go clean — `git merge-tree --write-tree --name-only HEAD main-worktree/HEAD` exits 1 and names the files
+that conflict — or, on GitHub, a pull request whose `mergeable` is anything but `MERGEABLE`, an `UNKNOWN` read once more first. Any
+other branch behind is no finding: say in your summary the base, how far behind, and each file both changed whose hunks are apart, and
+let the land go. On GitHub, nothing runs the suite on the merged tree — the landing's check is a receipt, and the base's own
+`${{ parameters.ciCheck }}` at the merge commit catches a break only after it lands — so what covers the rest is GitHub's own
+`mergeable` on the pull request and the `${{ parameters.ciCheck }}` context required of the commit you read: a base that moved under a
+green pull request makes the landing refuse rather than land. In this checkout, the landing's check runs the local check
 (`${{ parameters.localCheck }}`) on the base with the branch merged into it: a merge that conflicts or breaks it is taken back. Either
 way, it costs a retry and never a broken base. Once implement has merged the base, the diff your brief
 names shows the base's landings with the change: read the change alone with `git diff main-worktree/HEAD...HEAD`.

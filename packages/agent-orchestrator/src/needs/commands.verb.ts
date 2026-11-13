@@ -15,6 +15,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { carryHarnesses, type CarryRan } from '../release/carry.store.ts';
 import { runningRelease } from '../release/version.verb.ts';
+import { linkNemia, toolsNemia } from '../release/nemia-link.store.ts';
 import { followFix, startFix } from './fix.verb.ts';
 import { readinessOf } from './readiness.verb.ts';
 
@@ -193,8 +194,9 @@ export const DOCTOR_FIX: Command<Fix> = {
 /**
  * `nemia doctor carry`: each harness the store at its root holds activated, or the release this runs from or another installed release
  * carries in its own tree, installed at this release's pins (`carryHarnesses`), each said as it goes. Refused (`Invalid`, exit 2) where
- * an install fails, after trying the rest, naming `nemia doctor fix <harness>`. Run on this machine alone: `nemia upgrade` runs the new
- * release's before it switches to it.
+ * an install fails, after trying the rest, naming `nemia doctor fix <harness>`. And the tools folder's `nemia` linked to the launcher
+ * under the store's pointer where it is not (`linkNemia`), so a store installed before the link was made gets it at its next upgrade.
+ * Run on this machine alone: `nemia upgrade` runs the new release's before it switches to it.
  */
 export const DOCTOR_CARRY: Command<CarryRan> = {
   name: 'doctor carry',
@@ -211,6 +213,7 @@ export const DOCTOR_CARRY: Command<CarryRan> = {
   handler: () =>
     Effect.gen(function* () {
       const home = yield* StoreRoot;
+      if (linkNemia(home)) console.log(`linked ${toolsNemia(home)} to the launcher of the release releases/current names`);
       const ran = carryHarnesses(home, process.env, runningRelease().root);
       if (ran.code !== 0) {
         const failed = ran.harnesses.filter((h) => h.kind === 'failed').map((h) => h.name);

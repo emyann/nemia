@@ -156,9 +156,10 @@ Grace's session runs only the tests of what she changed.
 
 Implement merges the base into its branch before each sign-off (`git merge main-worktree/HEAD`: the tip of the branch the repository's
 own checkout is on, whatever it is called), so its check runs on the merged tree, and measures again what its change wrote by a measure.
-Review says in its summary whether the branch holds the base as it is then, and sends back a branch behind only where the base moved
-under the change: a file both changed, a file the change reads, or a measure it wrote. On GitHub, its own `mergeable` and the required CI
-context stay the guard for the rest, and a base that moved under a green pull request makes the merge refuse rather than land; in this
+Review says in its summary whether the branch holds the base as it is then, and sends back a branch behind only where what it lacks
+can change the verdict: a file both changed whose hunks overlap or touch, a test of one side (or the change's code) reading what the other
+changed, a measure either side wrote over the other's files, or a merge that does not go clean; any other branch behind it notes, and lets
+the land go. On GitHub, its own `mergeable` and the required CI context stay the guard for the rest, and a base that moved under a green pull request makes the merge refuse rather than land; in this
 checkout, the land step's check runs `localCheck` on the merged tree, and a merge that conflicts or breaks it is taken back. Land's
 note says nothing of it: the ending signs off before the run executes its check. On a merge round (`## Merge` in the brief) the step
 merges the commit the brief names instead.

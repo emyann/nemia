@@ -4,7 +4,8 @@
 #   curl -fsSL https://github.com/emyann/nemia/releases/latest/download/install.sh | sh
 #
 # It fetches the release archive for this machine and its SHA256SUMS, refuses an archive whose sum differs, unpacks it into
-# $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia.
+# $WF_ROOT/releases/<tag> through a hidden folder renamed into place, points releases/current at it and links ~/.local/bin/nemia and the
+# store's tools/bin/nemia to its launcher.
 # Then it asks, on the server, or reads from its flags under --yes: starting at login, and the address to bind, picked from the
 # private ones nemia service addresses lists or typed (a public or wildcard one refused but with --public). A bind exposes the store:
 # this machine's own person token is minted straight into the local context's file and never printed, and the board's single-use
@@ -235,6 +236,11 @@ case ":$PATH:" in
   *) warn "$bindir is not on your PATH: add it (export PATH=\"$bindir:\$PATH\" in your shell's profile)" ;;
 esac
 nemia=$bindir/nemia
+
+# The store's tools folder, first on every session's PATH, holds the same link, so a step runs the nemia its settings allow on a server
+# whose service PATH has no ~/.local/bin; through releases/current, it follows every upgrade.
+mkdir -p "$root/tools/bin"
+ln -sfn "$releases/current/bin/nemia" "$root/tools/bin/nemia"
 
 # doctor: the last thing the install does, on either side, whose exit fails no install. No harness comes with a release: the person
 # activates the one their sessions run on, by the fix nemia doctor names or on the board's Setup page.

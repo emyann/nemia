@@ -24,6 +24,8 @@ lays the release down:
 - the release's pointer, the link `current` beside it, moved to it;
 - the command, `~/.local/bin/nemia`, a link to the release's own launcher. Put `~/.local/bin` on your PATH if the installer says it is
   not.
+- the same link in the store's tools folder, `~/.agent-workflows/tools/bin/nemia`, which every session finds first on its PATH, so a
+  step runs the `nemia` its settings allow. Both name the launcher through `current`, so they follow every upgrade.
 
 Then it asks two things, on the server, each of which you can also answer by a flag with `--yes`, for a machine you set up by
 script:

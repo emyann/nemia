@@ -35,7 +35,9 @@ import {
 
 /**
  * The query of a list of runs: a list's (`listQuery`), and `fieldSelector`, the runs in one state, in Kubernetes' spelling:
- * `status.state=<state>` (or `==`), or `status.state!=<state>`, one term, a state of `RUN_STATES`. Kept as its text, so a
+ * `status.state=<state>` (or `==`), or `status.state!=<state>`, a state of `RUN_STATES`; or the finished runs of one outcome,
+ * `status.outcome=<outcome>` (or `==`), or every other run, `status.outcome!=<outcome>`, an outcome of `RUN_OUTCOMES`; one term. Kept
+ * as its text, so a
  * wrong one is refused in the package's words, a 422. A list asked by it carries the frame's parts (`RunStatus`, `RunListMeta`).
  */
 const runListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };

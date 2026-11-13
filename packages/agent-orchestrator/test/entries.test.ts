@@ -164,6 +164,8 @@ const PINNED: Record<string, string[]> = {
     'cloneTarget',
     'FACTORY_ADOPT',
     'FACTORY_APPLY',
+    'factoryExported',
+    'factoryImported',
     'FACTORY_PLAN',
     'FACTORY_RESOLVE',
     'FACTORY_UPGRADE',

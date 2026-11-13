@@ -84,6 +84,10 @@ export const READS: { readonly [K in ApiGetName]: ReadBound } = {
   'factories.rules': ONE,
   'factories.instruction': ONE,
   'factories.commands': ONE,
+  'factories.export': {
+    shape: 'one',
+    why: 'one factory whole, its folder packed: a tree of words as small as the factory, its runs left out',
+  },
   'mcpservers.list': LIST,
   'mcpservers.get': ONE,
   'mcpservers.signInState': ONE,

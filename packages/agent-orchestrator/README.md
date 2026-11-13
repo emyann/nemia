@@ -120,7 +120,11 @@ doctor fix mise --factory nemia --workflow quick; …`), again only where what i
 "Ready"`, both the tick's. Each is read off the feed's own lines, never remembered, so a restarted daemon says it again exactly where the
 read moved, and a store the feed never called not ready is never said ready. `nemia upgrade`, once it has restarted the daemon onto the
 new release, runs that release's `nemia doctor --json` and prints the same pieces under a line saying the store is not ready, and still
-succeeds. `nemia watch -l kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
+succeeds. The daemon's free sweep writes one more line of the store: `left running, ended`, `reason: "LeftEnded"`, `type: "Warning"`,
+`source: "daemon"`, labelled with its run alone (`labels.run`), once a sweep has ended processes a finished run's sessions left
+running (below, *The daemon frees a finished run itself*), its note the run and each process by its pid and command
+(`r-1 had finished, and a process it started still ran: pid 4242 (node)`); a deed, not a word that stands, so the fold keeps none
+of it. `nemia watch -l kind=Store` follows them, and the api sends them as a `store` event. A factory's upgrade conflicts are a line about the factory itself
 (`involved {kind: 'Factory'}`, labelled with it): `conflicts pending`, `reason: "ConflictsPending"`, when the `ConflictsPending` condition
 its controller writes to its status turns True, its note the condition's message, and `conflicts settled`, `reason: "ConflictsSettled"`,
 when it turns back, both `Normal` and the tick's. A word that stands per factory, compared by its reason alone (`conflictsDue`): the pass
@@ -4308,6 +4312,20 @@ restart included. No pass waits on it: the place is asked off the daemon's loop.
   a restart), with the fix. A run it frees is one line: `<id>  freed: removed 1 worktree, 13.2 MB; …`.
 - **Keeping a worktree on purpose**: `git worktree lock <path>` keeps one, and the daemon started with
   `WF_KEEP_WORKTREES=1` keeps them all, as before.
+- **Nothing a finished run started runs on.** The runtime ends a session's scope with the session; behind it,
+  each sweep reads this user's processes (`processesNow`, through `src/runtime-client.ts`), tells each one's run
+  by the folder of this store its environment names (a session's `WF_STEP_FILES`, else a check's
+  `WF_ARTIFACTS`, under `runs/<id>/`: `runOfEnvironment`; a bare `WF_RUN` names no store, and attributes
+  nothing), and of a run at rest that succeeded or was cancelled, a folder run's
+  too, ends each one still running — SIGTERM, then SIGKILL after `LEFT_GRACE` (2 seconds) — whatever
+  `WF_KEEP_WORKTREES` says, and writes one `left running, ended` line a run on the feed (`endLeftBehind`,
+  `src/forget/prune/left-behind.verb.ts`; `leftBehindOf`, proved by `contracts/left-behind.contract.ts`).
+  A failed run's are not: it may be tried again. The daemon's own process is never ended, nor a process
+  no session of the run started.
+- **A worktree another process works in is not freed.** A process of no session of the run's — a person's
+  shell, an editor, another run's session — whose working folder is in a finished run's worktree holds it:
+  the sweep leaves that run, unjudged, and `nemia up` warns `<id>  not freed: pid … (…) works in …` once
+  while the same processes hold it.
 
 `wf prune` is then for what the rule leaves: a finished run nobody will merge (`--unmerged`), a run's files
 (`--artifacts`), a worktree a person has since seen to, and a store no daemon ticks.
@@ -4501,7 +4519,7 @@ holding a concurrency slot forever.
 | `src/step-machine/step-machine.ts` | a step's lifecycle as a machine — pure: **`stepMove`**, whether two words read on two passes are a move it draws (`STEP_EDGES`), and its drawing (`stepMachineGraph`, `stepDiagram`); it decides nothing, held to `stepStatus` by its replay |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
 | `src/artifacts/artifacts.ts` | the files a step leaves — pure: what its brief says of them (`artifactsContract`), where one it names is found (`artifactPlace`), and the lines that list them (`artifactLines`); `artifacts/artifacts.store.ts` copies them |
-| `src/forget/prune/prune.ts` | a finished run pruned — pure: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`), what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and what it frees (`pruneLines`) |
+| `src/forget/prune/prune.ts` | a finished run pruned — pure: what a prune kept (`prunedKept`), whether it may run again (`pruneAgain`), what it refuses (`pruneRefusal`), what a pruned or a held run refuses (`prunedRefusal`, `heldRefusal`), and what it frees (`pruneLines`); and the free sweep's backstop: the run a process is of by its environment (`runOfEnvironment`), what the sweep does with it (`leftBehindOf`, proved by `contracts/left-behind.contract.ts`), the runs it ends processes of (`finishedAtRest`), and its words (`leftLineNote`, `heldWords`) |
 | `src/ending/ending.ts` | a run's ending — pure: when its merge lands on its check (`landingDue`, `landingOpen`), what landed (`landedWords`), the checkout it holds (`checkoutLine`), the denies it is filed with (`filedDenies`), and what is left for a person to decide (`toDecide`, `gateRefusal`) |
 | `src/gate/gate.ts` | a gate from a person's side — pure: **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, the words refused with an approval (`approvalWordsRefusal`), and whether a task held open waits for a person's word (`holdsOpen`) |
 | `src/branches/branches.ts` | a run's result branches — pure: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the tips a pass records (`tipBranches`, `tipsSeen`), and what `wf decide` shows of a branch: the numstat grouped by blast radius (`radius`), the agent-facing, check-affecting and lesson lists, and the lesson line; `branches/branches.store.ts` reads git |
@@ -4522,7 +4540,7 @@ holding a concurrency slot forever.
 | `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`), `tick-recent.json` (the recent passes, `recordRecentPass` and `recentPasses`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `recordDaemonLine`, `readFeed`, `watchFeed`, `feedCursorRefusal`), its size and the ends of its lines from a cursor (`feedSize`, `readFeedEnds`) |
 | `src/watch/cursor.store.ts` | a watcher's cursor file, a person's path: the cursor it holds or none (`cursorFileStart`), written whole through a temp name and a rename (`keepCursor`), rewritten to 0 on a cut (`cutCursorFile`), a directory that is not there and a file that holds no whole number each refused by name |
-| `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines and a daemon's start written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
+| `src/feed/feed.verb.ts` | the feed's one verb and its live readers: a pass's lines, a daemon's start and the free sweep's processes ended written once — appended, logged and published to the process's hub (`emitFeed`, `emitDaemonStarted`, `emitLeftEnded`, `FeedHub`, `feedHubLayer`) — and read as they come, from the hub where it can and the file where it must (`followFeed`, `FEED_FOLLOWERS`) |
 | `src/following/following.ts` | one step's session followed live, pure: the moments a follower is handed (`StepMoment`), and where a following goes each time the step is read again — another attempt, a wait on the feed, or its end (`nextOf`) |
 | `src/following/following.verb.ts` | one step's session followed live across a person's answer, the next turn and a try, waking on the step's lines of the feed between them (`followStep`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
@@ -4558,12 +4576,13 @@ holding a concurrency slot forever.
 | `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and what it would forget of the engine's tasks of each run, counted dry for `wf prune` (`runsForgetting`) |
 | `src/forget/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
 | `src/forget/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
+| `src/forget/prune/left-behind.verb.ts` | what a finished run left running ended by the free sweep, said on the feed, and the processes that hold a worktree answered (`endLeftBehind`, `LEFT_GRACE`) |
 | `src/list/list.verb.ts` | what a person reads of the runs: `wf ls` (`list`) |
 | `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decideRun`) |
 | `src/decide/decision.verb.ts` | a run's decision, the one read model of it (`decisionRead`, `runDecision`): objects' `RunDecision`, which `GET /api/runs/:runId/decision` serves and `wf decide` prints its screen off |
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
-| `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, a run's, a daemon's (`startedLine`) or the store's (`storeOnce`, its pause put and lifted), the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
+| `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, a run's, a daemon's (`startedLine`) or the store's (`storeOnce`, its pause put and lifted; `leftEndedLine`, a finished run's processes ended), the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
 | `src/watch/selector.ts` | the feed's selector grammar — pure: the keys a selector may name (`SELECTABLE_KEYS`, the labels and the five reserved, which no label may take: `labelKeysRefusal`), every malformed form refused by name (`selectorsRefusal`), the parse of checked text (`parseSelectors`), what a line offers a selector (`selectableOf`) and whether it is selected (`selects`) |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |

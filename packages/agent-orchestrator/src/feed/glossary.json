@@ -115,6 +115,11 @@
       "type": "Reason"
     },
     {
+      "term": "Left running, ended",
+      "meaning": "a Warning line about the store, `LeftEnded`, labelled with its run: written by the daemon's free sweep when it ended processes a finished run (at rest, succeeded or cancelled) left running, its note naming the run and each process by its pid and command. The daemon's deed, one line a run and sweep.",
+      "type": "Reason"
+    },
+    {
       "term": "Reason",
       "meaning": "the code a machine selects a line on, computed from typed state, never from a word: an `Awaiting*` family for a wait on a person (`AwaitingAnswer` with `via`), and `Waiting` with `on` for a wait on a thing. A former code is still read, on a line on disk and in a stored selector (`FORMER_REASONS`).",
       "type": "Reason",

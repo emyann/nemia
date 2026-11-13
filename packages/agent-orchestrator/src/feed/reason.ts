@@ -10,7 +10,7 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 49 entries below — 17 of a run, 26 of a step, 1 of a daemon, 3 of the store, 2 of a factory, 38
+ * **The codes are the owner's.** The 52 entries below — 17 of a run, 26 of a step, 1 of a daemon, 6 of the store, 2 of a factory, 41
  * distinct codes, eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read
  * under its former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
@@ -70,10 +70,11 @@ export const DENIED = 'denied: ';
 
 /**
  * The word each of a person's acts, each of the two runtime faults, a step's closeout read, the store's pause, a factory's level and
- * its conflicts, a pinned run behind its files and the store's readiness say, the one place it is spelled: the owner named the first six
- * at their slice's design gate, `closed out` on its card, `revisions behind` at its design's, `level changed` on its card, the
- * conflicts' two at theirs and the readiness' two codes on theirs (`NotReady`, `Ready`, said as the codes read), and `reason.test.ts`
- * holds each literally beside the rule below that reads it back.
+ * its conflicts, a pinned run behind its files, the store's readiness and the free sweep's end of what a finished run left running say,
+ * the one place it is spelled: the owner named the first six at their slice's design gate, `closed out` on its card, `revisions behind`
+ * at its design's, `level changed` on its card, the conflicts' two at theirs, the readiness' two codes on theirs (`NotReady`, `Ready`,
+ * said as the codes read) and `left running, ended` at its design's gate, and `reason.test.ts` holds each literally beside the rule below
+ * that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by**: the retired prose match found its words anywhere inside a line's word, so
  * `failed`, `blocked` or `needs:` in one of these would have woken a subscriber for a fact the owner said waits on nobody — which is why a
@@ -95,6 +96,7 @@ export const LINE_WORDS = {
   ConflictsPending: 'conflicts pending',
   ConflictsSettled: 'conflicts settled',
   RevisionsBehind: 'revisions behind',
+  LeftEnded: 'left running, ended',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
 /**
@@ -144,6 +146,7 @@ export const REASONS = {
   Ready: { kinds: ['Store'], type: 'Normal' },
   ConflictsPending: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
   ConflictsSettled: { kinds: ['Factory'], type: 'Normal', source: 'tick' },
+  LeftEnded: { kinds: ['Store'], type: 'Warning', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
 
 /** One of the feed's reasons, the code a machine selects on. */
@@ -257,7 +260,9 @@ const STEP_WORDS: readonly Rule[] = [
 /**
  * The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`); a factory's level in force,
  * a word that stands per factory until the level changes (`levelLines`); and the store's readiness, a word that stands until a piece a
- * run waits on goes missing or is put back (`readinessLines`), the tick's judgement of the daemon's read.
+ * run waits on goes missing or is put back (`readinessLines`), the tick's judgement of the daemon's read; and the processes a finished
+ * run left running that the daemon's free sweep ended (`leftEndedLine`), its deed, a line per run and sweep that ended any, which the
+ * fold keeps no word of.
  */
 const STORE_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.StorePaused, reason: 'StorePaused' },
@@ -265,6 +270,7 @@ const STORE_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.LevelChanged, reason: 'LevelChanged' },
   { is: LINE_WORDS.NotReady, reason: 'NotReady' },
   { is: LINE_WORDS.Ready, reason: 'Ready' },
+  { is: LINE_WORDS.LeftEnded, reason: 'LeftEnded' },
 ];
 
 /**

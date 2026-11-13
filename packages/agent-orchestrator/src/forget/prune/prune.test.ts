@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runOfEnvironment } from './prune.ts';
 
-const HOME = '/home/ann/.agent-workflows';
+const HOME = '/srv/ann/.agent-workflows';
 
 test('runOfEnvironment: the run a process is of, by WF_RUN, else by a WF_STEP_FILES under this store', async (t) => {
   const rows: ReadonlyArray<{ name: string; env: Record<string, string>; run: string | undefined }> = [
@@ -19,7 +19,7 @@ test('runOfEnvironment: the run a process is of, by WF_RUN, else by a WF_STEP_FI
     { name: "a session's WF_STEP_FILES under this home", env: { WF_STEP_FILES: `${HOME}/runs/r-1/artifacts/plan` }, run: 'r-1' },
     { name: 'the run folder itself', env: { WF_STEP_FILES: `${HOME}/runs/r-1` }, run: 'r-1' },
     { name: 'an empty WF_RUN is none, and the files are read', env: { WF_RUN: '', WF_STEP_FILES: `${HOME}/runs/r-1/x` }, run: 'r-1' },
-    { name: "another store's home", env: { WF_STEP_FILES: '/home/bob/.agent-workflows/runs/r-1/artifacts/plan' }, run: undefined },
+    { name: "another store's home", env: { WF_STEP_FILES: '/srv/bob/.agent-workflows/runs/r-1/artifacts/plan' }, run: undefined },
     { name: 'a home named alike beside it', env: { WF_STEP_FILES: `${HOME}2/runs/r-1/artifacts/plan` }, run: undefined },
     { name: 'a path that climbs out by ..', env: { WF_STEP_FILES: `${HOME}/runs/../runs/r-1/artifacts` }, run: undefined },
     { name: 'a path that climbs into this store by ..', env: { WF_STEP_FILES: `/tmp/../${HOME}/runs/r-1` }, run: undefined },

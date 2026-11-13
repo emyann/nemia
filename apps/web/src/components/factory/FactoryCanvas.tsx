@@ -26,7 +26,9 @@ import { Switch } from '@/components/ui/switch';
 import { ceilingsQuery } from '@/lib/api/ceilings';
 import { inboxQuery } from '@/lib/api/inbox';
 import { runObjectQuery } from '@/lib/api/run';
-import { judged, type RunRow } from '@/lib/api/judged';
+import { judged, runViewOf, type RunRow, type RunView } from '@/lib/api/judged';
+import { namespaceOf } from '@/lib/api/namespace';
+import { FINISHED_SIZE, finishedRunsQuery, type OpenRuns } from '@/lib/api/runs';
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,
@@ -40,11 +42,14 @@ import {
   CARD_WIDTH,
   CELL_HEIGHT,
   CELL_WIDTH,
+  floorRowsOf,
   floorRuns,
   inFlight,
   keepLayout,
   ONE_CELL,
+  openRows,
   openSpan,
+  parentsWanted,
   placeRuns,
   readsLines,
   titleOf,
@@ -145,10 +150,11 @@ const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
   !judged(run) ? paint.alive : toDecideOf(run) ? paint.yours : waitsOnYou(run) ? paint.yours : finished ? paint.sage : paint.alive;
 
 /**
- * Every run in flight of `factory`, given as `runs`, a card each, on a floor a person can arrange, each with its steps as a small
- * flowchart on it (`StepRail`). A run started `--after` runs is drawn with an edge from each of their cards into its own (`afterEdges`),
- * and a finished run a run in flight waits on is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left
- * of children.
+ * The runs of `factory` that are not finished, given as its light answer `open` (`openRunsQuery`), a card each, on a floor a person can
+ * arrange, each with its steps as a small flowchart on it (`StepRail`). A run started `--after` runs is drawn with an edge from each of
+ * their cards into its own (`afterEdges`), and a finished run of the factory a run in flight waits on is read by id and on the floor for
+ * it (`parentsWanted`, `floorRuns`); cards joined so are laid out layered, parents left of children. Show finished adds the newest page
+ * of the factory's finished runs (`finishedRunsQuery`), read only while it is on; every finished run is on Runs.
  *
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that starts takes the next free cell and
  * moves no card already down — and after that wherever a person dragged it, until "Reset layout". A card's chevron opens it: the card
@@ -167,12 +173,12 @@ const minimapFill = ({ data: { run, finished } }: RunFlowNode) =>
  *
  * What the page puts `above` the floor, its template among them, takes its height from the floor's, which fills the rest of the frame.
  */
-export function FactoryCanvas({ runs, factory, above }: { runs: readonly RunRow[]; factory: FactoryPlace; above?: ReactNode }) {
+export function FactoryCanvas({ open, factory, above }: { open: OpenRuns; factory: FactoryPlace; above?: ReactNode }) {
   return (
     <div className="flex h-[calc(100svh-var(--frame-top)-var(--frame-lines))] min-h-96 flex-col">
       {above}
       <ReactFlowProvider>
-        <Floor runs={runs} factory={factory} />
+        <Floor light={open} factory={factory} />
       </ReactFlowProvider>
     </div>
   );
@@ -194,9 +200,14 @@ const readsOf = (results: UseQueryResult<RunObject.Run>[]): Read[] =>
     trouble: error ? `Could not read its steps: ${error.message}` : null,
   }));
 
-/** The floor's header counts: the runs in flight (`flying` of `runs`), finished, to decide and waiting on you. */
-function FloorCounts({ runs, flying }: { runs: readonly RunRow[]; flying: number }) {
-  const finished = runs.length - flying;
+/**
+ * The floor's header counts, off the factory's light answer `open`: the runs in flight, finished — every finished run the answer counts
+ * (`counts.finished`), with each open run that is not in flight, which waits on a person — to decide and waiting on you.
+ */
+function FloorCounts({ open }: { open: OpenRuns }) {
+  const runs = openRows<RunRow>(open);
+  const flying = runs.filter((run) => !judged(run) || inFlight(run)).length;
+  const finished = open.counts.finished + runs.length - flying;
   const waiting = runs.filter((run) => judged(run) && waitsOnYou(run)).length;
   const toDecide = runs.filter((run) => judged(run) && toDecideOf(run) !== null).length;
   return (
@@ -219,6 +230,36 @@ const onTheFloor = (runs: readonly RunRow[], showFinished: boolean) => {
   return { judgedRuns, shownJudged, shown: [...runs.filter((run) => !judged(run)), ...shownJudged] };
 };
 
+/** The parents read by id (`parentsWanted`): each run read, as the list would judge it, and whether any read is still under way. */
+const parentsOf = (results: UseQueryResult<RunObject.Run>[]): { parents: RunView[]; reading: boolean } => ({
+  parents: results.flatMap(({ data }) => (data ? [runViewOf(data)] : [])),
+  reading: results.some((result) => result.isPending),
+});
+
+/**
+ * The rows the floor is drawn from (`floorRowsOf`): the light answer `light`, each finished run of `factory` an open run still waits on,
+ * read by id (`parentsWanted`, a parent of another factory left off), and, while `showFinished`, the newest page of the factory's finished
+ * runs, read only then; the ids of those in flight (`flying`), each other card drawn finished; and `reading` while a parent or that page is
+ * still to come, so the floor is not fitted before its cards are on it.
+ */
+function useFloorRows(light: OpenRuns, factory: FactoryPlace, showFinished: boolean) {
+  const wanted = useMemo(() => parentsWanted(openRows<RunRow>(light)), [light]);
+  const parentReads = useQueries({ queries: wanted.map((id) => runObjectQuery(id)), combine: parentsOf });
+  const finishedRead = useQuery({ ...finishedRunsQuery(factory.name, []), enabled: showFinished });
+  const finishedPage = showFinished ? finishedRead.data?.runs : undefined;
+  const runs = useMemo(
+    () =>
+      floorRowsOf<RunRow>(
+        light,
+        parentReads.parents.filter((parent) => namespaceOf(parent.factory) === factory.name),
+        finishedPage ?? [],
+      ),
+    [light, parentReads.parents, finishedPage, factory.name],
+  );
+  const flying = useMemo(() => new Set(runs.filter((run) => !judged(run) || inFlight(run)).map((run) => run.id)), [runs]);
+  return { runs, flying, reading: parentReads.reading || (showFinished && finishedRead.isPending) };
+}
+
 /**
  * A drag moving a card, or React Flow measuring one: the only changes the floor takes, since it adds, removes and selects no card itself.
  */
@@ -234,7 +275,8 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening   or
  *   closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless   an
  *   opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a   card
- *   off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
+ *   off the floor keeps its place and a run the floor no longer reads — not open, no parent read, not on the finished page shown — does
+ *   not; nor is such a run kept open.
  * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view as
  *   the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if
  *   any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the
@@ -257,12 +299,12 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
-function Floor({ runs, factory }: { runs: readonly RunRow[]; factory: FactoryPlace }) {
+function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   const { fitView, setViewport } = useReactFlow<RunFlowNode>();
   const store = useStoreApi<RunFlowNode>();
   const [showFinished, setShowFinished] = useState(false);
 
-  const flying = useMemo(() => new Set(runs.filter((run) => !judged(run) || inFlight(run)).map((run) => run.id)), [runs]);
+  const { runs, flying, reading } = useFloorRows(light, factory, showFinished);
   const { judgedRuns, shownJudged, shown } = useMemo(() => onTheFloor(runs, showFinished), [runs, showFinished]);
   const known = useMemo(() => new Set(runs.map((run) => run.id)), [runs]);
   const ids = useContent(shown.map((run) => run.id));
@@ -430,12 +472,12 @@ function Floor({ runs, factory }: { runs: readonly RunRow[]; factory: FactoryPla
   const [fits, setFits] = useState(1);
   const fitted = useRef(0);
   useEffect(() => {
-    if (fits === fitted.current || !sized(size)) return;
+    if (fits === fitted.current || !sized(size) || reading) return;
     if (placed.length !== ids.length || placed.some((node, i) => node.id !== ids[i])) return;
     const first = fitted.current === 0;
     fitted.current = fits;
     void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
-  }, [fits, placed, ids, fitView, size]);
+  }, [fits, placed, ids, fitView, size, reading]);
 
   useEffect(() => {
     if (inspecting && was.current) reveal(inspecting);
@@ -471,7 +513,7 @@ function Floor({ runs, factory }: { runs: readonly RunRow[]; factory: FactoryPla
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <FloorCounts runs={runs} flying={flying.size} />
+          <FloorCounts open={light} />
           <CapLine queued={queued.length} queueError={queue.error} />
         </div>
         <FloorOptions factory={factory} showFinished={showFinished} onShowFinished={toggleFinished} />
@@ -523,7 +565,7 @@ function Floor({ runs, factory }: { runs: readonly RunRow[]; factory: FactoryPla
             </div>
           </div>
         ) : (
-          <Empty anyRuns={runs.length > 0} queued={queued.length} />
+          <Empty anyRuns={light.counts.waiting + light.counts.inFlight + light.counts.finished > 0} queued={queued.length} />
         )}
       </div>
     </div>
@@ -596,14 +638,19 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
 const RouterLinkButton = routeLink(LinkButton);
 
 /**
- * The floor's options, at the header's right: the Show finished switch, named by a label beside it, and, but on the default factory, which
- * has no file to keep settings in, a link to the factory's settings.
+ * The floor's options, at the header's right: the Show finished switch, named by a label beside it, which shows the newest page of the
+ * factory's finished runs and says so on hover, every finished run being on Runs; and, but on the default factory, which has no file to
+ * keep settings in, a link to the factory's settings.
  */
 function FloorOptions(props: { factory: FactoryPlace; showFinished: boolean; onShowFinished: (on: boolean) => void }) {
   const finishedSwitch = useId();
   return (
     <div className="flex items-center gap-4 text-body-medium">
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2"
+        title={`Shows the newest ${FINISHED_SIZE} finished runs of this factory. Every finished run is on Runs.`}
+        data-show-finished
+      >
         <Switch id={finishedSwitch} isSelected={props.showFinished} onChange={props.onShowFinished} />
         <label htmlFor={finishedSwitch} className="cursor-pointer">
           Show finished

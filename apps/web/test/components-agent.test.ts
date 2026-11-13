@@ -371,6 +371,15 @@ const tried = (id: string, fields: Record<string, unknown> = {}) => ({
   ...fields,
 });
 
+/**
+ * The reads the Try panel looks for the latest try in, seeded: the runs not finished (`openRunsQuery`, `['runs-open']`), in flight, and
+ * the first page of the finished (`finishedPagesQuery`, `['runs-finished', null, 'pages']`).
+ */
+const triesRead = (open: unknown[], finished: unknown[] = []): Array<[readonly unknown[], unknown]> => [
+  [['runs-open'], { asOf: at, counts: { waiting: 0, inFlight: open.length, finished: finished.length }, waiting: [], inFlight: open }],
+  [['runs-finished', null, 'pages'], { pages: [{ asOf: at, total: finished.length, runs: finished, continue: null }], pageParams: [null] }],
+];
+
 /** A try's run as its page reads it: one step, `try`, filed, with what it spent of its dollar and the files its folder holds. */
 function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
   const run = runWith(null);
@@ -401,7 +410,7 @@ function tryDetail(fields: Record<string, unknown> = {}): RunDetail {
 
 test('an agent of yours is tried from its page: the fence said in one line, and Try it held until there is a brief', async () => {
   const { TryAgent } = await import('../src/components/agent/TryAgent.tsx');
-  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [[['runs'], []]]);
+  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), triesRead([]));
   const texts = textsOf(html);
   assert.ok(
     texts.includes(
@@ -416,13 +425,11 @@ test('an agent of yours is tried from its page: the fence said in one line, and 
 
 test('REFUSED: a second try while one moves — the button is held, and the latest try is drawn: its state, its spend of the dollar, its files and its run', async () => {
   const { TryAgent } = await import('../src/components/agent/TryAgent.tsx');
-  const runs = [
-    tried('r-old', { createdAt: '2026-09-01T00:00:00.000Z' }),
-    tried('r-t', { moving: true, createdAt: '2026-09-25T00:00:00.000Z' }),
-    { ...tried('r-x'), try: null },
-  ];
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
-    [['runs'], runs],
+    ...triesRead(
+      [tried('r-t', { moving: true, createdAt: '2026-09-25T00:00:00.000Z' }), { ...tried('r-x'), try: null }],
+      [tried('r-old', { createdAt: '2026-09-01T00:00:00.000Z' })],
+    ),
     ...readsOf(tryDetail({ status: 'running' })),
   ]);
   assert.match(html, /data-try-held[^>]*>A try is still running \(r-t\): one at a time\./);
@@ -437,7 +444,7 @@ test('REFUSED: a second try while one moves — the button is held, and the late
 test("a try stopped where no step broke says what stopped it, in its run's own word and with no row of the list, not a bare failed", async () => {
   const { TryAgent } = await import('../src/components/agent/TryAgent.tsx');
   const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
-    [['runs'], [tried('r-t', { status: 'running' })]],
+    ...triesRead([tried('r-t', { status: 'running' })]),
     ...readsOf(tryDetail({ status: 'blocked' })),
   ]);
   assert.match(html, /data-try-status[^>]*>blocked</);
@@ -472,7 +479,7 @@ test("REFUSED: an agent of yours the try's fence does not reach says why in plac
     "coder runs on `codex`, and a try is fenced by Claude Code's permission mode — `dontAsk` with `Edit(**)`, in a folder of its own — which codex does not take.";
   const html = await routedWith(
     createElement(TryAgent, { agent: { ...composing, name: 'coder', keys: { harness: 'codex' }, untried: { why, copy: null } } as never }),
-    [[['runs'], []]],
+    triesRead([]),
   );
   assert.ok(textsOf(html).includes(why), textsOf(html).join(' | '));
   assert.match(html, /data-try-untried/);

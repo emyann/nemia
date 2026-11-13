@@ -30,6 +30,7 @@ export const ROOTS = [
   'apps/api/src/guard.ts',
   'apps/api/src/mcp',
   'apps/cli/src',
+  'apps/web/src/lib/api/runs.ts',
   'apps/web/src/lib/brought.ts',
   'apps/web/src/lib/proposals.ts',
   'apps/web/src/lib/setup.ts',

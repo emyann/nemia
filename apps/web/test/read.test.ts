@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { decodes } from '../src/lib/api/decodes.ts';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
-import { openRunsQuery, rowsOf, runsQuery, runsSelectedQuery, type OpenRuns } from '../src/lib/api/runs.ts';
+import { openRunsQuery, rowsOf, runsSelectedQuery, type OpenRuns } from '../src/lib/api/runs.ts';
 import { agentOf, judged, runViewOf, sinceOf, type RunRow } from '../src/lib/api/judged.ts';
 import type { StepView } from '../src/lib/runView.ts';
 import { detail, runList, runObject, step } from './run-fixtures.ts';
@@ -66,7 +66,8 @@ const object = (timeline: TimelineTry[], namespace?: string) => {
   };
 };
 
-const readRuns = runsQuery.queryFn as unknown as () => Promise<RunRow[]>;
+/** Every run of a list asked with no label (`runsSelectedQuery('')`), decoded as `rowsOf` makes it. */
+const readRuns = runsSelectedQuery('').queryFn as unknown as () => Promise<RunRow[]>;
 
 /** The frame read for `factory`, or for every factory, with no context of a query's. */
 const readOpen = (factory?: string) => (openRunsQuery(factory).queryFn as unknown as () => Promise<OpenRuns>)();

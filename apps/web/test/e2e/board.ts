@@ -71,17 +71,17 @@ export const sectionsOf = (page: Page): Locator =>
     .getByRole('link')
     .filter({ hasText: /^(Inbox|Runs|Workflows)/ });
 
-/** The rail's FAB, Start a run, which opens the floating bar on the start of a run. */
+/** The rail's FAB, Start a run, which opens the start of a run in the frame's side sheet. */
 export const startOf = (page: Page): Locator => railColumnOf(page).getByRole('button', { name: 'Start a run' });
 
-/** The top bar's gauges button, which opens the machine's gauges in the floating bar. */
+/** The top bar's gauges button, which opens the machine's gauges in the frame's side sheet. */
 export const gaugesButtonOf = (page: Page): Locator => topBarOf(page).locator('[data-gauges-button] button');
 
-/** Opens the machine's gauges in the floating bar, unless they are open, and returns the bar. */
+/** Opens the machine's gauges in the frame's side sheet, unless they are open, and returns the bar. */
 export async function gaugesOf(page: Page): Promise<Locator> {
   const bar = page.locator('aside[data-bar="gauges"]');
   if (!(await bar.isVisible())) await gaugesButtonOf(page).click();
-  await expectVisible(bar, 'the gauges button opens the gauges in the floating bar');
+  await expectVisible(bar, 'the gauges button opens the gauges in the side sheet');
   return bar;
 }
 
@@ -172,7 +172,7 @@ export function fedDaemon(pid: number = process.pid): void {
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
-/** The frame's floating bar while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
+/** The frame's bar, in its side sheet, while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
 export const stepBar = (page: Page, run: string, step: string): Locator => page.locator(`aside[data-bar="step:${run}/${step}"]`);
 
 /**
@@ -852,9 +852,24 @@ export function herStopped(at: string): void {
   fs.writeFileSync(path.join(dir, 'stops.jsonl'), `${JSON.stringify({ at, attempt: 1 })}\n`);
 }
 
-/** Her face in the rail (or in the top bar on a narrow screen), her side sheet, and the panel it holds. */
+/** Her face in the rail (or in the top bar on a narrow screen), the frame's side sheet that holds her chat or a bar, and her panel. */
 export const herFaceOf = (page: Page): Locator => page.locator('[data-nemia-face-button]');
 export const herSheetOf = (page: Page): Locator => page.locator('[data-slot="side-sheet"]');
+
+/** The frame's docked sheet's holder, which says how it stands (`data-frame-sheet`) and what it shows (`data-sheet-shows`). */
+export const frameSheetOf = (page: Page): Locator => page.locator('[data-frame-sheet]');
+
+/** The frame's docked sheet comes to show `shows`, within `WAIT_MS`: what the address's `?bar=` names, her chat, or nothing. */
+export async function expectSheetShows(page: Page, shows: 'bar' | 'her' | 'none', assertion: string): Promise<void> {
+  try {
+    await page.locator(`[data-frame-sheet][data-sheet-shows="${shows}"]`).waitFor({ state: 'attached', timeout: WAIT_MS });
+  } catch {
+    const now = await frameSheetOf(page)
+      .getAttribute('data-sheet-shows', { timeout: 1000 })
+      .catch(() => 'no docked sheet');
+    throw new Refused(`${assertion} — the sheet shows ${now}`);
+  }
+}
 export const chatPanelOf = (page: Page): Locator => page.locator('[data-chat-panel]');
 
 /**

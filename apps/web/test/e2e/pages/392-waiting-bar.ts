@@ -11,7 +11,7 @@ import { OUT } from '../world.ts';
 /** The button under the runs that wait on you, on the Runs page. */
 const openerOf = (page: Page): Locator => page.locator('[data-section="waiting"] [data-waiting-opener]');
 
-/** The floating bar of the runs waiting on you. */
+/** The bar of the runs waiting on you, in the frame's side sheet. */
 const waitingBar = (page: Page): Locator => page.getByRole('complementary', { name: 'Waiting on you' });
 
 /** Goes to `to` in this tab and waits for its reads. */
@@ -33,7 +33,7 @@ async function agrees(page: Page, rows: readonly BellRow[]): Promise<void> {
 }
 
 /**
- * Pressed, the button under what waits on the Runs page `to` opens the runs waiting on you in every factory in the floating bar,
+ * Pressed, the button under what waits on the Runs page `to` opens the runs waiting on you in every factory in the frame's side sheet,
  * named in the address: a row each, oldest first, with its factory's tag; pressed again, it closes.
  */
 async function opens(page: Page, to: string, rows: readonly BellRow[]): Promise<void> {

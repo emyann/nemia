@@ -23,7 +23,9 @@ const BIN = path.join(ROOT, 'node_modules', '.bin');
 const FULL = '.oxlintrc.json';
 const FAST = '.oxlintrc.fast.json';
 
+type Block = { files: string[]; rules: Record<string, unknown> };
 type Config = {
+  overrides?: Block[];
   [key: string]: unknown;
   options?: Record<string, unknown>;
   ignorePatterns?: string[];
@@ -38,6 +40,13 @@ const parse = (text: string, name: string): Config => {
 };
 
 const read = (name: string): string => fs.readFileSync(path.join(ROOT, name), 'utf8');
+
+/** The folder of the first override block that refuses `x!`, taken from the whole config: the fixture's source lies there. */
+const guarded = (): string => {
+  const block = (parse(read(FULL), FULL).overrides ?? []).find((each) => 'typescript/no-non-null-assertion' in each.rules);
+  assert.ok(block, `no override block of ${FULL} sets typescript/no-non-null-assertion: give the fixture another override to break`);
+  return block.files[0].replace(/\/\*\*$/, '');
+};
 
 /** The keys the fast config may hold: what `extends` does not carry, and the one option it changes. */
 const OWN = ['$schema', 'extends', 'options', 'ignorePatterns'];
@@ -67,7 +76,7 @@ const typeAware = (): Set<string> => {
 };
 
 /**
- * A fixture that breaks a type-aware rule, a rule of the top level, a rule an override sets for the runtime's source, the comment
+ * A fixture that breaks a type-aware rule, a rule of the top level, a rule an override sets for one folder, the comment
  * plugin's rule, and one under an ignore pattern, in a scratch tree beside the whole config (its plugins made absolute) and `fastText`.
  */
 const tree = (fastText: string): string => {
@@ -84,7 +93,7 @@ const tree = (fastText: string): string => {
     path.join(dir, 'tsconfig.json'),
     JSON.stringify({ compilerOptions: { strict: true, module: 'nodenext', target: 'esnext', noEmit: true }, include: ['**/*.ts'] }),
   );
-  const source = path.join(dir, 'packages', 'agent-runtime', 'src');
+  const source = path.join(dir, guarded());
   fs.mkdirSync(source, { recursive: true });
   fs.writeFileSync(
     path.join(source, 'a.ts'),
@@ -156,5 +165,5 @@ test('REFUSED: a fast config that turns a rule off of its own', () => {
   assert.equal(text.split(key).length, 2, `no one ${key} in ${FAST}`);
   const drifted = text.replace(key, `"rules": { "no-debugger": "off" },\n  ${key}`);
   assert.equal(drift(parse(read(FULL), FULL), parse(drifted, FAST)).length, 1);
-  assert.deepEqual(unlike(tree(drifted), typeAware()), [`${FAST} misses packages/agent-runtime/src/a.ts:4 eslint(no-debugger)`]);
+  assert.deepEqual(unlike(tree(drifted), typeAware()), [`${FAST} misses ${guarded()}/a.ts:4 eslint(no-debugger)`]);
 });

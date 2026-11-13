@@ -216,7 +216,8 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   OTEL_EXPORTER_OTLP_ENDPOINT: '',
   /**
    * No bind, whatever a server's unit sets: the api listens on the loopback, where `startServer` reads its address, as every test seat's
-   * does (`SERVING_VARIABLES`, packages/agent-orchestrator/src/config/config.store.ts). The web app imports no package, so it is named here.
+   * does (`SERVING_VARIABLES`, packages/agent-orchestrator/src/config/config.store.ts). The web app imports no package, so it is
+   * named here.
    */
   NEMIA_BIND: '',
   /** Nor is the store marked exposed, by the same rule; a seat that wants one lays it over this (`serveExposed`). */

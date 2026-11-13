@@ -3,23 +3,19 @@
  * it: a change to a template's content bumps its `spec.version` (`nemia.yaml`) and records the new version and digest, so a factory
  * applied at a version always means the same files.
  *
- * The digest is the one `nemia template lint <folder>` prints, of the folder's files with their modes. A checkout's modes are its
- * umask's, so the digest is read over a scratch copy whose modes are git's (100644 a 0o644, 100755 a 0o755: `modesOf`), never over the
- * checkout as it is (`digestOf`).
+ * The digest is the one `nemia template lint <folder>` prints, of the folder's files with their modes as git records them, read by
+ * `digestOf` and `modesOf` of the workspace's own `released.ts`, the digest its `cut` writes at a landing.
  *
  * Each refusal is first made on a scratch copy of the workspace, a byte changed or a version bumped, then the workspace as it is read.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { scratch } from 'test-kit/scratch';
-import { nemia, storeEnv, TEMPLATES } from './template.ts';
-
-/** The record of what is released: by template, its version and the digest of its content. */
-const RELEASED = 'released.json';
+import { digestOf, modesOf, RELEASED, templatesIn } from '../released.ts';
+import { TEMPLATES } from './template.ts';
 
 /** How a template stands apart from its record: no record at its version, or another content under the version recorded. */
 type Kind = 'unrecorded' | 'changed';
@@ -27,50 +23,8 @@ type Kind = 'unrecorded' | 'changed';
 /** A template apart from its record: its name, how, and what to do, for a person. */
 type Apart = { template: string; kind: Kind; message: string };
 
-/** Each file of the folder `dir` that git tracks, by its path from `dir`, with the permission bits git records for it. */
-function modesOf(dir: string): Map<string, number> {
-  const listed = spawnSync('git', ['ls-files', '-s', '-z', '.'], { cwd: dir, encoding: 'utf8' });
-  assert.equal(listed.status, 0, listed.stderr);
-  return new Map(
-    listed.stdout
-      .split('\0')
-      .filter(Boolean)
-      .map((entry) => {
-        const [meta = '', file = ''] = entry.split('\t');
-        return [file, meta.startsWith('100755') ? 0o755 : 0o644] as const;
-      }),
-  );
-}
-
 /** The modes of every template of this workspace as git records them, by its path from the workspace. */
 const MODES = modesOf(TEMPLATES);
-
-/**
- * The digest of the content of the template `folder` (a folder of `root`), its files' modes set from `MODES` (0o644 for a file git does
- * not track yet), as `nemia template lint` prints it over a scratch copy.
- */
-function digestOf(root: string, folder: string): string {
-  const work = scratch('nemia-released-');
-  const copy = path.join(work, folder);
-  fs.cpSync(path.join(root, folder), copy, { recursive: true });
-  for (const file of fs.readdirSync(copy, { recursive: true, encoding: 'utf8' })) {
-    const at = path.join(copy, file);
-    fs.chmodSync(at, fs.statSync(at).isDirectory() ? 0o755 : (MODES.get(`${folder}/${file.split(path.sep).join('/')}`) ?? 0o644));
-  }
-  const linted = nemia(storeEnv(work), 'template', 'lint', copy);
-  assert.equal(linted.code, 0, linted.err);
-  const digest = /^digest of the content: (sha256:[0-9a-f]{64})$/m.exec(linted.out)?.[1];
-  assert.ok(digest, `nemia template lint printed a digest: ${linted.out}`);
-  return digest;
-}
-
-/** The templates of the workspace `root`: each folder of it that holds a `nemia.yaml`. */
-const templatesIn = (root: string): string[] =>
-  fs
-    .readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(root, entry.name, 'nemia.yaml')))
-    .map((entry) => entry.name)
-    .sort();
 
 /** Each template of the workspace `root` apart from its record in `released.json` there. */
 function apart(root: string): Apart[] {
@@ -79,7 +33,7 @@ function apart(root: string): Apart[] {
     const manifest = yaml.load(fs.readFileSync(path.join(root, template, 'nemia.yaml'), 'utf8')) as { spec: { version: string } };
     const version = manifest.spec.version;
     const recorded = record[template];
-    const digest = digestOf(root, template);
+    const digest = digestOf(root, template, MODES);
     if (recorded?.version !== version)
       return [
         {

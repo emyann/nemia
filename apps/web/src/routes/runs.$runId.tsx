@@ -37,6 +37,7 @@ import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
 import { ink } from '../lib/meaning';
 import { ENDED } from '../lib/words';
+import { Actor } from '../components/actor/Actor';
 
 /**
  * `step`, the old address of one step of the run and the one a message names a step by (`broughtOf`, `lib/stepLink.ts`), opens that
@@ -191,7 +192,7 @@ function Run({ run }: { run: RunDetail }) {
                 ] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
             ['started', startedRow(run)],
-            [ENDED.cancelled.word, run.cancelledAt && when(run.cancelledAt)],
+            [ENDED.cancelled.word, cancelledRow(run)],
             ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
             ['workflow', code(run.workflowDir)],
           ]}
@@ -430,6 +431,17 @@ function RunTook({ run }: { run: RunDetail }) {
   );
 }
 
+/** When the run was called off, and who called it off where its record says (`Actor`); nothing for a run never called off. */
+function cancelledRow(run: RunDetail): ReactNode {
+  if (!run.cancelledAt) return undefined;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2">
+      {when(run.cancelledAt)}
+      <Actor actor={run.cancelledBy} />
+    </span>
+  );
+}
+
 /**
  * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
  * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
@@ -454,7 +466,7 @@ function RunWaits({ run }: { run: RunDetail }) {
     <>
       {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
       {run.holding && (
-        <RunWait label="Held" wait={run.holding}>
+        <RunWait label="Held" wait={run.holding} actor={run.holding.actor}>
           <LiftHold id={run.id} />
         </RunWait>
       )}

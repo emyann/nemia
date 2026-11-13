@@ -11,7 +11,8 @@
  *   (`treeOf`, `standsFor`); a board built from another tree is ended first. Else it builds the web app into the folder (`vite build
  *   --outDir`), puts back the route tree the build regenerates (`keeping`), refuses when the workspace's `git status` changed over the
  *   build (`changedOver`), builds the page of the look's stories beside it (`buildParts`), starts a holder of its own (`hold`) and
- *   prints the three lines the holder wrote (`linesOf`): the board's address, the api's, and the stories'.
+ *   prints the four lines the holder wrote (`linesOf`): the board's address, the api's, the stories', and the person's token the store
+ *   keeps, which a browser pastes on the board's token page: every api route asks for one, loopback too.
  * - `hold`, the holder, started by `serve` alone and detached from it: seeds the store, serves it (served.ts), answers the stories'
  *   page itself from the folder it was built into (`serveStories`), writes where each listens,
  *   its pid and the tree it was built from into the folder (`served.json`), and ends by itself after `HOLD_MS` (`BOARD_HOLD_MS` in a
@@ -48,10 +49,10 @@ const PACE_MS = 200;
 const TRIES = 3;
 
 /**
- * What the holder writes once it serves: its own pid, where the board, its api and the page of the look's stories listen, and the
- * tree they were built from.
+ * What the holder writes once it serves: its own pid, where the board, its api and the page of the look's stories listen, the tree they
+ * were built from, and the person's token its store keeps (`token`, the seed's `SEAT_TOKEN`), which signs a browser in.
  */
-export type ServedBoard = { pid: number; board: string; api: string; stories: string; tree: string };
+export type ServedBoard = { pid: number; board: string; api: string; stories: string; tree: string; token: string };
 
 /**
  * The tree of the repository `repo` as it is now, as one word: a digest of its commit, of every change to a tracked file since, and of
@@ -125,9 +126,9 @@ export function servedIn(folder: string): ServedBoard | undefined {
   } catch {
     return undefined;
   }
-  const { pid, board, api, stories, tree } = (read ?? {}) as Partial<ServedBoard>;
-  if (typeof pid !== 'number' || ![board, api, stories, tree].every((said) => typeof said === 'string')) return undefined;
-  return alive(pid) ? ({ pid, board, api, stories, tree } as ServedBoard) : undefined;
+  const { pid, board, api, stories, tree, token } = (read ?? {}) as Partial<ServedBoard>;
+  if (typeof pid !== 'number' || ![board, api, stories, tree, token].every((said) => typeof said === 'string')) return undefined;
+  return alive(pid) ? ({ pid, board, api, stories, tree, token } as ServedBoard) : undefined;
 }
 
 /**
@@ -136,11 +137,15 @@ export function servedIn(folder: string): ServedBoard | undefined {
  */
 export const usable = (port: string): boolean => /^\d+$/.test(port) && !/^(?:8787|5173)/.test(port);
 
-/** The three lines `serve` prints: where the board listens, where its api does, and where the page of the look's stories does. */
-export const linesOf = (served: Pick<ServedBoard, 'board' | 'api' | 'stories'>): string[] => [
+/**
+ * The four lines `serve` prints: where the board listens, where its api does, where the page of the look's stories does, and the token
+ * a browser pastes on the board's token page to be read as the person.
+ */
+export const linesOf = (served: Pick<ServedBoard, 'board' | 'api' | 'stories' | 'token'>): string[] => [
   `board on ${served.board}`,
   `api on ${served.api}`,
   `stories on ${served.stories}`,
+  `token ${served.token}`,
 ];
 
 /** A refusal: said on stderr, exit 1. */
@@ -296,6 +301,7 @@ async function serve(dir: string): Promise<void> {
 /** `hold`: seeds and serves the folder's store, says where in `served.json`, and holds until it is asked to stop or its time is up. */
 async function hold(dir: string): Promise<void> {
   const { serveStore, servers, startServers, stopOnTheWayOut, stopServers } = await import('./served.ts');
+  const { seatToken } = await import('./world.ts');
   const store = path.join(dir, 'store');
   fs.mkdirSync(store);
   process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
@@ -311,7 +317,14 @@ async function hold(dir: string): Promise<void> {
   }
   const tree = process.env.BOARD_SERVE_TREE ?? '';
   const stories = await serveStories(path.join(dir, 'stories'));
-  const served: ServedBoard = { pid: process.pid, board: at.base, api: `http://127.0.0.1:${at.apiPort}`, stories: stories.at, tree };
+  const served: ServedBoard = {
+    pid: process.pid,
+    board: at.base,
+    api: `http://127.0.0.1:${at.apiPort}`,
+    stories: stories.at,
+    tree,
+    token: seatToken ?? '',
+  };
   fs.writeFileSync(path.join(dir, 'served.json.new'), `${JSON.stringify(served)}\n`);
   fs.renameSync(path.join(dir, 'served.json.new'), path.join(dir, 'served.json'));
   const holdMs = Number(process.env.BOARD_HOLD_MS) || HOLD_MS;

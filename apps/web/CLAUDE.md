@@ -62,7 +62,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   build`: `test/e2e/parts.test.ts` presses it, and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
-  on <url>`; `npm run board:stop` ends its holder, which else ends by itself.
+  on <url>`, and on a fourth the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every
+  api route asks for one, loopback too; `npm run board:stop` ends its holder, which else ends by itself.
+- Every api route asks for a token, so each browser context the e2e opens on a worker's seat is given the seed's (`SEAT_TOKEN`) as the
+  board's cookie before a page loads (`seated`, `e2e/served.ts`; `visitAll` does it for every page), and a request made from Node presents
+  it as its bearer (`bearer`); a context meant to meet the token page is opened bare.
 
 ## Writing an e2e page
 

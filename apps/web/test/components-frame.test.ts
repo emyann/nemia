@@ -43,6 +43,7 @@ test("a tab's page is drawn under the strip of Settings' tabs, each a link to it
     { tag: 'a', href: '/settings', name: 'Settings', selected: false },
     { tag: 'a', href: '/capabilities', name: 'Capabilities', selected: true },
     { tag: 'a', href: '/setup', name: 'Setup', selected: false },
+    { tag: 'a', href: '/tokens', name: 'Tokens', selected: false },
   ]);
   assert.match(
     html,

@@ -31,8 +31,8 @@ async function underHeader(page: Page): Promise<void> {
   await expectVisible(header.locator('[data-page-name]').getByText(PLACE, { exact: true }), `the header names the place, ${PLACE}`);
   await expectTexts(
     frameTabsOf(page).getByRole('tab'),
-    ['Settings', 'Capabilities', 'Setup'],
-    'the strip holds Settings, Capabilities, then Setup',
+    ['Settings', 'Capabilities', 'Setup', 'Tokens'],
+    'the strip holds Settings, Capabilities, Setup, then Tokens',
   );
   await expectTab(page, 'Settings', 'on /settings the Settings tab is selected');
   const top = (await header.boundingBox())!;
@@ -102,10 +102,10 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * The frame's tabs: Settings is one destination in the rail with a tab each, Settings, Capabilities and Setup, in a strip under the
-   * top bar and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same tab.
-   * The arrow keys move between the tabs without opening one, and Enter opens one, once. A page with one view, Agents, has no strip. The
-   * window's size is taken back.
+   * The frame's tabs: Settings is one destination in the rail with a tab each, Settings, Capabilities, Setup and Tokens, in a strip under
+   * the top bar and above the page. A tab is its own address: a click opens it, closing the floating bar, and a next visit opens the same
+   * tab. The arrow keys move between the tabs without opening one, and Enter opens one, once. A page with one view, Agents, has no strip.
+   * The window's size is taken back.
    */
   name: 'tabs',
   route: '/settings',

@@ -1,10 +1,13 @@
 /**
  * A store served for a browser to open, as a worker of `npm run e2e` (worker.ts) and `npm run board:serve` (serve.ts) each serve one of
  * their own: seeded (`seedStore`), behind an api on a free port that ticks nothing and a `vite preview` of a built app on another
- * (`serveStore`), never on :8787 or :5173. The servers started are kept here (`servers`), and stopped by the handles kept, never by a
- * name: at once on the way out (`cleanUp`, `stopOnTheWayOut`), or waited for (`stopServers`).
+ * (`serveStore`), never on :8787 or :5173. Every api route asks for a token, loopback too: the seed keeps one of the person's
+ * (`SEAT_TOKEN`), which each browser context a page opens on the seat is given as the board's cookie (`seated`). The servers started
+ * are kept here (`servers`), and stopped by the handles kept, never by a name: at once on the way out (`cleanUp`, `stopOnTheWayOut`),
+ * or waited for (`stopServers`).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,8 +28,23 @@ import {
   seedQuota,
   seedWorkflows,
 } from './seed.ts';
+import type { BrowserContext } from 'playwright';
+import { TOKEN_COOKIE } from 'objects';
 import { QUOTA_ASKS_MS } from './board.ts';
-import { API, apiEnv, fromNodeModules, heard, plain, setApiEnv, setStore, standingPass, store, WEB } from './world.ts';
+import {
+  API,
+  apiEnv,
+  fromNodeModules,
+  heard,
+  plain,
+  seatToken,
+  setApiEnv,
+  setSeatToken,
+  setStore,
+  standingPass,
+  store,
+  WEB,
+} from './world.ts';
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
@@ -127,11 +145,56 @@ export const tails = (): string =>
     })
     .join('');
 
+/** The name the person's token the seed keeps is kept under: the token each browser context is given (`seated`). */
+export const SEAT_TOKEN = 'e2e-board';
+
+/** Who holds a token minted by hand, as the package's record says it: an agent, bound to a factory or store-wide, maybe narrowed. */
+export type AgentHolder = { kind: 'agent'; agent: string; factory: string | null; narrowed: 'read' | 'act' | null };
+
+/**
+ * A standing token minted on the store `root` under `name`, its record written by hand as the package's token store writes it
+ * (`mintPersonToken`): `person-tokens/<sha-256 of the token>.json`, its name, when it was minted and, for an agent's, its `holder`,
+ * readable by its owner alone. With no holder it is the person's. The web imports no package. Answers the token, which the store keeps
+ * only the digest of; the record is the caller's to take back.
+ */
+export function mintPersonToken(root: string, name: string, holder?: AgentHolder): string {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const dir = path.join(root, 'person-tokens');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const digest = crypto.createHash('sha256').update(token).digest('hex');
+  fs.writeFileSync(
+    path.join(dir, `${digest}.json`),
+    `${JSON.stringify({ name, createdAt: new Date().toISOString(), ...(holder ? { holder } : {}) })}\n`,
+    { mode: 0o600 },
+  );
+  return token;
+}
+
+/**
+ * `context` given the seat's token (`seatToken`) as the cookie the api keeps a browser's token in (`TOKEN_COOKIE`), HttpOnly on `/` of
+ * the host `base` is on, as the api sets it on a sign-in, before any page of it loads: every read of the board, and every request a page
+ * makes through it (`page.request`, `fetch` in the page), presents the person's token. A context meant to meet the token page is never
+ * given it. Refuses where no store was seeded.
+ */
+export async function seated(context: BrowserContext, base: string): Promise<BrowserContext> {
+  if (seatToken === undefined) throw new Error('no store is seeded, so there is no token to give a browser: seed one (seedStore) first');
+  await context.addCookies([
+    { name: TOKEN_COOKIE, value: seatToken, domain: new URL(base).hostname, path: '/', httpOnly: true, sameSite: 'Strict' },
+  ]);
+  return context;
+}
+
+/** The headers a request made from Node to the seat presents: the seat's token as its bearer (`seatToken`). */
+export const bearer = (): Record<string, string> => {
+  if (seatToken === undefined) throw new Error('no store is seeded, so there is no token to present: seed one (seedStore) first');
+  return { authorization: `Bearer ${seatToken}` };
+};
+
 /**
  * Seeds `root`, an empty directory, as the pages read it. The seed writes the diamond after the checkout's files, which its base commits;
  * then the run with no repository anywhere in it, newest of them all; then the feed, over every journal the seed wrote, each journal
- * opening with the filing the api reads off its task's view. Refuses a directory that is not empty: it may be another worker's store, or
- * a person's.
+ * opening with the filing the api reads off its task's view; and last a token of the person's (`SEAT_TOKEN`), kept for the browsers.
+ * Refuses a directory that is not empty: it may be another worker's store, or a person's.
  */
 export function seedStore(root: string): void {
   if (!fs.existsSync(root) || fs.readdirSync(root).length)
@@ -148,6 +211,7 @@ export function seedStore(root: string): void {
   seedFolder(root);
   seedFactories(root, checkout);
   seedFeed(root);
+  setSeatToken(mintPersonToken(root, SEAT_TOKEN));
 }
 
 /**

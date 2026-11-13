@@ -16,6 +16,7 @@ import { backName, endingWarning } from '../../lib/gate';
 import type { Frozen } from '../../lib/frozen';
 import { budgetsGiven, GateBudgetFields, GateBudgetRows, type Amounts, type GateBudgets, type GivenBudget } from './GateBudgets';
 import { BUTTON, BUTTON_SECONDARY, TEXTAREA } from '../../lib/classes';
+import { Actor } from '../actor/Actor';
 
 /** A gated step's gate, as its object's status holds it. */
 type StepGate = NonNullable<StepView['gate']>;
@@ -621,6 +622,7 @@ export function Approved({
             : `every step after the gate is handed ${approval.message === null ? 'the approval' : 'these words'}`}
         </span>
       </p>
+      <Actor actor={approval.actor} />
       {approval.message === null ? (
         <p data-words="none" className="text-muted-foreground">
           with no words

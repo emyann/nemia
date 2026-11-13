@@ -148,7 +148,9 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   Grace's and Otto's one list), the browser's — and each agent names the files its role takes. Read a file's reasons before you add a
   verb or a deny: a verb is added by asking what file it can be made to write and what program it can be made to run. The denies hold
   the spellings as typed: one the shell rejoins (quoted, escaped, brace-split, built from a `$`) passes them. Agora alone allows `gh pr
-  view` and `gh pr checks`. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
+  view` and `gh pr checks`; the four read a tool's own help and version, gh's by `gh help <core command>` (never `gh
+  <command> --help`, which can run an alias or an extension) and claude's by exact lines measured safe (`help.allow.yaml`), while
+  the writers keep gh refused whole. A refused call goes at the top of a sign-off (sdlc's `RULES.md`). `packages/templates/test/fences.test.ts`
   holds the agents to the files and proves on their rendered fences, through the test kit's matcher (`test-kit/fence`), each read open
   and each write refused; `packages/agent-orchestrator/test/agent-fences.test.ts` proves, on the same lines, what each deny refuses
   spelling by spelling. The set is on the agents, not in `.claude/settings.json`, so the team travels to a factory that is not this

@@ -1,0 +1,103 @@
+# A tool's own interface, its help and its version, which a read-only agent reads from the tool installed rather than from memory.
+# Each line runs the tool's own help printer and nothing else: what a spelling could make it run instead is why each is shaped as it
+# is, below. The read set's denies (read-only.deny.yaml) apply to these lines too: no assignment before gh, no `--repo`, `-R`, `-c`,
+# `--web`, `--jq` or `--template` after it.
+#
+# gh, by `gh help <command>`, never `gh <command> --help`. gh rewrites `gh help X` into `gh X --help`, which runs X, only when X
+# resolves to an extension (`isExtensionCommand`, internal/ghcmd/cmd.go), and it registers extensions at the root alone, skipping one
+# whose name a core command holds (pkg/cmd/root/root.go): under a core command's name, `help` finds a command of gh's own, or one of
+# the aliases nested under it, and prints its usage; an alias is run by `gh <it>`, never by `help`. Words after the core name move
+# cobra's search within that command's tree alone. So each line names a core command: `gh help <a name not listed>` may be an
+# extension, and runs it; `gh <x> --help` runs a shell alias, which parses no flags (`sh -c <alias> -- --help`), and a flag that takes
+# a value swallows the `--help` and runs the command. The names are gh's own commands from its manual (cli.github.com/manual/gh, read
+# 2026-11-13), less `copilot`, an official extension's stub that may offer to install it, and `agent-task`, `preview`, `skill`,
+# `discussion` and `licenses`, recent enough that an older gh may hold an extension under the name. Any gh's update check or telemetry
+# is gh's own request, of no program a step names.
+- Bash(gh help)
+- Bash(gh --version)
+- Bash(gh help auth:*)
+- Bash(gh help browse:*)
+- Bash(gh help codespace:*)
+- Bash(gh help gist:*)
+- Bash(gh help issue:*)
+- Bash(gh help org:*)
+- Bash(gh help pr:*)
+- Bash(gh help project:*)
+- Bash(gh help release:*)
+- Bash(gh help repo:*)
+- Bash(gh help cache:*)
+- Bash(gh help run:*)
+- Bash(gh help workflow:*)
+- Bash(gh help alias:*)
+- Bash(gh help api:*)
+- Bash(gh help attestation:*)
+- Bash(gh help completion:*)
+- Bash(gh help config:*)
+- Bash(gh help extension:*)
+- Bash(gh help gpg-key:*)
+- Bash(gh help label:*)
+- Bash(gh help ruleset:*)
+- Bash(gh help search:*)
+- Bash(gh help secret:*)
+- Bash(gh help ssh-key:*)
+- Bash(gh help status:*)
+- Bash(gh help variable:*)
+# claude, by exact lines alone: no `*`, so no flag that takes a value (`-p x --help` starts a session), no planted path and no other
+# command fits before or after `--help`. Measured on Claude Code 2.1.322, 2026-11-13, in a scratch folder whose user, project and
+# local settings planted an `apiKeyHelper`, a status line and SessionStart, UserPromptSubmit, PreToolUse and SessionEnd hooks, and a
+# project MCP server, each touching a marker: `claude -p` there touched them; each line below exited 0 within a second, touched none
+# and wrote no file. A later version is measured again before a line is added. codex was not installed where this was measured: it
+# has no line.
+- Bash(claude --help)
+- Bash(claude --version)
+- Bash(claude agents --help)
+- Bash(claude attach --help)
+- Bash(claude auth --help)
+- Bash(claude auto-mode --help)
+- Bash(claude doctor --help)
+- Bash(claude gateway --help)
+- Bash(claude import --help)
+- Bash(claude install --help)
+- Bash(claude logs --help)
+- Bash(claude mcp --help)
+- Bash(claude plugin --help)
+- Bash(claude purge --help)
+- Bash(claude respawn --help)
+- Bash(claude rm --help)
+- Bash(claude setup-token --help)
+- Bash(claude stop --help)
+- Bash(claude ultrareview --help)
+- Bash(claude update --help)
+- Bash(claude auth login --help)
+- Bash(claude auth logout --help)
+- Bash(claude auth status --help)
+- Bash(claude mcp add --help)
+- Bash(claude mcp add-from-claude-desktop --help)
+- Bash(claude mcp add-json --help)
+- Bash(claude mcp get --help)
+- Bash(claude mcp list --help)
+- Bash(claude mcp login --help)
+- Bash(claude mcp logout --help)
+- Bash(claude mcp remove --help)
+- Bash(claude mcp reset-project-choices --help)
+- Bash(claude mcp serve --help)
+- Bash(claude plugin configure --help)
+- Bash(claude plugin details --help)
+- Bash(claude plugin disable --help)
+- Bash(claude plugin enable --help)
+- Bash(claude plugin eval --help)
+- Bash(claude plugin init --help)
+- Bash(claude plugin install --help)
+- Bash(claude plugin list --help)
+- Bash(claude plugin marketplace --help)
+- Bash(claude plugin prune --help)
+- Bash(claude plugin restore-set-aside --help)
+- Bash(claude plugin tag --help)
+- Bash(claude plugin test --help)
+- Bash(claude plugin uninstall --help)
+- Bash(claude plugin update --help)
+- Bash(claude plugin validate --help)
+- Bash(claude auto-mode config --help)
+- Bash(claude auto-mode critique --help)
+- Bash(claude auto-mode defaults --help)
+- Bash(claude auto-mode reset --help)

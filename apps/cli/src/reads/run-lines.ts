@@ -4,7 +4,7 @@
  * line, its word, its cost, its branch and its note, and under them what it asks of a person: what to decide, the steps that wait on
  * you, a run waited on that never lands, a hold and what lifts it, and where its work ended up. Pure.
  */
-import type { Run, RunStepStatus, TableAsked } from 'objects';
+import { headline, type Run, type RunStepStatus, type TableAsked } from 'objects';
 
 /** How much of a brief's first line the head line shows. */
 const BRIEF_WIDTH = 56;
@@ -17,9 +17,6 @@ const WORD_WIDTH = 20;
 
 /** The engine's bare word for a session that waits on its harness, which a step's `waitingFor` words. */
 const NEEDS_HUMAN = 'needs-human';
-
-/** `text` up to its first line's end. */
-const firstLine = (text: string): string => text.split('\n')[0] ?? text;
 
 /** A step's word: a session at `needs-human` says what it waits for, before what its closeout said. */
 const stepWordOf = (step: RunStepStatus): string =>
@@ -73,7 +70,7 @@ export function runLines(run: Run, asked: TableAsked): string[] {
   const { status } = run;
   const calledOff = `${status.cancelledAt ? '  (cancelled)' : ''}${status.pruned ? '  (pruned)' : ''}`;
   const cost = status.cost ? `  ${status.cost.said}` : '';
-  const head = `${run.metadata.name}  ${firstLine(run.spec.brief).slice(0, BRIEF_WIDTH)}${calledOff}${cost}${labelsOf(run.metadata.labels, asked)}`;
+  const head = `${run.metadata.name}  ${headline(run.spec.brief).slice(0, BRIEF_WIDTH)}${calledOff}${cost}${labelsOf(run.metadata.labels, asked)}`;
   const said = status.steps.map((step) => ({ step, word: `${stepWordOf(step)}${step.spent ? `  ${step.spent.said}` : ''}` }));
   const width = Math.max(WORD_WIDTH, ...said.map(({ word }) => word.length));
   return [

@@ -238,6 +238,7 @@ export {
   streamsOf,
 } from './endpoint-keys.ts';
 export { jsonBodied } from './write-body.ts';
+export { headline } from './headline.ts';
 export { Answered, apiClient, type ApiClient, type ApiClientOptions, READ_BOUND_MS, timedOut } from './api-client.ts';
 export { Schedule, ScheduleFired, ScheduleList, ScheduleSpec, ScheduleStatus, ScheduleWrite } from './schedule.ts';
 export { Hire, HireList, HireSetting, HireSettings, HireSpec, HireStatus, HireWrite } from './hire.ts';

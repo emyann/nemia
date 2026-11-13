@@ -2,7 +2,8 @@
  * `nemia decide <run>`, a verb of the client's own (the untangle intent's Q14): the run's decision read from the api
  * (`GET /api/runs/:runId/decision`, `objects`' `RunDecision`, the one read model the board reads too) and its screen printed — what it
  * waits on, or what it produced: the over-budget line, what each branch touched, the lesson, the check-affecting diffs in full, what each
- * step consumed, where each branch stands, the collisions, and the commands it leaves a person, numbered. At a terminal it then asks which
+ * step consumed, where each branch stands, the collisions, the questions each step waiting on you asks, numbered as `--answer` names them,
+ * and the commands it leaves a person, numbered. At a terminal it then asks which
  * to run: a `nemia` command is run as this client runs that verb, the words a placeholder holds (`"<objection>"`) asked first; a `git`
  * command is printed and never run. Off a terminal it prints and runs nothing.
  *
@@ -10,7 +11,7 @@
  * the decision shows in full, so it asks for them whole (`?diffs=*`): the api answers none whole unless asked.
  */
 import readline from 'node:readline';
-import type { DecideCommand, Decidable, RunDecision } from 'objects';
+import type { DecideCommand, Decidable, DecisionQuestion, RunDecision } from 'objects';
 import { Refused } from '../refused.ts';
 import { asked } from '../objects.ts';
 
@@ -19,7 +20,8 @@ export const DECIDE_HELP = `nemia decide <runId>
 
 What the run produced, and the choice it leaves you, as the api reads it (GET /api/runs/<runId>/decision):
 what it waits on, or the branches it touched, the lesson, the check-affecting diffs in full, what each
-step consumed, where each branch stands against the base, the collisions with other runs, and the
+step consumed, where each branch stands against the base, the collisions with other runs, the
+questions each step waiting on you asks, numbered as --answer <n>=<letter> names them, and the
 commands left to you, numbered. At a terminal it asks which to run: a nemia command runs as you would
 type it, its placeholders asked first; a git command is printed and never run.
 
@@ -84,6 +86,29 @@ const collisionLines = (d: Decidable): string[] =>
         ...(d.collisions.semantic !== null ? [`  ${d.collisions.semantic.said}`] : []),
       ];
 
+/** One question as asked: its number and title, its body, each option by its letter, the recommended marked, and how many it takes. */
+const questionBlock = (q: DecisionQuestion): string[] => [
+  `  ${q.number}. ${q.title}`,
+  ...(q.body.trim()
+    ? q.body
+        .trim()
+        .split('\n')
+        .map((line) => `     ${line}`)
+    : []),
+  ...q.options.map((o) => `     ${o.letter}  ${o.label}${o.meaning ? ` — ${o.meaning}` : ''}${o.recommended ? '  (recommended)' : ''}`),
+  `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
+];
+
+/**
+ * What each step waiting on you asks, numbered as `--answer <n>=<letter>` names them back: the step, then each field it asked under and its
+ * questions. None for a decision read before them.
+ */
+const questionLines = (d: Decidable): string[] =>
+  (d.questions ?? []).flatMap(({ step, questions }) => [
+    `${step} asks:`,
+    ...questions.flatMap((q, i) => [...(questions[i - 1]?.field === q.field ? [] : [`${q.field}:`]), ...questionBlock(q)]),
+  ]);
+
 /** A command as offered: its number, its label, the line, and the sentence it ends with. */
 const offered = (c: DecideCommand, at: number): string => `${at + 1}. ${c.label}: ${c.command}${c.said !== null ? `  — ${c.said}` : ''}`;
 
@@ -113,6 +138,7 @@ export function decisionLines(runId: string, decision: RunDecision): string[] {
     usedLines(d),
     standingLines(d),
     collisionLines(d),
+    questionLines(d),
     d.commands.map(offered),
   ].filter((lines) => lines.length);
   return body(sections.flatMap((lines, at) => (at === 0 ? lines : ['', ...lines])));

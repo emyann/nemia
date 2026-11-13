@@ -5,7 +5,7 @@
  * store's root.
  */
 import { Effect } from 'effect';
-import type { Decidable, DiffFile, RunDecision, SensitiveDiff, Standing } from 'objects';
+import type { Decidable, DiffFile, RunDecision, SensitiveDiff, Standing, StepQuestions } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
@@ -20,6 +20,7 @@ import { changesOf, type BranchChanges } from '../branches/changes.store.ts';
 import { mergesRead } from '../branches/merges.verb.ts';
 import type { Collisions } from '../collide/collide.ts';
 import { totalOf, usedOf } from '../resource/index.ts';
+import { askedQuestions, numberedQuestions } from '../question/index.ts';
 import { decidedOf, type Decided } from './decide.verb.ts';
 
 /** How many lines of one file's check-affecting diff a decision carries. `nemia decide` prints them all, off the place's whole diff. */
@@ -111,7 +112,7 @@ const answered = (read: DecisionRead | DecisionUnjudged): DecisionRead | Decisio
  * a run still running has a step waiting on you, and every branch a step worked on when no terminal step has one (`branchesToRead`), never
  * the base branch of a run that cut worktrees, each read from the run's place on this read (`changesOf`). What the place could not say is
  * an `error` on its entry, never a failed read. A folder run has no repository to ask, and a run that worked on its base branch itself no
- * standings.
+ * standings. Beside them, the questions each step waiting on you asks now (`questionsWaiting`).
  *
  * Fails with `Missing` for a run the store does not have.
  */
@@ -143,6 +144,7 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
   const read = yield* branchesOf(run, git, steps, decided, d.kind === 'awaiting' ? d.branches : undefined, collisions, how);
   const touched = read.touched.map(({ branch, radius }) => ({ branch, radius }));
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
+  const questions = questionsWaiting(decided, judged.waitingOnYou);
   const decision: Decidable = {
     standings: read.standings,
     touched,
@@ -159,9 +161,25 @@ const decisionOf = Effect.fnUntraced(function* (at: StepsReading, how: DecisionH
     ...(decided.checkout ? { baseHeldBy: decided.checkout } : {}),
     awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
     collisions,
+    ...(questions.length ? { questions } : {}),
   };
   return { run, decision, decided, touched: read.touched, results: read.results } satisfies DecisionRead;
 });
+
+/**
+ * The questions each step of `waiting`, the steps waiting on a person, asks in its current closeout, numbered as `nemia decide` prints them
+ * (`numberedQuestions`): what `answers` to its approval or its next try names back. A step that asks none is left out.
+ */
+const questionsWaiting = (decided: Decided, waiting: readonly string[]): StepQuestions[] =>
+  waiting.flatMap((step) => {
+    const questions = numberedQuestions(
+      askedQuestions(
+        decided.steps.find((s) => s.name === step),
+        decided.closeouts[step],
+      ),
+    );
+    return questions.length ? [{ step, questions }] : [];
+  });
 
 /**
  * A run's decision as the api serves it (`decisionRead`), or why it is not judged, in the words the board says it with: its unfrozen

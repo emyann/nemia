@@ -128,7 +128,10 @@ test('REFUSED, exit 2, before anything is asked: a flag no writer takes, `factor
   }
 });
 
-/** A stand-in of the api that reads a workflow and makes a proposal: what it was asked, by method and path, with each body. */
+/**
+ * A stand-in of the api that reads a workflow for the factory `shop` and makes a proposal: what it was asked, by method and path, with
+ * each body.
+ */
 const asked: { method: string; path: string; body: unknown }[] = [];
 const standIn = http.createServer((req, res) => {
   let text = '';
@@ -141,7 +144,7 @@ const standIn = http.createServer((req, res) => {
       res.end(JSON.stringify(json));
     };
     if (req.url === '/api/health') return answer(200, { ok: true });
-    if (req.method === 'POST' && req.url === '/api/workflows/read')
+    if (req.method === 'POST' && req.url === '/api/workflows/read?factory=shop')
       return answer(200, {
         metadata: { name: 'hired' },
         spec: { steps: [], files: [{ path: 'pictures.ts', text: 'process.exit(0);\n' }] },
@@ -171,7 +174,8 @@ test('`nemia workflows write factory <name> --factory <f>` proposes the workflow
   );
   const said = await nemia(['workflows', 'write', 'factory', 'hired', '--folder', draftFolder('hired'), '--factory', 'shop'], env);
   assert.equal(said.code, 0, said.err);
-  const read = asked.find((r) => r.path === '/api/workflows/read');
+  const read = asked.find((r) => r.path === '/api/workflows/read?factory=shop');
+  assert.ok(read, 'the draft is read for the factory, whose hires fill its steps as a run there reads them');
   assert.deepEqual(
     read?.body,
     {

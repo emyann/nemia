@@ -368,7 +368,7 @@ export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, slotsOf } from './cap/cap.verb.ts';
 export type { StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
-export { factoryDraftOf, foldersLoaded, type FolderLoaded } from './workflows/workflows.verb.ts';
+export { factoryDraftIn, factoryDraftOf, foldersLoaded, type FolderLoaded } from './workflows/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export { acceptRun, roundRun, type Accepted, type RoundAsked } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';

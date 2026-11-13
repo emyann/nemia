@@ -217,7 +217,7 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
                 <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                   {titleOf(run)}
                 </span>
-                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground sm:inline">{run.id}</span>
+                <span className="hidden shrink-0 font-mono text-body-small text-muted-foreground @md/page:inline">{run.id}</span>
                 <span data-standing className="shrink-0 text-body-small text-muted-foreground" title={run.waiting?.advice}>
                   {standingOf(run)}
                 </span>

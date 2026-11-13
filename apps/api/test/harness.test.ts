@@ -167,6 +167,8 @@ test("REFUSED under the daemon's per-session and serving variables: a test file 
   const daemons = {
     WF_SESSION_TOKEN: 'a-token-no-test-minted',
     WF_MEMORY_LIMIT: '6Gi',
+    WF_MEMORY_REQUEST: '2560Mi',
+    WF_MEMORY_RESERVED: '2Gi',
     WF_CGROUP_PARENT: 'sessions.slice',
     NEMIA_BIND: '100.126.244.0',
     WF_EXPOSED: '1',

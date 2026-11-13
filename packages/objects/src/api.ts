@@ -558,6 +558,12 @@ const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 const repoQuery = { repo: Schema.optionalKey(Schema.String) };
 
 /**
+ * The query of a workflow's draft read (`POST /api/workflows/read`): the factory it is read for (`?factory=`), whose hires fill its steps
+ * as a run of it there would read them, and the repository (`?repo=`) among the factory's; none for yours and the builtins alone.
+ */
+const draftReadQuery = { factory: Schema.optionalKey(Schema.String), ...repoQuery };
+
+/**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
  * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
  * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
@@ -600,7 +606,12 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('keys', '/api/workflows/keys', { success: KeyForm, error: definitionErrors }),
-  HttpApiEndpoint.post('read', '/api/workflows/read', { payload: DefinitionFiles, success: WorkflowCreate, error: definitionErrors }),
+  HttpApiEndpoint.post('read', '/api/workflows/read', {
+    query: draftReadQuery,
+    payload: DefinitionFiles,
+    success: WorkflowCreate,
+    error: definitionErrors,
+  }),
 ) {}
 
 /**

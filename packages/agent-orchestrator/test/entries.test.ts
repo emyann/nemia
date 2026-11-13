@@ -311,6 +311,7 @@ const PINNED: Record<string, string[]> = {
     'evictedBy',
     'exitVerdicts',
     'factoriesFilling',
+    'factoryDraftIn',
     'factoryDraftOf',
     'factoryInstruction',
     'factoryLines',

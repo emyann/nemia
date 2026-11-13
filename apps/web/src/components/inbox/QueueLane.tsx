@@ -25,14 +25,14 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   return (
     <aside
       aria-label="Queued cards"
-      className="flex shrink-0 gap-2 overflow-x-auto border-b bg-muted/30 p-3 md:w-64 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:border-r md:border-b-0"
+      className="flex shrink-0 gap-2 overflow-x-auto border-b bg-muted/30 p-3 @lg/page:w-64 @lg/page:flex-col @lg/page:overflow-x-hidden @lg/page:overflow-y-auto @lg/page:border-r @lg/page:border-b-0"
     >
-      <p className="hidden text-body-small text-muted-foreground md:block">
+      <p className="hidden text-body-small text-muted-foreground @lg/page:block">
         <span className="font-medium text-foreground">Queued</span> · started in this order as run slots free
       </p>
-      <ol className="flex gap-2 md:flex-col">
+      <ol className="flex gap-2 @lg/page:flex-col">
         {cards.map((card) => (
-          <li key={card.name} className="w-56 shrink-0 md:w-auto">
+          <li key={card.name} className="w-56 shrink-0 @lg/page:w-auto">
             <Ghost card={card} now={now} factories={factories} />
           </li>
         ))}

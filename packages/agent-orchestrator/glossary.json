@@ -961,7 +961,7 @@
     },
     {
       "term": "Session variables",
-      "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`, which a test's seat drops."
+      "meaning": "the daemon's per-session variables, declared once (`SESSION_VARIABLES`, `packages/agent-orchestrator/src/config/config.store.ts`): `WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`, `WF_MEMORY_RESERVED`, `WF_CGROUP_PARENT`, which a test's seat drops."
     },
     {
       "term": "Serving variables",

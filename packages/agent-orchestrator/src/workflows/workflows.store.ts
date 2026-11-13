@@ -382,8 +382,9 @@ const givenNameRefusal = (name: string, seen: readonly string[]): string | undef
 /**
  * The workflow `name` as its folder, given as its files (`files`, each a file directly in it by its name and its text), says it
  * (`WorkflowFilesRead`): read exactly as the Workflow door the program is given reads a folder on disk, its agents and skills found in
- * `places`, by writing the files into a scratch folder of the machine's temporary folder, named `name`, which is removed whatever the read
- * answers. The memory door holds a draft's steps rendered, never the files a person wrote, so it cannot read them as the disk does.
+ * `places` and its steps filled with the hires `fills` where it is read for a factory, by writing the files into a scratch folder of
+ * the machine's temporary folder, named `name`, which is removed whatever the read answers. The memory door holds a draft's steps
+ * rendered, never the files a person wrote, so it cannot read them as the disk does.
  * Refused `Invalid` for a name that is not a workflow's, a file's name that is not one directly in the folder, and a folder that does not
  * load, in the loader's words, which name the step.
  */
@@ -391,6 +392,7 @@ export const workflowDraftOfFiles = Effect.fn('workflowDraftOfFiles')(function* 
   name: string,
   files: readonly CarriedFile[],
   places: Places = {},
+  fills?: Fills,
 ) {
   yield* nameChecked(name);
   for (const [i, file] of files.entries()) {
@@ -411,7 +413,7 @@ export const workflowDraftOfFiles = Effect.fn('workflowDraftOfFiles')(function* 
           for (const file of files) fs.writeFileSync(path.join(folder, file.path), file.text);
         });
         const dir = yield* fromThrow(() => workflowDirAt(folder));
-        const steps = yield* door.workflows.read(dir, places);
+        const steps = yield* door.workflows.read(dir, places, fills);
         const carried = files
           .filter((f) => !isMarkdown(f.path) && textIn(new TextEncoder().encode(f.text)) !== null)
           .map((f) => ({ path: f.path, text: f.text }))

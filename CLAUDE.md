@@ -73,12 +73,12 @@ holds what every change needs.
   each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
   passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session, and the
-  daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`) and its serving ones (`NEMIA_BIND`,
-  `WF_EXPOSED`, which a server's unit sets): the four test seats (`packages/agent-orchestrator/test/ambient.ts`,
-  `apps/api/test/harness.ts`, `apps/cli/test/ambient.ts`, which each cli spawn's environment is built on, and
-  `packages/templates/test/template.ts`) drop the telemetry and all five, by the orchestrator's two lists (`SESSION_VARIABLES` and
-  `SERVING_VARIABLES`, held by `tools/guards/test/env-given.test.ts`), so a step's own run reads what CI reads, and a test that means one
-  sets it itself.
+  daemon's per-session variables (`WF_SESSION_TOKEN`, `WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`, `WF_MEMORY_RESERVED`,
+  `WF_CGROUP_PARENT`) and its serving ones (`NEMIA_BIND`, `WF_EXPOSED`, which a server's unit sets): the four test seats
+  (`packages/agent-orchestrator/test/ambient.ts`, `apps/api/test/harness.ts`, `apps/cli/test/ambient.ts`, which each cli spawn's
+  environment is built on, and `packages/templates/test/template.ts`) drop the telemetry and all seven, by the orchestrator's two
+  lists (`SESSION_VARIABLES` and `SERVING_VARIABLES`, held by `tools/guards/test/env-given.test.ts`), so a step's own run reads what CI
+  reads, and a test that means one sets it itself.
 - **No test refuses a byte order mark.** A file written through a tool can turn an escape into the character it names, so after writing
   an escape of a NUL, DEL or byte order mark, look for the raw bytes (`grep -rl $'\xEF\xBB\xBF'`).
 
@@ -132,6 +132,13 @@ holds what every change needs.
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
   `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
+  Where the branch lacks the base and the factory names a refresh (sdlc's `landingRefresh` and `landingDerives`), the merge first
+  brings the base into the run's branch, derives the factory's files again (`packages/templates/sdlc/carried/refresh.ts`) and pushes,
+  merging nothing; the receipt merges that head once `ci` is green there. The landed commit differs from git's plain merge of the
+  reviewed head and the base only in the paths `landingDerives` names. This repository's command is `node packages/templates/released.ts
+  cut`, which cuts each template's version and record again from the base: the nemia factory takes them at its upgrade onto sdlc
+  3.11.0, `nemia factory upgrade <factory> --to 3.11.0 --set "landingRefresh=node packages/templates/released.ts cut" --set
+  "landingDerives=packages/templates/released.json packages/templates/*/nemia.yaml"`.
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
 ## Agents in this repository

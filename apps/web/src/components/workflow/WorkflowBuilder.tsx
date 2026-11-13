@@ -216,10 +216,10 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
         }}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid gap-4 @3xl/page:grid-cols-[minmax(0,1fr)_18rem]">
         <div
           aria-label={`The steps of ${base.name}, to draw`}
-          className={cn(FLOOR_BOX, 'self-start lg:sticky lg:top-4')}
+          className={cn(FLOOR_BOX, 'self-start @3xl/page:sticky @3xl/page:top-4')}
           style={{ height }}
         >
           <ReactFlow
@@ -439,7 +439,7 @@ function AddStep({
         if (!nameRefusal(steps, name) && body.trim()) onAdd(name, body);
       }}
     >
-      <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)]">
+      <div className="grid gap-2 @md/page:grid-cols-[12rem_minmax(0,1fr)]">
         <div className="space-y-1">
           <label htmlFor={nameId} className="block text-body-small font-medium">
             Step name

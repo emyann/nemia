@@ -23,6 +23,9 @@ type StepGate = NonNullable<StepView['gate']>;
 /** A person's approval of the try a gated step is on. */
 type StepApproval = NonNullable<StepGate['approval']>;
 
+/** The closeout and the decision side by side once the page column has room for both, one under the other below it. */
+const SIDE_BY_SIDE = '@3xl/page:grid @3xl/page:grid-cols-2 @3xl/page:items-start @3xl/page:gap-4 @3xl/page:space-y-0';
+
 /**
  * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for
  * the words every step after the gate is handed under `## Approved` — the CLI's `approve --message`, which may be left empty. And Send
@@ -114,7 +117,7 @@ export function Gate({
     >
       {framed && <GateSentence step={step} back={back} acts={acts} />}
 
-      <div className={cn('space-y-4', closeout && 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0')}>
+      <div className={cn('space-y-4', closeout && SIDE_BY_SIDE)}>
         {closeout && (
           <section aria-label={`What ${step} handed on`} className="min-w-0 space-y-2 rounded border border-outline-variant bg-card p-3">
             <h3 className="text-label-medium text-muted-foreground">

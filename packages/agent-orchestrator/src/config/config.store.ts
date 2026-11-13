@@ -2,7 +2,8 @@
  * The `WF_` environment the package reads: where the store lives (`WF_ROOT`), the daemon's two ceilings (`WF_MAX_CONCURRENT`,
  * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), whether a finished run keeps its worktrees
  * (`WF_KEEP_WORKTREES`), how long the series are kept (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`), and the memory limit each
- * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), and whether the daemon of an
+ * session runs under by default and the slice its scope is made in (`WF_MEMORY_LIMIT`, `WF_CGROUP_PARENT`), the memory each asks of the
+ * machine by default and the floor the daemon keeps (`WF_MEMORY_REQUEST`, `WF_MEMORY_RESERVED`), and whether the daemon of an
  * archive install checks for a newer release (`NEMIA_RELEASE_CHECK`). Each is an Effect `Config`
  * with its default, and each has a plain reader that takes the environment it is given — never `process.env` by default — and answers the
  * value or throws `Invalid`, exit 2, in the variable's own words. A value that is set and not one the variable takes is refused, never
@@ -16,7 +17,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { Config, ConfigProvider, Context, Effect, Layer, Result, Schema } from 'effect';
-import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
+import { memoryBytesOf, memoryQuantityRefusal } from 'agent-runtime/vocabulary';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** An environment as a reader takes it: `process.env`, or a record a test means. */
@@ -79,14 +80,24 @@ const hourDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*[1-9]
   Config.withDefault(undefined),
 );
 
-/** `WF_MEMORY_LIMIT`: a Kubernetes quantity the runtime reads (`memoryQuantityRefusal`), trimmed; undefined, no limit, unset or blank. */
-const memory = Config.schema(
-  Schema.String.check(Schema.makeFilter((value: string) => !value.trim() || memoryQuantityRefusal(value.trim()) === undefined)),
-  'WF_MEMORY_LIMIT',
-).pipe(
-  Config.map((value): string | undefined => value.trim() || undefined),
-  Config.withDefault(undefined),
-);
+/** `variable`: a Kubernetes quantity the runtime reads (`memoryQuantityRefusal`), trimmed; undefined when unset or blank. */
+const quantity = (variable: string) =>
+  Config.schema(
+    Schema.String.check(Schema.makeFilter((value: string) => !value.trim() || memoryQuantityRefusal(value.trim()) === undefined)),
+    variable,
+  ).pipe(
+    Config.map((value): string | undefined => value.trim() || undefined),
+    Config.withDefault(undefined),
+  );
+
+/** `WF_MEMORY_LIMIT`: a quantity; undefined, no limit, unset or blank. */
+const memory = quantity('WF_MEMORY_LIMIT');
+
+/** `WF_MEMORY_REQUEST`: a quantity; undefined, each session asking its limit, unset or blank. */
+const request = quantity('WF_MEMORY_REQUEST');
+
+/** `WF_MEMORY_RESERVED`: a quantity; undefined, the default floor, unset or blank. */
+const reserved = quantity('WF_MEMORY_RESERVED');
 
 /** A systemd slice's unit name: letters, digits, `_`, `-`, `.`, `:` and `@`, ending `.slice`, as `systemd-run --slice=` takes one. */
 const SLICE = /^[\w:@.-]*[\w:@-]\.slice$/;
@@ -210,6 +221,45 @@ export const memoryLimit = (env: Env): string | undefined =>
   );
 
 /**
+ * `WF_MEMORY_REQUEST`, the memory every session and check the daemon files asks of the machine when its step names none (the engine's
+ * default request), which the runtime admits it by: a Kubernetes quantity, as written, or undefined — each asks its limit, as
+ * Kubernetes defaults a request — when unset, empty or blank. Refused in the runtime's words when it is anything else, and when it is
+ * above `WF_MEMORY_LIMIT`, since no session may ask more than it may hold.
+ */
+export const memoryRequest = (env: Env): string | undefined => {
+  const value = read(
+    request,
+    'WF_MEMORY_REQUEST',
+    env,
+    (said) =>
+      `WF_MEMORY_REQUEST=${said} is not a memory request: ${memoryQuantityRefusal(said.trim()) ?? ''} It is what each session asks of the machine, which the daemon admits it by, when its step names no \`memory:\`, a Kubernetes quantity: WF_MEMORY_REQUEST=2560Mi — or unset, for each to ask its limit.`,
+  );
+  const limit = memoryLimit(env);
+  if (value === undefined || limit === undefined) return value;
+  const asked = memoryBytesOf(value);
+  const held = memoryBytesOf(limit);
+  if (asked !== undefined && held !== undefined && asked > held)
+    throw new Invalid({
+      message: `WF_MEMORY_REQUEST=${value} is above WF_MEMORY_LIMIT=${limit}: a session cannot ask more than it may hold. Lower WF_MEMORY_REQUEST to WF_MEMORY_LIMIT or under (WF_MEMORY_REQUEST=2560Mi), or raise WF_MEMORY_LIMIT.`,
+    });
+  return value;
+};
+
+/**
+ * `WF_MEMORY_RESERVED`, the floor of the machine's memory the daemon keeps for itself and the machine, which it admits no session into:
+ * a Kubernetes quantity, as written, or undefined — an eighth of the machine, 1 GiB at least (`reservedFor`) — when unset, empty or
+ * blank. Refused in the runtime's words when it is anything else: read as the default, a mistyped value would keep a floor nobody set.
+ */
+export const memoryReserved = (env: Env): string | undefined =>
+  read(
+    reserved,
+    'WF_MEMORY_RESERVED',
+    env,
+    (said) =>
+      `WF_MEMORY_RESERVED=${said} is not a memory floor: ${memoryQuantityRefusal(said.trim()) ?? ''} It is the memory the daemon keeps for itself and the machine, which no session is admitted into, a Kubernetes quantity: WF_MEMORY_RESERVED=2Gi — or unset, for an eighth of the machine, 1 GiB at least.`,
+  );
+
+/**
  * `WF_CGROUP_PARENT`, the systemd slice every limited session's scope is made in, as Docker's `--cgroup-parent`: a unit name ending
  * `.slice`, which an operator caps to bound the sessions together, or undefined — the user manager's root slice — when unset or empty.
  */
@@ -258,9 +308,16 @@ export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOK
 
 /**
  * The daemon's per-session variables: what it sets on each session it starts, and so what no process but a session's starts with — the
- * session's token, and the memory limit and slice a limited session runs under. A test seat drops them, so a test reads what CI reads.
+ * session's token, the memory limit and slice a limited session runs under, and the request and floor it was admitted by. A test seat
+ * drops them, so a test reads what CI reads.
  */
-export const SESSION_VARIABLES = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
+export const SESSION_VARIABLES = [
+  'WF_SESSION_TOKEN',
+  'WF_MEMORY_LIMIT',
+  'WF_MEMORY_REQUEST',
+  'WF_MEMORY_RESERVED',
+  'WF_CGROUP_PARENT',
+] as const;
 
 /**
  * The daemon's serving variables: where its api listens (`NEMIA_BIND`) and whether its store is marked exposed (`WF_EXPOSED`), which a
@@ -278,6 +335,8 @@ export type Settings = {
   readonly metricsMinuteDays: number;
   readonly metricsHourDays: number | undefined;
   readonly memoryLimit: string | undefined;
+  readonly memoryRequest: string | undefined;
+  readonly memoryReserved: string | undefined;
   readonly cgroupParent: string | undefined;
   readonly defaultFactoryStarts: boolean;
   readonly sessionToken: string | undefined;
@@ -310,6 +369,12 @@ export const settingsOf = (env: Env): Settings => ({
   },
   get memoryLimit() {
     return memoryLimit(env);
+  },
+  get memoryRequest() {
+    return memoryRequest(env);
+  },
+  get memoryReserved() {
+    return memoryReserved(env);
   },
   get cgroupParent() {
     return cgroupParent(env);

@@ -509,6 +509,18 @@ feed, `nemia ls` and the run page — with the limit, the peak, and the knob to 
 `WF_MEMORY_LIMIT` (`outOfMemoryWords`). A raised `memory:` reaches a new run, since a run freezes its workflow; a raised
 `WF_MEMORY_LIMIT` reaches what the daemon files once it is restarted with it.
 
+**A session is admitted only while the memory it asks fits the machine.** What each asks is its request, a container's
+`resources.requests.memory`: the daemon's `WF_MEMORY_REQUEST` for every task filed with none of its own (`defaultRequests`), and,
+where it is unset, its limit, as Kubernetes defaults a request. The runtime admits a queued task while the requests of the tasks it holds
+and this one's fit the machine's memory above a floor kept for the daemon and the machine, and while what the machine has available
+covers it: `WF_MEMORY_RESERVED`, else an eighth of the machine, 1 GiB at least (`reservedFor`, `storeAdmission`). Both are Kubernetes
+quantities read by `config.store.ts` (`memoryRequest`, `memoryReserved`), refused where they read none, and a request above
+`WF_MEMORY_LIMIT` is refused; a refused one gives the engine neither. A task that does not fit waits, and one behind it that fits passes
+it. `WF_MAX_CONCURRENT` still bounds each pool. A step held back says why in its note in `nemia ls` (`admissionWords`):
+`waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`.
+`nemia service install --size auto` writes a request that fits the machine; `nemia doctor` says when the settings a daemon runs under
+cannot fit it (`memory-fit`). An installed server keeps the settings its person wrote.
+
 **A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
 
 ```md

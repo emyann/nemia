@@ -34,6 +34,7 @@ spec:
         - { path: fences/docs.allow.yaml }
         - Agent
         - { path: fences/read-only.allow.yaml }
+        - { path: fences/help.allow.yaml }
         - Bash(gh pr view:*)
         - Bash(gh pr checks:*)
         - { path: fences/browser.allow.yaml }

@@ -17,7 +17,8 @@ type Drawn = { Story: ComponentType; marked: boolean };
 
 const Drawing = createContext<Drawn | null>(null);
 
-const GROUND: CSSProperties = { padding: 24 };
+/** The story's ground, a page column as the frame's main is (`@container/page`), so a part's `@<size>/page:` layout reads its room. */
+const GROUND: CSSProperties = { padding: 24, containerType: 'inline-size', containerName: 'page' };
 
 /**
  * What holds a story: one that throws is said in its place (`data-broken`), by what it threw, before the router under it takes the

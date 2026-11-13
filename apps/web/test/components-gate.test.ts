@@ -1188,9 +1188,9 @@ test("the run page's gate draws what is being approved beside Approve and Send b
   assert.ok(handed >= 0, html);
   assert.ok(handed < html.indexOf('aria-label="Approve plan"'), 'what it handed on comes before the answer: read, then decided');
   assert.match(html, /data-field="approach"/);
-  assert.match(html, /lg:grid-cols-2/, 'beside the answer where the page is wide');
+  assert.match(html, /@3xl\/page:grid-cols-2/, 'beside the answer where the page is wide');
   const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', framed: false }));
-  assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
+  assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|@3xl\/page:grid-cols-2/);
 });
 
 /** A design's closeout at its gate, asking two questions as data in its `open` field. */

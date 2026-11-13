@@ -102,6 +102,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   (`readStored`, `store`, `forgetStored`), never `localStorage` by hand. A copy control's copied or failed moment, 1500 ms, is `useCopy`
   (`lib/useCopy.ts`); a media query is `useMedia` (`lib/useMedia.ts`), which `useIsMobile`, `useSheetPreview` and `useReducedMotion`
   read; a frame's size is `useFrameSize`, never a ResizeObserver by hand.
+- A page lays out by its column, never by the window: the frame's `<main data-frame-page>` is the named container `@container/page`
+  (`routes/__root.tsx`), narrower than the window beside her docked sheet. A page's or a part's layout variant is `@<size>/page:` by the
+  window's step less the open rail (`sm`→`@md`, `md`→`@lg`, `lg`→`@3xl`, `xl`→`@5xl`), a `max-` one written as its complement (Tailwind
+  writes no named `@max-`); a window breakpoint stays only where `KEPT` says why (the bar, a portaled sheet), held by
+  `test/page-room.test.ts`. The Overview's strip wraps by its frames' own widths (`components/frame/OverviewStrip.tsx`).
 - An approval is `useApprove` (`lib/useApprove.ts`) wherever a person approves; an ending's warning is `endingWarning` (`lib/gate.ts`),
   the card's and the gate's confirm alike. A run's wait on runs, or its hold, is drawn by `components/run/RunWait.tsx`, a proposal's
   phase tag and Widens mark by `components/gate/ProposalTags.tsx`, and a graph's edges from `StepGraphFacts` (`stepEdges`).

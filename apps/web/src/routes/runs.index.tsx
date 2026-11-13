@@ -39,7 +39,7 @@ export const Route = createFileRoute('/runs/')({
 /** The page's frame, as wide as the window lets it, over the look's ground: what it holds; the top bar names it. */
 function Page({ state, children }: { state: string; children: ReactNode }) {
   return (
-    <ScanLines className="min-h-full px-4 py-6 sm:px-8">
+    <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
       <article data-runs-page={state} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
         {children}
       </article>
@@ -137,7 +137,7 @@ function Runs() {
         {open.waiting.length === 0 ? (
           <Nothing>Nothing waits on you.</Nothing>
         ) : (
-          <div data-cards className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div data-cards className="grid grid-cols-1 gap-4 @5xl/page:grid-cols-2">
             {open.waiting.map((run) => (
               <WaitingCard key={run.id} run={run} asOf={asOf} />
             ))}

@@ -4,7 +4,9 @@ import type { Locator, Page, Request } from 'playwright';
 import {
   chatPanelOf,
   expectSheetShows,
+  expectStripWhole,
   frameSheetOf,
+  gaugesButtonOf,
   herFaceOf,
   openChat,
   photograph,
@@ -283,7 +285,10 @@ async function railFolds(page: Page): Promise<void> {
   if ((await railCookie(page)) !== cookie) throw new Refused('closing the sheet writes no sidebar_state');
 }
 
-/** On a phone the bar is the kit's modal sheet at the window's right, a dialog named for it; Close and Escape close it. */
+/**
+ * On a phone the bar is the kit's modal sheet at the window's right, a dialog named for it. Its Close and Escape close it and give the
+ * focus back to the control that opened it, and Back after Escape does not open it again.
+ */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   await visit(page, `${FLOOR}?bar=${OPEN}`);
@@ -300,19 +305,38 @@ async function onPhone(page: Page): Promise<void> {
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expectCount(dialog, 0, 'its Close closes the modal sheet');
   if (barInUrl(page) !== null) throw new Refused(`and the address loses bar — it is ${page.url()}`);
-  await visit(page, `${FLOOR}?bar=${OPEN}`);
-  await expectVisible(dialog, 'opened again');
+
+  const button = gaugesButtonOf(page);
+  const gauges = page.getByRole('dialog', { name: 'Gauges' });
+  await button.click();
+  await expectVisible(gauges, "on a phone the top bar's gauges button opens the gauges as a modal sheet");
+  await gauges.getByRole('button', { name: 'Close' }).click();
+  await expectCount(gauges, 0, 'its Close closes it');
+  await expectNone(
+    async () => ((await button.evaluate((el) => el === document.activeElement)) ? null : 'the focus is elsewhere'),
+    'and the focus is back on the gauges button that opened it: the dialog and the bar give it back to the same place',
+  );
+  await button.click();
+  await expectVisible(gauges, 'the gauges button opens it again');
   await page.keyboard.press('Escape');
-  await expectCount(dialog, 0, 'Escape closes the modal sheet');
+  await expectCount(gauges, 0, 'Escape closes the modal sheet');
   if (barInUrl(page) !== null) throw new Refused(`and the address loses bar — it is ${page.url()}`);
+  await expectNone(
+    async () => ((await button.evaluate((el) => el === document.activeElement)) ? null : 'the focus is elsewhere'),
+    'Escape gives the focus back to the gauges button too',
+  );
+  await page.goBack({ waitUntil: 'load' });
+  await idle(page);
+  await expectCount(gauges, 0, 'Back after Escape opens no dialog again: the close replaced the entry, once');
+  if (barInUrl(page) !== null) throw new Refused(`and Back leaves no bar in the address — it is ${page.url()}`);
 }
 
 /** What a page's widest content gives up beside the sheet: its tables' scroll, and the right of their last column. */
 type Room = { at: string; main: number; tables: { scroll: number; client: number; lastRight: number; mainRight: number }[] };
 
 /**
- * Beside a run's sheet at 1280 and 1600 the Runs page and a factory's floor are still read: each table's last column is in the page or
- * reached by its own scroll, and the floor's buttons and minimap stand inside the floor. What each gives up is written to
+ * Beside a run's sheet at 1280 and 1600 the Runs page, the Overview's strip and a factory's floor are still read: each table's last column
+ * is in the page or reached by its own scroll, and the floor's buttons and minimap stand inside the floor. What each gives up is written to
  * `bar-sheet-room.json` beside the pictures, which are taken of each.
  */
 async function pagesBeside(page: Page): Promise<void> {
@@ -343,6 +367,11 @@ async function pagesBeside(page: Page): Promise<void> {
           `at ${size.width} a table's last column ends at ${table.lastRight}, past the page's ${table.mainRight}, with no scroll to reach it`,
         );
     await photograph(page, path.join(OUT, `bar-sheet-runs-${size.width}-${await themeOf(page)}.png`));
+
+    await visit(page, `/?bar=${run}`);
+    await expectVisible(page.locator(`aside[data-bar="${run}"]`), `at ${size.width} the run's bar opens beside the Overview`);
+    await expectStripWhole(page, `beside a run's sheet at ${size.width}, the Overview's strip, laid out by its page column, reads whole`);
+    await photograph(page, path.join(OUT, `bar-sheet-overview-${size.width}-${await themeOf(page)}.png`));
 
     await visit(page, `/factories/default?bar=${run}`);
     await expectVisible(page.locator(`aside[data-bar="${run}"]`), `at ${size.width} the run's bar opens beside the floor`);

@@ -81,7 +81,7 @@ function LabelPage() {
   const spent = spentOf(stats);
   const cost = stats.all.total.costPerLanded;
   return (
-    <ScanLines className="min-h-full px-4 py-6 sm:px-8">
+    <ScanLines className="min-h-full px-4 py-6 @md/page:px-8">
       <article data-label-page={selector} className="mx-auto flex w-full max-w-[1360px] flex-col gap-10">
         <PageName>{selector}</PageName>
         <Section

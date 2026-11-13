@@ -332,14 +332,14 @@ function sessionsSlicePiece(facts: ReadinessFacts): ReadinessPiece {
       [SIZED],
     );
   const shown = facts.run('systemctl', ['--user', 'show', parent, '-p', 'MemoryMax', '--value']);
-  const word = shown?.code === 0 ? shown.out.trim() : '';
-  if (word !== 'infinity' && !/^\d+$/.test(word))
+  const memoryMax = shown?.code === 0 ? shown.out.trim() : '';
+  if (memoryMax !== 'infinity' && !/^\d+$/.test(memoryMax))
     return piece(
       SESSIONS_SLICE,
       'unknown',
       `the ceiling of the sessions' slice ${parent} could not be read: systemctl --user show ${parent} -p MemoryMax --value did not answer it`,
     );
-  const ceilingBytes = word === 'infinity' ? null : Math.max(1, Math.min(Number(word), 2 ** 50));
+  const ceilingBytes = memoryMax === 'infinity' ? null : Math.max(1, Math.min(Number(memoryMax), 2 ** 50));
   const fit = ceilingFit({ ceilingBytes, allocatableBytes });
   if (fit.verdict === 'held')
     return piece(

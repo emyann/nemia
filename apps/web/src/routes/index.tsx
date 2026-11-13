@@ -24,15 +24,16 @@ export const Route = createFileRoute('/')({
    */
   loader: async ({ context, deps }) => {
     const client = context.queryClient;
-    const strip = Promise.all([
+    await Promise.all([
       client.ensureQueryData(openRunsQuery(deps.factory)),
       client.ensureQueryData(finishedTodayQuery(deps.factory, dayStartOf(Date.now()))),
       client.prefetchQuery(ceilingsQuery),
       client.prefetchQuery(daemonQuery),
       client.prefetchQuery(quotaQuery),
+      client
+        .ensureQueryData(factoriesQuery)
+        .then((factories) => Promise.all(answered(factories).map((name) => client.ensureQueryData(openRunsQuery(name))))),
     ]);
-    const factories = await client.ensureQueryData(factoriesQuery);
-    await Promise.all([strip, ...answered(factories).map((name) => client.ensureQueryData(openRunsQuery(name)))]);
   },
   staticData: { fullBleed: true },
   component: Factories,

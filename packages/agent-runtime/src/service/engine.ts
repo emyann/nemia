@@ -870,7 +870,7 @@ const make = (options: EngineOptions) =>
       const task = { ...spec, harness: spec.harness ?? fallback, traceparent: options.telemetry ? yield* filingSpan : undefined };
       const refused = refusalOf(task) ?? argsRefusalOf(task) ?? harnessRefusalOf(task, harnesses);
       if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
-      return yield* go(file(limitedBy(options.defaultLimits, task, harnesses)));
+      return yield* go(file(limitedBy(options, task, harnesses)));
     });
 
     const tickVerb = Effect.fn('Engine.tick')(function* () {

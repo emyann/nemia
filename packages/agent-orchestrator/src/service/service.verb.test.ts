@@ -857,21 +857,30 @@ test("the live host's pause names this process, so the daemon's pass lifts it on
   }
 });
 
-test('--size auto on a 16 GiB, 8 CPU machine writes six sessions under 8 GiB each, read back off the unit; --bind writes the address and marks the store exposed', async () => {
+test('--size auto on a 16 GiB, 8 CPU machine writes five sessions asking 2.5 GiB under 8 GiB each, 2 GiB kept, read back off the unit; --bind writes the address and marks the store exposed', async () => {
   const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
   const done = await install({ size: 'auto', bind: '100.64.0.7' }, host);
   const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
-  assert.equal(env.get('WF_MAX_CONCURRENT'), '6');
+  assert.equal(env.get('WF_MAX_CONCURRENT'), '5');
   assert.equal(env.get('WF_MEMORY_LIMIT'), '8192Mi');
+  assert.equal(env.get('WF_MEMORY_REQUEST'), '2560Mi');
+  assert.equal(env.has('WF_MEMORY_RESERVED'), false, 'the floor is the default, not written');
   assert.equal(env.get('NEMIA_BIND'), '100.64.0.7');
   assert.equal(env.get('WF_EXPOSED'), '1');
   assert.ok(
-    done.lines.some((l) => l.includes('WF_MAX_CONCURRENT=6') && l.includes('WF_MEMORY_LIMIT=8192Mi')),
+    done.lines.some(
+      (l) =>
+        l.includes('WF_MAX_CONCURRENT=5') &&
+        l.includes('WF_MEMORY_LIMIT=8192Mi') &&
+        l.includes('WF_MEMORY_REQUEST=2560Mi') &&
+        l.includes('2048 MiB') &&
+        l.includes('WF_MEMORY_RESERVED'),
+    ),
     done.lines.join('\n'),
   );
 });
 
-test('--size auto keeps what --env gives, and on launchd writes no memory limit and says so', async (t) => {
+test('--size auto keeps what --env gives, and on launchd writes no memory limit or request and says so', async (t) => {
   await t.test('a variable --env gives is written once, as given', async () => {
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
     await install({ size: 'auto', env: ['WF_MAX_CONCURRENT=3'] }, host);
@@ -883,14 +892,26 @@ test('--size auto keeps what --env gives, and on launchd writes no memory limit 
     assert.equal(new Map(env).get('WF_MEMORY_LIMIT'), '8192Mi');
   });
 
-  await t.test('launchd: the sessions sized, no memory limit written, and a line saying none applies', async () => {
+  await t.test(
+    'a WF_MEMORY_LIMIT --env gives under the sized request leaves no request written, which the daemon would refuse',
+    async () => {
+      const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, size: { memoryMiB: 16384, cpus: 8 } });
+      await install({ size: 'auto', env: ['WF_MEMORY_LIMIT=2Gi'] }, host);
+      const env = new Map(unitRead(fs.readFileSync(UNIT, 'utf8')).env);
+      assert.equal(env.get('WF_MEMORY_LIMIT'), '2Gi');
+      assert.equal(env.has('WF_MEMORY_REQUEST'), false);
+    },
+  );
+
+  await t.test('launchd: the sessions sized, no memory limit or request written, and a line saying none applies', async () => {
     const machine = { platform: 'darwin', wsl: false, systemd: false };
     const { host } = hostOf({ lease: { kind: 'none' }, unitPid: null, machine, size: { memoryMiB: 16384, cpus: 8 } });
     const done = await install({ size: 'auto' }, host);
     t.after(() => fs.rmSync(done.file, { force: true }));
     const env = new Map(plistRead(fs.readFileSync(done.file, 'utf8')).env);
-    assert.equal(env.get('WF_MAX_CONCURRENT'), '6');
+    assert.equal(env.get('WF_MAX_CONCURRENT'), '5');
     assert.equal(env.has('WF_MEMORY_LIMIT'), false);
+    assert.equal(env.has('WF_MEMORY_REQUEST'), false);
     assert.ok(
       done.lines.some((l) => l.includes('no per-session memory limit')),
       done.lines.join('\n'),

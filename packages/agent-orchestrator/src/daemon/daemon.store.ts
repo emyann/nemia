@@ -7,9 +7,11 @@
  * package exports of it.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Result, Schema } from 'effect';
 import type { Settings } from '../config/config.store.ts';
+import { reservedFor } from '../service/index.ts';
 import {
   PHASES,
   RECENT_KEPT,
@@ -60,17 +62,26 @@ const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
  * pool at once, counted apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with
  * another run's implement, both in the `claude` pool. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset
  * — for no cap. `memory` (`WF_MEMORY_LIMIT`, `memoryLimit`) and `cgroupParent` (`WF_CGROUP_PARENT`) are handed to the runtime too, the
- * limit a task with none of its own is filed under and the slice its scope is made in (`storeLimits`), each absent when unset. A refusal of
- * any of them is thrown, so the pass that reads them refuses itself, and so does the daemon's start.
+ * limit a task with none of its own is filed under and the slice its scope is made in (`storeLimits`), each absent when unset. `request`
+ * (`WF_MEMORY_REQUEST`, `memoryRequest`) and `reserved` (`WF_MEMORY_RESERVED`, `memoryReserved`, else an eighth of the machine's
+ * `totalBytes`, 1 GiB at least: `reservedFor`) are what the runtime admits a session by against the machine's memory (`storeLimits`,
+ * `storeAdmission`), `request` absent when unset. A refusal of any of them is thrown, so the pass that reads them refuses itself, and
+ * so does the daemon's start.
  */
-export const ceilings = (config: Settings): { sessions: number; runs: number; memory?: string; cgroupParent?: string } => {
+export const ceilings = (
+  config: Settings,
+  totalBytes: () => number = os.totalmem,
+): { sessions: number; runs: number; memory?: string; cgroupParent?: string; request?: string; reserved: string } => {
   const memory = config.memoryLimit;
   const parent = config.cgroupParent;
+  const request = config.memoryRequest;
   return {
     sessions: config.maxConcurrent,
     runs: config.maxRuns,
     ...(memory === undefined ? {} : { memory }),
     ...(parent === undefined ? {} : { cgroupParent: parent }),
+    ...(request === undefined ? {} : { request }),
+    reserved: config.memoryReserved ?? `${reservedFor(Math.floor(totalBytes() / 2 ** 20))}Mi`,
   };
 };
 

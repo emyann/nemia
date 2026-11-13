@@ -2,8 +2,9 @@
  * The readiness read (`readinessOf`): every piece a person's server needs to run its factories, each in place, missing, not known or not
  * activated, with the command or the fix that puts it there and what it costs while missing (`cost`: a run waits on it, or it keeps the
  * server up or open) — each declared harness's two needs (installed, signed in), the service and its linger, the bind, the machine
- * (cgroup v2, the user's service manager, the tools folder), the places' needs, every factory's workflows' needs, the places' repository
- * needs in each factory's repository, a factory at all, and a newer release — and whether a run was ever started here (`ran`). Composed
+ * (cgroup v2, the user's service manager, the tools folder, whether the sessions' memory fits it), the places' needs, every factory's
+ * workflows' needs, the places' repository needs in each factory's repository, a factory at all, and a newer release — and whether a
+ * run was ever started here (`ran`). Composed
  * from facts the package already holds; the machine's are read through `ReadinessFacts`, which a test hands its own. A controller: it
  * reads the store, this process's needs' readings (`NeedsMemory`), or the checks run now where it keeps none.
  */
@@ -12,10 +13,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { Effect, Exit } from 'effect';
-import { DEFAULT_HARNESS, HARNESS_DECLARATIONS } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, HARNESS_DECLARATIONS, memoryBytesOf } from 'agent-runtime/vocabulary';
 import type { Need, NeedState, Readiness, ReadinessCost, ReadinessFix, ReadinessPiece, ReadinessState } from 'objects';
 import { pathLedByTools, StoreRoot, toolsBinDir, toolsDir } from '../config/root.store.ts';
-import type { Env } from '../config/config.store.ts';
+import { maxConcurrent, memoryLimit, memoryRequest, memoryReserved, type Env } from '../config/config.store.ts';
+import { isRefusal } from '../refusal/refusal.ts';
 import { listedAtOnce } from '../factory/door/factories.store.ts';
 import type { Factory, FactoryListing } from '../factory/factory.ts';
 import { workflowDirAt, workflowNeedsRead } from '../folder/folder.store.ts';
@@ -29,7 +31,7 @@ import { tried } from '../runtime-client.ts';
 import { archiveInstall, type Running } from '../release/index.ts';
 import { toolsNeed, toolsNemia } from '../release/nemia-link.store.ts';
 import { latestRelease, runningRelease } from '../release/version.verb.ts';
-import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind } from '../service/index.ts';
+import { BIND_PUBLIC_VARIABLE, bindExposure, DEFAULT_NAME, kindOfBind, memoryFit, reservedFor, type MemoryFit } from '../service/index.ts';
 import { claudeTokenStatus, tokenAgeWords, tokenWarningLine, TOKEN_MAKER, TOKEN_NAME, TOKEN_RENEWAL } from '../sign-in/sign-in.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { fixCommandOf, type FixAt } from './needs.ts';
@@ -58,11 +60,13 @@ export type CommandRead = { readonly code: number | null; readonly out: string }
 
 /**
  * The machine's facts the read asks, each a seam a test hands its own: the environment the api listens under (`NEMIA_BIND`,
- * `NEMIA_BIND_PUBLIC`, PATH), the user, whether a file is there, a command run with its answer (a harness's version among them), and the
- * release this process runs. Whether a harness is installed and signed in is the needs' memory's (`NeedsMemory`), never a fact here.
+ * `NEMIA_BIND_PUBLIC`, PATH), the user, whether a file is there, a command run with its answer (a harness's version among them), the
+ * release this process runs, and the machine's memory in bytes, undefined where it was not read. Whether a harness is installed and
+ * signed in is the needs' memory's (`NeedsMemory`), never a fact here.
  */
 export type ReadinessFacts = {
   readonly env: Env;
+  readonly memoryBytes?: number | undefined;
   readonly user: string;
   readonly exists: (file: string) => boolean;
   readonly run: (command: string, args: readonly string[]) => CommandRead;
@@ -82,6 +86,7 @@ export const liveFacts = (): ReadinessFacts => ({
     return ran.error !== undefined ? undefined : { code: ran.status, out: `${ran.stdout ?? ''}${ran.stderr ?? ''}` };
   },
   running: runningRelease(),
+  memoryBytes: os.totalmem(),
 });
 
 /** A fix a person types: its words and its command. */
@@ -111,6 +116,9 @@ const BIND: Of = { name: 'bind', area: 'bind', cost: 'server' };
 
 /** The tools folder holds what a fix installs, which a step's session finds there: a run waits on it. */
 const TOOLS: Of = { name: 'tools', area: 'machine', cost: 'run' };
+
+/** Whether the sessions' memory fits the machine keeps the server up: a run waits on none, and an admitted one may take the machine. */
+const MEMORY_FIT: Of = { name: 'memory-fit', area: 'machine', cost: 'server' };
 
 /** A factory: a run starts in one. */
 const FACTORY: Of = { name: 'factory', area: 'factory', cost: 'run' };
@@ -188,7 +196,109 @@ function machinePieces(home: string, facts: ReadinessFacts): ReadinessPiece[] {
         : piece(manager, 'missing', "the user's service manager (systemd --user) does not answer", [
             typed('log in as the user once, so their manager starts, and keep it with linger', `sudo loginctl enable-linger ${facts.user}`),
           ]);
-  return [cgroup, user, toolsPiece(home, facts)];
+  return [cgroup, user, toolsPiece(home, facts), memoryFitPiece(facts)];
+}
+
+/** `bytes` in whole MiB, as a person reads them. */
+const mib = (bytes: number): string => `${Math.floor(bytes / 2 ** 20)} MiB`;
+
+/** `bytes` as a quantity a setting takes, in whole Mi. */
+const mi = (bytes: number): string => `${Math.floor(bytes / 2 ** 20)}Mi`;
+
+/** `n` sessions, said. */
+const sessions = (n: number): string => `${n} session${n === 1 ? '' : 's'}`;
+
+/** The memory settings the daemon runs under, as its readers answer them: each quantity as written, and the sessions at once. */
+type MemorySet = {
+  readonly limit: string | undefined;
+  readonly request: string | undefined;
+  readonly reserved: string | undefined;
+  readonly at: number;
+};
+
+/** `env`'s memory settings, or the words of the refusal the daemon would answer one of them with. */
+function memorySetOf(env: Env): MemorySet | { readonly refused: string } {
+  try {
+    return { limit: memoryLimit(env), request: memoryRequest(env), reserved: memoryReserved(env), at: maxConcurrent(env) };
+  } catch (refused) {
+    if (!isRefusal(refused)) throw refused;
+    return { refused: refused.message };
+  }
+}
+
+/** The fix every memory-fit piece offers: the settings sized to this machine. */
+const SIZED = typed('size the sessions to this machine', 'nemia service install --size auto');
+
+/** What `fit` says of `set` on a machine read as `floor`, as the memory-fit piece. */
+function fitPiece(fit: MemoryFit, set: MemorySet, floor: string): ReadinessPiece {
+  switch (fit.verdict) {
+    case 'fits':
+      return piece(MEMORY_FIT, 'met', `${sessions(set.at)} at once fit ${floor}`);
+    case 'uncounted':
+      return piece(
+        MEMORY_FIT,
+        'unknown',
+        `no session's memory is counted against this machine's, with neither WF_MEMORY_LIMIT nor WF_MEMORY_REQUEST set: set WF_MEMORY_REQUEST (each session's ask) and WF_MEMORY_LIMIT, or size them with nemia service install --size auto`,
+        [SIZED],
+      );
+    case 'over': {
+      const asked = set.request === undefined ? 'its limit, WF_MEMORY_LIMIT, with no WF_MEMORY_REQUEST set' : 'WF_MEMORY_REQUEST';
+      const change =
+        fit.sessionsFit >= 1
+          ? `Set WF_MAX_CONCURRENT=${fit.sessionsFit}, or WF_MEMORY_REQUEST=${mi(Math.floor(fit.allocatableBytes / set.at))} or under for ${sessions(set.at)}`
+          : `Set WF_MEMORY_REQUEST=${mi(fit.allocatableBytes)} or under`;
+      return piece(
+        MEMORY_FIT,
+        'missing',
+        `${sessions(set.at)} at once (WF_MAX_CONCURRENT=${set.at}), each asking ${mib(fit.perSessionBytes)} (${asked}), are more than the ${mib(fit.allocatableBytes)} of ${floor}: ${sessions(fit.sessionsFit)} ${fit.sessionsFit === 1 ? 'fits' : 'fit'}. ${change}, or size them with nemia service install --size auto`,
+        [SIZED],
+      );
+    }
+    case 'limitOver':
+      return piece(
+        MEMORY_FIT,
+        'missing',
+        `one session may grow to WF_MEMORY_LIMIT=${set.limit ?? ''}, more than the ${mib(fit.allocatableBytes)} of ${floor}: set WF_MEMORY_LIMIT=${mi(fit.allocatableBytes)} or under, or size it with nemia service install --size auto`,
+        [SIZED],
+      );
+  }
+}
+
+/** A quantity a reader answered, in bytes, or null where unset. */
+const bytesOrNull = (quantity: string | undefined): number | null => (quantity === undefined ? null : (memoryBytesOf(quantity) ?? null));
+
+/**
+ * Whether the settings the daemon runs under fit this machine (`memoryFit`): the sessions at once (`WF_MAX_CONCURRENT`), each counted
+ * at its default request (`WF_MEMORY_REQUEST`), else its default limit (`WF_MEMORY_LIMIT`), against the machine's memory less the floor
+ * kept (`WF_MEMORY_RESERVED`, else an eighth of it, 1 GiB at least: `reservedFor`), and one session's limit against the same. Missing,
+ * naming how many fit and the setting to change, where they do not, or where a setting is one the daemon refuses, in its words; not
+ * known where nothing is counted or the memory was not read.
+ */
+function memoryFitPiece(facts: ReadinessFacts): ReadinessPiece {
+  const totalBytes = facts.memoryBytes;
+  if (totalBytes === undefined || !Number.isInteger(totalBytes) || totalBytes < 1)
+    return piece(MEMORY_FIT, 'unknown', "this machine's memory could not be read, so whether its sessions fit it is not known");
+  const set = memorySetOf(facts.env);
+  if ('refused' in set) return piece(MEMORY_FIT, 'missing', set.refused);
+  const reservedBytes = bytesOrNull(set.reserved) ?? reservedFor(Math.floor(totalBytes / 2 ** 20)) * 2 ** 20;
+  if (reservedBytes > totalBytes)
+    return piece(
+      MEMORY_FIT,
+      'missing',
+      `${set.reserved === undefined ? 'the floor kept, 1 GiB at least,' : `WF_MEMORY_RESERVED=${set.reserved}`} is more than this machine's ${mib(totalBytes)}, so no session is admitted: set WF_MEMORY_RESERVED under it`,
+    );
+  const fit = memoryFit({
+    totalBytes,
+    reservedBytes,
+    maxConcurrent: set.at,
+    limitBytes: bytesOrNull(set.limit),
+    requestBytes: bytesOrNull(set.request),
+  });
+  return fitPiece(
+    fit,
+    set,
+    `this machine's ${mib(totalBytes)} less the ${mib(reservedBytes)} kept for the daemon and the machine (WF_MEMORY_RESERVED)`,
+  );
 }
 
 /**

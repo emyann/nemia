@@ -17,7 +17,7 @@ export {
   unitRead,
   type ServiceSystem,
 } from './service.ts';
-export { sizedFor } from './sizing.ts';
+export { memoryFit, reservedFor, sizedFor, type MemoryFit } from './sizing.ts';
 export {
   addressKind,
   addressParsed,

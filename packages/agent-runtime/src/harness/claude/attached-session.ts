@@ -11,7 +11,15 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
-import { query, type CanUseTool, type HookCallbackMatcher, type HookEvent, type SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import {
+  query,
+  type CanUseTool,
+  type HookCallbackMatcher,
+  type HookEvent,
+  type SDKMessage,
+  type SpawnedProcess,
+  type SpawnOptions,
+} from '@anthropic-ai/claude-agent-sdk';
 import { attachedOptions } from './session-options.ts';
 import { alive } from '../../process/alive.ts';
 import {
@@ -36,7 +44,8 @@ import type { AskOption, AskQuestion } from '../../core/index.ts';
 import { own } from '../../core/own.ts';
 import { cutWords } from '../../core/restart.ts';
 import { claudeHeardFile, keepHeard } from './heard.ts';
-import { cgroupMemoryOf } from '../cgroup.ts';
+import { cgroupMemoryOf, cgroupNow, endScopeIn, scopeToEnd } from '../cgroup.ts';
+import { scopedOrBare } from './scope-fallback.ts';
 import { scopeFor, type ScopeAt } from '../scope.ts';
 
 /** What a verb refuses, thrown where it is read: nothing the harness can do will take it, and asking again will not change that. */
@@ -116,6 +125,11 @@ export type Live = {
   initRead?: InitRead;
   /** Run under a memory limit, in a scope of its own: each rewrite reads what Claude Code's cgroup says of its memory. */
   limited?: true;
+  /**
+   * Run in a scope of its own, limited or not: the first message it sends records the scope's folder (`cgroup`) on its run file, and
+   * its end ends the scope whole (`endScopeOf`). Taken off where an unlimited session's scope could not be made and it runs bare.
+   */
+  scoped?: true;
 };
 
 /**
@@ -514,6 +528,7 @@ const answered = (live: Live, m: SDKMessage): void => {
  */
 const took = (root: string, live: Live, m: SDKMessage): void => {
   live.pushed?.(m);
+  scopeSeen(root, live);
   if (m.type !== 'user' && m.type !== 'stream_event') capture(root, live, m);
   if (m.type === 'rate_limit_event') keepHeard(claudeHeardFile(root), m.rate_limit_info, Date.now());
   const over = callsEndedBy(m).filter((id) => live.calls.delete(id));
@@ -522,6 +537,17 @@ const took = (root: string, live: Live, m: SDKMessage): void => {
   else if (bridged !== undefined) rewrite(root, live, { bridge: { ...live.run.bridge, state: bridged } });
   else if (m.type === 'result') turnEnded(root, live, m);
   else if (over.length) rewrite(root, live);
+};
+
+/**
+ * The scope a scoped session runs in, recorded on its run file (`cgroup`) on the first message it sends: by then `systemd-run` has
+ * moved its Claude Code into the scope and run it, so its cgroup is the scope's. A read taken earlier would be the holder's own, which
+ * `scopeToEnd` refuses to end. Nothing for a session with no scope, or one recorded already.
+ */
+const scopeSeen = (root: string, live: Live): void => {
+  if (!live.scoped || live.run.cgroup !== undefined || live.run.childPid === undefined) return;
+  const cgroup = cgroupNow(live.run.childPid);
+  if (cgroup !== undefined) rewrite(root, live, { cgroup });
 };
 
 /** The turn of `live` ended by its result `m`: its calls and asks cleared, and the session written as `took` says. */
@@ -567,6 +593,14 @@ export const gone = async (pid: number | undefined, everyMs: number = GONE_POLL_
   }
 };
 
+/**
+ * Kills whatever is left in the scope a session's run file `recorded`, where `scopeToEnd` allows it (`endScopeIn`): by its
+ * `cgroup.kill`, at once, as its group is killed, so a process its commands started out of the group goes with it.
+ */
+export const endScopeOf = (recorded: string | undefined): void => {
+  if (recorded !== undefined && scopeToEnd(recorded, cgroupNow('self'))) endScopeIn(recorded, 'SIGKILL');
+};
+
 /** Kills the process group `pid` leads, and whatever is left of it: nothing when it is gone. */
 export const killGroup = (pid: number | undefined): void => {
   if (pid === undefined) return;
@@ -576,6 +610,38 @@ export const killGroup = (pid: number | undefined): void => {
     return;
   }
 };
+
+/**
+ * How the session `live` has its Claude Code started (`spawnClaudeCodeProcess`): in a process group of its own, behind its `scope`'s
+ * argv where it has one, its pid and start written on its run file, its group killed when the SDK aborts it. A scope with no limit
+ * falls back to a bare start where it cannot be made (`scopedOrBare`), and the run file says why (`unscoped`); a limited one does not,
+ * and its session fails as a session whose Claude Code would not start.
+ */
+const spawnerOf =
+  (root: string, live: Live, scope: { memoryLimit?: number; argv: string[] } | undefined) =>
+  (o: SpawnOptions): SpawnedProcess => {
+    if (scope !== undefined && scope.memoryLimit === undefined) {
+      let pid: number | undefined;
+      o.signal.addEventListener('abort', () => killGroup(pid), { once: true });
+      return scopedOrBare(
+        scope.argv,
+        o,
+        (child) => {
+          pid = child.pid;
+          if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
+        },
+        (why) => {
+          delete live.scoped;
+          rewrite(root, live, { unscoped: `its scope could not be made (${why}), so it runs with no scope` });
+        },
+      );
+    }
+    const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];
+    const child = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+    o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
+    if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
+    return child;
+  };
 
 /**
  * Starts the session `run` and answers it at once: `r` its spawn, `first` the first words on its input, `resume` the Claude Code session
@@ -621,7 +687,8 @@ export const startSession = (
   const given = attachedOptions(r);
   const scope = scopeFor(r, options.scope ?? {});
   if (scope !== undefined && 'refused' in scope) throw new Refusal(scope.refused);
-  if (scope) live.limited = true;
+  if (scope) live.scoped = true;
+  if (scope?.memoryLimit !== undefined) live.limited = true;
   writeRun(root, run);
   live.unanswered.add(live.input.push(first));
   const q = query({
@@ -633,13 +700,7 @@ export const startSession = (
       canUseTool: decidedHere(root, live, mayAsk),
       hooks: hooksOf(root, live, options.held, mayAsk, options.holdPollMs ?? HELD_POLL_MS),
       ...(options.executable ? { pathToClaudeCodeExecutable: options.executable } : {}),
-      spawnClaudeCodeProcess: (o) => {
-        const [command, ...args] = [...(scope?.argv ?? []), o.command, ...o.args];
-        const child = spawn(command ?? o.command, args, { cwd: o.cwd, env: o.env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
-        o.signal.addEventListener('abort', () => killGroup(child.pid), { once: true });
-        if (child.pid !== undefined) rewrite(root, live, childFacts(child.pid));
-        return child;
-      },
+      spawnClaudeCodeProcess: spawnerOf(root, live, scope),
     },
   });
   live.q = q as Live['q'];
@@ -659,6 +720,7 @@ export const startSession = (
     }
     if (live.limited) rewrite(root, live);
     killGroup(live.run.childPid);
+    endScopeOf(live.run.cgroup);
     if (abort.signal.aborted) end = 'canceled';
     if (!live.letGo && (live.run.state === 'working' || live.run.state === 'idle')) rewrite(root, live, { state: end });
   })();

@@ -30,6 +30,7 @@ import {
   type FeedReadiness,
   type FeedPublished,
   type FeedWords,
+  type StoreLine,
 } from './feed.ts';
 import { FeedDoor, feedPass } from './feed.store.ts';
 
@@ -177,6 +178,19 @@ export const emitFeed = Effect.fn('emitFeed')(function* (
 export const emitDaemonStarted = Effect.fn('emitDaemonStarted')(function* (line: DaemonLine) {
   const appended = yield* withinEffect('act', (yield* FeedDoor).lines.append([line]));
   yield* logged(line);
+  const hub = yield* FeedHub;
+  if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
+});
+
+/**
+ * The free sweep's lines (`leftEndedLine`), one per finished run whose left processes it ended, appended to the feed through its door
+ * (`FeedDoor`), logged, and published to the process's hub where it has one, as `emitDaemonStarted` does a daemon's. Fails with a
+ * refusal of the store, and dies of anything else it threw.
+ */
+export const emitLeftEnded = Effect.fn('emitLeftEnded')(function* (lines: readonly StoreLine[]) {
+  if (lines.length === 0) return;
+  const appended = yield* withinEffect('act', (yield* FeedDoor).lines.append(lines));
+  yield* Effect.forEach(lines, logged, { discard: true });
   const hub = yield* FeedHub;
   if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
 });

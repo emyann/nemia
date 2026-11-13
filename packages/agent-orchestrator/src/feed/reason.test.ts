@@ -157,9 +157,10 @@ const ONE_SHOTS: readonly Case[] = [
 ];
 
 /**
- * The five words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
- * moment the pause was put as its note, `level changed`, a factory's level in force in words as its note, and `not ready` and `ready`,
- * the store's readiness, the first with each missing piece a run waits on and its fix as its note.
+ * The six words the store's lines say, spelled here by hand as the owner named them: `store paused` and `store resumed`, each with the
+ * moment the pause was put as its note, `level changed`, a factory's level in force in words as its note, `not ready` and `ready`,
+ * the store's readiness, the first with each missing piece a run waits on and its fix as its note, and `left running, ended`, the
+ * processes of a finished run the daemon's free sweep ended, the run and each process in its note.
  */
 const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'store paused', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StorePaused' },
@@ -167,6 +168,12 @@ const STORE_LINES: readonly Case[] = [
   { kind: 'Store', word: 'level changed', note: 'acme is at auto until 2026-10-16T05:00:00.000Z, then manual', reason: 'LevelChanged' },
   { kind: 'Store', word: 'not ready', note: 'mise: nemia doctor fix mise', reason: 'NotReady' },
   { kind: 'Store', word: 'ready', note: 'every piece a run waits on is in place', reason: 'Ready' },
+  {
+    kind: 'Store',
+    word: 'left running, ended',
+    note: 'r-1 had finished, and a process it started still ran: pid 4242 (node)',
+    reason: 'LeftEnded',
+  },
 ];
 
 /** The two words a factory's lines say, spelled by hand as the owner named them, each with its `ConflictsPending` condition's message. */
@@ -256,8 +263,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
         `${runCodes('waiting', null, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 51, 'the table the owner named has 51 entries');
-    assert.equal(REASON_CODES.length, 40, 'of 40 distinct codes');
+    assert.equal(entries.length, 52, 'the table the owner named has 52 entries');
+    assert.equal(REASON_CODES.length, 41, 'of 41 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -387,8 +394,9 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
         ['person', false, 'Normal', false],
         ['tick', false, 'Warning', false],
         ['tick', false, 'Normal', false],
+        ['daemon', false, 'Warning', false],
       ],
-      "the store's pause and resume are a person's verbs, said once each, a factory's level a person's word that stands until it changes, and the store's readiness the tick's word that stands until it changes, a Warning while a run waits on a missing piece; none waits on anybody",
+      "the store's pause and resume are a person's verbs, said once each, a factory's level a person's word that stands until it changes, the store's readiness the tick's word that stands until it changes, a Warning while a run waits on a missing piece, and the processes a finished run left running the daemon's deed, a Warning; none waits on anybody",
     );
     assert.equal(sourceOf('Running'), 'tick', "a word the tick judged is the tick's, which is what a reason naming no source is");
   });

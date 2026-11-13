@@ -5,7 +5,9 @@
  * A `file:` base is read from the disk, which Node's `fetch` refuses. Each request sends nothing but a generic client name
  * (`CLIENT_NAME`). Also the two records an archive install keeps beside its releases: the store's floor, `$WF_ROOT/store.json`
  * (`readableFrom`, raised by the daemon as it takes the store, `raiseStoreFloor`), and the newest release the release check read,
- * `$WF_ROOT/releases/latest.json` (its notes' address kept where it is an http(s) one), each written whole by a rename.
+ * `$WF_ROOT/releases/latest.json` (its notes' address kept where it is an http(s) one), each written whole by a rename. Where an asset
+ * answers 404, the release of its tag is read from GitHub's API (`releaseApiUrl`, no token), so a release published before its release
+ * workflow attached the asset is told apart from no release at all (`awaitedAsset`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,6 +64,61 @@ export async function fetched(url: string, by: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer());
 }
 
+/**
+ * Where GitHub's API answers the release of `tag` in the repository whose download base is `source`, `<host>/<owner>/<repo>/releases`:
+ * `api.github.com` for github.com, and the host's own `/api/v3` for any other (GitHub Enterprise Server's); undefined for a base of
+ * another shape, a `file:` one among them.
+ */
+export function releaseApiUrl(source: string, tag: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(based(source));
+  } catch {
+    return undefined;
+  }
+  const repo = /^\/([^/]+)\/([^/]+)\/releases$/.exec(url.pathname);
+  if ((url.protocol !== 'https:' && url.protocol !== 'http:') || repo === null) return undefined;
+  const api = url.hostname === 'github.com' ? 'https://api.github.com' : `${url.origin}/api/v3`;
+  return `${api}/repos/${repo[1]}/${repo[2]}/releases/tags/${encodeURIComponent(tag)}`;
+}
+
+const ReleaseSchema = Schema.Struct({ assets: Schema.Array(Schema.Struct({ name: Schema.String })) });
+
+/**
+ * The names of the assets attached to the release of `tag` at `source`, as GitHub's API answers them with no token; undefined where it
+ * answers no such release (a draft among them, which it shows to no one without one), cannot be reached, or answers anything else.
+ */
+export async function releaseAssets(source: string, tag: string): Promise<readonly string[] | undefined> {
+  const url = releaseApiUrl(source, tag);
+  if (url === undefined) return undefined;
+  try {
+    const response = await fetch(url, { headers: { 'user-agent': CLIENT_NAME, accept: 'application/vnd.github+json' } });
+    if (!response.ok) return undefined;
+    const decoded = Schema.decodeUnknownResult(ReleaseSchema)(await response.json());
+    return Result.isFailure(decoded) ? undefined : decoded.success.assets.map((asset) => asset.name);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The asset `name` of `tag` at `source`, fetched (`fetched`). Where it answers 404 and the release of `tag` is published without it
+ * (`releaseAssets`), refused `Conflict`: the release workflow attaches it a few minutes after the tag, so the same upgrade goes through
+ * then. Where there is no such release, or it cannot be read, refused as `fetched` refuses.
+ */
+async function awaitedAsset(source: string, tag: string, name: string, by: string): Promise<Buffer> {
+  try {
+    return await fetched(assetUrl(source, tag, name), by);
+  } catch (err) {
+    if (!(err instanceof Missing)) throw err;
+    const attached = await releaseAssets(source, tag);
+    if (attached === undefined || attached.includes(name)) throw err;
+    throw new Conflict({
+      message: `${by}: ${tag} is published, but ${name} is not attached to it yet: its release workflow attaches the archives a few minutes after the tag; upgrade again then, like nemia upgrade ${tag}.`,
+    });
+  }
+}
+
 /** The checksum `sums` (a `SHA256SUMS` file) gives the asset `name`, in lowercase hex, or undefined where it names none. */
 export function sumOf(sums: string, name: string): string | undefined {
   for (const line of sums.split('\n')) {
@@ -115,7 +172,8 @@ export async function fetchLatest(source: string, by: string): Promise<LatestFil
 
 /**
  * The archive of `tag` for `platform` downloaded from `source` into the build's folder, checked against its tag's `SHA256SUMS`, and
- * unpacked into the build's `tree`. Refused, before anything is unpacked: an asset or a sums file not there, or one `SHA256SUMS` names
+ * unpacked into the build's `tree`. Refused, before anything is unpacked: an asset or a sums file not attached yet to a published
+ * release (`Conflict`, `awaitedAsset`) or not there, or one `SHA256SUMS` names
  * no checksum of, or another (`Invalid`); and a `tar` that fails, naming the log.
  */
 export async function unpackedArchive(
@@ -126,8 +184,8 @@ export async function unpackedArchive(
   by: string,
 ): Promise<void> {
   const name = assetName(tag, platform);
-  const bytes = await fetched(assetUrl(source, tag, name), by);
-  const sums = (await fetched(assetUrl(source, tag, SUMS), by)).toString('utf8');
+  const bytes = await awaitedAsset(source, tag, name, by);
+  const sums = (await awaitedAsset(source, tag, SUMS, by)).toString('utf8');
   const expected = sumOf(sums, name);
   if (expected === undefined)
     throw new Invalid({ message: `${by}: ${tag}'s ${SUMS} names no checksum of ${name}, so it cannot be checked: nothing changed.` });

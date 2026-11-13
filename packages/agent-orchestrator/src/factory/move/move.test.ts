@@ -15,15 +15,15 @@ const SINCE = '2026-11-01T00:00:00.000Z';
 /** A factory of the source's store on two repositories, one a clone of its origin, scheduled, wired and mounting two volumes. */
 const SOURCE: Factory = {
   name: 'shop',
-  repos: ['/src/clones/github.com/acme/shop', '/home/ann/notes'],
+  repos: ['/src/clones/github.com/acme/shop', '/work/notes'],
   workflows: ['build'],
   hires: { 'build/review': 'reviewer' },
   schedules: { build: { cron: '0 9 * * 1', brief: 'weekly', since: SINCE, repo: 'notes' } },
   origins: { '/src/clones/github.com/acme/shop': 'https://git.example/acme/shop.git' },
   workflowRepos: { build: 'notes' },
   volumes: [
-    { path: '/home/ann/data', readOnly: true, name: 'data' },
-    { path: '/home/ann/out', readOnly: false },
+    { path: '/work/data', readOnly: true, name: 'data' },
+    { path: '/work/out', readOnly: false },
   ],
   harnessSettings: { model: 'big' },
   costLines: { build: 5 },
@@ -34,7 +34,7 @@ const SOURCE: Factory = {
 
 /** Where the target puts each: the clone under its own store, the notes typed as a folder of its own, a volume moved. */
 const TARGET: OnTarget = {
-  repos: { '/src/clones/github.com/acme/shop': '/dst/clones/github.com/acme/shop', '/home/ann/notes': '/srv/journal' },
+  repos: { '/src/clones/github.com/acme/shop': '/dst/clones/github.com/acme/shop', '/work/notes': '/srv/journal' },
   origins: { '/dst/clones/github.com/acme/shop': 'https://git.example/acme/shop.git' },
   volumes: { data: '/srv/data' },
   instructionKept: false,
@@ -84,7 +84,7 @@ test('factoryOnTarget: the factory as the target files it', async (t) => {
     );
   });
   await t.test('volumes at their decided paths, their names and marks kept', () => {
-    assert.deepEqual(factoryOnTarget(SOURCE, { ...TARGET, volumes: { data: '/srv/data', '/home/ann/out': '/srv/out' } }).volumes, [
+    assert.deepEqual(factoryOnTarget(SOURCE, { ...TARGET, volumes: { data: '/srv/data', '/work/out': '/srv/out' } }).volumes, [
       { path: '/srv/data', readOnly: true, name: 'data' },
       { path: '/srv/out', readOnly: false },
     ]);
@@ -164,7 +164,7 @@ test('cardMoved: a card that follows its factory', async (t) => {
   const card = [
     '---',
     'workflow: build',
-    'repo: /home/ann/notes',
+    'repo: /work/notes',
     'queued: 2026-11-02T10:00:00.000Z',
     'gate: review',
     'model: review=big',

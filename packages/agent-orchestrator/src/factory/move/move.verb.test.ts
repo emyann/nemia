@@ -250,9 +250,9 @@ test('REFUSED: the import refuses before anything is written, and writes nothing
     ...exp,
     file: JSON.stringify({
       ...(JSON.parse(exp.file) as object),
-      repos: ['/home/ann/notes'],
+      repos: ['/work/notes'],
       origins: undefined,
-      volumes: [{ path: '/home/ann/data', readOnly: true, name: 'data' }],
+      volumes: [{ path: '/work/data', readOnly: true, name: 'data' }],
     }),
   };
   await t.test('a name the target holds is a Conflict', async () => {
@@ -266,12 +266,12 @@ test('REFUSED: the import refuses before anything is written, and writes nothing
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local, { volumes: { data: scratch('wf-move-volume-') } }));
     assert.equal(refused.kind, 'Invalid');
-    assert.equal(refused.message.includes('--repo /home/ann/notes='), true);
+    assert.equal(refused.message.includes('--repo /work/notes='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
   await t.test('a volume whose path the target refuses is Invalid, naming the flag that gives it another', async () => {
     const dst = side('wf-move-dst-');
-    const refused = refusal(await imported(dst, local, { repos: { '/home/ann/notes': scratch('wf-move-notes-') } }));
+    const refused = refusal(await imported(dst, local, { repos: { '/work/notes': scratch('wf-move-notes-') } }));
     assert.equal(refused.kind, 'Invalid');
     assert.equal(refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
@@ -280,7 +280,7 @@ test('REFUSED: the import refuses before anything is written, and writes nothing
     const dst = side('wf-move-dst-');
     const refused = refusal(await imported(dst, local));
     assert.equal(refused.kind, 'Invalid');
-    assert.equal(refused.message.includes('--repo /home/ann/notes=') && refused.message.includes('--volume data='), true);
+    assert.equal(refused.message.includes('--repo /work/notes=') && refused.message.includes('--volume data='), true);
     assert.deepEqual(held(dst), NOTHING);
   });
   await t.test('a folder sent that does not unpack is Invalid', async () => {

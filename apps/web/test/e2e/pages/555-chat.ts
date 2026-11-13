@@ -4,6 +4,7 @@ import {
   chatFieldOf,
   chatPanelOf,
   expectCues,
+  expectUncovered,
   expectPanelHeld,
   expectSheetIn,
   herChat,
@@ -95,6 +96,20 @@ const expectRail = (page: Page, state: string, assertion: string): Promise<void>
   expectVisible(railColumnOf(page).and(page.locator(`[data-state="${state}"]`)), assertion);
 
 /**
+ * The top bar holds whole beside her sheet: it wraps by its own width, not the window's, so its buttons at its right end — the pause,
+ * the gauges and the account — stand in the window with nothing over them, her sheet included.
+ */
+async function expectBarWhole(page: Page, assertion: string): Promise<void> {
+  const bar = page.locator('header[data-frame-header]');
+  for (const [part, name] of [
+    ['button[data-pause]', 'the pause'],
+    ['[data-gauges-button]', 'the gauges'],
+    ['[data-account-to-come]', 'the account'],
+  ] as const)
+    await expectUncovered(bar.locator(part).first(), `${assertion}: ${name} is uncovered`);
+}
+
+/**
  * Her sheet stands docked in the frame's row: 400 wide, holding her panel, its left at or past the page's right, nothing modal over the
  * page, and the page's own right edge its own.
  */
@@ -171,6 +186,7 @@ export default {
       if ((await face.evaluate((own) => getComputedStyle(own).boxShadow)) === 'none') throw new Refused('open, her face is ringed');
       await expectDocked(page);
       await expectRail(page, 'collapsed', 'at 1280 the open rail folds beside her sheet');
+      await expectBarWhole(page, 'beside her sheet at 1280 the top bar takes two lines and holds whole');
       if ((await railSays(page)) !== rail)
         throw new Refused(`the folded rail keeps the page lit and its badges — ${rail} became ${await railSays(page)}`);
       if ((await railCookie(page)) !== cookie)
@@ -233,6 +249,7 @@ export default {
       await expectRail(page, 'expanded', 'the menu button brings the rail back beside her sheet');
       await expectDocked(page);
       if ((await railCookie(page)) !== cookie) throw new Refused('asked back, the rail writes no sidebar_state: it was open already');
+      await expectBarWhole(page, 'beside her sheet and the rail brought back the top bar holds whole');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-rail-back-${await themeOf(page)}.png`), { fullPage: true });
 

@@ -4289,8 +4289,9 @@ restart included. No pass waits on it: the place is asked off the daemon's loop.
   `WF_KEEP_WORKTREES=1` keeps them all, as before.
 - **Nothing a finished run started runs on.** The runtime ends a session's scope with the session; behind it,
   each sweep reads this user's processes (`processesNow`, through `src/runtime-client.ts`), tells each one's run
-  by the variables every session and check is given (`WF_RUN`, else a `WF_STEP_FILES` under this store's
-  `runs/<id>/`: `runOfEnvironment`), and of a run at rest that succeeded or was cancelled, a folder run's
+  by the folder of this store its environment names (a session's `WF_STEP_FILES`, else a check's
+  `WF_ARTIFACTS`, under `runs/<id>/`: `runOfEnvironment`; a bare `WF_RUN` names no store, and attributes
+  nothing), and of a run at rest that succeeded or was cancelled, a folder run's
   too, ends each one still running — SIGTERM, then SIGKILL after `LEFT_GRACE` (2 seconds) — whatever
   `WF_KEEP_WORKTREES` says, and writes one `left running, ended` line a run on the feed (`endLeftBehind`,
   `src/forget/prune/left-behind.verb.ts`; `leftBehindOf`, proved by `contracts/left-behind.contract.ts`).

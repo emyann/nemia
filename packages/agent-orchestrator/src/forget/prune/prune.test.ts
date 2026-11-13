@@ -8,17 +8,31 @@ import { runOfEnvironment } from './prune.ts';
 
 const HOME = '/srv/ann/.agent-workflows';
 
-test('runOfEnvironment: the run a process is of, by WF_RUN, else by a WF_STEP_FILES under this store', async (t) => {
+test('runOfEnvironment: the run a process is of, by a WF_STEP_FILES, else a WF_ARTIFACTS, under this store', async (t) => {
   const rows: ReadonlyArray<{ name: string; env: Record<string, string>; run: string | undefined }> = [
     {
-      name: 'WF_RUN wins over a WF_STEP_FILES',
-      env: { WF_RUN: 'r-check', WF_STEP_FILES: `${HOME}/runs/r-session/artifacts/plan` },
+      name: 'a WF_STEP_FILES under this home wins over another WF_RUN beside it',
+      env: { WF_RUN: 'r-other', WF_STEP_FILES: `${HOME}/runs/r-session/artifacts/plan` },
+      run: 'r-session',
+    },
+    { name: 'a bare WF_RUN, which names no store, attributes nothing', env: { WF_RUN: 'r-check' }, run: undefined },
+    {
+      name: "a check's WF_ARTIFACTS under this home",
+      env: { WF_RUN: 'r-check', WF_ARTIFACTS: `${HOME}/runs/r-check/artifacts/review` },
       run: 'r-check',
     },
-    { name: "a check's WF_RUN alone", env: { WF_RUN: 'r-check' }, run: 'r-check' },
+    {
+      name: "a session's WF_STEP_FILES wins over a WF_ARTIFACTS",
+      env: { WF_STEP_FILES: `${HOME}/runs/r-1/artifacts/plan`, WF_ARTIFACTS: `${HOME}/runs/r-2/artifacts/plan` },
+      run: 'r-1',
+    },
+    {
+      name: "another store's check",
+      env: { WF_RUN: 'r-1', WF_ARTIFACTS: '/srv/bob/.agent-workflows/runs/r-1/artifacts/review' },
+      run: undefined,
+    },
     { name: "a session's WF_STEP_FILES under this home", env: { WF_STEP_FILES: `${HOME}/runs/r-1/artifacts/plan` }, run: 'r-1' },
     { name: 'the run folder itself', env: { WF_STEP_FILES: `${HOME}/runs/r-1` }, run: 'r-1' },
-    { name: 'an empty WF_RUN is none, and the files are read', env: { WF_RUN: '', WF_STEP_FILES: `${HOME}/runs/r-1/x` }, run: 'r-1' },
     { name: "another store's home", env: { WF_STEP_FILES: '/srv/bob/.agent-workflows/runs/r-1/artifacts/plan' }, run: undefined },
     { name: 'a home named alike beside it', env: { WF_STEP_FILES: `${HOME}2/runs/r-1/artifacts/plan` }, run: undefined },
     { name: 'a path that climbs out by ..', env: { WF_STEP_FILES: `${HOME}/runs/../runs/r-1/artifacts` }, run: undefined },

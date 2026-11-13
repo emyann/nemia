@@ -5,8 +5,9 @@
  * the worktree, which is not freed while it runs, said once; a process of a run in flight is none of the sweep's. Real processes and
  * real signals, on this host's `/proc`.
  *
- * Every run id is drawn afresh, so that no process of another store on this machine (whose `WF_RUN` names its own runs) is ever one of
- * this test's runs; a `WF_STEP_FILES` is read only under this test's store. Each child is ended by its pid in `t.after`.
+ * A process is told a run's by a folder of this store its environment names (`WF_STEP_FILES`, a check's `WF_ARTIFACTS`), never by a
+ * bare `WF_RUN`, which names no store: one carrying the finished run's id alone, as another store's check of a run of that id would,
+ * is never ended. Each child is ended by its pid in `t.after`.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -51,7 +52,13 @@ const answered = (id: string, status: string, atRest: boolean): Answered => ({
  * carries), ended by its pid when the test ends. Answers once it has taken its SIGTERM handler, so a SIGTERM that ends it is a bug.
  */
 async function leftChild(t: TestContext, cwd: string, marks: Record<string, string>): Promise<ChildProcess> {
-  const env: Record<string, string | undefined> = { ...process.env, WF_RUN: undefined, WF_STEP_FILES: undefined, ...marks };
+  const env: Record<string, string | undefined> = {
+    ...process.env,
+    WF_RUN: undefined,
+    WF_STEP_FILES: undefined,
+    WF_ARTIFACTS: undefined,
+    ...marks,
+  };
   const child = spawn(
     process.execPath,
     ['-e', "process.on('SIGTERM', () => {}); process.stdout.write('ready\\n'); setInterval(() => {}, 1000);"],
@@ -97,6 +104,8 @@ test("a finished run's left process is ended; a stranger in a finished worktree 
   const leftTree = path.join(ROOT, 'worktrees', left, 'repo');
   fs.mkdirSync(leftTree, { recursive: true });
   const orphan = await leftChild(t, leftTree, { WF_STEP_FILES: path.join(ROOT, 'runs', left, 'artifacts', 'x') });
+  const check = await leftChild(t, ROOT, { WF_RUN: left, WF_ARTIFACTS: path.join(ROOT, 'runs', left, 'artifacts', 'review') });
+  const otherStore = await leftChild(t, ROOT, { WF_RUN: left });
   fs.rmSync(path.join(ROOT, 'worktrees', left), { recursive: true, force: true });
 
   const heldTree = path.join(ROOT, 'worktrees', held, 'repo');
@@ -105,14 +114,17 @@ test("a finished run's left process is ended; a stranger in a finished worktree 
 
   const busyTree = path.join(ROOT, 'worktrees', busy, 'repo');
   fs.mkdirSync(busyTree, { recursive: true });
-  const working = await leftChild(t, busyTree, { WF_RUN: busy });
+  const working = await leftChild(t, busyTree, { WF_STEP_FILES: path.join(ROOT, 'runs', busy, 'artifacts', 'x') });
 
   const answers = [answered(left, 'succeeded', true), answered(held, 'cancelled', true), answered(busy, 'running', false)];
   const memory = freshFreeMemory();
   const first = await sweep(answers, memory);
 
   assert.ok(orphan.pid !== undefined && stranger.pid !== undefined && working.pid !== undefined);
+  assert.ok(check.pid !== undefined && otherStore.pid !== undefined);
   assert.equal(ended(orphan.pid), true, "the finished run's left process, which ignores SIGTERM, is ended within the sweep");
+  assert.equal(ended(check.pid), true, "what its check left, told by the check's WF_ARTIFACTS under this store, is ended too");
+  assert.equal(ended(otherStore.pid), false, 'a bare WF_RUN of the same id, which names no store, is never ended');
   assert.equal(ended(stranger.pid), false, 'a process no session of the run started is never ended');
   assert.equal(ended(working.pid), false, 'a process of a run in flight is none of the sweep');
 
@@ -125,6 +137,7 @@ test("a finished run's left process is ended; a stranger in a finished worktree 
   assert.equal(line?.labels?.run, left);
   assert.ok(line?.note?.includes(left), 'the note names the run');
   assert.ok(line?.note?.includes(String(orphan.pid)), 'the note names the pid it ended');
+  assert.ok(line?.note?.includes(String(check.pid)), "and the check's");
 
   assert.ok(fs.existsSync(path.join(ROOT, 'worktrees', held)), 'a worktree a process works in is not freed');
   assert.deepEqual(first.freed, []);

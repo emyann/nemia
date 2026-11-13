@@ -303,28 +303,35 @@ export function untakenWords(run: Run, why: UntakenWhy): string {
 /** One process as the sweep reads it, one run as it reads it, and what it does with the one against the other. */
 export type { LeftProcess, LeftVerdict, SweptRun };
 
-/** The variable a check is given its run by (`checkEnvOf`). */
-export const RUN_MARK = 'WF_RUN';
-
 /** The variable a session is given its step's files by (`STEP_FILES`, `filed.ts`), a folder under `<home>/runs/<id>/`. */
 export const STEP_FILES_MARK = 'WF_STEP_FILES';
 
-/** The variables a process is told apart by: what the sweep asks `/proc` for. */
-export const LEFT_MARKS = [RUN_MARK, STEP_FILES_MARK] as const;
+/** The variable a check is given its step's files by (`checkEnvOf`), a folder under `<home>/runs/<id>/` too. */
+export const ARTIFACTS_MARK = 'WF_ARTIFACTS';
 
 /**
- * The run of this store a process is of, by its environment `env`: `WF_RUN` where it is set, else the `<id>` of a `WF_STEP_FILES` under
- * `<home>/runs/<id>/`; `undefined` for one under another store's home, one that climbs out by `..`, and one that names neither. Pure.
+ * The variables a process is told apart by: what the sweep asks `/proc` for. Each names a folder of one store, so a process is never
+ * read as a run of another store's that shares its id; a bare `WF_RUN` names no store, and attributes nothing.
+ */
+export const LEFT_MARKS = [STEP_FILES_MARK, ARTIFACTS_MARK] as const;
+
+/** The `<id>` of `folder` where it is under `<home>/runs/<id>/`, absolute and climbing out by no `..`; else `undefined`. */
+const runUnder = (folder: string | undefined, home: string): string | undefined => {
+  if (folder === undefined || !path.isAbsolute(folder) || folder.split('/').includes('..')) return undefined;
+  const runs = `${path.join(path.resolve(home), 'runs')}/`;
+  if (!folder.startsWith(runs)) return undefined;
+  const id = firstPiece(folder.slice(runs.length), '/');
+  return id === '' || id === '.' ? undefined : id;
+};
+
+/**
+ * The run of this store a process is of, by its environment `env`: the `<id>` of a session's `WF_STEP_FILES` under `<home>/runs/<id>/`,
+ * else of a check's `WF_ARTIFACTS` there; `undefined` for a folder under another store's home or one that climbs out by `..`, and for
+ * a process that names neither, a bare `WF_RUN` included: it names no store, and is passed on to whatever a process carrying it
+ * spawns. Pure.
  */
 export function runOfEnvironment(env: Readonly<Record<string, string>>, home: string): string | undefined {
-  const run = env[RUN_MARK];
-  if (run !== undefined && run !== '') return run;
-  const files = env[STEP_FILES_MARK];
-  if (files === undefined || !path.isAbsolute(files) || files.split('/').includes('..')) return undefined;
-  const runs = `${path.join(path.resolve(home), 'runs')}/`;
-  if (!files.startsWith(runs)) return undefined;
-  const id = firstPiece(files.slice(runs.length), '/');
-  return id === '' || id === '.' ? undefined : id;
+  return runUnder(env[STEP_FILES_MARK], home) ?? runUnder(env[ARTIFACTS_MARK], home);
 }
 
 /**

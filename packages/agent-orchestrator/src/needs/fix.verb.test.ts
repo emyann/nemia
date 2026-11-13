@@ -2,8 +2,8 @@
  * A need's fix, started by the server (`startFix`) and read back (`fixOf`, `followFix`), on the runtime's stand-in (`testEngine`) and the
  * test place given a need of its own and a repository need: a place's fix is filed as a command task in the store's folder, the tools
  * folder first on its PATH, each answer as its variable; a harness's install is found by its name alone and filed, and its typed sign-in
- * refused (`Invalid`); the store's own `tools` need is found by its name, and its command, run, links the tools folder's `nemia` to the
- * pointer's release, failing on a store with no pointer; an answer left out, a need no place declares and a fix of a workflow of a
+ * refused (`Invalid`); the store's own `tools` need is found by its name and filed in the store's folder (its command, run, in
+ * `src/release/nemia-link.boundary.test.ts`); an answer left out, a need no place declares and a fix of a workflow of a
  * factory whose places are not trusted are refused, nothing filed; a repository need named by its factory alone is filed in that
  * factory's repository once its places are trusted, and refused, naming the trust, before; and the fix's phase, output and exit code
  * are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of
@@ -13,7 +13,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { Effect, Stream } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { scratch } from 'test-kit/scratch';
@@ -30,6 +29,7 @@ import { trustPlaces } from '../trust/trust.verb.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
 import { signInNeedOf } from './harness.ts';
 import { answerVariable, fixOf, followFix, startFix } from './fix.verb.ts';
+import { toolsNeed } from '../release/nemia-link.store.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-fix-');
@@ -153,32 +153,14 @@ test("a harness's install is found by its name and filed; a fix a person types i
   assert.equal(engine().tasks.get(fix.id)?.spec.cwd, ROOT);
 });
 
-test("the store's tools need is found by its name and filed; its command links nemia to the pointer's release, and fails with no pointer", async () => {
+test("the store's tools need is found by its name and filed in the store's folder, its command the need's own", async () => {
   const fix = await run(startFix({ need: 'tools' }));
   const filed = engine().tasks.get(fix.id)?.spec;
   assert.ok(filed);
+  assert.equal(filed.harness, 'command');
   assert.equal(filed.cwd, ROOT);
-  const { command, env } = filed.config as { command: string[]; env: Record<string, string> };
-  const ran = (home: string) => {
-    const done = spawnSync(command[0] ?? 'sh', command.slice(1), { cwd: home, env: { ...env, PATH: process.env.PATH ?? '/usr/bin:/bin' } });
-    return done.status;
-  };
-  const link = path.join(toolsDir(ROOT), 'bin', 'nemia');
-  assert.notEqual(ran(ROOT), 0, "no releases/current: a checkout's store gets no link");
-  assert.equal(fs.existsSync(link), false);
-
-  const release = path.join(ROOT, 'releases', 'v1.0.0', 'bin');
-  fs.mkdirSync(release, { recursive: true });
-  fs.writeFileSync(path.join(release, 'nemia'), '#!/bin/sh\n', { mode: 0o755 });
-  fs.symlinkSync('v1.0.0', path.join(ROOT, 'releases', 'current'));
-  try {
-    assert.equal(ran(ROOT), 0);
-    assert.equal(fs.readlinkSync(link), path.join(ROOT, 'releases', 'current', 'bin', 'nemia'));
-    assert.equal(fs.realpathSync(link), fs.realpathSync(path.join(release, 'nemia')));
-  } finally {
-    fs.rmSync(path.join(ROOT, 'releases'), { recursive: true, force: true });
-    fs.rmSync(link, { force: true });
-  }
+  const { command } = filed.config as { command: string[] };
+  assert.ok(command.at(-1)?.endsWith(toolsNeed(ROOT).fixes?.[0]?.command ?? 'no fix'), "the need's fix is what is filed");
 });
 
 test("a repository need named by its factory alone runs in the factory's repository once trusted, and is refused, naming the trust, before", async () => {

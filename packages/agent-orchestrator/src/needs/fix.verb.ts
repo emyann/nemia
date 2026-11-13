@@ -18,7 +18,7 @@ import { noFactoryLine, type FactoryListing } from '../factory/factory.ts';
 import { workflowNeedsRead } from '../folder/folder.store.ts';
 import { carriedDirOf } from '../frozen/frozen.store.ts';
 import { PlaceService } from '../place/place.store.ts';
-import { toolsNeed } from '../release/index.ts';
+import { toolsNeed } from '../release/nemia-link.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';

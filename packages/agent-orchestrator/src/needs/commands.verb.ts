@@ -15,7 +15,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { carryHarnesses, type CarryRan } from '../release/carry.store.ts';
 import { runningRelease } from '../release/version.verb.ts';
-import { linkNemia, toolsNemia } from '../release/index.ts';
+import { linkNemia, toolsNemia } from '../release/nemia-link.store.ts';
 import { followFix, startFix } from './fix.verb.ts';
 import { readinessOf } from './readiness.verb.ts';
 

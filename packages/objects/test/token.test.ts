@@ -14,7 +14,10 @@ test('a token listed decodes as the person’s or an agent’s, and a mint takes
     { name: 'ops', holder: 'agent', agent: 'operator', factory: 'a', narrowed: 'act', createdAt: '2026-11-13T00:00:00.000Z' },
   ])
     assert.deepEqual(Schema.encodeSync(Token)(Schema.decodeUnknownSync(Token)(token)), token);
-  assert.throws(() => Schema.decodeUnknownSync(TokenMint)({ name: 'ops', agent: 'operator', narrowed: 'answer' }), 'a widening is no narrowing');
+  assert.throws(
+    () => Schema.decodeUnknownSync(TokenMint)({ name: 'ops', agent: 'operator', narrowed: 'answer' }),
+    'a widening is no narrowing',
+  );
 });
 
 test('an actor is optional where it is recorded: an event with none decodes, and each kind of actor reads in words', () => {

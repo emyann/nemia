@@ -46,7 +46,7 @@ export function SkillForm({
     >
       {refusal}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @md/page:grid-cols-2">
         <Field
           label="Name"
           hint={
@@ -69,7 +69,7 @@ export function SkillForm({
           placeholder={detail ? undefined : 'Write a note'}
         />
         <Field
-          className="sm:col-span-2"
+          className="@md/page:col-span-2"
           label="Description"
           hint="What it does and when to use it, one line: a session that is only told its name reads this to decide to load it."
           value={form.description}

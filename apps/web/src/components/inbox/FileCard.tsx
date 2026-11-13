@@ -133,7 +133,7 @@ function FactoryField({
       <label htmlFor={field} className="block text-body-medium font-medium">
         Factory
       </label>
-      <select id={field} value={picked} onChange={(event) => onPick(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
+      <select id={field} value={picked} onChange={(event) => onPick(event.target.value)} className={`${FIELD} @md/page:max-w-xs`}>
         <option value="">No factory: chosen at start</option>
         {offered.map((f) => (
           <option key={f.name} value={f.name}>
@@ -172,7 +172,7 @@ function InFactory({ factory, picked, onWorkflow }: { factory: Factory; picked: 
   const on = picked === null ? null : startRepo(factory, picked);
   const [only, ...more] = factory.repos;
   return (
-    <div className="grid gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+    <div className="grid gap-3 @md/page:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
       <div className="space-y-1.5">
         <label htmlFor={field} className="block text-body-medium font-medium">
           Workflow

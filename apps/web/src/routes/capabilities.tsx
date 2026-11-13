@@ -275,7 +275,7 @@ function ServerRow({ server }: { server: McpServer }) {
               <li
                 key={tool.name}
                 data-denied={tool.denied ?? undefined}
-                className="grid grid-cols-1 gap-x-4 py-1 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
+                className="grid grid-cols-1 gap-x-4 py-1 @md/page:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
               >
                 <span className="flex min-w-0 items-center gap-2 font-mono text-body-small" title={`mcp__${name}__${tool.name}`}>
                   <span className={tool.denied ? 'truncate line-through decoration-outline' : 'truncate'}>{tool.name}</span>

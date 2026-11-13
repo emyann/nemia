@@ -120,7 +120,7 @@ function PathDrawn({
     <div
       data-path={read.taskId}
       data-reading={reading || undefined}
-      className={`grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] ${reading ? 'opacity-60' : ''}`}
+      className={`grid gap-4 @lg/page:grid-cols-[minmax(0,1fr)_18rem] ${reading ? 'opacity-60' : ''}`}
     >
       <MachineCanvas machine={read.lifecycle} {...LIFECYCLE} id="debug-lifecycle" lit={lit} taken={taken} maxHeight={CANVAS_MAX_HEIGHT} />
       <Timeline path={read.path} at={at} machine={read.lifecycle} onScrub={onScrub} />

@@ -3,6 +3,7 @@ export {
   CARD_IN_PLAY,
   CARD_STATES,
   cardInPlay,
+  cardsListed,
   cardText,
   cardState,
   cardWorkflowRefusal,

@@ -4,7 +4,8 @@
  * factory filed is listed and read back, written back and read again, removed and gone; a level, rules and servers written are read back,
  * and taken back. And the write check: a new factory under a name that is no slug, under the default factory's, or at a name taken, and a
  * factory written that breaks an invariant of the model's `Factory` — no repository, a hire into a workflow it does not offer — is refused
- * and nothing is written.
+ * and nothing is written. And the folder as a whole, which a move reads and places: every file under it but those that stay with the
+ * store (`proposals/`, `delegations/`), placed only where no folder is, and removed whole.
  *
  * Each walk is on a side of its own: a fresh store, or a fresh stand-in.
  */
@@ -14,6 +15,7 @@ import { act, done } from './door-walks.ts';
 import type { FactoryDoorShape } from '../src/factory/door/factories.store.ts';
 import { FactoryName, isDefaultFactory } from '../src/factory/factory.model.ts';
 import type { Factory } from '../src/factory/factory.ts';
+import { FOLDER_WALKS } from './factory-folder-walks.ts';
 
 type Walk = DoorWalk<FactoryDoorShape>;
 type Door = FactoryDoorShape;
@@ -43,6 +45,7 @@ const filed = (door: Door, name: string, more: Partial<Factory> = {}): string =>
 const since = '2026-11-01T00:00:00.000Z';
 
 export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
+  ...FOLDER_WALKS,
   'factories.list': [
     { name: 'the default factory alone in an empty store', walk: ({ door }) => done(door.factories.list()), says: ['default'] },
     {

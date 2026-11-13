@@ -2,10 +2,12 @@
  * A need's fix, started by the server (`startFix`) and read back (`fixOf`, `followFix`), on the runtime's stand-in (`testEngine`) and the
  * test place given a need of its own and a repository need: a place's fix is filed as a command task in the store's folder, the tools
  * folder first on its PATH, each answer as its variable; a harness's install is found by its name alone and filed, and its typed sign-in
- * refused (`Invalid`); an answer left out, a need no place declares and a fix of a workflow of a factory whose places are not trusted are
- * refused, nothing filed; a repository need named by its factory alone is filed in that factory's repository once its places are trusted,
- * and refused, naming the trust, before; and the fix's phase, output and exit code are read off its task as it settles. The test's store
- * is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of its own, so no place is trusted until a test trusts it.
+ * refused (`Invalid`); the store's own `tools` need is found by its name and filed in the store's folder (its command, run, in
+ * `src/release/nemia-link.boundary.test.ts`); an answer left out, a need no place declares and a fix of a workflow of a
+ * factory whose places are not trusted are refused, nothing filed; a repository need named by its factory alone is filed in that
+ * factory's repository once its places are trusted, and refused, naming the trust, before; and the fix's phase, output and exit code
+ * are read off its task as it settles. The test's store is its own, at `ROOT`, given as `ENV`, and the harness's trust file a folder of
+ * its own, so no place is trusted until a test trusts it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,6 +29,7 @@ import { trustPlaces } from '../trust/trust.verb.ts';
 import { DEFAULT_HARNESS } from 'agent-runtime/vocabulary';
 import { signInNeedOf } from './harness.ts';
 import { answerVariable, fixOf, followFix, startFix } from './fix.verb.ts';
+import { toolsNeed } from '../release/nemia-link.store.ts';
 import type { Env } from '../config/config.store.ts';
 
 const ROOT = scratch('wf-fix-');
@@ -148,6 +151,16 @@ test("a harness's install is found by its name and filed; a fix a person types i
   const fix = await run(startFix({ need: DEFAULT_HARNESS }));
   assert.equal(engine().tasks.get(fix.id)?.spec.harness, 'command');
   assert.equal(engine().tasks.get(fix.id)?.spec.cwd, ROOT);
+});
+
+test("the store's tools need is found by its name and filed in the store's folder, its command the need's own", async () => {
+  const fix = await run(startFix({ need: 'tools' }));
+  const filed = engine().tasks.get(fix.id)?.spec;
+  assert.ok(filed);
+  assert.equal(filed.harness, 'command');
+  assert.equal(filed.cwd, ROOT);
+  const { command } = filed.config as { command: string[] };
+  assert.ok(command.at(-1)?.endsWith(toolsNeed(ROOT).fixes?.[0]?.command ?? 'no fix'), "the need's fix is what is filed");
 });
 
 test("a repository need named by its factory alone runs in the factory's repository once trusted, and is refused, naming the trust, before", async () => {

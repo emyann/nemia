@@ -1,12 +1,13 @@
 /**
  * The Factory door's memory stand-in: a fresh layer of `FactoryDoor` per call, its factories and the files the store keeps beside each —
- * its level, rules, instruction and servers — held in maps, built by `factoryDoorOver` as the files layer is, so the writes are checked the
- * one way on both. A test gives it its program — `Effect.provide(program, factoryDoorMemory())` — where it needs a factory to exist and
- * nothing of the disk; the walks of `test/factory-walks.ts` hold it to what the files answer. Its paths are under `MEMORY_ROOT`, named as
- * the files name them under the store's root.
+ * its level, rules, instruction and servers, and every other file of its folder — held in maps, built by `factoryDoorOver` as the files
+ * layer is, so the writes are checked the one way on both. A test gives it its program — `Effect.provide(program, factoryDoorMemory())` —
+ * where it needs a factory to exist and nothing of the disk; the walks of `test/factory-walks.ts` hold it to what the files answer. Its
+ * paths are under `MEMORY_ROOT`, named as the files name them under the store's root.
  *
  * A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`). It renders no tree: a templated factory's wiring is
- * held in its record, as the files hold it in the tree.
+ * held in its record, as the files hold it in the tree. Its folder, read whole, is the files placed in it with its level, servers, rules
+ * and instruction as the maps hold them now, at the paths the files keep them at; a folder placed sets those maps from its files.
  */
 import path from 'node:path';
 import { Layer } from 'effect';
@@ -18,6 +19,9 @@ import type { FactoryLevelFile } from '../../level/level.ts';
 import type { FactoryServers } from '../servers/index.ts';
 import { FactoryDoor, factoryDoorOver, folderKeptRefusal, instructionRead, type FactoryLayer } from './factories.store.ts';
 import { DEFAULT_INSTRUCTION } from '../factory.ts';
+import type { TreeFile } from '../../archive/archive.ts';
+import { folderPathRefusal, staysWithStore } from './folder.store.ts';
+import { FOLDER_STAYS } from '../move/move.ts';
 
 /** Where the stand-in says a factory's files are: the root its paths are named under, as the files' are under the store's root. */
 export const MEMORY_ROOT = '/memory';
@@ -98,13 +102,100 @@ function instructionsIn(instructions: Map<string, string>, held: (name: string, 
   };
 }
 
-/** A fresh Factory door over maps: nothing filed, no level, rules, instruction nor servers. */
+/** The files the store keeps beside a factory that the stand-in holds in maps of their own, at the paths the files keep them. */
+const LEVEL_FILE = 'level.json';
+const SERVERS_FILE = 'servers.json';
+
+/** The bytes of `text` in UTF-8, as a file of a folder holds them. */
+const fileOf = (path: string, text: string): TreeFile => ({ path, mode: 0o644, bytes: new TextEncoder().encode(text) });
+
+/** The text of a file of a folder. */
+const textOf = (file: TreeFile): string => new TextDecoder().decode(file.bytes);
+
+/** The maps the stand-in keeps a factory's files in, by factory. */
+type Kept = {
+  readonly folders: Map<string, readonly TreeFile[]>;
+  readonly stays: Map<string, readonly string[]>;
+  readonly levels: Map<string, FactoryLevelFile>;
+  readonly rules: Map<string, string>;
+  readonly instructions: Map<string, string>;
+  readonly servers: Map<string, FactoryServers>;
+};
+
+/** Whether `path` is a file a map of `Kept` holds rather than the folder's own. */
+const isMapped = (path: string): boolean => [LEVEL_FILE, SERVERS_FILE, FACTORY_RULES_FILE, DEFAULT_INSTRUCTION].includes(path);
+
+/** The JSON of the file `file` of the folder of `name`, refused `Invalid` where it does not read. */
+const jsonOf = (name: string, file: TreeFile): unknown => {
+  try {
+    return JSON.parse(textOf(file)) as unknown;
+  } catch {
+    throw new Invalid({ message: `${factoriesAt(name, file.path)} is not JSON. Nothing was placed.` });
+  }
+};
+
+/** The folders of `kept`, as a layer's: read with what its maps hold, placed into them, removed from them. */
+function foldersIn(kept: Kept): FactoryLayer['folder'] {
+  const there = (name: string) =>
+    kept.folders.has(name) || kept.levels.has(name) || kept.rules.has(name) || kept.instructions.has(name) || kept.servers.has(name);
+  return {
+    read: (name) => {
+      const level = kept.levels.get(named(name));
+      const servers = kept.servers.get(name);
+      const rules = kept.rules.get(name);
+      const instruction = kept.instructions.get(name);
+      const files = [
+        ...(kept.folders.get(name) ?? []).map((file) => structuredClone(file)),
+        ...(level === undefined ? [] : [fileOf(LEVEL_FILE, `${JSON.stringify(level)}\n`)]),
+        ...(servers === undefined ? [] : [fileOf(SERVERS_FILE, `${JSON.stringify({ servers })}\n`)]),
+        ...(rules === undefined ? [] : [fileOf(FACTORY_RULES_FILE, `${rules}\n`)]),
+        ...(instruction === undefined ? [] : [fileOf(DEFAULT_INSTRUCTION, instruction)]),
+      ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+      return { files, stays: [...(kept.stays.get(name) ?? [])] };
+    },
+    place: (name, files) => {
+      const refused = files.map((file) => folderPathRefusal(file.path)).find((why) => why !== undefined);
+      if (refused !== undefined) throw new Invalid({ message: refused });
+      if (there(named(name)))
+        throw new Conflict({
+          message: `${factoriesAt(name)} is there already, and a factory's folder is placed only where none is. Nothing was placed.`,
+        });
+      const byPath = new Map(files.map((file) => [file.path, file] as const));
+      const level = byPath.get(LEVEL_FILE);
+      const servers = byPath.get(SERVERS_FILE);
+      const read = {
+        level: level === undefined ? undefined : (jsonOf(name, level) as FactoryLevelFile),
+        servers: servers === undefined ? undefined : (jsonOf(name, servers) as { servers?: FactoryServers }).servers,
+      };
+      kept.folders.set(name, structuredClone(files.filter((file) => !isMapped(file.path) && !staysWithStore(file.path))));
+      kept.stays.set(
+        name,
+        FOLDER_STAYS.filter((stays) => files.some((file) => staysWithStore(file.path) && file.path.startsWith(`${stays}/`))),
+      );
+      if (read.level !== undefined) kept.levels.set(name, read.level);
+      if (read.servers !== undefined) kept.servers.set(name, read.servers);
+      const rules = byPath.get(FACTORY_RULES_FILE);
+      if (rules !== undefined) kept.rules.set(name, textOf(rules).trim());
+      const instruction = byPath.get(DEFAULT_INSTRUCTION);
+      if (instruction !== undefined) kept.instructions.set(name, textOf(instruction));
+      return factoriesAt(name);
+    },
+    remove: (name) => {
+      const was = there(named(name));
+      for (const map of [kept.folders, kept.stays, kept.levels, kept.rules, kept.instructions, kept.servers]) map.delete(name);
+      return was;
+    },
+  };
+}
+
+/** A fresh Factory door over maps: nothing filed, no level, rules, instruction, servers nor folder. */
 export function factoryDoorMemory(): Layer.Layer<never> {
   const factories = new Map<string, Factory>();
   const levels = new Map<string, FactoryLevelFile>();
   const rules = new Map<string, string>();
   const instructions = new Map<string, string>();
   const servers = new Map<string, FactoryServers>();
+  const folders = new Map<string, readonly TreeFile[]>();
   const names = () => [...factories.keys()].sort();
   const missing = (name: string, notDone: string) => new Missing({ message: `${noFactoryLine(name, names())} ${notDone}` });
   const held = (name: string, notDone: string): Factory => {
@@ -157,6 +248,7 @@ export function factoryDoorMemory(): Layer.Layer<never> {
         else servers.set(named(name), structuredClone(kept));
       },
     },
+    folder: foldersIn({ folders, stays: new Map(), levels, rules, instructions, servers }),
   };
   return Layer.succeed(FactoryDoor)(factoryDoorOver(layer));
 }

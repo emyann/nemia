@@ -45,13 +45,8 @@ export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, {
  * The schedules of the factory `namespace`, read now, the runs read through `memo` where one is handed; none for the default factory or a
  * file that does not read; `Missing` where no factory has the name.
  */
-const schedulesOf = Effect.fn('schedulesOf')(function* (
-  home: string,
-  repo: string | undefined,
-  namespace: string,
-  memo: ScheduleRuns | undefined,
-) {
-  const { listing } = yield* factoryFiled(home, repo, namespace);
+const schedulesOf = Effect.fn('schedulesOf')(function* (home: string, namespace: string, memo: ScheduleRuns | undefined) {
+  const { listing } = yield* factoryFiled(home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const verify = yield* setting('verifyRest');
   const listed = yield* tried(() => schedulesListed(home, keptRuns(home, memo, scheduleRun, verify)));
@@ -61,24 +56,22 @@ const schedulesOf = Effect.fn('schedulesOf')(function* (
 /** A page of the schedules of the factory `namespace` (`ScheduleList`), read now at the store `home`, the runs through `memo`. */
 export const scheduleList = Effect.fn('scheduleList')(function* (
   home: string,
-  repo: string | undefined,
   namespace: string,
   query: ObjectQuery,
   memo: ScheduleRuns | undefined,
 ) {
-  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, repo, namespace, memo), query, 'schedule');
+  const listed: ScheduleList = yield* objectsListed('Schedule', yield* schedulesOf(home, namespace, memo), query, 'schedule');
   return listed;
 });
 
 /** The schedule of the workflow `name` in the factory `namespace`, the runs read through `memo`; `Missing` where it schedules none. */
 export const scheduleObject = Effect.fn('scheduleObject')(function* (
   home: string,
-  repo: string | undefined,
   namespace: string,
   name: string,
   memo: ScheduleRuns | undefined,
 ) {
-  const found = (yield* schedulesOf(home, repo, namespace, memo)).find((s) => s.metadata.name === name);
+  const found = (yield* schedulesOf(home, namespace, memo)).find((s) => s.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

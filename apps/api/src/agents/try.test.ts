@@ -26,7 +26,7 @@ import { scratch } from 'test-kit/scratch';
 import { startRun, tryFolder } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { addFactory, testPlace } from 'agent-orchestrator/testing';
 import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import { story } from 'test-kit/checkpoints';
 import { listedRuns, objectOf } from '../../test/run-reads.ts';
@@ -37,9 +37,13 @@ const engine = () => engineFor(standIn());
 const runWith = runOver(() => stand().layer);
 const app = eachTest(() => appOver(standIn(), stand()));
 
-/** The board's repository: a plain directory, with agents of its own and a skill only it has. */
+/**
+ * The board's repository: a plain directory, with agents of its own and a skill only it has, read in `default` by its `?repo=`
+ * (`ON_REPO`), which the factory `bench`, filed on it, lets the api read.
+ */
 const repo = scratch('nemia-api-try-repo-');
-process.env.HKB_REPO = repo;
+addFactory({ name: 'bench', repos: [repo] });
+const ON_REPO = `repo=${encodeURIComponent(repo)}`;
 
 const YOURS = path.join(root, 'workflows', 'agents');
 const TRIES = path.join(root, 'tries');
@@ -102,7 +106,7 @@ type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, headers: Record<string, string> = json) =>
-  app().request(`/api/namespaces/default/agents/${name}/try`, {
+  app().request(`/api/namespaces/default/agents/${name}/try?${ON_REPO}`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -185,7 +189,7 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
       assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
     }
     const agent = asListing<AgentListing>(
-      (await (await app().request('/api/namespaces/default/agents/scribe?origin=yours')).json()) as never,
+      (await (await app().request(`/api/namespaces/default/agents/scribe?origin=yours&${ON_REPO}`)).json()) as never,
     );
     assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
 
@@ -233,7 +237,7 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
 
       fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
       const agent = asListing<AgentListing>(
-        (await (await app().request('/api/namespaces/default/agents/scribe?origin=yours')).json()) as never,
+        (await (await app().request(`/api/namespaces/default/agents/scribe?origin=yours&${ON_REPO}`)).json()) as never,
       );
       const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
       assert.ok(
@@ -324,7 +328,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
         /allows `Bash, Edit\(\/home\/\*\*\)` in a mode that asks first/,
       );
       assert.match(why, /none of those rules is inside the folder/);
-      const agents = await everyOrigin<AgentListing>(app(), 'agents');
+      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
       assert.equal(agents.find((agent) => agent.name === 'outward')!.untried!.why, why, 'the listing says what the try refuses with');
       assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
       const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
@@ -392,7 +396,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       assert.equal(res.status, 422, await res.clone().text());
       assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
       assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
-      const agents = await everyOrigin<AgentListing>(app(), 'agents');
+      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
       assert.deepEqual(agents.find((agent) => agent.from === 'yours' && agent.name === 'browsing')?.untried, {
         why: SERVERS_UNTRIED,
         copy: null,
@@ -407,7 +411,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
       assert.ok(why.includes('`fence`') && why.includes('try'), why);
       assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
-      const agents = await everyOrigin<AgentListing>(app(), 'agents');
+      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
       assert.equal(agents.find((agent) => agent.from === 'yours' && agent.name === 'closed')?.untried?.why, why);
       fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
       const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
@@ -455,7 +459,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
   await t.test(
     'the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent',
     async () => {
-      const agents = await everyOrigin<AgentListing>(app(), 'agents');
+      const agents = await everyOrigin<AgentListing>(app(), 'agents', 'default', ON_REPO);
       const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
       assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
       assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);

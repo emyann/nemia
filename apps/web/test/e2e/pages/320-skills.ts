@@ -10,8 +10,9 @@ export default {
   /**
    * An agent of yours composes its skills from a list, and Claude Code's prompt from what it does. `scribe`, which gives none, first names
    * a skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
-   * description is edited and left unsaved. The sheet lists your library, this repository's and Nemia's in that order, the repository's
-   * `scratch` refused with its reason and nothing to press, and Nemia's saying none: none is built in. A skill of your library is added
+   * description is edited and left unsaved. The sheet lists your library and Nemia's in that order, and no group of this repository's, the
+   * default factory working on none; a skill of your library with no frontmatter, which the page writes and takes back, refused with its
+   * reason and nothing to press, and Nemia's offered as copies. A skill of your library is added
    * from the sheet's first group, a change of the form alone: nothing is written until Save, and the edit is kept. Its tools, which leave
    * out Skill, are put right from the note that says so, and Doesn't write code is picked, with Only my instructions behind For experts.
    * Saved, the file gives the skill and says harnessPrompt: no-coding. The page takes the agent back, so each visit, in either theme, reads
@@ -30,12 +31,15 @@ export default {
     const was = fs.readFileSync(agentFile, 'utf8');
     const naming = was.replace(/^---\n/, `---\nskills: ${nowhere}\n`);
     const drafted = 'Use this when a change needs its notes written, drafted and not yet saved.';
+    const bare = path.join(library, 'scratch-e2e');
 
     const form = page.locator(`form[data-agent-form="${seeded.name}"]`);
     await expectVisible(form, `${seeded.name}'s form`);
     try {
       if (naming === was) throw new Refused(`agents/${seeded.name}.md opens with its frontmatter — it holds ${JSON.stringify(was)}`);
       fs.writeFileSync(agentFile, naming);
+      fs.mkdirSync(bare, { recursive: true });
+      fs.writeFileSync(path.join(bare, 'SKILL.md'), '# Scratch\n\nNotes, with no frontmatter.\n');
       await page.reload({ waitUntil: 'load' });
       await idle(page);
       await expectVisible(
@@ -71,13 +75,14 @@ export default {
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await expectTexts(
         sheet.locator('section[data-skill-place] h3'),
-        ['Your library', 'This repository', 'Built into Nemia'],
-        'the sheet lists your library, this repository and what is built into Nemia, in the order an agent of yours finds a name',
+        ['Your library', 'Built into Nemia'],
+        'the sheet lists your library and what is built into Nemia, in the order an agent of yours finds a name, and no repository',
       );
-      const scratch = sheet.locator('section[aria-label="This repository"] [data-offered-skill="scratch"]');
+      await expectCount(sheet.locator('section[aria-label="This repository"]'), 0, "no group of this repository's: the default reads none");
+      const scratch = sheet.locator('section[aria-label="Your library"] [data-offered-skill="scratch-e2e"]');
       await expectVisible(
         scratch.locator('[data-offer-refused]', { hasText: 'has no frontmatter' }),
-        "the repository's scratch is listed, refused with its reason",
+        'a skill of your library with no frontmatter is listed, refused with its reason',
       );
       await expectCount(scratch.getByRole('button'), 0, 'and nothing to press');
       const builtIn = sheet.locator('section[aria-label="Built into Nemia"]');
@@ -150,6 +155,7 @@ export default {
       await expectVisible(form.getByRole('button', { name: 'Save', disabled: true }), 'and Save waits again');
     } finally {
       fs.writeFileSync(agentFile, was);
+      fs.rmSync(bare, { recursive: true, force: true });
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

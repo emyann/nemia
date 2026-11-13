@@ -407,6 +407,7 @@ test('REFUSED: an attach naming a repository the factory has no folder of that n
 
 test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', async (t) => {
   const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
+  const attach = `nemia factory attach ${at.factory} ${at.workflow} --repo`;
   const rows: Array<[string, (repo: string) => unknown, 'Missing' | 'Invalid', (repo: string) => string[]]> = [
     [
       'a cron Cron does not read, quoting it',
@@ -418,16 +419,23 @@ test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', asyn
     ['a cron that never fires', () => setScheduleAt(ROOT, { ...at, cron: '0 0 30 2 *', tz: 'UTC' }), 'Invalid', () => ['--cron']],
     ['an empty brief', () => setScheduleAt(ROOT, { ...at, brief: '  ' }), 'Invalid', () => ['--brief']],
     [
-      "a repository not the factory's",
+      'a repository set, which is retired: the wiring places its runs',
       () => setScheduleAt(ROOT, { ...at, repo: '/elsewhere' }),
       'Invalid',
-      (repo) => ['/elsewhere', 'pipao', repo, '--repo'],
+      () => [attach],
     ],
+    ["the factory's own repository set, retired all the same", (repo) => setScheduleAt(ROOT, { ...at, repo }), 'Invalid', () => [attach]],
     [
       'a bad cron through the command line',
       () => main(['factory', 'schedule', 'pipao', 'janitor', '--cron', '61 * * * *', '--brief', 'Read the stats'], noEngine()),
       'Invalid',
       () => ['--cron "61 * * * *"', '59'],
+    ],
+    [
+      'a repository through the command line, its flag retired',
+      () => main(['factory', 'schedule', at.factory, at.workflow, '--cron', at.cron, '--brief', 'x', '--repo', '/elsewhere'], noEngine()),
+      'Invalid',
+      () => [attach],
     ],
     [
       'a bad zone through the command line',
@@ -444,13 +452,31 @@ test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', asyn
       assert.deepEqual(bytesOf('pipao'), before);
     });
 
-  await t.test('no repository named in a factory of two, which a scheduled start could not choose between; one named is taken', () => {
+  await t.test('a workflow the wiring places on none of a factory of two is refused naming the attach; one wired is written', () => {
     const repo = fresh();
     const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-    addFactoryAt(ROOT, { name: 'pipao', repos: [repo, other] });
-    attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'janitor' });
-    assert.throws(() => setScheduleAt(ROOT, at), refused('Invalid', 'pipao', '--repo'));
-    assert.equal(setScheduleAt(ROOT, { ...at, repo: other }).schedule.repo, other);
+    addFactoryAt(ROOT, { name: at.factory, repos: [repo, other] });
+    attachWorkflowAt(ROOT, at);
+    const before = bytesOf(at.factory);
+    assert.throws(() => setScheduleAt(ROOT, at), refused('Invalid', attach));
+    assert.deepEqual(bytesOf(at.factory), before);
+    attachWorkflowAt(ROOT, { ...at, repo: path.basename(other) });
+    const written = setScheduleAt(ROOT, at).schedule;
+    assert.equal(written.repo, undefined);
+    assert.deepEqual(readFactoryAt(ROOT, at.factory).schedules[at.workflow], written);
+  });
+
+  await t.test("an old schedule's repository sent back as it is, as a Schedule's object reads it, is written; another is refused", () => {
+    const repo = pipao(at.workflow);
+    const file = path.join(FACTORIES, `${at.factory}.json`);
+    const old = { cron: '0 9 * * 1', brief: 'Read the stats', repo, since: '2026-01-01T00:00:00.000Z' };
+    fs.writeFileSync(file, `${JSON.stringify({ ...fileOf(at.factory), schedules: { [at.workflow]: old } })}\n`);
+    const before = bytesOf(at.factory);
+    assert.throws(() => setScheduleAt(ROOT, { ...at, repo: path.join(ROOT, 'elsewhere') }), refused('Invalid', attach));
+    assert.deepEqual(bytesOf(at.factory), before);
+    const again = setScheduleAt(ROOT, { ...at, cron: '0 10 * * 1', repo });
+    assert.deepEqual(again.replaced, old);
+    assert.equal(readFactoryAt(ROOT, at.factory).schedules[at.workflow]?.cron, '0 10 * * 1');
   });
 });
 

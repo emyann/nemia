@@ -63,9 +63,10 @@ export const pathSent = (typed: string, env: NodeJS.ProcessEnv = process.env): s
 
 /**
  * The `repo` query of a command about a repository: the one `--repo` names (`typed`), sent as `pathSent` sends a path; none where
- * `--factory` names the factory (`factory`), which places it, or under a remote context, whose daemon answers on its own repository;
- * else, under this machine's context, the folder the command is typed in (`here`), which the api places on the repository it knows that
- * holds it, and refuses where it knows none, naming how to file a factory on it.
+ * `--factory` names the factory (`factory`), which places it, or under a remote context, whose daemon's folders are not this one's;
+ * else, under this machine's context, the folder the command is typed in (`here`), which the api places on the repository of a filed
+ * factory that holds it, and refuses where no factory's does, naming how to file a factory on it. With no `repo`, the default factory
+ * reads no repository: yours and the builtins alone, never the api's own folder.
  */
 export function repoQueryOf(
   typed: string | undefined,

@@ -5,7 +5,8 @@
  * got, its commands and its volumes) and of a Schedule put and taken back —
  * in a scratch store (`WF_ROOT`) whose factories are filed with the package's own verbs.
  *
- * The api's own repository (`HKB_REPO`) has the workflow `beta`. `repoR`, a git repository, has `alpha`, whose step `implement` names no
+ * The api's own repository (`HKB_REPO`) has the workflow `beta`, and no request reads it: no factory works on it but `owned`, filed by
+ * the row that reads it through that factory. `repoR`, a git repository, has `alpha`, whose step `implement` names no
  * agent, and `gamma`, and the agent `ada` beside them; `repoS` is a second repository. `solo` works on `repoR` alone and attaches `alpha`,
  * hiring no one; `hired` does the same, and hires `ada` into `alpha/implement`; `pair` works on both. `stranger` is a directory no factory
  * names, with a workflow and an MCP server of its own, which the api must never read nor start.
@@ -20,7 +21,7 @@ import { scratch } from 'test-kit/scratch';
 import { story } from 'test-kit/checkpoints';
 import { linesOf, listedOf } from '../../test/run-reads.ts';
 import { app } from '../app.ts';
-import { workflowsListed } from '../../test/definitions.ts';
+import { listedIn, workflowsListed } from '../../test/definitions.ts';
 import { addToInbox, loadWorkflows, readInbox, runsAtOnce, hireRefusalOf, unfilledRefusal, StoreRoot } from 'agent-orchestrator';
 import { addFactory, attachWorkflow, clearSchedule, hireAgent, removeFactory, setSchedule } from 'agent-orchestrator/testing';
 import { Effect } from 'effect';
@@ -100,14 +101,23 @@ const saysAll = (text: string, facts: string[]): void => {
 
 test('placeFor: the repository and the factory a request is answered on, and every other refused', async (t) => {
   await t.test(
-    "a ?repo= that is neither the api's own nor any factory's is a 422 naming those it may be and the add — nothing of it listed",
+    "a ?repo= that is no factory's is a 422 naming those it may be and the add — nothing of it listed, and never the api's own",
     async () => {
       const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(stranger)}`);
       assert.equal(status, 422);
-      saysAll(said(body), [`${stranger}: `, [own, repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --repo ${stranger}.`]);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), '?repo=', `nemia factory add <name> --repo ${stranger}.`]);
+      assert.ok(!said(body).includes(own), "the api's own, which no factory works on, is not offered");
       assert.ok(!JSON.stringify(body).includes('"x"'), 'the workflow x in it is never listed');
     },
   );
+
+  await t.test("a ?repo= of the api's own that no factory works on is a 422 as any other, its workflow beta never listed", async () => {
+    const { status, body } = await workflowsListed<never>(app, `repo=${encodeURIComponent(own)}`);
+    assert.equal(status, 422);
+    saysAll(said(body), [`${own}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${own}.`]);
+    assert.ok(!said(body).includes(`, ${own}`) && !said(body).includes(`${own},`), "the api's own is not among those it may be");
+    assert.ok(!JSON.stringify(body).includes('"beta"'), 'the workflow beta in it is never listed');
+  });
 
   await t.test(
     'capabilities for a ?repo= no factory names is a 422, its MCP server never started — as it is once a factory names it',
@@ -140,12 +150,13 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       body.map(() => null),
       'nothing is unfilled in the default factory',
     );
-    const { body: plain } = await workflowsListed<WorkflowListing>(app, '');
+    const plain = await listedIn<WorkflowListing>(app, 'workflows');
     assert.deepEqual(
-      plain.filter((w) => w.from === 'repo').map((w) => w.name),
-      ['beta'],
-      'a request naming neither is answered on the api own repository, as before',
+      plain.filter((w) => w.from === 'repo' || w.name === 'beta').map((w) => w.name),
+      [],
+      "a request naming neither reads no repository: never the api's own beta",
     );
+    assert.equal((await workflowsListed<never>(app, '')).status, 422, 'and its repository layer, asked for, is refused');
   });
 
   await t.test(
@@ -154,7 +165,7 @@ test('placeFor: the repository and the factory a request is answered on, and eve
       assert.deepEqual(await workflowsListed<WorkflowListing>(app, 'factory=default'), await workflowsListed<WorkflowListing>(app, ''));
       const { status, body } = await workflowsListed<never>(app, `factory=default&repo=${encodeURIComponent(stranger)}`);
       assert.equal(status, 422);
-      saysAll(said(body), [`${stranger}: `, [own, repoR, repoS].join(', '), `nemia factory add <name> --repo ${stranger}.`]);
+      saysAll(said(body), [`${stranger}: `, [repoR, repoS].join(', '), `nemia factory add <name> --repo ${stranger}.`]);
     },
   );
 
@@ -201,10 +212,32 @@ test('placeFor: the repository and the factory a request is answered on, and eve
     assert.equal(body[0].dir, path.join(repoR, 'workflows', 'alpha'));
   });
 
-  await t.test('GET /api/repository answers the repository a request is answered on: the api own, or the factory one', async () => {
-    assert.deepEqual((await get<{ repo: string }>('/api/repository')).body, { repo: own });
-    assert.deepEqual((await get<{ repo: string }>('/api/repository?factory=solo')).body, { repo: repoR });
-  });
+  await t.test(
+    "a factory that works on the api's own and another, asked with no ?repo=, is a 422 naming the ?repo= — the api's own is not filled in; named, it is read",
+    async (t) => {
+      addFactory({ name: 'owned', repos: [own, repoR] });
+      t.after(() => removeFactory('owned'));
+      const sorted = [own, repoR].sort();
+      const fallen = await workflowsListed<never>(app, 'factory=owned');
+      assert.equal(fallen.status, 422, JSON.stringify(fallen.body));
+      saysAll(said(fallen.body), [...sorted, `?factory=owned&repo=${sorted[0]}`]);
+      const repository = await get<unknown>('/api/repository?factory=owned');
+      assert.equal(repository.status, 422, 'nor does GET /api/repository fill it in');
+      const named = await get<{ repo: string }>(`/api/repository?factory=owned&repo=${encodeURIComponent(own)}`);
+      assert.deepEqual(named.body, { repo: own }, 'named with ?repo=, the factory reads it');
+    },
+  );
+
+  await t.test(
+    "GET /api/repository answers the factory's repository, and with no factory named is a 422 naming ?factory=, never the api's own",
+    async () => {
+      assert.deepEqual((await get<{ repo: string }>('/api/repository?factory=solo')).body, { repo: repoR });
+      const plain = await get<unknown>('/api/repository');
+      assert.equal(plain.status, 422, JSON.stringify(plain.body));
+      saysAll(said(plain.body), ['?factory=<name>', 'nemia factory add']);
+      assert.ok(!said(plain.body).includes(own), "the api's own is never answered");
+    },
+  );
 });
 
 test('a person works in a factory with hires: the listing names what is unfilled, the step page its hires, and a run and a card start in it', async (t) => {
@@ -429,10 +462,10 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
       saysAll(many, ['POST /api/namespaces/hired/runs', 'POST /api/namespaces/pair/runs', 'POST /api/namespaces/solo/runs']);
       assert.ok(many.endsWith('Nothing was started.'), many);
       const loose = await post('/api/namespaces/default/runs', { workflow: 'beta', brief: 'Add a cache' });
-      assert.equal(loose.status, 422);
+      assert.equal(loose.status, 422, "with no ?repo=, the default factory has no repository to start on: never the api's own");
       const none = said(await loose.json());
-      assert.ok(none.startsWith(`${own}: no factory works on this folder, `), none);
-      saysAll(none, ['POST /api/namespaces/<name>/runs']);
+      saysAll(none, ['?factory=<name>', 'nemia factory add']);
+      assert.ok(!none.includes(own), none);
       assert.deepEqual(runFiles(), before, 'nothing written');
     },
   );
@@ -459,7 +492,9 @@ test('POST /api/namespaces/default/runs as shipped: the factory a start that nam
       const before = runFiles();
       const res = await post(`/api/namespaces/default/cards/${card.name}/start`, { workflow: 'delta' });
       assert.equal(res.status, 422);
-      assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
+      const none = said(await res.json());
+      assert.ok(none.startsWith(`${card.name}: `), none);
+      saysAll(none, ['?factory=<name>', 'factory:']);
       const placed = await post(`/api/namespaces/default/cards/${card.name}/start?repo=${encodeURIComponent(repoT)}`, {
         workflow: 'delta',
       });
@@ -502,7 +537,11 @@ test('a person reads the factories: the default first, each by name, a broken fi
           unschedule: {},
           volumeRm: {},
         });
-        assert.deepEqual(byName('default')?.spec, { repos: [own], hires: {}, volumes: [] }, 'no workflows: it offers every one');
+        assert.deepEqual(
+          byName('default')?.spec,
+          { repos: [], hires: {}, volumes: [] },
+          'no workflows: it offers every one, on no repository',
+        );
         assert.deepEqual(byName('default')?.status, { conditions: [], untrusted: [] });
         assert.deepEqual(byName('hired')?.status.untrusted, [
           {

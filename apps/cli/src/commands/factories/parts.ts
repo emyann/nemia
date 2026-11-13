@@ -1,8 +1,8 @@
 /**
  * The runners of a factory's parts kept in its namespace: `nemia factory schedule` and `unschedule` (a Schedule, named by its
- * workflow, its `--repo` sent as `repoSent` says) and its MCP servers, listed with their states (`servers`), recorded (`server add`, its
- * flags mapped here to the McpServer's write) and taken off (`server rm`). Each prints, word for word as the old path did, what the answer
- * says it wrote (`writtenOf`).
+ * workflow, a retired `--repo` still sent as `repoSent` says, for the api to refuse naming the attach) and its MCP servers, listed with
+ * their states (`servers`), recorded (`server add`, its flags mapped here to the McpServer's write) and taken off (`server rm`). Each
+ * prints, word for word as the old path did, what the answer says it wrote (`writtenOf`).
  */
 import { type Args, MCP_TRANSPORTS, type McpServer, type McpServerWrite } from 'objects';
 import { asked, everyPage, pageOf } from '../../objects.ts';

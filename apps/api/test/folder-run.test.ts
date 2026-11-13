@@ -4,10 +4,10 @@
  * has a repository — rather than a repository run's words. In a scratch store, with no git repository anywhere, on the stand-ins: the
  * runtime's test engine, the step's task signed off by hand, and the test place.
  *
- * And a folder team as the board finds and files for it, with the repository the api is pointed at a plain directory that is no
- * repository at all: `repoOf` resolves a path and never asks git, so the api runs, the store's own workflows list, and a card for a
- * team that works in folders is filed by its workflow's name with no `repo:` — a card's `repo` being retired, refused for every team —
- * and started on the api's repository, an old card's `repo:` said as ignored.
+ * And a folder team as the board finds and files for it, with the repository of the factory `shore` a plain directory that is no
+ * repository at all: the api runs, the store's own workflows list, and a card for a team that works in folders is filed by its
+ * workflow's name with no `repo:` — a card's `repo` being retired, refused for every team — and started in `shore` (`?factory=shore`),
+ * an old card's `repo:` said as ignored.
  */
 import { root } from './harness.ts';
 import { listedIn } from './definitions.ts';
@@ -21,7 +21,7 @@ import { scratch } from 'test-kit/scratch';
 import { Effect } from 'effect';
 import type { Card } from 'objects';
 import { testEngine } from 'agent-runtime/testing';
-import { testPlace } from 'agent-orchestrator/testing';
+import { addFactory, attachWorkflow, hireAgent, testPlace } from 'agent-orchestrator/testing';
 import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
 import { linesOf, listedOf, listedRuns, objectOf, specOf, stepOf } from './run-reads.ts';
 
@@ -30,9 +30,8 @@ const standIn = eachTest(testEngine);
 const engine = () => engineFor(standIn());
 const app = eachTest(() => appOver(standIn(), stand()));
 
-/** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
+/** The repository of the factory `shore`: a plain directory, no git, no workflows folder of its own until `teamInRepo`. */
 const notARepo = scratch('nemia-api-folder-here-');
-process.env.HKB_REPO = notARepo;
 
 /** A folder team of the store's own, as workflows/note is: every step says `workspace: folder`, so it looks at no repository. */
 const team = path.join(root, 'workflows', 'notes');
@@ -339,8 +338,18 @@ test("a folder run read on the board: listed by its kind and place, its page wit
   );
 });
 
-/** The folder team as the api's repository has it: a card names a workflow its factory offers, the default's the repository's. */
-const teamInRepo = (): void => fs.cpSync(team, path.join(notARepo, 'workflows', 'notes'), { recursive: true });
+/**
+ * The folder team as `shore`'s repository has it, and `shore` filed on that directory, offering it with an agent of the repository's
+ * hired into its step: a card names a workflow its factory offers.
+ */
+const teamInRepo = (): void => {
+  fs.cpSync(team, path.join(notARepo, 'workflows', 'notes'), { recursive: true });
+  fs.mkdirSync(path.join(notARepo, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(notARepo, 'workflows', 'agents', 'scribe.md'), '---\nharness: claude\n---\nYou write notes.\n');
+  addFactory({ name: 'shore', repos: [notARepo] });
+  attachWorkflow({ factory: 'shore', workflow: 'notes' });
+  hireAgent({ factory: 'shore', agent: 'scribe', step: 'notes/write' });
+};
 
 /**
  * An old card, filed before `repo:` was retired, for the team that works on a repository, and started on the one that works in folders,
@@ -402,7 +411,7 @@ test('a folder team as the board finds and files for it, the repository a plain 
         return ((await res.json()) as Card).metadata.name;
       };
       const startOn = async (card: string) =>
-        app().request(`/api/namespaces/default/cards/${card}/start`, {
+        app().request(`/api/namespaces/default/cards/${card}/start?factory=shore`, {
           method: 'POST',
           headers: json,
           body: JSON.stringify({ workflow: 'notes', from: 'yours', brief: 'Write the note.' }),

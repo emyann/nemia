@@ -51,6 +51,7 @@ export type ScheduleListed = {
   cron: string;
   tz: string | null;
   brief: string;
+  /** An old schedule's retired repository, read and ignored: its runs work on the one the factory's wiring names. */
   repo: string | null;
   next: string | null;
   last: { run: string; at: string } | null;

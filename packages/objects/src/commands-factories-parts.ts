@@ -88,7 +88,19 @@ const scheduleFlag = (flag: string, key: string, takes: string): Flag => ({
   twice: `nemia factory schedule takes ${flag} once: a workflow has one schedule in a factory.`,
 });
 
-const SCHEDULE_USAGE = '<factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]';
+/**
+ * `--repo`, retired and out of the usage: kept so a schedule that names one is read and refused naming the attach that places its runs
+ * (`scheduleRepoRefusal`), never refused as a flag the command does not take.
+ */
+const RETIRED_REPO: Flag = {
+  flag: '--repo',
+  kind: 'text',
+  key: 'repo',
+  takes: `--repo is retired: a scheduled run works on the repository the factory's wiring names for its workflow. Leave it out, and place its runs with nemia factory attach <factory> <workflow> --repo <name>.`,
+  twice: `--repo is retired: leave it out, and place a schedule's runs with nemia factory attach <factory> <workflow> --repo <name>.`,
+};
+
+const SCHEDULE_USAGE = '<factory> <workflow> --cron <expr> --brief <text> [--tz <zone>]';
 
 const SCHEDULE_SPEC: Spec = {
   positionals: [
@@ -98,7 +110,7 @@ const SCHEDULE_SPEC: Spec = {
   flags: [
     scheduleFlag('--cron', 'cron', 'a cron expression of five or six fields'),
     scheduleFlag('--brief', 'brief', 'what each run is asked'),
-    scheduleFlag('--repo', 'repo', "one of the factory's repositories"),
+    RETIRED_REPO,
     scheduleFlag('--tz', 'tz', 'an IANA time zone, such as America/Montreal'),
   ],
   unknown: (arg) =>

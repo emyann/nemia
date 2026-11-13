@@ -25,8 +25,8 @@ import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
 /**
- * A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and repository, none for the
- * default factory of an api with none.
+ * A factory as a Hire reads it: its name, its hires, its workflows (none for every one found), its tree and its first repository, none
+ * for the default factory, which works on none.
  */
 export type HiringFactory = Pick<Factory, 'name' | 'hires' | 'tree'> & {
   readonly workflows?: readonly string[] | undefined;
@@ -153,24 +153,24 @@ export const hiresOf = Effect.fn('hiresOf')(function* (f: HiringFactory, home: s
   });
 });
 
-/** The factory `namespace` as a Hire reads it, the default on `repo`; `Missing` where no factory has the name. */
-const hiringOf = Effect.fn('hiringOf')(function* (home: string, repo: string | undefined, namespace: string) {
-  const { factory: object, listing } = yield* factoryFiled(home, repo, namespace);
+/** The factory `namespace` as a Hire reads it, on its own first repository; `Missing` where no factory has the name. */
+const hiringOf = Effect.fn('hiringOf')(function* (home: string, namespace: string) {
+  const { factory: object, listing } = yield* factoryFiled(home, namespace);
   const tree = listing !== undefined && !('error' in listing) ? listing.tree : undefined;
   const factory: HiringFactory = {
     name: namespace,
     hires: { ...object.spec.hires },
     ...(tree === undefined ? {} : { tree }),
     workflows: object.spec.workflows,
-    repo: object.spec.repos[0] ?? repo,
+    repo: object.spec.repos[0],
     harnessSettings: object.spec.harnessSettings,
   };
   return { factory, filedAt: object.metadata.creationTimestamp };
 });
 
 /** A page of the Hires of the factory `namespace` (`HireList`), read now at the store `home`. */
-export const hireList = Effect.fn('hireList')(function* (home: string, repo: string | undefined, namespace: string, query: ObjectQuery) {
-  const { factory, filedAt } = yield* hiringOf(home, repo, namespace);
+export const hireList = Effect.fn('hireList')(function* (home: string, namespace: string, query: ObjectQuery) {
+  const { factory, filedAt } = yield* hiringOf(home, namespace);
   const listed: HireList = yield* objectsListed('Hire', yield* hiresOf(factory, home, filedAt), query, 'hire');
   return listed;
 });
@@ -202,7 +202,7 @@ export const hireNamedIn = (hires: readonly Hire[], namespace: string, name: str
 };
 
 /** The Hire `name` of the factory `namespace` as an object, read now; refused as `hireNamedIn` refuses. */
-export const hireObject = Effect.fn('hireObject')(function* (home: string, repo: string | undefined, namespace: string, name: string) {
-  const { factory, filedAt } = yield* hiringOf(home, repo, namespace);
+export const hireObject = Effect.fn('hireObject')(function* (home: string, namespace: string, name: string) {
+  const { factory, filedAt } = yield* hiringOf(home, namespace);
   return yield* hireNamedIn(yield* hiresOf(factory, home, filedAt), namespace, name);
 });

@@ -302,7 +302,6 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
     cron: '0 9 * * 1',
     tz: 'America/Montreal',
     brief: 'Read the stats',
-    repo: null,
     next: '2026-10-12T13:00:00.000Z',
     last: null,
     refused: null,

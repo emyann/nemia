@@ -522,12 +522,18 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
  */
 const originQuery = { origin: Schema.optionalKey(Schema.String) };
 
+/**
+ * The query of an agent's custom instructions: the repository whose agents the name is looked for in, one a factory works on; none for
+ * yours and the builtins alone.
+ */
+const instructionsQuery = { repo: Schema.optionalKey(Schema.String) };
+
 /** The query of a removal: the `resourceVersion` it was read at, refused where the files now hold another. */
 const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 
 /**
- * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one the api knows, its own or a
- * factory's; the api's own where none is named.
+ * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one a factory works on, or a
+ * folder under one, read as that repository; none where none is named, yours and the builtins alone.
  */
 const repoQuery = { repo: Schema.optionalKey(Schema.String) };
 
@@ -639,20 +645,20 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.get('instructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
-    query: repoQuery,
+    query: instructionsQuery,
     success: AgentInstructions,
     error: definitionErrors,
   }),
   HttpApiEndpoint.put('putInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
-    query: repoQuery,
+    query: instructionsQuery,
     payload: AgentInstructionsWrite,
     success: AgentInstructions,
     error: definitionErrors,
   }),
   HttpApiEndpoint.delete('deleteInstructions', '/api/namespaces/:namespace/agents/:name/instructions', {
     params: cardParams,
-    query: repoQuery,
+    query: instructionsQuery,
     success: AgentInstructionsCleared,
     error: definitionErrors,
   }),

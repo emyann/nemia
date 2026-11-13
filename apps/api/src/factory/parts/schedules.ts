@@ -7,20 +7,20 @@
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE, scheduleList, scheduleObject } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
+import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
 
 /** The schedule `name` of `namespace`, read now, the runs it fired through the app's memo. */
 const scheduleIn = (s: Served, namespace: string, name: string) =>
-  s.inRequest(scheduleObject(s.home, defaultRepo(s), namespace, name, s.memo.records.factories));
+  s.inRequest(scheduleObject(s.home, namespace, name, s.memo.records.factories));
 
 export const schedulesHandlers = readsBounded(Api, 'schedules', (handlers) =>
   handlers
     .handle('list', ({ params: { namespace }, query }) =>
       answered((s) => {
         factoryNamed(`GET /api/namespaces/${namespace}/schedules`, namespace);
-        return s.inRequest(scheduleList(s.home, defaultRepo(s), namespace, queryOf(query), s.memo.records.factories));
+        return s.inRequest(scheduleList(s.home, namespace, queryOf(query), s.memo.records.factories));
       }),
     )
     .handle('get', ({ params: { namespace, name } }) =>

@@ -1,15 +1,9 @@
 /**
- * What the handlers of a factory and its parts share: the default factory's repository, the api's own (`repoOf`); a list query as the
- * package reads it, `?labelSelector=` and its retired spelling `?selector=` read the same, each given again for another (OR); and a name
- * that is no factory's refused `Invalid` before anything is read. Their writes are guarded as every write is, before their body is read
- * (`writeGuard`, guard.ts).
+ * What the handlers of a factory and its parts share: a list query as the package reads it, `?labelSelector=` and its retired spelling
+ * `?selector=` read the same, each given again for another (OR); and a name that is no factory's refused `Invalid` before anything is
+ * read. Their writes are guarded as every write is, before their body is read (`writeGuard`, guard.ts).
  */
 import { factoryNameRefusal, Invalid as Refused, type ObjectQuery } from 'agent-orchestrator';
-import { repoOf } from '../../capabilities/capabilities.ts';
-import type { Served } from '../../layer.ts';
-
-/** The repository the default factory is on: the api's own, none where the api has none (`repoOf`). */
-export const defaultRepo = (s: Served): string | undefined => repoOf(s.env, s.running);
 
 /** One selector, several, or none, as a list. */
 const listOf = (given: string | readonly string[] | undefined): string[] =>

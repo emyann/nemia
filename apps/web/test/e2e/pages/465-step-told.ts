@@ -58,10 +58,13 @@ async function untold(page: Page, placed: string, factory: string): Promise<void
   }
 }
 
+/** A second factory the page files on the checkout, offering `dev` and hiring nothing: where `review`'s own file is read. */
+const PLAIN = 'plain';
+
 /**
- * Writes the hire of REVIEWER into `hiring`'s `dev/review`, as its one hire (the seeded one into `dev/implement` is refused beside the
- * step's own `agent:` line, as 181-workflow finds), the agent's file, and RECENT's record on the checkout
- * from its `main`, as `wf start` freezes one; returns what takes them back.
+ * Writes PLAIN's file, the hire of REVIEWER into `hiring`'s `dev/review`, as its one hire (the seeded one into `dev/implement` is refused
+ * beside the step's own `agent:` line, as 181-workflow finds), the agent's file, and RECENT's record on the checkout from its `main`, as
+ * `wf start` freezes one; returns what takes them back.
  */
 function written(checkout: string): () => void {
   const factoryFile = path.join(store!, 'factories', `${FACTORIES.hiring.name}.json`);
@@ -93,7 +96,10 @@ function written(checkout: string): () => void {
     steps: { implement: { taskId: null }, review: { taskId: null } },
   };
   fs.writeFileSync(record, JSON.stringify(run, null, 2));
+  const plain = path.join(store!, 'factories', `${PLAIN}.json`);
+  fs.writeFileSync(plain, JSON.stringify({ repos: [checkout], workflows: [WORKFLOWS.good.name] }, null, 2));
   return () => {
+    fs.rmSync(plain, { force: true });
     fs.rmSync(record, { force: true });
     fs.rmSync(reviewerFile, { force: true });
     fs.writeFileSync(factoryFile, factoryText);
@@ -116,16 +122,16 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * What a step will be told, on its page, read now. With no factory picked, `dev`'s `review` says its file names no agent, and that
-   * FACTORIES' `hiring` hires one into it, linked to the page in that factory; there, the hire is marked hired, and the layers are drawn
-   * open, each beside where it is edited — the agent's page, its custom instructions on it, the factory's rules, none told, on the
-   * factory's Settings, the step's file in the checkout — with the run of `dev` in that factory among its recent runs, not reached yet;
-   * and its file reads as written, its agent row said to be the hire's. The run's step links back to the step's page in its place, and
-   * its header to its workflow's. With rules planted that cannot be told, the step's page reads all the same, and says the step is told
-   * none. The page writes the hire, the agent, the run and those rules, and takes them back.
+   * What a step will be told, on its page, read now. In a factory on the checkout that hires nothing into it (the default one reading no
+   * repository), `dev`'s `review` says its file names no agent, nothing marked hired; in FACTORIES' `hiring`, which hires one into it, the
+   * hire is marked hired, and the layers are drawn open, each beside where it is edited — the agent's page, its custom instructions on it,
+   * the factory's rules, none told, on the factory's Settings, the step's file in the checkout — with the run of `dev` in that factory
+   * among its recent runs, not reached yet; and its file reads as written, its agent row said to be the hire's. The run's step links back
+   * to the step's page in its place, and its header to its workflow's. With rules planted that cannot be told, the step's page reads all
+   * the same, and says the step is told none. The page writes the hire, the agent, the run and those rules, and takes them back.
    */
   name: 'step-told',
-  route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
+  route: '/workflows',
   expect: async (page) => {
     const theme = await themeOf(page);
     const { good } = WORKFLOWS;
@@ -135,25 +141,32 @@ export default {
     const step = `/workflows/repo/${good.name}/review`;
     const placed = `${step}?factory=${factory}`;
     try {
-      await goto(page, step);
+      await goto(page, `${step}?factory=${PLAIN}`);
       await expectVisible(
         page.locator('[data-step-agent]', { hasText: 'Its file names no agent.' }),
-        'with no factory: its file names none',
+        `in ${PLAIN}, hiring nothing: its file names none`,
       );
-      await expectHref(page, `a[data-hired-in="${factory}"]`, placed, `${factory} hires into it, linked to this page in ${factory}`);
       await expectCount(page.locator('[data-hired]'), 0, 'and nothing is marked hired');
       await settled(page);
       await photograph(page, path.join(OUT, `step-told-file-${theme}.png`));
 
-      await page.locator(`a[data-hired-in="${factory}"]`).click();
-      await page.waitForURL((url) => url.searchParams.get('factory') === factory);
-      await idle(page);
+      await goto(page, placed);
       await expectVisible(page.locator(`[data-hired="${factory}"]`, { hasText: `hired by ${factory}` }), 'the hire, marked hired');
       const told = page.locator('details[data-will-be-told]');
       await expectVisible(told.locator('summary', { hasText: 'What it will be told' }), 'what it will be told, drawn open');
       await expectVisible(told.locator('[data-read-now]'), 'read now, and frozen when a run starts');
-      await expectHref(page, '[data-home="instructions"] a', `/agents/repo/${REVIEWER}`, "the agent's instructions live on its page");
-      await expectHref(page, '[data-home="custom"] a', `/agents/repo/${REVIEWER}#custom-instructions`, 'your custom instructions too');
+      await expectHref(
+        page,
+        '[data-home="instructions"] a',
+        `/agents/repo/${REVIEWER}?factory=${factory}`,
+        "the agent's instructions live on its page, in the factory",
+      );
+      await expectHref(
+        page,
+        '[data-home="custom"] a',
+        `/agents/repo/${REVIEWER}?factory=${factory}#custom-instructions`,
+        'your custom instructions too',
+      );
       const rules = told.locator('[data-layer="factory"]');
       await expectVisible(
         rules.getByRole('heading', { name: "4. The factory's rules", exact: true }),
@@ -208,7 +221,7 @@ export default {
         'whose way back to its workflow keeps the place',
       );
       await untold(page, placed, factory);
-      await goto(page, step);
+      await goto(page, '/workflows');
     } finally {
       takeBack();
     }

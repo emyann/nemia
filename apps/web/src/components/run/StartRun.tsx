@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { repositoryQuery, startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
+import { startRun, type Place, type Started, type WorkflowListing } from '../../lib/api/workflows.ts';
 import { runsQuery } from '../../lib/api/runs.ts';
 import { judged, type RunView } from '../../lib/api/judged.ts';
 import { startCard } from '../../lib/api/inbox.ts';
@@ -146,8 +146,9 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
 }
 
 /**
- * Where a start runs: in folders, for a team whose every step works in one, else on `repo` — this repository when none is given — and in
- * `factory` when one is named; from the workflow's folder; and, for a card, that it stays in the inbox, listed as started.
+ * Where a start runs: in folders, for a team whose every step works in one, else on `repo` — the repository of a factory that attaches the
+ * workflow when none is given, the default factory working on none — and in `factory` when one is named; from the workflow's folder; and,
+ * for a card, that it stays in the inbox, listed as started.
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
   return (
@@ -155,7 +156,7 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
       {workflow.folderTeam ? (
         'Works in folders it makes for each step'
       ) : (
-        <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>
+        <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'the repository of a factory that attaches it'}</>
       )}
       {factory && (
         <>
@@ -170,20 +171,17 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
 }
 
 /**
- * The runs a new run waits on (the CLI's `start --after`): every run on the repository a start runs in, in flight and finished, newest
- * first, each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which
- * runs it may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when
- * it is not the api's own: the one a card's factory wires for its workflow. The runs are read as the page opens, not on the list's beat:
- * a run started since is listed on the next visit. A title wraps within its row, read whole, and no row runs past the card it is in,
- * however long the title.
+ * The runs a new run waits on (the CLI's `start --after`): every run on `repo`, the repository a start runs in, in flight and finished,
+ * newest first, each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out —
+ * which runs it may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is the one a
+ * factory wires for the workflow; with none, the default factory working on no repository, no run is listed and nothing is asked of the
+ * api, and the form says why. The runs are read as the page opens, not on the list's beat: a run started since is listed on the next
+ * visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
  */
 function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]; onChange: (after: string[]) => void; repo?: string }) {
-  const repository = useQuery(repositoryQuery);
   const runs = useQuery({ ...runsQuery, refetchInterval: false });
   const legend = useId();
-  const error = repository.error ?? runs.error;
-  const where = repo ?? repository.data?.repo;
-  const onRepo = where && runs.data ? newestFirst(runs.data.filter(judged).filter((run) => run.repo === where)) : null;
+  const onRepo = repo && runs.data ? newestFirst(runs.data.filter(judged).filter((run) => run.repo === repo)) : null;
 
   return (
     <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
@@ -193,8 +191,12 @@ function AfterPicker({ selected, onChange, repo }: { selected: readonly string[]
       <p className="text-body-small text-muted-foreground">
         Waits until it lands: nothing of it is filed until each has landed, and it is handed what each concluded.
       </p>
-      {error ? (
-        <p className="text-body-small text-failure">Could not list the runs to wait on: {error.message}</p>
+      {!repo ? (
+        <p data-no-repo className="text-body-small text-muted-foreground">
+          No repository to wait on a run of: a start in no factory works on none. Open the workflow in the factory that attaches it.
+        </p>
+      ) : runs.error ? (
+        <p className="text-body-small text-failure">Could not list the runs to wait on: {runs.error.message}</p>
       ) : !onRepo ? (
         <p className="text-body-small text-muted-foreground">Reading the runs…</p>
       ) : !onRepo.length ? (

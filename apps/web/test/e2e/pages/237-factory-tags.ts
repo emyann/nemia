@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { FACTORIES, FOLDER, QUEUED_IN, WORKFLOWS } from '../seed.ts';
+import { AGENTS, checkoutIn, FACTORIES, FOLDER, QUEUED_IN, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -18,9 +18,10 @@ async function open(page: Page, route: string): Promise<void> {
 
 export default {
   /**
-   * Each item says which factory it is in. On Workflows, `dev` is tagged with the factory that attaches it on the checkout, linked to its
-   * floor, and not with `broken`, whose file does not read, and the factory picked in the address keeps it alone, or none and says so; on
-   * Agents, the agent that factory hires is tagged with it. On Runs, FOLDER's row says its factory and every other run `default`; the
+   * Each item says which factory it is in. On Workflows, yours `mine`, which FACTORIES' `hiring` is made to attach beside the checkout's
+   * `dev`, is tagged with it, linked to its floor, and not with `broken`, whose file does not read, and the factory picked in the address
+   * keeps its two, or none and says so; the default factory lists no repository's. On Agents, your agent is tagged with no factory until
+   * that factory is made to hire it, then with it. On Runs, FOLDER's row says its factory and every other run `default`; the
    * factory picked in the address keeps its runs alone, counted by the api, and each part says when it keeps none. On the
    * Inbox, a card filed in the factory is tagged with it, linked, every other card says it has no factory yet and wears no tag, and
    * `default` picked leaves the tagged one out. The card is taken back.
@@ -71,44 +72,54 @@ export default {
       "with no link of its own back: the sidebar's picker does that",
     );
 
-    await open(page, '/workflows');
-    const dev = page.locator(`section[aria-label="Workflow ${WORKFLOWS.good.name}"]`);
-    await expectTexts(
-      dev.locator('[data-factory-tag]'),
-      [factory],
-      `${WORKFLOWS.good.name} is tagged with the factory that attaches it on the checkout, not with ${FACTORIES.broken}, whose file does not read`,
-    );
-    await expectVisible(dev.locator(`a[data-factory-tag="${factory}"][href="/factories/${factory}"]`), 'its tag linked to the floor');
-    await expectCount(page.locator('[data-factory-tag="default"]'), 0, 'and no workflow is tagged with the default factory');
-    await shoot('workflows');
-    const cards = page.locator('section[aria-label^="Workflow "]');
-    const every = await cards.count();
-    await open(page, `/workflows?factory=${factory}`);
-    await expectCount(cards, 1, `with ${factory} picked, Workflows keeps the one it offers`);
-    await expectVisible(dev, `and it is ${WORKFLOWS.good.name}`);
-    await open(page, '/workflows?factory=default');
-    await expectCount(cards, every, 'with the default factory picked, every workflow, which it offers');
-    await open(page, `/workflows?factory=${empty}`);
-    await expectCount(cards, 0, `with ${empty} picked, which offers none, Workflows lists none`);
-    await expectVisible(page.locator('[data-filtered-out]', { hasText: `No workflow is in the factory ${empty}.` }), 'and says so');
-    await page.locator('[data-filtered-out]').getByRole('link', { name: "Show every factory's" }).click();
-    await page.waitForURL((url) => url.pathname === '/workflows' && !url.searchParams.has('factory'));
-    await expectCount(cards, every, 'which shows every workflow again');
+    const { good, yours } = WORKFLOWS;
+    const brokenFile = path.join(store!, 'factories', `${FACTORIES.broken}.json`);
+    const brokenText = fs.readFileSync(brokenFile, 'utf8');
+    const offered = checkoutIn(store!, [good.name, yours.name]);
+    fs.writeFileSync(brokenFile, JSON.stringify({ workflows: [good.name, yours.name] }, null, 2));
+    try {
+      await open(page, '/workflows');
+      const mine = page.locator(`section[aria-label="Workflow ${yours.name}"]`);
+      await expectTexts(
+        mine.locator('[data-factory-tag]'),
+        [factory],
+        `${yours.name} is tagged with the factory that attaches it, not with ${FACTORIES.broken}, whose file does not read`,
+      );
+      await expectVisible(mine.locator(`a[data-factory-tag="${factory}"][href="/factories/${factory}"]`), 'its tag linked to the floor');
+      await expectCount(page.locator('[data-factory-tag="default"]'), 0, 'and no workflow is tagged with the default factory');
+      await shoot('workflows');
+      const cards = page.locator('section[aria-label^="Workflow "]');
+      const every = await cards.count();
+      await open(page, `/workflows?factory=${factory}`);
+      await expectCount(cards, 2, `with ${factory} picked, Workflows keeps the two it offers`);
+      await expectVisible(page.locator(`section[aria-label="Workflow ${good.name}"]`), `the checkout's ${good.name}`);
+      await expectVisible(mine, `and ${yours.name}`);
+      await open(page, '/workflows?factory=default');
+      await expectCount(cards, every, 'with the default factory picked, every workflow, which it offers');
+      await open(page, `/workflows?factory=${empty}`);
+      await expectCount(cards, 0, `with ${empty} picked, which offers none, Workflows lists none`);
+      await expectVisible(page.locator('[data-filtered-out]', { hasText: `No workflow is in the factory ${empty}.` }), 'and says so');
+      await page.locator('[data-filtered-out]').getByRole('link', { name: "Show every factory's" }).click();
+      await page.waitForURL((url) => url.pathname === '/workflows' && !url.searchParams.has('factory'));
+      await expectCount(cards, every, 'which shows every workflow again');
+    } finally {
+      offered();
+      fs.writeFileSync(brokenFile, brokenText);
+    }
 
+    const scribe = page.locator(`section[data-agent="${AGENTS.seeded.name}"][data-from="yours"]`);
     await open(page, '/agents');
-    const hired = page.locator(`section[data-agent="${WORKFLOWS.good.agent.name}"][data-from="repo"]`);
-    await expectTexts(
-      hired.locator('[data-factory-tag]'),
-      [factory],
-      `${WORKFLOWS.good.agent.name}, hired by ${factory}, is tagged with it`,
-    );
-    await expectVisible(hired.locator(`a[href="/factories/${factory}"]`), 'linked to its floor');
-    await expectCount(
-      page.locator('section[data-agent][data-from="yours"] [data-factory-tag]'),
-      0,
-      'and your agent, hired nowhere, with none',
-    );
-    await shoot('agents');
+    await expectVisible(scribe, `${AGENTS.seeded.name}, yours, is listed`);
+    await expectCount(scribe.locator('[data-factory-tag]'), 0, 'and, hired nowhere, with no tag');
+    const hiring = checkoutIn(store!, [good.name], { [`${good.name}/review`]: AGENTS.seeded.name });
+    try {
+      await open(page, '/agents');
+      await expectTexts(scribe.locator('[data-factory-tag]'), [factory], `${AGENTS.seeded.name}, hired by ${factory}, is tagged with it`);
+      await expectVisible(scribe.locator(`a[href="/factories/${factory}"]`), 'linked to its floor');
+      await shoot('agents');
+    } finally {
+      hiring();
+    }
 
     const cardFile = path.join(store!, 'inbox', `${CARD}.md`);
     try {

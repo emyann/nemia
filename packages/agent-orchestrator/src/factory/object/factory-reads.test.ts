@@ -84,18 +84,18 @@ const counted = async <A>(program: Program<A>) => {
 test('the factories, one factory, its commands, hires and servers read no run record, however many the store holds', async () => {
   placed();
   const reads: Array<[string, Program<unknown>]> = [
-    ['factoryList', factoryList(ROOT, repo, {})],
-    ['factoryObject', factoryObject(ROOT, repo, 'mill')],
-    ['factoryCommandsOf', factoryCommandsOf(ROOT, repo, 'mill')],
-    ['hireList', hireList(ROOT, repo, 'mill', {})],
-    ['mcpServerList', mcpServerList(ROOT, repo, 'mill', {})],
+    ['factoryList', factoryList(ROOT, {})],
+    ['factoryObject', factoryObject(ROOT, 'mill')],
+    ['factoryCommandsOf', factoryCommandsOf(ROOT, 'mill')],
+    ['hireList', hireList(ROOT, 'mill', {})],
+    ['mcpServerList', mcpServerList(ROOT, 'mill', {})],
   ];
   for (const [name, program] of reads) assert.equal((await counted(program)).records, 0, `${name} reads no run's record`);
 });
 
 test("a factory's commands take back each schedule its file holds, by workflow; the default factory's and a stray file's none", async () => {
   placed();
-  const of = async (name: string) => Object.keys((await counted(factoryCommandsOf(ROOT, repo, name))).value.unschedule);
+  const of = async (name: string) => Object.keys((await counted(factoryCommandsOf(ROOT, name))).value.unschedule);
   assert.deepEqual(await of('mill'), ['janitor', 'nightly'], "the factory's scheduled workflows, by name");
   assert.deepEqual(await of('default'), [], 'the default factory schedules nothing');
   assert.deepEqual(await of('stray'), [], 'a file that does not read schedules nothing');
@@ -104,7 +104,7 @@ test("a factory's commands take back each schedule its file holds, by workflow; 
 test("a warm read of the schedules reads no finished run's record, answers a cold read's own, and sees a run fired since", async () => {
   placed();
   const memo = recordMemo() as ScheduleRuns;
-  const listed = (kept: ScheduleRuns | undefined) => scheduleList(ROOT, repo, 'mill', {}, kept);
+  const listed = (kept: ScheduleRuns | undefined) => scheduleList(ROOT, 'mill', {}, kept);
   const last = (list: { items: ReadonlyArray<{ metadata: { name: string }; status: { last?: { run: string } } }> }) =>
     list.items.find((s) => s.metadata.name === 'janitor')?.status.last?.run;
 

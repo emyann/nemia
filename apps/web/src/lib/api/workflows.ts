@@ -8,7 +8,6 @@ import { Option, Schema } from 'effect';
 import {
   DEFAULT_NAMESPACE,
   DEFINITION_ORIGINS,
-  RepositoryAnswer,
   type DefinitionOrigin,
   type Workflow,
   type WorkflowStep,
@@ -16,7 +15,7 @@ import {
 } from 'objects';
 import type { GraphEdge, RunGraph } from './graph.ts';
 import type { StepLayers } from './layers.ts';
-import { call, read, runs, workflows as served, type Refuse } from './objects.ts';
+import { runs, workflows as served, type Refuse } from './objects.ts';
 import { namespaceOf } from './namespace.ts';
 import { sourceOf, type SchemaFile, StepKeySchema, WorkflowStepSpecSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
 
@@ -218,12 +217,6 @@ export const workflowNameOf = (workflowDir: string): string =>
     .replace(/[\\/]+$/, '')
     .split(/[\\/]/)
     .at(-1) || workflowDir;
-
-/** The repository a start runs in, as the api resolved it: what the start form lists the runs of. Read once a visit. */
-export const repositoryQuery = queryOptions({
-  queryKey: ['repository'],
-  queryFn: () => call((c) => c.server.repository({ query: {} }), read(RepositoryAnswer)),
-});
 
 /** What a start answers: the new run. An inbox card started stays in the inbox, listed as `started`. */
 export type Started = { id: string };

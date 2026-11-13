@@ -16,7 +16,7 @@ import { wire } from '../wiring/wire.verb.ts';
 import { unscheduledRefusal } from '../factory.ts';
 import { Missing } from '../../refusal/refusal.ts';
 import type { Schedule } from '../factory.ts';
-import { repoFor, startRun } from '../../start/start.verb.ts';
+import { startRun, wiredRepoFor } from '../../start/start.verb.ts';
 import { putScheduleTry } from './schedule.store.ts';
 import type { ScheduleStarted, ScheduleTry } from './schedule.ts';
 
@@ -29,16 +29,24 @@ const oneLine = (err: unknown): string =>
     .join(' / ');
 
 /**
- * The start of the schedule read `r` for its fire `due`, as a person's `nemia start --factory` is: its repository and folder first, the
- * factory's tree before the repository's `workflows/` when it is made from a template.
+ * The start of the schedule read `r` for its fire `due`, as a person's `nemia start --factory` is: on the repository the factory's wiring
+ * names for its workflow, else its only one (`wiredRepoFor`), whatever retired `repo` an old schedule names; its folder the factory's
+ * tree's before the repository's `workflows/` when it is made from a template. Refused, `Invalid`, naming the attach, where the wiring
+ * places the workflow on none of its repositories, and `Missing` where the factory is no longer filed.
  */
-const started = (home: string, r: Read, due: string, daemonRepo: string) =>
+const started = (home: string, r: Read, due: string) =>
   Effect.suspend(() => {
-    const repo = repoFor(home, r.factory.name, r.schedule.repo, daemonRepo);
+    const repo = wiredRepoFor(home, r.factory.name, r.workflow);
+    if (repo === undefined)
+      return Effect.fail(
+        new Missing({
+          message: `The factory ${r.factory.name} is no longer filed, so its schedule of ${r.workflow} starts nothing: see the factories with nemia factory ls. Nothing was started.`,
+        }),
+      );
     return startRun({
       brief: r.schedule.brief,
       repo,
-      repoNamed: r.schedule.repo !== undefined,
+      repoNamed: false,
       workflowDir: workflowFolder(r.workflow, path.join(r.factory.tree ?? repo, 'workflows'), repo, r.factory.tree),
       factory: r.factory.name,
       scheduled: { factory: r.factory.name, workflow: r.workflow, due },
@@ -47,17 +55,17 @@ const started = (home: string, r: Read, due: string, daemonRepo: string) =>
 
 /**
  * The tick's scheduled start: the first schedule due (`scheduleDue`), factories by name, then workflows by name, started through `startRun`
- * on the schedule's repository, else the factory's one, else `repo`, the daemon's; one a pass, none when none is due. Its try is kept for
- * its fire (`putScheduleTry`): a start, so a removed run does not bring its fire back; a refusal (exit 2), not tried again until the next
+ * on the repository the factory's wiring names for the workflow (`started`); one a pass, none when none is due. Its try is kept for its
+ * fire (`putScheduleTry`): a start, so a removed run does not bring its fire back; a refusal (exit 2), not tried again until the next
  * fire; a failure, tried again on the next pass and said as `again` while it reads the same. A try that cannot be written is said all the
  * same.
  */
-export const startDue = Effect.fn('startDue')(function* (repo: string, runs: readonly Run[], now: number = Date.now()) {
+export const startDue = Effect.fn('startDue')(function* (runs: readonly Run[], now: number = Date.now()) {
   const home = yield* StoreRoot;
   const due = schedulesRead(home, runs, now).find(isDue);
   if (!due) return undefined;
   const at = { factory: due.factory.name, workflow: due.workflow, due: new Date(due.fires.latest).toISOString() };
-  const exit = yield* Effect.exit(started(home, due, at.due, repo));
+  const exit = yield* Effect.exit(started(home, due, at.due));
   const keep = (tried: ScheduleTry): void => {
     try {
       putScheduleTry(home, at.factory, at.workflow, tried);

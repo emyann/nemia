@@ -143,7 +143,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     async (sub) => {
       await resolvedBy(sub, 'acme', LINE, '--theirs');
       const proposal = readResolutions(ROOT, 'acme')?.proposals?.['Factory/acme'] ?? '';
-      await stage.runWith(stage.board().e, approveProgram(PERSON, 'acme', proposal, { home: ROOT, repo: ROOT }));
+      await stage.runWith(stage.board().e, approveProgram(PERSON, 'acme', proposal, { home: ROOT }));
       const status = reconciled(factory('acme'));
       assert.deepEqual(
         status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => [c.status, c.reason]),

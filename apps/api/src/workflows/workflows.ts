@@ -248,7 +248,7 @@ export type InRequest = <A, E>(program: Effect.Effect<A, E, StoreRoot>) => Promi
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
  * repository's `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so
- * the board shows a folder as a start would read it. With no repository (an install, no factory named), yours alone.
+ * the board shows a folder as a start would read it. With no repository (the default factory with no `?repo=`), yours alone.
  */
 export const placesOf = (repo: string | undefined, home: string): Places => (repo === undefined ? { home } : { repo, home });
 

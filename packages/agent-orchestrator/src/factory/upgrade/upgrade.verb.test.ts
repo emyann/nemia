@@ -390,7 +390,7 @@ test("a factory's rules carried by an upgrade: taken where the tree has none, a 
       const recorded = reconciled(templated('both'));
       assert.equal(recorded.version, '0.1.0', 'the merge waits on the proposal');
       assert.deepEqual(recorded.upgrade?.conflicts[0]?.proposal, { name: proposal, phase: 'waiting' }, 'the status names it');
-      await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT, repo: ROOT }));
+      await runWith(noEngine(), approveProgram(PERSON, 'both', proposal, { home: ROOT }));
       const merged = reconciled(templated('both'));
       assert.equal(merged.version, '0.2.0');
       assert.equal(merged.upgrade, undefined);
@@ -558,7 +558,7 @@ test('a parameter set again at the version applied: previewed, filed with its pl
         proposals: { 'Workflow/dev': proposal },
       });
       assert.equal(reconciled(templated('clash')).conditions[0].reason, 'UpgradePending', 'the workflow waits on its proposal');
-      await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT, repo: ROOT }));
+      await runWith(noEngine(), approveProgram(PERSON, 'clash', proposal, { home: ROOT }));
       assert.equal(reconciled(templated('clash')).conditions[0].reason, 'Upgraded');
       assert.match(textIn(treeDir(ROOT, 'clash'), REVIEW), /^budget: 9$/m);
       rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 9', 'budget: 6');

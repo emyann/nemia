@@ -209,7 +209,7 @@ export const everyPage = <P extends Paged, E>(ask: (page: PageAsked) => Effect.E
   });
 
 /**
- * The factories the api lists (`FactoryList`, `GET /api/factories`), every page, the default first on its own repository, for the read
+ * The factories the api lists (`FactoryList`, `GET /api/factories`), every page, the default first, on no repository, for the read
  * `verb`.
  */
 export const factoriesListed = (verb: string, env: NodeJS.ProcessEnv = process.env) =>

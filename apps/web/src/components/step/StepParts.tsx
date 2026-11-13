@@ -75,7 +75,8 @@ export function StepAgent({ page, place = {} }: { page: WorkflowStepPage; place?
 }
 
 /**
- * Where each layer of the step lives, for `Told`: the agent's file, on its page; your custom instructions, on the agent's page too; the
+ * Where each layer of the step lives, for `Told`: the agent's file, on its page; your custom instructions, on the agent's page too, a
+ * a repository's agent's read in `place`; the
  * factory's rules, on the Settings of the factory the page is read in, null where it is read in none; the step's own file, edited in its
  * workflow's builder for one of yours and named by its path for the repository's; and each skill's page, where the api found it, or
  * for one with no page that the repository has, a skill named with its folder, its name as written and that it is the repository's.
@@ -97,6 +98,7 @@ function homesOf(page: WorkflowStepPage, place: PagePlace): LayerHomes {
         <RouteLink
           to="/agents/$from/$agent"
           params={{ from: page.from, agent }}
+          search={page.from === 'repo' ? place : {}}
           hash="custom-instructions"
           data-home-link="custom"
           className={cn('font-mono', LINK)}

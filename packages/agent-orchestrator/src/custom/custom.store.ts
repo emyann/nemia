@@ -19,16 +19,18 @@ export const isStoreAgent = (name: string): boolean => name === STORE_AGENT;
 
 /**
  * Refuse, as `Missing`, an agent `name` a run on `repo` could not name: none of the repository's places for agents has it, nor yours in the
- * store `home` (`agentsFor`), and it is not the store's own agent (`STORE_AGENT`). The refusal lists the names there are. A name whose
- * file does not read is one all the same.
+ * store `home` (`agentsFor`), and it is not the store's own agent (`STORE_AGENT`); with no repository, none of yours and the builtins. The
+ * refusal lists the names there are. A name whose file does not read is one all the same.
  */
-function refuseNoAgent(home: string, name: string, repo: string): void {
+function refuseNoAgent(home: string, name: string, repo: string | undefined): void {
   if (isStoreAgent(name)) return;
-  const at = path.resolve(repo);
-  const names = [...agentsFor(path.join(at, 'workflows', '_'), { repo: at, home }).keys()].sort();
+  const at = repo === undefined ? undefined : path.resolve(repo);
+  const dir = path.join(at ?? home, 'workflows', '_');
+  const names = [...agentsFor(dir, at === undefined ? { home } : { repo: at, home }).keys()].sort();
   if (names.includes(name)) return;
+  const where = at === undefined ? 'in yours' : `where a run on ${at} looks for one, nor in yours`;
   throw new Missing({
-    message: `no agent named ${name} where a run on ${at} looks for one, nor in yours (${path.join(home, 'workflows', 'agents')}). ${names.length ? `The agents there: ${names.join(', ')}.` : 'There are none.'} Name one of them, or the repository it is in.`,
+    message: `no agent named ${name} ${where} (${path.join(home, 'workflows', 'agents')}). ${names.length ? `The agents there: ${names.join(', ')}.` : 'There are none.'} Name one of them, or the repository it is in.`,
   });
 }
 
@@ -36,7 +38,7 @@ function refuseNoAgent(home: string, name: string, repo: string): void {
  * The custom instructions for the agent `name` in the store `home`, as `readCustomInstructions` reads them, for a person's command and the
  * board alike. Refused, reading nothing: a name a run on `repo` could not name (`Missing`).
  */
-export function customInstructionsFor(home: string, name: string, repo: string): string | undefined {
+export function customInstructionsFor(home: string, name: string, repo: string | undefined): string | undefined {
   refuseNoAgent(home, name, repo);
   return readCustomInstructions(home, name);
 }
@@ -46,7 +48,7 @@ export function customInstructionsFor(home: string, name: string, repo: string):
  * a run on `repo` could not name (`Missing`), blank text, a frontmatter block (`customInstructionsRefusal`), and anything at the file
  * that is neither a file nor a link (`notAFileRefusal`), which the read refuses too. A link at the file is replaced, never written through.
  */
-export function writeCustomInstructions(home: string, name: string, text: string, repo: string): string {
+export function writeCustomInstructions(home: string, name: string, text: string, repo: string | undefined): string {
   refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!text.trim())
@@ -67,7 +69,7 @@ export function writeCustomInstructions(home: string, name: string, text: string
  * Remove the custom instructions for the agent `name` from the store `home`: whether there were any. Refused, removing nothing, for a name
  * a run on `repo` could not name (`Missing`).
  */
-export function clearCustomInstructions(home: string, name: string, repo: string): boolean {
+export function clearCustomInstructions(home: string, name: string, repo: string | undefined): boolean {
   refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;

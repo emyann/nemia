@@ -3503,7 +3503,8 @@ stateDiagram-v2
 ### Schedules: `nemia factory schedule` and `nemia factory unschedule`
 
 A factory can start a workflow it has attached on its own, at each fire of a cron. The schedule sits on the attachment, in the factory's
-file, since a run needs a factory and a repository and only the attachment knows both:
+file, since a run needs a factory and a repository and only the attachment knows both: its run works on the repository the factory's
+wiring names for the workflow (`nemia factory attach <factory> <workflow> --repo <name>`), else the factory's only one, as a card's does:
 
 ```bash
 nemia factory schedule nemia janitor --cron "0 9 * * 1" --brief "Read the stats" --tz America/Montreal
@@ -3516,7 +3517,10 @@ nemia factory unschedule nemia janitor
 
 - **The words are cron**, five or six fields, read by Effect's `Cron` in `--tz` (an IANA zone; the machine's without it). A cron or a
   zone it does not read is refused with its reason (`Invalid`), and so are a workflow the factory has not attached, naming the attach, an
-  empty `--brief`, and a factory of two or more repositories given no `--repo`. A second schedule of the workflow replaces the first.
+  empty `--brief`, and a workflow the wiring places on none of a factory of two or more repositories, naming the attach that places it
+  (`scheduleRepoRefusal`). A schedule's `repo` is retired, as a card's `repo:` was: a write that sets one, or changes an old schedule's
+  (`--repo`, or the Schedule's `spec.repo`), is refused naming the same attach, and nothing is scheduled; an old schedule's still reads,
+  is sent back as it is, and is ignored. A second schedule of the workflow replaces the first.
   `since` is stamped when it is written, so a new schedule starts nothing before its next fire.
 - **The daemon starts it, at every level**, Manual included, Nemia off: a schedule is the tick's machinery, never an agent's. A pass that
   started no queued card, with a run slot free and the store not paused, starts the first schedule due (factories by name, then workflows),

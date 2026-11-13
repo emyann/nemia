@@ -203,6 +203,7 @@ export const apiEnvOf = (root: string, bin: string): NodeJS.ProcessEnv => ({
   WF_ROOT: root,
   /** The e2e's starts are made in its scratch checkout, which no factory of its store holds: they go to the default factory. */
   WF_DEFAULT_FACTORY_STARTS: '1',
+  /** The folder the api's tick works in; a request is placed by its factory alone, the checkout read through FACTORIES' `hiring`. */
   HKB_REPO: path.join(root, 'checkout'),
   CLAUDE_CONFIG_DIR: path.join(root, 'claude'),
   /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */

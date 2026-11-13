@@ -70,8 +70,8 @@ export type AgentLayer = {
   };
   readonly custom: {
     readonly read: (name: string, repo?: string) => string | undefined;
-    readonly write: (name: string, text: string, repo: string) => string;
-    readonly clear: (name: string, repo: string) => boolean;
+    readonly write: (name: string, text: string, repo?: string) => string;
+    readonly clear: (name: string, repo?: string) => boolean;
   };
 };
 

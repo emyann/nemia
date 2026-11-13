@@ -51,14 +51,8 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
   });
 
 /** The volumes of the factory `namespace`, read now; none for the default factory; `Missing` where no factory has the name. */
-const volumesNow = Effect.fn('volumesNow')(function* (
-  e: Engine,
-  how: SummaryHow,
-  repo: string | undefined,
-  namespace: string,
-  isDirectory: (at: string) => boolean,
-) {
-  const { factory, listing } = yield* factoryFiled(how.home, repo, namespace);
+const volumesNow = Effect.fn('volumesNow')(function* (e: Engine, how: SummaryHow, namespace: string, isDirectory: (at: string) => boolean) {
+  const { factory, listing } = yield* factoryFiled(how.home, namespace);
   if (listing === undefined || 'error' in listing) return [];
   const runs = yield* mountingRuns(e, how);
   return volumesOf(listing, factory.metadata.creationTimestamp, { home: how.home, isDirectory, runs });
@@ -68,12 +62,11 @@ const volumesNow = Effect.fn('volumesNow')(function* (
 export const volumeList = Effect.fn('volumeList')(function* (
   e: Engine,
   how: SummaryHow,
-  repo: string | undefined,
   namespace: string,
   query: ObjectQuery,
   isDirectory: (at: string) => boolean = onDisk,
 ) {
-  const listed: VolumeList = yield* objectsListed('Volume', yield* volumesNow(e, how, repo, namespace, isDirectory), query, 'volume');
+  const listed: VolumeList = yield* objectsListed('Volume', yield* volumesNow(e, how, namespace, isDirectory), query, 'volume');
   return listed;
 });
 
@@ -81,12 +74,11 @@ export const volumeList = Effect.fn('volumeList')(function* (
 export const volumeObject = Effect.fn('volumeObject')(function* (
   e: Engine,
   how: SummaryHow,
-  repo: string | undefined,
   namespace: string,
   name: string,
   isDirectory: (at: string) => boolean = onDisk,
 ) {
-  const found = (yield* volumesNow(e, how, repo, namespace, isDirectory)).find((v) => v.metadata.name === name);
+  const found = (yield* volumesNow(e, how, namespace, isDirectory)).find((v) => v.metadata.name === name);
   if (found === undefined)
     return yield* Effect.fail<Missing | Invalid>(
       new Missing({

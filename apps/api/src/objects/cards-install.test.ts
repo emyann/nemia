@@ -3,8 +3,9 @@
  * repository of its own (`Running` of `kind: 'install'`, `HKB_REPO` unset): a card is placed by what it says, never refused for the api's
  * missing repository. A card names its factory and its workflow, never a repository: one in a factory of one repository is filed there
  * and listed, labelled and queued; one that names no factory is filed with none, as `nemia inbox add` in process files it, its workflow
- * by name with no repository looked at. A `repo` sent is refused, and so is a `?repo=` on a card's start: the factory places the run, by
- * the repository its wiring names (`PUT …/workflows/<workflow>` with `{ repo }`), which an attach sent with no body leaves as it was.
+ * by name with no repository looked at, and its start with no factory named is refused, naming `?factory=`. A `repo` sent is refused, and
+ * so is a `?repo=` on a card's start: the factory places the run, by the repository its wiring names (`PUT …/workflows/<workflow>` with
+ * `{ repo }`), which an attach sent with no body leaves as it was.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -85,6 +86,22 @@ test('on an install, a card is placed by its factory, or filed with no repositor
     assert.equal(res.status, 201, JSON.stringify(card));
     assert.equal(card.spec.workflow, 'dev');
   });
+
+  await s.test(
+    'REFUSED: a card in no factory, started in default with no ?factory=, is 422 naming ?factory= and factory:, no run started',
+    async () => {
+      const listed = (await (await app.request('/api/namespaces/default/cards')).json()) as CardList;
+      const loose = listed.items.find((c) => c.spec.workflow === 'dev');
+      assert.ok(loose, 'the card in no factory naming dev');
+      const runs = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : []);
+      const before = runs();
+      const res = await send(`/api/namespaces/default/cards/${loose.metadata.name}/start`, 'POST', {});
+      const answer = (await res.json()) as { error: string };
+      assert.equal(res.status, 422, JSON.stringify(answer));
+      assert.ok(answer.error.includes('?factory=<name>') && answer.error.includes('factory:'), answer.error);
+      assert.deepEqual(runs(), before, 'no run is started on any folder');
+    },
+  );
 
   await s.test('REFUSED: a card sent with a repo is 422, the repo being retired, nothing filed', async () => {
     const before = fs.readdirSync(path.join(root, 'inbox')).length;

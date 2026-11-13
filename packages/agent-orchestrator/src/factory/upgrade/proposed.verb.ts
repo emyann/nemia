@@ -6,7 +6,6 @@
  * token refused is refused `Conflict`; the rest as `proposeProgram` refuses it, another factory's session among them (`Forbidden`). The
  * api's (`withResolutionProposerAs`) proposes the same by the request's caller.
  */
-import path from 'node:path';
 import { Effect } from 'effect';
 import type { ProposedObject } from 'objects';
 import { setting } from '../../config/config.store.ts';
@@ -41,7 +40,7 @@ const proposedBy =
 /** The object of `kind` named `name` of `factory` proposed as `spec`, or its removal, by the session's caller: the proposal's name. */
 export const resolutionProposed: ResolutionProposed = (factory, kind, name, spec, why) =>
   Effect.gen(function* () {
-    const place: ProposalPlace = { home: yield* StoreRoot, repo: path.resolve('.') };
+    const place: ProposalPlace = { home: yield* StoreRoot };
     const caller = yield* sessionCaller(yield* setting('sessionToken'));
     if (caller.kind === 'refused')
       return yield* Effect.fail(

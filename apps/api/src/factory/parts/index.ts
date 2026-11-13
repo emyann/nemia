@@ -5,6 +5,6 @@
  */
 export { hiresHandlers } from './hires.ts';
 export { builtinHandlers, mcpServersHandlers } from './mcp-servers.ts';
-export { defaultRepo, factoryNamed, queryOf } from './parts.ts';
+export { factoryNamed, queryOf } from './parts.ts';
 export { schedulesHandlers } from './schedules.ts';
 export { volumesHandlers } from './volumes.ts';

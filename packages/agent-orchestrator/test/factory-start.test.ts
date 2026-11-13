@@ -308,22 +308,36 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test(
-    '`nemia factory schedule` writes a schedule stamped with since, read back, written again whole; unschedule takes it',
+    'REFUSED: `nemia factory schedule` of a workflow the wiring places on neither repository, or naming one, each naming the attach',
     async () => {
-      const typed = ['factory', 'schedule', 'pipao', 'build', '--cron', '0 9 * * 1', '--brief', 'Read the stats', '--tz', 'UTC'];
-      await typedFrom(ROOT, [...typed, '--repo', a]);
-      const first = readFactoryAt(ROOT, 'pipao').schedules.build;
-      assert.deepEqual([first.brief, first.tz, first.repo], ['Read the stats', 'UTC', a]);
+      const f = path.basename(file, '.json');
+      const typed = ['factory', 'schedule', f, 'notes', '--cron', '0 9 * * 1', '--brief', 'Read the stats'];
+      const before = JSON.stringify(fileOf(f));
+      await refusedBy(() => typedFrom(ROOT, typed), 'Invalid', `nemia factory attach ${f} notes --repo`, path.basename(a));
+      await refusedBy(() => typedFrom(ROOT, [...typed, '--repo', a]), 'Invalid', `nemia factory attach ${f} notes --repo`);
+      assert.equal(JSON.stringify(fileOf(f)), before);
+    },
+  );
+
+  await s.test(
+    '`nemia factory schedule` of a wired workflow writes a schedule stamped with since and no repository, read back, written again whole',
+    async () => {
+      const f = path.basename(file, '.json');
+      await typedFrom(ROOT, ['factory', 'attach', f, 'notes', '--repo', path.basename(a)]);
+      const typed = ['factory', 'schedule', f, 'notes', '--cron', '0 9 * * 1', '--brief', 'Read the stats', '--tz', 'UTC'];
+      await typedFrom(ROOT, typed);
+      const first = readFactoryAt(ROOT, f).schedules.notes;
+      assert.deepEqual([first.brief, first.tz, first.repo], ['Read the stats', 'UTC', undefined]);
       const before = Date.now();
-      const again = setScheduleAt(ROOT, { factory: 'pipao', workflow: 'build', cron: '0 9 * * 1', brief: 'Read the stats', repo: a });
+      const again = setScheduleAt(ROOT, { factory: f, workflow: 'notes', cron: '0 9 * * 1', brief: 'Read the stats' });
       assert.deepEqual(again.replaced, first);
       assert.ok(Date.parse(again.schedule.since) >= before - 1000 && Date.parse(again.schedule.since) <= Date.now());
       assert.deepEqual(
-        readFactoryAt(ROOT, 'pipao').schedules,
-        { build: { cron: '0 9 * * 1', brief: 'Read the stats', repo: a, since: again.schedule.since } },
+        readFactoryAt(ROOT, f).schedules,
+        { notes: { cron: '0 9 * * 1', brief: 'Read the stats', since: again.schedule.since } },
         'a schedule written again is written whole: no zone',
       );
-      assert.deepEqual((fileOf('pipao') as { later: unknown }).later, { kept: true });
+      assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true });
     },
   );
 
@@ -336,7 +350,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       '         build/implement ← implementer',
       '         build/review ← reviewer',
     ]);
-    await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'build']);
+    await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'notes']);
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').schedules, {});
   });
 

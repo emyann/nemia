@@ -221,7 +221,7 @@ test('a switch onto another template: previewed with no common base, held to its
       const proposals = Object.values(resolutions.proposals ?? {}) as string[];
       assert.ok(proposals.length > 0, "a workflow's conflicts are resolved by its proposal");
       for (const name of proposals) {
-        const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'crew', name, { home: ROOT, repo: ROOT }));
+        const applied = await stage.runWith(stage.board().e, approveProgram(PERSON, 'crew', name, { home: ROOT }));
         assert.equal(applied.status.phase, 'applied');
       }
     },

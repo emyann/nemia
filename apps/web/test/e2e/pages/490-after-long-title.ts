@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectInside, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { DIAMOND, WORKFLOWS } from '../seed.ts';
+import { DIAMOND, FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -47,14 +47,16 @@ export default {
   /**
    * The start form's After list with a run on the repository whose title runs longer than a row, a path in it breaking nowhere: on a wide
    * screen and on a phone's, its row stays inside the workflow's page and the title wraps, read whole. The run is written beside the seed
-   * as a copy of the diamond's top and taken back after.
+   * as a copy of the diamond's top and taken back after. The checkout's `dev` starts in FACTORIES' `hiring`, the factory on the checkout,
+   * made able to (`hiringStarts`) and taken back after: the default factory works on no repository.
    */
   name: 'after-long-title',
-  route: `/workflows/repo/${WORKFLOWS.good.name}`,
+  route: `/workflows/repo/${WORKFLOWS.good.name}?factory=${FACTORIES.hiring.name}`,
   expect: async (page) => {
     const runs = path.join(store!, 'runs');
     const record = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.top.id}.json`), 'utf8')) as { brief: string };
     const file = path.join(runs, `${LONG.id}.json`);
+    const starts = hiringStarts(store!);
     try {
       fs.writeFileSync(file, JSON.stringify({ ...record, id: LONG.id, brief: `${LONG.title}\n\nA run the e2e waits on, by its title.` }));
       await page.reload({ waitUntil: 'load' });
@@ -65,6 +67,7 @@ export default {
     } finally {
       await page.setViewportSize(WIDE);
       fs.rmSync(file, { force: true });
+      starts();
     }
     await page.reload({ waitUntil: 'load' });
     await idle(page);

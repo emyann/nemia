@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
-import { AGENTS } from '../seed.ts';
+import { AGENTS, checkoutIn, FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { serveSeat } from '../served.ts';
 import { apiEnv, OUT, store } from '../world.ts';
@@ -108,35 +108,44 @@ function ranTo(id: string): void {
 
 export default {
   /**
-   * An agent of yours tried on a short brief, from its page. The repository's agent is not tried: its page says to copy it to yours, with
-   * the copy, and has no Try button. `scribe`'s Try panel says in one line that a try is a rehearsal fenced to its own folder, holds Try it
-   * until there is a brief, and starts the try: the store's hidden `tries/scribe` folder, written with the fence and a dollar, and a folder
-   * run of it. While the try moves the button is held, and the Factory and Runs tag it `try`. Ran — as the tick and the harness would leave
-   * it, said on the feed — the panel shows its state, what it spent of its dollar, the file it wrote and its run; that run's page tags it,
-   * links the agent, and removes it, asked twice. The try is told on a seat of its own, started once the store's harness is put in place
-   * (`harnessPlanted`), so its first sweep reads it installed. The page takes back the try's record, folders and journal, `tries/` and the
-   * harness, so each visit reads the store as seeded.
+   * An agent of yours tried on a short brief, from its page. The repository's agent is not tried: its page, read in FACTORIES' `hiring`,
+   * the factory on the checkout, made to offer `dev` and taken back after, says to copy it to yours, with the copy, and has no Try button.
+   * `scribe`'s Try panel says in one line that a try is a rehearsal fenced to its own folder, holds Try it until there is a brief, and
+   * starts the try: the store's hidden `tries/scribe` folder, written with the fence and a dollar, and a folder run of it. While the try
+   * moves the button is held, and the Factory and Runs tag it `try`. Ran — as the tick and the harness would leave it, said on the feed —
+   * the panel shows its state, what it spent of its dollar, the file it wrote and its run; that run's page tags it, links the agent, and
+   * removes it, asked twice. The try is told on a seat of its own, started once the store's harness is put in place (`harnessPlanted`), so
+   * its first sweep reads it installed. The page takes back the try's record, folders and journal, `tries/` and the harness, so each visit
+   * reads the store as seeded.
    */
   name: 'agent-try',
-  route: `/agents/repo/implementer`,
+  route: '/agents',
   expect: async (page) => {
     const { seeded } = AGENTS;
     const tries = path.join(store!, 'tries');
     if (fs.existsSync(tries)) throw new Refused(`the store has no tries/ before the page tries anything — ${tries} is there`);
 
-    const yours = page.locator('section[data-try-yours]');
-    await expectVisible(
-      yours.getByText('Copy it to yours to try it', { exact: false }),
-      "the repository's agent says to copy it to yours to try it",
-    );
-    const into = path.join(store!, 'workflows', 'agents');
-    const copy = new RegExp(`^mkdir -p '${escaped(into)}' && cp '[^']+/implementer\\.md'( '[^']+')? '${escaped(into)}/'$`);
-    await expectVisible(
-      yours.locator('code', { hasText: copy }),
-      `with the cp, as the api words it, that copies it into the store this api reads, ${into}, never a home the api may not read`,
-    );
-    await expectCount(page.getByRole('button', { name: 'Try it' }), 0, "the repository's agent has no Try button");
-    await photograph(yours, path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`));
+    const offered = checkoutIn(store!, [WORKFLOWS.good.name]);
+    try {
+      await goto(page, `/agents/repo/implementer?factory=${FACTORIES.hiring.name}`);
+
+      const yours = page.locator('section[data-try-yours]');
+      await expectVisible(
+        yours.getByText('Copy it to yours to try it', { exact: false }),
+        "the repository's agent says to copy it to yours to try it",
+      );
+      const into = path.join(store!, 'workflows', 'agents');
+      const copy = new RegExp(`^mkdir -p '${escaped(into)}' && cp '[^']+/implementer\\.md'( '[^']+')? '${escaped(into)}/'$`);
+      await expectVisible(
+        yours.locator('code', { hasText: copy }),
+        `with the cp, as the api words it, that copies it into the store this api reads, ${into}, never a home the api may not read`,
+      );
+      await expectCount(page.getByRole('button', { name: 'Try it' }), 0, "the repository's agent has no Try button");
+      await photograph(yours, path.join(OUT, `agent-try-yours-${await themeOf(page)}.png`));
+    } finally {
+      offered();
+    }
+    await goto(page, '/agents');
 
     let id: string | undefined;
     const own = page.url();

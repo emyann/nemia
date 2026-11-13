@@ -85,10 +85,11 @@ export type Capabilities = {
 export const HOME_REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /**
- * The repository the api serves of its own: `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — else, where the api
- * runs an install (`running`), the repository it was built from where that is a folder on disk, and its own checkout otherwise. None where
- * the install's `source` is no folder — an install unpacked from a published archive, whose source is the address it was downloaded from:
- * an address is never a folder, so it is never joined into one.
+ * The folder the daemon's pass ticks in (main.ts), and never a request's place: no route reads it, a request being placed by its factory
+ * alone (`placeFor`, factory/place.ts). `HKB_REPO` when set — how the tests and `npm run e2e` give it a fixture — else, where the api runs
+ * an install (`running`), the repository it was built from where that is a folder on disk, and its own checkout otherwise. None where the
+ * install's `source` is no folder — an install unpacked from a published archive, whose source is the address it was downloaded from: an
+ * address is never a folder, so it is never joined into one.
  */
 export const repoOf = (env: NodeJS.ProcessEnv, running?: Running): string | undefined => {
   const given = env.HKB_REPO?.trim();

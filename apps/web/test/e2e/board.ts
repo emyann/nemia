@@ -27,10 +27,16 @@ export const SECTIONS = ['Inbox', 'Runs', 'Workflows'] as const;
 /** The pages whose `?factory=` picks a factory; on any other page only the path of a factory's floor or settings does. */
 const LISTINGS = ['/inbox', '/runs', '/workflows', '/capabilities'];
 
-/** The factory `url` picks, as the board reads it: the name of a factory's floor or settings, else a listing's `?factory=`, else none. */
+/** A workflow's or a step's page, and a factory's own agent's or skill's, whose `?factory=` picks a factory as a listing's does. */
+const PICKING = /^\/workflows\/[^/]+\/[^/]+(?:\/[^/]+)?$|^\/agents\/(?:skills\/)?factory\/[^/]+$/;
+
+/**
+ * The factory `url` picks, as the board reads it (`pickedOf`, src/components/nav/nav.ts): the name of a factory's floor or settings, else
+ * the `?factory=` of a listing or of a page that picks (`PICKING`), else none.
+ */
 export const pickedIn = (url: URL): string | null =>
   /^\/factories\/([^/]+)(?:\/settings)?$/.exec(url.pathname)?.[1] ??
-  (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
+  (LISTINGS.includes(url.pathname) || PICKING.test(url.pathname) ? url.searchParams.get('factory') || null : null);
 
 /** The rail's destinations, in its order, one column from the top. */
 export const RAIL_PLACES = ['Overview', 'Runs', 'Inbox', 'Factories', 'Agents', 'Workflows', 'Stats', 'Nemia', 'Settings'];

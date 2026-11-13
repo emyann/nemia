@@ -17,7 +17,7 @@ nemia factory attach <factory> <workflow> [--repo <name>]
 nemia factory detach <factory> <workflow>
 nemia factory hire <factory> <agent> --step <workflow>/<step>
 nemia factory fire <factory> --step <workflow>/<step>
-nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--repo <path>] [--tz <zone>]
+nemia factory schedule <factory> <workflow> --cron <expr> --brief <text> [--tz <zone>]
 nemia factory unschedule <factory> <workflow>
 nemia factory servers <factory>
 nemia factory server add <factory> <server> --url <address> [--transport http|sse] [--header <name>=<value> ...] [--client-id <id>] [--callback-port <port>]

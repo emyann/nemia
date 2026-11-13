@@ -293,7 +293,7 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     .handle('lines', ({ params: { name } }) =>
       answered(async ({ repo, home }) => {
         const run = found(home, name);
-        return { ...runLines(run), workflowPage: repo === undefined ? null : workflowPageOf(run, repo, home) };
+        return { ...runLines(run), workflowPage: workflowPageOf(run, repo, home) };
       }),
     )
     .handle('concluded', ({ params: { name } }) => answered((s) => s.inRequest(CONCLUDED.handler({ runId: name }))))

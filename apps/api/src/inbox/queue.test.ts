@@ -42,10 +42,10 @@ import { Effect } from 'effect';
 
 const repo = scratch('nemia-api-queue-repo-');
 /**
- * The environment this file's api and programs read: the harness's store (`root`), this file's repository, and no `WF_MAX_RUNS`. A
- * test that means a setting sets it here, in its own scope: the api reads it on each request.
+ * The environment this file's api and programs read: the harness's store (`root`), and no `WF_MAX_RUNS`. A test that means a setting
+ * sets it here, in its own scope: the api reads it on each request.
  */
-const ENV: NodeJS.ProcessEnv = { ...process.env, WF_ROOT: root, WF_MAX_RUNS: undefined, HKB_REPO: repo };
+const ENV: NodeJS.ProcessEnv = { ...process.env, WF_ROOT: root, WF_MAX_RUNS: undefined };
 const { app } = appOf(liveOf(ENV));
 
 /** `program`, one of the package's inbox verbs, run on the harness's store (`root`) and its settings: its refusal thrown as itself. */

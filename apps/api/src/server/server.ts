@@ -11,7 +11,8 @@
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
  * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
- *   lists the runs of, for a run to wait on.
+ *   lists the runs of, for a run to wait on. A factory's repository: in the default factory, which reads none, it is refused, `Invalid`,
+ *   naming the `?factory=` that picks one (`repoNeeded`).
  * - `GET /api/store` — your store's folders, how a factory is filed in it and how Nemia is turned on (`yourStore`, workflows/yours.ts),
  *   under the request's store root.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds (`ceilingsOf`): what
@@ -80,7 +81,6 @@ import {
 import { DEFAULT_HARNESS } from 'agent-orchestrator/workflow';
 import { Api, type Event, type FeedWait, type Health } from 'objects';
 import { capabilitiesWithSteps, pageRead, unreadAnswer } from '../capabilities/index.ts';
-import { repoOf } from '../capabilities/capabilities.ts';
 import { repoNeeded } from '../factory/place.ts';
 import { ceilingsOf, feedOpened, metricsOf, readDaemon } from '../gauges/index.ts';
 import { answeredWrite, ServedNow } from '../objects/refused.ts';
@@ -147,7 +147,7 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('capabilities', () =>
       answered(async (s) => {
         const { e, placeService, config, env, home, mcp, inRequest, trace } = s;
-        const read = pageRead(s, repoOf(env, s.running), listedAtOnce(home));
+        const read = pageRead(s, listedAtOnce(home));
         if ('unread' in read) return unreadAnswer(read.unread);
         return capabilitiesWithSteps(read.repo, { e, placeService, config, trace, env, home, asker: mcp, inRequest });
       }),

@@ -23,7 +23,7 @@ import {
 } from 'agent-orchestrator';
 import { Api } from 'objects';
 import type { Served } from '../../layer.ts';
-import { defaultRepo, factoryNamed, queryOf } from './parts.ts';
+import { factoryNamed, queryOf } from './parts.ts';
 import { answered } from '../../objects/refused.ts';
 import { wantsTable } from '../../objects/table.ts';
 import { readsBounded } from '../../objects/answer-bound.ts';
@@ -40,7 +40,7 @@ const named = (route: string, namespace: string, name: string): void => {
 };
 
 /** The server `name` of `namespace`, read now. */
-const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, defaultRepo(s), namespace, name));
+const serverIn = (s: Served, namespace: string, name: string) => s.inRequest(mcpServerObject(s.home, namespace, name));
 
 export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
   handlers
@@ -48,7 +48,7 @@ export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
       Effect.flatMap(wantsTable, (table) =>
         answered(async (s) => {
           factoryNamed(`GET /api/namespaces/${namespace}/mcpservers`, namespace);
-          const list = await s.inRequest(mcpServerList(s.home, defaultRepo(s), namespace, queryOf(query)));
+          const list = await s.inRequest(mcpServerList(s.home, namespace, queryOf(query)));
           return table ? mcpServerTable(list) : list;
         }),
       ),

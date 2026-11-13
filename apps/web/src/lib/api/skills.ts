@@ -47,11 +47,11 @@ const skillRowOf = (skill: Skill): SkillRow => ({
 });
 
 /**
- * The places a namespace's skills are listed by, in the order an agent of yours finds a name: your library, the repository's and Nemia's;
- * in a factory, its own tree first.
+ * The places a namespace's skills are listed by, in the order an agent of yours finds a name: in a factory, its own tree, your library,
+ * its repository's and Nemia's; in the default namespace, which works on no repository, your library and Nemia's.
  */
 const skillOrigins = (namespace: string): DefinitionOrigin[] =>
-  namespace === DEFAULT_NAMESPACE ? ['yours', 'repo', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
+  namespace === DEFAULT_NAMESPACE ? ['yours', 'builtin'] : ['factory', 'yours', 'repo', 'builtin'];
 
 /**
  * Every skill of `namespace`'s places, a list each read by its origin (`?origin=`), shadowed or not, read from disk on each request; keyed

@@ -269,3 +269,50 @@ test('across the end of daylight saving in Montreal, 2026-11-01, a daily fire at
   }
   assert.deepEqual(scheduledDues(), ['2026-10-31T05:30:00.000Z', '2026-11-01T05:30:00.000Z', '2026-11-02T06:30:00.000Z']);
 });
+
+/** The schedule `schedule` planted in the factory `name`'s file by hand, as an older `nemia` wrote it: no write's refusal reads it. */
+const planted = (name: string, workflow: string, schedule: Record<string, string>): void => {
+  const file = path.join(ROOT, 'factories', `${name}.json`);
+  const was = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  fs.writeFileSync(file, `${JSON.stringify({ ...was, schedules: { [workflow]: schedule } })}\n`);
+};
+
+test("an old schedule's repository is read and ignored: its run starts on the repository the factory's wiring names", async (t) => {
+  const s = story(t);
+  aStore(t, '2026-10-04T12:00:00Z');
+  const named = aTeamRepo();
+  const wired = aTeamRepo();
+  addFactoryAt(ROOT, { name: 'duo', repos: [named, wired] });
+  attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev' });
+  const e = runtime();
+
+  await s.test('REFUSED: a workflow the wiring places on neither repository is refused on its fire, naming the attach', async () => {
+    planted('duo', 'dev', {
+      cron: '0 9 * * 1',
+      tz: 'America/Montreal',
+      brief: 'Read the stats',
+      repo: named,
+      since: '2026-10-01T00:00:00Z',
+    });
+    t.mock.timers.setTime(Date.parse(MONDAY) + 400);
+    const pass = await runWith(e, tickRun());
+    const at = pass.scheduled as { refused?: string } | undefined;
+    assert.match(at?.refused ?? '', /nemia factory attach duo dev --repo/);
+    assert.deepEqual(scheduledDues(), []);
+  });
+
+  await s.test('wired to the other repository, its next fire starts on that one, not on the one the schedule names', async () => {
+    attachWorkflowAt(ROOT, { factory: 'duo', workflow: 'dev', repo: path.basename(wired) });
+    planted('duo', 'dev', {
+      cron: '0 9 * * 1',
+      tz: 'America/Montreal',
+      brief: 'Read the stats',
+      repo: named,
+      since: '2026-10-01T00:00:00Z',
+    });
+    t.mock.timers.setTime(Date.parse('2026-10-12T13:00:00.000Z') + 400);
+    const id = startedBy(await runWith(e, tickRun()));
+    const run = listRuns(ROOT).find((r) => r.id === id);
+    assert.deepEqual([run?.factory, run?.repo, run?.workflowDir], ['duo', wired, path.join(wired, 'workflows', 'dev')]);
+  });
+});

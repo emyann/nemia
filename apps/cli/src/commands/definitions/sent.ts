@@ -15,9 +15,9 @@ type RepoQuery = { readonly repo?: string };
 
 /**
  * `ask` made on the repository a definitions' command is about: the one `--repo` names, sent as `pathSent` sends a path; none typed,
- * under this machine's context the folder the command is typed in, which the api places on the repository it knows that holds it
- * (`repoQueryOf`), and where it knows none (`Invalid`) asked again with no repository, which the api answers on its own. Under a remote
- * context no repository is sent.
+ * under this machine's context the folder the command is typed in, which the api places on the repository of a filed factory that holds
+ * it (`repoQueryOf`), and where no factory's does (`Invalid`) asked again with no repository, which the api answers with yours and the
+ * builtins alone. Under a remote context no repository is sent.
  */
 export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
   const typed = textArg(args, 'repo');

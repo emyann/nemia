@@ -57,12 +57,6 @@ function ScheduleRow({ schedule: s, now }: { schedule: FactorySchedule; now: Dat
             'none yet'
           )}
         </dd>
-        {s.repo && (
-          <>
-            <dt className="text-muted-foreground">Repository</dt>
-            <dd className="truncate font-mono text-body-small">{s.repo}</dd>
-          </>
-        )}
       </dl>
       {s.refused && (
         <Alert variant="destructive" data-schedule-refused>

@@ -320,6 +320,16 @@
       "term": "Definition files",
       "meaning": "a workflow's, an agent's or a skill's files as a person keeps them, each by its path and text, sent to `POST /api/{workflows|agents|skills}/read`, which reads them into the kind's spec by the orchestrator's readers and writes nothing (`DefinitionFiles`, `packages/objects/src/workflow.ts`).",
       "type": "DefinitionFiles"
+    },
+    {
+      "term": "Field shape",
+      "meaning": "what a field of a step's declared output stands for, by its `x-shape` marker: questions to a person, budgets for the steps after it, a link or a commit; served beside a closeout's schema (`StepCloseout.shapes`) and a frozen step's fields (`RunSpecStep.fields`), so the board picks the field's widget once from it (`FIELD_SHAPES`, `packages/objects/src/words.ts`).",
+      "type": "FieldShape"
+    },
+    {
+      "term": "Task source",
+      "meaning": "where a part of a step's task came from: a person, a step before it, a check's verdict, or the run itself; carried on a text part of what a step was told (`TaskPart`'s `source`, `packages/objects/src/run-told.ts`; `TASK_SOURCES`, `packages/objects/src/words.ts`).",
+      "type": "TaskSource"
     }
   ]
 }

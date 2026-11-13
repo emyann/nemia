@@ -229,6 +229,24 @@ export const HANDED_HOW = ['waited', 'read'] as const;
 /** One of `HANDED_HOW`. */
 export type HandedHow = (typeof HANDED_HOW)[number];
 
+/**
+ * What a field of a step's declared output stands for, by its `x-shape` marker (`SHAPES`, question.ts): questions to a person, budgets
+ * for the steps after it, a link, or a commit. The board draws each by a widget of its own.
+ */
+export const FIELD_SHAPES = ['questions', 'budgets', 'link', 'commit'] as const;
+
+/** One of `FIELD_SHAPES`. */
+export type FieldShape = (typeof FIELD_SHAPES)[number];
+
+/**
+ * Where a part of a step's task came from (`TaskPart`'s `source`, handed.ts): a person (what was asked, approved, answered or said), a
+ * step before it, a check's verdict, or the run itself.
+ */
+export const TASK_SOURCES = ['person', 'step', 'check', 'run'] as const;
+
+/** One of `TASK_SOURCES`. */
+export type TaskSource = (typeof TASK_SOURCES)[number];
+
 /** Where a step's told layers were given: its prompt, or its brief. */
 export const TOLD_VIA = ['prompt', 'brief'] as const;
 

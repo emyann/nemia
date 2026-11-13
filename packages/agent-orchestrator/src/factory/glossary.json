@@ -192,6 +192,23 @@
       "term": "Clone",
       "meaning": "a factory's repository named by its git URL: kept in the store under `clones/<host>/<path>` (`cloneTarget`, proved by `packages/agent-orchestrator/contracts/clone-target.contract.ts`, in `packages/agent-orchestrator/src/factory/clones/clones.ts`), its URL recorded beside it in the factory's `origins`, cloned by the place's `clone` when the factory is added or applied, on the api's machine where that is asked over the api (`factories.create`, `factories.apply`), and again by the daemon's sweep when its folder is gone (`clonesOnce`). The machine's own git credentials make it; Nemia holds none.",
       "type": "CloneTarget"
+    },
+    {
+      "term": "Factory move",
+      "meaning": "a factory read whole from one store and filed on another, under two client contexts (`nemia factory move <name> --to <context>`): its file, its folder but what stays with the source's store (`FOLDER_STAYS`: its proposals and delegations), its template and the cards no run was started from; runs never move, and the source is never written. Before the target writes anything, each repository is given as `nemia factory add --repo` would be given it, what was typed for it (`--repo <source>=<url|path>`) over the URL the source recorded as its origin, a folder with neither refused (`RepoOnTarget`); and each volume is mounted at the path typed for it (`--volume <name>=<path>`) or its own, judged as `nemia factory volume add` judges one, a path the target refuses refused (`VolumeOnTarget`); both proved by `packages/agent-orchestrator/contracts/factory-move.contract.ts`, in `packages/agent-orchestrator/src/factory/move/move.ts`. The target trusts none of its places: the person trusts them, and removes the source.",
+      "type": "RepoOnTarget",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/#move-it-to-another-store"
+      }
+    },
+    {
+      "term": "Factory export",
+      "meaning": "one factory as its store holds it, for another store to file (`factoryExported`, `packages/agent-orchestrator/src/factory/move/move.verb.ts`): its file's text, its folder packed but its proposals and delegations, its template as a request sends one, its instruction's words where a folder of the source's machine keeps them, its cards in play no run was started from, and those a run keeps, each with why. A read: nothing of the source is written."
+    },
+    {
+      "term": "Factory import",
+      "meaning": "a factory filed on this store from another's export (`factoryImported`, `packages/agent-orchestrator/src/factory/move/move.verb.ts`), all or nothing: every refusal first, each repository and volume the target cannot take named together by its flag; then its repositories cloned, its template kept, its folder placed, its file filed and its cards filed, each card without its `repo:`, `from:` and `queued:` and ending with the line that says where it came from (`cardMoved`, `packages/agent-orchestrator/src/factory/move/move.ts`). A failure after a write takes back its cards, its file and its folder. Its places are left untrusted."
     }
   ]
 }

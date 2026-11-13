@@ -1,12 +1,11 @@
 /**
- * Nemia's side sheet, the frame's: whether her face opened it and whether the person asked for the rail back while it was folded for it
- * (`HerSheetProvider`, `useHerSheet`), how the frame stands around it (`useFrameFold`, which reads `frameFold` off the window's width, the
- * rail as the person keeps it, the sheet and the page), and the sheet itself (`HerSheet`): the kit's standard side sheet, 400 wide, docked
- * in the frame's row at the right of the page, the page narrowing beside it, or on a narrow screen the kit's modal sheet over the page;
- * none on her own page (`/chat`), which is the panel itself. It holds her chat's panel (`ChatPanel`, `sheet`) with its own header, so the
- * kit's sheet is given no title and draws no header of its own.
+ * Nemia's side sheet, the frame's: whether her face opened it and whether the person asked for the rail back while it was folded for the
+ * frame's sheet (`HerSheetProvider`, `useHerSheet`), how the frame stands around that sheet (`useFrameFold`, which reads `frameFold` off
+ * the window's width, the rail as the person keeps it, the address's `?bar=`, her sheet and the page), and her chat's panel as the sheet
+ * holds it (`HerPanel`), with its own header. The sheet itself is the frame's (`FrameSheet`), which shows what the address's `?bar=` names
+ * or her chat, one at a time.
  *
- * The rail folded for her sheet is read, never written: no `sidebar_state` cookie is written for it, and the rail comes back as it was
+ * The rail folded for the sheet is read, never written: no `sidebar_state` cookie is written for it, and the rail comes back as it was
  * the moment the sheet closes. Her sheet stays open across pages, as the frame does.
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
@@ -14,7 +13,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useMatches } from '@tanstack/react-router';
 import { ChatPanel } from '@/components/nemia/chat/ChatPanel';
 import { useNemiaPresence } from '@/components/nemia/useNemiaPresence';
-import { SideSheet } from '@/components/ui/ds';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { levelQuery } from '@/lib/api/nemia';
@@ -22,13 +20,15 @@ import { openRunsQuery } from '@/lib/api/runs';
 import { atWork } from '@/lib/footer';
 import { frameFold, type FrameFold } from '@/lib/frameFold';
 import { useMedia } from '@/lib/useMedia';
+import { useBar } from '@/lib/useBar';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 import { useNow } from '@/lib/useNow';
 
-/** Her sheet as the frame holds it: open or not, the rail asked back, and the three presses that change them. */
+/** Her sheet as the frame holds it: open or not, the rail asked back, and the presses that change them. */
 type HerSheetState = {
   open: boolean;
   railAsked: boolean;
+  /** Her face's press: closes her where the sheet shows her, else shows her in it, closing what the address's `?bar=` names. */
   toggle: () => void;
   close: () => void;
   askRail: () => void;
@@ -36,18 +36,38 @@ type HerSheetState = {
 
 const HerSheetContext = createContext<HerSheetState | null>(null);
 
-/** Holds her sheet for the whole frame, so it stays open across pages; closing it forgets the rail the person asked back. */
+/**
+ * Holds her sheet for the whole frame, so it stays open across pages. One sheet at a time: when the address comes to name a bar's thing
+ * (a press, a link, Back), her open flag clears, so closing that bar leaves no sheet; her face shows her again, closing the bar. The rail
+ * the person asked back is forgotten once no sheet is drawn.
+ */
 export function HerSheetProvider({ children }: { children?: ReactNode }) {
+  const bar = useBar();
+  const barOpen = bar.open !== undefined;
+  const ownsChat = useOwnsChat();
   const [open, setOpen] = useState(false);
   const [railAsked, setRailAsked] = useState(false);
+  const [barWas, setBarWas] = useState(barOpen);
+  if (barOpen !== barWas) {
+    setBarWas(barOpen);
+    if (barOpen && open) setOpen(false);
+  }
+  const drawn = barOpen || (open && !ownsChat);
+  if (!drawn && railAsked) setRailAsked(false);
+  const shown = open && !ownsChat && !barOpen;
+  const closeBar = bar.close;
   const close = useCallback(() => {
     setOpen(false);
     setRailAsked(false);
   }, []);
   const toggle = useCallback(() => {
-    setOpen((was) => !was);
-    setRailAsked(false);
-  }, []);
+    if (shown) {
+      close();
+      return;
+    }
+    setOpen(true);
+    if (barOpen) closeBar();
+  }, [shown, barOpen, close, closeBar]);
   const askRail = useCallback(() => setRailAsked(true), []);
   const value = useMemo(() => ({ open, railAsked, toggle, close, askRail }), [open, railAsked, toggle, close, askRail]);
   return <HerSheetContext.Provider value={value}>{children}</HerSheetContext.Provider>;
@@ -72,17 +92,19 @@ export function useFrameFold(): FrameFold {
   const narrow = useIsMobile();
   const wide = useMedia('(min-width: 1600px)', true);
   const ownsChat = useOwnsChat();
+  const barOpen = useBar().open !== undefined;
   return frameFold({
     width: narrow ? 'narrow' : wide ? 'wide' : 'medium',
     railOpen,
+    barOpen,
     sheetOpen: sheet.open,
     railAsked: sheet.railAsked,
     ownsChat,
   });
 }
 
-/** Her chat's panel as the sheet holds it, at the page at `path` with `search`. */
-function SheetPanel({ path, search, onClose }: { path: string; search: Record<string, unknown>; onClose: () => void }) {
+/** Her chat's panel as the frame's sheet holds it (`FrameSheet`), at the page at `path` with `search`. */
+export function HerPanel({ path, search, onClose }: { path: string; search: Record<string, unknown>; onClose: () => void }) {
   const chat = useNemiaChat();
   const nemia = useQuery(levelQuery).data;
   const open = useQuery(openRunsQuery()).data;
@@ -98,37 +120,5 @@ function SheetPanel({ path, search, onClose }: { path: string; search: Record<st
       mode="sheet"
       onClose={onClose}
     />
-  );
-}
-
-/**
- * The modal sheet stands at the window's right, leaving the kit's 56 pixels of scrim at its left: the kit's own floor of 360 pixels is
- * wider than that on a phone, and its sheet then stands short of the right edge, so the floor is lifted and the sheet pushed right.
- */
-const MODAL_AT_THE_RIGHT = 'ml-auto min-w-0';
-
-/** Her sheet at the page at `path` with `search`: docked beside the page, modal on a narrow screen, none on her own page. */
-export function HerSheet({ path, search }: { path: string; search: Record<string, unknown> }) {
-  const { close } = useHerSheet();
-  const fold = useFrameFold();
-  const narrow = useIsMobile();
-  const ownsChat = useOwnsChat();
-  if (ownsChat) return null;
-  if (narrow)
-    return (
-      <SideSheet variant="modal" isOpen={fold.sheet === 'modal'} onClose={close} aria-label="Nemia's chat" className={MODAL_AT_THE_RIGHT}>
-        {fold.sheet === 'modal' && <SheetPanel path={path} search={search} onClose={close} />}
-      </SideSheet>
-    );
-  return (
-    <div data-her-sheet={fold.sheet} className="sticky top-0 z-30 h-svh shrink-0 self-start">
-      <SideSheet
-        variant="standard"
-        isOpen={fold.sheet === 'docked'}
-        className="h-svh w-[400px] min-w-[400px] rounded-none border-l border-outline-variant bg-surface"
-      >
-        {fold.sheet === 'docked' && <SheetPanel path={path} search={search} onClose={close} />}
-      </SideSheet>
-    </div>
   );
 }

@@ -9,10 +9,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   attemptLine,
-  BESIDE_MIN,
-  besideBar,
-  besideOpen,
-  drawnWhole,
   edgeLine,
   edgesOf,
   edgeState,
@@ -20,7 +16,6 @@ import {
   forgetFactoryLayout,
   forgetFactoryOpen,
   forgetLayout,
-  LEAST_ZOOM,
   LOOP_DEPTH,
   loopLabel,
   loopPath,
@@ -485,42 +480,6 @@ test('the layout store: per run and per Factory, until forgotten, on storage tha
     assert.deepEqual(readFactoryOpen(), []);
     assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
     assert.doesNotThrow(() => forgetFactoryOpen());
-  });
-});
-
-test('besideBar, besideOpen and drawnWhole: where a canvas is fitted', async (t) => {
-  await t.test(
-    'a canvas is fitted beside the bar only where the bar covers it, leaves room, and the nodes fit there at the least zoom',
-    () => {
-      assert.deepEqual(besideBar(900, 456, 400), { left: '10%', right: '480px', y: '20%' });
-      assert.equal(besideBar(900, 0, 400), null, 'the bar covers none of the canvas');
-      assert.equal(besideBar(900, -20, 400), null, 'the bar is beside the canvas');
-      assert.equal(besideBar(900, 900 - BESIDE_MIN + 1, 10), null, 'it leaves less than the least width');
-      const room = 900 * 0.9 - (456 + 24);
-      assert.notEqual(besideBar(900, 456, room / LEAST_ZOOM), null, 'nodes as wide as the room at the least zoom fit');
-      assert.equal(besideBar(900, 456, room / LEAST_ZOOM + 1), null, 'nodes any wider would run off the canvas: the fit takes it whole');
-    },
-  );
-  await t.test(
-    'a step opened in the bar is fitted beside it alone only where the run is too wide to fit there and its node lies under it',
-    () => {
-      const padding = { left: '10%', right: '519px', y: '20%' };
-      assert.deepEqual(besideOpen(862, 495, 400, { right: 380, width: 224 }), { padding, alone: false }, 'the run fits beside the bar');
-      assert.deepEqual(besideOpen(862, 495, 524, { right: 383, width: 224 }), { padding, alone: true }, 'too wide: the step under the bar');
-      assert.equal(besideOpen(862, 495, 524, { right: 862 - 495, width: 224 }), null, 'a node that ends where the bar begins is left');
-      assert.equal(besideOpen(862, 495, 524, null), null, 'no step is open');
-      assert.equal(besideOpen(862, 495, 524, { right: 383, width: 600 }), null, 'no room beside the bar even for the step');
-    },
-  );
-  await t.test('nodes are drawn whole on a canvas only where none of their edges is past one of its own', () => {
-    const box = { x: 100, y: 50, width: 400, height: 100 };
-    assert.equal(drawnWhole(box, { x: 0, y: 0, zoom: 1 }, 500, 150), true, 'they end on its right and bottom edges');
-    assert.equal(drawnWhole(box, { x: -101, y: 0, zoom: 1 }, 500, 150), false, 'past its left edge');
-    assert.equal(drawnWhole(box, { x: 0, y: -51, zoom: 1 }, 500, 150), false, 'past its top edge');
-    assert.equal(drawnWhole(box, { x: 1, y: 0, zoom: 1 }, 500, 150), false, 'past its right edge');
-    assert.equal(drawnWhole(box, { x: 0, y: 1, zoom: 1 }, 500, 150), false, 'past its bottom edge');
-    assert.equal(drawnWhole(box, { x: 0, y: 0, zoom: 1.01 }, 500, 150), false, 'drawn larger, past its right and bottom edges');
-    assert.equal(drawnWhole(box, { x: -50, y: -25, zoom: 0.5 }, 250, 75), true, 'its offset and zoom both count');
   });
 });
 

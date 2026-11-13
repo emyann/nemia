@@ -68,7 +68,6 @@ import { capLine, queueOf } from '@/lib/inbox';
 import { passLine, passTitle } from '@/lib/pass';
 import { wholeMachine, type Bar } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
-import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
 import { useContent } from '@/lib/useContent';
 import { useFrameSize } from '@/lib/useFrameSize';
@@ -302,11 +301,10 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The header counts runs in flight, finished, to decide as the CLI's `ls` says them, and waiting on you. A run waiting on you, or to
  *   decide,   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in
  *   both.   Beside the counts it draws the cap (`CapLine`), and at its right the floor's options (`FloorOptions`).
- * - The floor fills the screen under the root's top bar, its frame narrowed by what the bar covers of it
- *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
- *   its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs waiting on you. The
- *   floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough beside them, and the legend wraps short of
- *   the minimap when there is one; arrowheads take their edges' colour in both themes.
+ * - The floor fills the screen under the root's top bar, narrowing beside the frame's side sheet when it opens. The queue lane sits at
+ *   its left, and gives its room to the floor while the bar shows a run, a step, or what is the whole machine's: its gauges or the runs
+ *   waiting on you. The floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough beside them, and the
+ *   legend wraps short of the minimap when there is one; arrowheads take their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
@@ -390,8 +388,6 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
   }, [open, known]);
 
   const frame = useRef<HTMLDivElement>(null);
-  const whole = useRef<HTMLDivElement>(null);
-  const over = useBarOver(whole);
   const latest = useRef({ open, placed, spans, inspecting });
   useLayoutEffect(() => {
     latest.current = { open, placed, spans, inspecting };
@@ -533,8 +529,8 @@ function Floor({ light, factory }: { light: OpenRuns; factory: FactoryPlace }) {
       <div className="flex min-h-0 flex-1 flex-col @lg/page:flex-row">
         {laned && !inspecting && <QueueLane cards={queued} />}
         {shown.length ? (
-          <div ref={whole} className="flex min-h-0 min-w-0 flex-1">
-            <div ref={frame} className="@container min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <div ref={frame} className="@container min-h-0 min-w-0 flex-1">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}

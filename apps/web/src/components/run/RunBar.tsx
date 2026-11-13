@@ -1,12 +1,12 @@
 /**
- * The frame's floating bar for a run: what a person needs to see of it without leaving the floor — what it asks of them, its steps and
+ * The frame's side sheet for a run: what a person needs to see of it without leaving the floor — what it asks of them, its steps and
  * their statuses, and its brief — read from the run's record, which a read again keeps current. Its page, which Open visits, has the rest.
  */
 import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
-import { FloatingBar } from '../frame/FloatingBar';
+import { BarPanel } from '../frame/BarPanel';
 import { Markdown } from '../markdown/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../gate/Needs';
 import { RunGone } from './RunGone';
@@ -21,9 +21,9 @@ import { Unread } from '../step/StepBar';
 export function RunBar({ run: id }: { run: string }) {
   const { view: run, error } = useRunRead(id);
   return (
-    <FloatingBar title={run ? titleOf(run) : id} description={<span className="font-mono text-body-small">{id}</span>}>
+    <BarPanel title={run ? titleOf(run) : id} description={<span className="font-mono text-body-small">{id}</span>}>
       <RunBody id={id} run={run} error={error} />
-    </FloatingBar>
+    </BarPanel>
   );
 }
 

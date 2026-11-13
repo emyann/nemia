@@ -14,8 +14,8 @@ import {
   blockOf,
   untrustedFor,
   factoriesShown,
-  factoryBlocks,
   openBlockOf,
+  openBlocks,
   runsOf,
   factoryIn,
   namespaceOf,
@@ -77,6 +77,12 @@ const run = (id: string, factoryName: string | null, extra: Partial<RunView> = {
 });
 
 const names = (xs: readonly { name: string }[]) => xs.map((x) => x.name);
+
+/** A factory's light answer as its block reads it: how many of its runs wait, are in flight and are finished. */
+const answer = (waiting: number, inFlight: number, finished: number) => ({ counts: { waiting, inFlight, finished } });
+
+/** The light answers of `factories`, each of `counts`, by name, as the Overview reads them. */
+const answers = (factories: readonly { name: string }[], counts = answer(0, 0, 0)) => new Map(factories.map((f) => [f.name, counts]));
 const ids = (xs: readonly { id: string }[]) => xs.map((x) => x.id);
 
 /** A run or a card of each factory, in the order a page lists them: one of the default factory names none, one names it as `default`. */
@@ -88,21 +94,25 @@ const tagged = [
   { id: 'n-2', factory: 'nemia' },
 ];
 
-test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a factory, and what each counts', async (t) => {
+test('openBlocks, blockOf, factoriesShown: the machine split into a block a factory, and what each counts', async (t) => {
   await t.test(
-    'the default factory is a block only while no factory is filed and a run names none, whatever the order it is listed in',
+    'the default factory is a block only while no factory is filed and its answer counts a run (`held`), whatever the order it is listed in',
     () => {
       const nemia = factory('nemia');
       const broken = factory('broken', { repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
-      assert.deepEqual(names(factoryBlocks([fallback], [run('r-2', null)])), ['default']);
-      assert.deepEqual(names(factoryBlocks([fallback], [run('r-1', 'gone')])), []);
-      assert.deepEqual(names(factoryBlocks([fallback], [])), []);
-      assert.deepEqual(names(factoryBlocks([fallback, nemia], [run('r-1', 'nemia')])), ['nemia']);
-      assert.deepEqual(names(factoryBlocks([fallback, nemia], [run('r-1', 'nemia'), run('r-2', null)])), ['nemia']);
-      assert.deepEqual(names(factoryBlocks([nemia, factory('pipao'), fallback], [run('r-2', null)])), ['nemia', 'pipao']);
-      assert.deepEqual(names(factoryBlocks([fallback, broken], [run('r-2', null)])), ['broken']);
+      const blocks = (factories: Factory[], held: boolean) => names(openBlocks(factories, answers(factories), held));
+      assert.deepEqual(blocks([fallback], true), ['default']);
+      assert.deepEqual(blocks([fallback], false), []);
+      assert.deepEqual(blocks([fallback, nemia], false), ['nemia']);
+      assert.deepEqual(blocks([fallback, nemia], true), ['nemia']);
+      assert.deepEqual(blocks([nemia, factory('pipao'), fallback], true), ['nemia', 'pipao']);
+      assert.deepEqual(blocks([fallback, broken], true), ['broken']);
     },
   );
+  await t.test('a factory shown whose answer is not read yet has no block, and hides no other', () => {
+    const nemia = factory('nemia');
+    assert.deepEqual(names(openBlocks([fallback, nemia, factory('pipao')], answers([nemia]), false)), ['nemia']);
+  });
   await t.test(
     "each run is in the factory its record names, the default factory's naming none: a pipao run in neither default nor nemia",
     () => {
@@ -120,25 +130,21 @@ test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a f
     assert.deepEqual(names(queuedIn(cards, factory('nemia'))), ['n']);
   });
   await t.test(
-    'a block counts its runs in flight as the floor does, a held one and one at its gate among them, those waiting on you, and its workflows',
+    "a block's runs, in flight and waiting on you are its own answer's counts, never another factory's; its workflows and hires its file's",
     () => {
-      const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', waitingOnYou: false };
-      const runs = [
-        run('working', 'nemia', { status: 'running', moving: true }),
-        run('held', 'nemia', { status: 'running', holding }),
-        run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] }),
-        run('done', 'nemia'),
-        run('elsewhere', null, { status: 'running', moving: true, waitingOnYou: ['plan'] }),
-      ];
-      const [nemia] = factoryBlocks([fallback, factory('nemia')], runs);
-      const [def] = factoryBlocks([fallback], runs);
+      const opens = new Map([
+        ['nemia', answer(1, 3, 4)],
+        ['default', answer(2, 5, 7)],
+      ]);
+      const [nemia] = openBlocks([fallback, factory('nemia')], opens, true);
+      const [def] = openBlocks([fallback], opens, true);
       assert.deepEqual(
         { ...nemia },
         {
           name: 'nemia',
           default: false,
           repos: ['nemia'],
-          runs: 4,
+          runs: 8,
           inFlight: 3,
           waitsOnYou: 1,
           workflows: 1,
@@ -146,12 +152,13 @@ test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a f
           error: null,
         },
       );
-      assert.deepEqual([def.runs, def.inFlight, def.waitsOnYou, def.workflows, def.hires, def.repos], [1, 1, 1, null, 0, ['app']]);
+      assert.deepEqual([def.runs, def.inFlight, def.waitsOnYou, def.workflows, def.hires, def.repos], [14, 5, 2, null, 0, ['app']]);
     },
   );
   await t.test('a factory whose file does not read is still a block, with why, and hides no other', () => {
     const broken = factory('broken', { repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' });
-    const blocks = factoryBlocks([fallback, factory('nemia'), broken, factory('pipao')], []);
+    const factories = [fallback, factory('nemia'), broken, factory('pipao')];
+    const blocks = openBlocks(factories, answers(factories), false);
     assert.deepEqual(names(blocks), ['nemia', 'broken', 'pipao']);
     assert.deepEqual(
       blocks.map((b) => [b.error, b.runs, b.inFlight, b.waitsOnYou, b.workflows, b.hires]),

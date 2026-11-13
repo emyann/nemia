@@ -22,7 +22,7 @@ import type { StepSpec } from '../step/step.ts';
 import { scratch } from 'test-kit/scratch';
 import { importsIn } from 'test-kit/imports';
 import { provisionDeps } from '../runner.ts';
-import { checkoutParts, keepCheckoutInstalled, lockfileParts } from './worktree.store.ts';
+import { checkoutParts, keepCheckoutInstalled, keepWorktreeInstalled, lockfileParts, worktreeParts } from './worktree.store.ts';
 
 const ROOT = scratch('wf-deps-');
 
@@ -688,4 +688,92 @@ test("a clone the store keeps is installed when it has no node_modules, and left
   const persons = anUninstalled(path.join(ROOT, 'persons'));
   assert.deepEqual(await keepCheckoutInstalled(ROOT, persons), { kept: 'untouched' });
   assert.ok(!fs.existsSync(path.join(persons, 'node_modules')), "a person's checkout is theirs to install");
+});
+
+/**
+ * A checkout as `aCheckout` makes one, and a worktree of a run's cut where the store keeps its worktrees (`<home>/worktrees/<run>/run`),
+ * provisioned as the cut provisions it.
+ */
+async function aRunWorktree(): Promise<{ home: string; run: string; main: string; wt: string }> {
+  const { main } = aCheckout();
+  const home = fs.mkdtempSync(path.join(ROOT, 'home-'));
+  const run = 'r-deps';
+  const wt = path.join(home, 'worktrees', run, 'run');
+  fs.mkdirSync(path.dirname(wt), { recursive: true });
+  execFileSync('git', ['worktree', 'add', '-q', '-b', `run-${path.basename(home)}`, wt, 'HEAD'], { cwd: main, stdio: 'ignore' });
+  assert.equal((await provisionDeps(main, wt)).tree, 'hardlinked');
+  return { home, run, main, wt };
+}
+
+/** The branch's lockfile moved under the worktree, as a merge of a base that added a workspace package moves it. */
+const lockfileGainsY = (wt: string) => {
+  write(path.join(wt, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
+  write(path.join(wt, 'packages/y/index.js'), "module.exports = 'branch-y';\n");
+  npmLockfile(wt);
+};
+
+test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async (t) => {
+  const { main, wt } = await aRunWorktree();
+  assert.equal(worktreeParts(wt), null, 'a tree hardlinked at the cut has what its lockfile names');
+  lockfileGainsY(wt);
+  assert.equal(worktreeParts(wt), 'node_modules/y', 'a package the lockfile now names, and the tree lacks');
+
+  const linked = aCheckout();
+  write(path.join(linked.main, 'node_modules/third/package.json'), JSON.stringify({ name: 'third', version: '2.0.0' }));
+  const lockfile = path.join(linked.wt, 'package-lock.json');
+  const lock = JSON.parse(fs.readFileSync(lockfile, 'utf8'));
+  lock.packages['node_modules/third'] = { version: '2.0.0' };
+  fs.writeFileSync(lockfile, JSON.stringify(lock));
+  t.mock.method(fs, 'linkSync', () => {
+    throw Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV', syscall: 'link' });
+  });
+  assert.equal((await provisionDeps(linked.main, linked.wt)).tree, 'linked');
+  assert.equal(worktreeParts(linked.wt), null, "a tree of main's packages linked is judged by what the links give");
+  assert.equal(worktreeParts(path.join(ROOT, 'nowhere')), null, 'no tree, no parting');
+});
+
+test("a run's worktree whose lockfile moved is cleared and provisioned again before a filing — the checkout untouched — and then left alone", async () => {
+  const { home, run, main, wt } = await aRunWorktree();
+  const third = path.join(main, 'node_modules/third/index.js');
+  const links = fs.statSync(third).nlink;
+  const mains = snapshot(path.join(main, 'node_modules'));
+  assert.equal(await keepWorktreeInstalled(home, run, main, wt), undefined, 'a current tree is left as it is');
+
+  lockfileGainsY(wt);
+  const again = await keepWorktreeInstalled(home, run, main, wt);
+  assert.equal(again?.act, 'reprovision');
+  assert.equal(again?.because, 'node_modules/y');
+  assert.deepEqual(again?.deps, { tree: 'own', installed: true }, "main has not installed y: the worktree's tree is npm's own");
+  assert.equal(required(wt, 'y').value, 'branch-y', 'the package the moved lockfile names resolves');
+  assert.deepEqual(snapshot(path.join(main, 'node_modules')), mains, "main's tree was not written");
+  assert.equal(fs.readFileSync(third, 'utf8'), "module.exports = 'main-third';\n");
+  assert.equal(fs.statSync(third).nlink, links - 1, "the worktree's hardlink was unlinked, never written through");
+  assert.equal(await keepWorktreeInstalled(home, run, main, wt), undefined, 'and then it is current');
+});
+
+test("a tree that is not a run's worktree, is one link, or is none is never cleared; one with none is provisioned; a failed install is said and tried again", async () => {
+  const { home, run, main, wt } = await aRunWorktree();
+  write(path.join(main, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
+  npmLockfile(main);
+  const mains = snapshot(path.join(main, 'node_modules'));
+  assert.equal(await keepWorktreeInstalled(home, run, main, main), undefined, "the repository's checkout is never written");
+  assert.equal(await keepWorktreeInstalled(home, 'another-run', main, wt), undefined, "nor another run's worktree");
+  assert.deepEqual(snapshot(path.join(main, 'node_modules')), mains);
+
+  fs.rmSync(path.join(wt, 'node_modules'), { recursive: true });
+  fs.symlinkSync(path.join(main, 'node_modules'), path.join(wt, 'node_modules'));
+  lockfileGainsY(wt);
+  assert.equal(await keepWorktreeInstalled(home, run, main, wt), undefined, 'a node_modules that is one link is left as it is');
+  assert.equal(fs.readlinkSync(path.join(wt, 'node_modules')), path.join(main, 'node_modules'));
+
+  fs.unlinkSync(path.join(wt, 'node_modules'));
+  const provisioned = await keepWorktreeInstalled(home, run, main, wt);
+  assert.deepEqual([provisioned?.act, provisioned?.because], ['provision', 'node_modules']);
+  assert.equal(required(wt, 'y').value, 'branch-y');
+
+  write(path.join(wt, 'package-lock.json'), '{ not a lockfile');
+  const failed = await keepWorktreeInstalled(home, run, main, wt);
+  assert.deepEqual([failed?.act, failed?.deps.tree], ['reprovision', 'failed']);
+  assert.ok(failed?.deps.tree === 'failed' && failed.deps.error.length > 0, 'with what npm said');
+  assert.equal((await keepWorktreeInstalled(home, run, main, wt))?.deps.tree, 'failed', 'never mistaken for a finished tree');
 });

@@ -20,9 +20,11 @@ import {
   depsPlan,
   isModuleKey,
   lockfilePackages,
+  inside,
   lockfileParting,
   workspaceModules,
   workspacePlan,
+  worktreeDeps,
   type DepEntry,
   type DepsListing,
   type Installed,
@@ -160,14 +162,20 @@ function parsedLock(text: string): unknown {
 /**
  * What `root` has on disk at each package path a lockfile names: a link and where it leads from `root`, a package and its version (none
  * for a package without a manifest that reads), or null.
+ *
+ * `through`, for a worktree's own tree read against its lockfile: a link that leads out of `root` where the lockfile names a package, not
+ * a link, is read as the package it leads to — a tree provisioned `linked` (main's packages linked where they could not be hardlinked) is
+ * judged by what its links give, not taken to part at its first one.
  */
-function installedAt(root: string, lock: unknown): Record<string, Installed | null> {
+function installedAt(root: string, lock: unknown, through = false): Record<string, Installed | null> {
   const installed: Record<string, Installed | null> = {};
-  for (const key of Object.keys(lockfilePackages(lock) ?? {}).filter(isModuleKey)) {
+  const packages = lockfilePackages(lock) ?? {};
+  const real = through ? realOr(root) : root;
+  for (const key of Object.keys(packages).filter(isModuleKey)) {
     const at = path.join(root, key);
     const st = lstatOf(at);
     if (!st) installed[key] = null;
-    else if (st.isSymbolicLink()) {
+    else if (st.isSymbolicLink() && !(through && !packages[key]?.link && leadsOut(real, at))) {
       installed[key] = {
         link: true,
         resolved: path
@@ -184,6 +192,24 @@ function installedAt(root: string, lock: unknown): Record<string, Installed | nu
     }
   }
   return installed;
+}
+
+/** The real path of `p`, or `p` where it is not there to resolve. */
+function realOr(p: string): string {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+/** Whether the link at `at` leads, resolved, to a path outside `realRoot`; a link that leads nowhere does not. */
+function leadsOut(realRoot: string, at: string): boolean {
+  try {
+    return !fs.realpathSync(at).startsWith(realRoot + path.sep);
+  } catch {
+    return false;
+  }
 }
 
 /** Main's `node_modules`, listed for `depsPlan`: names and link targets, nothing below a package. */
@@ -279,8 +305,9 @@ function hardlinkTree(from: string, to: string): number {
  * or read off a link an earlier pass left, after which every package left to make is linked too.
  *
  * Idempotent, so a pass that died halfway can run it again and a second call changes nothing: a tree npm
- * installed (it has `.package-lock.json`, which the plan never makes) is left alone, and so is a
- * `node_modules` that is one link; a tree the plan made gains only what it lacks, and
+ * installed (it has `.package-lock.json`, which the plan never makes) is left alone here, and so is a
+ * `node_modules` that is one link — a tree whose lockfile has moved past it is cleared first, before a filing, by
+ * `keepWorktreeInstalled`, and then provisioned here as a new one; a tree the plan made gains only what it lacks, and
  * nothing already there is replaced or added to. A package is made under a dot name beside its place and
  * renamed into it whole, so one a pass died making is never taken for a package, and is made again. It
  * writes nothing under the main checkout. It does not throw: a tick that threw here would throw on every
@@ -353,6 +380,123 @@ function depsNotes(deps: Provisioned): string[] {
       `node_modules: main's packages linked, not hardlinked — ${deps.why ?? 'unknown'}; a fenced step's reads under it leave its worktree and are denied`,
     ];
   return [];
+}
+
+/**
+ * Where a worktree's `package-lock.json` asks for a package its own `node_modules` does not have on disk, as named: the first package path
+ * they part at (`lockfileParting`), or null. Read through each link that leaves the worktree (`installedAt`'s `through`), so a tree whose
+ * packages are main's, linked, parts only where main's do. Null for a worktree with no lockfile, and for one with no `node_modules` of its
+ * own: there is no tree of its own to part.
+ */
+export function worktreeParts(worktree: string): string | null {
+  if (!fs.lstatSync(path.join(worktree, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) return null;
+  let text: string;
+  try {
+    text = fs.readFileSync(path.join(worktree, 'package-lock.json'), 'utf8');
+  } catch {
+    return null;
+  }
+  const lock = parsedLock(text);
+  return lockfileParting(lock, installedAt(worktree, lock, true));
+}
+
+/**
+ * A worktree's `node_modules` cleared, to be provisioned again: its root's, and the own `node_modules` of each workspace folder its
+ * lockfile installs into (`workspaceModules`) — where the folder is the worktree's own directory and its `node_modules` no link. Removing
+ * unlinks: a file hardlinked from the checkout keeps its content there, and a link is never followed.
+ */
+function clearDeps(worktree: string): void {
+  const root = fs.realpathSync(worktree);
+  let lock: unknown = null;
+  try {
+    lock = parsedLock(fs.readFileSync(path.join(worktree, 'package-lock.json'), 'utf8'));
+  } catch {}
+  for (const folder of workspaceModules(lock)) {
+    const modules = path.join(worktree, folder, 'node_modules');
+    if (isOwnDirectory(path.join(worktree, folder), path.join(root, folder)) && lstatOf(modules)?.isDirectory())
+      fs.rmSync(modules, { recursive: true, force: true });
+  }
+  if (lstatOf(path.join(worktree, 'node_modules'))?.isDirectory())
+    fs.rmSync(path.join(worktree, 'node_modules'), { recursive: true, force: true });
+}
+
+/**
+ * What a filing in a worktree did to its `node_modules` (`keepWorktreeInstalled`): provisioned where it had none, or cleared and
+ * provisioned again where its lockfile parted from it (`because`, where), with the checkout's own install beside it and what the tree
+ * turned out to be.
+ */
+export type Reinstalled = {
+  readonly act: 'provision' | 'reprovision';
+  readonly because: string;
+  readonly kept: CheckoutKept;
+  readonly deps: Provisioned;
+};
+
+/**
+ * One of run `runId`'s worktrees, its `node_modules` brought to what its `package-lock.json` names before a step, a try, a round or a
+ * check is filed in it: read from the disk at each call, never from what the cut left (`worktreeParts`), and decided by `worktreeDeps`.
+ * Where it is due, a tree it has is cleared, and the worktree is provisioned as a cut provisions one: the checkout of a clone Nemia keeps
+ * brought current first (`keepCheckoutInstalled`), then hardlinked from it, or `npm ci` where it does not have what the lockfile asks for
+ * (`provisionDeps`). Undefined where nothing was due.
+ *
+ * Only a worktree under the store's `worktrees/<run>/`, and neither the repository's checkout nor a folder inside it, is ever written; a
+ * `node_modules` that is one link (`shared`) is left as it is. It does not throw: a failed install is said in `deps`, and tried again
+ * at the next filing.
+ */
+export async function keepWorktreeInstalled(
+  home: string,
+  runId: string,
+  repo: string,
+  worktree: string,
+): Promise<Reinstalled | undefined> {
+  const modules = lstatOf(path.join(worktree, 'node_modules'));
+  const tree = !modules ? 'none' : modules.isSymbolicLink() ? 'shared' : 'own';
+  const due = worktreeDeps({
+    ours: isRunWorktree(home, runId, repo, worktree),
+    lockfile: fs.statSync(path.join(worktree, 'package-lock.json'), { throwIfNoEntry: false })?.isFile() ?? false,
+    tree,
+    parting: tree === 'own' ? worktreeParts(worktree) : null,
+  });
+  if (due.act === 'keep') return undefined;
+  if (due.act === 'reprovision') {
+    try {
+      clearDeps(worktree);
+    } catch (err) {
+      return { ...due, kept: { kept: 'untouched' }, deps: { tree: 'failed', error: (err as Error).message } };
+    }
+  }
+  const kept = await keepCheckoutInstalled(home, repo);
+  const provisioned = await provisionDeps(repo, worktree);
+  const deps: Provisioned = kept.kept === 'failed' && provisioned.tree === 'absent' ? { tree: 'failed', error: kept.error } : provisioned;
+  return { ...due, kept, deps };
+}
+
+/** Whether `worktree` lies, by real path, under the store's `worktrees/<runId>/`, and is neither `repo` nor inside it. */
+function isRunWorktree(home: string, runId: string, repo: string, worktree: string): boolean {
+  try {
+    const real = fs.realpathSync(worktree);
+    const repoReal = realOr(repo);
+    return (
+      inside(realOr(path.join(home, 'worktrees', runId)), real) !== null && real !== repoReal && inside(repoReal, real) === null
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the run's log says of a worktree's `node_modules` brought to its lockfile before a filing (`keepWorktreeInstalled`): that it was
+ * provisioned again and where its lockfile parted from it, then the checkout's own install and the tree's notes as a cut says them. Of a
+ * worktree that had none, only what a cut would say. Pure.
+ */
+export function reinstalledNotes(repo: string, r: Reinstalled): string[] {
+  return [
+    ...(r.act === 'reprovision'
+      ? [`node_modules: provisioned again — its package-lock.json asks for ${r.because}, which its node_modules lacked`]
+      : []),
+    ...keptNotes(repo, r.kept),
+    ...depsNotes(r.deps),
+  ];
 }
 
 /**
@@ -444,7 +588,8 @@ const followedBy = Effect.fn('followedBy')(function* (place: Place, repo: string
  * conflicts is left conflicted, its paths answered (`conflicts`) for the step's brief: resolving it is the job. The dependencies are
  * provisioned after, in the workspace the place made, on the merged tree and its lockfile — once a checkout Nemia cloned has its own
  * install brought current (`keepCheckoutInstalled`), so they are hardlinked from it; a clone whose install failed and has no tree to
- * link gives the step `failed`, which its brief says, rather than nothing.
+ * link gives the step `failed`, which its brief says, rather than nothing. A workspace already cut, and one a step inherits, is read
+ * against its lockfile first, and provisioned again where they part (`keepWorktreeInstalled`).
  *
  * Before any of it, a run that cuts worktrees has its place bring the repository's checkout up to its remote (`follow`): the base a step
  * merges (`main-worktree/HEAD` in git's words) is then the remote's, whoever landed on it, and a checkout that cannot be moved is left
@@ -475,7 +620,13 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   if (plan.kind === 'base') return cut({ workspace: run.repo, branch: run.branch, notes: followed });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
-    return cut({ workspace: parent.workspace, branch: parent.branch, notes: followed });
+    const again = yield* Effect.promise(() => keepWorktreeInstalled(home, run.id, run.repo, parent.workspace));
+    return cut({
+      workspace: parent.workspace,
+      branch: parent.branch,
+      ...(again ? { deps: again.deps } : {}),
+      notes: [...followed, ...(again ? reinstalledNotes(run.repo, again) : [])],
+    });
   }
   const asked = yield* madeBy(place, {
     repo: run.repo,
@@ -487,15 +638,20 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (
   });
   if (!('made' in asked)) return asked;
   const { made } = asked;
-  const kept = yield* Effect.promise(() => keepCheckoutInstalled(home, run.repo));
-  const provisioned = yield* Effect.promise(() => provisionDeps(run.repo, made.workspace));
+  const again = yield* Effect.promise(() => keepWorktreeInstalled(home, run.id, run.repo, made.workspace));
+  const kept = again?.kept ?? (yield* Effect.promise(() => keepCheckoutInstalled(home, run.repo)));
+  const provisioned = again?.deps ?? (yield* Effect.promise(() => provisionDeps(run.repo, made.workspace)));
   const deps: Provisioned = kept.kept === 'failed' && provisioned.tree === 'absent' ? { tree: 'failed', error: kept.error } : provisioned;
   return cut({
     workspace: made.workspace,
     branch: made.branch,
     ...(made.conflicts.length ? { merge: { conflicts: made.conflicts, say: place.declared.say.conflicts } } : {}),
     deps,
-    notes: [...followed, ...made.notes, ...keptNotes(run.repo, kept), ...depsNotes(deps)],
+    notes: [
+      ...followed,
+      ...made.notes,
+      ...(again?.act === 'reprovision' ? reinstalledNotes(run.repo, again) : [...keptNotes(run.repo, kept), ...depsNotes(deps)]),
+    ],
   });
 });
 

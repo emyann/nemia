@@ -8,6 +8,9 @@ import { factoriesShown } from '@/lib/factories';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { cn } from '@/lib/utils';
 import { StartFab } from '../factory/FactoryStart';
+import { NemiaRailFace } from '../nemia/NemiaRailFace';
+import { useNemiaPresence } from '../nemia/useNemiaPresence';
+import { useFrameFold, useHerSheet, useOwnsChat } from './HerSheet';
 import { destinationHref, destinationOf, DESTINATIONS, frameRunsQuery, pickedOf } from '../nav/nav';
 
 /** What the Runs badge says to a screen reader: how many runs wait on you. */
@@ -40,10 +43,16 @@ function useRailItems(path: string, search: Record<string, unknown>): Navigation
   }));
 }
 
-/** The button that opens and closes the rail, or on a narrow screen its drawer: named for what a press does. */
+/**
+ * The button that opens and closes the rail, or on a narrow screen its drawer: named for what a press does. While the rail is narrow only
+ * for her side sheet (`foldedForSheet`), a press asks for it back beside the sheet and writes no `sidebar_state` cookie, the person's fold
+ * being open already.
+ */
 export function MenuButton() {
-  const { open, isMobile, openMobile, toggleSidebar } = useSidebar();
-  const shown = isMobile ? openMobile : open;
+  const { isMobile, openMobile, toggleSidebar } = useSidebar();
+  const fold = useFrameFold();
+  const { askRail } = useHerSheet();
+  const shown = isMobile ? openMobile : fold.rail === 'expanded';
   return (
     <IconButton
       data-menu-button
@@ -51,19 +60,29 @@ export function MenuButton() {
       icon={PanelLeft}
       aria-label={shown ? 'Close the menu' : 'Open the menu'}
       aria-expanded={shown}
-      onPress={toggleSidebar}
+      onPress={!isMobile && fold.foldedForSheet ? askRail : toggleSidebar}
     />
   );
 }
 
+/** Nemia's face at the page at `path` with `search`, which opens and closes her side sheet (`HerSheet`). */
+export function HerFace({ path, search }: { path: string; search: Record<string, unknown> }) {
+  const sheet = useHerSheet();
+  const presence = useNemiaPresence(path, search);
+  const ownsChat = useOwnsChat();
+  return <NemiaRailFace presence={presence} open={sheet.open} ownsChat={ownsChat} onToggle={sheet.toggle} />;
+}
+
 /**
- * The frame's rail at `path` with `search`, the whole height of the window at its left: the menu button and the FAB that starts a run
- * (`StartFab`) above the kit's `NavigationRail`, 97 pixels closed and 221 open, with its labels beside the icons, as this browser's
- * `sidebar_state` cookie last left it; the destination the page lights is lit. On a narrow screen the rail leaves the page's side, and the
- * menu button of the top bar opens the same destinations in the kit's modal drawer, which a pick closes.
+ * The frame's rail at `path` with `search`, the whole height of the window at its left: Nemia's face (`HerFace`), then the menu button
+ * and the FAB that starts a run (`StartFab`) above the kit's `NavigationRail`, 97 pixels closed and 221 open, with its labels beside the
+ * icons, as this browser's `sidebar_state` cookie last left it, or narrow while her side sheet is open beside a page under 1600
+ * (`useFrameFold`); the destination the page lights is lit. On a narrow screen the rail leaves the page's side, and the menu button of
+ * the top bar opens the same destinations in the kit's modal drawer, which a pick closes.
  */
 export function FrameRail({ path, search }: { path: string; search: Record<string, unknown> }) {
-  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const open = useFrameFold().rail === 'expanded';
   const picked = pickedOf(path, search);
   const items = useRailItems(path, search);
   const selected = destinationOf(path)?.id ?? null;
@@ -87,6 +106,9 @@ export function FrameRail({ path, search }: { path: string; search: Record<strin
     >
       <div data-rail-scroll className="flex min-h-0 flex-col overflow-y-auto">
         <div className={cn('flex flex-col gap-1.5 pt-2.5 pb-3.5', open ? 'items-start px-5' : 'items-center')}>
+          <span className={cn('flex pt-1 pb-2', open ? 'px-1' : 'justify-center')}>
+            <HerFace path={path} search={search} />
+          </span>
           <MenuButton />
           <StartFab name={picked} isExtended={open} />
         </div>

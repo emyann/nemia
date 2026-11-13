@@ -1,5 +1,15 @@
 import path from 'node:path';
-import { dockFaceOf, expectCardKeys, expectInstant, expectRendered, expectSource, filesIn, sidebar, railPlace, litOf } from '../board.ts';
+import {
+  expectUncovered,
+  expectCardKeys,
+  expectInstant,
+  expectRendered,
+  expectSource,
+  filesIn,
+  sidebar,
+  railPlace,
+  litOf,
+} from '../board.ts';
 import { expectCount, expectVisible, Refused } from '../checks.ts';
 import { CARDS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -45,12 +55,10 @@ export default {
 
     await expectCardKeys(page, file, rich.name, { workflow: rich.workflow, model: rich.model });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const lastRow = await file.locator('section[aria-label="Keys"] tr[data-key]').last().boundingBox();
-    const dock = await dockFaceOf(page).locator('..').boundingBox();
-    if (!lastRow || !dock || lastRow.y + lastRow.height > dock.y)
-      throw new Refused(
-        `the last key row ends above Nemia's dock once the page is scrolled to its end — row ${JSON.stringify(lastRow)}, dock ${JSON.stringify(dock)}`,
-      );
+    await expectUncovered(
+      file.locator('section[aria-label="Keys"] tr[data-key]').last(),
+      'the last key row is in the window with nothing over it once the page is scrolled to its end',
+    );
     await page.evaluate(() => window.scrollTo(0, 0));
     await expectSource(file, body, path.join(inbox, `${rich.name}.md`));
     if (JSON.stringify(filesIn(inbox)) !== JSON.stringify(before))

@@ -29,7 +29,7 @@ type CueHue = 'yours' | 'alive' | 'failure' | 'none';
 /** A cue: its hue and its words. */
 type Cue = { hue: CueHue; words: string };
 
-/** A presence that may hold: whether it holds, the face it gives, its cue, and the sentence her docked face says it in. */
+/** A presence that may hold: whether it holds, the face it gives, its cue, and the sentence her face in the rail says it in. */
 type Fact = {
   holds: (presence: Presence) => boolean;
   face: FaceExpression;
@@ -82,9 +82,15 @@ export const faceOf = (presence: Presence): FaceExpression => FACE_ORDER.find((f
 /** The cue of every presence that holds, in the owner's order; none when she is only up. */
 export const cuesOf = (presence: Presence): Cue[] => FACE_ORDER.filter((fact) => fact.holds(presence)).map((fact) => fact.cue(presence));
 
+/** Where her face in the rail stands: her chat closed, her sheet open, or the page itself her chat's own (`/chat`). */
+export type FaceAt = 'closed' | 'open' | 'page';
+
+/** What a press of her face does at `at`, said first in her face's name. */
+const FACE_DOES: Record<FaceAt, string> = { closed: "Open Nemia's chat.", open: "Close Nemia's chat.", page: "Nemia's chat is this page." };
+
 /**
- * What her docked face is called, by the presence that gives it its expression — the first in the owner's order that holds, her session
- * being up where none does — and by whether the panel it opens is already open: `Open Nemia's chat. 2 wait on you.`
+ * What her face in the rail is called, by the presence that gives it its expression — the first in the owner's order that holds, her
+ * session being up where none does — and by where it stands (`at`): `Open Nemia's chat. 2 wait on you.`
  */
-export const dockWords = (presence: Presence, open: boolean): string =>
-  `${open ? 'Close' : 'Open'} Nemia's chat. ${FACE_ORDER.find((fact) => fact.holds(presence))?.says(presence) ?? 'Her session is up.'}`;
+export const dockWords = (presence: Presence, at: FaceAt): string =>
+  `${FACE_DOES[at]} ${FACE_ORDER.find((fact) => fact.holds(presence))?.says(presence) ?? 'Her session is up.'}`;

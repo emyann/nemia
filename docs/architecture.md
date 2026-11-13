@@ -359,9 +359,10 @@ factory, `default` for none; another namespace's is a 404), the route of the run
 sides, its `--raw` record the CLI's alone), and refuses any `?view=` with a 422 naming what to read instead. The runs are a `RunList` at
 `GET /api/runs` and `GET /api/namespaces/<factory>/runs`, paged by `?limit=` and `?continue=` and selected by `?labelSelector=`, for
 a client and for the board: its floor, strips and pickers read the RunList whole, and its frame the RunList asked by state
-(`?fieldSelector=status.state=<state>`, `==` or `!=`), which judges every run of its namespace through the informer to count them
-(`metadata.counts`) and lays the frame's parts on each run's status, measured to `metadata.asOf`, the finished newest first by their
-own `continue` token. The
+(`?fieldSelector=status.state=<state>`, `==` or `!=`), or by a finished run's outcome (`status.outcome=<outcome>`, `==` or `!=`, by
+which the floor reads the runs nobody decided beside those not finished), which judges every run of its namespace through the
+informer to count them (`metadata.counts`) and lays the frame's parts on each run's status, measured to `metadata.asOf`, the finished
+newest first by their own `continue` token. The
 board reads the object, each step's tries and told at `…/steps/:step/tries` and `…/steps/:step/told`, keyed by the step's stamp so a step
 reads again only when it moved, and the lines once at `GET /api/runs/:runId/lines` (`RunLinesAnswer`, mirrored by hand); the api's tests
 read the same. The run's named actions — its start (`POST /api/namespaces/<factory>/runs`), removal, refresh, prune, labels, hold and

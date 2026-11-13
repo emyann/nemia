@@ -1,8 +1,9 @@
 /**
  * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port, each parsed against its words
  * in `objects`. `nemia show` prints the run object and `show --raw` its record; `closeout` and `closeout --try` print a try's closeout a
- * field a line; `nemia ls <run>` prints the run off its object (`GET /api/runs/:name`), its steps' lines and what it asks of you, under
- * this machine's context and under a remote one pointed at the same api — each held to the lines the in-process reads printed of the
+ * field a line, and what its printer (`closeoutPrinted`) says of the answers the seed holds none of are rows of `CLOSEOUT_PRINTED`, typed
+ * by the api's Schema; `nemia ls <run>` prints the run off its object (`GET /api/runs/:name`), its steps' lines and what it asks of you,
+ * under this machine's context and under a remote one pointed at the same api — each held to the lines the in-process reads printed of the
  * same seed before they were deleted. `nemia ls` and `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked
  * with `TABLE_ACCEPT`, with `-l`, `--show-labels` and `-L` on a labelled run and card. Each read is seen asking the api, by the request
  * line the api says. `nemia ls` over a runs list the api answers in pages, each but the last with a `continue`, prints a line per run of
@@ -20,9 +21,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { LIST_PAGE } from 'objects';
+import { LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
 import { configWritten } from '../src/context.ts';
+import { closeoutPrinted } from '../src/reads/closeout.ts';
 import { scratch } from 'test-kit/scratch';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -474,6 +476,137 @@ test("`nemia closeout <run> <step> [--try <n>]` prints a try's closeout a field 
     assert.match(api.said().slice(before), route, 'it asked the api');
   }
 });
+
+/** A try's closeout with nothing but its outcome and summary, which each row of `CLOSEOUT_PRINTED` fills with what it holds. */
+const bare: StepCloseout = {
+  apiVersion: 'nemia/v1',
+  outcome: 'done',
+  summary: 'Built it.',
+  body: null,
+  needs: null,
+  artifacts: [],
+  values: [],
+  refused: [],
+  output: {},
+  missing: [],
+  replies: null,
+  schema: {},
+  questions: [],
+  raw: {},
+};
+
+/**
+ * What `closeoutPrinted` says of a decoded answer the seed above does not hold: each row a try as the api's Schema types it, a line each
+ * of `said` holds, and each pair of `under` a line holding the first with the next line holding the second.
+ */
+const CLOSEOUT_PRINTED: readonly {
+  what: string;
+  read: TryCloseout;
+  said: readonly string[];
+  under?: readonly (readonly [string, string])[];
+  lines?: number;
+}[] = [
+  {
+    what: 'each output field by its name and value, a string as it is and anything else as JSON',
+    read: { try: 2, unreadable: null, closeout: { ...bare, output: { again: true, verdict: 'pass', findings: [{ file: 'a.ts' }] } } },
+    said: ['output:', '  again: true', '  verdict: pass', '  findings: [{"file":"a.ts"}]'],
+  },
+  {
+    what: 'a value it handed on by its name and value',
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: { ...bare, values: [{ name: 'pull request', value: 'https://example.test/pr/1', link: 'https://example.test/pr/1' }] },
+    },
+    said: ['values:', '  pull request: https://example.test/pr/1'],
+  },
+  {
+    what: "each reply to a finding, its answer on the finding's line and its why on the line under it",
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: {
+        ...bare,
+        replies: [
+          { finding: 'the flag is unnamed', answer: "won't fix", why: 'the spec names it in the next card' },
+          { finding: 'a test is missing', answer: 'fixed', why: 'added beside the printer' },
+        ],
+      },
+    },
+    said: ['replies:'],
+    under: [
+      ["won't fix: the flag is unnamed", 'the spec names it in the next card'],
+      ['fixed: a test is missing', 'added beside the printer'],
+    ],
+  },
+  {
+    what: 'a try with no closeout yet says so in one line, naming the try and its step',
+    read: { try: 3, closeout: null, unreadable: null },
+    said: ['try 3', 'implement', 'no closeout yet'],
+    lines: 1,
+  },
+  {
+    what: 'a try whose closeout does not read says why in one line',
+    read: { try: 1, closeout: null, unreadable: { error: 'Unexpected token } in JSON', raw: '{]' } },
+    said: ['try 1', 'implement', 'Unexpected token } in JSON'],
+    lines: 1,
+  },
+  {
+    what: 'its body, after a blank line, where it says more than its summary',
+    read: { try: 2, unreadable: null, closeout: { ...bare, body: 'Two names would do.' } },
+    said: ['try 2: done: Built it.', 'Two names would do.'],
+    lines: 3,
+  },
+  {
+    what: 'a body that only repeats its summary, once',
+    read: { try: 2, unreadable: null, closeout: { ...bare, body: 'Built it.' } },
+    said: ['Built it.'],
+    lines: 1,
+  },
+  {
+    what: "its questions' titles on one line",
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: {
+        ...bare,
+        outcome: 'blocked',
+        questions: [
+          {
+            field: 'questions',
+            questions: [
+              { title: 'Which flag name?', body: '', options: [], recommended: null, multiple: false },
+              { title: 'Ship it behind a gate?', body: '', options: [], recommended: null, multiple: false },
+            ],
+          },
+        ],
+      },
+    },
+    said: ['Which flag name?', 'Ship it behind a gate?'],
+  },
+  {
+    what: 'what it left out and what it was refused',
+    read: { try: 2, unreadable: null, closeout: { ...bare, missing: ['verdict', 'findings'], refused: ['Bash(git push)'] } },
+    said: ['verdict', 'findings', 'refused:', '  Bash(git push)'],
+  },
+];
+
+for (const { what, read, said, under = [], lines } of CLOSEOUT_PRINTED) {
+  test(`\`nemia closeout\` prints ${what}`, () => {
+    const printed = closeoutPrinted(read, 'implement');
+    for (const fact of said)
+      assert.ok(
+        printed.some((line) => line.includes(fact)),
+        `a line holds ${fact}: ${printed.join('\n')}`,
+      );
+    for (const [line, next] of under) {
+      const at = printed.findIndex((l) => l.includes(line));
+      assert.ok(at >= 0, `a line holds ${line}: ${printed.join('\n')}`);
+      assert.ok(printed[at + 1]?.includes(next), `the line under ${line} holds ${JSON.stringify(next)}: ${printed.join('\n')}`);
+    }
+    if (lines !== undefined) assert.equal(printed.length, lines, printed.join('\n'));
+  });
+}
 
 /** The lines the in-process `nemia ls <run>` printed of each seeded run, between the pause and the standing line, before it was deleted. */
 const ONE_RUN: Readonly<Record<string, readonly string[]>> = {

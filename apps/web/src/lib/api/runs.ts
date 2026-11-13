@@ -1,7 +1,8 @@
 /**
  * The runs as the board reads them off the RunList (`runs.listAll`, `runs.list`), each made the board's one view of a run (`runViewOf`)
  * or said unjudged (`UnjudgedRun`): the light answer of the runs not finished (`openRunsQuery`), the finished runs a page at a time
- * (`finishedRunsQuery`, `finishedPagesQuery`) or those finished today (`finishedTodayQuery`), and a label's runs whole
+ * (`finishedRunsQuery`, `finishedPagesQuery`) or those finished today (`finishedTodayQuery`), the finished runs nobody decided
+ * (`undecidedRunsQuery`), and a label's runs whole
  * (`runsSelectedQuery`); and a run's named actions, each in the run's namespace. No page reads every run (`test/structure.test.ts`).
  */
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
@@ -113,6 +114,9 @@ export const OPEN_SELECTOR = 'status.state!=finished';
 /** The field selector of the finished runs, newest finished first. */
 export const FINISHED_SELECTOR = 'status.state=finished';
 
+/** The field selector of the finished runs nobody decided: their work is done, and their result waits on a person. */
+export const UNDECIDED_SELECTOR = 'status.outcome=undecided';
+
 /** A list of runs, of every factory or of `factory` alone (its namespace, `default` the runs of none). */
 const listOf = (factory: string | undefined, query: RunListQuery): Promise<RunList> =>
   factory === undefined ? runs.listAll(query) : runs.list(factory, query);
@@ -163,6 +167,19 @@ export function finishedOf(list: RunList): FinishedPage {
     continue: list.metadata.continue || null,
   };
 }
+
+/**
+ * The finished runs nobody decided (`GET /api/runs?fieldSelector=status.outcome=undecided`, every page of them), of every factory or of
+ * `factory` alone, newest finished first: a run that waits on a person though it is finished, which the floor shows whether Show finished
+ * is on or not. Keyed `['runs-finished', factory, 'undecided']`, so the feed and a write read it again as they read every page of the
+ * finished runs, a decision or a merge taking it off; paced as `runsSelectedQuery` is.
+ */
+export const undecidedRunsQuery = (factory?: string) =>
+  queryOptions({
+    queryKey: ['runs-finished', factory ?? null, 'undecided'],
+    queryFn: () => listOf(factory, { fieldSelector: UNDECIDED_SELECTOR }).then((list) => finishedOf(list).runs),
+    refetchInterval: () => pace(5_000),
+  });
 
 /** How many finished runs a page of the board holds. */
 export const FINISHED_SIZE = 9;

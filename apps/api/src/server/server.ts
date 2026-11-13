@@ -164,7 +164,9 @@ export const serverHandlers = readsBounded(Api, 'server', (handlers) =>
     .handle('quota', () =>
       answered(({ e, env, quota }) => quota({ env, harness: DEFAULT_HARNESS, ask: () => engineRead('quota', e.quota(DEFAULT_HARNESS)) })),
     )
-    .handle('stats', ({ query, request }) => answered((s) => statsOf({ ...query, selector: selectorsOf(request) }, s)))
+    .handle('stats', ({ query: { labelSelector, ...query }, request }) =>
+      answered((s) => statsOf({ ...query, selector: [...[labelSelector ?? []].flat(), ...selectorsOf(request)] }, s)),
+    )
     .handle('paused', () => answered((s) => s.inRequest(PAUSED.handler({}))))
     .handle('pauseNow', () => answered((s) => s.inRequest(PAUSE_NOW.handler({}, { records: { pause: s.memo.records.pause } }))))
     .handle('pauseTimeout', () => answered((s) => s.inRequest(PAUSE_TIMEOUT.handler({}))))

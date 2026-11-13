@@ -17,7 +17,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { scratch } from 'test-kit/scratch';
-import { main } from '../cli/main.ts';
+import { typed as handledArgv } from '../../test/typed.ts';
 import { PHASES, type RecentPass } from '../meter/meter.ts';
 import { metered } from '../meter/tally.store.ts';
 import {
@@ -97,19 +97,8 @@ const filesNow = () =>
     days(ROOT, tier).map((d) => `${tier}/${d}:${fs.statSync(dayFile(ROOT, tier, d)).mtimeMs}`),
   );
 
-/** What `nemia argv` printed on stdout, line by line. */
-const typed = async (t: TestContext, argv: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.map(String).join(' '));
-  });
-  try {
-    await main(argv, noEngine(), undefined, undefined, ENV);
-  } finally {
-    log.mock.restore();
-  }
-  return printed;
-};
+/** `argv` run on its entry's handler over this file's store, `ENV`: what it answers. */
+const typed = (argv: readonly string[]) => handledArgv(argv, noEngine(), undefined, undefined, ENV);
 
 /** That `err` is a refusal of kind `tag` with exit 2. */
 const refusedAs =
@@ -200,7 +189,7 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
   },
   {
     name: 'REFUSED: `nemia series --range 2w`, a range it does not take, as Invalid with exit 2',
-    check: () => assert.rejects(main(['series', '--range', '2w'], noEngine(), undefined, undefined, ENV), refusedAs('Invalid')),
+    check: () => assert.rejects(typed(['series', '--range', '2w']), refusedAs('Invalid')),
   },
 ];
 
@@ -278,10 +267,10 @@ const KEPT: { name: string; check: (t: TestContext) => void | Promise<void> }[] 
     },
   },
   {
-    name: '`nemia series --json` is the answer the api serves',
-    check: async (t) => {
+    name: '`nemia series` answers what the api serves',
+    check: async () => {
       appendLines(ROOT, 'hour', [line('2026-01-02T03:00:00.000Z', 7)]);
-      const answer = JSON.parse((await typed(t, ['series', '--range', 'all', '--json'])).join('\n'));
+      const answer = JSON.parse(JSON.stringify(await typed(['series', '--range', 'all', '--json'])));
       assert.ok(
         answer.series.some((x: { s: string }) => x.s === 'store.runs'),
         'the line kept is in the answer',

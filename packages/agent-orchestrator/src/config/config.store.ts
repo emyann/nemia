@@ -263,12 +263,6 @@ export const sessionToken = (env: Env): string | undefined => env.WF_SESSION_TOK
 export const SESSION_VARIABLES = ['WF_SESSION_TOKEN', 'WF_MEMORY_LIMIT', 'WF_CGROUP_PARENT'] as const;
 
 /**
- * What forwards the command line to another machine's daemon: its api's address, and the token it presents there, which the client
- * sets on the CLI it spawns under a context naming a remote daemon. A test seat drops them, so a person's shell never forwards a test.
- */
-export const FORWARD_VARIABLES = ['NEMIA_SERVER', 'NEMIA_SERVER_TOKEN'] as const;
-
-/**
  * The daemon's serving variables: where its api listens (`NEMIA_BIND`) and whether its store is marked exposed (`WF_EXPOSED`), which a
  * service bound beyond its machine sets in its unit and so every session and check it runs inherits. A test seat drops them, so an api a
  * test starts listens on the loopback and the store it made reads as not exposed, as on CI; a test that means one sets it itself.

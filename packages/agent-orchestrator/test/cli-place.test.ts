@@ -1,12 +1,13 @@
 /**
- * A command of the CLI asks the place `main` is handed, as it talks to the engine it is handed: `nemia start`, `nemia decide` and
- * `nemia rm`, typed in this process over the test place, on a repository git never made. No file of `src/cli` names the git place but
+ * A command asks the place it is handed, as it talks to the engine it is handed: `nemia start` and `nemia rm` on their entries'
+ * handlers, as the api calls them, and the run's decision read as the api reads it (`decisionRead`), in this process over the test
+ * place, on a repository git never made. No file of `src/cli` names the git place but
  * `main`, once, as the place it takes when it is handed none (`placeNamed`), which holds the commands this file does not type.
  *
  * The test's store is its own, at `ROOT`, given as `ENV`. The file sets what its starts depend on itself: a run on a
  * repository no factory holds goes to the default factory (`WF_DEFAULT_FACTORY_STARTS`), and a command that ticks starts no daemon.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,7 +15,10 @@ import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runOver } from './placed.ts';
 import { scratch } from 'test-kit/scratch';
-import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
+import { forgetTyped } from './forgetting.ts';
+import { decisionOf } from './screens.ts';
+import { countsLine } from '../src/branches/branches.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { advanceRun, runWith as runEngine } from '../src/runner.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
@@ -45,20 +49,6 @@ const advanced = (id: string) => runWith(engineOf(engine().layer), advanceRun(ru
 /** A pass of the tick's over every run of the store, on this test's engine and place: where their branches stand, written down. */
 const aPass = () => runWith(engineOf(engine().layer), passStanding(listRuns(ROOT)));
 
-/** `nemia`, typed with `argv` and handed this test's engine and place: the lines it printed. */
-async function typed(t: TestContext, ...argv: string[]): Promise<string[]> {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await main(argv, engineOf(engine().layer), undefined, stand().place, ENV);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-}
-
 /** A workflow folder of one step, `implement`, which works in a workspace of its own. */
 function oneStep(): string {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -66,12 +56,18 @@ function oneStep(): string {
   return dir;
 }
 
-test('a run started, read once a pass has read where its branch stands, and removed through `main` is answered by the place `main` was handed, on a repository git never made', async (t) => {
+test('a run started, read once a pass has read where its branch stands, and removed is answered by the place it was handed, on a repository git never made', async () => {
   const { world } = stand();
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const base = world.repository(repo, { 'a.txt': 'one\n' });
 
-  const id = (await typed(t, 'start', 'add a flag', '--workflows', oneStep(), '--repo', repo))[0].split(' ')[0];
+  const { id } = (await onHandler(
+    ['start', 'add a flag', '--workflows', oneStep(), '--repo', repo],
+    engineOf(engine().layer),
+    undefined,
+    stand().place,
+    ENV,
+  )) as { id: string };
   assert.equal(runRecord(ROOT, id).baseRef, base, 'nemia start opened the place it was handed, which answered the commit the handle made');
   assert.equal(fs.existsSync(path.join(repo, '.git')), false, 'and git made nothing there');
 
@@ -84,15 +80,23 @@ test('a run started, read once a pass has read where its branch stands, and remo
   engine().settle(`${id}-implement`, 'failed', {});
   await advanced(id);
   await aPass();
-  const decided = (await typed(t, 'decide', id)).join('\n').split('\n');
-  assert.match(decided[0], new RegExp(`^${id}`), 'nemia decide read the run');
-  assert.ok(
-    decided.includes(`  branch    wf/${id}/${LINE_NAME} is ahead of main by 1 commit`),
-    `where the branch stands is the handed place's answer: git never made this repository\n${decided.join('\n')}`,
+  const read = await decisionOf(engineOf(engine().layer), id, { place: stand().place, env: ENV });
+  assert.equal(read.run.id, id, 'the decision read the run');
+  const { decision } = read;
+  assert.ok('standings' in decision, JSON.stringify(decision));
+  assert.deepEqual(
+    decision.standings.map((x) => x.said),
+    [`wf/${id}/${LINE_NAME} is ahead of main by 1 commit`],
+    "where the branch stands is the handed place's answer: git never made this repository",
   );
-  assert.ok(decided.includes(`  wf/${id}/${LINE_NAME}  — 1 file: +1 −0`), `and what it changed is too\n${decided.join('\n')}`);
+  assert.deepEqual(
+    read.results.map((r) => [r.branch, 'error' in r.radius ? r.radius.error : countsLine(r.radius)]),
+    [[`wf/${id}/${LINE_NAME}`, '1 file: +1 −0']],
+    'and what it changed is too',
+  );
 
-  await typed(t, 'rm', id);
+  const forgot = await forgetTyped((effect) => runWith(engineOf(engine().layer), effect), ROOT, ['rm', id]);
+  assert.equal(forgot.error, undefined, forgot.printed.join('\n'));
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false, 'nemia rm forgot the run');
   assert.equal(fs.existsSync(workspace), false, 'its workspace removed by the place it was handed');
   assert.notEqual(world.tip(repo, `wf/${id}/${LINE_NAME}`), base, 'what the step left handed off on its branch first');
@@ -133,7 +137,7 @@ test('REFUSED: a file of `src/cli` that names the git place — a program given 
   const mainFile = files.find(({ file }) => file === 'src/cli/main.ts');
   assert.ok(mainFile, 'src/cli/main.ts is read');
   assert.match(mainFile.text, DEFAULT, '`main` takes the git place when it is handed none');
-  assert.ok(files.length >= 5, `the CLI's files are read: ${files.map(({ file }) => file).join(', ')}`);
+  assert.ok(files.length >= 4, `the CLI's files are read: ${files.map(({ file }) => file).join(', ')}`);
   assert.deepEqual(
     files.flatMap(({ file, text }) => placeNamed(text).map((named) => `${file}: ${named}`)),
     [],

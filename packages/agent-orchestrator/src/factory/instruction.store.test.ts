@@ -22,7 +22,7 @@ import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, runWith as r
 import { readFactoriesAt, setInstructionAt } from './factory.store.ts';
 import { readInstructionAt, writeInstructionText } from './instruction.store.ts';
 import { clearRules, readRules, writeRules } from './rules/rules.store.ts';
-import { main as cli } from '../cli/main.ts';
+import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -32,8 +32,8 @@ const FACTORIES = path.join(ROOT, 'factories');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
-/** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
+/** `nemia <argv>` read by its entry's words and run onto its handler, as the api calls it, given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof typed>[1]) => typed(argv, e, undefined, stand().place, ENV);
 
 const engine = eachTest(testEngine);
 heldUnasked(engine);

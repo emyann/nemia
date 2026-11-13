@@ -39,10 +39,21 @@ import { engineOf } from '../src/runtime-client.ts';
 import { artifactsDir, inputsDir, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { factsOf, typed as onHandler, type StartedAnswer } from './typed.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-mounts-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: '100' };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? onHandler(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 type Mount = { path: string; readOnly: boolean };
 type Refusal = Error & { _tag?: string; exitCode?: number };
@@ -99,6 +110,9 @@ const filedFor = (id: string, step: string) => filings().get(runRecord(ROOT, id)
 /** One pass of the run `id`, on the stage's engine. */
 const pass = (id: string) => stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
 
+/** What `nemia start` answers: what its handler answered, and the facts the client words (`StartedAnswer`). */
+const started = async (argv: string[]): Promise<StartedAnswer> => factsOf((await stage.main(['start', ...argv])) as Started);
+
 /** What `nemia <argv>` prints, a line each. */
 async function typed(argv: string[]): Promise<string[]> {
   const lines: string[] = [];
@@ -149,8 +163,8 @@ test('mounts on every filing: a factory run whose implement writes one folder of
   await s.test(
     'nemia start freezes the other repositories on the record read-only, and says them and the one implement alone writes',
     async () => {
-      const out = await typed(['start', 'build it', '--workflows', wide, '--factory', 'trio', '--repo', own, '--input', given]);
-      id = out[0].split(' ')[0];
+      const out = await started(['build it', '--workflows', wide, '--factory', 'trio', '--repo', own, '--input', given]);
+      id = out.id;
       const run = runRecord(ROOT, id);
       inputs = inputsDir(ROOT, run);
       assert.deepEqual(run.mounts, readOnly(web, docs), 'read back');
@@ -159,12 +173,11 @@ test('mounts on every filing: a factory run whose implement writes one folder of
         readOnly(web, docs),
         'as written',
       );
-      names(out.join('\n'), `mounts: ${web}, ${docs}`, `writable: ${web}`, 'for implement alone');
-      assert.equal(
-        out.some((l) => l.startsWith('not mounted')),
-        false,
-      );
+      assert.deepEqual(out.facts.mounts, [web, docs], 'the start says the folders it mounts, in order');
+      assert.deepEqual(out.facts.writable, [{ path: web, steps: ['implement'] }], 'and the one implement alone writes');
+      assert.equal(out.notMounted, undefined, 'and none left out');
       frozen = path.join(ROOT, 'runs', id, 'workflow', String(run.workflowFiles));
+      assert.equal(out.facts.workflowFiles, frozen, "the start says where it copied its workflow's files");
       writes = [{ path: web, readOnly: false }, ...readOnly(docs, inbox, inputs, frozen)];
     },
   );
@@ -312,9 +325,10 @@ test('where a run mounts less: the default factory and a factory of one reposito
     'a factory folder that is no directory at start is left out of the mounts, and nemia start says so; none left, the record has no key',
     async () => {
       fs.rmSync(repos[2], { recursive: true });
-      const out = await typed(['start', 'build it', '--workflows', plain, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
-      assert.deepEqual(runRecord(ROOT, out[0].split(' ')[0]).mounts, readOnly(repos[1]));
-      names(out.join('\n'), `not mounted: ${repos[2]}`, 'start again once it is there');
+      const out = await started(['build it', '--workflows', plain, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
+      assert.deepEqual(runRecord(ROOT, out.id).mounts, readOnly(repos[1]));
+      assert.deepEqual(out.notMounted, [repos[2]], 'the start says the folder it left out');
+      assert.deepEqual(out.facts.mounts, [repos[1]]);
       fs.rmSync(repos[1], { recursive: true });
       const none = await stage.runPlaced(
         startRun({ brief: 'build it', repo: repos[0], workflowDir: plain, isolate: false, factory: 'trio' }),

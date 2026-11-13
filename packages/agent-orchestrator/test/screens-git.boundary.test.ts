@@ -1,14 +1,15 @@
 /**
- * What a person and a step read in the git place's own words, told as four stories: the whole screens of `nemia decide`, each one
- * checkpoint compared line for line, with the branch the repository each test makes is on (`master` named by the fixture, never git's
- * own default, or `main` for a repository with a workspace package) and the commands it offers; a line of `nemia ls` laid out after that
- * branch; the sentence a fan-in is told of the paths its merge left in conflict; what a branch touched where only git says it (a rename,
- * a binary file, a lint config's diff); and the git processes `nemia ls` costs. The test place says each in words of its own, so these
- * keep the git place; what the screens say of a run is told on the test place in decide.test.ts.
+ * What a person and a step read in the git place's own words, told as four stories: the whole decisions a run's read model gives
+ * (`decisionFacts`, what `GET /api/runs/:runId/decision` serves and the client's `nemia decide` prints), each one checkpoint compared
+ * whole, with the branch the repository each test makes is on (`master` named by the fixture, never git's own default, or `main` for a
+ * repository with a workspace package) and the commands it offers; a line of `nemia ls` laid out after that branch; the sentence a fan-in
+ * is told of the paths its merge left in conflict; what a branch touched where only git says it (a rename, a binary file, a lint config's
+ * diff); and the git processes `nemia ls` costs. The test place says each in words of its own, so these keep the git place; what a
+ * decision says of a run is told on the test place in decide.test.ts.
  *
  * The store is the file's own, at `ROOT`, given as `ENV`.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,8 @@ import { type TaskSpec, ForgetRefused } from 'agent-runtime';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
-import { decideScreen } from './screens.ts';
+import { decisionFacts, decisionOf } from './screens.ts';
+import { runLines } from '../src/object/lines.verb.ts';
 import { isRepositoryRun, shownNote } from '../src/run.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
@@ -37,7 +39,8 @@ import {
 import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { metered } from '../src/meter/tally.store.ts';
-import { main } from '../src/cli/main.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-screens-git-');
@@ -50,10 +53,6 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\nplace
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
-
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
-  decideScreen(t, e, argv, as, place, ENV);
 
 /**
  * A repository with one commit, so `nemia start` has a base to record. The screens below quote its branch by name, so the fixture
@@ -226,12 +225,20 @@ const repositoryRunOf = (run: Run): RepositoryRun => {
 const started = async (dir: string) =>
   repositoryRunOf(await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false })));
 
+/** `run`'s whole decision as facts (`decisionFacts`), read on the git place over this file's store, the globs `sensitive` names in full. */
+const whole = async (e: Engine, run: RepositoryRun, sensitive?: readonly string[]) =>
+  decisionFacts(await decisionOf(e, run.id, { place: builtinGitPlace, env: ENV, ...(sensitive ? { sensitive } : {}) }));
+
+/** A task on the clock of a board that stamps no filing: settled before it spawned, its times not known. */
+const UNSPAWNED = ['unspawned', null, null, null, 'never spawned', '—'];
 /**
- * `nemia decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and
- * `<root>`.
+ * The n-th task a timed board filed (`timed`), on its clock: filed 10n minutes after its midnight, spawned 12 s later, ended at 5
+ * minutes.
  */
-const whole = (t: TestContext, e: Engine, run: RepositoryRun, ...flags: string[]): Promise<string[]> =>
-  screenOn(t, e, [run.id, ...flags], { '<id>': run.id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });
+const ranAt = (n: number) => {
+  const at = Date.parse('2026-09-13T00:00:00Z') + n * 600_000;
+  return ['ended', new Date(at).toISOString(), new Date(at + 12_000).toISOString(), new Date(at + 300_000).toISOString(), '12s', '4m48s'];
+};
 
 /** `git` in `repo`, as the test's own identity, its output as text. */
 const git = (repo: string, ...args: string[]) =>
@@ -380,8 +387,8 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
   );
 
   await s.test(
-    'a step whose job was denied a call says so — on `nemia ls` beside its line and on `nemia decide` under it — and its status is unchanged',
-    async (c) => {
+    'a step whose job was denied a call says so — on `nemia ls` beside its line and in the decision under it — and its status is unchanged',
+    async () => {
       const run = await started(folder());
       const b = board();
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
@@ -393,16 +400,6 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
       ]);
       b.settle(taskId, 'succeeded', SIGNED);
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-      const printed: string[] = [];
-      const log = c.mock.method(console, 'log', (...args: unknown[]) => {
-        printed.push(args.join(' '));
-      });
-      const printedBy = async (...args: string[]) => {
-        printed.length = 0;
-        await main(args, b.e, undefined, undefined, ENV);
-        return printed.join('\n');
-      };
-
       const [implement, review] = (await runWith(b.e, list(b.e, runRecord(ROOT, run.id)))).steps;
       assert.deepEqual(
         [implement.message, shownNote(implement)],
@@ -410,31 +407,49 @@ test("what a step is told and what it shows, in the git place's words: a fan-in'
         'each call once, and the status as it was',
       );
       assert.equal(review.note, undefined, 'a step denied nothing says nothing');
-      assert.match(
-        await printedBy('ls'),
-        /^ {3}implement +unverified · done +master {2}· denied: Skill\(look\), Bash\(pytest\)$/m,
-        '`nemia ls`: after the branch, unpadded',
-      );
+      const { runs } = (await typed(['ls'], b.e, undefined, undefined, ENV)) as RunsListed;
+      const listed = runs.find((one) => one.run.id === run.id)?.listed.steps.find((step) => step.name === 'implement');
+      assert.equal(listed && 'denied' in listed ? listed.denied : undefined, 'denied: Skill(look), Bash(pytest)', '`nemia ls` reads it so');
       const decided = await runWith(b.e, decideRun(run.id));
       assert.deepEqual(decided.denied, { implement: 'denied: Skill(look), Bash(pytest)' });
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-      assert.match(
-        await printedBy('decide', run.id),
-        /\n {2}implement\n(?: {4}.*\n)*? {4}denied: Skill\(look\), Bash\(pytest\)\n/,
-        '`nemia decide`: under the step',
+      const steps = (await whole(b.e, run)).steps as Record<string, { denied?: string }>;
+      assert.deepEqual(
+        [steps.implement?.denied, steps.review?.denied],
+        ['denied: Skill(look), Bash(pytest)', undefined],
+        'the decision: under the step, and under no other',
       );
-      assert.doesNotMatch(printed.join('\n'), /\n {2}review\n(?: {4}.*\n)*? {4}denied:/, 'and under no other');
-      log.mock.restore();
     },
   );
 });
 
-test('the whole screens of a run in the checkout, on master, by how its step ended', async (t) => {
+/** A step of a run on a board that stamps no filing (`board`): its closeout, no check, nothing measured, and its one try unspawned. */
+const plainStep = (closeout: unknown, more: Record<string, unknown> = {}) => ({
+  closeout,
+  check: null,
+  used: 'not measured',
+  cost: 'cost  not measured',
+  tries: [[1, UNSPAWNED, null]],
+  ...more,
+});
+const DID_IT = ['done', 'did it', null, {}];
+/** What a run that worked on its base branch itself offers: the diff of its work, to read it; nothing to merge. */
+const readIt = (run: RepositoryRun) => [['read it', `git -C ${run.repo} diff ${run.baseRef}...master`]];
+/** What a run in the checkout of a repository on master touched, read and decided, when nothing it did is on its branch. */
+const onMaster = {
+  overBudget: null,
+  touched: [['master', [[], [], []]]],
+  lesson: 'nothing written where the next agent reads',
+  inFull: [['master', []]],
+  run: ['run not measured', '—', '—', 'not known'],
+};
+
+test('the whole decisions of a run in the checkout, on master, by how its step ended', async (t) => {
   const s = story(t);
 
   await s.test(
-    'the whole screen of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call',
-    async (c) => {
+    'the whole decision of a run from an inbox card, given a file, whose step its harness waits on and is told a word, and then denied a call',
+    async () => {
       const given = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'notes.txt');
       fs.writeFileSync(given, 'read me\n');
       const run = repositoryRunOf(
@@ -455,164 +470,107 @@ test('the whole screens of a run in the checkout, on master, by how its step end
       b.tasks.get(taskId)!.phase = 'running';
       b.waiting.set(taskId, 'a permission prompt: Bash(npm test)');
       b.said.set(taskId, [{ at: '2026-09-14T16:01:00.000Z', attempt: 1, text: 'mind the lockfile' }]);
-      assert.deepEqual(await whole(c, b.e, run), [
-        '<id>  add a flag',
-        '  from inbox card card-7',
-        '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
-        '',
-        '  still running: implement',
-        '  implement: waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
-        '  nothing to decide yet',
-      ]);
+      const waits = `waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/${run.id}-implement/1`;
+      const { run: read } = await decisionOf(b.e, run.id, { place: builtinGitPlace, env: ENV });
+      assert.deepEqual(
+        [runLines(read).fromNote, read.inputs, fs.readdirSync(path.join(ROOT, 'runs', run.id, 'inputs'))],
+        ['from inbox card card-7', ['notes.txt'], ['notes.txt']],
+        'from its card, and given a file the run keeps in its inputs',
+      );
+      assert.deepEqual(await whole(b.e, run), {
+        decision: { running: true },
+        running: { kind: 'running', waiting: ['implement'] },
+        waitingOn: { implement: waits },
+        retrying: [],
+        rounding: [],
+      });
       b.denials.set(taskId, [{ tool: 'Bash', what: 'npm test' }]);
       b.settle(taskId, 'succeeded', SIGNED);
       await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
       b.settle(`${run.id}-review`, 'succeeded', SIGNED);
-      assert.deepEqual(await whole(c, b.e, run), [
-        '<id>  add a flag',
-        '  from inbox card card-7',
-        '  inputs  notes.txt  —  in <root>/runs/<id>/inputs',
-        '',
-        '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
-        '',
-        '  touched  master',
-        '    nothing — the branch changed no file against the base',
-        '  lesson  nothing written where the next agent reads',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-        '  none',
-        '',
-        '  implement',
-        '    harness  waiting for a permission prompt: Bash(npm test) — answer it in Claude Code: claude agents, session ae/<id>-implement/1',
-        '    denied: Bash(npm test)',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-        '    said to try 1, at 2026-09-14T16:01:00.000Z:',
-        '    ```text',
-        '    mind the lockfile',
-        '    ```',
-        '    did it',
-        '',
-        '  review',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-        '    did it',
-        '',
-        '  cost  run not measured',
-        '  timeline  run  queued —  ran —  wall not known',
-        '',
-        '  master',
-        '',
-        '  worked directly on master; nothing to merge; the base was <base>',
-        '  read it    git -C <repo> diff <base>...master',
-      ]);
+      assert.deepEqual(await whole(b.e, run), {
+        verdicts: { outcome: 'succeeded', unverified: ['implement', 'review'] },
+        offers: [],
+        ...onMaster,
+        steps: {
+          implement: plainStep(DID_IT, {
+            waitingOn: waits,
+            denied: 'denied: Bash(npm test)',
+            said: [{ at: '2026-09-14T16:01:00.000Z', attempt: 1, text: 'mind the lockfile', try: 1 }],
+          }),
+          review: plainStep(DID_IT),
+        },
+        results: [['master', null, []]],
+        standings: [],
+        collisions: null,
+        commands: readIt(run),
+      });
     },
   );
 
-  await s.test('the whole screen of a step its harness ended at its budget', async (c) => {
+  await s.test('the whole decision of a step its harness ended at its budget', async () => {
     const run = await started(folder());
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.settle(`${run.id}-implement`, 'failed', undefined, undefined, 'budget');
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(await whole(c, b.e, run), [
-      '<id>  add a flag',
-      '',
-      '  BUDGET EXHAUSTED, waiting on you: implement  — its harness ended its session at its budget:; nothing after it ran',
-      '',
-      '  once more, on the next tick:',
-      '    implement: budget exhausted. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-      '',
-      '  touched  master',
-      '    nothing — the branch changed no file against the base',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued —  ran —  wall not known',
-      '',
-    ]);
+    assert.deepEqual(await whole(b.e, run), {
+      verdicts: { outcome: 'waiting', budgetExhausted: ['implement'] },
+      offers: [
+        `implement: budget exhausted. Continue its session, told what happened:  nemia retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`,
+      ],
+      ...onMaster,
+      steps: { implement: plainStep(undefined) },
+      results: [],
+      standings: [],
+      collisions: null,
+      commands: [['once more', `nemia retry ${run.id} implement`]],
+    });
   });
 
-  await s.test('the whole screen of a step that says `denials: fail`, denied a call', async (c) => {
+  await s.test('the whole decision of a step that says `denials: fail`, denied a call', async () => {
     const run = await started(folder('denials: fail'));
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.denials.set(`${run.id}-implement`, [{ tool: 'Write', what: '/tmp/w/notes.md' }]);
     b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(await whole(c, b.e, run), [
-      '<id>  add a flag',
-      '',
-      '  DENIED, waiting on you: implement  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run',
-      '',
-      '  once more, on the next tick:',
-      "    implement: denied — its harness denied its try a call, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md) to the folder's allowedTools:, which allows it. This run's allowedTools: is frozen at nemia start, so a try of it is denied the same again. A new session, told to do without it:  nemia retry <id> implement --fresh  (or continue its session: nemia retry <id> implement)",
-      '',
-      '  touched  master',
-      '    nothing — the branch changed no file against the base',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    denied: Write(/tmp/w/notes.md)',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-      '    did it',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued —  ran —  wall not known',
-      '',
-    ]);
+    assert.deepEqual(await whole(b.e, run), {
+      verdicts: { outcome: 'waiting', denied: ['implement'] },
+      offers: [
+        `implement: denied — its harness denied its try a call, and denials: fail passes none on. For a new run, add Edit(//tmp/w/notes.md) to the folder's allowedTools:, which allows it. This run's allowedTools: is frozen at nemia start, so a try of it is denied the same again. A new session, told to do without it:  nemia retry ${run.id} implement --fresh  (or continue its session: nemia retry ${run.id} implement)`,
+      ],
+      ...onMaster,
+      steps: { implement: plainStep(DID_IT, { denied: 'denied: Write(/tmp/w/notes.md)' }) },
+      results: [],
+      standings: [],
+      collisions: null,
+      commands: [['once more', `nemia retry ${run.id} implement --fresh`]],
+    });
   });
 
-  await s.test('the whole screen of a step whose closeout does not read, never nudged', async (c) => {
+  await s.test('the whole decision of a step whose closeout does not read, never nudged', async () => {
     const run = await started(folder());
     const b = board();
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
     b.closedOut.set(`${run.id}-implement`, true);
     b.settle(`${run.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(await whole(c, b.e, run), [
-      '<id>  add a flag',
-      '',
-      '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
-      '',
-      '  once more, on the next tick:',
-      '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-      '',
-      '  touched  master',
-      '    nothing — the branch changed no file against the base',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-      '    closeout unreadable — unparseable: Unexpected end of JSON input',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued —  ran —  wall not known',
-      '',
-    ]);
+    assert.deepEqual(await whole(b.e, run), {
+      verdicts: { outcome: 'waiting', unsigned: ['implement'] },
+      offers: [
+        `implement: unsigned. Continue its session, told what happened:  nemia retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`,
+      ],
+      ...onMaster,
+      steps: { implement: plainStep({ error: 'unparseable: Unexpected end of JSON input' }) },
+      results: [],
+      standings: [],
+      collisions: null,
+      commands: [['once more', `nemia retry ${run.id} implement`]],
+    });
   });
 
-  await s.test('the whole screen of a run whose every step passed its check', async (c) => {
+  await s.test('the whole decision of a run whose every step passed its check', async () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\ncheck: true\n---\nimplement it\n');
     const run = await started(dir);
@@ -623,44 +581,78 @@ test('the whole screens of a run in the checkout, on master, by how its step end
     b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
     b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
     await runWith(b.e, advanceRun(runRecord(ROOT, run.id)));
-    assert.deepEqual(await whole(c, b.e, run), [
-      '<id>  add a flag',
-      '',
-      '  every step verified',
-      '',
-      '  touched  master',
-      '    nothing — the branch changed no file against the base',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    check  true  →  exit 0 ✓',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1        filed not known  settled before it spawned  used not measured',
-      '              try 1 check  filed not known  settled before it spawned',
-      '    did it',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued —  ran —  wall not known',
-      '',
-      '  master',
-      '',
-      '  worked directly on master; nothing to merge; the base was <base>',
-      '  read it    git -C <repo> diff <base>...master',
-    ]);
+    assert.deepEqual(await whole(b.e, run), {
+      verdicts: { outcome: 'succeeded' },
+      offers: [],
+      ...onMaster,
+      steps: { implement: plainStep(DID_IT, { check: ['true', 0, true], tries: [[1, UNSPAWNED, UNSPAWNED]] }) },
+      results: [['master', null, []]],
+      standings: [],
+      collisions: null,
+      commands: readIt(run),
+    });
   });
 });
 
-test("a run waiting on you, on git: its whole screens, what its branches touched in the place's report, and what `nemia ls` costs", async (t) => {
+/** The diff of the weakened test the run waiting on you committed, as the place gives it whole. */
+const ADD_TEST_DIFF = [
+  'diff --git a/packages/x/test/add.test.ts b/packages/x/test/add.test.ts',
+  'index ae00847..2dc14f5 100644',
+  '--- a/packages/x/test/add.test.ts',
+  '+++ b/packages/x/test/add.test.ts',
+  '@@ -1,2 +1,2 @@',
+  " import assert from 'node:assert';",
+  '-assert.equal(add(1, 1), 2);',
+  '+assert.ok(true);',
+];
+
+/** The whole decision of the run waiting on you on `branch`, the files `inFull` read whole. */
+const waiting = (run: RepositoryRun, branch: string, inFull: unknown[]) => ({
+  verdicts: { outcome: 'succeeded', unverified: ['review'] },
+  offers: [],
+  overBudget: null,
+  touched: [
+    [
+      branch,
+      [
+        [
+          ['(root)', 2, 2, 0, 1],
+          ['packages/x', 2, 2, 1, 0],
+        ],
+        ['CLAUDE.md'],
+        ['packages/x/test/add.test.ts'],
+      ],
+    ],
+  ],
+  lesson: 'CLAUDE.md +2 −0',
+  inFull: [[branch, inFull]],
+  steps: {
+    implement: {
+      closeout: DID_IT,
+      check: ['npm test', 0, true],
+      used: '29 responses · 93 tool calls · 6.35M in · 112k out',
+      cost: 'cost  not measured',
+      tries: [[1, ranAt(0), ranAt(1)]],
+    },
+    review: { closeout: DID_IT, check: null, used: 'not measured', cost: 'cost  not measured', tries: [[1, ranAt(2), null]] },
+  },
+  run: ['run not measured', '36s', '14m24s', '25m00s'],
+  results: [[branch, '4 files: +4 −1, 1 binary', ['CLAUDE.md']]],
+  standings: [`${branch} is ahead of main by 1 commit`],
+  collisions: null,
+  commands: [
+    ['land it', `git -C ${run.repo} merge --no-ff ${branch}`],
+    ['drop it', `git -C ${run.repo} branch -D ${branch}`],
+  ],
+});
+
+test("a run waiting on you, on git: its whole decisions, what its branches touched in the place's report, and what `nemia ls` costs", async (t) => {
   const s = story(t);
   let a = { run: undefined as unknown as RepositoryRun, repo: '', branch: '', b: timed() };
 
   await s.test(
-    'the whole screen of a run waiting on you, once a pass has read where its branch stands: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and ship and drop — each task viewed once and the feed never read',
-    async (c) => {
+    'the whole decision of a run waiting on you, once a pass has read where its branch stands: verdicts, touched with a binary file, lesson, in full, each step, the totals, the branch and its notes, and land and drop — each task viewed once and the feed never read',
+    async () => {
       const repo = aPackage();
       const run = repositoryRunOf(await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: checked(), isolate: false })));
       const branch = `wf/${run.id}`;
@@ -690,60 +682,11 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
 
       b.viewed.clear();
       b.fed.reads = 0;
-      assert.deepEqual(await whole(c, b.e, run), [
-        '<id>  add sub',
-        '',
-        '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
-        '',
-        '  touched  wf/<id>',
-        '    (root)      2 files  +2 −0 · 1 binary',
-        '    packages/x  2 files  +2 −1',
-        '    agent-facing     CLAUDE.md',
-        '    check-affecting  packages/x/test/add.test.ts',
-        '  lesson  CLAUDE.md +2 −0',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-        '  diff --git a/packages/x/test/add.test.ts b/packages/x/test/add.test.ts',
-        '  index ae00847..2dc14f5 100644',
-        '  --- a/packages/x/test/add.test.ts',
-        '  +++ b/packages/x/test/add.test.ts',
-        '  @@ -1,2 +1,2 @@',
-        "   import assert from 'node:assert';",
-        '  -assert.equal(add(1, 1), 2);',
-        '  +assert.ok(true);',
-        '',
-        '  implement',
-        '    check  npm test  →  exit 0 ✓',
-        '    used  29 responses · 93 tool calls · 6.35M in · 112k out',
-        '    cost  not measured',
-        '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 responses · 93 tool calls · 6.35M in · 112k out',
-        '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-        '    did it',
-        '',
-        '  review',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
-        '    did it',
-        '',
-        '  cost  run not measured',
-        '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
-        '',
-        '  wf/<id>  — 4 files: +4 −1, 1 binary',
-        '',
-        '  ── CLAUDE.md ───────────────────────────────────────────────────────',
-        '  lesson one',
-        '  lesson two',
-        '',
-        '  branch    wf/<id> is ahead of main by 1 commit',
-        '',
-        '  land it   git -C <repo> merge --no-ff wf/<id>',
-        '  drop it   git -C <repo> branch -D wf/<id>',
-      ]);
+      assert.deepEqual(await whole(b.e, run), waiting(run, branch, [['packages/x/test/add.test.ts', ADD_TEST_DIFF]]));
       assert.deepEqual(
         Object.fromEntries(b.viewed),
         { [`${run.id}-implement`]: 1, [`${run.id}-implement-check`]: 1, [`${run.id}-review`]: 1 },
-        'each task viewed once for the whole screen, usage included: every view is a harness observe',
+        'each task viewed once for the whole decision, usage included: every view is a harness observe',
       );
       assert.equal(
         b.fed.reads,
@@ -755,50 +698,8 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
     },
   );
 
-  await s.test('the whole screen with --sensitive naming nothing: the heading, and none, in place of the check files', async (c) => {
-    assert.deepEqual(await whole(c, a.b.e, a.run, '--sensitive', 'nothing/**'), [
-      '<id>  add sub',
-      '',
-      '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
-      '',
-      '  touched  wf/<id>',
-      '    (root)      2 files  +2 −0 · 1 binary',
-      '    packages/x  2 files  +2 −1',
-      '    agent-facing     CLAUDE.md',
-      '    check-affecting  packages/x/test/add.test.ts',
-      '  lesson  CLAUDE.md +2 −0',
-      '',
-      '  ── in full: the files --sensitive names (nothing/**), in place of what decides a check ───',
-      '  none',
-      '',
-      '  implement',
-      '    check  npm test  →  exit 0 ✓',
-      '    used  29 responses · 93 tool calls · 6.35M in · 112k out',
-      '    cost  not measured',
-      '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 responses · 93 tool calls · 6.35M in · 112k out',
-      '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-      '    did it',
-      '',
-      '  review',
-      '    used  not measured',
-      '    cost  not measured',
-      '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
-      '    did it',
-      '',
-      '  cost  run not measured',
-      '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
-      '',
-      '  wf/<id>  — 4 files: +4 −1, 1 binary',
-      '',
-      '  ── CLAUDE.md ───────────────────────────────────────────────────────',
-      '  lesson one',
-      '  lesson two',
-      '',
-      '  branch    wf/<id> is ahead of main by 1 commit',
-      '',
-      '  land it   git -C <repo> merge --no-ff wf/<id>',
-      '  drop it   git -C <repo> branch -D wf/<id>',
-    ]);
+  await s.test('the whole decision with --sensitive naming nothing: no file in full, in place of the check files', async () => {
+    assert.deepEqual(await whole(a.b.e, a.run, ['nothing/**']), waiting(a.run, a.branch, []));
   });
 
   await s.test(
@@ -857,16 +758,11 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
     assert.doesNotMatch(lint.inFull as string, /add\.ts/, 'a file no glob names is not printed in full');
   });
 
-  await s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async (c) => {
+  await s.test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async () => {
     const { e, viewed, settle } = a.b;
     const ls = async () => {
       viewed.clear();
-      const log = c.mock.method(console, 'log', () => {});
-      try {
-        return (await metered(() => main(['ls'], e, undefined, undefined, ENV))).tallies!.kinds.place.spawned;
-      } finally {
-        log.mock.restore();
-      }
+      return (await metered(() => typed(['ls'], e, undefined, undefined, ENV))).tallies!.kinds.place.spawned;
     };
     const oneStep = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(oneStep, 'work.md'), '---\nplace: git\n---\nwork it\n');
@@ -898,55 +794,63 @@ test("a run waiting on you, on git: its whole screens, what its branches touched
   });
 });
 
-test('the whole screens of a run through its tries and on two branches, and of `nemia decide --help`', async (t) => {
+/** A run on main blocked on `implement`, read on a timed board: what it touched, read and offers, its step as `implement` says it. */
+const blockedOnMain = (run: RepositoryRun, implement: Record<string, unknown>, total: string[]) => ({
+  verdicts: { outcome: 'waiting', awaitingAnswer: ['implement'] },
+  offers: [
+    `implement: blocked. Continue its session, told what happened:  nemia retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`,
+  ],
+  overBudget: null,
+  touched: [['main', [[], [], []]]],
+  lesson: 'nothing written where the next agent reads',
+  inFull: [['main', []]],
+  steps: { implement },
+  run: ['run not measured', ...total],
+  results: [],
+  standings: [],
+  collisions: null,
+  commands: [['once more', `nemia retry ${run.id} implement`]],
+});
+
+test('the whole decisions of a run through its tries and on two branches', async (t) => {
   const s = story(t);
 
   await s.test(
-    'the whole screen of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered',
-    async (c) => {
+    'the whole decision of a running run, of a try asked for, of a step blocked with its question, and of a try a person answered',
+    async () => {
       const run = repositoryRunOf(
         await runPlaced(startRun({ brief: 'add sub', repo: aPackage(), workflowDir: checked(), isolate: false })),
       );
       const { e, settle } = timed();
+      const running = (retrying: unknown[]) => ({
+        decision: { running: true },
+        running: { kind: 'running', waiting: ['implement'] },
+        waitingOn: {},
+        retrying,
+        rounding: [],
+      });
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      assert.deepEqual(await whole(c, e, run), ['<id>  add sub', '', '  still running: implement', '  nothing to decide yet']);
+      assert.deepEqual(await whole(e, run), running([]));
       settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      assert.deepEqual(await whole(c, e, run), [
-        '<id>  add sub',
-        '',
-        '  BLOCKED, waiting on you: implement',
-        '',
-        '  once more, on the next tick:',
-        '    implement: blocked. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-        '',
-        '  touched  main',
-        '    nothing — the branch changed no file against the base',
-        '  lesson  nothing written where the next agent reads',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-        '  none',
-        '',
-        '  implement  BLOCKED',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-        '    two readings',
-        '    needs: Rename --flag?',
-        '    to answer it:  nemia retry <id> implement --message "<answer>"',
-        '',
-        '  cost  run not measured',
-        '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
-        '',
-      ]);
+      const answering = `to answer it:  nemia retry ${run.id} implement --message "<answer>"`;
+      assert.deepEqual(
+        await whole(e, run),
+        blockedOnMain(
+          run,
+          {
+            closeout: ['blocked', 'two readings', 'Rename --flag?', {}],
+            check: null,
+            used: 'not measured',
+            cost: 'cost  not measured',
+            tries: [[1, ranAt(0), null]],
+            answering,
+          },
+          ['12s', '4m48s', '5m00s'],
+        ),
+      );
       await runWith(e, retryRun(run.id, 'implement', { mode: 'continue', message: 'Keep it.\nThe flag is public.' }));
-      assert.deepEqual(await whole(c, e, run), [
-        '<id>  add sub',
-        '',
-        '  still running: implement',
-        '  implement: try 2 asked (--continue, with your answer) — the next tick files it',
-        '  nothing to decide yet',
-      ]);
+      assert.deepEqual(await whole(e, run), running([['implement', 2, 'continue', 'ask']]));
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       settle(`${run.id}-implement-try2`, 'succeeded', {
         outcome: 'blocked',
@@ -955,43 +859,31 @@ test('the whole screens of a run through its tries and on two branches, and of `
         needs: 'And the README?',
       });
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-      assert.deepEqual(await whole(c, e, run), [
-        '<id>  add sub',
-        '',
-        '  BLOCKED, waiting on you: implement',
-        '',
-        '  once more, on the next tick:',
-        '    implement: blocked. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
-        '',
-        '  touched  main',
-        '    nothing — the branch changed no file against the base',
-        '  lesson  nothing written where the next agent reads',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-        '  none',
-        '',
-        '  implement  BLOCKED  (try 2, continued on your word, answered)',
-        '    used  not measured',
-        '    cost  this try not measured · not measured over 2 tries',
-        '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-        '              try 2  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
-        '    try 1 needs: Rename --flag?',
-        '    your answer: Keep it.',
-        '    The flag is public.',
-        '    one reading',
-        '    needs: And the README?',
-        '    to answer it:  nemia retry <id> implement --message "<answer>"',
-        '',
-        '  cost  run not measured',
-        '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
-        '',
-      ]);
+      assert.deepEqual(
+        await whole(e, run),
+        blockedOnMain(
+          run,
+          {
+            closeout: ['blocked', 'one reading', 'And the README?', {}],
+            check: null,
+            used: 'not measured',
+            cost: 'cost  this try not measured · not measured over 2 tries',
+            tries: [
+              [1, ranAt(0), null],
+              [2, ranAt(1), null],
+            ],
+            answer: { try: 2, message: 'Keep it.\nThe flag is public.', needs: 'Rename --flag?' },
+            answering,
+          },
+          ['24s', '9m36s', '15m00s'],
+        ),
+      );
     },
   );
 
   await s.test(
-    'the whole screen of a run on two branches, once a pass has read where they stand, one with a note longer than the screen shows',
-    async (c) => {
+    'the whole decision of a run on two branches, once a pass has read where they stand, one with a note longer than a screen shows',
+    async () => {
       const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
       fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
       fs.writeFileSync(path.join(dir, 'docs.md'), '---\nplace: git\n---\nwrite it down\n');
@@ -1004,65 +896,54 @@ test('the whole screens of a run through its tries and on two branches, and of `
         git(wt, 'add', '-A');
         git(wt, 'commit', '-q', '-m', `add ${file}`);
       };
+      const notes = Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join('');
       committed('implement', 'sub.ts', 'export const sub = (a, b) => a - b;\n');
-      committed('docs', 'NOTES.md', Array.from({ length: 123 }, (_, i) => `note ${i + 1}\n`).join(''));
+      committed('docs', 'NOTES.md', notes);
       settle(`${run.id}-implement`, 'succeeded', SIGNED);
       settle(`${run.id}-docs`, 'succeeded', SIGNED);
       await runWith(e, advanceRun(runRecord(ROOT, run.id)));
       await runWith(e, passStanding(listRuns(ROOT)));
-      assert.deepEqual(await whole(c, e, run), [
-        '<id>  add sub',
-        '',
-        '  UNVERIFIED: docs, implement  — no check: declared; only its own word says it worked',
-        '',
-        '  touched  wf/<id>/run',
-        '    (root)  1 file   +123 −0',
-        '  touched  wf/<id>/implement',
-        '    (root)  1 file   +1 −0',
-        '  lesson  nothing written where the next agent reads',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/run ───',
-        '  none',
-        '',
-        '  ── in full: the check-affecting files — what a change could edit to make its check pass, on wf/<id>/implement ───',
-        '  none',
-        '',
-        '  docs',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-        '    did it',
-        '',
-        '  implement',
-        '    used  not measured',
-        '    cost  not measured',
-        '    timeline  try 1  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s  used not measured',
-        '    did it',
-        '',
-        '  cost  run not measured',
-        '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
-        '',
-        '  wf/<id>/run  — 1 file: +123 −0',
-        '',
-        '  ── NOTES.md ────────────────────────────────────────────────────────',
-        ...Array.from({ length: 120 }, (_, i) => `  note ${i + 1}`),
-        '  … 3 more lines — git show wf/<id>/run:NOTES.md',
-        '  wf/<id>/implement  — 1 file: +1 −0',
-        '',
-        '  branch    wf/<id>/run is ahead of main by 1 commit',
-        '  branch    wf/<id>/implement is ahead of main by 1 commit',
-        '',
-        '  land it   git -C <repo> merge --no-ff wf/<id>/run',
-        '  drop it   git -C <repo> branch -D wf/<id>/run wf/<id>/implement',
-      ]);
+      const [runBranch, implementBranch] = [`wf/${run.id}/run`, `wf/${run.id}/implement`];
+      const plain = (n: number) => ({
+        closeout: DID_IT,
+        check: null,
+        used: 'not measured',
+        cost: 'cost  not measured',
+        tries: [[1, ranAt(n), null]],
+      });
+      const read = await decisionOf(e, run.id, { place: builtinGitPlace, env: ENV });
+      assert.deepEqual(decisionFacts(read), {
+        verdicts: { outcome: 'succeeded', unverified: ['docs', 'implement'] },
+        offers: [],
+        overBudget: null,
+        touched: [
+          [runBranch, [[['(root)', 1, 123, 0, 0]], [], []]],
+          [implementBranch, [[['(root)', 1, 1, 0, 0]], [], []]],
+        ],
+        lesson: 'nothing written where the next agent reads',
+        inFull: [
+          [runBranch, []],
+          [implementBranch, []],
+        ],
+        steps: { docs: plain(0), implement: plain(1) },
+        run: ['run not measured', '24s', '9m36s', '15m00s'],
+        results: [
+          [runBranch, '1 file: +123 −0', ['NOTES.md']],
+          [implementBranch, '1 file: +1 −0', []],
+        ],
+        standings: [`${runBranch} is ahead of main by 1 commit`, `${implementBranch} is ahead of main by 1 commit`],
+        collisions: null,
+        commands: [
+          ['land it', `git -C ${run.repo} merge --no-ff ${runBranch}`],
+          ['drop it', `git -C ${run.repo} branch -D ${runBranch} ${implementBranch}`],
+        ],
+      });
+      const [docsNotes] = read.results;
+      assert.deepEqual(
+        docsNotes && !('error' in docsNotes.notes) && docsNotes.notes.map((n) => [n.file, `${n.text}\n`]),
+        [['NOTES.md', notes]],
+        'the note whole, as its branch has it: a reader cuts it',
+      );
     },
   );
-
-  await s.test('the whole screen of `nemia decide --help`, and of `nemia decide` with no run', async (c) => {
-    const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');
-    const { HELP } = await import('../src/cli/flags.ts');
-    const { e } = timed();
-    assert.deepEqual(await screenOn(c, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
-    assert.deepEqual(await screenOn(c, e, [], {}), HELP.split('\n'));
-  });
 });

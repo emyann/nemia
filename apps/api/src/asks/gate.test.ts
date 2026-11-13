@@ -420,7 +420,16 @@ test('a person approves a gate on the board: the need on the list and the detail
       took = (await res.json()) as Approved;
       assert.deepEqual(
         { ...took, at: undefined },
-        { step: 'plan', try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(root, R, 'plan', 1) },
+        {
+          step: 'plan',
+          try: 1,
+          at: undefined,
+          message: 'Ship the second reading.',
+          file: approvalFile(root, R, 'plan', 1),
+          loop: false,
+          next: 'waiting',
+          caps: [],
+        },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
       assert.deepEqual(JSON.parse(fs.readFileSync(approvalFile(root, R, 'plan', 1), 'utf8')), {

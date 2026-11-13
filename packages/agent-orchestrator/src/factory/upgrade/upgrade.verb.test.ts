@@ -15,12 +15,12 @@ import { STEP_OUTPUT_SCHEMA, teamCopy } from '../../../test/team.ts';
 import { testPlace } from '../../../place/memory/index.ts';
 import { eachTest, runOver } from '../../../test/placed.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
-import type { Command } from '../../command/entry.verb.ts';
+import type { Served } from '../../command/entry.verb.ts';
 import type { Args } from '../../command/command.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
 import { FACTORY_RULES, factoryRules, runWith as runEngine } from '../../runner.ts';
 import { readFactoryAt } from '../factory.store.ts';
-import { main as cli } from '../../cli/main.ts';
+import { factoryTyped } from '../../../test/factory-typed.ts';
 import { appliedDir, digestOf, entriesIn, resolutionsFile, statusFile, swapTree, treeDir } from '../applied/applied.store.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { FACTORY_PLAN, FACTORY_UPGRADE } from './upgrade.verb.ts';
@@ -35,8 +35,8 @@ const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate, reconciled } = programsAt(ROOT);
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer, ENV);
-/** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
+/** `nemia`, as a story of the factories types it (`factoryTyped`), its commands given this test's place. */
+const main = (argv: string[], e?: Parameters<typeof factoryTyped>[1]) => factoryTyped(argv, e, undefined, stand().place, ENV);
 
 const stood = eachTest(testEngine);
 heldUnasked(stood);
@@ -126,13 +126,17 @@ const rewrite = (folder: string, file: string, from: string, to: string): void =
   fs.writeFileSync(path.join(folder, file), text.replace(from, to));
 };
 
-/** What `args` printed, run as the command line runs them. */
-async function printedBy(t: { mock: { method: Function } }, ...args: string[]): Promise<string[]> {
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...words: unknown[]) => printed.push(words.join(' ')));
-  await main(args, noEngine());
-  return printed.flatMap((p) => p.split('\n'));
-}
+/** What `nemia factory diff <args>` previews of an upgrade: the versions, the switch, and what files it. */
+type Previewed = {
+  name: string;
+  from?: string;
+  to: string;
+  next: { line: string; digest: string; dropped: readonly string[] };
+  switched?: { from: string; to: string };
+};
+
+/** The upgrade `nemia factory diff <args>` previews. */
+const previewOf = async (...args: string[]): Promise<Previewed> => (await main(['factory', 'diff', ...args], noEngine())) as Previewed;
 
 test('upgrade refuses, writing nothing: no template, no render, a --to that is no version, the template at another, the same, a downgrade; and diff no --template on a hand-made one', async (t) => {
   t.mock.method(console, 'log', () => {});
@@ -188,8 +192,8 @@ test('an upgrade with no conflict, up or down: filed alone, then merged by the c
       rewrite(treeDir(ROOT, 'clean'), REVIEW, 'budget: 7', 'budget: 9');
       released(dir, '0.2.0', 5);
       const folder = bytesUnder(path.join(FACTORIES, 'clean'));
-      const printed = await printedBy(t, 'factory', 'upgrade', 'clean', '--to', '0.2.0');
-      assert.deepEqual(printed, ['clean: 0.1.0 → 0.2.0', `filed: ${file}`, 'the daemon merges it on its next pass (nemia up)']);
+      const filed = await main(['factory', 'upgrade', 'clean', '--to', '0.2.0'], noEngine());
+      assert.deepEqual(filed, { name: 'clean', from: '0.1.0', to: '0.2.0', file, dropped: [], conflicts: 0 });
       assert.deepEqual(
         JSON.parse(fs.readFileSync(file, 'utf8')),
         { ...filedAs, template: { ...filedAs.template, version: '0.2.0' }, generation: 2 },
@@ -242,9 +246,9 @@ test('a switch onto a template of another name is judged by no version: neither 
         manifest.metadata.name = 'renamed';
         fs.writeFileSync(path.join(other, 'nemia.yaml'), stringify(manifest, { lineWidth: 0 }));
         released(other, version, 5);
-        const printed = await printedBy(t, 'factory', 'diff', name, '--to', version, '--template', other);
-        assert.equal(printed[0], `${name}: team 0.1.0 → renamed ${version}`);
-        const line = printed.find((l) => l.includes(' files it')) ?? '';
+        const preview = await previewOf(name, '--to', version, '--template', other);
+        assert.deepEqual([preview.switched, preview.from, preview.to], [{ from: 'team', to: 'renamed' }, '0.1.0', version]);
+        const { line } = preview.next;
         assert.doesNotMatch(line, /--downgrade/);
         const plan = /--plan (sha256:[0-9a-f]{64})/.exec(line)?.[1];
         assert.ok(plan, line);
@@ -271,16 +275,12 @@ test('an upgrade onto a template that declares other parameters: --set given, th
   const before = bytesUnder(FACTORIES);
   const onto = ['onto', '--to', '0.2.0', '--template', other];
   await assert.rejects(main(['factory', 'diff', ...onto], noEngine()), refusedWith('Invalid', /cap has no default/));
-  const preview = await printedBy(t, 'factory', 'diff', ...onto, '--set', 'cap=9');
-  assert.ok(preview.includes('dropped: budget'), preview.join('\n'));
-  const digest = preview.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '';
+  const preview = await previewOf(...onto, '--set', 'cap=9');
+  assert.deepEqual(preview.next.dropped, ['budget']);
+  const { digest } = preview.next;
   assert.match(digest, /^sha256:[0-9a-f]{64}$/);
-  assert.ok(
-    preview.at(-1)?.startsWith(`nemia factory upgrade onto --to 0.2.0 --template ${other} --set cap=9 --plan ${digest} files it`),
-    preview.join('\n'),
-  );
-  const eight = await printedBy(t, 'factory', 'diff', ...onto, '--set', 'cap=8');
-  const stale = eight.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '';
+  assert.equal(preview.next.line, `nemia factory upgrade onto --to 0.2.0 --template ${other} --set cap=9 --plan ${digest}`);
+  const stale = (await previewOf(...onto, '--set', 'cap=8')).next.digest;
   assert.notEqual(stale, digest, 'another --set is another plan');
   const upgrade = (...rest: string[]) => main(['factory', 'upgrade', ...onto, ...rest], noEngine());
   await assert.rejects(upgrade('--set', 'cap=9'), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
@@ -295,18 +295,18 @@ test('an upgrade onto a template that declares other parameters: --set given, th
     spec.parameters.cap.default = 5;
   });
   const bare = ['onto', '--to', '0.2.0', '--template', defaulted];
-  const dropping = await printedBy(t, 'factory', 'diff', ...bare);
-  assert.ok(dropping.includes('dropped: budget'), dropping.join('\n'));
+  const dropping = await previewOf(...bare);
+  assert.deepEqual(dropping.next.dropped, ['budget']);
   assert.match(
-    dropping.at(-1) ?? '',
-    new RegExp(`^nemia factory upgrade onto --to 0\\.2\\.0 --template \\S+ --plan sha256:[0-9a-f]{64} files it`),
+    dropping.next.line,
+    new RegExp(`^nemia factory upgrade onto --to 0\\.2\\.0 --template \\S+ --plan sha256:[0-9a-f]{64}$`),
     'a parameter dropped with no --set given still holds the upgrade to its plan',
   );
   await assert.rejects(main(['factory', 'upgrade', ...bare], noEngine()), refusedWith('Invalid', /nemia factory diff onto --to 0\.2\.0/));
   assert.deepEqual(bytesUnder(FACTORIES), before, 'the previews and every refusal write nothing');
   const folder = bytesUnder(path.join(FACTORIES, 'onto'));
-  const filed = await printedBy(t, 'factory', 'upgrade', ...onto, '--set', 'cap=9', '--plan', digest);
-  assert.ok(filed.includes('dropped: budget'), filed.join('\n'));
+  const filed = (await main(['factory', 'upgrade', ...onto, '--set', 'cap=9', '--plan', digest], noEngine())) as { dropped: string[] };
+  assert.deepEqual(filed.dropped, ['budget']);
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
     ...filedAs,
     template: { source: other, version: '0.2.0', params: { cap: 9 } },
@@ -468,11 +468,8 @@ test("REFUSED Invalid, nothing proposed: a workflow's conflict resolved with tex
   assert.deepEqual([kept.choices, kept.proposals], [{ [`${REVIEW}#rounds`]: { text: 'rounds: [5\n' } }, undefined]);
 });
 
-/** The plan `nemia factory diff` printed in `printed`, and the line that files it. */
-const planIn = (printed: string[]): { plan: string; line: string } => ({
-  plan: printed.find((line) => line.startsWith('plan: '))?.slice('plan: '.length) ?? '',
-  line: printed.find((line) => line.includes(' files it')) ?? '',
-});
+/** The plan's digest `nemia factory diff` previewed in `preview`, and the line that files it. */
+const planIn = (preview: Previewed): { plan: string; line: string } => ({ plan: preview.next.digest, line: preview.next.line });
 
 test('a parameter set again at the version applied: previewed, filed with its plan, merged with no new version', async (t) => {
   await t.test("it merges with no conflict, and the factory's file records the new value", async (t) => {
@@ -482,13 +479,13 @@ test('a parameter set again at the version applied: previewed, filed with its pl
     const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
     rewrite(treeDir(ROOT, 'reset'), REVIEW, 'rounds: 3', 'rounds: 4');
     const before = bytesUnder(FACTORIES);
-    const preview = await printedBy(t, 'factory', 'diff', 'reset', '--to', '0.1.0', '--set', 'budget=9');
-    assert.equal(preview[0], 'reset: its parameters at 0.1.0');
+    const preview = await previewOf('reset', '--to', '0.1.0', '--set', 'budget=9');
+    assert.deepEqual([preview.from, preview.to, preview.switched], ['0.1.0', '0.1.0', undefined]);
     const { plan, line } = planIn(preview);
     assert.match(plan, /^sha256:[0-9a-f]{64}$/);
-    assert.ok(line.startsWith(`nemia factory upgrade reset --to 0.1.0 --set budget=9 --plan ${plan} files it`), preview.join('\n'));
+    assert.equal(line, `nemia factory upgrade reset --to 0.1.0 --set budget=9 --plan ${plan}`);
     assert.doesNotMatch(line, /--downgrade/);
-    const { plan: stale } = planIn(await printedBy(t, 'factory', 'diff', 'reset', '--to', '0.1.0', '--set', 'budget=8'));
+    const { plan: stale } = planIn(await previewOf('reset', '--to', '0.1.0', '--set', 'budget=8'));
     const upgrade = (...rest: string[]) => main(['factory', 'upgrade', 'reset', '--to', '0.1.0', '--set', 'budget=9', ...rest], noEngine());
     await assert.rejects(upgrade(), refusedWith('Invalid', /nemia factory diff reset --to 0\.1\.0 --set budget=9/));
     await assert.rejects(upgrade('--plan', stale), refusedWith('Conflict', /nemia factory diff reset --to 0\.1\.0/));
@@ -539,7 +536,7 @@ test('a parameter set again at the version applied: previewed, filed with its pl
       await applied('clash');
       const set = async (value: number) => {
         const sets = ['--to', '0.1.0', '--set', `budget=${value}`];
-        const { plan } = planIn(await printedBy(t, 'factory', 'diff', 'clash', ...sets));
+        const { plan } = planIn(await previewOf('clash', ...sets));
         await main(['factory', 'upgrade', 'clash', ...sets, '--plan', plan], noEngine());
       };
       rewrite(treeDir(ROOT, 'clash'), REVIEW, 'budget: 7', 'budget: 8');
@@ -643,7 +640,7 @@ test("a swap whose new tree cannot be renamed in puts the person's tree back, or
 });
 
 /** The handler of `command` over `args`, with `builtins` as the folder of the builtin templates. */
-const handledWith = <D extends object>(builtins: string, command: Command<D>, args: Args) =>
+const handledWith = <D extends object>(builtins: string, command: Served<D>, args: Args) =>
   runWith(noEngine(), withBuiltins(command.handler(args), builtins));
 
 test('--template names a builtin template by its name: an upgrade records the name, and a name no builtin has is refused', async (t) => {
@@ -654,7 +651,7 @@ test('--template names a builtin template by its name: an upgrade records the na
   released(path.join(builtins, 'team'), '0.2.0', 5);
   await t.test('REFUSED Missing, nothing written: diff and upgrade to a name no builtin template has', async () => {
     const before = bytesUnder(ROOT);
-    for (const command of [FACTORY_PLAN, FACTORY_UPGRADE] as Command<object>[])
+    for (const command of [FACTORY_PLAN, FACTORY_UPGRADE] as Served<object>[])
       await assert.rejects(
         handledWith(builtins, command, { factory: 'from-folder', to: '0.2.0', template: 'nope' }),
         refusedWith('Missing', /\bteam\b/, /\.\/nope/),

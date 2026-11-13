@@ -6,8 +6,7 @@
  * alone. The folders the board lists are loaded by the program the api runs itself (`foldersLoaded`), handed its factory whole. The api
  * resolves which folder a read names, and words the board's answer around what each answers.
  */
-import { fromPlace, refusing } from '../command/requests.verb.ts';
-import { WORKFLOWS_WRITE_WORDS } from 'objects';
+import { WORKFLOWS_RM_WORDS, WORKFLOWS_WRITE_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import path from 'node:path';
 import { Cause, Effect, Exit, Schema } from 'effect';
@@ -15,8 +14,8 @@ import { tried } from '../runtime-client.ts';
 import { WorkflowDoor, type CarriedFile } from './workflows.store.ts';
 import type { WorkflowDir } from '../folder/folder.model.ts';
 import type { Flag, Positional, Spec } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
-import { FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
+import type { Command, Served } from '../command/entry.verb.ts';
+import { yoursOrRefused } from '../yours/yours.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
 import { FactoryDoor, factoryOrNone, templatedAtOnce, templatedTreeOf } from '../factory/door/factories.store.ts';
 import { factoryFills } from '../factory/rules/rules.store.ts';
@@ -212,28 +211,8 @@ const usersOf = Effect.fn('usersOf')(function* (dir: string) {
  * (`workflowVersionRefusal`). Refused, with nothing removed, while a run, a queued card or a factory still needs it (`usersOf`), each
  * named with the command that frees it.
  */
-export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
-  name: 'workflows rm',
-  served: [
-    {
-      endpoint: 'workflows.delete',
-      request: refusing('workflows rm', ['repo'], fromPlace({ version: 'resourceVersion' }, ['repo', 'factory'])),
-    },
-  ],
-  usage: 'yours <name> --version <v>',
-  help: ['a workflow folder of yours removed, at the --version it was read at'],
-  spec: writerSpec(
-    'workflows rm',
-    'yours <name> --version <v>',
-    [FROM, { key: 'name', takes: 'required', kind: 'name' }],
-    [versionFlag('workflows rm', 'the folder')],
-  ),
-  writes: true,
-  class: 'ask',
-  only: {
-    side: 'cli',
-    why: "the api serves it as the Workflow's `delete` verb of `objects`' Api (`/api/namespaces/:namespace/workflows`), which calls this entry's handler: no route of its own",
-  },
+export const WORKFLOWS_REMOVE: Served<WorkflowRemoved, WorkflowRemoveInput> = {
+  ...WORKFLOWS_RM_WORDS,
   input: WorkflowRemoveInput,
   handler: ({ version, ...where }) =>
     Effect.flatMap(StoreRoot, (home) =>
@@ -245,7 +224,6 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved, WorkflowRemoveInput> = {
         return yield* door.workflows.remove(dir, version, users, places);
       }),
     ),
-  print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
 };
 
 /** Why a folder does not load, in the loader's words: what it was refused or died of. */
@@ -317,4 +295,7 @@ export const WORKFLOWS_STEP: Command<{ step: StepSpec | null; steps: string[] },
 };
 
 /** The board's workflow entries, in the order the table lists them. */
-export const WORKFLOW_ENTRIES: readonly Command[] = [WORKFLOWS_WRITE, WORKFLOWS_REMOVE, WORKFLOWS_STEP] as readonly Command[];
+export const WORKFLOW_ENTRIES: readonly (Command | Served)[] = [WORKFLOWS_WRITE, WORKFLOWS_REMOVE, WORKFLOWS_STEP] as readonly (
+  | Command
+  | Served
+)[];

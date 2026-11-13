@@ -8,7 +8,7 @@
  * The test's store is its own, at `ROOT`, given as `ENV`, with `WF_DEFAULT_FACTORY_STARTS` in it: its runs start
  * in repositories no factory holds.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +17,7 @@ import type { Run } from '../src/run.ts';
 import type { PlaceOutcome } from '../src/place/place.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { namesFor } from './assessed.ts';
 import { placeOver, unreadBy } from './place-over.ts';
 import { advanceRun, cancelRun, decideRun, list, startRun, runWith } from '../src/runner.ts';
@@ -27,7 +28,9 @@ import { runDoorMemory } from '../src/runs/memory.store.ts';
 import { LINE_NAME } from '../src/run.ts';
 import { PlaceService } from '../src/place/place.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told, type StartedAnswer } from './typed.ts';
+import type { RunsListed } from '../src/list/list.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-lifecycle-');
@@ -42,7 +45,7 @@ const ENV: Env = {
 };
 /** A run's steps read now, at this test's store. */
 const stepsOf = (run: Parameters<typeof stepsNow>[0]) => stepsNow(run, ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
@@ -77,28 +80,19 @@ const subjects = (checkout: string): string[] => {
   }
   return seen.map((id) => world().read(checkout, id).message.split('\n')[0]);
 };
-/** What `console.log` printed while `run` ran, a line each. */
-const printedBy = async (t: TestContext, run: () => Promise<unknown>): Promise<string[]> => {
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    out.push(args.map(String).join(' '));
-  });
-  try {
-    await run();
-  } finally {
-    log.mock.restore();
-  }
-  return out.join('\n').split('\n');
+/** The step names `nemia ls <id>` reads of the run, in its order. */
+const lsNames = async (id: string): Promise<string[]> => {
+  const { runs } = (await typed(['ls', id], stage.board().e, undefined, stage.place().place, ENV)) as RunsListed;
+  assert.deepEqual(
+    runs.map(({ run }) => run.id),
+    [id],
+    '`nemia ls <id>` reads that one run',
+  );
+  return (runs[0]?.listed.steps ?? []).map((step) => step.name);
 };
-/** The step names `nemia ls <id>` prints, in its order. */
-const lsNames = async (t: TestContext, id: string): Promise<string[]> =>
-  (await printedBy(t, () => stage.main(['ls', id])))
-    .slice(1)
-    .map((line) => /^ {3}([a-z][\w-]*) /.exec(line)?.[1])
-    .filter((name): name is string => Boolean(name));
-/** The step sections `nemia decide <id>` prints, in its order. */
-const decideNames = async (t: TestContext, id: string, steps: readonly string[]): Promise<string[]> =>
-  (await printedBy(t, () => stage.main(['decide', id]))).filter((l) => steps.includes(l.trim()) && /^ {2}\S/.test(l)).map((l) => l.trim());
+/** The steps the decision of `<id>` reads, in its order: the order the client's `nemia decide` prints them in. */
+const decideNames = async (id: string, steps: readonly string[]): Promise<string[]> =>
+  (await decidedOn(stage, id)).steps.map((x) => x.name).filter((n) => steps.includes(n));
 /** The test place, its `verb` answering `outcome`, each call counted, as the layer a pass is given it by. */
 const placeAnswering = <V extends 'make' | 'handoff'>(verb: V, outcome: PlaceOutcome<V>) => {
   let asked = 0;
@@ -116,10 +110,9 @@ test('a chain runs to success: plan → implement → review, on one line of wor
   const ORDER = ['plan', 'implement', 'review'];
   await s.test('`nemia start` says the steps in the order they run, and keys the record so, whose files sort another way', async () => {
     const dir = folderOf({ implement: ['after: plan'], plan: [], review: ['after: implement', 'check: npm test'] });
-    const printed = await printedBy(t, () => stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', aRepo()]));
-    const [started, said] = printed[0].split('  ');
-    id = started;
-    assert.equal(said, '3 step(s): plan → implement → review');
+    const started = (await stage.main(['start', 'plan the flag', '--workflows', dir, '--repo', aRepo()])) as StartedAnswer;
+    id = started.id;
+    assert.deepEqual(started.facts.steps, [{ name: 'plan' }, { name: 'implement' }, { name: 'review' }], 'in the order they run');
     const run = runRecord(ROOT, id);
     assert.deepEqual([Object.keys(run.steps), run.workflow?.map((x) => x.name)], [ORDER, ORDER]);
   });
@@ -177,7 +170,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.match(uncommitted(line), /coverage\.out/, 'left untracked');
   });
   await s.test('`nemia ls` names the steps in the order they run', async () => {
-    assert.deepEqual(await lsNames(t, id), ORDER);
+    assert.deepEqual(await lsNames(id), ORDER);
   });
   await s.test('the check passes: the run succeeded, each step handed off once, and `nemia decide` reads in order', async () => {
     stage.board().settle(`${id}-review-check`, 'succeeded', undefined, 0);
@@ -189,7 +182,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.deepEqual(handed, ['review', 'implement', 'plan'], 'one hand-off per finished step');
     const { decision: d } = await stage.runWith(stage.board().e, decideRun(id));
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed], ['succeeded', []]);
-    assert.deepEqual(await decideNames(t, id, ORDER), ORDER);
+    assert.deepEqual(await decideNames(id, ORDER), ORDER);
   });
   await s.test(
     "a record keyed in the folder's order, its workflow frozen so or not at all, reads, lists and decides in the steps' order",
@@ -220,8 +213,8 @@ test('a chain runs to success: plan → implement → review, on one line of wor
           ORDER,
           legacyId,
         );
-        assert.deepEqual(await lsNames(t, legacyId), ORDER, legacyId);
-        if (frozen) assert.deepEqual(await decideNames(t, legacyId, ORDER), ORDER, legacyId);
+        assert.deepEqual(await lsNames(legacyId), ORDER, legacyId);
+        if (frozen) assert.deepEqual(await decideNames(legacyId, ORDER), ORDER, legacyId);
       }
     },
   );

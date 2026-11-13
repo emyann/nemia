@@ -2,7 +2,7 @@
  * The Factory (`src/factory.ts`): a factory and a page of them as the Api's endpoints answer them, every key kept, a factory missing
  * every optional key read; its condition words closed; and its sub-resources — its rules, its instruction and its commands, the old
  * route's lines as the board read them — as the Api's endpoints answer them and take their writes; and the writes that name a template
- * or a folder, a template given by its name or packed, never by a path.
+ * or a folder, a template given by its name, packed, or by a path of the daemon's machine, which its verb holds to a whole one.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -149,10 +149,10 @@ test("an upgrade's conflict names the proposal its resolution waits on: its phas
   );
 });
 
-test('a template travels by its name or packed in base64, never as a path; REFUSED: both, neither, or a path key', () => {
-  for (const template of [{ name: 'sdlc' }, { archive: 'H4sIAAAA' }])
+test("a template travels by its name, packed in base64, or by a path of the daemon's machine; REFUSED: none of them, or no text", () => {
+  for (const template of [{ name: 'sdlc' }, { archive: 'H4sIAAAA' }, { path: '/srv/sdlc' }])
     assert.deepEqual(taken('factories', 'apply', { template, repos: ['/srv/repo'] }), { template, repos: ['/srv/repo'] });
-  assert.equal(taken('factories', 'apply', { template: { path: '/laptop/sdlc' }, repos: [] }), undefined);
+  assert.equal(taken('factories', 'apply', { template: { path: 7 }, repos: [] }), undefined);
   assert.equal(taken('factories', 'apply', { template: {}, repos: [] }), undefined);
   assert.deepEqual(taken('factories', 'apply', {}), {}, "a template or repositories left out are the verb's to refuse, in its words");
   assert.equal(Schema.decodeUnknownExit(TemplateGiven)({ name: 1 })._tag, 'Failure');

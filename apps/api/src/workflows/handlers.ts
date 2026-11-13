@@ -357,8 +357,8 @@ export const workflowsHandlers = readsBounded(Api, 'workflows', (handlers) =>
             error: `${route} takes the \`?resourceVersion=\` the Workflow was read at, so a folder changed since is not removed unseen.`,
           });
         const before = await workflowAt(s, namespace, name, 'yours');
-        await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
-        return before;
+        const { removed } = await s.inRequest(WORKFLOWS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
+        return { ...before, status: { ...before.status, removed } };
       }),
     )
     .handle('step', ({ params: { namespace, name, step }, query }) =>

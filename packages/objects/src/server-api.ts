@@ -411,9 +411,9 @@ export type Quota = typeof Quota.Type;
 /**
  * `GET /api/stats`' query: `from` and `to` UTC days, `by` what the rows go by, and the facts kept by `agent`, `step`, `workflow`,
  * `ofFactory` and `ofRepo` (named so beside `factory` and `repo`, which name the place every route is answered in). Each kept as the text
- * it was sent as, refused in the package's words, a 422. The label query, given again for another, the runs whose labels one of them
- * takes, the api reads off the request under its former key, the retired spelling of `labelSelector` this table holds no field of: it is
- * declared here when the query takes the new name.
+ * it was sent as, refused in the package's words, a 422. `labelSelector`, a label query given once or again (`nemia stats -l`), the runs
+ * whose labels one of them takes; the api reads its former key off the request beside it, the retired spelling this table holds no
+ * field of.
  */
 export const StatsQuery = {
   from: Schema.optionalKey(Schema.String),
@@ -424,6 +424,7 @@ export const StatsQuery = {
   workflow: Schema.optionalKey(Schema.String),
   ofFactory: Schema.optionalKey(Schema.String),
   ofRepo: Schema.optionalKey(Schema.String),
+  labelSelector: Schema.optionalKey(Schema.Union([Schema.String, Schema.Array(Schema.String)])),
 };
 
 /**
@@ -456,7 +457,11 @@ export const SubscriptionWrite = Schema.Struct({
 });
 export type SubscriptionWrite = typeof SubscriptionWrite.Type;
 
-/** What `POST /api/subscriptions/:name` answers: the subscription put under its name, its news from the feed's byte `from`. */
+/**
+ * What `POST /api/subscriptions/:name` answers: the subscription put under its name, its news from the feed's byte `from`; and `hints`,
+ * a sentence for each former word one of its selectors still says, naming what it says now (none where none does; left out by an older
+ * api).
+ */
 export const Subscribed = Schema.Struct({
   name: Schema.String,
   subscription: Schema.Struct({
@@ -466,6 +471,7 @@ export const Subscribed = Schema.Struct({
     from: Schema.Number,
     scope: Schema.optionalKey(SubscriptionScope),
   }),
+  hints: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type Subscribed = typeof Subscribed.Type;
 

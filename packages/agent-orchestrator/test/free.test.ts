@@ -36,9 +36,10 @@ import { freeable, freeSaid, freeTurn } from '../src/forget/prune/prune.ts';
 import { up } from '../src/daemon/up.verb.ts';
 import { recentPasses } from '../src/daemon/daemon.store.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
-import { main } from '../src/cli/main.ts';
 import { hold, unhold } from '../src/wait/wait.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
+import { told } from './typed.ts';
+import { forgetTyped } from './forgetting.ts';
 
 const ROOT = scratch('wf-free-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -53,7 +54,8 @@ const ENV: Record<string, string | undefined> = {
   WF_KEEP_WORKTREES: undefined,
 };
 const files = filesStoreAt(ROOT);
-const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const world = () => stage.place().world;
 const runPlaced = stage.runPlaced;
 
@@ -381,7 +383,7 @@ test(
 
     await s.test(
       'REFUSED at shipped defaults: a held run whose work is done is no finished run, and nothing is said of it; a finished run whose record froze no workflow is left, said once across three sweeps, and freed by hand',
-      async (t) => {
+      async () => {
         const { id, repo } = await started(WORK);
         await ticked(() => atWork(id), `${id}'s work at work`);
         await stage.runWith(engine(), hold(id, []));
@@ -418,7 +420,7 @@ test(
         assert.ok(logged[0].includes(`nemia prune ${id}`), logged[0]);
         assert.ok(whole(id));
 
-        await printedBy(t, ['prune', id, '--yes']);
+        await forgetTyped((effect) => stage.runWith(engine(), effect), ROOT, ['prune', id, '--yes']);
         assert.ok(gone(id), 'the prune the line names frees it');
       },
     );

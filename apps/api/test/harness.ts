@@ -112,12 +112,11 @@ process.env.HOME = away;
 
 /**
  * No api test starts with a per-session variable of the daemon's (`SESSION_VARIABLES`), nor a serving one (`SERVING_VARIABLES`: the
- * address its api listens on, the store marked exposed), nor a forwarding one (`FORWARD_VARIABLES`): a
- * test that means one sets it itself. The
- * package is imported here, after every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
+ * address its api listens on, the store marked exposed): a test that means one sets it itself. The package is imported here, after
+ * every variable above is set, since its modules read some as they load (`CLAUDE_CONFIG_DIR`).
  */
-const { FORWARD_VARIABLES, SERVING_VARIABLES, SESSION_VARIABLES } = await import('agent-orchestrator');
-for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, ...FORWARD_VARIABLES]) delete process.env[name];
+const { SERVING_VARIABLES, SESSION_VARIABLES } = await import('agent-orchestrator');
+for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES]) delete process.env[name];
 
 /** How many calls of `verb` the fake has answered. */
 const callsOf = (verb: string): number =>

@@ -53,18 +53,26 @@ export type InputOf<I> = [Args] extends [I] ? { readonly input?: Schema.Decoder<
 /**
  * A command whole: its spec, `input`, the keys its handler takes where they are its own (`InputOf`), `handler`, which is the Effect of
  * calling one package verb with the arguments, answering data — never printed lines — and requiring the engine as a service
- * (`EngineService`), run by a caller with `runWith`, and `print`, the lines the CLI prints of that data. The api answers the data in the
+ * (`EngineService`), run by a caller with `runWith`, and `print`, the lines this CLI prints of that data: a command the client holds is
+ * a `Served`, with none. The api answers the data in the
  * shape its endpoint's success Schema says. A handler
  * reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the process's own at the command line, the
  * app's on the api; and what a caller that lives long keeps between its calls from `kept` — the api's memos of the stats and of the runs at
  * rest — which the command line, calling once, hands none of. `note` is what the CLI says of the data
  * on stderr, beside what it prints.
  */
-export type Command<D extends object = Readonly<Record<string, unknown>>, I = Args> = CommandSpec &
+export type Command<D extends object = Readonly<Record<string, unknown>>, I = Args> = Served<D, I> & {
+  print(data: D, args: I): readonly string[];
+  note?(data: D, args: I): readonly string[];
+};
+
+/**
+ * A command the client holds (`objects`' `COMMAND_WORDS`), as the table keeps it: its words spread, `input` and `handler`, which the api
+ * calls, and no `print`: the client (`apps/cli`) parses, words and prints it, from what the api answers.
+ */
+export type Served<D extends object = Readonly<Record<string, unknown>>, I = Args> = CommandSpec &
   InputOf<I> & {
     handler(args: I, kept?: Kept): Effect.Effect<D, Refusal, EngineService | PlaceService | StoreRoot | StoreConfig>;
-    print(data: D, args: I): readonly string[];
-    note?(data: D, args: I): readonly string[];
   };
 
 /**
@@ -78,7 +86,11 @@ export type Ran = CommandSpec & { readonly only: { readonly side: 'cli'; readonl
  * callers never hand it what it does not take — the CLI decodes its parsed `Args` through the entry's `input` first (`inputOf`), and the
  * api calls the typed entry itself, by its exported name.
  */
-export const tableEntry = <D extends object, I>(command: Command<D, I>): Command => command as unknown as Command;
+export function tableEntry<D extends object, I>(command: Command<D, I>): Command;
+export function tableEntry<D extends object, I>(command: Served<D, I>): Served;
+export function tableEntry<D extends object, I>(command: Served<D, I>): Served {
+  return command as unknown as Served;
+}
 
 /**
  * A typed entry's own check of what it was handed: the refusal its spec's `check` words, said before anything is read — nothing where

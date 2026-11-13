@@ -4,9 +4,9 @@
  * is held until a person lifts it (`nemia hold <run> --off`), as Kubernetes' Job `spec.suspend` holds a Job, and no tick lifts it.
  *
  * `holdRefusal` words the stop `holdStop` decides, then judges each run named (`afterRefusal`'s reasons, a circle), which reads paths and
- * walks the store and is held by its tests. `holdingOf` (summary/judged.verb.ts), `nemia ls` (`asksLines`, list/list.ts) and `nemia
- * decide` (`printWaiting`, cli/decide/decide.ts) read `holdNeedsYou` alike, so the board's bell, `nemia ls`'s line and the decision
- * cannot say different things of one hold.
+ * walks the store and is held by its tests. `holdingOf` (summary/judged.verb.ts), which the run's decision carries as its `holding`
+ * (`decisionRead`, decide/decision.verb.ts), and `nemia ls` (`asksLines`, list/list.ts) read `holdNeedsYou` alike, so the board's bell,
+ * `nemia ls`'s line and the decision cannot say different things of one hold.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Wait } from '../src/wait/wait.ts';

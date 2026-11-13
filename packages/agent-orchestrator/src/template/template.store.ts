@@ -329,8 +329,16 @@ export function treeOfDraft(draft: Draft): TreeFile[] {
 /** A factory's words as read where they are kept: its words, or null where there are none, why they do not read, and its file. */
 export type WordsRead = { words: string | null; error: string | null; file: string };
 
-/** A factory an export holds the parts of, as its door read them: the factory, its file, its instruction and its rules. */
-export type FactoryParts = { factory: Factory; file: string; instruction: WordsRead; rules: WordsRead };
+/**
+ * A factory an export holds the parts of, as the api of the context in use answers them: the factory's name, repositories, attached
+ * workflows, hires and revisions policy, where it is kept, its instruction and its rules.
+ */
+export type FactoryParts = {
+  factory: Pick<Factory, 'name' | 'repos' | 'workflows' | 'hires' | 'revisions'>;
+  file: string;
+  instruction: WordsRead;
+  rules: WordsRead;
+};
 
 /** What `nemia template export` asks: the folder to write, the repository to read, and the factory whose parts it holds. */
 export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };

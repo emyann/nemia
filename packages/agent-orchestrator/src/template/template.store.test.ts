@@ -30,6 +30,7 @@ import { followed } from '../../test/factory-planted.ts';
 import { main } from '../cli/main.ts';
 import { engineOf } from '../runtime-client.ts';
 import { exportedTemplate, packedTemplate, unpackedTemplate } from './template.verb.ts';
+import { exportedWithFactory } from '../../test/templated.ts';
 import { AgentDoor } from '../agents/agent-door.store.ts';
 import { agentDoorMemory } from '../agents/agent-memory.store.ts';
 import { AgentName } from '../agents/agents.model.ts';
@@ -48,7 +49,7 @@ function run<A>(program: Effect.Effect<A, unknown, Root>): A {
 }
 
 /** `nemia template export`'s program, `factory` the name `--factory` gives. */
-const exportTemplate = (ask: { dir: string; from: string; factory?: string }) => run(exportedTemplate(ask.dir, ask.from, ask.factory));
+const exportTemplate = (ask: { dir: string; from: string; factory?: string }) => run(exportedWithFactory(ask.dir, ask.from, ask.factory));
 
 /** `nemia template pack`'s program. */
 const packTemplate = (ask: { dir: string; out?: string; cwd: string }) => run(packedTemplate(ask.dir, ask.out, ask.cwd));

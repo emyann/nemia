@@ -3,23 +3,19 @@
  * questions the step asks (`--answer`, `typedAnswers`), or a loop out of rounds ended as it stands, with the person's words (what `nemia
  * accept` was, decision 7: `approveForm`), and what the next tick files because of it.
  */
-import { refusing, renamed, requiring } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
-import { RunApprove } from 'objects';
-import { commandLine, type Args } from '../command/command.ts';
+import { APPROVE_WORDS, approveRefusal, RunApprove } from 'objects';
 import { Invalid } from '../refusal/refusal.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun } from '../round/round.verb.ts';
 import { approveForm } from './form.verb.ts';
-import { checked, type Command } from '../command/entry.verb.ts';
-import { ANSWER_HELP, answerFlag, givenAnswers, typedAnswers } from '../question/asked.verb.ts';
+import { checked, type Served } from '../command/entry.verb.ts';
+import { givenAnswers, typedAnswers } from '../question/asked.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
-import { approvalWordsRefusal } from './gate.ts';
 import { approveRun } from './gate.verb.ts';
 import { dollarsOf } from '../keys/index.ts';
-import { dollars } from '../money/money.ts';
 import { budgetArgs, type StepBudget } from '../budget/budget.ts';
 
 /**
@@ -80,15 +76,11 @@ function budgetsLoopRefusal(input: ApproveInput): string | null {
     : null;
 }
 
-/** The refusal of an approval's words before anything is read: empty words (`approvalWordsRefusal`). */
-const approveRefusal = (args: Args): string | null =>
-  approvalWordsRefusal(typeof args.message === 'string' ? args.message : undefined, commandLine(APPROVE, args));
-
 /**
  * `nemia approve`: a step's try approved at its gate, or a loop out of rounds ended as it stands; what the next tick files because of it,
  * and the file the approval is written to. `loop` says which.
  */
-export const APPROVE: Command<
+export const APPROVE: Served<
   {
     step: string;
     try: number;
@@ -101,64 +93,7 @@ export const APPROVE: Command<
   },
   ApproveInput
 > = {
-  name: 'approve',
-  served: [
-    {
-      endpoint: 'runs.approve',
-      request: refusing('approve', ['answer', 'budget'], requiring('step', 'nemia approve <runId> <step>', renamed({ runId: 'name' }))),
-    },
-  ],
-  usage: '<runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]',
-  help: [
-    'let a step waiting at its gate hand on: what waits on it is filed on',
-    'the next tick, and every step after the gate is handed your words',
-    'under ## Approved. To send it back instead, with what to change:',
-    'nemia retry <runId> <step> --message "<objection>"',
-    'Of a loop out of rounds — the step that closes it, or the run alone',
-    'where it has one loop — enough: the loop ends on your words, with its',
-    'findings open, --message "<why>" required. What waits on the looping',
-    'step is filed as if it had said again: false, and every step after',
-    'the loop is handed your words and those findings under ## Accepted.',
-    'To go round once more instead: nemia retry <runId> [<step>] --round',
-    ...ANSWER_HELP,
-    '--budget <step>=<amount>: the cap of a step after the gate, in',
-    'dollars, over what the step proposed for it; once for each step.',
-    'Your approval makes the budgets the step proposed the caps of the',
-    'steps after the gate, and auto never approves unasked a cap above',
-    "a step's own budget",
-  ],
-  spec: {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'step', takes: 'optional', kind: 'name' },
-    ],
-    flags: [
-      answerFlag('approve'),
-      {
-        flag: '--budget',
-        kind: 'text',
-        key: 'budget',
-        many: true,
-        takes:
-          '--budget takes a step after the gate and its cap in dollars: nemia approve <runId> <step> --budget <step>=<amount>, like --budget implement=60',
-        only: { side: 'cli', why: 'the api takes the budgets as data, by step and dollars (`budgets`)' },
-      },
-      {
-        flag: '--message',
-        kind: 'text',
-        key: 'message',
-        takes: '--message takes the words that go with your approval, quoted: nemia approve <runId> [<step>] --message "<words>".',
-        twice: 'nemia approve takes --message once: put all your words in it, quoted — nemia approve <runId> [<step>] --message "<words>".',
-      },
-    ],
-    unknown: (arg) =>
-      `nemia approve does not take ${arg}. It takes the run, the step, --answer <n>=<letter>, --budget <step>=<amount> and --message "<words>": nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"].`,
-  },
-  check: approveRefusal,
-  writes: true,
-  ticks: true,
-  class: 'answer',
-  only: { side: 'cli', why: "the api serves it as the Run's `approve` of `objects`' Api, calling this handler" },
+  ...APPROVE_WORDS,
   input: ApproveInput,
   handler: Effect.fnUntraced(function* (input: ApproveInput) {
     const home = yield* StoreRoot;
@@ -208,21 +143,4 @@ export const APPROVE: Command<
       caps: capped,
     };
   }),
-  print({ step, try: tryNo, message, file, next, loop, caps }, { runId, answer, answers }) {
-    const then =
-      next === 'step'
-        ? `the next tick files ${step}`
-        : next === 'waiting'
-          ? 'the next tick files what waits on it'
-          : 'nothing waits on it: its run can be decided';
-    if (loop) return [`${runId}  accepted: try ${tryNo} of ${step} as it stands, its findings open — ${then}`, `   ${file}`];
-    return [
-      `${runId}  approved: try ${tryNo} of ${step}${answer?.length || answers?.length ? ', with your answers' : message !== null ? ', with your words' : ''} — ${then}`,
-      ...caps.map(
-        (c) =>
-          `   cap  ${c.step} ${dollars(c.usd)}${c.above && c.workflow !== null ? ` (above the workflow's ${dollars(c.workflow)})` : ''}`,
-      ),
-      `   ${file}`,
-    ];
-  },
 };

@@ -7,6 +7,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { FactoryWritten } from './written.ts';
 
 /**
  * What a person set: the cron, five or six fields; the brief each run is asked; the zone. A scheduled run works on the repository the
@@ -38,13 +39,14 @@ export const ScheduleStatus = Schema.Struct({
 });
 export type ScheduleStatus = typeof ScheduleStatus.Type;
 
-/** A schedule, as an object. */
+/** A schedule, as an object; a write's answer says what it wrote (`written`). */
 export const Schedule = Schema.Struct({
   apiVersion: Schema.Literal(API_VERSION),
   kind: Schema.Literal('Schedule'),
   metadata: ObjectMeta,
   spec: ScheduleSpec,
   status: ScheduleStatus,
+  written: Schema.optionalKey(FactoryWritten),
 });
 export type Schedule = typeof Schedule.Type;
 

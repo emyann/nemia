@@ -1,11 +1,10 @@
 /**
- * `nemia watch` over the api's stream (`GET /api/feed/stream`), against the in-process watch on the same feed (the old path's entry
- * spawned directly, as `src/local.ts` resolves it, `entryOf`): a store of the
- * test's own, its feed written by the package's own writer as another process writes it (`emitFeed`, no hub), served by the api spawned
- * with `--no-tick` on a free port, whose url the test writes into the store's lease as a daemon's would be. What `--once` prints, with
- * the operator's selectors and a label a person put on a run (`team=core`), in JSON and in words with the pause standing; a cursor file
- * resumed, and one holding a cursor the feed cannot be read from; the api killed under a running watch and started again; and a selector
- * naming a former reason.
+ * `nemia watch` over the api's stream (`GET /api/feed/stream`), its words parsed against `objects`' `WATCH_WORDS`: a store of the test's
+ * own, its feed written by the package's own writer as another process writes it (`emitFeed`, no hub), served by the api spawned with
+ * `--no-tick` on a free port, whose url the test writes into the store's lease as a daemon's would be. What `--once` prints, with the
+ * operator's selectors and a label a person put on a run (`team=core`), in JSON and in words with the pause standing; a cursor file
+ * resumed, one holding a cursor the feed cannot be read from, one holding no number and one in no directory; the api killed under a
+ * running watch and started again; and a selector naming a former reason, and one the api's grammar refuses.
  *
  * Every child is bounded (`timeout`) and killed when its test is done; every wait is on the output it counts, never on a length of time.
  */
@@ -19,7 +18,6 @@ import { scratch } from 'test-kit/scratch';
 import { Effect, Layer, Logger } from 'effect';
 import { emitFeed, type FeedWords, freshFeedMemo, StoreRoot } from 'agent-orchestrator';
 import { ambient } from './ambient.ts';
-import { entryOf } from '../src/local.ts';
 
 const CLI = path.join(import.meta.dirname, '..');
 const NEMIA = path.join(CLI, 'bin', 'nemia.ts');
@@ -95,21 +93,22 @@ async function apiOver(t: TestContext, root: string) {
   return { ...api, url };
 }
 
-/** `nemia <args>` in the store `root`, starting no daemon: this client's bin, or the old path's entry where `bin` names it. */
-const nemia = (t: TestContext, root: string, args: readonly string[], bin: string = NEMIA) => {
-  const env = { ...ambient(), WF_ROOT: root, NEMIA_DAEMON_START: 'off' };
-  return child(t, spawn(process.execPath, [bin, ...args], { cwd: root, env, timeout: 120_000 }));
+/** `nemia <args>` in the store `root`, starting no daemon, its home a scratch one, so no config of the person's names a token. */
+const nemia = (t: TestContext, root: string, args: readonly string[]) => {
+  const env = { ...ambient(), WF_ROOT: root, HOME: path.join(SCRATCH, 'home'), NEMIA_DAEMON_START: 'off' };
+  return child(t, spawn(process.execPath, [NEMIA, ...args], { cwd: root, env, timeout: 120_000 }));
 };
 
 /** `nemia <args>` run to its end: its code and what it printed. */
-const ran = async (t: TestContext, root: string, args: readonly string[], bin: string = NEMIA) => {
-  const c = nemia(t, root, args, bin);
+const ran = async (t: TestContext, root: string, args: readonly string[]) => {
+  const c = nemia(t, root, args);
   const code = await c.ended;
   return { code, out: c.out(), err: c.err() };
 };
 
-/** The same words run to their end on the old path, the orchestrator's CLI reading the store in process. */
-const inProcess = (t: TestContext, root: string, args: readonly string[]) => ran(t, root, args, entryOf('nemia'));
+/** The feed whole, read once to its end in JSON: what each read of a part of it is held to. */
+const whole = async (t: TestContext, root: string) =>
+  json((await ran(t, root, ['watch', '--once', '--json'])).out).filter((l) => 'at' in l);
 
 /** The JSON lines of `out`. */
 const json = (out: string): Array<Record<string, unknown>> =>
@@ -149,22 +148,30 @@ async function seeded() {
 
 const OPERATOR = ['-l', 'waits=person', '-l', 'kind=Store'];
 
-test('`nemia watch --once` over the api prints what the in-process watch prints of the same feed: the lines, the bookmark, the pause', async (t) => {
+test('`nemia watch --once` over the api prints the lines its selectors take, each with its cursor, the bookmark and the pause', async (t) => {
   const store = await seeded();
   await apiOver(t, store.root);
   const served = await ran(t, store.root, ['watch', '--once', ...OPERATOR, '--json']);
-  const local = await inProcess(t, store.root, ['watch', '--once', ...OPERATOR, '--json']);
   assert.equal(served.code, 0, served.err);
-  assert.equal(local.code, 0, local.err);
-  assert.equal(served.out, local.out, 'the same lines, each with its cursor, and the same last bookmark');
   const lines = json(served.out);
   assert.equal(lines.length, 4, `the gate, the pause put and lifted, and the bookmark: ${served.out}`);
+  assert.deepEqual(
+    lines.slice(0, 3).map((l) => [l.run ?? l.store, l.word]),
+    [
+      ['r-1', 'awaiting approval'],
+      ['store', 'store paused'],
+      ['store', 'store resumed'],
+    ],
+    'the gate, then the pause put and lifted',
+  );
+  assert.ok(
+    lines.slice(0, 3).every((l, i, all) => typeof l.cursor === 'number' && (i === 0 || l.cursor > (all[i - 1]?.cursor as number))),
+    `each line with its cursor, in order: ${served.out}`,
+  );
   assert.deepEqual(lines.at(-1), { cursor: store.size() }, "the bookmark at the feed's end");
 
   const team = await ran(t, store.root, ['watch', '--once', '-l', 'team=core', '--json']);
-  const teamLocal = await inProcess(t, store.root, ['watch', '--once', '-l', 'team=core', '--json']);
   assert.equal(team.code, 0, `a person's key is a selector the api takes: ${team.err}`);
-  assert.equal(team.out, teamLocal.out, "the same lines of a person's key");
   const taken = json(team.out).filter((l) => !('cursor' in l && Object.keys(l).length === 1));
   assert.ok(taken.length > 0, `the lines of the run labelled team=core: ${team.out}`);
   assert.ok(
@@ -175,14 +182,20 @@ test('`nemia watch --once` over the api prints what the in-process watch prints 
   const paused = await ran(t, store.root, ['pause', '--why', 'held for the watch']);
   assert.equal(paused.code, 0, paused.err);
   const plain = await ran(t, store.root, ['watch', '--once', ...OPERATOR]);
-  const plainLocal = await inProcess(t, store.root, ['watch', '--once', ...OPERATOR]);
   assert.equal(plain.code, 0, plain.err);
-  assert.equal(plain.out, plainLocal.out, 'in words: the pause standing, the lines, and `cursor: <n>`');
-  assert.match(plain.out.split('\n')[0] ?? '', /held for the watch/, 'the pause first');
+  const said = plain.out.trimEnd().split('\n');
+  assert.match(said[0] ?? '', /^Paused since .* held for the watch.*nemia resume resumes it$/, 'the pause first');
+  assert.match(
+    said[1] ?? '',
+    /^\d\d:\d\d:\d\d {2}r-1 {2}plan {2}awaiting approval {2}· approve it: nemia approve r-1 plan$/,
+    'the gate in words',
+  );
+  assert.match(said[2] ?? '', /^\d\d:\d\d:\d\d {2}store {2}— {2}store paused by ann {2}· merging by hand/, 'the pause put, in words');
+  assert.match(said[3] ?? '', /^\d\d:\d\d:\d\d {2}store {2}— {2}store resumed/, 'and lifted');
   assert.match(plain.out, new RegExp(`cursor: ${store.size()}\\n$`));
 });
 
-test('`--once` with no api answering at the lease is refused, naming `nemia up`, where the in-process watch reads the file', async (t) => {
+test('`--once` with no api answering at the lease is refused, naming `nemia up`', async (t) => {
   const store = await seeded();
   const api = await apiOver(t, store.root);
   api.proc.kill('SIGTERM');
@@ -191,7 +204,6 @@ test('`--once` with no api answering at the lease is refused, naming `nemia up`,
   assert.equal(served.code, 2, `REFUSED: the watch reads the api, and none answers: ${served.out}`);
   assert.match(served.err, /`nemia up`/);
   assert.doesNotMatch(served.err, /--local/);
-  assert.equal((await inProcess(t, store.root, ['watch', '--once', '--json'])).code, 0);
 });
 
 test('`--cursor-file` resumes from the saved cursor, no line twice; a cursor typed beside it is refused, naming what to drop', async (t) => {
@@ -204,13 +216,8 @@ test('`--cursor-file` resumes from the saved cursor, no line twice; a cursor typ
   await store.pass({ 'r-1': planAt('succeeded'), 'r-2': teamCore('r-2', planAt('succeeded')) });
   const second = await ran(t, store.root, ['watch', '--once', '--json', '--cursor-file', file]);
   assert.equal(second.code, 0, second.err);
-  const whole = await inProcess(t, store.root, ['watch', '--once', '--json']);
   const said = [...json(first.out), ...json(second.out)].filter((l) => 'at' in l);
-  assert.deepEqual(
-    said,
-    json(whole.out).filter((l) => 'at' in l),
-    'the two reads together are the feed whole, each line once',
-  );
+  assert.deepEqual(said, await whole(t, store.root), 'the two reads together are the feed whole, each line once');
   assert.ok(json(second.out).filter((l) => 'at' in l).length >= 1, 'the second read has the lines written between');
   assert.equal(fs.readFileSync(file, 'utf8'), `${store.size()}\n`);
 
@@ -228,8 +235,11 @@ test('a saved cursor the feed cannot be read from restarts the watch at 0, said 
   assert.equal(got.code, 0, got.err);
   assert.equal(got.err.match(/held cursor 5/g)?.length, 1, `said once: ${got.err}`);
   assert.match(got.err, /nemia watch/);
-  const whole = await inProcess(t, store.root, ['watch', '--once', '--json']);
-  assert.equal(got.out, whole.out, 'the feed from its start');
+  assert.deepEqual(
+    json(got.out).filter((l) => 'at' in l),
+    await whole(t, store.root),
+    'the feed from its start',
+  );
   assert.equal(fs.readFileSync(file, 'utf8'), `${store.size()}\n`);
 });
 
@@ -257,8 +267,7 @@ test(
     const liveness = printed.filter((l) => 'liveness' in l).map((l) => l.liveness);
     assert.deepEqual(liveness, ['down', 'up'], 'down once, up once');
     const lines = printed.filter((l) => 'at' in l && !('liveness' in l));
-    const whole = json((await inProcess(t, store.root, ['watch', '--once', '--json'])).out).filter((l) => 'at' in l);
-    assert.deepEqual(lines, whole, 'every line of the feed once, in order, across the restart');
+    assert.deepEqual(lines, await whole(t, store.root), 'every line of the feed once, in order, across the restart');
     assert.equal(fs.readFileSync(file, 'utf8'), `${store.size()}\n`);
 
     watch.proc.kill('SIGINT');
@@ -266,19 +275,34 @@ test(
   },
 );
 
-test('a selector naming a former reason prints its hint on stderr, as the in-process watch does', async (t) => {
+test("a selector naming a former reason prints its hint on stderr once; one the grammar refuses is the api's refusal, exit 2", async (t) => {
   const store = await seeded();
   await apiOver(t, store.root);
   const served = await ran(t, store.root, ['watch', '--once', '-l', 'reason=NeedsHuman']);
-  const local = await inProcess(t, store.root, ['watch', '--once', '-l', 'reason=NeedsHuman']);
   assert.equal(served.code, 0, served.err);
   assert.match(served.err, /NeedsHuman/, 'the hint names the former word');
   assert.match(served.err, /reason=AwaitingAnswer/, 'and the selector to type');
-  assert.equal(served.err, local.err, 'the same hint, once');
-  assert.equal(served.out, local.out);
+  assert.equal(served.err.split('\n').filter((l) => l.startsWith('nemia watch:')).length, 1, `the hint, once: ${served.err}`);
+  assert.match(served.out, new RegExp(`cursor: ${store.size()}\\n$`), "read to the feed's end");
 
   const refused = await ran(t, store.root, ['watch', '--once', '-l', 'no/pe=x']);
   assert.equal(refused.code, 2, 'REFUSED: a key no label is spelled');
   assert.match(refused.err, /no\/pe/);
   assert.equal(refused.out, '');
+});
+
+test('REFUSED: a cursor file holding no number, and one in no directory, each exit 2 naming the file, before a line is read', async (t) => {
+  const store = await seeded();
+  await apiOver(t, store.root);
+  const junk = path.join(store.root, 'junk.cursor');
+  fs.writeFileSync(junk, 'nineteen\n');
+  const held = await ran(t, store.root, ['watch', '--once', '--cursor-file', junk]);
+  assert.equal(held.code, 2, held.err);
+  assert.ok(held.err.includes(junk), `it names the file: ${held.err}`);
+  assert.equal(held.out, '', 'no line read');
+  const nowhere = path.join(store.root, 'nope', 'x.cursor');
+  const lost = await ran(t, store.root, ['watch', '--once', '--cursor-file', nowhere]);
+  assert.equal(lost.code, 2, lost.err);
+  assert.ok(lost.err.includes(path.join(store.root, 'nope')), `it names the directory: ${lost.err}`);
+  assert.equal(lost.out, '', 'no line read');
 });

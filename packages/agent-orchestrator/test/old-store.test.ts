@@ -26,18 +26,20 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { runWith, tickRun } from '../src/runner.ts';
 import { listRuns, runRecord, rewriteRun, runFile } from '../src/record/record.store.ts';
 import { ownDenies } from '../src/workflow/index.ts';
 import { stepPlace } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told, type StartedAnswer } from './typed.ts';
+import { RM } from '../src/forget/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-old-store-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'old-store');
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -239,22 +241,30 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
     assert.doesNotMatch(lines.join('\n'), /unreadable/);
   });
 
-  await s.test('`nemia decide` decides a run of the old store', async (c) => {
-    const lines = await printed(c, ['decide', 'notes']);
-    assert.ok(lines[0].startsWith('notes  take the notes'), lines.join('\n'));
+  await s.test('the decision of a run of the old store is read', async () => {
+    const { run } = await decidedOn(stage, 'notes');
+    assert.deepEqual([run.id, run.brief], ['notes', 'take the notes']);
   });
 
   await s.test(
     '`nemia start` on a folder still on the former names starts under the new, naming each line to rename; renamed, it says nothing',
-    async (c) => {
+    async () => {
       const dir = path.join(ROOT, 'workflows', 'renamed');
-      const said = await printed(c, ['start', 'write it', '--workflows', dir, '--repo', path.join(ROOT, 'repo'), '--no-worktree']);
-      const write = runRecord(ROOT, said[0].split(' ')[0]).workflow!.find((step) => step.name === 'write')!;
+      const said = (await stage.main([
+        'start',
+        'write it',
+        '--workflows',
+        dir,
+        '--repo',
+        path.join(ROOT, 'repo'),
+        '--no-worktree',
+      ])) as StartedAnswer;
+      const write = runRecord(ROOT, said.id).workflow!.find((step) => step.name === 'write')!;
       assert.deepEqual([write.disallowedTools, write.allowedTools], [['SendMessage'], ['Edit(**)']], 'the run started, its lists read');
-      const text = said.join('\n');
+      const text = (said.hints ?? []).join('\n');
       assert.ok(text.includes(`${path.join(dir, 'write.md')}: \`disallow:\` is read as \`disallowedTools:\``), text);
       assert.ok(text.includes(`${path.join(ROOT, 'workflows', 'agents', 'writer.md')}: \`allow:\` is read as \`allowedTools:\``), text);
-      const run = runRecord(ROOT, said[0].split(' ')[0]);
+      const run = runRecord(ROOT, said.id);
       assert.equal(holdsAny(written(run.id).workflow[0], 'disallow', 'allow'), false, '`nemia start` writes no former name');
       await stage.runWith(b.e, tickRun({ repo: ROOT }));
       assert.equal(holdsAny(written(run.id).workflow[0], 'disallow', 'allow'), false, 'nor does the pass after it');
@@ -262,8 +272,16 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
       const sandboxed = path.join(ROOT, 'workflows', 'sandboxed');
       fs.mkdirSync(sandboxed);
       fs.writeFileSync(path.join(sandboxed, 'work.md'), '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nWork it.\n');
-      const codex = await printed(c, ['start', 'work it', '--workflows', sandboxed, '--repo', path.join(ROOT, 'repo'), '--no-worktree']);
-      const codexId = codex[0].split(' ')[0];
+      const codex = (await stage.main([
+        'start',
+        'work it',
+        '--workflows',
+        sandboxed,
+        '--repo',
+        path.join(ROOT, 'repo'),
+        '--no-worktree',
+      ])) as StartedAnswer;
+      const codexId = codex.id;
       const sandbox = () => [written(codexId).workflow[0].sandbox, holdsAny(written(codexId).workflow[0], 'permissionMode')];
       assert.deepEqual(sandbox(), ['read-only', false], "a codex step's sandbox is written under `sandbox` alone");
       await stage.runWith(b.e, tickRun({ repo: ROOT }));
@@ -271,17 +289,22 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
 
       fs.writeFileSync(path.join(dir, 'write.md'), '---\nplace: git\nagent: writer\ndisallowedTools: SendMessage\n---\n');
       fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'writer.md'), '---\nallowedTools: Edit(**)\n---\nWrite it.\n');
-      const again = await printed(c, ['start', 'write it', '--workflows', dir, '--repo', path.join(ROOT, 'repo'), '--no-worktree']);
-      assert.doesNotMatch(again.join('\n'), /former name|is read as `/);
+      const again = (await stage.main([
+        'start',
+        'write it',
+        '--workflows',
+        dir,
+        '--repo',
+        path.join(ROOT, 'repo'),
+        '--no-worktree',
+      ])) as StartedAnswer;
+      assert.doesNotMatch((again.hints ?? []).join('\n'), /former name|is read as `/, 'renamed, the start answers no line to rename');
     },
   );
 
-  await s.test('`nemia rm` forgets a run of the old store, and the others stay', async (c) => {
-    const said = await printed(c, ['rm', 'notes']);
-    assert.ok(
-      said.some((l) => l.startsWith('notes  ')),
-      said.join('\n'),
-    );
+  await s.test('`nemia rm` forgets a run of the old store, and the others stay', async () => {
+    const forgot = await stage.runWith(b.e, RM.handler({ runId: 'notes' }));
+    assert.deepEqual([forgot.id, forgot.removed], ['notes', true]);
     assert.equal(fs.existsSync(runFile(ROOT, 'notes')), false, 'its record is gone');
     assert.deepEqual(
       listRuns(ROOT, () => {})

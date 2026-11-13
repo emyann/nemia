@@ -140,15 +140,6 @@ export const unheld = (name: string): Refused =>
     `no context named ${name} in ${CONTEXT_VARIABLE} or the config: see the contexts there are with \`nemia config get-contexts\`, or add it with \`nemia config set-context ${name} --server <url> --token-file <file>\``,
   );
 
-/**
- * `nemia template export --factory <name>` typed under the remote context `name`: refused, since the factory it reads is this machine's
- * store's, not the daemon's, and no endpoint serves an export; naming the machine to run it on and the context that reads this one.
- */
-export const factoryNotHere = (name: string): Refused =>
-  new Refused(
-    `nemia template export --factory reads the factory from a store in process, and the context in use, ${name}, is a remote daemon: run it on that daemon's machine, or export this machine's factory with \`NEMIA_CONTEXT=local nemia template export …\``,
-  );
-
 /** What `nemia config` says of itself, on `--help` or no words. */
 const USAGE = [
   'nemia config use-context <name>          use the context <name> (local: this machine’s store)',

@@ -1,18 +1,19 @@
 /**
- * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port. `nemia show`, `show --raw`,
- * `closeout` and `closeout --try` print the same stdout and exit with the same code as the same command run on the old path, the
- * orchestrator's own CLI entry spawned directly as `src/local.ts` resolves it (`entryOf`), which reads the store in process (the parity
- * guard: the printers live twice until the in-process reads retire). `nemia ls` and
- * `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked with `TABLE_ACCEPT`, with `-l`, `--show-labels` and
- * `-L` on a labelled run and card; `nemia ls <run>`, which no server table prints yet, is the old path's. Each read is seen asking the api,
- * by the request line the api says. `nemia ls` over a runs list the api answers in pages, each but the last with a `continue`, prints a
- * line per run of every page (`everyPage`), the api's table cut into pages of two rows by a stand-in in front of it. A bare 404 — an api
- * older than this client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none
- * started (`NEMIA_DAEMON_START=off`), exits 2 naming `nemia up` and never `--local`.
+ * The moved reads over HTTP, on one seeded store served by an api started with `--no-tick` on a free port, each parsed against its words
+ * in `objects`. `nemia show` prints the run object and `show --raw` its record; `closeout` and `closeout --try` print a try's closeout a
+ * field a line, and what its printer (`closeoutPrinted`) says of the answers the seed holds none of are rows of `CLOSEOUT_PRINTED`, typed
+ * by the api's Schema; `nemia ls <run>` prints the run off its object (`GET /api/runs/:name`), its steps' lines and what it asks of you,
+ * under this machine's context and under a remote one pointed at the same api — each held to the lines the in-process reads printed of the
+ * same seed before they were deleted. `nemia ls` and `nemia inbox` print the server's `Table` of the runs and of the cards (fc2e), asked
+ * with `TABLE_ACCEPT`, with `-l`, `--show-labels` and `-L` on a labelled run and card. Each read is seen asking the api, by the request
+ * line the api says. `nemia ls` over a runs list the api answers in pages, each but the last with a `continue`, prints a line per run of
+ * every page (`everyPage`), the api's table cut into pages of two rows by a stand-in in front of it. A bare 404 — an api older than this
+ * client — exits 2 naming the restart; an unknown run exits 2 with the api's refusal; no api serving the store, and none started
+ * (`NEMIA_DAEMON_START=off`), exits 2 naming `nemia up` and never `--local`.
  *
  * The store is a scratch folder (`test-kit/scratch`, which reaps what runs in it), never this machine's; the api writes no lease with
- * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder, which both paths word alike.
- * Every child is waited on for its end, or for the line it says, never for a length of time.
+ * `--no-tick`, so the test writes the one the client reads, its `url` alone: a lease that names no holder. Every child is waited on for
+ * its end, or for the line it says, never for a length of time.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,9 +21,10 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { LIST_PAGE } from 'objects';
+import { LIST_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { ambient } from './ambient.ts';
-import { entryOf } from '../src/local.ts';
+import { configWritten } from '../src/context.ts';
+import { closeoutPrinted } from '../src/reads/closeout.ts';
 import { scratch } from 'test-kit/scratch';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
@@ -209,9 +211,9 @@ write(
 /** How a child ended, and what it said on each stream. */
 type Said = { code: number | null; out: string; err: string };
 
-/** `nemia <argv>` on the store, waited on for its end: this client's bin, or the old path's entry where `bin` names it. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV, bin: string = CLI): Promise<Said> {
-  const child = spawn(process.execPath, [bin, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+/** `nemia <argv>` on the store, waited on for its end. */
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv = ENV): Promise<Said> {
+  const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
   child.stdout.on('data', (chunk) => (out += chunk));
@@ -257,14 +259,24 @@ const api = await startApi();
 lease(api.url);
 test.after(() => api.stop());
 
-/** Each read the parity holds, by the route the api answers it on. */
-const READS: ReadonlyArray<readonly [readonly string[], RegExp]> = [
-  [['show', RUN], /\/api\/runs\/r-parity\b/],
-  [['show', RUN, '--raw'], /\/api\/runs\/r-parity\/record\b/],
-  [['closeout', RUN, 'build'], /\/api\/runs\/r-parity\/steps\/build\/tries/],
-  [['closeout', RUN, 'build', '--try', '1'], /\/api\/runs\/r-parity\/steps\/build\/tries\/1\/closeout/],
-  [['closeout', RUN, 'review'], /\/api\/runs\/r-parity\/steps\/review\/tries/],
-];
+/**
+ * A laptop whose context in use is a remote daemon, the api serving the seeded store, with a token the store minted: its own store root
+ * is never made, so what it prints came over HTTP.
+ */
+async function remote(): Promise<NodeJS.ProcessEnv> {
+  const minted = await nemia(['token', 'add', 'reads-laptop']);
+  assert.equal(minted.code, 0, minted.err);
+  const token = /Authorization: Bearer (\S+)/.exec(minted.out)?.[1] ?? assert.fail(minted.out);
+  const folder = scratch('nemia-cli-reads-laptop-');
+  const env = {
+    ...ENV,
+    WF_ROOT: path.join(folder, 'store'),
+    HOME: path.join(folder, 'home'),
+    XDG_CONFIG_HOME: path.join(folder, 'config'),
+  };
+  configWritten({ contexts: [{ name: 'vps', server: api.url, token }], current: 'vps' }, env);
+  return env;
+}
 
 test("`nemia ls` prints the server's table of the runs: its columns of priority 0 under their names, a row per run", async () => {
   const before = api.said().length;
@@ -417,32 +429,250 @@ test('`nemia inbox -l … -L <key>`: the cards either selector takes, each with 
   assert.doesNotMatch(either.out, /^hold-the-reads /m, 'and neither takes a card with no labels');
 });
 
-for (const [argv, route] of READS)
-  test(`\`nemia ${argv.join(' ')}\` over HTTP prints what the old path prints, and exits the same`, async () => {
-    const before = api.said().length;
-    const served = await nemia(argv);
-    const local = await nemia(argv, ENV, entryOf('nemia'));
-    assert.equal(local.code, 0, `the old path reads the seed: ${local.err}`);
-    assert.equal(served.code, local.code, `the same exit code: ${served.err}`);
-    assert.equal(served.out, local.out, 'the same stdout');
-    assert.equal(served.err, local.err, 'the same stderr');
-    assert.match(api.said().slice(before), route, 'it asked the api');
-  });
-
-test('`nemia ls` says a hold that names no run is held until a person lifts it, and never that the run waits on you', async () => {
-  const listed = await nemia(['ls', 'r-parked']);
-  assert.equal(listed.code, 0, listed.err);
-  assert.match(
-    listed.out,
-    /→ held until a person lifts it \(why: folded into an intake; by operator\)  —  nemia hold r-parked --off lifts it/,
+test('`nemia show <run>` prints the run object, nemia/v1, with the line that points to --raw; `--raw` prints its record', async () => {
+  const before = api.said().length;
+  const shown = await nemia(['show', RUN]);
+  assert.equal(shown.code, 0, shown.err);
+  const object = JSON.parse(shown.out) as { apiVersion: string; kind: string; metadata: { name: string; labels: Record<string, string> } };
+  assert.equal(object.apiVersion, 'nemia/v1');
+  assert.equal(object.kind, 'Run');
+  assert.equal(object.metadata.name, RUN);
+  assert.deepEqual(object.metadata.labels, { team: 'core', workflow: 'no-such-workflow', factory: 'default' });
+  assert.equal(shown.err, `nemia show prints the run as one object; \`nemia show --raw ${RUN}\` prints its record.\n`);
+  assert.match(api.said().slice(before), /\/api\/runs\/r-parity\b/, 'it asked the api');
+  const raw = await nemia(['show', RUN, '--raw']);
+  assert.equal(raw.code, 0, raw.err);
+  assert.equal(raw.err, '');
+  const record = JSON.parse(raw.out) as { id: string; brief: string; workflow: { name: string; body: string }[]; labels: object };
+  assert.equal(record.id, RUN);
+  assert.equal(record.brief, 'Hold the reads to the old path\n\nAnd say why.…', 'its brief cut at 120 characters, marked');
+  assert.deepEqual(
+    record.workflow.map(({ name, body }) => [name, body]),
+    [
+      ['build', 'Build it.…'],
+      ['review', 'Review it.…'],
+    ],
+    "each frozen step's body cut at 60, marked",
   );
-  assert.doesNotMatch(listed.out, /waiting on you/);
+  assert.deepEqual(record.labels, { team: 'core' });
+  assert.match(api.said().slice(before), /\/api\/runs\/r-parity\/record\b/, 'it asked the record');
 });
 
-test('`nemia ls` says what the session of a step at work runs on, off its attempt’s record, beside its line', async () => {
-  const said = await nemia(['ls', 'r-working']);
-  assert.equal(said.code, 0, said.err);
-  assert.match(said.out, /build .* · on v1\.2\.0, codex 0\.200\.0/);
+test("`nemia closeout <run> <step> [--try <n>]` prints a try's closeout a field a line: the latest by default, or the one named", async () => {
+  for (const [argv, out, route] of [
+    [['closeout', RUN, 'build'], 'try 2: done: Built it.\n\nartifacts:\n  NOTES.md\n', /\/api\/runs\/r-parity\/steps\/build\/tries/],
+    [['closeout', RUN, 'build', '--try', '1'], 'try 1: done: A first cut.\n', /\/api\/runs\/r-parity\/steps\/build\/tries\/1\/closeout/],
+    [
+      ['closeout', RUN, 'review'],
+      'try 1: blocked: Half reviewed.\nneeds: Which database?\n',
+      /\/api\/runs\/r-parity\/steps\/review\/tries/,
+    ],
+  ] as const) {
+    const before = api.said().length;
+    const read = await nemia(argv);
+    assert.equal(read.code, 0, read.err);
+    assert.equal(read.out, out, argv.join(' '));
+    assert.equal(read.err, '');
+    assert.match(api.said().slice(before), route, 'it asked the api');
+  }
+});
+
+/** A try's closeout with nothing but its outcome and summary, which each row of `CLOSEOUT_PRINTED` fills with what it holds. */
+const bare: StepCloseout = {
+  apiVersion: 'nemia/v1',
+  outcome: 'done',
+  summary: 'Built it.',
+  body: null,
+  needs: null,
+  artifacts: [],
+  values: [],
+  refused: [],
+  output: {},
+  missing: [],
+  replies: null,
+  schema: {},
+  questions: [],
+  raw: {},
+};
+
+/**
+ * What `closeoutPrinted` says of a decoded answer the seed above does not hold: each row a try as the api's Schema types it, a line each
+ * of `said` holds, and each pair of `under` a line holding the first with the next line holding the second.
+ */
+const CLOSEOUT_PRINTED: readonly {
+  what: string;
+  read: TryCloseout;
+  said: readonly string[];
+  under?: readonly (readonly [string, string])[];
+  lines?: number;
+}[] = [
+  {
+    what: 'each output field by its name and value, a string as it is and anything else as JSON',
+    read: { try: 2, unreadable: null, closeout: { ...bare, output: { again: true, verdict: 'pass', findings: [{ file: 'a.ts' }] } } },
+    said: ['output:', '  again: true', '  verdict: pass', '  findings: [{"file":"a.ts"}]'],
+  },
+  {
+    what: 'a value it handed on by its name and value',
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: { ...bare, values: [{ name: 'pull request', value: 'https://example.test/pr/1', link: 'https://example.test/pr/1' }] },
+    },
+    said: ['values:', '  pull request: https://example.test/pr/1'],
+  },
+  {
+    what: "each reply to a finding, its answer on the finding's line and its why on the line under it",
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: {
+        ...bare,
+        replies: [
+          { finding: 'the flag is unnamed', answer: "won't fix", why: 'the spec names it in the next card' },
+          { finding: 'a test is missing', answer: 'fixed', why: 'added beside the printer' },
+        ],
+      },
+    },
+    said: ['replies:'],
+    under: [
+      ["won't fix: the flag is unnamed", 'the spec names it in the next card'],
+      ['fixed: a test is missing', 'added beside the printer'],
+    ],
+  },
+  {
+    what: 'a try with no closeout yet says so in one line, naming the try and its step',
+    read: { try: 3, closeout: null, unreadable: null },
+    said: ['try 3', 'implement', 'no closeout yet'],
+    lines: 1,
+  },
+  {
+    what: 'a try whose closeout does not read says why in one line',
+    read: { try: 1, closeout: null, unreadable: { error: 'Unexpected token } in JSON', raw: '{]' } },
+    said: ['try 1', 'implement', 'Unexpected token } in JSON'],
+    lines: 1,
+  },
+  {
+    what: 'its body, after a blank line, where it says more than its summary',
+    read: { try: 2, unreadable: null, closeout: { ...bare, body: 'Two names would do.' } },
+    said: ['try 2: done: Built it.', 'Two names would do.'],
+    lines: 3,
+  },
+  {
+    what: 'a body that only repeats its summary, once',
+    read: { try: 2, unreadable: null, closeout: { ...bare, body: 'Built it.' } },
+    said: ['Built it.'],
+    lines: 1,
+  },
+  {
+    what: "its questions' titles on one line",
+    read: {
+      try: 2,
+      unreadable: null,
+      closeout: {
+        ...bare,
+        outcome: 'blocked',
+        questions: [
+          {
+            field: 'questions',
+            questions: [
+              { title: 'Which flag name?', body: '', options: [], recommended: null, multiple: false },
+              { title: 'Ship it behind a gate?', body: '', options: [], recommended: null, multiple: false },
+            ],
+          },
+        ],
+      },
+    },
+    said: ['Which flag name?', 'Ship it behind a gate?'],
+  },
+  {
+    what: 'what it left out and what it was refused',
+    read: { try: 2, unreadable: null, closeout: { ...bare, missing: ['verdict', 'findings'], refused: ['Bash(git push)'] } },
+    said: ['verdict', 'findings', 'refused:', '  Bash(git push)'],
+  },
+];
+
+for (const { what, read, said, under = [], lines } of CLOSEOUT_PRINTED) {
+  test(`\`nemia closeout\` prints ${what}`, () => {
+    const printed = closeoutPrinted(read, 'implement');
+    for (const fact of said)
+      assert.ok(
+        printed.some((line) => line.includes(fact)),
+        `a line holds ${fact}: ${printed.join('\n')}`,
+      );
+    for (const [line, next] of under) {
+      const at = printed.findIndex((l) => l.includes(line));
+      assert.ok(at >= 0, `a line holds ${line}: ${printed.join('\n')}`);
+      assert.ok(printed[at + 1]?.includes(next), `the line under ${line} holds ${JSON.stringify(next)}: ${printed.join('\n')}`);
+    }
+    if (lines !== undefined) assert.equal(printed.length, lines, printed.join('\n'));
+  });
+}
+
+/** The lines the in-process `nemia ls <run>` printed of each seeded run, between the pause and the standing line, before it was deleted. */
+const ONE_RUN: Readonly<Record<string, readonly string[]>> = {
+  'r-parity': [
+    'r-parity  Hold the reads to the old path',
+    '   build          unverified · done      · try 2, fresh, on your word',
+    '   review         succeeded · BLOCKED  ',
+    '   → waiting on you: review  —  nemia decide r-parity',
+  ],
+  'r-parked': [
+    'r-parked  The run r-parked',
+    '   build          pending              ',
+    '   → held until a person lifts it (why: folded into an intake; by operator)  —  nemia hold r-parked --off lifts it',
+  ],
+  'r-working': ['r-working  The run r-working', '   build          starting               · on v1.2.0, codex 0.200.0'],
+  'r-asking': [
+    'r-asking  The run r-asking',
+    '   plan           succeeded · BLOCKED    · asks 2 questions',
+    '   → waiting on you: plan  —  nemia decide r-asking',
+  ],
+  'r-held': [
+    'r-held  The run r-held',
+    '   build          pending              ',
+    '   → held until r-parity lands (why: merge conflicts; by operator)  —  nemia hold r-held --off lifts it',
+  ],
+  'r-landed': [
+    'r-landed  The run r-landed',
+    '   build          unverified · done    wf/r-landed/build',
+    '   → result: wf/r-landed/build  —  nemia decide r-landed',
+  ],
+  'r-after': [
+    'r-after  The run r-after',
+    '   build          waiting on r-missing (no such run) ',
+    '   → waiting on you: the store has no run r-missing — yours to resolve: nemia cancel r-after, or start the work again without --after r-missing',
+  ],
+  'r-cancelled': ['r-cancelled  The run r-cancelled  (cancelled)', '   build          pending              '],
+};
+
+test("`nemia ls <run>` prints the run off its object, its steps and what it asks, under this machine's context and a remote one", async () => {
+  const away = await remote();
+  for (const [context, env] of [
+    ['local', ENV],
+    ['remote', away],
+  ] as const)
+    for (const [run, lines] of Object.entries(ONE_RUN)) {
+      const before = api.said().length;
+      const listed = await nemia(['ls', run], env);
+      assert.equal(listed.code, 0, `${context} ${run}: ${listed.err}`);
+      const out = listed.out.split('\n');
+      const head = out.indexOf(lines[0] ?? '');
+      assert.ok(head > 0, `${context}: ${run}'s head line, after the pause:\n${listed.out}`);
+      assert.deepEqual(out.slice(head, head + lines.length), lines, `${context}: ${run}'s lines`);
+      assert.match(out[0] ?? '', /^Paus.* by operator: a release; .*nemia resume/, 'the pause, first');
+      assert.match(out.at(-2) ?? '', /^daemon: /, 'the daemon, last');
+      assert.match(api.said().slice(before), new RegExp(`/api/runs/${run}\\b`), 'it asked the run');
+    }
+  assert.equal(fs.existsSync(away.WF_ROOT ?? ''), false, "nothing read or made on the laptop's own store");
+});
+
+test('REFUSED: `nemia ls <run>` beside -l, and -o with another output, exit 2 naming what to type, before anything is asked', async () => {
+  const both = await nemia(['ls', RUN, '-l', 'team=core']);
+  assert.equal(both.code, 2, both.err);
+  assert.match(both.err, new RegExp(`nemia ls ${RUN}\``));
+  const yaml = await nemia(['ls', '-o', 'yaml']);
+  assert.equal(yaml.code, 2, yaml.err);
+  assert.match(yaml.err, /nemia ls -o wide/);
 });
 
 test("REFUSED: an unknown run is the api's refusal, exit 2, naming the command that lists the runs", async () => {

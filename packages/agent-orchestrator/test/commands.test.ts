@@ -1,15 +1,27 @@
 /**
- * The shipped command table: no rule of the table broken against the CLI's own verbs and runners, and each command on the CLI alone, on
- * the api alone, or on both and typed.
+ * The shipped command table: no rule of the table broken against the CLI's runners, and each command on the CLI alone, on the api
+ * alone, or on both and typed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLI_VERBS, TABLE, commandBreaks } from '../src/runner.ts';
 import { classBreaks } from '../src/admission/index.ts';
-import { RUNS, VERBS } from '../src/cli/main.ts';
+import { COMMAND_WORDS } from 'objects';
+import { RUNS } from '../src/cli/main.ts';
+import { HELD, KEPT } from './held-commands.baseline.ts';
 
-test('the shipped table breaks none of its rules against the CLI’s verbs and runners, nor gives a tool a name its own verbs give', () => {
-  assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()], CLI_VERBS), []);
+test('the shipped table breaks none of its rules against the CLI’s runners, nor gives a tool a name the verbs the api serves beside it give', () => {
+  assert.deepEqual(commandBreaks(TABLE, [...RUNS.keys()], CLI_VERBS, [...KEPT, ...HELD]), []);
+});
+
+test('the store verbs this CLI still serves only shrink: each one held is an entry it serves whose words the client does not hold yet', () => {
+  const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
+  const moved = COMMAND_WORDS.map((w) => w.name);
+  assert.deepEqual(
+    [...KEPT, ...HELD].filter((name) => !served.includes(name) || moved.includes(name)),
+    [],
+    'take a name out of test/held-commands.baseline.ts in the change that moves it',
+  );
 });
 
 test('the commands whose work waits on the next pass tick, and the start itself (daemon), and no read, nor up, tick or watch, does', () => {
@@ -170,7 +182,6 @@ test("each command is served on the CLI alone, on the api alone, or on both and 
       ['workflows step', 'api'],
       ['tick', 'cli'],
       ['up', 'cli'],
-      ['watch', 'cli'],
       ['admit', 'cli'],
     ],
   );
@@ -224,7 +235,6 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'claude-token status',
       'version',
       'workflows step',
-      'watch',
       'admit',
     ],
   );

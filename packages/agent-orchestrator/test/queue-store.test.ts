@@ -21,10 +21,13 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Run } from '../src/run.ts';
-import { queueLine } from '../src/inbox/inbox.ts';
+import { inboxLines, queueLine, type InboxListing } from '../src/inbox/inbox.ts';
+import { INBOX_ADD, type InboxAddInput } from '../src/inbox/commands.verb.ts';
+import { handled, typed } from './typed.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM } from './team.ts';
-import { decideScreen } from './screens.ts';
+import { decidedOn, decisionOn } from './screens.ts';
+import { runLines } from '../src/object/lines.verb.ts';
 import { names } from './assessed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import {
@@ -45,7 +48,7 @@ import {
 } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { told } from './typed.ts';
 import { cardFiles } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { passParents } from '../src/views/views.verb.ts';
@@ -68,12 +71,29 @@ const ENV: Record<string, string | undefined> = {
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRootNeeded>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
 const addToInbox = (opts: Parameters<typeof addToInboxVerb>[0]) => atRoot(addToInboxVerb(opts));
 const readInbox = () => atRoot(readInboxVerb());
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith, runPlaced } = stage;
 
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const screenOn = (...[t, e, argv, as, place]: Parameters<typeof decideScreen>): Promise<string[]> =>
-  decideScreen(t, e, argv, as, place, ENV);
+/** A store verb typed, run on its entry's handler as the api calls it (`typed`), over `e` (the stage's engine when none is named). */
+const verb = (argv: readonly string[], e?: Engine) => typed(argv, e ?? stage.board().e, undefined, stage.place().place, ENV);
+
+/** What `nemia inbox queue`'s handler answers: what it did, the card's place among how many, and its factory's one repository. */
+type Queued = { was: string; queued: string | null; place: number | null; of: number | null; factoryRepo: string | null };
+
+/** `nemia inbox queue <argv>` on its entry's handler (`verb`): what it did. */
+const queuedBy = async (...argv: string[]): Promise<Queued> => (await verb(['inbox', 'queue', ...argv])) as Queued;
+
+/** `nemia inbox add` as the api calls its handler: the idea's text, a file read where it is typed, and the card's keys. */
+const added = (input: InboxAddInput) => handled(INBOX_ADD, input, { e: stage.board().e, place: stage.place().place, env: ENV });
+
+/** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry (`verb`). */
+const listedLines = async (): Promise<string[]> => {
+  const { cards, defaultStarts } = (await verb(['inbox'])) as { cards: InboxListing[]; defaultStarts: boolean };
+  return inboxLines(cards, defaultStarts);
+};
+
+/** Run `id`'s decision on this file's stage, as the api serves it (`decisionOn`). */
+const decisionNow = async (id: string) => (await decisionOn(stage, id)).decision;
 /** The runs waited on as a read with no standing reads them: none of their branches asked. */
 const noParents = () => passParents(standingReader(NOTHING_READ));
 
@@ -237,10 +257,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
   const task = (r: Run) => `${r.id}-implement`;
   let one: Run, two: Run, younger: Run, older: Run;
   const HELD = 'waiting for a run slot (2 of 2 in flight)';
-  const heldDecided = (r: Run) => [
-    `  ${HELD}`,
-    `  nothing of ${r.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
-  ];
+  const heldDecided = { running: true, held: { inFlight: 2, cap: 2 } };
 
   await s.test(
     'at a cap of 2, two runs are filed and the others wait: `nemia tick`, `nemia ls` and `nemia decide` say 2 of 2 in flight, and each record says when the cap first held it',
@@ -268,7 +285,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
         (await printedBy(c, ['ls', older.id])).some((l) => /^ {3}implement +waiting for a run slot \(2 of 2 in flight\)/.test(l)),
         'judged over the store for one run too',
       );
-      assert.deepEqual((await printedBy(c, ['decide', older.id])).slice(2), heldDecided(older));
+      assert.deepEqual(await decisionNow(older.id), heldDecided, 'held at the cap: 2 in flight of 2');
       assert.equal((await runWith(b.e, decideRun(one.id))).held, undefined);
     },
   );
@@ -298,9 +315,9 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     async (c) => {
       const seen = async () => ({
         listed: (await printedBy(c, ['ls'])).filter((l) => l.includes('waiting for a run slot')).map((l) => l.trim()),
-        decided: (await printedBy(c, ['decide', older.id])).slice(2),
+        decided: await decisionNow(older.id),
       });
-      const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided(older) };
+      const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided };
       try {
         for (const shell of [undefined, '5', '1', 'two']) {
           ENV.WF_MAX_RUNS = shell;
@@ -312,13 +329,10 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     },
   );
 
-  await s.test('the whole screen of a run the cap holds', async (c) => {
-    assert.deepEqual(await screenOn(c, b.e, [older.id], { '<id>': older.id, '<root>': ROOT }, stage.place().place), [
-      '<id>  c the older',
-      '',
-      '  waiting for a run slot (2 of 2 in flight)',
-      '  nothing of <id> is filed until a run in flight settles, oldest held first; nothing to decide yet',
-    ]);
+  await s.test('the whole decision of a run the cap holds', async () => {
+    const read = await decisionOn(stage, older.id);
+    assert.deepEqual(read.decision, heldDecided);
+    assert.deepEqual(read.decided?.held, { inFlight: 2, cap: 2 }, "the package's reading of it, which `nemia ls` says");
   });
 
   await s.test(
@@ -400,16 +414,13 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
     assert.deepEqual(b.filings.slice(-1), [task(younger)]);
   });
 
-  await s.test("the timeline counts the wait for a slot as the run's queue, on `nemia decide` too", async (c) => {
+  await s.test("the timeline counts the wait for a slot as the run's queue, on the decision's reading too", async () => {
     b.tasks.get(task(younger))!.filedAt = '2026-09-16T10:15:00.000Z';
     b.settle(task(younger), 'succeeded', SIGNED);
+    const slot = { from: at(4), filedAt: '2026-09-16T10:15:00.000Z', ms: 71 * 60_000, queued: '1h11m' };
     const { timeline } = await runWith(b.e, decideRun(younger.id));
-    assert.deepEqual(
-      timeline.slot,
-      { from: at(4), filedAt: '2026-09-16T10:15:00.000Z', ms: 71 * 60_000, queued: '1h11m' },
-      'created at 09:04 and filed at 10:15: that wait is its queue',
-    );
-    assert.ok((await printedBy(c, ['decide', younger.id])).includes('  timeline  run slot  queued 1h11m'), 'on the screen');
+    assert.deepEqual(timeline.slot, slot, 'created at 09:04 and filed at 10:15: that wait is its queue');
+    assert.deepEqual((await decidedOn(stage, younger.id)).timeline.slot, slot, 'the read the api serves says the same');
   });
 
   await s.test(
@@ -613,14 +624,14 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
     const promise = checkoutPromiseLine(runningRelease());
     const promised = promise ? [`   ${promise}`] : [];
-    const startedLines = printed.filter((l) => / {2}daemon started {2}· /.test(l));
+    const daemonStarts = printed.filter((l) => / {2}daemon started {2}· /.test(l));
     assert.deepEqual(
-      startedLines.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
+      daemonStarts.map((l) => l.replace(/^\d\d:\d\d:\d\d {2}/, '').replace(/at \S+$/, 'at …')),
       [`pid ${process.pid}  daemon started  · first daemon on this store`, `pid ${process.pid}  daemon started  · last stopped at …`],
       'each start writes the feed its daemon started line, the second saying when the first stopped',
     );
     assert.deepEqual(
-      printed.filter((l) => !startedLines.includes(l)),
+      printed.filter((l) => !daemonStarts.includes(l)),
       [
         'up — every 4000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
@@ -688,37 +699,37 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
   let busy: Run;
   let run: Run;
 
-  await s.test('`nemia inbox add <file> --factory` files a card whose gate is in its file, and `nemia inbox` lists both', async (c) => {
+  await s.test('`nemia inbox add <file> --factory` files a card whose gate is in its file, and `nemia inbox` lists both', async () => {
     const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
     fs.writeFileSync(idea, '---\nworkflow: dev\ngate: review\n---\nCache the views between passes\n');
-    [name] = (await printedBy(c, ['inbox', 'add', idea, '--factory', 'solo']))[0].split('  ');
+    ({ name } = (await added({ idea: fs.readFileSync(idea, 'utf8'), factory: 'solo' })).card);
     file = path.join(INBOX, `${name}.md`);
     assert.equal(fs.readFileSync(file, 'utf8'), '---\nworkflow: dev\ngate: review\nfactory: solo\n---\nCache the views between passes\n');
-    const [listed] = (await printedBy(c, ['inbox'])).filter((l) => l.startsWith(name));
+    const [listed] = (await listedLines()).filter((l) => l.startsWith(name));
     assert.ok(listed.includes('gate: review') && listed.includes('factory: solo'), listed);
   });
 
   await s.test(
     "`nemia inbox queue` marks it, says its place and that it starts on its factory's repository for its workflow, and keeps the card file's time — a queue is no edit of the idea, and `--off` takes it back as old still",
-    async (c) => {
+    async () => {
       const filed = new Date('2026-09-16T08:00:00.000Z');
       fs.utimesSync(file, filed, filed);
-      const queued = await printedBy(c, ['inbox', 'queue', name]);
+      const queued = await queuedBy(name);
       const when = /^queued: (.*)$/m.exec(fs.readFileSync(file, 'utf8'))![1];
-      assert.ok(queued[0].startsWith(`${name}  queued at ${when}, 1 of 1`), queued[0]);
-      assert.equal(
-        queued[1],
-        `the tick starts it on its own once its turn comes and a run slot is free, on ${solo}, its factory's repository for its workflow — take it back with nemia inbox queue ${name} --off`,
+      assert.deepEqual(
+        [queued.was, queued.queued, queued.place, queued.of, queued.factoryRepo],
+        ['queued', when, 1, 1, solo],
+        "queued at the time its file says, 1 of 1, on its factory's repository for its workflow",
       );
       assert.match(
-        (await printedBy(c, ['inbox'])).find((l) => l.startsWith(name))!,
+        (await listedLines()).find((l) => l.startsWith(name))!,
         /  queued 1 of 1$/,
       );
       assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'as old as it was');
-      await printedBy(c, ['inbox', 'queue', name, '--off']);
+      await queuedBy(name, '--off');
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^queued: /m, 'taken back');
       assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and as old still');
-      await printedBy(c, ['inbox', 'queue', name]);
+      await queuedBy(name);
       assert.match(fs.readFileSync(file, 'utf8'), /^queued: /m, 'queued again');
       const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', factory: 'solo' });
       assert.ok(
@@ -786,33 +797,29 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
     },
   );
 
-  await s.test('`nemia decide` names the card the run came from, under its line', async (c) => {
-    assert.equal((await printedBy(c, ['decide', run.id]))[1], `  from inbox card ${name}`);
+  await s.test("the run's decision names the card the run came from, as its lines say it", async () => {
+    assert.equal(runLines((await decisionOn(stage, run.id)).run).fromNote, `from inbox card ${name}`);
   });
 
   await s.test(
     '`--off` and `nemia inbox rm` take a card back, and a free slot starts nothing — nor a card never queued; `--workflow` writes both',
-    async (c) => {
+    async () => {
       await runWith(b.e, cancelRun(run.id));
       b.settle(`${run.id}-implement`, 'stopped');
       const bare = addToInbox({ text: 'No workflow yet', factory: 'solo' });
-      assert.deepEqual(await printedBy(c, ['inbox', 'queue', bare.card.name, '--off']), [
-        `${bare.card.name}  not queued — nothing to take back`,
-      ]);
-      await printedBy(c, ['inbox', 'queue', bare.card.name, '--workflow', 'dev']);
+      assert.equal((await queuedBy(bare.card.name, '--off')).was, 'not queued', 'nothing to take back');
+      await queuedBy(bare.card.name, '--workflow', 'dev');
       assert.match(
         fs.readFileSync(bare.file, 'utf8'),
         /^---\nworkflow: dev\nqueued: \S+\nfactory: solo\n---\nNo workflow yet\n$/,
         '--workflow writes both',
       );
-      assert.deepEqual(await printedBy(c, ['inbox', 'queue', bare.card.name, '--off']), [
-        `${bare.card.name}  taken back: it no longer starts on its own — start it with nemia start ${bare.card.name}`,
-      ]);
+      assert.equal((await queuedBy(bare.card.name, '--off')).was, 'taken back');
       assert.equal(fs.readFileSync(bare.file, 'utf8'), `---\nworkflow: dev\nfactory: solo\n---\nNo workflow yet\n`);
       const runs = listRuns(ROOT).length;
       assert.deepEqual([(await runWith(b.e, tickRun())).queue, listRuns(ROOT).length], [undefined, runs], 'taken back: not started');
-      await printedBy(c, ['inbox', 'queue', bare.card.name]);
-      await printedBy(c, ['inbox', 'rm', bare.card.name]);
+      await queuedBy(bare.card.name);
+      await verb(['inbox', 'rm', bare.card.name]);
       assert.deepEqual(
         [(await runWith(b.e, tickRun())).queue, listRuns(ROOT).length],
         [undefined, runs],
@@ -829,18 +836,18 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       const before = fs.readFileSync(card.file, 'utf8');
       const folder = path.join(solo, 'workflows', 'dev');
       await assert.rejects(
-        stage.main(['inbox', 'queue', card.card.name, '--workflow', folder]),
+        queuedBy(card.card.name, '--workflow', folder),
         refusedAs('Invalid', `--workflow ${folder}`, 'Nothing was queued.'),
       );
       assert.equal(fs.readFileSync(card.file, 'utf8'), before);
-      await stage.main(['inbox', 'rm', card.card.name]);
+      await verb(['inbox', 'rm', card.card.name]);
     },
   );
 
-  await s.test('a queued card that names no factory starts on the repository the daemon runs in, as `nemia start` takes `.`', async (c) => {
+  await s.test('a queued card that names no factory starts on the repository the daemon runs in, as `nemia start` takes `.`', async () => {
     const daemons = aRepoWith('dev');
     const { card } = addToInbox({ text: 'Anywhere the daemon is', workflow: 'dev' });
-    await printedBy(c, ['inbox', 'queue', card.name]);
+    await queuedBy(card.name);
     const pass = await runWith(b.e, tickRun({ repo: daemons }));
     const [started] = fromCard(card.name);
     assert.deepEqual(
@@ -902,7 +909,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
         `nemia inbox queue gone-a1b2 --off, then nemia inbox queue gone-a1b2`,
       );
       assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns(ROOT)], [text, []], 'the card as it was, and no run');
-      const listed = (await printedBy(c, ['inbox'])).find((l) => l.startsWith('gone-a1b2'))!;
+      const listed = (await listedLines()).find((l) => l.startsWith('gone-a1b2'))!;
       names(listed, 'workflow: nope', 'queued 1 of 2 — not started at ', 'gone-a1b2.md: `workflow: nope`');
 
       const next = await runWith(b.e, tickRun({ repo }));
@@ -916,8 +923,8 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
       fs.mkdirSync(path.join(repo, 'workflows', 'nope'));
       fs.writeFileSync(path.join(repo, 'workflows', 'nope', 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-      await printedBy(c, ['inbox', 'queue', 'gone-a1b2', '--off']);
-      await printedBy(c, ['inbox', 'queue', 'gone-a1b2']);
+      await queuedBy('gone-a1b2', '--off');
+      await queuedBy('gone-a1b2');
       const retried = await runWith(b.e, tickRun({ repo }));
       const [back] = fromCard('gone-a1b2');
       assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back.id });
@@ -972,12 +979,12 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
   await s.test(
     "REFUSED on the repository it was tried on: a card that names no repository, refused on the daemon's, is passed over by every pass there, and started by a pass in a repository that has its workflow",
-    async (c) => {
+    async () => {
       emptyStore(undefined);
       const none = aRepoWith();
       const dev = aRepoWith('dev');
       const { card } = addToInbox({ text: 'Wherever the daemon is', workflow: 'dev' });
-      await printedBy(c, ['inbox', 'queue', card.name]);
+      await queuedBy(card.name);
 
       const refused = await runWith(b.e, tickRun({ repo: none }));
       assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
@@ -990,7 +997,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
         [undefined, []],
         'passed over on the same repository',
       );
-      assert.match((await printedBy(c, ['inbox']))[0], new RegExp(` — not started at \\S+ on ${escaped(none)}: `));
+      assert.match((await listedLines())[0], new RegExp(` — not started at \\S+ on ${escaped(none)}: `));
 
       const started = await runWith(b.e, tickRun({ repo: dev }));
       const [run] = fromCard(card.name);
@@ -1000,12 +1007,12 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
   await s.test(
     "REFUSED on its factory's repository: a card of a workflow its factory has not attached is tried there, and passed over by every pass after, from a daemon anywhere",
-    async (c) => {
+    async () => {
       emptyStore(undefined);
       const solo = aSoloFactory([]);
       const daemons = aRepoWith('dev');
       aCard('unattached-card', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
-      await printedBy(c, ['inbox', 'queue', 'unattached-card']);
+      await queuedBy('unattached-card');
       const refused = await runWith(b.e, tickRun({ repo: daemons }));
       assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
       assert.equal(refused.queue.on, undefined, "the card's factory names the repository, not the daemon");
@@ -1017,7 +1024,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
         [undefined, []],
         'passed over on the same repository',
       );
-      const [line] = await printedBy(c, ['inbox']);
+      const [line] = await listedLines();
       names(line, ' — not started at ', `on ${solo}, its factory's repository for its workflow: dev: `);
       assert.doesNotMatch(line, /run nemia up/);
     },
@@ -1043,7 +1050,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.doesNotMatch(refused.queue.refused, /--factory <name>;|at start/, 'a daemon has no flag to give');
       assert.doesNotMatch(queueLine(refused.queue), / not started on |run nemia up in the repository/);
       assert.deepEqual([(await runWith(b.e, tickRun({ repo: solo }))).queue, listRuns(ROOT)], [undefined, []], 'the refusal lasts');
-      const [line] = await printedBy(c, ['inbox']);
+      const [line] = await listedLines();
       assert.match(line, /^loose-card .* — not started at \S+: \S+\/inbox\/loose-card\.md: this card names no factory, /);
       assert.doesNotMatch(line, /run nemia up in the repository/);
 
@@ -1080,7 +1087,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
   const cards = () => Object.fromEntries(fs.readdirSync(INBOX).map((f) => [f, fs.readFileSync(path.join(INBOX, f), 'utf8')]));
   const before = cards();
   const runs = listRuns(ROOT).length;
-  const queue = (...argv: string[]) => stage.main(['inbox', 'queue', ...argv]);
+  const queue = (...argv: string[]) => queuedBy(...argv);
   const rows: Array<[string, () => Promise<unknown>, 'Missing' | 'Conflict' | 'Invalid', string[], shipped?: boolean]> = [
     [
       'a name with no card',
@@ -1088,7 +1095,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
       'Missing',
       ['no card no-such-card in the inbox', bare.card.name, 'nemia inbox queue <name>', 'nemia inbox add "<idea>"'],
     ],
-    ['no name', () => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <w>] [--off]']],
+    ['no name', () => queue(), 'Invalid', ['the name of the card', 'nemia inbox queue <name> [--workflow <name>] [--off]']],
     ['a name that leaves the inbox', () => queue('../runs/x'), 'Invalid', ["`../runs/x` is not a card's name"]],
     [
       'a card with no workflow',
@@ -1179,10 +1186,10 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
     async (c) => {
       asShipped(c);
       const older = aCard('older', { workflow: 'dev', queued: at(1) }, 'Queued before the rule.');
-      await printedBy(c, ['inbox', 'queue', 'older', '--off']);
+      await queuedBy('older', '--off');
       assert.doesNotMatch(fs.readFileSync(older, 'utf8'), /queued:/);
       const placed = aCard('placed', { workflow: 'dev', factory: 'solo' }, 'Build it in solo.');
-      await printedBy(c, ['inbox', 'queue', 'placed']);
+      await queuedBy('placed');
       assert.match(fs.readFileSync(placed, 'utf8'), /^queued: \S+$/m);
     },
   );
@@ -1197,7 +1204,7 @@ test(
     const b = ticking();
     aSoloFactory(['dev']);
     const removed = addToInbox({ text: 'Started by hand', workflow: 'dev', factory: 'solo' });
-    await printedBy(t, ['inbox', 'queue', removed.card.name]);
+    await queuedBy(removed.card.name);
     await printedBy(t, ['start', removed.file]);
     assert.equal(fromCard(removed.card.name).length, 1);
     assert.deepEqual(
@@ -1218,7 +1225,7 @@ test(
     );
 
     const stuck = addToInbox({ text: 'Started by hand, and left behind', workflow: 'dev', factory: 'solo' });
-    await printedBy(t, ['inbox', 'queue', stuck.card.name]);
+    await queuedBy(stuck.card.name);
     fs.chmodSync(INBOX, 0o555);
     try {
       await printedBy(t, ['start', stuck.file]);

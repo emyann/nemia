@@ -26,12 +26,15 @@ import { Effect, Exit, Layer, Logger, ManagedRuntime, References, Stream } from 
 import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from 'test-kit/scratch';
 import { story, staged } from './story.ts';
+import { decidedOf } from './screens.ts';
 import { bell, until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { EngineService, engine, feedHubLayer, followStep, retryRun, tickRun, runWith, withProposalsPass } from '../src/runner.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { storeConfigLayer } from '../src/config/root.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { handled, told, type StartedAnswer } from './typed.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
+import { SAY } from '../src/say/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-remote-');
@@ -41,7 +44,7 @@ const CALLS = path.join(BIN, 'calls.log');
 for (const name of ['claude', 'codex'])
   fs.writeFileSync(path.join(BIN, name), `#!/bin/sh\necho "${name} $*" >> '${CALLS}'\nexit 1\n`, { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
-const stage = staged({ runWith, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 type Engine = ReturnType<typeof engine>;
 type Moment = Stream.Success<ReturnType<typeof followStep>>;
@@ -89,7 +92,7 @@ async function startedBy(start: (argv: string[]) => Promise<unknown>, dir: strin
   process.chdir(ROOT);
   try {
     const argv = ['start', 'a note on tides', '--workflows', dir, ...(given ? ['--input', GIVEN] : [])];
-    return (await said(() => start(argv))).out[0].split(/\s+/)[0];
+    return ((await start(argv)) as StartedAnswer).id;
   } finally {
     process.chdir(cwd);
   }
@@ -139,7 +142,7 @@ async function remoteRun(t: Waiter, name: string, answer: Answer, secret: string
     const id = await started(team(`${name}-team`, `a2a:${name}`));
     const e = engine(ENV);
     await settle(t, e, id);
-    return { server, id, e, decided: await printed(['decide', id], e), listed: await printed(['ls'], e) };
+    return { server, id, e, decided: await decidedOf(e, id, { place: builtinGitPlace, env: ENV }), listed: await printed(['ls'], e) };
   } finally {
     delete process.env[variable];
     await server.close();
@@ -247,7 +250,7 @@ test(
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'succeeded');
         assert.ok(runRecord(ROOT, id).steps.ask?.taskId, 'filed');
-        assert.ok(decided.join('\n').includes('ask'), decided.join('\n'));
+        assert.equal(decided.timeline.steps.ask?.length, 1, 'the decision reads its one try');
         assert.match(listed.join('\n'), /^\s+ask\s+unverified\s*$/m, listed.join('\n'));
         const everything = (dir: string): string[] =>
           fs
@@ -272,9 +275,9 @@ test(
           's3cret',
         );
         assert.equal(server.sent.length, 1);
-        const words = decided.join('\n');
-        assert.match(words, /blocked/, words);
-        assert.match(words, /a source for the tide tables/, words);
+        const said = decided.closeouts.ask;
+        assert.ok(said && !('error' in said), JSON.stringify(said));
+        assert.deepEqual([said.outcome, said.needs], ['blocked', 'a source for the tide tables']);
       },
     );
 
@@ -285,15 +288,16 @@ test(
         assert.equal(server.sent.length, 0, 'no message went out without its secret');
         const view = await Effect.runPromise(e.view(`${id}-ask`));
         assert.equal(view.phase, 'failed');
-        const words = JSON.stringify(view.state.attempts) + decided.join('\n');
+        const offered = [...decided.offers, ...decided.commands.map((x) => x.command)];
+        const words = JSON.stringify(view.state.attempts) + offered.join('\n');
         assert.ok(words.includes('set WF_A2A_CRITIC_TOKEN to the secret'), words);
         assert.ok(words.includes("the scheme `token` critic's card declares"), words);
         assert.ok(words.includes('`nemia retry`'), words);
         assert.ok(
-          decided.some((line) => line.trim() === `ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
-          `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${decided.join('\n')}`,
+          offered.includes(`ask: failed. Send it again, as a new Task told what happened:  nemia retry ${id} ask`),
+          `offered a new Task, not a session continued nor a model, which nemia retry refuses on a remote step:\n${offered.join('\n')}`,
         );
-        assert.doesNotMatch(decided.join('\n'), /--model|Continue its session/);
+        assert.doesNotMatch(offered.join('\n'), /--model|Continue its session/);
 
         for (const [flag, asked] of [
           ['--model haiku', { mode: 'fresh', model: 'haiku' }],
@@ -336,7 +340,7 @@ test(
           await tick(e);
           const listed = (await printed(['ls'], e)).join('\n');
           assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
-          const decided = (await printed(['decide', id], e)).join('\n');
+          const decided = `ask: ${(await decidedOf(e, id, { place: builtinGitPlace, env: ENV })).waitingOn.ask}`;
           assert.match(
             decided,
             new RegExp(
@@ -347,7 +351,11 @@ test(
           assert.equal(decided.includes('claude agents'), false, decided);
           assert.match((await printed(['logs', id, 'ask'], e)).join('\n'), /Which tide tables — Brest or Dover\?/);
 
-          await printed(['say', id, 'ask', 'Brest, please.'], e);
+          await handled(
+            SAY,
+            { runId: id, step: 'ask', text: 'Brest, please.', caller: { kind: 'person' } },
+            { e, place: builtinGitPlace, env: ENV },
+          );
           await settle(c, e, id);
           assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
           assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
@@ -443,7 +451,7 @@ test(
 );
 
 /** `nemia argv` with the engine `main` makes itself, as a restarted `nemia up` would, and what it printed. */
-const own = (argv: string[]) => said(() => cli(argv, undefined, undefined, undefined, ENV));
+const own = (argv: string[]) => said(() => told(argv, engine(ENV), undefined, builtinGitPlace, ENV));
 
 const LOCAL = team('local', 'claude', 'work', 'Write a note on tides.');
 const REMOTE = team('remote', 'a2a:reviewer', 'work');
@@ -467,7 +475,7 @@ test(
         async (row) => {
           const server = await a2aServer({ answer: () => ({ asks: 'Which note?' }) });
           const good = JSON.stringify({ reviewer: { url: server.url } });
-          const start = (dir: string) => startedBy((argv) => cli(argv, undefined, undefined, undefined, ENV), dir, false);
+          const start = (dir: string) => startedBy((argv) => told(argv, engine(ENV), undefined, builtinGitPlace, ENV), dir, false);
           try {
             fs.writeFileSync(FILE, good);
             const away = await start(REMOTE);

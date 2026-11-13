@@ -21,11 +21,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { TaskSpec } from 'agent-runtime';
-import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { TEAM, TEAM_DEV } from './team.ts';
 import { promised } from './promised.ts';
+import { decidedOf } from './screens.ts';
 import { Effect } from 'effect';
 import { Conflict } from '../src/refusal/refusal.ts';
 import { runGiven, runOver } from './placed.ts';
@@ -47,7 +47,6 @@ import {
 import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
 import { roundOf } from '../src/run.ts';
-import { main } from '../src/cli/main.ts';
 import { gitPlace } from '../place/git/place.ts';
 import { stagedHere, landingDenies, landingWords } from '../src/place/landing.store.ts';
 import { builtinGitPlace } from '../src/place/builtin.store.ts';
@@ -562,7 +561,7 @@ for (const [said, exitCode, words] of [
   ['refuses', 1, 'its check refused the merge (exit 1)'],
   ['does not finish', undefined, 'its check did not finish'],
 ] as const) {
-  test(`REFUSED at shipped defaults: a check that ${said} on the merge has the run abort it — the base branch never moves, and a try of ship merges again, never --recheck`, async (t) => {
+  test(`REFUSED at shipped defaults: a check that ${said} on the merge has the run abort it — the base branch never moves, and a try of ship merges again, never --recheck`, async () => {
     const { repo, id, e, tasks, settle, base, checkId } = await stagedAndSigned();
     const shot = photographed(id, { count: 4, bytes: 10 });
     settle(checkId, 'failed', undefined, exitCode);
@@ -587,8 +586,9 @@ for (const [said, exitCode, words] of [
     assert.equal(shipLine.message, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
     assert.equal(shipLine.note, `nothing landed on main: ${words}`, 'and why nothing landed');
 
-    const printed = (await decideLines(t, e, id)).flatMap((l) => l.split('\n'));
-    const line = printed.find((l) => l.trimStart().startsWith('ship: '))?.trim();
+    const decided = await decidedOf(e, id, { place: builtinGitPlace, env: ENV });
+    const printed = [...decided.offers, ...decided.commands.map((c) => c.command)];
+    const line = printed.find((l) => l.startsWith('ship: '));
     assert.ok(line, printed.join('\n'));
     assert.ok(line.includes(`nemia retry ${id} ship`), line);
     assert.ok(!printed.some((l) => l.includes('--recheck')), printed.join('\n'));
@@ -715,20 +715,6 @@ const STOPPED = {
   artifacts: [],
   needs: "the branch has to take main: add.ts conflicts with main's sub",
 };
-
-/** What `nemia decide` prints for a run, line by line. */
-async function decideLines(t: { mock: { method: typeof import('node:test').mock.method } }, e: Engine, id: string): Promise<string[]> {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.map(String).join(' '));
-  });
-  try {
-    await main(['decide', id], e, undefined, undefined, ENV);
-  } finally {
-    log.mock.restore();
-  }
-  return printed;
-}
 
 /** main moves under the run: a commit on the base branch that gives add.ts a `sub` of its own, which the branch's conflicts with. */
 const mainMoves = (repo: string): string => {

@@ -40,7 +40,8 @@ import { runRecord } from '../src/record/record.store.ts';
 import { approveProgram, declineProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
 import { mintToken } from '../src/token/token.store.ts';
-import { main } from '../src/cli/main.ts';
+import { factoryTyped } from './factory-typed.ts';
+import type { StartedAnswer } from './typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -48,7 +49,7 @@ const ROOT = scratch('wf-upgrade-conflict-');
 const FACTORIES = path.join(ROOT, 'factories');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 
 /** The document `file` of `dir`, its spec changed by `change`. */
 function edit(dir: string, file: string, change: (spec: Record<string, any>) => void): void {
@@ -191,7 +192,7 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     });
     await printedBy(t, 'factory', 'apply', 'crew', '--template', dir, '--repo', repo, '--set', 'budget=7');
     assert.equal(reconciled(factory('crew')).conditions[0].reason, 'Rendered');
-    run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
+    run = ((await stage.main(['start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'])) as StartedAnswer).id;
     assert.equal(runRecord(ROOT, run).workflow?.find((step) => step.name === 'review')?.rounds, 3);
     rewrite(tree(), REVIEW, 'rounds: 3', 'rounds: 4');
     rewrite(tree(), REVIEW, 'budget: 7', 'budget: 9');
@@ -211,20 +212,22 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
 
   await s.test(
     'nemia factory diff previews what merges cleanly and each conflict, then the upgrade to file before the line that resolves each, and writes nothing',
-    async (t) => {
+    async () => {
       const before = bytesUnder(FACTORIES);
-      const printed = await printedBy(t, 'factory', 'diff', 'crew', '--to', '0.2.0');
+      const preview = (await stage.main(['factory', 'diff', 'crew', '--to', '0.2.0'])) as {
+        from?: string;
+        to: string;
+        merge: { conflicts: ReadonlyArray<{ at: string }> };
+        next: { line: string; digest: string };
+      };
       assert.deepEqual(bytesUnder(FACTORIES), before, 'the plan writes nothing');
-      assert.equal(printed[0], 'crew: 0.1.0 → 0.2.0');
-      assert.ok(printed.includes('conflicts: 3'), printed.join('\n'));
-      const upgrade = printed.findIndex((line) => line.startsWith('first, nemia factory upgrade crew --to 0.2.0 files it'));
-      assert.ok(upgrade > 0, printed.join('\n'));
-      assert.match(printed[upgrade - 1] ?? '', /^plan: sha256:[0-9a-f]{64}$/, 'the digest the upgrade is held to, where one is');
-      for (const at of [LINE, SCRIPT_LINE, ROUNDS]) {
-        assert.ok(printed.includes(`  ${at}`), printed.join('\n'));
-        const resolve = printed.indexOf(`    nemia factory resolve crew '${at}' --ours|--theirs|--file <path>`);
-        assert.ok(resolve > upgrade, `the resolve of ${at} comes after the upgrade it is taken for:\n${printed.join('\n')}`);
-      }
+      assert.deepEqual([preview.from, preview.to], ['0.1.0', '0.2.0']);
+      assert.deepEqual(
+        preview.merge.conflicts.map((c) => c.at),
+        [LINE, SCRIPT_LINE, ROUNDS],
+      );
+      assert.match(preview.next.line, /^nemia factory upgrade crew --to 0\.2\.0/, 'the upgrade to file before each is resolved');
+      assert.match(preview.next.digest, /^sha256:[0-9a-f]{64}$/, 'the digest the upgrade is held to, where one is');
     },
   );
 
@@ -240,12 +243,12 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     },
   );
 
-  await s.test("nemia factory upgrade files the version wanted in the factory's file, and nothing else", async (t) => {
+  await s.test("nemia factory upgrade files the version wanted in the factory's file, and nothing else", async () => {
     const file = path.join(FACTORIES, 'crew.json');
     const filedAs = JSON.parse(fs.readFileSync(file, 'utf8'));
     const folder = bytesUnder(path.join(FACTORIES, 'crew'));
-    const printed = await printedBy(t, 'factory', 'upgrade', 'crew', '--to', '0.2.0');
-    assert.match(printed[2], /^3 conflicts wait for a choice: nemia factory diff crew --to 0\.2\.0 shows each/);
+    const filed = (await stage.main(['factory', 'upgrade', 'crew', '--to', '0.2.0'])) as { conflicts: number };
+    assert.equal(filed.conflicts, 3, 'three conflicts wait for a choice');
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
       ...filedAs,
       template: { ...filedAs.template, version: '0.2.0' },
@@ -286,14 +289,20 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     assert.deepEqual(readStatus(ROOT, 'crew'), waiting);
   });
 
-  await s.test('resolve refuses what is no conflict or not one choice, writing nothing, and writes each choice it is given', async (t) => {
+  await s.test('resolve refuses what is no conflict or not one choice, writing nothing, and writes each choice it is given', async () => {
     const resolve = (...rest: string[]) => stage.main(['factory', 'resolve', 'crew', ...rest]);
+    const resolvedBy = async (...rest: string[]) =>
+      (await resolve(...rest)) as {
+        left: readonly string[];
+        proposed?: { kind: string; name: string; proposal: string };
+        waits: readonly string[];
+      };
     await assert.rejects(resolve('nowhere.md', '--ours'), refusedWith('Missing', /nowhere\.md is no conflict/));
     await assert.rejects(resolve(ROUNDS), refusedWith('Invalid', /takes one choice/));
     await assert.rejects(resolve(ROUNDS, '--ours', '--theirs'), refusedWith('Invalid', /takes one choice/));
     await assert.rejects(resolve(ROUNDS, '--file', path.join(dir, 'gone.md')), refusedWith('Invalid', /no file at/));
     assert.ok(!fs.existsSync(resolutionsFile(ROOT, 'crew')), 'a refused resolve writes nothing');
-    assert.match((await printedBy(t, 'factory', 'resolve', 'crew', ROUNDS, '--theirs'))[1], /^2 conflicts still wait/);
+    assert.deepEqual((await resolvedBy(ROUNDS, '--theirs')).left, [LINE, SCRIPT_LINE], 'two conflicts still wait');
     assert.deepEqual(proposalsOf('crew'), [], "the workflow's other conflict has no choice yet, so nothing is proposed");
     assert.deepEqual(
       reconciled(factory('crew')).upgrade?.conflicts.map((c) => [c.at, c.proposal]),
@@ -305,13 +314,10 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
       "a choice for a workflow's conflict is a draft: it settles nothing by itself",
     );
     assert.deepEqual(bytesUnder(tree()), waitingTree, 'nothing merged');
-    const printed = await printedBy(t, 'factory', 'resolve', 'crew', SCRIPT_LINE, '--file', scriptChoice());
+    const proposing = await resolvedBy(SCRIPT_LINE, '--file', scriptChoice());
     proposal = recordedFor('crew', 'Workflow/dev') ?? '';
     assert.deepEqual(proposalsOf('crew'), [proposal], 'each conflict of the workflow has a choice: it is proposed, once');
-    assert.ok(
-      printed.includes(`the Workflow dev is proposed as your choices compose it, ${proposal}: nemia proposals approve ${proposal} -n crew`),
-      printed.join('\n'),
-    );
+    assert.deepEqual(proposing.proposed, { kind: 'Workflow', name: 'dev', proposal }, 'the Workflow dev, as the choices compose it');
     const made = proposalIn('crew', proposal);
     assert.equal(made.status.phase, 'waiting');
     assert.deepEqual(made.status.proposedBy, {}, 'the person, from a shell with no session token');
@@ -333,10 +339,11 @@ test('an upgrade with a conflict: previewed, filed, waited on with the status al
     assert.equal(fs.readFileSync(resolutionsFile(ROOT, 'crew'), 'utf8'), recorded, 'a refused resolve writes nothing');
     const mine = path.join(scratch('wf-upgrade-conflict-choice-'), 'line.md');
     fs.writeFileSync(mine, 'Never push on a Friday, nor on a weekend.\n');
-    const last = await printedBy(t, 'factory', 'resolve', 'crew', LINE, '--file', mine);
+    const last = await resolvedBy(LINE, '--file', mine);
     rules = recordedFor('crew', 'Factory/crew') ?? '';
     assert.ok(rules !== '' && rules !== proposal, 'the rules are proposed as the Factory, a proposal of their own');
-    for (const p of [proposal, rules]) assert.ok(last[2]?.includes(`nemia proposals approve ${p} -n crew`), last.join('\n'));
+    assert.deepEqual(last.left, [], 'every conflict has a choice');
+    for (const p of [proposal, rules]) assert.ok(last.waits.includes(p), `the merge waits on ${p}: ${last.waits.join(', ')}`);
     assert.deepEqual(
       proposalIn('crew', rules).spec.objects.map((o: { kind: string; spec: { rules?: string } }) => [o.kind, o.spec.rules]),
       [['Factory', 'Never push on a Friday, nor on a weekend.\n\nWrite the tests first, always.\n']],
@@ -503,7 +510,7 @@ test("a workflow's resolution made from a session: its agent's in its own factor
     return token;
   };
   const resolveIn = (token: string, factoryName: string, ...rest: string[]) =>
-    main(['factory', 'resolve', factoryName, ...rest], stage.board().e, undefined, stage.place().place, {
+    factoryTyped(['factory', 'resolve', factoryName, ...rest], stage.board().e, undefined, stage.place().place, {
       ...ENV,
       WF_SESSION_TOKEN: token,
     });

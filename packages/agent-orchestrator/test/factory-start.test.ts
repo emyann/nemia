@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
+import { factoryLines } from '../src/factory/factory.ts';
 import { teamCopy } from './team.ts';
 import { names } from './assessed.ts';
 import { staged, story } from './story.ts';
@@ -33,18 +34,21 @@ import {
 } from '../src/factory/factory.store.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { detached } from './factory-planted.ts';
-import { main as cli } from '../src/cli/main.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { nemiaDefinition } from '../src/nemia/level.store.ts';
-import { FACTORY_HELP } from '../src/factory/factory.verb.ts';
 import { writeRules } from '../src/factory/rules/rules.store.ts';
 import { writeInstructionText } from '../src/factory/instruction.store.ts';
+import { factsOf, told, type StartedAnswer } from './typed.ts';
+import { startFactoryAtOnce, wiredRepoFor, workflowFolder, type StartInput } from '../src/runner.ts';
+import { inboxNameAt } from '../src/inbox/inbox.store.ts';
+import { settingsOf } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-factory-start-');
 const FACTORIES = path.join(ROOT, 'factories');
 /** The test's store and its settings: `asShipped` takes the default factory's switch out of it, for a checkpoint's scope. */
 const ENV: Record<string, string | undefined> = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 /** The test place of this test, as the focused test below reads it. */
 const stand = stage.place;
 const { runPlaced } = stage;
@@ -122,6 +126,7 @@ function filed(name: string, ...repos: string[]): void {
 
 /** What `nemia <argv>` prints, typed from `cwd`, a line each. */
 async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
+  if (argv[0] === 'start') throw new Error('a start answers its facts, not lines: call startTypedFrom');
   const lines: string[] = [];
   const log = console.log;
   const was = process.cwd();
@@ -138,8 +143,58 @@ async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
   return lines.join('\n').split('\n');
 }
 
-/** The id of the run `nemia start` printed first. */
-const startedId = (lines: readonly string[]): string => lines[0].split(' ')[0];
+/**
+ * `nemia start <argv>` typed in `cwd`, as the client and the api run it together: a file there read as the brief; else an inbox card, by
+ * its path or its name, started as the
+ * Card's `start` starts it (`START` given the `card`, from `cwd`); any other brief in the factory `--factory` names, else the one whose
+ * repository holds `--repo` or `cwd`, as the Run's `create` finds it (`startFactoryAtOnce`), on the repository its wiring names for the
+ * workflow (`wiredRepoFor`), a `--repo` that names another said to have only found the factory. What it answers, with the facts the
+ * client words.
+ */
+async function startTypedFrom(cwd: string, argv: string[]): Promise<StartedAnswer> {
+  const args = parseArgv(START.spec, argv.slice(1)) ?? {};
+  const text = (key: string) => (typeof args[key] === 'string' ? args[key] : undefined);
+  const named = text('repo') === undefined ? undefined : path.resolve(cwd, text('repo') ?? '');
+  const file = path.resolve(cwd, text('brief') ?? '');
+  const was = process.cwd();
+  process.chdir(cwd);
+  try {
+    const card = inboxNameAt(ROOT, text('brief') ?? '');
+    const here = fs.statSync(file, { throwIfNoEntry: false })?.isFile() === true;
+    if (card !== null)
+      return factsOf(
+        await stage.runWith(
+          stage.board().e,
+          START.handler({ ...args, brief: undefined, card, at: cwd, fix: '--factory <name>', repo: named }),
+        ),
+      );
+    const found = startFactoryAtOnce(ROOT, text('factory'), named ?? cwd, '--factory <name>', settingsOf(ENV).defaultFactoryStarts);
+    const typed = text('workflows');
+    const wired =
+      found.factory === undefined || typed === undefined
+        ? undefined
+        : wiredRepoFor(ROOT, found.factory.name, path.basename(path.resolve(cwd, typed)));
+    const repo = wired ?? found.repo ?? repoFor(ROOT, found.factory?.name, named, cwd);
+    const foundFactory = wired !== undefined && named !== undefined && named !== wired ? text('repo') : undefined;
+    const workflows = typed === undefined ? undefined : workflowFolder(typed, cwd, repo, found.factory?.tree);
+    const brief = here ? fs.readFileSync(file, 'utf8').trim() : text('brief');
+    const given = {
+      ...args,
+      brief,
+      repo,
+      repoNamed: named !== undefined && foundFactory === undefined,
+      factory: found.factory?.name,
+      ...(workflows !== undefined ? { workflows } : {}),
+      ...(foundFactory !== undefined ? { repoFoundFactory: foundFactory } : {}),
+    } as StartInput;
+    return factsOf(await stage.runWith(stage.board().e, START.handler(given)));
+  } finally {
+    process.chdir(was);
+  }
+}
+
+/** The id of the run `nemia start` answered. */
+const startedId = (answer: StartedAnswer): string => answer.id;
 
 /** The switch off, as shipped, for the test or checkpoint `t`: put back as it was once it ends. */
 function asShipped(t: { after: (fn: () => void) => void }): void {
@@ -171,12 +226,6 @@ function aPlanOf(build: string): string {
   return dir;
 }
 
-/** The runs `nemia start <folder>` started: the records written since `before`. */
-const plannedRuns = (before: readonly string[]) =>
-  runsWritten()
-    .filter((f) => f.endsWith('.json') && !before.includes(f))
-    .map((f) => runRecord(ROOT, f.slice(0, -'.json'.length)));
-
 /** A card filed in the inbox as `<name>.md`, with `text` whole: its path. */
 function aCard(name: string, text: string): string {
   fs.mkdirSync(inboxDir(ROOT), { recursive: true });
@@ -185,6 +234,8 @@ function aCard(name: string, text: string): string {
   return card;
 }
 
+/** What `nemia factory ls` lists of the store's factories, as the orchestrator words a listing (`factoryLines`); the client's own. */
+const listedHere = (): string[] => factoryLines(readFactoriesAt(ROOT));
 const DEFAULT_LINE = 'default  every run and card that names no factory — read, never written';
 
 test('a factory from nothing to a run: filed, given workflows, hires and a schedule, listed, started in, and removed', async (t) => {
@@ -194,22 +245,20 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   const file = path.join(FACTORIES, 'pipao.json');
   let run = '';
 
-  await s.test('`nemia factory ls` with no folder lists the default alone; --help prints the help', async () => {
-    assert.deepEqual(readFactoriesAt(ROOT), []);
-    const alone = await typedFrom(ROOT, ['factory']);
-    assert.deepEqual([alone[0], alone.length], [DEFAULT_LINE, 3]);
-    assert.deepEqual(await typedFrom(ROOT, ['factory', '--help']), FACTORY_HELP.split('\n'));
-  });
+  await s.test(
+    "no factory is filed before the first `nemia factory add` (its listing and help are the client's: apps/cli/test)",
+    async () => {
+      assert.deepEqual(readFactoriesAt(ROOT), []);
+    },
+  );
 
   await s.test(
     '`nemia factory add` files <name>.json, each repository absolute and named once, no workflows key, a plain directory enough',
     async () => {
-      const printed = await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
+      await typedFrom(ROOT, ['factory', 'add', 'pipao', '--repo', a, '--repo', path.relative(ROOT, a), '--repo', b]);
       assert.deepEqual(factoryFiles(), ['pipao.json']);
       assert.deepEqual(fileOf('pipao'), { repos: [a, b], generation: 1 }, 'an add writes no workflows key, and its generation 1');
       assert.ok(!fs.existsSync(path.join(a, '.git')));
-      assert.deepEqual(printed.slice(0, 2), [`pipao  ${a}, ${b}`, `filed: ${file}`]);
-      assert.equal(printed[2], `trusted for Claude Code: ${a}`);
       assert.deepEqual(readFactoryAt(ROOT, 'pipao'), {
         name: 'pipao',
         repos: [a, b],
@@ -227,14 +276,11 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     '`nemia factory attach` adds a workflow by name, sorted and once, keeping every other key; detach takes it back',
     async () => {
       fs.writeFileSync(file, JSON.stringify({ ...fileOf('pipao'), later: { kept: true } }));
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'intake']), ['pipao  attached intake', `attached: ${file}`]);
+      await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'intake']);
       attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' });
       attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'notes' });
       const before = fs.readFileSync(file);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build']), [
-        'pipao  already attached build',
-        `unchanged: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build']);
       assert.deepEqual(attachWorkflowAt(ROOT, { factory: 'pipao', workflow: 'build' }), { file, already: true });
       assert.deepEqual(fs.readFileSync(file), before, 'an attach of one attached already writes nothing');
       assert.deepEqual(readFactoryAt(ROOT, 'pipao').workflows, ['build', 'intake', 'notes']);
@@ -245,21 +291,12 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   await s.test(
     '`nemia factory hire` files one agent a step, a second hire replacing the first; fire takes one back and keeps the rest',
     async () => {
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'otto', '--step', 'build/implement']), [
-        'pipao  build/implement ← otto',
-        `hired: ${file}`,
-      ]);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'implementer', '--step=build/implement']), [
-        'pipao  build/implement ← implementer (was otto)',
-        `hired: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'otto', '--step', 'build/implement']);
+      await typedFrom(ROOT, ['factory', 'hire', 'pipao', 'implementer', '--step=build/implement']);
       assert.deepEqual(hireAgentAt(ROOT, { factory: 'pipao', agent: 'reviewer', step: 'build/review' }), { file });
       hireAgentAt(ROOT, { factory: 'pipao', agent: 'shipper', step: 'intake/frame' });
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'fire', 'pipao', '--step', 'intake/frame']), [
-        'pipao  intake/frame  fired shipper',
-        `fired: ${file}`,
-      ]);
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'detach', 'pipao', 'intake']), ['pipao  detached intake', `detached: ${file}`]);
+      await typedFrom(ROOT, ['factory', 'fire', 'pipao', '--step', 'intake/frame']);
+      await typedFrom(ROOT, ['factory', 'detach', 'pipao', 'intake']);
       assert.deepEqual(fileOf('pipao'), {
         repos: [a, b],
         later: { kept: true },
@@ -289,7 +326,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const f = path.basename(file, '.json');
       await typedFrom(ROOT, ['factory', 'attach', f, 'notes', '--repo', path.basename(a)]);
       const typed = ['factory', 'schedule', f, 'notes', '--cron', '0 9 * * 1', '--brief', 'Read the stats', '--tz', 'UTC'];
-      assert.equal((await typedFrom(ROOT, typed))[0], `${f}  notes at 0 9 * * 1 (UTC)`);
+      await typedFrom(ROOT, typed);
       const first = readFactoryAt(ROOT, f).schedules.notes;
       assert.deepEqual([first.brief, first.tz, first.repo], ['Read the stats', 'UTC', undefined]);
       const before = Date.now();
@@ -306,7 +343,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
   );
 
   await s.test('`nemia factory ls` lists the factory with its workflows, its hires and its schedule', async () => {
-    const listed = await typedFrom(ROOT, ['factory', 'ls']);
+    const listed = listedHere();
     assert.deepEqual(listed.slice(0, 5), [
       DEFAULT_LINE,
       `pipao    ${a}, ${b}`,
@@ -314,8 +351,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       '         build/implement ← implementer',
       '         build/review ← reviewer',
     ]);
-    assert.match(listed.join('\n'), /schedule notes {2}0 9 \* \* 1 .*"Read the stats"/);
-    assert.equal((await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'notes']))[0], 'pipao  notes no longer at 0 9 * * 1');
+    await typedFrom(ROOT, ['factory', 'unschedule', 'pipao', 'notes']);
     assert.deepEqual(readFactoryAt(ROOT, 'pipao').schedules, {});
   });
 
@@ -323,15 +359,16 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     'REFUSED: a start of a workflow the factory of two repositories names none for, naming the attach; the attach names one',
     async () => {
       await startRefused(
-        () => typedFrom(a, ['start', 'build it', '--workflows', build, '--no-worktree']),
+        () => startTypedFrom(a, ['start', 'build it', '--workflows', build, '--no-worktree']),
         'Invalid',
         'nemia factory attach',
         'build --repo',
         path.basename(a),
         path.basename(b),
       );
-      const attached = await typedFrom(ROOT, ['factory', 'attach', 'pipao', 'build', '--repo', path.basename(a)]);
-      names(attached.join('\n'), path.basename(a));
+      const attach = ['factory', 'attach', 'pipao', 'build', '--repo', path.basename(a)];
+      await typedFrom(ROOT, attach);
+      assert.equal(readFactoryAt(ROOT, attach[2]).workflowRepos?.build, path.basename(a), 'the attach names the repository build works on');
     },
   );
 
@@ -339,13 +376,17 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     asShipped(sub);
     const deep = path.join(a, 'src', 'deep');
     fs.mkdirSync(deep, { recursive: true });
-    const out = await typedFrom(deep, ['start', 'build it', '--workflows', build, '--no-worktree']);
+    const out = await startTypedFrom(deep, ['start', 'build it', '--workflows', build, '--no-worktree']);
     run = startedId(out);
     assert.deepEqual([runRecord(ROOT, run).factory, runRecord(ROOT, run).repo], ['pipao', a]);
-    assert.ok(out.includes(`factory: pipao, on ${a}`), out.join('\n'));
+    assert.deepEqual(
+      [out.facts.factory, out.facts.repo, out.facts.repository],
+      ['pipao', a, true],
+      'the start says its factory and the repository it is on',
+    );
     const named = runRecord(
       ROOT,
-      startedId(await typedFrom(ROOT, ['start', 'again', '--workflows', build, '--repo', deep, '--no-worktree'])),
+      startedId(await startTypedFrom(ROOT, ['start', 'again', '--workflows', build, '--repo', deep, '--no-worktree'])),
     );
     assert.deepEqual([named.factory, named.repo], ['pipao', a], '--repo is the folder the factory is found from');
   });
@@ -379,12 +420,8 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const [notes, scratchpad] = [scratch('wf-volume-notes-'), scratch('wf-volume-pad-')];
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]), [
-        `${f}  volume ${notes} :rw`,
-        "writable for each step whose fence writes; a step's writes there are not the run's workspace: nothing commits, lands or reverts them",
-        `changed: ${file} — runs started from now on mount it; a run in flight keeps what it was started with`,
-      ]);
-      assert.equal((await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]))[0], `${f}  volume ${notes} :ro (was :rw)`);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:rw`]);
+      await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${notes}:ro`]);
       await typedFrom(ROOT, ['factory', 'volume', 'add', f, `${scratchpad}:rw`]);
       const volumes = [
         { path: notes, readOnly: true, name: path.basename(notes).toLowerCase() },
@@ -398,7 +435,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, notes]), 'Invalid', notes);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', 'default', `${notes}:ro`]), 'Conflict');
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'add', f, `${ROOT}:ro`]), 'Invalid', ROOT);
-      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' volume '));
+      const listed = listedHere().filter((l) => l.includes(' volume '));
       assert.deepEqual(
         listed.map((l) => l.trim().split(' ').slice(0, 3).join(' ')),
         volumes.map((v) => `volume ${v.path} ${v.readOnly ? ':ro' : ':rw'}`),
@@ -411,21 +448,18 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const volumes = (readFactoryAt(ROOT, f).volumes ?? []).map(({ path: at, readOnly }) => ({ path: at, readOnly }));
-      const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
+      const out = await startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
       assert.deepEqual(runRecord(ROOT, id).volumes, volumes);
       const writable = volumes.find((v) => !v.readOnly);
       assert.ok(writable);
-      assert.ok(
-        out.some((l) => l.startsWith(`volume: ${writable.path} — writable for `) && l.includes("not the run's workspace")),
-        out.join('\n'),
+      assert.deepEqual(
+        [out.facts.volumes ?? [], (out.facts.writableVolumes ?? []).map((w) => w.path)],
+        [volumes.filter((v) => v.readOnly).map((v) => v.path), [writable.path]],
+        'the start says the volumes it mounts, read-only and writable',
       );
       const before = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-      for (const v of volumes)
-        assert.deepEqual(await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]), [
-          `${f}  volume ${v.path} removed`,
-          `changed: ${file}`,
-        ]);
+      for (const v of volumes) await typedFrom(ROOT, ['factory', 'volume', 'rm', f, v.path]);
       assert.equal('volumes' in fileOf(f), false, 'the key is gone once none is left');
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), before);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'volume', 'rm', f, writable.path]), 'Missing', writable.path);
@@ -437,8 +471,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const off = { commit: '', pr: '' };
-      const said = await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
-      assert.equal(said[0], `${f}  setting claude.attribution {"commit":"","pr":""}`);
+      await typedFrom(ROOT, ['factory', 'setting', 'set', f, 'claude.attribution', JSON.stringify(off)]);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } });
       assert.deepEqual((fileOf(f) as { later: unknown }).later, { kept: true }, 'every other key kept');
       const before = fs.readFileSync(file, 'utf8');
@@ -454,7 +487,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       await typedFrom(ROOT, ['factory', 'detach', f, 'notes']);
       await typedFrom(ROOT, ['factory', 'attach', f, 'notes']);
       assert.deepEqual(fileOf(f).harnessSettings, { claude: { attribution: off } }, 'a wiring change keeps the settings');
-      const listed = (await typedFrom(ROOT, ['factory', 'ls'])).filter((l) => l.includes(' setting '));
+      const listed = listedHere().filter((l) => l.includes(' setting '));
       assert.deepEqual(
         listed.map((l) => l.trim()),
         ['setting claude.attribution {"commit":"","pr":""}'],
@@ -466,13 +499,10 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     "a run started then freezes the settings, says them, and files them to each Claude Code step's session; a setting removed after changes no run started",
     async () => {
       const f = path.basename(file, '.json');
-      const out = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
+      const out = await startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']);
       const id = startedId(out);
       assert.deepEqual(runRecord(ROOT, id).harnessSettings, { claude: { attribution: { commit: '', pr: '' } } });
-      assert.ok(
-        out.some((l) => l.startsWith('harness settings: claude.attribution')),
-        out.join('\n'),
-      );
+      assert.deepEqual(out.facts.settings, ['claude.attribution'], 'the start says the settings it froze');
       await stage.runWith(stage.board().e, advanceRun(runRecord(ROOT, id)));
       const filed = stage.board().specs.filter((spec) => Object.values(runRecord(ROOT, id).steps).some((st) => st.taskId === spec.id));
       assert.ok(filed.length, 'a step was filed');
@@ -481,10 +511,7 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         assert.deepEqual(JSON.parse(settings ?? '{}').attribution, { commit: '', pr: '' }, spec.id);
       }
       const record = fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8');
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), [
-        `${f}  setting claude.attribution removed`,
-        `changed: ${file}`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']);
       assert.equal('harnessSettings' in fileOf(f), false, 'the key is gone once none is left');
       assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record);
       await refusedBy(() => typedFrom(ROOT, ['factory', 'setting', 'rm', f, 'claude.attribution']), 'Missing', 'claude.attribution');
@@ -496,13 +523,10 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     async () => {
       const f = path.basename(file, '.json');
       const start = async (cwd: string, ...factory: string[]) =>
-        runRecord(ROOT, startedId(await typedFrom(cwd, ['start', 'x', '--workflows', build, ...factory, '--no-worktree'])));
+        runRecord(ROOT, startedId(await startTypedFrom(cwd, ['start', 'x', '--workflows', build, ...factory, '--no-worktree'])));
       await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'notes', '30']);
       assert.equal((await start(b, '--factory', f)).costLine, undefined, "notes' line is not build's");
-      assert.deepEqual(await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '80']), [
-        `${f}  cost line build $80.00`,
-        `changed: ${file} — runs started from now on are held to it; a run in flight keeps the line it was started with`,
-      ]);
+      await typedFrom(ROOT, ['factory', 'cost-line', 'set', f, 'build', '80']);
       const frozen = await start(b, '--factory', f);
       assert.equal(frozen.costLine, 80);
       assert.equal((await start(aRepo())).costLine, undefined, 'a run in the default factory');
@@ -523,21 +547,23 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
       const before = fs.readFileSync(file, 'utf8');
       fs.writeFileSync(file, JSON.stringify({ ...fileOf(f), harnessSettings: { claude: { hooks: {} } } }));
       const runs = runsWritten();
-      await refusedBy(() => typedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']), 'Invalid', 'hooks');
+      await refusedBy(() => startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', f, '--no-worktree']), 'Invalid', 'hooks');
       assert.deepEqual(runsWritten(), runs);
       fs.writeFileSync(file, before);
     },
   );
 
   await s.test('of two repositories: the one its wiring names, wherever it is typed and whatever --repo names, saying so', async () => {
-    const inside = await typedFrom(b, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
+    const inside = await startTypedFrom(b, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
     assert.equal(runRecord(ROOT, startedId(inside)).repo, a);
-    const named = await typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--repo', b, '--no-worktree']);
+    const named = await startTypedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--repo', b, '--no-worktree']);
     assert.equal(runRecord(ROOT, startedId(named)).repo, a);
-    const said = named.find((l) => l.startsWith(`--repo ${b} `));
-    assert.ok(said, named.join('\n'));
-    names(said, 'build', a);
-    const elsewhere = await typedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
+    assert.deepEqual(
+      [named.repoFoundFactory, named.facts.workflow, named.facts.repo],
+      [b, 'build', a],
+      '--repo only found the factory, whose wiring places build on a',
+    );
+    const elsewhere = await startTypedFrom(ROOT, ['start', 'x', '--workflows', build, '--factory', 'pipao', '--no-worktree']);
     assert.equal(runRecord(ROOT, startedId(elsewhere)).repo, a, 'typed outside its repositories, on the one wired');
   });
 
@@ -549,14 +575,14 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     assert.equal(repoFor(ROOT, 'mono', undefined, ROOT), c);
     assert.equal(repoFor(ROOT, 'mono', '/elsewhere', ROOT), '/elsewhere', 'a repository named is kept, for the start to judge');
     assert.equal(repoFor(ROOT, undefined, undefined, ROOT), ROOT);
-    const out = await typedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'mono', '--no-worktree']);
+    const out = await startTypedFrom(ROOT, ['start', 'build it', '--workflows', build, '--factory', 'mono', '--no-worktree']);
     assert.deepEqual([runRecord(ROOT, startedId(out)).repo, runRecord(ROOT, startedId(out)).factory], [c, 'mono']);
-    assert.ok(out.includes(`factory: mono, on ${c}`), out.join('\n'));
     assert.deepEqual(
-      (await typedFrom(ROOT, ['factory', 'ls'])).slice(0, 2),
-      [DEFAULT_LINE, `mono     ${c}`],
-      'listed by name, not as filed',
+      [out.facts.factory, out.facts.repo, out.facts.repository],
+      ['mono', c, true],
+      'the start says its factory and the repository it is on',
     );
+    assert.deepEqual(listedHere().slice(0, 2), [DEFAULT_LINE, `mono     ${c}`], 'listed by name, not as filed');
   });
 
   await s.test('a folder team started in the factory names it and works on no repository', async () => {
@@ -581,26 +607,9 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
         assert.equal(steps.implement.body, 'Build what was asked.');
         assert.deepEqual(['factory' in started, started.repo, 'factory' in runRecord(ROOT, started.id)], [false, loose, false]);
       }
-      const typed = runRecord(ROOT, startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
+      const typed = runRecord(ROOT, startedId(await startTypedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
       assert.deepEqual(['factory' in typed, typed.repo], [false, loose]);
       fs.rmSync(path.join(FACTORIES, 'default.json'));
-    },
-  );
-
-  await s.test(
-    'as shipped, `nemia start <folder>` runs every card in the factory alone holding its folder, or in --factory',
-    async (sub) => {
-      asShipped(sub);
-      const before = runsWritten();
-      await typedFrom(a, ['start', aPlanOf(build)]);
-      const found = plannedRuns(before);
-      assert.equal(found.length, 2);
-      for (const r of found) assert.deepEqual([r.factory, r.repo], ['pipao', a]);
-      const between = runsWritten();
-      await typedFrom(ROOT, ['start', aPlanOf(build), '--factory', 'mono']);
-      const named = plannedRuns(between);
-      assert.equal(named.length, 2);
-      for (const r of named) assert.deepEqual([r.factory, r.repo], ['mono', readFactoryAt(ROOT, 'mono').repos[0]]);
     },
   );
 
@@ -609,20 +618,13 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     setInstructionAt(ROOT, { factory: 'pipao', at: { store: true } });
     writeInstructionText(ROOT, 'pipao', 'Ship small.');
     const mono = fs.readFileSync(path.join(FACTORIES, 'mono.json'));
-    assert.deepEqual(await typedFrom(ROOT, ['factory', 'rm', 'pipao']), [
-      `pipao  removed — ${file}`,
-      `instruction removed: ${path.join(FACTORIES, 'pipao')}`,
-    ]);
+    await typedFrom(ROOT, ['factory', 'rm', 'pipao']);
     assert.deepEqual([fs.existsSync(rules), fs.existsSync(path.join(FACTORIES, 'pipao'))], [false, false]);
     assert.deepEqual(factoryFiles(), ['mono.json']);
     assert.deepEqual(fs.readFileSync(path.join(FACTORIES, 'mono.json')), mono);
     fs.writeFileSync(path.join(FACTORIES, 'torn.json'), '{');
     await typedFrom(ROOT, ['factory', 'rm', 'torn']);
-    assert.deepEqual(
-      await typedFrom(ROOT, ['factory', 'rm', 'mono']),
-      [`mono  removed — ${path.join(FACTORIES, 'mono.json')}`],
-      'with no instruction, no line of it',
-    );
+    await typedFrom(ROOT, ['factory', 'rm', 'mono']);
     assert.deepEqual(factoryFiles(), []);
   });
 
@@ -753,7 +755,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
       filed('b', shared);
       const trees = worktrees(shared);
       await startRefused(
-        () => typedFrom(shared, ['start', 'build it', '--workflows', build]),
+        () => startTypedFrom(shared, ['start', 'build it', '--workflows', build]),
         'Invalid',
         shared,
         '2',
@@ -762,7 +764,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
       assert.equal(worktrees(shared), trees, 'no worktree made');
       const run = runRecord(
         ROOT,
-        startedId(await typedFrom(shared, ['start', 'build it', '--workflows', build, '--factory', 'b', '--no-worktree'])),
+        startedId(await startTypedFrom(shared, ['start', 'build it', '--workflows', build, '--factory', 'b', '--no-worktree'])),
       );
       assert.equal(run.factory, 'b', '--factory picks one');
     },
@@ -777,7 +779,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     filed('outer', outer);
     filed('inner', inner);
     await startRefused(
-      () => typedFrom(inner, ['start', 'build it', '--workflows', build, '--no-worktree']),
+      () => startTypedFrom(inner, ['start', 'build it', '--workflows', build, '--no-worktree']),
       'Invalid',
       `inner on ${inner}`,
       `outer on ${outer}`,
@@ -789,7 +791,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     asShipped(sub);
     const loose = aRepo();
     await startRefused(
-      () => typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree']),
+      () => startTypedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree']),
       'Invalid',
       loose,
       '--factory <name>',
@@ -803,19 +805,19 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     async (sub) => {
       asShipped(sub);
       const plan = aPlanOf(build);
-      await startRefused(() => typedFrom(aRepo(), ['start', plan]), 'Invalid', '--factory <name>');
+      await startRefused(() => startTypedFrom(aRepo(), ['start', plan]), 'Invalid', '--factory <name>');
       const shared = aRepo();
       filed('c', shared);
       filed('d', shared);
-      await startRefused(() => typedFrom(ROOT, ['start', plan, '--repo', shared]), 'Invalid', '--factory c, or --factory d');
+      await startRefused(() => startTypedFrom(ROOT, ['start', plan, '--repo', shared]), 'Invalid', '--factory c, or --factory d');
     },
   );
 
   await s.test('REFUSED: `nemia start --factory default`, with WF_DEFAULT_FACTORY_STARTS=1 and as shipped', async (sub) => {
     const typed = ['start', 'x', '--workflows', build, '--factory', 'default', '--no-worktree'];
-    await startRefused(() => typedFrom(repo, typed), 'Invalid', '`default`', '--factory <name>', 'pipao');
+    await startRefused(() => startTypedFrom(repo, typed), 'Invalid', '`default`', '--factory <name>', 'pipao');
     asShipped(sub);
-    await startRefused(() => typedFrom(repo, typed), 'Invalid', '`default`', '--factory <name>', 'pipao');
+    await startRefused(() => startTypedFrom(repo, typed), 'Invalid', '`default`', '--factory <name>', 'pipao');
   });
 
   await s.test('REFUSED with WF_DEFAULT_FACTORY_STARTS=1 all the same: a folder two factories hold', async () => {
@@ -823,7 +825,7 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     filed('e', shared);
     filed('f', shared);
     await startRefused(
-      () => typedFrom(shared, ['start', 'x', '--workflows', build, '--no-worktree']),
+      () => startTypedFrom(shared, ['start', 'x', '--workflows', build, '--no-worktree']),
       'Invalid',
       '--factory e, or --factory f',
     );
@@ -854,17 +856,24 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
     '`nemia start <card> --factory` starts it in the factory, on its one repository from any directory, and keeps it',
     async () => {
       const card = aCard('build-it', 'Build it.\n');
-      const out = await typedFrom(ROOT, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree']);
+      const out = await startTypedFrom(ROOT, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree']);
       const run = runRecord(ROOT, startedId(out));
       assert.deepEqual([run.factory, run.repo, run.from], ['pipao', repo, { inbox: 'build-it' }]);
-      assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
+      assert.deepEqual(
+        [out.facts.factory, out.facts.repo, out.facts.repository],
+        ['pipao', repo, true],
+        'the start says its factory and the repository it is on',
+      );
       assert.ok(fs.existsSync(card), 'the card is kept');
     },
   );
 
   await s.test("a card's factory: starts it there, its workflow: found in the factory's repository; --factory is over it", async () => {
     aCard('in-pipao', '---\nworkflow: build\nfactory: pipao\n---\nBuild it.\n');
-    const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', path.join(inboxDir(ROOT), 'in-pipao.md'), '--no-worktree'])));
+    const run = runRecord(
+      ROOT,
+      startedId(await startTypedFrom(ROOT, ['start', path.join(inboxDir(ROOT), 'in-pipao.md'), '--no-worktree'])),
+    );
     assert.deepEqual([run.factory, run.repo, run.workflowDir], ['pipao', repo, path.join(repo, 'workflows', 'build')]);
     const other = teamIn(aRepo());
     filed('other', other);
@@ -879,18 +888,18 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       const before = await runPlaced(startRun({ brief: 'read first', repo, workflowDir: build, isolate: false, factory: 'pipao' }));
       const card = aCard('by-its-name', `---\nworkflow: build\nfactory: pipao\nfrom: ${before.id}\n---\nBuild it by name.\n`);
       const elsewhere = fs.mkdtempSync(path.join(ROOT, 'typed-'));
-      const run = runRecord(ROOT, startedId(await typedFrom(elsewhere, ['start', 'by-its-name', '--no-worktree'])));
+      const run = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'by-its-name', '--no-worktree'])));
       assert.deepEqual(
         [run.brief, run.factory, run.workflowDir, run.context, run.from],
         ['Build it by name.', 'pipao', path.join(repo, 'workflows', 'build'), [before.id], { inbox: 'by-its-name' }],
       );
       assert.ok(fs.existsSync(card), 'the card is kept');
       const flags = ['--factory', 'pipao', '--workflows', build, '--no-worktree'];
-      const text = runRecord(ROOT, startedId(await typedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
+      const text = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
       assert.deepEqual([text.brief, 'from' in text], ['no-such-card', false], 'a name no card has stays a text brief');
       const shadowed = aCard('shadowed', 'From the card.\n');
       fs.writeFileSync(path.join(elsewhere, 'shadowed'), 'From the file.\n');
-      const file = runRecord(ROOT, startedId(await typedFrom(elsewhere, ['start', 'shadowed', ...flags])));
+      const file = runRecord(ROOT, startedId(await startTypedFrom(elsewhere, ['start', 'shadowed', ...flags])));
       assert.equal(file.brief, 'From the file.', 'a file of that name where it is typed is the brief');
       assert.ok(fs.existsSync(shadowed), 'the card of that name stays in the inbox');
     },
@@ -986,7 +995,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       asShipped(sub);
       const card = aCard('loose', `---\nrepo: ${repo}\n---\nBuild it.\n`);
       await startRefused(
-        () => typedFrom(repo, ['start', card, '--workflows', 'build', '--no-worktree']),
+        () => startTypedFrom(repo, ['start', card, '--workflows', 'build', '--no-worktree']),
         'Invalid',
         card,
         '`factory: <name>`',
@@ -996,12 +1005,12 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
       assert.ok(fs.existsSync(card), 'the card stays in the inbox');
       const flagged = runRecord(
         ROOT,
-        startedId(await typedFrom(repo, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree'])),
+        startedId(await startTypedFrom(repo, ['start', card, '--workflows', 'build', '--factory', 'pipao', '--no-worktree'])),
       );
       assert.equal(flagged.factory, 'pipao');
       const own = aCard('own', '---\nfactory: pipao\n---\nBuild it.\n');
       assert.equal(
-        runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', own, '--workflows', 'build', '--no-worktree']))).factory,
+        runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', own, '--workflows', 'build', '--no-worktree']))).factory,
         'pipao',
       );
     },
@@ -1022,7 +1031,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
   await s.test('REFUSED: a card of a factory of two repositories that names none for its workflow, naming the attach', async () => {
     const card = aCard('pick', '---\nworkflow: dev\nfactory: f\n---\nPick a repository.\n');
     await startRefused(
-      () => typedFrom(ROOT, ['start', 'pick']),
+      () => startTypedFrom(ROOT, ['start', 'pick']),
       'Invalid',
       'nemia factory attach f dev --repo',
       path.basename(a),
@@ -1035,26 +1044,28 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     "after `nemia factory attach f dev --repo <b>`, a card's run works on b; an old card's repo: is said and not read",
     async () => {
       await typedFrom(ROOT, ['factory', 'attach', 'f', 'dev', '--repo', path.basename(b)]);
-      const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', 'pick'])));
+      const run = runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', 'pick'])));
       assert.deepEqual([run.factory, run.repo, run.workflowDir], ['f', b, path.join(b, 'workflows', 'dev')]);
       aCard('old', `---\nworkflow: dev\nrepo: ${a}\nfactory: f\n---\nAn old card.\n`);
-      const out = await typedFrom(ROOT, ['start', 'old']);
+      const out = await startTypedFrom(ROOT, ['start', 'old']);
       assert.equal(runRecord(ROOT, startedId(out)).repo, b);
-      names(out.join('\n'), `repo: ${a}`, 'retired');
+      assert.equal(out.ignoredRepo, a, "the card's retired repo: is said not read");
     },
   );
 
   await s.test('`nemia start "x" --workflows dev --repo <a>` starts on b, saying --repo only found the factory', async () => {
-    const out = await typedFrom(ROOT, ['start', 'x', '--workflows', 'dev', '--repo', a]);
+    const out = await startTypedFrom(ROOT, ['start', 'x', '--workflows', 'dev', '--repo', a]);
     assert.deepEqual([runRecord(ROOT, startedId(out)).factory, runRecord(ROOT, startedId(out)).repo], ['f', b]);
-    const said = out.find((l) => l.startsWith(`--repo ${a} `));
-    assert.ok(said, out.join('\n'));
-    names(said, 'the factory f', 'dev', b);
+    assert.deepEqual(
+      [out.repoFoundFactory, out.facts.factory, out.facts.workflow, out.facts.repo],
+      [a, 'f', 'dev', b],
+      '--repo only found the factory f, whose wiring places dev on b',
+    );
   });
 
   await s.test('REFUSED: `nemia start <card> --repo`, naming the attach, nothing started', async () => {
     aCard('with-repo', '---\nworkflow: dev\nfactory: f\n---\nStarted with a repo.\n');
-    await startRefused(() => typedFrom(ROOT, ['start', 'with-repo', '--repo', a]), 'Invalid', 'nemia factory attach');
+    await startRefused(() => startTypedFrom(ROOT, ['start', 'with-repo', '--repo', a]), 'Invalid', 'nemia factory attach');
   });
 
   await s.test('a factory of one repository: a card naming none starts on it, with no --repo on the attach', async () => {
@@ -1062,7 +1073,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     addFactoryAt(ROOT, { name: 'g', repos: [c] });
     attachWorkflowAt(ROOT, { factory: 'g', workflow: 'dev' });
     aCard('in-g', '---\nworkflow: dev\nfactory: g\n---\nOne repository.\n');
-    const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', 'in-g'])));
+    const run = runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', 'in-g'])));
     assert.deepEqual([run.factory, run.repo], ['g', c]);
   });
 
@@ -1074,7 +1085,7 @@ test("a card and a brief work on the repository the factory's wiring names, neve
     fs.cpSync(path.dirname(dev), yours, { recursive: true });
     try {
       aCard('in-h', '---\nworkflow: dev\nfactory: h\n---\nFrom yours.\n');
-      const run = runRecord(ROOT, startedId(await typedFrom(ROOT, ['start', 'in-h'])));
+      const run = runRecord(ROOT, startedId(await startTypedFrom(ROOT, ['start', 'in-h'])));
       assert.deepEqual([run.repo, run.workflowDir], [d, path.join(yours, 'dev')]);
     } finally {
       fs.rmSync(yours, { recursive: true, force: true });

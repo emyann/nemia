@@ -20,7 +20,9 @@ import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { markCancelled, runRecord } from '../src/record/record.store.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { main } from '../src/cli/main.ts';
+import { factsOf, typed as onHandler } from './typed.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { builtinGitPlace, engine } from '../src/runner.ts';
 
 const ROOT = scratch('wf-after-elsewhere-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -235,7 +237,7 @@ const aParent = async (
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async (t) => {
+test("REFUSED at `nemia start`, before a run is written: --after an unknown run, a run given twice, another repository's run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>", async () => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'parent.txt' });
@@ -276,7 +278,15 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   assert.equal(runsWritten(), before, 'no run written');
 
   const typed = (...flags: string[]) =>
-    main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags], undefined, undefined, undefined, ENV);
+    onHandler(
+      ['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags],
+      engine(ENV),
+      undefined,
+      builtinGitPlace,
+      ENV,
+    ) as Promise<{
+      id: string;
+    }>;
 
   await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
   await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
@@ -295,25 +305,19 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
     'nor by the CLI: dropped, any of these would start a run that waits on nothing, or on the wrong repository, and the tick would file it',
   );
 
-  const printed: string[] = [];
-  t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
   const second = await aParent(repo, b, { work: 'second.txt' });
-  await typed('--after', p.run.id, `--after=${second.run.id}`);
-  const id = printed[0].split(' ')[0];
+  const started = await typed('--after', p.run.id, `--after=${second.run.id}`);
+  const { id } = started;
+  const { facts } = factsOf(started as unknown as Started);
   assert.deepEqual(runRecord(ROOT, id).after, [p.run.id, second.run.id], '--after is allowed as often as there are runs to wait on');
-  assert.match(
-    printed.join('\n'),
-    new RegExp(
-      `^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until nemia decide says each has landed on ${escaped(p.run.branch)}$`,
-      'm',
-    ),
+  assert.deepEqual(
+    [facts.after, facts.branch],
+    [[p.run.id, second.run.id], p.run.branch],
+    'the start says each run it waits on, in order, and the branch each lands on',
   );
-  printed.length = 0;
-  await typed();
+  const bare = await typed();
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${printed[0].split(' ')[0]}.json`), 'utf8')), 'after'),
+    Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${bare.id}.json`), 'utf8')), 'after'),
     false,
     'without --after the record is what it was',
   );

@@ -18,7 +18,7 @@ import { readFactoryAt } from '../factory/factory.store.ts';
 import { appliedDir, treeDir } from '../factory/applied/applied.store.ts';
 import { runRecord } from '../record/record.store.ts';
 import { advanceRun, startRun } from '../runner.ts';
-import { main } from '../cli/main.ts';
+import { told, type StartedAnswer } from '../../test/typed.ts';
 import { engineOf, runWith } from '../runtime-client.ts';
 import { FACTORY_PLAN } from '../factory/upgrade/upgrade.verb.ts';
 import { FACTORY_ADOPT } from './adopt.verb.ts';
@@ -30,7 +30,8 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const FACTORIES = path.join(ROOT, 'factories');
 const INBOX = path.join(ROOT, 'inbox');
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/** `nemia` as a person types it: a verb the client holds run onto its handler (`told`); the rest by the CLI. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 /** Every file under `dir`, by its path in it, with its bytes, so a verb is seen to have written nothing there. */
 const bytesUnder = (dir: string): Record<string, string> =>
@@ -55,18 +56,22 @@ async function printedBy(t: { mock: { method: Function } }, ...argv: string[]): 
   return printed.flatMap((p) => p.split('\n'));
 }
 
+/** The id of the run `nemia start <argv>` answered. */
+const startedId = async (...argv: string[]): Promise<string> => ((await stage.main(['start', ...argv])) as StartedAnswer).id;
+
 /** Refused by kind and exit 2, its message matching each of `patterns`. */
 const refusedWith =
   (tag: 'Missing' | 'Conflict' | 'Invalid', ...patterns: RegExp[]) =>
   (err: Error & { exitCode?: number; _tag?: string }) =>
     err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
-/** The digest the plan `printed` carries. */
-const digestIn = (printed: readonly string[]): string => {
-  const line = printed.find((l) => l.startsWith('plan: '));
-  assert.ok(line, printed.join('\n'));
-  return line.slice('plan: '.length);
-};
+/** The takeover `nemia factory diff <name> --template <dir>` previews: its plan, its digest and the line that takes it over. */
+const previewed = async (name: string, dir: string) =>
+  (await stage.main(['factory', 'diff', name, '--template', dir])) as {
+    plan: { runs: { ids: readonly string[] } };
+    digest: string;
+    line: string;
+  };
 
 /** The file of the factory `name`, as JSON. */
 const fileOf = (name: string): Record<string, unknown> =>
@@ -132,28 +137,24 @@ test('a hand-made factory taken over by a template: previewed, written, its card
       await printedBy(t, 'factory', 'schedule', 'crew', 'dev', '--cron', '0 9 * * *', '--brief', 'Look at the views');
       await printedBy(t, 'factory', 'instruction', 'crew', '--store');
       fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify({ ...fileOf('crew'), later: { kept: true } }, null, 2)}\n`);
-      run = (await printedBy(t, 'start', 'Cache the views', '--factory', 'crew', '--workflows', 'dev'))[0].split(' ')[0];
+      run = await startedId('Cache the views', '--factory', 'crew', '--workflows', 'dev', '--repo', repo);
       runBefore = JSON.stringify(runRecord(ROOT, run));
       finished = await aFinished(repo, 'crew');
       cardFile = card('views', 'crew', 'dev');
     },
   );
 
-  await s.test('nemia factory diff --template previews the takeover, prints its digest, and writes nothing', async (t) => {
+  await s.test('nemia factory diff --template previews the takeover, answers its digest, and writes nothing', async () => {
     const before = bytesUnder(ROOT);
-    const printed = await printedBy(t, 'factory', 'diff', 'crew', '--template', dir);
+    const planned = await previewed('crew', dir);
     assert.deepEqual(bytesUnder(ROOT), before, 'the preview writes nothing');
     assert.equal(fs.existsSync(appliedDir(ROOT, 'crew')), false);
     assert.equal(fs.existsSync(treeDir(ROOT, 'crew')), false);
-    const runs = printed.find((l) => l.startsWith('runs waiting or in flight: '));
-    assert.ok(runs, printed.join('\n'));
-    assert.ok(runs.includes(run), `it names the run in flight: ${runs}`);
-    assert.equal(runs.includes(finished), false, 'it leaves off the run that finished');
-    digest = digestIn(printed);
-    assert.ok(
-      printed.some((l) => l.includes(`nemia factory adopt crew --template ${dir} --plan ${digest}`)),
-      printed.join('\n'),
-    );
+    const { ids } = planned.plan.runs;
+    assert.ok(ids.includes(run), `it names the run in flight: ${ids.join(', ')}`);
+    assert.equal(ids.includes(finished), false, 'it leaves off the run that finished');
+    digest = planned.digest;
+    assert.ok(planned.line.includes(`nemia factory adopt crew --template ${dir} --plan ${digest}`), planned.line);
   });
 
   await s.test('nemia factory adopt --plan stages the render and gives the file the template, every other key kept', async (t) => {
@@ -173,8 +174,8 @@ test('a hand-made factory taken over by a template: previewed, written, its card
     assert.ok(read.workflows.includes('dev'), "it reads the tree's wiring");
   });
 
-  await s.test('the card filed before the takeover starts, on the workflow in the tree', async (t) => {
-    const started = (await printedBy(t, 'start', cardFile))[0].split(' ')[0];
+  await s.test('the card filed before the takeover starts, on the workflow in the tree', async () => {
+    const started = await startedId(cardFile);
     assert.ok(runRecord(ROOT, started).workflowDir.startsWith(treeDir(ROOT, 'crew')), runRecord(ROOT, started).workflowDir);
   });
 
@@ -196,7 +197,7 @@ test('a hand-made factory taken over by a template: previewed, written, its card
   await s.test('a takeover stopped after staging, before the file, is finished by the next', async (t) => {
     const { template: _gone, ...rest } = fileOf('crew');
     fs.writeFileSync(path.join(FACTORIES, 'crew.json'), `${JSON.stringify(rest, null, 2)}\n`);
-    const again = digestIn(await printedBy(t, 'factory', 'diff', 'crew', '--template', dir));
+    const { digest: again } = await previewed('crew', dir);
     await printedBy(t, 'factory', 'adopt', 'crew', '--template', dir, '--plan', again);
     assert.equal((fileOf('crew').template as { source: string }).source, dir);
   });
@@ -209,8 +210,7 @@ test('what nemia factory adopt refuses, each with nothing written', async (t) =>
     await assert.rejects(stage.main(argv), refused);
     assert.deepEqual(bytesUnder(ROOT), before, `${argv.join(' ')} wrote nothing`);
   };
-  const planOf = async (t: { mock: { method: Function } }, name: string) =>
-    digestIn(await printedBy(t, 'factory', 'diff', name, '--template', dir));
+  const planOf = async (_t: unknown, name: string) => (await previewed(name, dir)).digest;
 
   await t.test('no --plan: Invalid, naming the preview', async (t) => {
     await madeByHand(t, 'noplan', repo);

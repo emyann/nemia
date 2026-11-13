@@ -42,7 +42,13 @@
       "retired": [
         {
           "spelling": "selector",
-          "card": "Resource objects: every kind Nemia serves is a nemia/v1 object"
+          "card": "Resource objects: every kind Nemia serves is a nemia/v1 object",
+          "kept": [
+            {
+              "path": "packages/objects/src/commands-flags.ts",
+              "why": "another sense: what a command line's `-l` takes, kubectl's word for it, and the key its words parse it under; the query key a client sends it as is `labelSelector`"
+            }
+          ]
         }
       ]
     },

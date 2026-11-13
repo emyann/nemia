@@ -608,7 +608,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
 
       const rounded = await askRound({ step: 'review', budget: 3 });
       assert.equal(rounded.status, 202, await rounded.clone().text());
-      assert.deepEqual(await rounded.json(), { step: 'review', round: 3, file: roundAskFile(root, R, 'review', 3) });
+      assert.deepEqual(await rounded.json(), { step: 'review', round: 3, budget: 3, file: roundAskFile(root, R, 'review', 3) });
       const { at: roundWhen, ...roundWritten } = JSON.parse(fs.readFileSync(roundAskFile(root, R, 'review', 3), 'utf8'));
       assert.deepEqual(roundWritten, { step: 'review', round: 3, budget: 3 });
       assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);

@@ -1,6 +1,6 @@
 /**
  * `nemia rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches
- * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
+ * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line a refusal says (`notForgottenLine`). Pure:
  * what the run's place reads of its repository is handed in.
  */
 import type { StepSpec } from '../step/step.ts';
@@ -576,7 +576,7 @@ export function checkLogsOf(
 }
 
 /**
- * What `nemia rm` did with one run, for `forgetLine` to say.
+ * What `nemia rm` did with one run: the api answers it, and a refusal is said of it (`notForgottenLine`).
  *
  *   missing    the store has no record of it: what was left under its id, removed
  *   refused    `forgetRefusal` said why, and nothing was touched
@@ -628,67 +628,30 @@ export type Forgot = {
   engine?: EngineForgetting;
 };
 
-/** One line for one run `nemia rm` was given, saying what happened, and what the engine did with its tasks (`engineWords`). Pure. */
-export function forgetLine(f: Forgot): string {
+/** What `nemia rm` did with a run it did not forget: refused, held, or no such run. */
+export type NotForgotten = Forgot & { kind: Exclude<Forgot['kind'], 'forgotten'> };
+
+/**
+ * The line of a run `nemia rm` did not forget, which its refusal says (`forgetRefusal`): why, and what to do, and what the engine did with
+ * its tasks (`engineWords`). A run forgotten is said by the client off what the api answers of it (`apps/cli`, `forgottenLine`). Pure.
+ */
+export function notForgottenLine(f: NotForgotten): string {
   const engine = f.engine ? engineWords(f.engine, { id: f.id }) : '';
   return engine ? `${storeLine(f)}; ${engine}` : storeLine(f);
 }
 
-/** What `nemia rm` did with one run's worktrees, branches and files. */
-function storeLine(f: Forgot): string {
-  const them = (n: number) => (n > 1 ? 'them' : 'it');
+/** What `nemia rm` left of one run it did not forget: why, its worktrees removed or held, and the files removed. */
+function storeLine(f: NotForgotten): string {
   if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
   const files = f.files.length ? `removed ${f.files.join(', ')}` : '';
   if (f.kind === 'missing')
     return `${f.id}  no such run — ${files ? `nothing to forget but what was left under its id: ${files}` : 'nothing to forget'}${f.left.length ? `;${leftWords(f)}` : ''}`;
-
   const worktrees = [
     f.removed.length ? `removed ${f.removed.length} worktree${f.removed.length > 1 ? 's' : ''}` : '',
     ...f.handedOff.map((h) => `committed what ${h.step} left uncommitted${h.branch ? ` on ${h.branch}` : ''} as ${h.commit.slice(0, 7)}`),
     f.gone.length ? `${f.gone.length} worktree${f.gone.length > 1 ? 's were' : ' was'} already gone` : '',
   ].filter(Boolean);
-  if (f.kind === 'held') {
-    return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: nemia rm ${f.id} again then.`;
-  }
-
-  if (f.folder)
-    return [
-      `${f.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`,
-      files,
-      f.unfrozen ? `its workflow was never frozen, and ${f.unfrozen}` : '',
-    ]
-      .filter(Boolean)
-      .join('; ');
-
-  const base = f.base ?? 'its base branch';
-  const deleted = f.branches.filter((b) => b.deleted);
-  const kept = (why: BranchFate['why']) => f.branches.filter((b) => !b.deleted && b.why === why).map((b) => b.branch);
-  const branches = [
-    deleted.length
-      ? `deleted ${deleted.map((b) => `${b.branch} (${b.why === 'forced' ? `not merged into ${base}, forced` : `merged into ${base}`})`).join(', ')}`
-      : '',
-    kept('default').length
-      ? `kept ${kept('default').join(', ')} — branches are kept unless asked: --delete-branches deletes those merged into ${base}`
-      : '',
-    kept('unmerged').length
-      ? `kept ${kept('unmerged').join(', ')}: not merged into ${base} — --force-unmerged deletes ${them(kept('unmerged').length)}, and the work on ${them(kept('unmerged').length)}`
-      : '',
-    ...f.branches.map((b) =>
-      typeof b.why !== 'object'
-        ? ''
-        : 'git' in b.why
-          ? `kept ${b.branch}: git would not delete it — ${b.why.git}`
-          : `kept ${b.branch}: the place's remove did not answer — ${b.why.unread}; nemia rm ${f.id} again deletes it once it does`,
-    ),
-  ].filter(Boolean);
-  return [
-    `${f.id}  forgotten: ${worktrees.length ? worktrees.join(', ') : f.isolate === false ? `no worktrees, it worked in ${f.repo} itself` : 'no worktrees'}`,
-    files,
-    branches.length ? branches.join('; ') : f.isolate === false ? 'no branch of its own' : 'no branches left',
-    f.unfrozen ? `its workflow was never frozen, and ${f.unfrozen}` : '',
-  ]
-    .filter(Boolean)
-    .join('; ');
+  return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: nemia rm ${f.id} again then.`;
 }
 
 /** What is still there after `nemia rm`, each with what to do about it, in its place's command (`fix`). */

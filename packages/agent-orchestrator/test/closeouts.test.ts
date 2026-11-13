@@ -18,6 +18,12 @@ import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
+import type { Decided } from '../src/decide/decide.verb.ts';
+import { askedQuestions, closeoutRefusals, questionLines } from '../src/question/index.ts';
+import { lacksTold } from '../src/tick/told.verb.ts';
+import { inputsNote } from '../src/start/inputs.ts';
+import { signoffsSpent } from '../src/runner.ts';
 import { names } from './assessed.ts';
 import { answerText, type Question } from '../src/question/question.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
@@ -33,13 +39,13 @@ import {
   startRun,
   runWith,
 } from '../src/runner.ts';
-import { artifactsDir, asksDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
+import { artifactsDir, asksDir, inputsDir, runRecord, rewriteRun } from '../src/record/record.store.ts';
 import { SIGNOFF } from '../src/run.ts';
 import { lackedOf } from '../src/record/record.ts';
 import { RUN_LABELS, SESSION_TOKEN, STEP_FILES } from '../src/filed/filed.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { told, type StartedAnswer } from './typed.ts';
 
 const ROOT = scratch('wf-closeouts-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -52,7 +58,8 @@ const ENV: Env = {
   WF_MAX_RUNS: undefined,
   NEMIA_DAEMON_START: 'off',
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -118,6 +125,17 @@ const listed = async (id: string) => {
 const awaiting = async (id: string) => {
   const { decision: d } = await stage.runWith(stage.board().e, decideRun(id));
   return d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed };
+};
+
+/** What the run refuses of step `name`'s closeout in `decided` (`closeoutRefusals`), as the run object's tries say it. */
+const refusalsOf = (decided: Decided, name: string): string[] => {
+  const c = decided.closeouts[name];
+  assert.ok(c && !('error' in c), JSON.stringify(c));
+  return closeoutRefusals(
+    decided.steps.find((x) => x.name === name),
+    c,
+    decided.steps,
+  );
 };
 
 /** What `nemia` printed, line by line, over the stage's engine. */
@@ -429,8 +447,8 @@ test('files a closeout names', async (t) => {
     },
   );
   await s.test(
-    'REFUSED once a round: the nudge names the file again, and the step is unsigned on you; `nemia decide` names the file',
-    async (sub) => {
+    "REFUSED once a round: the nudge names the file again, and the step is unsigned on you; the decision's reading names the file",
+    async () => {
       stage.board().settle(`${task}-try2`, 'succeeded', signed(gone));
       const p = await pass(id);
       assert.deepEqual([p.tried, p.checked, p.filed], [[], [], []], 'no second nudge in the round, no check, nothing after it');
@@ -438,11 +456,19 @@ test('files a closeout names', async (t) => {
       for (let n = 0; n < 3; n++) assert.deepEqual((await pass(id)).tried, [], 'nor on a later pass');
       assert.equal(stage.board().tasks.has(`${task}-try3`), false);
       assert.equal(stage.board().tasks.has(`${task}-try2-check`), false);
-      const screen = await printedBy(sub, ['decide', id]);
-      assert.match(screen, /UNSIGNED: implement \(asked to sign off once by the run, and unsigned again\)/);
-      assert.ok(screen.includes("implement's closeout named a file the run does not have:"), screen);
-      assert.ok(screen.includes(`- \`${gone}\`: it is not a file in \`${files}\`.`), screen);
-      assert.ok(screen.includes(`nemia retry ${id} implement`), screen);
+      const decided = await decidedOn(stage, id);
+      assert.ok(decided.decision.kind === 'awaiting', JSON.stringify(decided.decision));
+      assert.deepEqual(decided.decision.unsigned, ['implement']);
+      assert.ok(signoffsSpent(decided.run.steps.implement), 'asked to sign off once by the run, and unsigned again');
+      const told = lacksTold(ROOT, decided.run, 'implement', decided.run.steps.implement).lacks ?? [];
+      assert.ok(
+        told.some((l) => l.startsWith(`- \`${gone}\`: it is not a file in \`${files}\`.`)),
+        told.join('\n'),
+      );
+      assert.ok(
+        decided.commands.some((c) => c.command.includes(`nemia retry ${id} implement`)),
+        JSON.stringify(decided.commands),
+      );
     },
   );
   const kept = () => path.join(files, 'kept-dark.png');
@@ -561,7 +587,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
     });
   await t.test(
     'REFUSED once a round: `needs` on a done v1 closeout is unsigned before any check, nudged naming it, then waits on you',
-    async (sub) => {
+    async () => {
       const { id, task } = await filed();
       stage.board().settle(task, 'succeeded', signedV1('done', 'Did it.', 'a person should look'));
       const p = await pass(id);
@@ -572,9 +598,13 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       stage.board().settle(`${task}-try2`, 'succeeded', signedV1('done', 'Did it.', 'still'));
       const again = await pass(id);
       assert.deepEqual([again.tried, again.checked, again.filed], [[], [], []], 'no second nudge in the round');
-      const screen = await printedBy(sub, ['decide', id]);
-      assert.match(screen, /UNSIGNED: implement/);
-      assert.ok(screen.includes('!! not accepted: `needs` is set on a `done` closeout'), screen);
+      const decided = await decidedOn(stage, id);
+      assert.ok(decided.decision.kind === 'awaiting' && decided.decision.unsigned.includes('implement'), JSON.stringify(decided.decision));
+      const refused = refusalsOf(decided, 'implement');
+      assert.ok(
+        refused.some((r) => r.startsWith('`needs` is set on a `done` closeout')),
+        refused.join('\n'),
+      );
     },
   );
   for (const counted of ['counted', 'none counted'])
@@ -702,13 +732,13 @@ test('a run given inputs', async (t) => {
   let repo = '';
   await s.test(
     "`nemia start --input` copies each file into the run's inputs/, its names frozen on the record, nothing in the workspace",
-    async (sub) => {
+    async () => {
       repo = aRepo();
       const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
       fs.writeFileSync(path.join(given, 'mock.png'), 'png bytes');
       fs.mkdirSync(path.join(given, 'notes'));
       fs.writeFileSync(path.join(given, 'notes', 'brief notes.md'), '# what the person meant\n');
-      const printed = await printedBy(sub, [
+      const started = (await stage.main([
         'start',
         'add a flag',
         '--workflows',
@@ -719,13 +749,13 @@ test('a run given inputs', async (t) => {
         '--input',
         path.join(given, 'mock.png'),
         `--input=${path.join(given, 'notes', 'brief notes.md')}`,
-      ]);
-      id = printed.split(' ')[0];
+      ])) as StartedAnswer;
+      id = started.id;
       dir = path.join(ROOT, 'runs', id, 'inputs');
       assert.deepEqual(runRecord(ROOT, id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
       assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
       assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
-      assert.ok(printed.split('\n').includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed);
+      assert.deepEqual(started.facts.inputs, { names: ['mock.png', 'brief notes.md'], dir }, 'the start says them, in order, and where');
       assert.deepEqual(stage.place().world.changes(repo), [], 'nothing written into the workspace');
     },
   );
@@ -740,9 +770,10 @@ test('a run given inputs', async (t) => {
       assert.ok(asked >= 0 && brief.indexOf(`\n\n## Files given with it\n\n${line}\n`) > asked, `${name}:\n${brief}`);
     }
   });
-  await s.test("`nemia decide` names them under the run's line", async (sub) => {
-    const screen = (await printedBy(sub, ['decide', id])).split('\n');
-    assert.deepEqual(screen.slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
+  await s.test("the decision's run holds them, named in its inputs' line", async () => {
+    const { run } = await decidedOn(stage, id);
+    assert.deepEqual(run.inputs, ['mock.png', 'brief notes.md']);
+    assert.equal(inputsNote(inputsDir(ROOT, run), run.inputs, run.cards), `inputs  mock.png, brief notes.md  —  in ${dir}`);
   });
   await s.test('a run given none has no key on its record, no inputs directory, and a brief without the line', async () => {
     const plain = await stage.runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: twoSteps(), isolate: false }));
@@ -781,7 +812,6 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
     (...flags: string[]) =>
     () =>
       stage.main(['start', 'a run with files', '--workflows', twoSteps(), '--repo', repo, '--no-worktree', ...flags]);
-  const plan = folderOf({ 'a.md': `---\nworkflow: ${twoSteps()}\n---\nthe only card\n` });
   const rows: Array<[string, () => Promise<unknown>, string[]]> = [
     ['an `output:` file that is not there', starting(noSchema), ['review:', '`output: review.schema.json`', 'not there']],
     [
@@ -817,11 +847,6 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
       'a misspelt --inputs',
       typed('--inputs', a),
       ['nemia start does not take --inputs', '--input <file> once per file', '--gate <step>', '--factory <name>', '--brief "<brief>"'],
-    ],
-    [
-      '`nemia start <folder> --input`',
-      () => stage.main(['start', plan, '--repo', repo, '--input', a]),
-      ['nemia start <folder> does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
     ],
   ];
   for (const [name, refused, facts] of rows)
@@ -897,10 +922,19 @@ test('a blocked step asks questions in two fields, and is answered by their numb
     });
     await pass(id);
   });
-  await s.test('`nemia decide` numbers them on across the fields, and offers an `--answer` for each', async (sub) => {
-    const screen = (await printedBy(sub, ['decide', id])).split('\n');
+  await s.test("the decision's closeout numbers them on across the fields, and offers an `--answer` for each", async () => {
+    const decided = await decidedOn(stage, id);
+    const plan = decided.closeouts.plan;
+    assert.ok(plan && !('error' in plan), JSON.stringify(plan));
+    const screen = questionLines(
+      askedQuestions(
+        decided.steps.find((x) => x.name === 'plan'),
+        plan,
+      ),
+    ).map((l) => `    ${l}`);
+    screen.push(`    ${decided.answering.plan}`);
     const at = screen.indexOf('    later:');
-    assert.ok(screen.indexOf('    open:') > 0 && at > screen.indexOf('    open:'), screen.join('\n'));
+    assert.ok(screen.indexOf('    open:') === 0 && at > screen.indexOf('    open:'), screen.join('\n'));
     assert.deepEqual(screen.slice(at, at + 5), [
       '    later:',
       '      3. When?',
@@ -960,11 +994,11 @@ test('REFUSED once a round: questions that do not read are unsigned, nudged nami
     stage.board().settle(`${id}-plan-try2`, 'succeeded', said);
     assert.deepEqual((await pass(id)).tried, [], 'no second nudge in the round');
   });
-  await s.test('`nemia decide` says why the field is not read as questions', async (sub) => {
-    const screen = await printedBy(sub, ['decide', id]);
-    assert.match(screen, /UNSIGNED: plan/);
-    const refused = screen.split('\n').find((l) => l.includes('!! not accepted:'));
-    assert.ok(refused, screen);
-    names(refused, '`open`', '"retry, gate"');
+  await s.test("the decision's closeout says why the field is not read as questions", async () => {
+    const decided = await decidedOn(stage, id);
+    assert.ok(decided.decision.kind === 'awaiting' && decided.decision.unsigned.includes('plan'), JSON.stringify(decided.decision));
+    const refused = refusalsOf(decided, 'plan');
+    assert.equal(refused.length, 1, refused.join('\n'));
+    names(refused[0], '`open`', '"retry, gate"');
   });
 });

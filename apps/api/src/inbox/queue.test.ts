@@ -91,6 +91,12 @@ const verb =
       ...(body !== undefined ? { body } : {}),
     });
 const queue = verb(false);
+/** The Card's `queue` of the card `name` in `default`, on the workflow `workflow` sent in its query. */
+const queuedOn = (name: string, workflow: string) =>
+  app.request(`/api/namespaces/default/cards/${name}/queue?workflow=${encodeURIComponent(workflow)}`, {
+    method: 'POST',
+    headers: JSON_TYPE,
+  });
 const unqueue = verb(true);
 const listed = async (): Promise<Card[]> => {
   const res = await app.request('/api/cards');
@@ -371,6 +377,9 @@ test('the queue verbs: what a queue or a take-back refuses, writing nothing', as
 
       const placed = await queue('placed', JSON_TYPE, undefined, 'mill');
       assert.equal(placed.status, 200, await placed.clone().text());
+      const { status } = (await placed.json()) as Card;
+      assert.equal(status.queueLength, 2, "the answer of a queue counts the cards queued, every factory's");
+      assert.equal(status.factoryRepo, undefined, 'a factory not on file names no repository to start on');
       const cards = await listed();
       assert.equal(cards.find((c) => c.metadata.name === 'placed')?.metadata.namespace, 'mill');
       assert.deepEqual(inLine(cards), ['older', 'placed'], 'behind the card queued before it');
@@ -397,21 +406,39 @@ test('the queue verbs: what a queue or a take-back refuses, writing nothing', as
   });
 
   await t.test(
-    'the queue takes no body: one sent — a workflow, null, text that is no JSON — is not read, so no workflow is written from it',
+    "the queue takes a workflow by name in its query, written over the card's own; one given as a path, or empty, is refused, writing nothing",
     async () => {
       clear();
       const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
-      for (const body of [JSON.stringify({ workflow: 'dev' }), '{"workflow":null}', 'null']) {
-        const res = await queue(card.name, JSON_TYPE, body);
-        assert.equal(res.status, 422, `${body}: the card names no workflow, and none is read from the body`);
+      for (const workflow of ['./workflows/dev', path.join(repo, 'workflows', 'dev'), 'a\\b', '']) {
+        const res = await queuedOn(card.name, workflow);
+        assert.equal(res.status, 422, `${workflow}: refused`);
+        assert.match(((await res.json()) as { error: string }).error, /--workflow <name>/, 'naming the by-name form');
       }
       assert.equal(cardText(card.name), 'Queue me on mine\n', 'nothing written');
-      const { card: named } = onStore(addToInbox({ text: 'Queue me on dev', workflow: 'dev' }));
-      const res = await queue(named.name, JSON_TYPE, 'not json');
+      const res = await queuedOn(card.name, 'dev');
       assert.equal(res.status, 200, await res.clone().text());
-      assert.equal(((await res.json()) as Card).spec.workflow, 'dev', 'queued on the workflow the card names');
+      const queued = (await res.json()) as Card;
+      assert.equal(queued.spec.workflow, 'dev', 'queued on the workflow sent, by name');
+      assert.equal(typeof queued.spec.queued, 'string', 'and queued');
+      assert.equal(queued.status.queueLength, 1, 'the only card queued');
+      assert.match(cardText(card.name), /\nworkflow: dev\n/, "the card's file names it");
     },
   );
+
+  await t.test('the queue reads no body: a workflow, null, text that is no JSON sent there is not read', async () => {
+    clear();
+    const { card } = onStore(addToInbox({ text: 'Queue me on mine' }));
+    for (const body of [JSON.stringify({ workflow: 'dev' }), '{"workflow":null}', 'null']) {
+      const res = await queue(card.name, JSON_TYPE, body);
+      assert.equal(res.status, 422, `${body}: the card names no workflow, and none is read from the body`);
+    }
+    assert.equal(cardText(card.name), 'Queue me on mine\n', 'nothing written');
+    const { card: named } = onStore(addToInbox({ text: 'Queue me on dev', workflow: 'dev' }));
+    const res = await queue(named.name, JSON_TYPE, 'not json');
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.equal(((await res.json()) as Card).spec.workflow, 'dev', 'queued on the workflow the card names');
+  });
 });
 
 const at = (minute: number) => `2026-09-16T10:${String(minute).padStart(2, '0')}:00.000Z`;

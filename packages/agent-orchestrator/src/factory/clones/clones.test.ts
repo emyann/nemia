@@ -17,7 +17,7 @@ import { eachTest } from '../../../test/placed.ts';
 import { placeOver } from '../../../test/place-over.ts';
 import { heldUnasked } from '../../../test/unasked.ts';
 import { story } from '../../../test/story.ts';
-import { main as cli } from '../../cli/main.ts';
+import { typed as handlerOf } from '../../../test/typed.ts';
 import { engineOf } from '../../runtime-client.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import { PlaceService, type Place } from '../../place/place.store.ts';
@@ -61,14 +61,9 @@ test('a --repo value read as a path or as the folder its clone is kept in, one r
     });
 });
 
-/** `nemia`, as a person types it, on `place` (this test's by default). */
-async function typed(t: TestContext, argv: string[], place: Place = stand().place): Promise<void> {
-  const mock = t.mock.method(console, 'log', () => undefined);
-  try {
-    await cli(argv, engineOf(engine().layer), undefined, place, ENV);
-  } finally {
-    mock.mock.restore();
-  }
+/** `nemia <argv>` on `place` (this test's by default), run onto its entry's handler as the api calls it. */
+async function typed(_t: TestContext, argv: string[], place: Place = stand().place): Promise<void> {
+  await handlerOf(argv, engineOf(engine().layer), undefined, place, ENV);
 }
 
 /** A repository of this test's place at a folder of its own, one commit on it, and its `file://` URL. */

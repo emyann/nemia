@@ -1,17 +1,19 @@
 /**
  * sdlc's janitor's filing script (`workflows/janitor/cards.ts`), driven as Argus's check drives it: `node cards.ts <closeout>`, with a
- * scratch store as `WF_ROOT`, a bounded subprocess, and `nemia` on the PATH as a factory has it: here the orchestrator's CLI, by its
- * entry. It files each card through `nemia inbox add`, ready to start, never a card whose title the inbox already has, and starts
- * nothing; each refusal has a fixture that breaks its rule, and files nothing at all. A refusal is held by its exit and by what it
- * filed, never by its words.
+ * scratch store as `WF_ROOT`, a bounded subprocess, and `nemia` on the PATH as a factory has it: the client (`apps/cli`), asking the
+ * api served on the scratch store, in whose factories each card is filed, since the subject is the card really filed in the inbox. It
+ * files each card through `nemia inbox add`, ready to start, never a card whose title the inbox already has, and starts nothing; each
+ * refusal has a fixture that breaks its rule, and files nothing at all. A refusal is held by its exit and by what it filed, never by its
+ * words.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
-import { BIN, SDLC, storeEnv } from './template.ts';
+import { REPO } from 'test-kit/repo';
+import { SDLC, storeEnv } from './template.ts';
 
 const SCRIPT = path.join(SDLC, 'workflows', 'janitor', 'cards.ts');
 
@@ -36,17 +38,67 @@ function closeoutFile(fields: Record<string, unknown>): string {
   return file;
 }
 
-/** A scratch world: its store's environment, with `nemia` first on the PATH. */
-function world(): { env: NodeJS.ProcessEnv; root: string } {
+/** The client's bin (`apps/cli`), the `nemia` a factory's steps type, and the api it asks (`apps/api`), from the repository's root. */
+const CLIENT = path.join(REPO, 'apps', 'cli', 'bin', 'nemia.ts');
+const API = path.join(REPO, 'apps', 'api');
+
+/**
+ * The api served on the store `env` names, `--no-tick` on a free port, its lease written where the client reads it (`daemon.json`): its
+ * url, once it listens, and stopped as the test ends.
+ */
+async function served(t: TestContext, env: NodeJS.ProcessEnv): Promise<void> {
+  const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], { cwd: API, env: { ...env, PORT: '0' } });
+  let said = '';
+  const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
+  t.after(async () => {
+    child.kill();
+    await ended;
+  });
+  const url = await new Promise<string>((resolve, reject) => {
+    const look = () => {
+      const m = /api listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(said);
+      if (m?.[1]) resolve(m[1]);
+    };
+    child.stdout.on('data', (chunk) => ((said += chunk), look()));
+    child.stderr.on('data', (chunk) => ((said += chunk), look()));
+    void ended.then(() => reject(new Error(`the api ended before it listened:\n${said}`)));
+  });
+  fs.mkdirSync(env.WF_ROOT!, { recursive: true });
+  fs.writeFileSync(path.join(env.WF_ROOT!, 'daemon.json'), JSON.stringify({ url }));
+}
+
+/**
+ * A scratch world: its store's environment, served by the api, with `nemia` first on the PATH as a factory has it — the client, which
+ * files a card through the api under this machine's context, its daemon never started on demand.
+ */
+async function world(t: TestContext): Promise<{ env: NodeJS.ProcessEnv; root: string }> {
   const at = scratch('nemia-janitor-');
   const env = storeEnv(at);
+  for (const name of ['NEMIA_CONTEXT', 'XDG_CONFIG_HOME']) delete env[name];
+  env.NEMIA_DAEMON_START = 'off';
   const bin = path.join(at, 'bin');
   fs.mkdirSync(bin);
-  fs.writeFileSync(path.join(bin, 'nemia'), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(BIN)} "$@"\n`, {
+  fs.writeFileSync(path.join(bin, 'nemia'), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(CLIENT)} "$@"\n`, {
     mode: 0o755,
   });
   env.PATH = `${bin}${path.delimiter}${env.PATH ?? ''}`;
+  await served(t, env);
+  for (const [factory, workflows] of Object.entries(FACTORIES)) {
+    const repo = path.join(at, 'repos', factory);
+    fs.mkdirSync(repo, { recursive: true });
+    nemia(env, ['factory', 'add', factory, '--repo', repo, '--no-trust']);
+    for (const workflow of workflows) nemia(env, ['factory', 'attach', factory, workflow]);
+  }
   return { env, root: env.WF_ROOT! };
+}
+
+/** The factories the cards are filed in, each with the workflows it attaches: a card names its factory, which offers its workflow. */
+const FACTORIES: Readonly<Record<string, readonly string[]>> = { acme: ['build'], pipao: ['intake'] };
+
+/** `nemia` typed in the world `env`, as a person sets the factory up: refused, the test fails with what it said. */
+function nemia(env: NodeJS.ProcessEnv, argv: readonly string[]): void {
+  const ran = spawnSync(process.execPath, [CLIENT, ...argv], { env, encoding: 'utf8', timeout: 120_000 });
+  assert.equal(ran.status, 0, `nemia ${argv.join(' ')}: ${ran.stdout}${ran.stderr}`);
 }
 
 /** The inbox's cards in `root`, by file name, with their text. */
@@ -80,8 +132,8 @@ function run(env: NodeJS.ProcessEnv, args: string[]): { code: number | null; out
   return { code: ran.status, out: ran.stdout, err: ran.stderr };
 }
 
-test('each card is filed through nemia inbox add, ready to start, with its numbers, and nothing is started or queued', () => {
-  const { env, root } = world();
+test('each card is filed through nemia inbox add, ready to start, with its numbers, and nothing is started or queued', async (t) => {
+  const { env, root } = await world(t);
   const first = card('Allow agora the log it reads');
   const second = card('Send seldon’s reads to Grep', { kind: 'skill', agent: 'seldon', factory: 'pipao', workflow: 'intake' });
   const ran = run(env, [closeoutFile({ cards: [first, second] })]);
@@ -111,8 +163,8 @@ test('each card is filed through nemia inbox add, ready to start, with its numbe
   assert.deepEqual(fs.existsSync(path.join(root, 'runs')) ? fs.readdirSync(path.join(root, 'runs')) : [], [], 'no run started');
 });
 
-test('REFUSED: a card whose title the inbox has, in other case and spacing, is not filed again, and a second check files nothing', () => {
-  const { env, root } = world();
+test('REFUSED: a card whose title the inbox has, in other case and spacing, is not filed again, and a second check files nothing', async (t) => {
+  const { env, root } = await world(t);
   fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'inbox', 'allow-agora-the-log-k2q9.md'),
@@ -129,16 +181,16 @@ test('REFUSED: a card whose title the inbox has, in other case and spacing, is n
 });
 
 for (const key of ['factory', 'workflow'])
-  test(`REFUSED: a card with no ${key} is not ready to start, and nothing is filed, not even the card beside it`, () => {
-    const { env, root } = world();
+  test(`REFUSED: a card with no ${key} is not ready to start, and nothing is filed, not even the card beside it`, async (t) => {
+    const { env, root } = await world(t);
     const ran = run(env, [closeoutFile({ cards: [card('A ready card'), card('A card half said', { [key]: ' ' })] })]);
     assert.equal(ran.code, 1);
     assert.ok(ran.err.includes(key), 'it names the field');
     assert.deepEqual(inbox(root), {});
   });
 
-test('REFUSED: a card whose title is more than one line, or empty, files nothing, not even the card beside it', () => {
-  const { env, root } = world();
+test('REFUSED: a card whose title is more than one line, or empty, files nothing, not even the card beside it', async (t) => {
+  const { env, root } = await world(t);
   const twoLines = run(env, [closeoutFile({ cards: [card('A ready card'), card('Allow agora\nthe log it reads')] })]);
   assert.equal(twoLines.code, 1);
   assert.ok(twoLines.err.includes('#2'), 'it names the card');
@@ -147,16 +199,16 @@ test('REFUSED: a card whose title is more than one line, or empty, files nothing
   assert.deepEqual(inbox(root), {});
 });
 
-test('REFUSED: a card of a kind that is not fence, body, skill or on-purpose files nothing, not even the card beside it', () => {
-  const { env, root } = world();
+test('REFUSED: a card of a kind that is not fence, body, skill or on-purpose files nothing, not even the card beside it', async (t) => {
+  const { env, root } = await world(t);
   const ran = run(env, [closeoutFile({ cards: [card('A ready card'), card('Deny agora the push', { kind: 'deny' })] })]);
   assert.equal(ran.code, 1);
   for (const kind of ['fence', 'body', 'skill', 'on-purpose']) assert.ok(ran.err.includes(kind), `it names the kind ${kind}`);
   assert.deepEqual(inbox(root), {});
 });
 
-test('REFUSED: an inbox card whose file starts with a byte order mark still reads its title, so it is not filed again', () => {
-  const { env, root } = world();
+test('REFUSED: an inbox card whose file starts with a byte order mark still reads its title, so it is not filed again', async (t) => {
+  const { env, root } = await world(t);
   fs.mkdirSync(path.join(root, 'inbox'), { recursive: true });
   const bom = String.fromCharCode(0xfeff);
   fs.writeFileSync(path.join(root, 'inbox', 'keep-git-push-refu-b0m1.md'), `${bom}---\nfactory: acme\n---\nKeep git push refused\n`);
@@ -165,8 +217,8 @@ test('REFUSED: an inbox card whose file starts with a byte order mark still read
   assert.deepEqual(Object.keys(inbox(root)), ['keep-git-push-refu-b0m1.md']);
 });
 
-test('REFUSED: a card nemia inbox add refuses fails the check, and the cards before it stay filed for the next check', () => {
-  const { env, root } = world();
+test('REFUSED: a card nemia inbox add refuses fails the check, and the cards before it stay filed for the next check', async (t) => {
+  const { env, root } = await world(t);
   const ran = run(env, [closeoutFile({ cards: [card('A ready card'), card('A card on a workflow path', { workflow: 'flows/build' })] })]);
   assert.equal(ran.code, 1);
   assert.ok(ran.err.includes('#2'), 'it names the card');
@@ -176,15 +228,15 @@ test('REFUSED: a card nemia inbox add refuses fails the check, and the cards bef
   );
 });
 
-test('REFUSED: two cards with the same title, in other case and spacing, file nothing', () => {
-  const { env, root } = world();
+test('REFUSED: two cards with the same title, in other case and spacing, file nothing', async (t) => {
+  const { env, root } = await world(t);
   const ran = run(env, [closeoutFile({ cards: [card('Keep git push refused'), card('keep  GIT push refused')] })]);
   assert.equal(ran.code, 1);
   assert.deepEqual(inbox(root), {});
 });
 
-test('REFUSED: a period compared with that is not as long as the period read, or does not end the day before it, files nothing', () => {
-  const { env, root } = world();
+test('REFUSED: a period compared with that is not as long as the period read, or does not end the day before it, files nothing', async (t) => {
+  const { env, root } = await world(t);
   const cards = [card('Keep git push refused')];
   const shorter = run(env, [closeoutFile({ cards, against: { from: '2026-09-02', to: '2026-09-14' } })]);
   assert.equal(shorter.code, 1);
@@ -196,8 +248,8 @@ test('REFUSED: a period compared with that is not as long as the period read, or
   assert.deepEqual(inbox(root), {});
 });
 
-test('REFUSED: no closeout, or one that is not there, files nothing and names it', () => {
-  const { env, root } = world();
+test('REFUSED: no closeout, or one that is not there, files nothing and names it', async (t) => {
+  const { env, root } = await world(t);
   const none = run(env, ['']);
   assert.equal(none.code, 1);
   assert.ok(none.err.includes('WF_CLOSEOUT'), 'it names where the closeout comes from');

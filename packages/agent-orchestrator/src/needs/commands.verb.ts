@@ -181,7 +181,7 @@ export const DOCTOR_FIX: Command<Fix> = {
     side: 'cli',
     why: "the api answers POST /api/readiness/fixes by startFix with objects' FixStart, and serves the fix's output apart",
   },
-  served: [{ endpoint: 'readiness.fix', request: async (input) => fixStartOf(input as Args) }],
+  served: [{ endpoint: 'readiness.fix' }],
   handler: (args) =>
     Effect.gen(function* () {
       const started = yield* startFix(yield* tried(() => fixStartOf(args)));

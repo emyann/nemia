@@ -1,17 +1,10 @@
 /** `nemia say`, an entry of the command table: words to a step's session, journalled on its task, or kept for its first try (`sayRun`). */
-import { renamed } from '../command/requests.verb.ts';
 import { Effect, Schema } from 'effect';
-import { RunSay, type SaidAfter } from 'objects';
+import { RunSay, type SaidAfter, SAY_WORDS } from 'objects';
 import type { Speaker } from '../chat/chat.ts';
-import { saidLines, type Said } from './say.ts';
+import { type Said } from './say.ts';
 import { sayRun } from './say.verb.ts';
-import type { Command } from '../command/entry.verb.ts';
-
-/** The run's id and the step's name, as `nemia say` takes them first. */
-const RUN_STEP = [
-  { key: 'runId', takes: 'required', kind: 'name' },
-  { key: 'step', takes: 'required', kind: 'name' },
-] as const;
+import type { Served } from '../command/entry.verb.ts';
 
 /** Who calls: the person, with no session's token, or a session's agent by its token (`Caller`, `sessionCaller`). */
 const SayCaller = Schema.Union([
@@ -35,7 +28,7 @@ const pickSaid = ({ at, attempt, text, after }: Said) => ({ at, attempt, text, a
  * kept for its first try (`kept: true`, on no task, `taskId: null`, the attempt its first). It takes every word after the
  * step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
-export const SAY: Command<
+export const SAY: Served<
   {
     at: string;
     attempt: number;
@@ -49,38 +42,7 @@ export const SAY: Command<
   },
   SayInput
 > = {
-  name: 'say',
-  served: [{ endpoint: 'runs.say', request: renamed({ runId: 'name' }, ['caller']) }],
-  usage: '<runId> <step> [--as <name>] "<words>"',
-  help: [
-    "tell a step's running session something, through its harness: the",
-    "engine journals the words on the step's task, nemia ls notes the step",
-    'said to, and nemia decide prints them under it. A try that continues',
-    'the session is handed them again, as ## Said to your session.',
-    'Words to a step not filed yet (waiting on --after, a hold or an',
-    'earlier step) are kept, not delivered: its first try is handed them,',
-    'as ## Said before you started, and no try after it.',
-    "Words from a session its run filed are its agent's, by its token",
-    '(WF_SESSION_TOKEN); an agent with none says --as <name> before its',
-    "words, a name the person allowed with nemia chat allow. An agent's",
-    'words reach the step under its name, never as yours',
-  ],
-  spec: {
-    positionals: [...RUN_STEP, { key: 'text', takes: 'rest', kind: 'text' }],
-    flags: [
-      {
-        flag: '--as',
-        kind: 'name',
-        key: 'as',
-        takes:
-          '--as takes the name an agent with no session token speaks under, one the person allowed: nemia say <runId> <step> --as <name> "<words>".',
-      },
-    ],
-    unknown: (arg) => `nemia say does not take ${arg}.`,
-  },
-  writes: true,
-  class: 'act',
-  only: { side: 'cli', why: "the api serves it as the Run's `say` of `objects`' Api, calling this handler" },
+  ...SAY_WORDS,
   input: SayInput,
   handler: Effect.fnUntraced(function* ({ runId, step, text: given, caller, from }: SayInput) {
     const told = yield* sayRun(runId, step, given, from === undefined ? { caller } : { caller, from });
@@ -90,15 +52,4 @@ export const SAY: Command<
         : { ...pickSaid(told.said), try: told.try, taskId: told.taskId };
     return told.from.kind === 'agent' ? { ...answer, from: told.from, words: given } : answer;
   }),
-  print({ at, attempt, text, try: tryNo, taskId, kept }, { runId, step }) {
-    return [
-      kept
-        ? `${runId}  kept for ${step}'s first try, at ${at} — not delivered: no session of ${step} runs yet, and its first try's brief carries the words`
-        : `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: nemia decide ${runId} prints it under the step`,
-      ...saidLines([{ at, attempt, text, try: tryNo }])
-        .slice(1)
-        .flatMap((l) => l.split('\n'))
-        .map((line) => `   ${line}`),
-    ];
-  },
 };

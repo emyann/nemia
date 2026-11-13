@@ -20,6 +20,11 @@ import { steeredClock } from '../../../test/steered.ts';
 import { templated as programsAt } from '../../../test/templated.ts';
 import { attachWorkflowAt, fireAgentAt, hireAgentAt, readFactoriesAt, readFactoryAt } from '../factory.store.ts';
 import { main as cli } from '../../cli/main.ts';
+import { told } from '../../../test/typed.ts';
+import { handled } from '../../../test/typed.ts';
+import { names } from '../../../test/assessed.ts';
+import type { PlaceTrust } from '../../trust/trust.ts';
+import { FACTORY_INSTRUCT } from '../instruction.verb.ts';
 import { reconcile } from './applied.verb.ts';
 import { appliedDir, readStatus, statusFile, treeDir } from './applied.store.ts';
 import { detached, followed } from '../../../test/factory-planted.ts';
@@ -39,8 +44,15 @@ const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 const FACTORIES = path.join(ROOT, 'factories');
 const { exportTemplate, reconciled, reconciledAt } = programsAt(ROOT);
 const stand = eachTest(testPlace);
-/** `nemia`, as a person types it, its commands given this test's place. */
-const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place, ENV);
+/**
+ * `nemia`, as a person types it, its commands given this test's place: a verb the client holds run onto its entry's handler as the
+ * api calls it (`told`); the old CLI's own verbs through it.
+ */
+const main = (argv: string[], e?: Parameters<typeof cli>[1]) => told(argv, e, undefined, stand().place, ENV);
+
+/** `nemia factory instruct <factory> --file <words>`, its words read where it is typed, as the client sends them. */
+const instruct = (factory: string, words: string) =>
+  handled(FACTORY_INSTRUCT, { factory, words: fs.readFileSync(words, 'utf8') }, { e: noEngine(), place: stand().place, env: ENV });
 
 const engine = eachTest(testEngine);
 heldUnasked(engine);
@@ -482,13 +494,10 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       await apply('told', dir, repo, '--set', 'budget=7');
       const words = path.join(scratch('wf-applied-words-'), 'words.md');
       fs.writeFileSync(words, 'Operate the tree.\n');
-      await assert.rejects(
-        main(['factory', 'instruct', 'told', '--file', words], noEngine()),
-        refusedWith('Conflict', /its tree is not rendered yet/),
-      );
+      await assert.rejects(instruct('told', words), refusedWith('Conflict', /its tree is not rendered yet/));
       assert.equal(fs.existsSync(treeDir(ROOT, 'told')), false, 'an instruct refused seeds no tree');
       reconciled(templated('told'));
-      await main(['factory', 'instruct', 'told', '--file', words], noEngine());
+      await instruct('told', words);
       assert.equal(fs.readFileSync(path.join(treeDir(ROOT, 'told'), 'NEMIA.md'), 'utf8'), 'Operate the tree.\n');
       await assert.rejects(
         main(['factory', 'instruction', 'told', '--store'], noEngine()),
@@ -556,28 +565,26 @@ test("what a templated factory's verbs read and write: its tree's wiring, instru
       t.after(() => {
         process.env.CLAUDE_CONFIG_DIR = before;
       });
-      const printed: string[] = [];
-      t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
       const { dir, repo } = template();
       const workspace = path.join(scratch('wf-applied-ws-'), 'one');
       assert.ok('answer' in stand().place.askNow('make', { repo, at: workspace, run: 'r', leaf: 'one', from: 'main', also: [] }));
       const plain = scratch('wf-applied-plain-');
 
-      await apply('quiet', dir, repo, '--set', 'budget=3', '--no-trust');
+      const quiet = (await apply('quiet', dir, repo, '--set', 'budget=3', '--no-trust')) as { trusts: readonly PlaceTrust[] };
       assert.deepEqual(trustedIn(config), []);
-      assert.deepEqual(
-        printed.filter((l) => /trusted for|not trusted/.test(l)),
-        [],
-      );
+      assert.deepEqual(quiet.trusts, [], 'nothing asked, so nothing said');
 
-      await apply('trusting', dir, workspace, '--repo', plain, '--set', 'budget=3');
+      const trusting = (await apply('trusting', dir, workspace, '--repo', plain, '--set', 'budget=3')) as { trusts: readonly PlaceTrust[] };
       assert.deepEqual(trustedIn(config).sort(), [plain, repo].sort());
-      const lines = printed.join('\n').split('\n');
-      assert.ok(lines.includes(`trusted for Claude Code: ${workspace} (kept under ${repo})`), lines.join('\n'));
-      assert.ok(
-        lines.includes(`  take it back: set projects["${plain}"].hasTrustDialogAccepted to false in ${path.join(config, '.claude.json')}`),
-        lines.join('\n'),
+      const wrote = trusting.trusts.flatMap((one) => ('wrote' in one && one.wrote ? [one] : []));
+      assert.deepEqual(
+        wrote.map((one) => [one.place, one.folder]),
+        [
+          [workspace, repo],
+          [plain, plain],
+        ],
       );
+      names(wrote[1]?.back ?? '', `projects["${plain}"].hasTrustDialogAccepted`, path.join(config, '.claude.json'));
     },
   );
 });

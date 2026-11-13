@@ -343,28 +343,20 @@ test('a person reads the agents: both places listed, one read by name, the card 
   });
 
   await s.test(
-    "the listing and a card are the package's nemia agents and nemia agents card, answered with what the board adds and without a person's custom file",
+    "the listing and a card are the package's nemia agents and nemia agents card, answered with what the board adds and the file of a person's custom instructions, which the client prints",
     async () => {
       const AGENTS_ENTRY = COMMANDS.find((c) => c.name === 'agents')!;
       const CARD_ENTRY = COMMANDS.find((c) => c.name === 'agents card')!;
       writeCustomInstructions(root, 'reviewer', 'Say it in French.', repo);
       try {
         const all = await listed();
-        assert.deepEqual(
-          all.filter((a) => 'custom' in a).map((a) => `${a.from}/${a.name}`),
-          [],
-          "the file of a person's custom instructions is the CLI's to print, not a key of the board's",
-        );
         const { agents: read } = (await runWith(engine(process.env), AGENTS_ENTRY.handler({ repo }))) as AgentsRead;
         assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'yours')?.custom, 'the package read the custom file');
         const board = (one: object) => {
           const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
           return rest;
         };
-        assert.deepEqual(
-          all.map(board),
-          read.map(({ custom: _custom, ...rest }) => rest),
-        );
+        assert.deepEqual(all.map(board), read, 'each with the file of its custom instructions, or null, as the package read it');
         const res = await readAt('/api/agents/yours/reviewer/card');
         assert.equal(res.status, 200, await res.clone().text());
         const { card } = (await runWith(engine(process.env), CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'yours' }))) as CardRead;

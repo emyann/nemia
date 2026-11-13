@@ -40,11 +40,14 @@ test('nemia chat allow, disallow and speakers: the names an agent may speak unde
   await t.test('a name taken back is gone, and the others stay', async () => {
     assert.deepEqual(await answer(home, CHAT_DISALLOW.handler({ name: 'operator' })), { allowed: ['nemia-ab12/design'] });
   });
-  await t.test('REFUSED: a name no agent speaks under, by the check and by the handler, with nothing written', async () => {
-    assert.equal(typeof CHAT_ALLOW.check?.({ name: 'You' }), 'string');
-    assert.equal(await refusedAs(storeGiven(home)(CHAT_ALLOW.handler({ name: 'person' })) as Effect.Effect<unknown, unknown>), 'Invalid');
-    assert.deepEqual(await answer(home, CHAT_SPEAKERS.handler({})), { allowed: ['nemia-ab12/design'] });
-  });
+  await t.test(
+    'REFUSED: a name no agent speaks under, by the handler the api and the client both reach, with nothing written',
+    async () => {
+      for (const name of ['You', 'person', 'Not/A Name'])
+        assert.equal(await refusedAs(storeGiven(home)(CHAT_ALLOW.handler({ name })) as Effect.Effect<unknown, unknown>), 'Invalid', name);
+      assert.deepEqual(await answer(home, CHAT_SPEAKERS.handler({})), { allowed: ['nemia-ab12/design'] });
+    },
+  );
   await t.test('REFUSED: a call given no store root does not compile, and one run all the same writes nothing', async () => {
     const before = fs.readFileSync(speakersFile(path.join(home, 'nemia')), 'utf8');
     // @ts-expect-error -- the handler asks the store root, and it is given none

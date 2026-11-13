@@ -1,18 +1,20 @@
 /**
  * A run's feed, told as a person's stories on the stage (`story.ts`): the tick writes what it judged of each run and step on the test
- * place and the engine's stand-in, a line each time it changed, and `nemia watch` reads it. A gated run through its gate, its approval and
- * its end, read by `nemia watch` and across a restart; a person's acts and the runtime's faults, each said once; a step's denials, each a
- * one-shot by its step and try; a run waiting on a person, never said as failed; and a feed cut under a watch.
+ * place and the engine's stand-in, a line each time it changed, and a read of the feed takes it (`readFeed`, `watchFeed`, what the api's
+ * stream serves `nemia watch`). A gated run through its gate, its approval and its end, read from a cursor and across a restart; a
+ * person's acts and the runtime's faults, each said once; a step's denials, each a one-shot by its step and try; a run waiting on a
+ * person, never said as failed; and a feed cut under a watch.
  *
  * What the feed's writer does with the words of one pass — the one-shots it counts, the fold and the diff, a line torn or of a shape
  * of its own, the bytes a line is published at, and the watch's races with the file — is `src/feed/feed.test.ts`'s; the hub and its
- * live readers `src/feed/feed.verb.test.ts`'s; what `nemia watch` refuses of what was typed `src/cli/watch.test.ts`'s.
+ * live readers `src/feed/feed.verb.test.ts`'s; what `nemia watch` refuses of what was typed
+ * `packages/objects/test/commands-reads.test.ts`'s, and what it prints `apps/cli/test/watch.test.ts`'s.
  *
  * A file of its own, since `tick` reads every run under `WF_ROOT` and writes the store's one feed: each story empties the store first, and
  * counts only its own runs' lines. The store is the file's own, at `ROOT`, given as `ENV`; `WF_VERIFY_REST=1` judges
  * in full every run a pass answers from its memo of runs at rest.
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +24,7 @@ import type { Run } from '../src/record/record.ts';
 import type { FeedLine, Reason, RunLine } from '../src/feed/feed.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
+import { decidedOn } from './screens.ts';
 import { names } from './assessed.ts';
 import type { EnginePhase } from '../src/views/views-words.ts';
 import {
@@ -33,6 +36,7 @@ import {
   feedFile,
   freshFeedMemo,
   readFeed,
+  readFeedEnds,
   startRun,
   tickRun,
   watchFeed,
@@ -49,7 +53,9 @@ import { freshRestMemo } from '../src/tick/tick.verb.ts';
 import { runLabels, stepLabels } from '../src/telemetry/telemetry.ts';
 import { DEFAULT_NAMESPACE } from '../src/factory/factory.ts';
 import { followed } from './factory-planted.ts';
-import { main, watchPrinted } from '../src/cli/main.ts';
+import { main } from '../src/cli/main.ts';
+import { typed } from './typed.ts';
+import { parseSelectors, selects } from '../src/watch/selector.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -166,19 +172,12 @@ const said = (run: string, reason: Reason) =>
 /** The pass's words for every run, as `tick` hands them to the feed: what a restarted daemon's first pass would judge. */
 const judged = (pass: Effect.Success<ReturnType<typeof tickRun>>) => new Map(pass.runs.map((a) => [a.run.id, a.feed]));
 
-/** What `nemia <argv>` printed on stdout, a line each. */
-const printedBy = async (t: TestContext, ...argv: string[]): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
-};
+/** `nemia <argv>` handed to its entry's handler, as the api calls it (`typed`), over the stage's engine and place: its data. */
+const handedTo = (...argv: string[]) => typed(argv, stage.board().e, undefined, stage.place().place, ENV);
+
+/** The lines of the feed from `from` that `selectors` take (`selects`), as the api's stream serves them to `nemia watch`. */
+const taken = (from: number, ...selectors: string[]): FeedLine[] =>
+  readFeed(ROOT, from).lines.filter((l) => selects(parseSelectors(selectors), l));
 
 /** Refused at exit 2, its words naming each of `facts`. */
 const refusedNaming =
@@ -295,72 +294,36 @@ test(
         fs.writeFileSync(FEED, kept);
       },
     );
-    await s.test('nemia watch --once prints each line and the cursor to read on from; from the end, the cursor alone', async () => {
-      const printed = await printedBy(t, 'watch', '--once');
-      assert.equal(printed.at(-1), `cursor: ${size()}`);
+    await s.test('a read of the feed from 0 answers each line and the cursor to read on from; from the end, the cursor alone', async () => {
+      const read = readFeed(ROOT, 0);
+      assert.equal(read.cursor, size());
       assert.ok(
-        printed.some((l) => l.includes(run.id) && l.endsWith('running')),
-        printed.join('\n'),
+        read.lines.some((l) => isRunLine(l) && l.run === run.id && l.word === 'running'),
+        JSON.stringify(read.lines),
       );
-      assert.deepEqual(
-        await printedBy(t, 'watch', '--once', String(size())),
-        [`cursor: ${size()}`],
-        'from the end, nothing but the cursor',
-      );
+      assert.deepEqual(readFeed(ROOT, size()), { lines: [], cursor: size() }, 'from the end, nothing but the cursor');
     });
-    await s.test(
-      'nemia watch --once -l waits=person prints only the lines that wait on a person, and still ends at the feed’s end',
-      async () => {
-        const waiting = await printedBy(t, 'watch', '--once', '-l', 'waits=person');
-        assert.equal(waiting.at(-1), `cursor: ${size()}`);
-        const taken = lines().filter((l) => l.waits === 'person');
-        assert.ok(taken.length >= 2, 'the gate wrote the run’s line and the step’s, each waiting on a person');
-        assert.equal(waiting.length - 1, taken.length, waiting.join('\n'));
-        for (const l of waiting.slice(0, -1)) assert.match(l, /awaiting approval/);
-        const either = await printedBy(t, 'watch', '--once', '-l', `run=${run.id},kind=Run`, '-l', 'waits=person');
-        assert.equal(
-          either.length - 1,
-          lines().filter((l) => (l.run === run.id && l.step === undefined) || l.waits === 'person').length,
-          'a line either selector takes, each clause of one held',
-        );
-        assert.deepEqual(
-          await printedBy(t, 'watch', '--once', '-l', 'factory=nowhere'),
-          [`cursor: ${size()}`],
-          'a selector that takes nothing still says where the feed ends, not where its last line did',
-        );
-      },
-    );
-    await s.test(
-      'nemia watch --once --json prints the lines whole and a cursor-only bookmark as its last line, and nothing but JSON',
-      async () => {
-        const said = await printedBy(t, 'watch', '--once', '--json', '-l', `kind=Step,run=${run.id}`);
-        assert.deepEqual(JSON.parse(said.at(-1)!), { cursor: size() }, 'the bookmark carries the cursor and nothing else');
-        const parsed = said.slice(0, -1).map((l) => JSON.parse(l) as RunLine & { cursor: number });
-        assert.deepEqual(
-          parsed.map((l) => l.step),
-          lines()
-            .filter((l) => l.run === run.id && l.step !== undefined)
-            .map((l) => l.step),
-        );
-        for (const l of parsed)
-          assert.equal(feedCursorRefusal(ROOT, l.cursor), undefined, `${l.step} ${l.word}: its cursor is one the feed takes`);
-        assert.equal(
-          said.some((l) => !l.startsWith('{')),
-          false,
-          'stdout holds nothing but JSON',
-        );
-      },
-    );
-    const file = path.join(ROOT, 'once.cursor');
-    await s.test('nemia watch --once keeps its place in --cursor-file, and a watch given one starts from it', async () => {
-      fs.rmSync(file, { force: true });
-      assert.equal((await printedBy(t, 'watch', '--once', '--cursor-file', file)).at(-1), `cursor: ${size()}`);
-      assert.equal(fs.readFileSync(file, 'utf8'), `${size()}\n`);
+    await s.test('-l waits=person takes only the lines that wait on a person; -l given again takes a line either takes', async () => {
+      const waiting = taken(0, 'waits=person');
+      assert.ok(waiting.length >= 2, 'the gate wrote the run’s line and the step’s, each waiting on a person');
+      for (const l of waiting) assert.equal(l.word, 'awaiting approval', JSON.stringify(l));
       assert.deepEqual(
-        await printedBy(t, 'watch', '--once', '--cursor-file', file),
-        [`cursor: ${size()}`],
-        'the second read starts where the file says, and reads nothing twice',
+        waiting,
+        lines().filter((l) => l.waits === 'person'),
       );
+      assert.equal(
+        taken(0, `run=${run.id},kind=Run`, 'waits=person').length,
+        lines().filter((l) => (l.run === run.id && l.step === undefined) || l.waits === 'person').length,
+        'a line either selector takes, each clause of one held',
+      );
+      assert.deepEqual(taken(0, 'factory=nowhere'), [], 'a selector that takes nothing takes no line');
+    });
+    await s.test("each line's end is a cursor the feed takes: what a watch in JSON hands on beside the line", async () => {
+      const { lines: read, ends } = readFeedEnds(ROOT, 0);
+      const steps = read.flatMap((l, i) => (isRunLine(l) && l.run === run.id && l.step !== undefined ? [{ l, end: ends[i] }] : []));
+      assert.ok(steps.length > 0);
+      for (const { l, end } of steps)
+        assert.equal(feedCursorRefusal(ROOT, end ?? -1), undefined, `${l.step} ${l.word}: its end is a cursor`);
     });
     await s.test('the approval is a file of its own, and the next pass says what it changed: no word twice in a row', async () => {
       const at = size();
@@ -377,52 +340,26 @@ test(
         'the run no longer waits on you',
       );
       assert.equal(words(run.id, 'implement').at(-1), 'pending');
-      const resumed = await printedBy(t, 'watch', '--once', '--cursor-file', file);
-      assert.equal(resumed.at(-1), `cursor: ${size()}`);
-      assert.equal(
-        resumed.length - 1,
-        readFeed(ROOT, at).lines.length,
-        'the cursor file resumes the watch where it was: the lines since, and no other',
-      );
-      assert.equal(fs.readFileSync(file, 'utf8'), `${size()}\n`);
+      const since = readFeed(ROOT, at);
+      assert.ok(since.lines.length > 0, 'a read from where a watch was takes the lines since');
+      assert.equal(since.cursor, size());
     });
-    await s.test('a cursor file the feed cannot be read from starts the watch over, says why once, and keeps its place', async () => {
-      const stale = path.join(ROOT, 'stale.cursor');
-      fs.writeFileSync(stale, `${size() + 900}\n`);
-      const out: string[] = [];
-      const err: string[] = [];
-      const log = t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
-      const wrote = t.mock.method(console, 'error', (...a: unknown[]) => err.push(a.join(' ')));
-      try {
-        await stage.main(['watch', '--once', '--cursor-file', stale]);
-      } finally {
-        log.mock.restore();
-        wrote.mock.restore();
-      }
-      assert.equal(out.at(-1), `cursor: ${size()}`, 'it read the feed there is now, from its start');
-      assert.equal(out.length, readFeed(ROOT, 0).lines.length + 1, 'every line of it');
-      assert.equal(err.length, 1, 'said once');
-      names(err[0], stale, String(size() + 900), 'said again');
-      assert.equal(fs.readFileSync(stale, 'utf8'), `${size()}\n`, 'and it kept its place, as any watch does');
-    });
-    await s.test('REFUSED: a cursor inside a line, past the end or not a number, by the read, by nemia watch and by a watch', async () => {
+    await s.test(
+      'a cursor past the feed’s end is one the feed refuses: what a watch reading a stale cursor file starts over from',
+      async () => {
+        names(feedCursorRefusal(ROOT, size() + 900) ?? '', String(size() + 900));
+      },
+    );
+    await s.test('REFUSED: a cursor inside a line, past the end or not a number, by the read and by a watch', async () => {
       const { cursor } = readFeed(ROOT, 0);
       assert.equal(cursor, size());
       const inside = cursor - 2;
       assert.throws(() => readFeed(ROOT, inside), refusedNaming(`cursor ${inside}`, 'inside a line'));
-      const log = t.mock.method(console, 'log', () => {});
-      try {
-        await assert.rejects(stage.main(['watch', String(inside)]), refusedNaming(String(inside), 'inside a line'));
-        assert.equal(log.mock.callCount(), 0, 'refused before it says it is watching');
-      } finally {
-        log.mock.restore();
-      }
+      names(feedCursorRefusal(ROOT, inside) ?? '', String(inside), 'inside a line');
       assert.throws(() => watchFeed(ROOT, { from: inside, onLine: () => {} }), refusedNaming('inside a line'));
       const past = cursor + 10;
       const [named, sized] = [`cursor ${past} `, `(${cursor} bytes, `];
       assert.throws(() => readFeed(ROOT, past), refusedNaming(named, sized, 'nemia watch --once 0'));
-      await assert.rejects(stage.main(['watch', 'twelve']), refusedNaming('nemia watch', 'one cursor at most', 'a whole number of bytes'));
-      await assert.rejects(stage.main(['watch', '0', '1']), refusedNaming('nemia watch does not take 1', 'nemia watch [cursor]'));
       assert.throws(() => readFeed(ROOT, -1), refusedNaming('a whole number of bytes'));
       let at = 0;
       for (const line of fs.readFileSync(FEED, 'utf8').split('\n').slice(0, -1)) {
@@ -1065,9 +1002,10 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
       .at(-1)!;
     assert.deepEqual({ word: last.word, note: last.note }, { word: 'awaiting approval', note: 'waiting on you: approve ship' });
     assert.equal(words(run.id).includes('failed'), false, `no line of the run says failed: ${words(run.id).join(' → ')}`);
-    const decided = (await printedBy(t, 'decide', run.id)).join('\n');
-    assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'nemia decide says the same run awaits approval');
-    assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
+    const { decision } = await decidedOn(stage, run.id);
+    assert.ok(decision.kind === 'awaiting', JSON.stringify(decision));
+    assert.deepEqual(decision.awaitingApproval, ['ship'], 'the decision says the same run awaits approval');
+    assert.deepEqual([decision.outcome, decision.failed], ['waiting', []], 'and that nothing failed');
   });
   await s.test('a run whose step broke says failed, gate or not', async () => {
     const broke = await stage.runPlaced(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ENDING }));
@@ -1129,80 +1067,81 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
 });
 
 test(
-  'a feed cut under nemia watch — truncated, deleted, replaced — is said once each, the next transition delivered, its cursor file at 0',
+  'a feed cut under a watch — truncated, deleted, replaced — is said once each, and the next transition delivered',
   WAITED,
   async (t) => {
     const s = story(t);
     emptyStore();
-    const out: string[] = [];
-    const err: string[] = [];
+    const got: FeedLine[] = [];
+    const cut: string[] = [];
+    const failed: string[] = [];
     const spoke = bell();
-    t.mock.method(console, 'log', (...a: unknown[]) => {
-      out.push(a.join(' '));
-      spoke.ring();
-    });
-    t.mock.method(console, 'error', (...a: unknown[]) => {
-      err.push(a.join(' '));
-      spoke.ring();
-    });
     const heard = (ok: () => boolean, what: string) => until(t, ok, what, { bell: spoke, everyMs: 20 });
-    const cuts = () => err.filter((l) => l.includes('under this watch'));
-    const printed = () => out.join('\n');
-    const file = path.join(ROOT, 'cut.cursor');
-    fs.rmSync(file, { force: true });
-    const kept = (): number | undefined => (fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8').trim()) : undefined);
+    const said = (from: number, ok: (l: RunLine) => boolean) => got.slice(from).some((l) => isRunLine(l) && ok(l));
     let run: Run;
-    let watch: ReturnType<typeof watchPrinted> | undefined;
+    let watch: ReturnType<typeof watchFeed> | undefined;
     t.after(() => watch?.stop());
-    await s.test('nemia watch says it is watching from the feed’s end, its engine asked nothing', async () => {
+    await s.test('a watch from the feed’s end, its engine asked nothing', async () => {
       run = await started('the cut');
       await tick();
-      const from = size();
-      watch = watchPrinted(ROOT, from, {}, { cursorFile: file });
-      assert.deepEqual(out, [`watching from ${from}, ^C to stop`]);
+      watch = watchFeed(ROOT, {
+        from: size(),
+        intervalMs: 20,
+        onLine: (line) => {
+          got.push(line);
+          spoke.ring();
+        },
+        onCut: (words) => {
+          cut.push(words);
+          spoke.ring();
+        },
+        onError: (err) => {
+          failed.push((err as Error).message);
+          spoke.ring();
+        },
+      });
+      assert.deepEqual(got, []);
     });
-    await s.test('truncated to nothing: said once, its cursor file at 0, and the gate reached after the cut delivered', async () => {
+    await s.test('truncated to nothing: said once, and the gate reached after the cut delivered', async () => {
       fs.truncateSync(FEED, 0);
-      await heard(() => cuts().length >= 1, 'the truncation said');
-      assert.equal(cuts().length, 1, 'the truncation is said once');
-      names(cuts()[0], 'nemia watch:', 'truncated under this watch', 'is 0 bytes now', 'from its start');
-      await heard(() => kept() === 0, 'the cursor file rewritten to 0 on the cut');
+      await heard(() => cut.length >= 1, 'the truncation said');
+      assert.equal(cut.length, 1, 'the truncation is said once');
+      names(cut[0] ?? '', 'truncated under this watch', 'is 0 bytes now', 'from its start');
       settle(task(run, 'plan'), 'succeeded', SIGNED);
       await ticks(2);
-      await heard(() => /\splan\s+awaiting approval/.test(printed()), 'the watch reads the feed the tick writes again from its start');
+      await heard(
+        () => said(0, (l) => l.step === 'plan' && l.word === 'awaiting approval'),
+        'the feed the tick writes again, read from its start',
+      );
     });
     await s.test('deleted: the same, said once, and the approval after it delivered', async () => {
-      const before = printed().length;
+      const before = got.length;
       fs.rmSync(FEED);
-      await heard(() => cuts().length >= 2, 'the deletion said');
-      assert.equal(cuts().length, 2, 'the deletion is said once');
-      names(cuts()[1], 'deleted under this watch');
+      await heard(() => cut.length >= 2, 'the deletion said');
+      assert.equal(cut.length, 2, 'the deletion is said once');
+      names(cut[1] ?? '', 'deleted under this watch');
       await stage.runWith(stage.board().e, approveRun(run.id, 'plan'));
       await ticks(2);
-      await heard(() => /\splan\s+(?!awaiting)/.test(printed().slice(before)), 'the approval after the deletion is delivered');
+      await heard(() => said(before, (l) => l.step === 'plan' && l.word !== 'awaiting approval'), 'the approval after the deletion');
     });
     await s.test('replaced by another file of the same bytes and more: its inode tells, not its size; said once, and read', async () => {
-      const at = printed().length;
+      const at = got.length;
       const next = `${FEED}.next`;
       fs.writeFileSync(
         next,
         `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`,
       );
       fs.renameSync(next, FEED);
-      await heard(() => cuts().length >= 3 && printed().slice(at).includes('r-new'), 'the replacement said on stderr, and read');
-      assert.equal(cuts().length, 3, 'the replacement is said once');
-      names(cuts()[2], 'replaced under this watch');
+      await heard(() => cut.length >= 3 && said(at, (l) => l.run === 'r-new'), 'the replacement said, and read');
+      assert.equal(cut.length, 3, 'the replacement is said once');
+      names(cut[2] ?? '', 'replaced under this watch');
     });
     await s.test('each cut said once: every beat after reads on, the line after is delivered, and no cursor is refused, ever', async () => {
-      const quiet = [...err];
+      const quiet = [...cut];
       fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
-      await heard(() => printed().includes('r-last'), 'the line after delivered');
-      assert.deepEqual(err, quiet, 'nothing more said');
-      assert.equal(
-        err.some((l) => /past the end|falls inside a line/.test(l)),
-        false,
-      );
-      assert.equal(kept(), size(), 'and the cursor file at the feed’s end');
+      await heard(() => said(0, (l) => l.run === 'r-last'), 'the line after delivered');
+      assert.deepEqual(cut, quiet, 'nothing more said');
+      assert.deepEqual(failed, [], 'no cursor refused');
       assert.equal(stage.board().said.length + stage.board().stopped.length, 0, 'the engine asked nothing by the watch');
     });
   },
@@ -1221,7 +1160,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
   const STORE = { kind: 'Store', name: 'store' };
   let at = '';
   await s.test('nemia pause, then passes, is one `store paused` of the store, a person’s deed', async () => {
-    await printedBy(t, 'pause', '--why', 'a rebase');
+    await handedTo('pause', '--why', 'a rebase');
     at = readPause(ROOT)!.at;
     await ticks(3);
     assert.deepEqual(storeSaid(), [[STORE, 'StorePaused', 'store paused', `since ${at}`, 'person']]);
@@ -1235,7 +1174,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
     assert.ok(put?.message?.includes(by) && put.message.includes('a rebase'), put?.message);
   });
   await s.test('nemia pause --now --yes on the pause that stands keeps its moment, and writes no second put', async () => {
-    await printedBy(t, 'pause', '--now', '--yes');
+    await handedTo('pause', '--now', '--yes');
     await ticks(2);
     assert.equal(storeSaid().length, 1);
   });
@@ -1243,7 +1182,7 @@ test("the store's pause and resume, each one line of the store's, said once by t
     assert.deepEqual(recordFeed(ROOT, judged(await tick()), { memo: freshFeedMemo(), pause: readPause(ROOT) }).lines, []);
   });
   await s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
-    await printedBy(t, 'resume');
+    await handedTo('resume');
     await ticks(3);
     assert.deepEqual(storeSaid(), [
       [STORE, 'StorePaused', 'store paused', `since ${at}`, 'person'],
@@ -1255,10 +1194,13 @@ test("the store's pause and resume, each one line of the store's, said once by t
       'and a restart none',
     );
   });
-  await s.test('nemia watch -l kind=Store prints the two lines of the store and no other', async () => {
-    const printed = (await printedBy(t, 'watch', '--once', '-l', 'kind=Store')).filter((l) => /\d\d:\d\d:\d\d/.test(l));
-    assert.equal(printed.length, 2, printed.join('\n'));
-    assert.ok(printed[0].includes('store  —  store paused') && printed[0].includes('a rebase'), printed[0]);
-    assert.ok(printed[1].includes('store  —  store resumed'), printed[1]);
+  await s.test('-l kind=Store takes the two lines of the store and no other', async () => {
+    const store = taken(0, 'kind=Store');
+    assert.deepEqual(
+      store.map((l) => l.word),
+      ['store paused', 'store resumed'],
+      JSON.stringify(store),
+    );
+    assert.ok(store[0] && 'why' in store[0] && store[0].why === 'a rebase', JSON.stringify(store[0]));
   });
 });

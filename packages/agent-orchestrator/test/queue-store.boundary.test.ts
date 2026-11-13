@@ -15,13 +15,15 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from '../src/runtime-client.ts';
 import type { Run, TaskPhase } from '../src/run.ts';
-import { queueLine } from '../src/inbox/inbox.ts';
+import { inboxLines, queueLine, type InboxListing } from '../src/inbox/inbox.ts';
+import { typed } from './typed.ts';
 import { scratch } from 'test-kit/scratch';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { runGiven, runOver } from './placed.ts';
 import type { StoreRoot as StoreRootNeeded } from '../src/config/root.store.ts';
 import { startRun, tickRun, runWith as runEngine, gitPlaceLayer, StoreRoot, readInbox as readInboxVerb } from '../src/runner.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
 import { main } from '../src/cli/main.ts';
 
@@ -179,22 +181,13 @@ const started = async (
 };
 const at = (minute: number) => `2026-09-16T09:${String(minute).padStart(2, '0')}:00.000Z`;
 
-/** What `main` printed, line by line, for one verb. */
-const printedBy = async (
-  t: { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } },
-  e: Engine,
-  ...argv: string[]
-): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await main(argv, e, undefined, undefined, ENV);
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
+/** The lines `nemia inbox` makes of its cards (`inboxLines`), read through its entry's handler as the api calls it (`typed`), over `e`. */
+const listedLines = async (e: Engine): Promise<string[]> => {
+  const { cards, defaultStarts } = (await typed(['inbox'], e, undefined, builtinGitPlace, ENV)) as {
+    cards: InboxListing[];
+    defaultStarts: boolean;
+  };
+  return inboxLines(cards, defaultStarts);
 };
 
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
@@ -243,7 +236,7 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   );
   const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'odd-include-a1b2.json'), 'utf8'));
   assert.deepEqual([written.refused, written.repo, written.why], [false, broken, first.queue.failed]);
-  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('odd-include-a1b2'))!;
+  const listed = (await listedLines(b.e)).find((l) => l.startsWith('odd-include-a1b2'))!;
   assert.match(
     listed,
     / {2}queued 1 of 2 — failed at \S+ on \S+: the place's open was not heard: open threw before it answered: ELOOP: too many symbolic links encountered.* — not a refusal: the tick tries it again on every pass, where it keeps its place$/,

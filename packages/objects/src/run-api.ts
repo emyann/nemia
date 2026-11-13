@@ -58,6 +58,18 @@ const runReadErrors = [Missing, Invalid, Unjudged];
  */
 const runActionErrors = [BadRequest, Missing, Conflict, Invalid, WriteFailed];
 
+/**
+ * The query of a run's removal, each asked where it is `true`, as a decision's `diffs` is: `whole`, a run of a workflow removed as `nemia
+ * rm` removes it — its worktrees removed through git, what one held uncommitted committed first, its branches kept — where left out a try
+ * alone is removed (a run started from an agent's page, any other refused); `deleteBranches`, its branches merged into its base deleted
+ * too; `forceUnmerged` beside it, the others too, with their work.
+ */
+const removeQuery = {
+  whole: Schema.optionalKey(Schema.String),
+  deleteBranches: Schema.optionalKey(Schema.String),
+  forceUnmerged: Schema.optionalKey(Schema.String),
+};
+
 /** A run, by its namespace and its name. */
 const runParams = { namespace: Schema.String, name: Schema.String };
 
@@ -72,8 +84,8 @@ const takenLater = <S extends Schema.Top>(answer: S) => answer.pipe(Schema.annot
  * read beside it; and its named actions, each in its namespace alone: started, removed — a try alone, a run started
  * from an agent's page, any other being `nemia rm`'s — refreshed, pruned, its labels edited, held and its hold lifted, and a step of it
  * tried again, approved, routed — a condition's route given by hand — and said words to. A run's namespace is its factory, `default`
- * for one that names none: a run addressed under another is `Missing`. A start is placed on the repository `?repo=` names, else the
- * api's own.
+ * for one that names none: a run addressed under another is `Missing`. A start in `default` is placed in the factory whose repository
+ * holds the folder `?repo=` names; with none it is refused, naming `?factory=`.
  */
 export class RunsGroup extends HttpApiGroup.make('runs').add(
   HttpApiEndpoint.get('listAll', '/api/runs', { query: runListQuery, success: runListed, error: runReadErrors }),
@@ -93,6 +105,7 @@ export class RunsGroup extends HttpApiGroup.make('runs').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/runs/:name', {
     params: runParams,
+    query: removeQuery,
     success: RunRemoved,
     error: runActionErrors,
   }),

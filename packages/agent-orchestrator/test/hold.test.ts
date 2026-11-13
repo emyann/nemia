@@ -7,7 +7,7 @@
  * is the same flag as `--until <run>`: nothing is refused of it but the run it names.
  *
  * Its words, pure, are in `src/wait/wait.test.ts`; a hold refused where git alone can say why — another base branch, a result branch
- * removed by hand — is in `hold-git.boundary.test.ts`, on real git. Two whole screens of a loop out of rounds live here too. The test's
+ * removed by hand — is in `hold-git.boundary.test.ts`, on real git. Two whole decisions of a loop out of rounds live here too. The test's
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
@@ -25,7 +25,7 @@ import type { PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
-import { decideScreen as screenOf } from './screens.ts';
+import { decidedOn, decisionOn } from './screens.ts';
 import { staged, story, type Board } from './story.ts';
 import { names } from './assessed.ts';
 import { storeGiven } from './config-given.ts';
@@ -34,6 +34,7 @@ import {
   advanceRun,
   BY_CAP,
   approveRun,
+  countsLine,
   decideRun,
   forgetRun,
   hold,
@@ -41,6 +42,7 @@ import {
   holdWord,
   prune,
   retryRun,
+  roundDueNote,
   roundRun,
   sayRun,
   PERSON,
@@ -56,14 +58,12 @@ import { EngineService as RunsEngine } from '../src/runtime-client.ts';
 import { Effect as RunsEffect } from 'effect';
 import { passStanding } from '../src/standing/standing.verb.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { told } from './typed.ts';
 
 const ROOT = scratch('wf-hold-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
 
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const decideScreen = (...[t, e, argv, as, place]: Parameters<typeof screenOf>): Promise<string[]> => screenOf(t, e, argv, as, place, ENV);
 /** Every run's summary, as the whole list judges it (`runsSummarized`), read through the informer and filings `kept` hands. */
 const RUNS = {
   handler: (_args: object, kept?: Parameters<typeof howOf>[0]) =>
@@ -71,7 +71,8 @@ const RUNS = {
       return yield* runsSummarized(yield* RunsEngine, yield* howOf(kept));
     }),
 };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/** A command line as a person types it: a verb the client holds on its entry's handler, its lines said (`told`); else `main`. */
+const stage = staged({ runWith, main: told, engineOf, env: ENV });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const world = () => stage.place().world;
@@ -184,6 +185,12 @@ const typed = async (t: TestContext, ...argv: string[]) => {
     log.mock.restore();
   }
 };
+/** What `nemia hold` answers, as the client prints it: the run, whether its hold was lifted, and the hold. */
+type Held = { id: string; lifted: boolean; hold: { until: string[]; why?: string; by?: string } };
+
+/** `nemia hold <argv>` on its entry's handler, as the api runs it: what it answers. */
+const holdTyped = async (...argv: string[]): Promise<Held> => (await stage.main(['hold', ...argv])) as Held;
+
 /** `nemia <verb>` answered, printing what it printed. */
 const said = async (t: TestContext, ...argv: string[]): Promise<string> => {
   const { printed, error } = await typed(t, ...argv);
@@ -201,6 +208,16 @@ const refusedNaming =
   };
 
 const VERBS = /nemia (approve|retry|round|accept) /;
+
+/** Run `id`'s decision on this file's stage, as the api serves it (`RunDecision`). */
+const decision = async (id: string) => (await decisionOn(stage, id)).decision;
+/** Run `id`'s decision as one text, for what it says and does not say. */
+const decisionText = async (id: string): Promise<string> => JSON.stringify(await decision(id));
+/** The looping steps of run `id` out of rounds, waiting on you (`Decided`'s `exhausted`); none where it awaits nobody. */
+const exhaustedOf = async (id: string): Promise<string[]> => {
+  const d = (await decidedOn(stage, id)).decision;
+  return d.kind === 'awaiting' ? d.exhausted : [];
+};
 
 /** `text` as a pattern that matches it and nothing else inside a line. */
 const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -224,19 +241,17 @@ test('a run held until another lands: said by every screen with why and who, not
   const words = `held until ${target.id} lands (why: merge conflicts in five files; by operator)`;
   let run = { id: '' } as Run;
 
-  await s.test('`nemia hold <run> --until <run>` says the hold back, put by the OS user, and writes no why', async (sub) => {
+  await s.test('`nemia hold <run> --until <run>` answers the hold, put by the OS user, and writes no why', async () => {
     run = await aStarted(repo, 'waits for the target');
-    assert.equal(
-      await said(sub, 'hold', run.id, '--until', target.id),
-      `${run.id}  held until ${target.id} lands (by ${user}) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
-    );
+    const put = await holdTyped(run.id, '--until', target.id);
+    assert.deepEqual([put.id, put.lifted, put.hold.until, put.hold.by, put.hold.why], [run.id, false, [target.id], user, undefined]);
     const file = JSON.parse(fs.readFileSync(holdFileOf(run.id), 'utf8')) as Record<string, unknown>;
     assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
     assert.equal(file.by, user, 'nor --by: it is put by the OS user');
   });
   await s.test("`--why` and `--by` write the person's why, one line, and who they are into the file, and say them back", async (sub) => {
     const withWords = await aStarted(repo, 'held with words');
-    const printed = await said(sub, 'hold', withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
+    const put = await holdTyped(withWords.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
     assert.deepEqual(
       (({ why: w, by }) => ({ why: w, by }))(JSON.parse(fs.readFileSync(holdFileOf(withWords.id), 'utf8')) as Record<string, unknown>),
       {
@@ -244,10 +259,7 @@ test('a run held until another lands: said by every screen with why and who, not
         by: 'operator',
       },
     );
-    assert.equal(
-      printed,
-      `${withWords.id}  held until ${target.id} lands (why: two words; by operator) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
-    );
+    assert.deepEqual([put.hold.until, put.hold.why, put.hold.by], [[target.id], 'two words', 'operator'], 'what nemia hold says back');
     const plain = await aStarted(repo, 'held with none');
     await said(sub, 'hold', plain.id, '--until=' + target.id, '--why=it waits');
     assert.equal(runRecord(ROOT, plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
@@ -278,14 +290,17 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.equal((await tick(b, worded.id)).feed.run.note, words, "the feed's note says the words");
     },
   );
-  await s.test('`nemia ls` and `nemia decide` say the hold and how to lift it', async (sub) => {
+  await s.test('`nemia ls` and the decision say the hold and how to lift it', async (sub) => {
     await aPass(b.e);
     assert.match(await said(sub, 'ls', run.id), new RegExp(`→ held until ${target.id} lands  —  nemia hold ${run.id} --off lifts it`));
-    assert.match(
-      await said(sub, 'decide', run.id),
-      new RegExp(
-        `\n  held until ${target.id} lands\n  nothing of ${run.id} is filed, and nothing is asked of you, until nemia decide says ${target.id} has landed`,
+    const held = await decision(run.id);
+    assert.ok('holding' in held && held.holding !== undefined && !('waiting' in held), JSON.stringify(held));
+    assert.equal(held.holding.word, `held until ${target.id} lands`);
+    assert.ok(
+      held.holding.advice.startsWith(
+        `nothing of ${run.id} is filed, and nothing is asked of you, until nemia decide says ${target.id} has landed`,
       ),
+      held.holding.advice,
     );
   });
   await s.test('a hold written between the read and the filing holds: the pass checks the file at the filing', async () => {
@@ -296,7 +311,7 @@ test('a run held until another lands: said by every screen with why and who, not
     assert.ok(!b.filings.includes(`${other.id}-implement`), 'a run read before the hold was put is not filed on that read');
   });
   await s.test(
-    'REFUSED while held: an approval and a retry — `nemia ls`, `nemia decide` and decide offer neither, but say the hold, with its words; the gate is asked again once it lifts',
+    'REFUSED while held: an approval and a retry — `nemia ls` and the decision offer neither, but say the hold, with its words; the gate is asked again once it lifts',
     async (sub) => {
       const atGate = await atItsGate(b, repo, 'at its gate');
       assert.match(await said(sub, 'ls', atGate.id), /waiting on you: approve implement/, 'the gate is asked before');
@@ -322,11 +337,13 @@ test('a run held until another lands: said by every screen with why and who, not
       const olderLs = await said(sub, 'ls', olderGate.id);
       assert.match(olderLs, new RegExp(`→ held until ${target.id} lands  —  nemia hold ${olderGate.id} --off lifts it`), olderLs);
       assert.match(olderLs, new RegExp(`held until ${target.id} lands; its approval is asked once the hold lifts`), olderLs);
-      const screen = await said(sub, 'decide', atGate.id);
-      assert.doesNotMatch(screen, /waiting on you|AWAITING APPROVAL/, screen);
-      assert.doesNotMatch(screen, VERBS, screen);
-      assert.match(screen, new RegExp(`\n  ${literal(words)}\n`), screen);
-      assert.match(await said(sub, 'decide', olderGate.id), new RegExp(`\n  held until ${target.id} lands\n`));
+      const screen = await decision(atGate.id);
+      const text = JSON.stringify(screen);
+      assert.doesNotMatch(text, /waiting on you|AWAITING APPROVAL/, text);
+      assert.doesNotMatch(text, VERBS, text);
+      assert.equal('holding' in screen ? screen.holding?.word : text, words, 'the hold, in its words');
+      const older = await decision(olderGate.id);
+      assert.equal('holding' in older ? older.holding?.word : JSON.stringify(older), `held until ${target.id} lands`);
       const d = await stage.runWith(b.e, decideRun(atGate.id));
       assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}]);
       assert.deepEqual(
@@ -344,19 +361,16 @@ test('a run held until another lands: said by every screen with why and who, not
       await tick(b, atGate.id);
       assert.ok(!b.filings.includes(`${atGate.id}-review`), 'a pass files nothing on an approval written by hand beside the hold');
       fs.rmSync(approvals, { recursive: true });
-      assert.equal(
-        await said(sub, 'hold', atGate.id, '--off'),
-        `${atGate.id}  hold lifted — the next tick goes on, and what its steps ask is asked`,
-      );
+      assert.equal((await holdTyped(atGate.id, '--off')).lifted, true);
       assert.match(await said(sub, 'ls', atGate.id), /waiting on you: approve implement/, 'lifted by hand, the gate is asked again');
-      assert.match(await said(sub, 'decide', atGate.id), new RegExp(`nemia approve ${atGate.id} implement`));
+      assert.match(await decisionText(atGate.id), new RegExp(`nemia approve ${atGate.id} implement`));
     },
   );
   await s.test(
     'REFUSED while held: a loop out of rounds is offered neither once more nor enough, and both are refused; asked again on the lift',
     async (sub) => {
       const loop = await outOfRounds(b, repo);
-      assert.match(await said(sub, 'decide', loop.id), /ROUNDS EXHAUSTED, waiting on you/);
+      assert.deepEqual(await exhaustedOf(loop.id), ['review'], 'out of rounds, waiting on you');
       await said(sub, 'hold', loop.id, '--until', target.id);
       const held = `${loop.id} is held until ${target.id} lands`;
       await assert.rejects(stage.runWith(b.e, roundRun(loop.id, 'review')), refusedNaming('Conflict', held, 'a round would release'));
@@ -364,14 +378,15 @@ test('a run held until another lands: said by every screen with why and who, not
         stage.runWith(b.e, acceptRun(loop.id, 'review', 'as it stands')),
         refusedNaming('Conflict', held, 'an acceptance would release'),
       );
-      const loopScreen = await said(sub, 'decide', loop.id);
+      const loopScreen = await decisionText(loop.id);
+      assert.deepEqual(await exhaustedOf(loop.id), [], 'held: no round is out on you');
       assert.doesNotMatch(loopScreen, /waiting on you|ROUNDS EXHAUSTED/, loopScreen);
       assert.doesNotMatch(loopScreen, VERBS, loopScreen);
       const loopLs = await said(sub, 'ls', loop.id);
       assert.doesNotMatch(loopLs, /waiting on you/, loopLs);
       assert.doesNotMatch(loopLs, VERBS, loopLs);
       assert.equal((await stage.runWith(b.e, unhold(loop.id))).run.id, loop.id);
-      assert.match(await said(sub, 'decide', loop.id), /ROUNDS EXHAUSTED, waiting on you/);
+      assert.deepEqual(await exhaustedOf(loop.id), ['review'], 'asked again on the lift');
     },
   );
   await s.test(
@@ -386,7 +401,7 @@ test('a run held until another lands: said by every screen with why and who, not
       const ls = await said(sub, 'ls', asking.id);
       assert.doesNotMatch(ls, /waiting on you/, ls);
       assert.doesNotMatch(ls, VERBS, ls);
-      const screen = await said(sub, 'decide', asking.id);
+      const screen = await decisionText(asking.id);
       assert.doesNotMatch(screen, /waiting on you|BLOCKED/, screen);
       assert.doesNotMatch(screen, VERBS, screen);
       assert.equal((await stage.runWith(b.e, decideRun(asking.id))).decision.kind, 'running');
@@ -405,7 +420,9 @@ test('a run held until another lands: said by every screen with why and who, not
       fs.rmSync(asks, { recursive: true });
       await stage.runWith(b.e, unhold(asking.id));
       assert.match(await said(sub, 'ls', asking.id), /waiting on you: implement/);
-      assert.match(await said(sub, 'decide', asking.id), /which colour\?/);
+      const asked = (await decidedOn(stage, asking.id)).closeouts.implement;
+      assert.equal(asked && !('error' in asked) ? asked.needs : asked, 'which colour?');
+      assert.deepEqual((await decidedOn(stage, asking.id)).decision.kind, 'awaiting', "its question is the person's again");
     },
   );
   await s.test(
@@ -439,59 +456,58 @@ test('a run held until another lands: said by every screen with why and who, not
     },
   );
   await s.test(
-    'the whole screen of a run held while its step runs, once a pass has read where the run it names stands, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled',
+    'the whole decision of a run held while its step runs, once a pass has read where the run it names stands, of one waiting --after another, alone and with a hold beside, and of one held until a run that was cancelled',
     async (sub) => {
       const parent = await aRunning(b, repo);
       const cancelled = await aRunning(b, repo);
-      const ids = { '<parent>': parent.id, '<target>': cancelled.id, '<root>': ROOT };
-      const place = stage.place().place;
       const going = await aRunning(b, repo);
       await stage.runWith(b.e, hold(going.id, [cancelled.id]));
       asOlder(going.id);
       await aPass(b.e);
-      assert.deepEqual(await decideScreen(sub, b.e, [going.id], { ...ids, '<id>': going.id }, place), [
-        '<id>  still going',
-        '',
-        '  held until <target> lands',
-        '  still running: implement',
-        '  nothing of <id> is filed, and nothing is asked of you, until nemia decide says <target> has landed; to go on before then: nemia hold <id> --off',
+      const read = await decisionOn(stage, going.id);
+      const word = (w: { word: string; advice: string; waitingOnYou: boolean } | undefined) => w && [w.word, w.advice, w.waitingOnYou];
+      assert.deepEqual('holding' in read.decision && !('waiting' in read.decision) ? word(read.decision.holding) : read.decision, [
+        `held until ${cancelled.id} lands`,
+        `nothing of ${going.id} is filed, and nothing is asked of you, until nemia decide says ${cancelled.id} has landed; to go on before then: nemia hold ${going.id} --off`,
+        false,
       ]);
+      assert.deepEqual(read.decided?.decision, { kind: 'running', waiting: ['implement'] }, 'what still runs');
       const child = await aStarted(repo, 'after the parent', oneStep(), { after: [parent.id] });
-      assert.deepEqual(await decideScreen(sub, b.e, [child.id], { ...ids, '<id>': child.id }, place), [
-        '<id>  after the parent',
-        '',
-        '  waiting on <parent>',
-        '  nothing of <id> is filed until nemia decide says <parent> has landed on main; nothing to decide yet',
-      ]);
+      const waiting = [
+        `waiting on ${parent.id}`,
+        `nothing of ${child.id} is filed until nemia decide says ${parent.id} has landed on main; nothing to decide yet`,
+        false,
+      ];
+      const alone = await decision(child.id);
+      assert.deepEqual(['waiting' in alone ? word(alone.waiting) : alone, 'holding' in alone], [waiting, false]);
       await stage.runWith(b.e, hold(child.id, [cancelled.id]));
       asOlder(child.id);
-      assert.deepEqual(await decideScreen(sub, b.e, [child.id], { ...ids, '<id>': child.id }, place), [
-        '<id>  after the parent',
-        '',
-        '  waiting on <parent>',
-        '  nothing of <id> is filed until nemia decide says <parent> has landed on main; nothing to decide yet',
-        '  held until <target> lands as well — nemia hold <id> --off lifts the hold, and not the wait above',
-      ]);
+      const beside = await decision(child.id);
+      assert.deepEqual(
+        ['waiting' in beside ? word(beside.waiting) : beside, 'holding' in beside ? beside.holding?.word : null],
+        [waiting, `held until ${cancelled.id} lands`],
+        'the wait, and the hold beside it',
+      );
+      assert.equal('holding' in beside ? beside.holding?.waitingOnYou : true, false, 'a hold on a run still going is on nobody');
       const worded = await aStarted(repo, 'after the parent, held with words', oneStep(), { after: [parent.id] });
       await said(sub, 'hold', worded.id, '--until', target.id, ...why);
-      assert.match(
-        await said(sub, 'decide', worded.id),
-        new RegExp(`\n  ${literal(words)} as well — nemia hold ${worded.id} --off lifts the hold, and not the wait above$`),
-      );
+      const wordedHeld = await decision(worded.id);
+      assert.deepEqual(['waiting' in wordedHeld, 'holding' in wordedHeld ? wordedHeld.holding?.word : null], [true, words]);
       await said(sub, 'cancel', cancelled.id);
       const at = runRecord(ROOT, cancelled.id).cancelledAt!;
-      assert.deepEqual(await decideScreen(sub, b.e, [child.id], { ...ids, '<id>': child.id, '<at>': at }, place), [
-        '<id>  after the parent',
-        '',
-        '  waiting on <parent>',
-        '  nothing of <id> is filed until nemia decide says <parent> has landed on main; nothing to decide yet',
-        '  held until <target> (cancelled) lands as well — <target> was cancelled at <at>, and a cancelled run never lands — yours to resolve: nemia hold <id> --off, or nemia cancel <id>',
-      ]);
-      assert.deepEqual(await decideScreen(sub, b.e, [cancelled.id], { ...ids, '<at>': at }, place), [
-        '<target>  still going',
-        '',
-        '  cancelled at <at> — nothing to decide',
-      ]);
+      const resolve = await decision(child.id);
+      assert.deepEqual(
+        ['waiting' in resolve ? word(resolve.waiting) : resolve, 'holding' in resolve ? word(resolve.holding) : null],
+        [
+          waiting,
+          [
+            `held until ${cancelled.id} (cancelled) lands`,
+            `${cancelled.id} was cancelled at ${at}, and a cancelled run never lands — yours to resolve: nemia hold ${child.id} --off, or nemia cancel ${child.id}`,
+            true,
+          ],
+        ],
+      );
+      assert.deepEqual(await decision(cancelled.id), { nothing: `cancelled at ${at} — nothing to decide` });
     },
   );
   await s.test('the tick lifts the hold on the pass that reads the run it names landed, and the run goes on on that pass', async () => {
@@ -577,16 +593,16 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     assert.match(await said(sub, 'ls', id), /waiting on you/);
     assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
   });
-  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async (sub) => {
-    const printed = await said(sub, 'hold', id, '--why', why);
-    assert.ok(printed.startsWith(`${id}  ${words}`), printed);
-    assert.match(printed, new RegExp(`nemia hold ${id} --off`), 'it says how to lift it');
+  await s.test('`nemia hold <run> --why` with no --until holds it, and writes a hold that names no run', async () => {
+    const put = await holdTyped(id, '--why', why);
+    assert.deepEqual([put.hold.until, put.hold.why], [[], why], 'held until a person lifts it, and why');
     assert.deepEqual((JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { until: unknown }).until, []);
   });
-  await s.test('`nemia decide`, `nemia ls` and the summary say it is held and why, and ask nothing', async (sub) => {
+  await s.test('the decision, `nemia ls` and the summary say it is held and why, and ask nothing', async (sub) => {
     await aPass(b.e);
-    const screen = (await decideScreen(sub, b.e, [id], { '<id>': id })).join('\n');
-    assert.match(screen, new RegExp(`\n  ${literal(words)}\n`), screen);
+    const held = await decision(id);
+    const screen = JSON.stringify(held);
+    assert.equal('holding' in held ? held.holding?.word : screen, words);
     assert.doesNotMatch(screen, /waiting on you|How is the card cut\?/, screen);
     assert.doesNotMatch(screen, VERBS, screen);
     const ls = await said(sub, 'ls', id);
@@ -612,7 +628,13 @@ test('a run held until a person lifts it: no run named, nothing asked nor filed 
     await said(sub, 'hold', id, '--off');
     await tick(b, id);
     await aPass(b.e);
-    assert.match((await decideScreen(sub, b.e, [id], { '<id>': id })).join('\n'), /How is the card cut\?/);
+    const lifted = await decidedOn(stage, id);
+    assert.deepEqual(
+      lifted.decision.kind === 'awaiting' ? lifted.decision.awaitingAnswer : lifted.decision,
+      ['plan'],
+      'the run awaits the answer to its questions again',
+    );
+    assert.match(JSON.stringify(lifted.closeouts.plan), /How is the card cut\?/, 'its question is on the step it asks of');
     assert.deepEqual((await summaryOf(id)).waitingOnYou, ['plan']);
   });
   await s.test('a folder run takes a hold that names no run, and --off lifts it', async (sub) => {
@@ -942,15 +964,6 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   );
 });
 
-/**
- * A screen with the times its timeline lines read off the stand-in's clock put back as `<t>`, and their durations as `<d>`: when a
- * test ran is no fact of the screen.
- */
-const untimed = (lines: string[]): string[] =>
-  lines.map((l) => (/^ *timeline {2}/.test(l) ? l.replace(/\d\d:\d\d:\d\dZ/g, '<t>').replace(/\b\d+(m\d+)?s\b/g, '<d>') : l));
-const TRIED = '    timeline  try 1  filed <t>  spawned <t>  ended <t>  queued <d>  ran <d>  used not measured';
-const RAN = '  timeline  run  queued <d>  ran <d>  wall <d>';
-
 /** A loop run on `b` whose review asked for another round on the last one its `rounds:` allows. */
 async function outOfRounds(b: Board, repo = aRepo()) {
   const loop = await aStarted(repo, 'a loop', looping());
@@ -966,65 +979,64 @@ async function outOfRounds(b: Board, repo = aRepo()) {
   return loop;
 }
 
-test('the whole screen of a loop out of rounds, once a pass has read where its branch stands, and of the round a person asks for', async (t) => {
+/**
+ * What a decision says of each step that a person reads beside it: its closeout's summary and output, what its session used, and how many
+ * tries it has on the clock.
+ */
+const stepsSaid = (decided: Awaited<ReturnType<typeof decidedOn>>, d: { used: Record<string, { used: string; cost: string }> }) =>
+  Object.fromEntries(
+    ['implement', 'review'].map((name) => {
+      const c = decided.closeouts[name];
+      const said = c && !('error' in c) ? [c.summary, c.output ?? {}] : c;
+      return [name, [said, d.used[name]?.used, d.used[name]?.cost, decided.timeline.steps[name]?.length]];
+    }),
+  );
+
+test('the whole decision of a loop out of rounds, once a pass has read where its branch stands, and of the round a person asks for', async () => {
   const b = stage.board();
   const loop = await outOfRounds(b);
   await aPass(b.e);
-  const place = stage.place().place;
+  const repo = runRecord(ROOT, loop.id).repo!;
+  const read = await decisionOn(stage, loop.id);
+  const decided = read.decided!;
+  const d = read.decision;
+  assert.ok('touched' in d && decided.decision.kind === 'awaiting', JSON.stringify(d));
+  assert.deepEqual([decided.decision.unverified, decided.decision.exhausted], [['implement'], ['review']]);
+  assert.deepEqual(decided.offers, [
+    `review: it asked for round 2, and \`rounds: 1\` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry ${loop.id} review --round`,
+    `review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve ${loop.id} review --message "<why>"`,
+  ]);
   assert.deepEqual(
-    untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(ROOT, loop.id).repo!, '<root>': ROOT }, place)),
-    [
-      '<id>  a loop',
-      '',
-      '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
-      '  ROUNDS EXHAUSTED, waiting on you: review  — asked for another round on the last one rounds: allows; its findings are below',
-      '',
-      '  once more, on the next tick:',
-      '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry <id> review --round',
-      '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve <id> review --message "<why>"',
-      '',
-      '  touched  wf/<id>/run',
-      '    nothing — the branch changed no file against the base',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      TRIED,
-      '    did it',
-      '',
-      '  review',
-      '    used  not measured',
-      '    cost  not measured',
-      TRIED,
-      '    did it',
-      '    again: true',
-      '',
-      '  cost  run not measured',
-      RAN,
-      '',
-      '  wf/<id>/run',
-      '',
-      '  branch    wf/<id>/run is on main',
-      '',
-      '  land it   git -C <repo> merge --no-ff wf/<id>/run',
-      '  drop it   git -C <repo> branch -D wf/<id>/run',
-    ],
+    d.touched.map((x) => [x.branch, 'error' in x.radius ? x.radius.error : x.radius.changes]),
+    [[`wf/${loop.id}/run`, []]],
+    'the branch changed no file against the base',
+  );
+  assert.deepEqual([d.lesson.state, d.sensitive.map((x) => x.files)], ['nothing', [[]]]);
+  assert.deepEqual(stepsSaid(decided, d), {
+    implement: [['did it', {}], 'not measured', 'not measured', 1],
+    review: [['did it', { again: true }], 'not measured', 'not measured', 1],
+  });
+  assert.equal(d.cost, 'run not measured');
+  assert.deepEqual(
+    d.standings.map((x) => [x.where, x.said]),
+    [['on', `wf/${loop.id}/run is on main`]],
+  );
+  assert.deepEqual(
+    d.commands.filter((x) => x.label === 'land it' || x.label === 'drop it').map((x) => x.command),
+    [`git -C ${repo} merge --no-ff wf/${loop.id}/run`, `git -C ${repo} branch -D wf/${loop.id}/run`],
   );
   await stage.runWith(b.e, roundRun(loop.id, 'review'));
-  assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<root>': ROOT }, place), [
-    '<id>  a loop',
-    '',
-    '  still running: review',
-    '  review: round 2 asked (nemia retry --round) — the next tick files implement',
-    '  nothing to decide yet',
-  ]);
+  const asked = await decisionOn(stage, loop.id);
+  assert.deepEqual(asked.decision, { running: true });
+  assert.deepEqual(asked.decided?.decision, { kind: 'running', waiting: ['review'] });
+  const steps = asked.decided?.steps ?? [];
+  assert.deepEqual(
+    asked.decided?.rounding.map((r) => `${r.step}: ${roundDueNote(steps, r)}`),
+    ['review: round 2 asked (nemia retry --round) — the next tick files implement'],
+  );
 });
 
-test('the whole screen of a loop a person accepted as it stands, once a pass has read where its branch stands', async (t) => {
+test('the whole decision of a loop a person accepted as it stands, once a pass has read where its branch stands', async () => {
   const b = stage.board();
   const loop = await outOfRounds(b);
   committed(runRecord(ROOT, loop.id).steps.implement.workspace!, 'loop.ts');
@@ -1035,45 +1047,37 @@ test('the whole screen of a loop a person accepted as it stands, once a pass has
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
   await tick(b, loop.id);
   await aPass(b.e);
-  const place = stage.place().place;
+  const repo = runRecord(ROOT, loop.id).repo!;
+  const read = await decisionOn(stage, loop.id);
+  const decided = read.decided!;
+  const d = read.decision;
+  assert.ok('touched' in d && decided.decision.kind === 'awaiting', JSON.stringify(d));
+  assert.deepEqual([decided.decision.unverified, decided.decision.exhausted], [['implement', 'review'], []]);
   assert.deepEqual(
-    untimed(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': runRecord(ROOT, loop.id).repo!, '<root>': ROOT }, place)),
-    [
-      '<id>  a loop',
-      '',
-      '  UNVERIFIED: implement, review  — no check: declared; only its own word says it worked',
-      '',
-      '  touched  wf/<id>/run',
-      '    (root)  1 file   +1 −0',
-      '  lesson  nothing written where the next agent reads',
-      '',
-      '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-      '  none',
-      '',
-      '  implement',
-      '    used  not measured',
-      '    cost  not measured',
-      TRIED,
-      '    did it',
-      '',
-      '  review',
-      '    accepted  accepted as it stands 08:00Z, its findings open — "as it stands"',
-      '    used  not measured',
-      '    cost  not measured',
-      TRIED,
-      '    did it',
-      '    again: true',
-      '',
-      '  cost  run not measured',
-      RAN,
-      '',
-      '  wf/<id>/run  — 1 file: +1 −0',
-      '',
-      '  branch    wf/<id>/run is ahead of main by 1 commit',
-      '',
-      '  land it   git -C <repo> merge --no-ff wf/<id>/run',
-      '  drop it   git -C <repo> branch -D wf/<id>/run',
-    ],
+    d.touched.map((x) => [
+      x.branch,
+      'error' in x.radius ? x.radius.error : x.radius.groups.map((g) => [g.name, g.files, g.added, g.removed]),
+    ]),
+    [[`wf/${loop.id}/run`, [['(root)', 1, 1, 0]]]],
+  );
+  assert.deepEqual([d.lesson.state, d.sensitive.map((x) => x.files)], ['nothing', [[]]]);
+  assert.deepEqual(decided.accepted, { review: 'accepted as it stands 08:00Z, its findings open — "as it stands"' });
+  assert.deepEqual(stepsSaid(decided, d), {
+    implement: [['did it', {}], 'not measured', 'not measured', 1],
+    review: [['did it', { again: true }], 'not measured', 'not measured', 1],
+  });
+  assert.equal(d.cost, 'run not measured');
+  assert.deepEqual(
+    read.results.map((r) => [r.branch, 'error' in r.radius ? r.radius.error : countsLine(r.radius)]),
+    [[`wf/${loop.id}/run`, '1 file: +1 −0']],
+  );
+  assert.deepEqual(
+    d.standings.map((x) => [x.where, x.said]),
+    [['ahead', `wf/${loop.id}/run is ahead of main by 1 commit`]],
+  );
+  assert.deepEqual(
+    d.commands.filter((x) => x.label === 'land it' || x.label === 'drop it').map((x) => x.command),
+    [`git -C ${repo} merge --no-ff wf/${loop.id}/run`, `git -C ${repo} branch -D wf/${loop.id}/run`],
   );
 });
 

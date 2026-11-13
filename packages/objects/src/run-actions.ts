@@ -13,6 +13,7 @@
 import { Schema } from 'effect';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
+import { Paused } from './server-api.ts';
 import { RETRY_MODES, SAID_AFTER } from './words.ts';
 
 /** Strings, given many times. */
@@ -25,12 +26,36 @@ const NotBlank = Schema.String.check(Schema.makeFilter((text: string) => text.tr
 const Answers = Schema.Array(Schema.Struct({ question: Schema.String, chose: Strings, own: Schema.optionalKey(Schema.String) }));
 
 /**
+ * A file handed to a run's steps (`nemia start --input <file>`), read where the start is typed and sent by its name, never its path: its
+ * `text` where its bytes are UTF-8 text, else its bytes in `base64` (a picture); one of the two. Its name is a file's own, no folder in it.
+ */
+export const RunInput = Schema.Struct({
+  name: NotBlank,
+  text: Schema.optionalKey(Schema.String),
+  base64: Schema.optionalKey(Schema.String),
+}).annotate({ identifier: 'RunInput' });
+export type RunInput = typeof RunInput.Type;
+
+/**
+ * What a start takes beside its workflow and brief, a brief's and a card's alike: each step's model for this run alone (`models`, step
+ * to model, as `--model <step>=<model>` gives it), the steps gated (`gates`), a run with no worktree of its own (`noWorktree`), and the
+ * files handed to its steps (`inputs`).
+ */
+export const startExtras = {
+  models: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  gates: Schema.optionalKey(Schema.Array(NotBlank)),
+  noWorktree: Schema.optionalKey(Schema.Boolean),
+  inputs: Schema.optionalKey(Schema.Array(RunInput)),
+};
+
+/**
  * A run started, as `nemia start` starts one: the workflow, where it is read from when both the repository and your library have it,
- * the runs it waits on (`after`) and is handed as context (`context`), the inbox cards it is handed by name (`cards`), its brief, and the
- * labels it is started with (`key=value`).
+ * the runs it waits on (`after`) and is handed as context (`context`), the inbox cards it is handed by name (`cards`), its brief, the
+ * labels it is started with (`key=value`), and what `startExtras` adds.
  * An inbox card is started at its own path (`CardStart`): a `card` sent here is refused, its message naming that path.
  */
 export const RunStart = Schema.Struct({
+  ...startExtras,
   workflow: NotBlank,
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
   after: Schema.optionalKey(Schema.Array(NotBlank)),
@@ -46,9 +71,77 @@ export const RunStart = Schema.Struct({
 }).annotate({ identifier: 'RunStart' });
 export type RunStart = typeof RunStart.Type;
 
-/** What a start answers: the run's name. */
-export const RunStarted = Schema.Struct({ id: Schema.String }).annotate({ identifier: 'RunStarted' });
+/** A folder of a run's factory and the steps that write it: each other local step reads it alone. */
+const WrittenBy = Schema.Struct({ path: Schema.String, steps: Strings });
+
+/** A folder a run copied files into: the files by name, and the folder. */
+const CopiedInto = Schema.Struct({ names: Strings, dir: Schema.String });
+
+/**
+ * A run as it was started, what `nemia start` prints of it: its steps, each with the agent it is filed with; the inbox card it came from
+ * (`from`); its factory; its repository, and whether it works in one (`repository`: a folder run's steps work in a folder each); its
+ * workflow's name; the factory's folders it mounts read-only (`mounts`) and those some steps write (`writable`); its volumes, read-only
+ * (`volumes`) and writable (`writableVolumes`); the harness settings it froze (`settings`); where it works (`workspace`); the inputs and
+ * cards it copied, and where its workflow's and carried files were copied; the runs it waits on to land on its `branch` (`after`) and is
+ * handed as context (`context`); the steps gated (`gated`) and the endings a person approves first (`ends`); each step's model for it
+ * alone (`models`); its labels, and each key it did not inherit since the runs it names disagree on it (`labelsLeftOut`).
+ */
+export const RunStartedFacts = Schema.Struct({
+  steps: Schema.Array(Schema.Struct({ name: Schema.String, agent: Schema.optionalKey(Schema.String) })),
+  from: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  repo: Schema.String,
+  repository: Schema.Boolean,
+  workflow: Schema.String,
+  mounts: Schema.optionalKey(Strings),
+  writable: Schema.optionalKey(Schema.Array(WrittenBy)),
+  volumes: Schema.optionalKey(Strings),
+  writableVolumes: Schema.optionalKey(Schema.Array(WrittenBy)),
+  settings: Schema.optionalKey(Strings),
+  workspace: Schema.String,
+  inputs: Schema.optionalKey(CopiedInto),
+  cards: Schema.optionalKey(CopiedInto),
+  workflowFiles: Schema.optionalKey(Schema.String),
+  carriedFiles: Schema.optionalKey(Schema.String),
+  after: Schema.optionalKey(Strings),
+  branch: Schema.String,
+  context: Schema.optionalKey(Strings),
+  gated: Schema.optionalKey(Strings),
+  ends: Schema.optionalKey(Strings),
+  models: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  labelsLeftOut: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })) })),
+  ),
+}).annotate({ identifier: 'RunStartedFacts' });
+export type RunStartedFacts = typeof RunStartedFacts.Type;
+
+/**
+ * What a start answers: the run's name; and what `nemia start` prints of it, where the api says it: the run as it was started (`run`),
+ * the store's pause as it stood once the run was written (`paused`), the runs handed as context that had landed (`landed`), a line for
+ * each file of its folder that still writes a former spelling (`hints`), the factory's repositories and volumes left out of its mounts,
+ * being no directory (`notMounted`, `notVolumes`), and the `?repo=` that only found the factory, its wiring placing the run on another
+ * (`repoFoundFactory`). Of an inbox card's start, the card, why its `queued:` line is still on it (`queueLeft`), and a `repo:` the start
+ * did not take (`ignoredRepo`).
+ */
+export const RunStarted = Schema.Struct({
+  id: Schema.String,
+  card: Schema.optionalKey(Schema.String),
+  queueLeft: Schema.optionalKey(Schema.String),
+  ignoredRepo: Schema.optionalKey(Schema.String),
+  paused: Schema.optionalKey(Paused),
+  landed: Schema.optionalKey(Strings),
+  hints: Schema.optionalKey(Strings),
+  notMounted: Schema.optionalKey(Strings),
+  notVolumes: Schema.optionalKey(Strings),
+  repoFoundFactory: Schema.optionalKey(Schema.String),
+  run: Schema.optionalKey(RunStartedFacts),
+}).annotate({ identifier: 'RunStarted' });
 export type RunStarted = typeof RunStarted.Type;
+
+/** What an inbox card's start answers (the Card's `start`): what a start answers (`RunStarted`), the card's name always among it. */
+export const CardStarted = Schema.Struct({ ...RunStarted.fields, card: Schema.String }).annotate({ identifier: 'CardStarted' });
+export type CardStarted = typeof CardStarted.Type;
 
 /**
  * The ways a try is asked for, and the former spelling the api still takes and answers with a `hint` (`nudge`, now `continue`): the
@@ -80,6 +173,7 @@ export const RunAsked = Schema.Struct({
   stopFirst: Schema.optionalKey(Schema.Boolean),
   step: Schema.optionalKey(Schema.String),
   round: Schema.optionalKey(Schema.Finite),
+  budget: Schema.optionalKey(Schema.Finite),
   hint: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunAsked' });
 export type RunAsked = typeof RunAsked.Type;
@@ -92,13 +186,22 @@ export const RunApprove = Schema.Struct({
 }).annotate({ identifier: 'RunApprove' });
 export type RunApprove = typeof RunApprove.Type;
 
-/** What an approval answers: the step, the try approved, when, the words, and the approval's file. */
+/**
+ * What an approval answers: the step, the try approved, when, the words, and the approval's file; and, as `nemia approve` prints it,
+ * whether it ended a loop out of rounds (`loop`), what the next tick files because of it (`next`), and each cap it set (`caps`), above
+ * the step's own budget in the workflow or not.
+ */
 export const RunApproved = Schema.Struct({
   step: Schema.String,
   try: Schema.Finite,
   at: Schema.String,
   message: Schema.NullOr(Schema.String),
   file: Schema.String,
+  loop: Schema.optionalKey(Schema.Boolean),
+  next: Schema.optionalKey(Schema.Literals(['step', 'waiting', 'nothing'])),
+  caps: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ step: Schema.String, usd: Schema.Finite, above: Schema.Boolean, workflow: Schema.NullOr(Schema.Finite) })),
+  ),
 }).annotate({ identifier: 'RunApproved' });
 export type RunApproved = typeof RunApproved.Type;
 
@@ -125,6 +228,8 @@ export const RunSaid = Schema.Struct({
   kept: Schema.optionalKey(Schema.Literal(true)),
   from: Schema.optionalKey(ChatSpeaker),
   words: Schema.optionalKey(Schema.String),
+  try: Schema.optionalKey(Schema.Finite),
+  taskId: Schema.optionalKey(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: 'RunSaid' });
 export type RunSaid = typeof RunSaid.Type;
 
@@ -147,6 +252,7 @@ export const RunRefreshed = Schema.Struct({
   sha: Schema.optionalKey(Schema.String),
   round: Schema.optionalKey(Schema.Finite),
   file: Schema.optionalKey(Schema.String),
+  said: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunRefreshed' });
 export type RunRefreshed = typeof RunRefreshed.Type;
 
@@ -222,18 +328,50 @@ const EngineForgetting = Schema.Struct({
   marker: Schema.optionalKey(Schema.String),
 });
 
-/** What a removal answers: the run, that it was removed, and what the engine forgot of its tasks (null with none). */
+/**
+ * Why a run's branch was deleted or kept by its removal: merged into its base, or not and forced, deleted; kept, unasked (`default`), not
+ * merged (`unmerged`), git's refusal in its words (`git`), or the place's remove unanswered (`unread`).
+ */
+export const BranchWhy = Schema.Union([
+  Schema.Literals(['merged', 'forced', 'default', 'unmerged']),
+  Schema.Struct({ git: Schema.String }),
+  Schema.Struct({ unread: Schema.String }),
+]);
+export type BranchWhy = typeof BranchWhy.Type;
+
+/**
+ * What a removal answers: the run, that it was removed, what the engine forgot of its tasks (null with none); and what `nemia rm` prints
+ * of it: the worktrees removed (`worktrees`), what each held uncommitted, committed first (`handedOff`), those already gone (`gone`), the
+ * files removed, the record first (`files`), what became of each branch and why (`branches`), its base branch and repository, whether it
+ * cut worktrees (`isolate`), whether it was a folder run (`folder`), and why its unfrozen workflow did not read (`unfrozen`).
+ */
 export const RunRemoved = Schema.Struct({
   id: Schema.String,
   removed: Schema.Boolean,
   engine: Schema.NullOr(EngineForgetting),
+  worktrees: Schema.optionalKey(Strings),
+  handedOff: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ step: Schema.String, branch: Schema.optionalKey(Schema.String), commit: Schema.String })),
+  ),
+  gone: Schema.optionalKey(Strings),
+  files: Schema.optionalKey(Strings),
+  branches: Schema.optionalKey(Schema.Array(Schema.Struct({ branch: Schema.String, deleted: Schema.Boolean, why: BranchWhy }))),
+  base: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  isolate: Schema.optionalKey(Schema.Boolean),
+  folder: Schema.optionalKey(Schema.Literal(true)),
+  unfrozen: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunRemoved' });
 export type RunRemoved = typeof RunRemoved.Type;
 
-/** A finished run pruned, as `nemia prune <run> --yes` prunes it: its files with `artifacts`, a run nobody merged with `unmerged`. */
+/**
+ * A finished run pruned, as `nemia prune <run> --yes` prunes it: its files with `artifacts`, a run nobody merged with `unmerged`; with
+ * `preview`, judged and listed with what it would free, and nothing removed, as `nemia prune` lists it before it asks.
+ */
 export const RunPrune = Schema.Struct({
   unmerged: Schema.optionalKey(Schema.Boolean),
   artifacts: Schema.optionalKey(Schema.Boolean),
+  preview: Schema.optionalKey(Schema.Boolean),
 }).annotate({ identifier: 'RunPrune' });
 export type RunPrune = typeof RunPrune.Type;
 
@@ -242,7 +380,8 @@ const Sized = Schema.Struct({ path: Schema.String, bytes: Schema.Finite });
 
 /**
  * What a prune answers: the run, that it was pruned, `nemia prune`'s lines, the worktrees removed, its files where removed (null where
- * not), and what was left, each with why: git's word and its fix, a folder that did not read, or the files a worktree holds.
+ * not), and what was left, each with why: git's word and its fix, a folder that did not read, or the files a worktree holds; and of a
+ * preview, the bytes a prune would free (`bytes`).
  */
 export const RunPruned = Schema.Struct({
   id: Schema.String,
@@ -257,5 +396,6 @@ export const RunPruned = Schema.Struct({
       Schema.Struct({ path: Schema.String, files: Schema.String }),
     ]),
   ),
+  bytes: Schema.optionalKey(Schema.Finite),
 }).annotate({ identifier: 'RunPruned' });
 export type RunPruned = typeof RunPruned.Type;

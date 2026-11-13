@@ -2,36 +2,19 @@
  * `nemia rm` and `nemia prune`, entries of the command table: one run forgotten (`forgetRun`), or what it left on disk pruned (`prune`);
  * the CLI's runners walk the many runs each takes.
  */
-import { refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { forgetLine, type Forgot } from './forget.ts';
+import { notForgottenLine, type Forgot } from './forget.ts';
 import { forgetRun } from './forget.verb.ts';
 import type { EngineForgetting } from './forgetting/forgetting.ts';
 import { pruneLines, type Pruning } from './prune/prune.ts';
 import { prune } from './prune/prune.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { Effect, Schema } from 'effect';
-import { RunPrune } from 'objects';
+import { PRUNE_WORDS, RM_WORDS, rmRefusal, RunPrune } from 'objects';
 import { tryOf } from '../summary/reads.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
-import type { Args } from '../command/command.ts';
-import { checked, type Command } from '../command/entry.verb.ts';
-
-/** `nemia rm`'s form, as its refusals end on it. */
-const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
-
-/**
- * Refused of `nemia rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag
- * deletes, and alone would delete nothing, silently — then a switch with no run to forget.
- */
-function rmRefusal(args: Args): string | null {
-  if (args.forceUnmerged === true && args.deleteBranches !== true)
-    return "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
-  if (args.runId === undefined && args.deleteBranches === true)
-    return 'nemia rm takes the runs to forget, by id: nemia rm <runId> [<runId> ...] — nemia ls lists them.';
-  return null;
-}
+import { checked, type Served } from '../command/entry.verb.ts';
 
 /**
  * What `nemia rm` takes of one run: the run, its two switches, and the two the api sets: `onlyTry`, removing a try alone — a run started
@@ -64,30 +47,11 @@ const tryAlone = Effect.fnUntraced(function* (runId: string, home: string) {
 
 /** What removed nothing, as a refusal: refused or held, a `Conflict` in `forget`'s words; a record gone since, `Missing`; else none. */
 export const forgetRefusal = (forgot: Forgot): Conflict | Missing | null => {
-  if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
-  if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });
-  return forgot.kind === 'missing' ? new Missing({ message: forgetLine(forgot) }) : null;
-};
-
-/**
- * What the api answers of a run it removed (`runs.delete`: a try alone, its id, whether it was removed, and what the engine did with its
- * tasks), as `nemia rm` prints it: forgotten as a folder run is, which a try is, with no worktree or branch to say anything of.
- */
-const forgotThere = (answer: unknown): { id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot } => {
-  const { id, removed, engine } = answer as { id: string; removed: boolean; engine: EngineForgetting | null };
-  const forgot: Forgot = {
-    id,
-    kind: removed ? 'forgotten' : 'held',
-    folder: true,
-    removed: [],
-    handedOff: [],
-    gone: [],
-    left: [],
-    branches: [],
-    files: [],
-    ...(engine === null ? {} : { engine }),
-  };
-  return { id, removed, engine, forgot };
+  const { kind } = forgot;
+  if (kind === 'forgotten') return null;
+  const message = notForgottenLine({ ...forgot, kind });
+  if (kind === 'missing') return new Missing({ message });
+  return new Conflict({ message: kind === 'refused' ? (forgot.refusal ?? message) : message });
 };
 
 /**
@@ -95,40 +59,8 @@ const forgotThere = (answer: unknown): { id: string; removed: boolean; engine: E
  * tasks on the engine (`engine`, null where nothing was removed). The api removes a try alone (`onlyTry`), and a run only once it is gone
  * (`refuses`): what `forget` refused, or held, is a `Conflict` in its words, and a run gone since a `Missing`.
  */
-export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }, RmInput> = {
-  name: 'rm',
-  served: [
-    {
-      endpoint: 'runs.delete',
-      request: refusing('rm', ['deleteBranches', 'forceUnmerged'], renamed({ runId: 'name' }, ['onlyTry', 'refuses'])),
-      answer: forgotThere,
-    },
-  ],
-  usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
-  help: [
-    "forget runs that are over, a line each: a run's worktrees removed",
-    'through git, what one held uncommitted committed first, then its',
-    'record and every file under WF_ROOT keyed by its id. Refused while',
-    'a task of it is in flight, anything is due to be filed or asked',
-    'for, or a run waiting on it has not started. Its branches are kept:',
-    "--delete-branches deletes those merged into the run's base branch,",
-    'and --force-unmerged beside it the others, with their work. Then',
-    "the engine forgets the run's tasks: their journals and session",
-    'files; one not settled yet is forgotten by the next passes',
-  ],
-  spec: {
-    positionals: [{ key: 'runId', takes: 'many', kind: 'name' }],
-    flags: [
-      { flag: '--delete-branches', kind: 'switch', key: 'deleteBranches' },
-      { flag: '--force-unmerged', kind: 'switch', key: 'forceUnmerged' },
-    ],
-    unknown: (arg) =>
-      `nemia rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`,
-  },
-  check: rmRefusal,
-  writes: true,
-  class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the Run's `delete` of `objects`' Api, calling this handler, a try alone" },
+export const RM: Served<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }, RmInput> = {
+  ...RM_WORDS,
   input: RmInput,
   handler: Effect.fnUntraced(function* (input: RmInput) {
     const home = yield* StoreRoot;
@@ -143,7 +75,6 @@ export const RM: Command<{ id: string; removed: boolean; engine: EngineForgettin
     if (refused) return yield* Effect.fail(refused);
     return { id: forgot.id, removed: forgot.kind === 'forgotten', engine: forgot.engine ?? null, forgot };
   }),
-  print: ({ forgot }) => [forgetLine(forgot)],
 };
 
 /**
@@ -168,7 +99,7 @@ export const pruneRefusal = (pruning: Pruning): Conflict | null => {
  * `nemia prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes`
  * does, with `refuses`: what `prune` refused, or found nothing to prune of, is a `Conflict` there, in its words.
  */
-export const PRUNE: Command<
+export const PRUNE: Served<
   {
     id: string;
     pruned: boolean;
@@ -180,36 +111,7 @@ export const PRUNE: Command<
   },
   PruneInput
 > = {
-  name: 'prune',
-  served: [{ endpoint: 'runs.prune', request: renamed({ runId: 'name' }, ['yes', 'refuses']) }],
-  usage: '[<runId> ...] [--unmerged] [--artifacts] [--yes]',
-  help: [
-    'free the space runs that are over hold: their worktrees, removed',
-    "through git, and nothing else — each run's record, branches and",
-    'files are kept, and it stays on nemia ls, nemia decide and the board,',
-    'marked pruned. --artifacts removes its files too (runs/<id>/',
-    'artifacts/: screenshots, logs), of a run whose worktrees are',
-    'already gone as well; its record and branches are still kept.',
-    'Lists what it would remove, with its size, and removes it on',
-    '--yes, or on y at the prompt. With no run, every run. Refused',
-    'while a run is not over, owes a hand-off, is a folder run, or has',
-    'a worktree held, on no branch, or with changes no commit has;',
-    'and a finished run not merged unless --unmerged, with --artifacts',
-    'as without: its files are what a person reads to decide it',
-  ],
-  spec: {
-    positionals: [{ key: 'runId', takes: 'many', kind: 'name' }],
-    flags: [
-      { flag: '--unmerged', kind: 'switch', key: 'unmerged' },
-      { flag: '--artifacts', kind: 'switch', key: 'artifacts' },
-      { flag: '--yes', kind: 'switch', key: 'yes' },
-    ],
-    unknown: (arg) =>
-      `nemia prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
-  },
-  writes: true,
-  class: 'ask',
-  only: { side: 'cli', why: "the api serves it as the Run's `prune` of `objects`' Api, calling this handler" },
+  ...PRUNE_WORDS,
   input: PruneInput,
   handler: Effect.fnUntraced(function* (input: PruneInput) {
     const p: Pruning = yield* prune(input.runId, {
@@ -222,5 +124,4 @@ export const PRUNE: Command<
     const { id, worktrees, left } = p;
     return { id, pruned: p.kind === 'pruned', lines: pruneLines(p), worktrees, artifacts: p.artifacts ?? null, left, pruning: p };
   }),
-  print: ({ lines }) => lines,
 };

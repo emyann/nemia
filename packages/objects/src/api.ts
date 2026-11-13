@@ -39,7 +39,7 @@
  */
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
-import { Card, CardFile, CardList, CardStart, CardWrite } from './card.ts';
+import { Card, CardFile, CardList, CardQueue, CardStart, CardWrite } from './card.ts';
 import { Table } from './table.ts';
 import {
   Factory,
@@ -98,6 +98,7 @@ import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
+import { CardStarted } from './run-actions.ts';
 import { StepsGroup } from './step-api.ts';
 import { NemiaGroup } from './nemia-api.ts';
 import { Subscription, SubscriptionList } from './subscription.ts';
@@ -227,13 +228,12 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.post('start', '/api/namespaces/:namespace/cards/:name/start', {
     params: cardParams,
     payload: CardStart,
-    success: Schema.Struct({ id: Schema.String, card: Schema.String, ignoredRepo: Schema.optionalKey(Schema.String) }).pipe(
-      Schema.annotate({ httpApiStatus: 201 }),
-    ),
+    success: CardStarted.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: cardErrors,
   }),
   HttpApiEndpoint.post('queue', '/api/namespaces/:namespace/cards/:name/queue', {
     params: cardParams,
+    query: CardQueue,
     success: CardObject,
     error: cardErrors,
   }),
@@ -532,6 +532,12 @@ const instructionsQuery = { repo: Schema.optionalKey(Schema.String) };
 const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
 
 /**
+ * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one a factory works on, or a
+ * folder under one, read as that repository; none where none is named, yours and the builtins alone.
+ */
+const repoQuery = { repo: Schema.optionalKey(Schema.String) };
+
+/**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
  * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
  * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
@@ -563,7 +569,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/workflows/:name', {
     params: cardParams,
-    query: removeQuery,
+    query: { ...removeQuery, ...repoQuery },
     success: WorkflowObject,
     error: definitionErrors,
   }),
@@ -586,7 +592,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
 export class AgentsGroup extends HttpApiGroup.make('agents').add(
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/agents', {
     params: namespaceParams,
-    query: { ...listQuery, ...originQuery },
+    query: { ...listQuery, ...originQuery, ...repoQuery },
     success: AgentListOrTable,
     error: definitionErrors,
   }),
@@ -610,7 +616,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.delete('delete', '/api/namespaces/:namespace/agents/:name', {
     params: cardParams,
-    query: removeQuery,
+    query: { ...removeQuery, ...repoQuery },
     success: AgentObject,
     error: definitionErrors,
   }),
@@ -622,7 +628,7 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
   }),
   HttpApiEndpoint.get('card', '/api/namespaces/:namespace/agents/:name/card', {
     params: cardParams,
-    query: originQuery,
+    query: { ...originQuery, ...repoQuery },
     success: AgentCard,
     error: definitionErrors,
   }),

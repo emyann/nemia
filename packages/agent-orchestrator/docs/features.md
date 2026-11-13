@@ -55,10 +55,12 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
    carded, waiting in the inbox.
 4. §15 to §17, the rest of a harness's fence under its block (decision 12, after its slice 1 shipped on 2026-10-31): the runtime's
    generic `fence`, the api and the board on the block and `overridable:`, and the internal fields moved.
-5. The api-consumer intent's remaining slices, each a `build` card (`area=cli`, `initiative=api-consumer`), each closing its own api
-   gaps first and moving its verbs' words into `objects`' `COMMAND_WORDS` (slice 1, the foundation and the three writers, shipped):
-   the run's verbs; the inbox and labels; factories, policies and the rest of the three kinds; the moved reads' words; then forwarding
-   retired (`NEMIA_SERVER`, `src/command/forward.verb.ts`, `src/command/requests.verb.ts` deleted).
+
+The api-consumer intent shipped (2026-11-12): every store verb's words are `objects`' (`COMMAND_WORDS`) and its runner the client's
+(`apps/cli/src/commands/`), each linking the endpoint its runner calls, which `commandBreaks` holds (a stream, `watch`, aside); the
+run's verbs, the inbox and labels, factories, policies and the rest of the three kinds, the reads and the rest moved, and forwarding
+retired (`NEMIA_SERVER`, `src/command/forward.verb.ts`, `src/command/requests.verb.ts` deleted): a word under a remote context the
+client does not answer is refused, and `template export --factory` reads the factory through the api.
 
 A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
 4c, admission), the second item until 2026-10-24, is closed as decided that day (language work, decision 6): a try stays the
@@ -1882,9 +1884,10 @@ it by hand left git's worktree list stale and a record pointing at nothing.
 
 What was built:
 
-- **`wf rm <runId> [<runId> ...]`**, each run judged on its own, one line each (`forgetLine`). A run refused, or held by a worktree git
-  would not remove, makes the verb exit 2 once every run has had its line. The CLI refuses `--force-unmerged` without `--delete-branches`,
-  a flag it does not take, and flags with no run, before any run is read.
+- **`wf rm <runId> [<runId> ...]`**, each run judged on its own, one line each (a run forgotten worded by the client's `forgottenLine`,
+  one not forgotten by `notForgottenLine`). A run refused, or held by a worktree git would not remove, makes the verb exit 2 once every
+  run has had its line. The CLI refuses `--force-unmerged` without `--delete-branches`, a flag it does not take, and flags with no run,
+  before any run is read.
 - **The pure part, in forget/forget.ts.** `forgetRefusal` names every reason at once, each with what to do. It refuses a task in flight (a step or its
   check, pending or running), anything a pass would file (a step ready, a check, try or round due, roots waiting on runs), an ask no pass
   has spent, and a run another run waits on and has not started on (`gated`), naming the runs it would strand. The last two apply to a run
@@ -1956,7 +1959,7 @@ What was measured:
   started, were cancelled or wait on another; every reason at once; a record whose folder does not read; `parseWorktrees` and
   `runWorktrees` against the repository, a longer id's directory and the run's own, with `HEAD` and `detached`; `heldWorktree`;
   `branchFates`; `checkLogsOf`, sparing a stored run whose id the given one starts with; `idRefusal`, an id with a file's suffix told the id;
-  `forgetLine`'s words, for a detached worktree and a hand-off refused too.
+  `notForgottenLine`'s words, for a detached worktree and a hand-off refused too.
 - `test/store.test.ts` (14 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
   last pass committed on its branch and nothing git ignores, a link in `node_modules` not followed, the record and every file under its id
   removed, another run's check log left, the board untouched, and a second `wf rm` saying `no such run`, exit 0. Four refusals in one `wf rm`
@@ -2626,8 +2629,8 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
   class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
   *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
-  make it prompt; `none` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
-  (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
+  make it prompt; `none` and api-only entries are left out. The verb the api serves beside the table (`decide`, which the client
+  prints) is said once, in `CLI_VERBS` (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
   table, naming the command that regenerates it:
   `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
 - **Her skills**: `bring-what-waits` replaced bring-a-gate, with a section for each of what card A's admission counts as waiting on the
@@ -5918,7 +5921,7 @@ Tested in `src/watch/selector.test.ts` (each malformed form refused by name; the
 absent-key semantics; AND within and OR across; six selections a person types, each selecting different lines when one clause is
 dropped), `src/watch/cursor.store.test.ts` (the round trip, no temp left, the cut, a missing directory and a file that is no number
 refused), `src/subscription/subscription.test.ts` (the bookmark's line and its cadence), `src/command/command.test.ts` (the usage, the
-help word for word, and every refusal of what was typed), `src/cli/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
+help word for word, and every refusal of what was typed), `apps/cli/test/watch.test.ts` (a filtered watch's cursor file at the feed's end, the
 bookmark under `--json`, and a cut) and `test/watch-selectors.test.ts` (the verb typed whole: `--once` stops at the end and prints the
 cursor, a selector takes the lines it names, and a watch resumes from its cursor file).
 
@@ -5954,7 +5957,7 @@ at 3:33 AM on 2026-10-16. The conversion wakes nobody newly on them: only a wake
 Tested in `src/subscription/former-wake.test.ts` (the per-word table, the subsumption, the two shipped lists, an unknown word, and each
 retired flag's refusal), `src/feed/reason.test.ts` (the equivalence over every word the package writes, and the ⊇ over all 256 subsets),
 `src/subscription/subscription.store.test.ts` (a stored wake record read back as selectors with its file untouched, and the four records
-left out), `src/subscription/subscription.verb.test.ts`, `src/cli/watch.test.ts` (the refusals by name), and
+left out), `src/subscription/subscription.verb.test.ts`, `apps/cli/test/watch.test.ts` (the refusals by name), and
 `src/subscription/deliver.verb.test.ts`.
 ## Shipped: the api's feed stream takes selectors and sends bookmarks (2026-10-16)
 

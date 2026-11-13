@@ -138,8 +138,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   only where the route makes no `runPlaced` read of agents or skills, which runs outside the app's runtime and reads the files.
 - **A request's factory and repository are resolved in `served`** (`placeFor`, `factory/place.ts`): a handler reads `repo` and `factory`
   off `Served`, never `?repo=` itself. A request is placed by its factory alone: one with no factory, or `default`, reads no repository
-  (yours and the builtins), but a factory's named by `?repo=`, and never the api's own, `HKB_REPO`/`repoOf` being the tick's folder
-  alone (`main.ts`). A test reads a repository through a factory it files (`addFactory`, `?factory=`), never by setting `HKB_REPO`.
+  (yours and the builtins), but a factory's named by `?repo=` — or by a folder under it, read as that repository (`holdingOf`) — and
+  never the api's own, `HKB_REPO`/`repoOf` being the tick's folder alone (`main.ts`). A test reads a repository through a factory it
+  files (`addFactory`, `?factory=`), never by setting `HKB_REPO`.
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, the package's `roster/fills.store.ts`), never by its
   name alone: the same name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.
 - **The app's layer holds the process's telemetry** (`telemetryLayer` in `liveOf`, `app.ts`), so every request says a line

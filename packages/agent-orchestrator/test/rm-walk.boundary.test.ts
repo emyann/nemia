@@ -19,7 +19,7 @@ import { runGiven, runOver } from './placed.ts';
 import { advanceRun, startRun, runWith as runEngine, gitPlaceLayer } from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
 import { LINE_NAME } from '../src/run.ts';
-import { main } from '../src/cli/main.ts';
+import { forgetTyped } from './forgetting.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-store-');
@@ -187,8 +187,6 @@ const board = () => {
 };
 
 /** What `nemia rm` says the board's `forget` did with a run's one task. */
-const FORGOT_ONE = '; the engine forgot 1 task of it (1.0 KB of journal, 2 feed lines)';
-
 /** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
@@ -219,23 +217,10 @@ const worktreesOf = (repo: string) =>
     .filter((l) => l.startsWith('worktree '))
     .map((l) => l.slice('worktree '.length));
 const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
-/** `nemia rm`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
-const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
-  try {
-    await main(['rm', ...args], e, undefined, undefined, ENV);
-    return { printed, error: undefined };
-  } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number } };
-  } finally {
-    log.mock.restore();
-  }
-};
+/** `nemia rm`, as the client runs it over the api, a run at a time on the entry's handler: the lines it printed, and its error. */
+const rmTyped = (_t: TestContext, e: Engine, ...args: string[]) => forgetTyped((effect) => runWith(e, effect), ROOT, ['rm', ...args]);
 
-test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
+test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 2", async (t) => {
   const repo = anIgnoringRepo();
   const b = board();
   const run = await runPlaced(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
@@ -260,16 +245,37 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
   const filings = [...b.filings];
 
-  const { printed, error } = await rmTyped(t, b.e, run.id);
+  const { printed, forgot, error } = await rmTyped(t, b.e, run.id);
   assert.equal(error, undefined);
   const branch = `wf/${run.id}/${LINE_NAME}`;
   const commit = gitIn(repo, 'rev-parse', branch);
-  assert.deepEqual(printed, [
-    `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; ` +
-      `removed runs/${run.id}.json, runs/${run.id}.asks/, runs/${run.id}/, checks/${run.id}-implement-check.stderr, worktrees/${run.id}/; ` +
-      `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}` +
-      FORGOT_ONE,
-  ]);
+  assert.deepEqual(printed, [], 'a removal is answered as data, which the client words');
+  assert.deepEqual(
+    forgot.map((f) => [f.id, f.kind, f.removed, f.handedOff, f.gone, f.files, f.branches, f.base]),
+    [
+      [
+        run.id,
+        'forgotten',
+        [wt],
+        [{ step: 'implement', branch, commit }],
+        [],
+        [
+          `runs/${run.id}.json`,
+          `runs/${run.id}.asks/`,
+          `runs/${run.id}/`,
+          `checks/${run.id}-implement-check.stderr`,
+          `worktrees/${run.id}/`,
+        ],
+        [{ branch, deleted: false, why: 'default' }],
+        run.branch,
+      ],
+    ],
+  );
+  assert.deepEqual(
+    [forgot[0].engine?.forgotten.length, forgot[0].engine?.journalBytes, forgot[0].engine?.feedLines],
+    [1, 1024, 2],
+    'the engine forgot its 1 task, 1.0 KB of journal and 2 feed lines',
+  );
 
   assert.ok(!worktreesOf(repo).includes(wt), 'git lists the worktree no more');
   assert.ok(!fs.existsSync(wt) && !under('worktrees', run.id));
@@ -298,7 +304,7 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   );
 
   const again = await rmTyped(t, b.e, run.id);
-  assert.deepEqual([again.printed, again.error], [[`${run.id}  no such run — nothing to forget`], undefined]);
+  assert.deepEqual([again.printed, again.error?.exitCode], [[`${run.id}  no such run — nothing to forget`], 2]);
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
   fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
 });

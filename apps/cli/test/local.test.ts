@@ -1,9 +1,10 @@
 /**
  * What `nemia` does with no daemon serving its store (the intent's Q14): a moved read with the start turned off is refused, exit 2, naming
  * the command that starts one here (`nemia up`) and the one that installs the service, and never `--local`; the old path, spawned
- * directly (`captured`), still reads the store in process; the verbs that need no daemon — `version`, `service status`, `template lint`
- * — run with none and no flag; a write reaches the in-process path with its words intact, seen by what it writes into the store; and
- * `--local` is refused wherever it is typed, before the in-process parser reads the words.
+ * directly (`captured`), answers `daemon --json` from the store's lease in process, which is how the client starts one on demand; the
+ * verbs that need no daemon — `version`, `service status`, `template lint` — run with none and no flag; a write reaches the store
+ * through the daemon's api with its words intact, seen by what it writes into the store; and `--local` is refused wherever it is typed,
+ * before the in-process parser reads the words.
  * Each `nemia` is this checkout's bin, run as a child on a scratch store, waited on for its exit.
  */
 import { test } from 'node:test';
@@ -14,6 +15,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { ambient } from './ambient.ts';
 import { captured } from '../src/local.ts';
+import { servedStore } from './served.ts';
 
 const BIN = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const SCRATCH = scratch('nemia-local-');
@@ -104,12 +106,13 @@ test('with no daemon and the start off, a moved read is refused, exit 2, naming 
   assert.equal(fs.existsSync(path.join(root, 'daemon.json')), false);
 });
 
-test('the old path, spawned directly, reads the store in process, with no daemon', async () => {
-  const { root, env } = aStore('ls-local');
-  seedGated(root);
-  const { code, stdout } = await captured(['ls'], env);
+test("the old path, spawned directly, answers `daemon --json` from the store's lease in process, starting none with the start off", async () => {
+  const { root, env } = aStore('daemon-here');
+  const { code, stdout } = await captured(['daemon', '--json'], env);
   assert.equal(code, 0, stdout);
-  assert.ok(stdout.includes(GATED.id), stdout);
+  const answer: unknown = JSON.parse(stdout);
+  assert.ok(typeof answer === 'object' && answer !== null && 'url' in answer, stdout);
+  assert.equal(answer.url, null, 'no daemon serves the store');
   assert.equal(fs.existsSync(path.join(root, 'daemon.json')), false);
 });
 
@@ -127,19 +130,22 @@ test('version, service status and template lint run with no daemon and no flag',
   }
 });
 
-test('nemia approve <run> <step> reaches the in-process path with its words intact: the approval is written into the store', async () => {
-  const { root, env } = aStore('approve');
-  seedGated(root);
-  const before = fs.readdirSync(path.join(root, 'runs'));
-  const { code, stderr } = await nemia(['approve', GATED.id, GATED.step], env);
-  assert.equal(code, 0, stderr);
-  const written = fs.readdirSync(path.join(root, 'runs')).filter((name) => !before.includes(name));
-  assert.deepEqual(written, [`${GATED.id}.asks`]);
-  const asks = path.join(root, 'runs', `${GATED.id}.asks`);
-  const said = fs.statSync(asks).isDirectory()
-    ? fs.readdirSync(asks, { recursive: true, encoding: 'utf8' }).join('\n')
-    : fs.readFileSync(asks, 'utf8');
-  assert.ok(said.includes(GATED.step), said);
+test('nemia approve <run> <step> reaches the store through the api with its words intact: the approval is written into the store', async () => {
+  const store = await servedStore('nemia-local-approve-', seedGated);
+  try {
+    const before = fs.readdirSync(path.join(store.root, 'runs'));
+    const { code, err } = await store.nemia(['approve', GATED.id, GATED.step]);
+    assert.equal(code, 0, err);
+    const written = fs.readdirSync(path.join(store.root, 'runs')).filter((name) => !before.includes(name));
+    assert.deepEqual(written, [`${GATED.id}.asks`]);
+    const asks = path.join(store.root, 'runs', `${GATED.id}.asks`);
+    const said = fs.statSync(asks).isDirectory()
+      ? fs.readdirSync(asks, { recursive: true, encoding: 'utf8' }).join('\n')
+      : fs.readFileSync(asks, 'utf8');
+    assert.ok(said.includes(GATED.step), said);
+  } finally {
+    await store.stop();
+  }
 });
 
 test('--local is refused, exit 2, before the in-process parser reads the words, wherever it is typed, naming the command without it', async () => {

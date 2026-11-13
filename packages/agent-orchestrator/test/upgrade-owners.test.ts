@@ -17,7 +17,7 @@ import { readFactoryAt } from '../src/factory/factory.store.ts';
 import { readResolutions, resolutionsFile, treeDir } from '../src/factory/applied/applied.store.ts';
 import { approveProgram } from '../src/approval/approve.verb.ts';
 import { PERSON } from '../src/caller/caller.ts';
-import { main } from '../src/cli/main.ts';
+import { factoryTyped } from './factory-typed.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -25,7 +25,7 @@ const ROOT = scratch('wf-upgrade-owners-');
 const FACTORIES = path.join(ROOT, 'factories');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: factoryTyped, engineOf, env: ENV });
 const PLACE = { home: ROOT, repo: ROOT };
 
 const AGENT = 'workflows/agents/reviewer.md';

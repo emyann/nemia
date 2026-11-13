@@ -1,11 +1,13 @@
 # apps/cli — `nemia` (`wf`, its alias), a client of the api
 
-`nemia` and `wf` as a person types them: the moved reads (`READ_VERBS` in `src/route.ts`: `show`, `closeout`, `ls`, the
-inbox's read and `watch`) asked of the api serving the store over HTTP, the client's own verbs (`CLIENT_VERBS`: `get`, `apply`,
-`explain`, over every kind the api serves, `propose` and `proposals`, `decide`, `channel`, and `server`) asked of it whatever else is typed, the commands
-whose words it holds (`MOVED_COMMANDS`, `objects`' `COMMAND_WORDS`) parsed, helped and run here through the api under every context, and
-every other verb and a help of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`). `--local` is refused,
-exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
+`nemia` and `wf` as a person types them. Every store verb is a moved command: its words are `objects`' (`COMMAND_WORDS`, the names
+`MOVED_COMMANDS`), and it is parsed, helped, run and printed here through the api under every context. Its reads (`READ_VERBS` in
+`src/route.ts`: `doctor` and `daemon`) and its own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, over every kind the api serves,
+`propose` and `proposals`, `decide`, `channel` and `server`) ask the api serving the store over HTTP. A verb about this machine (`MACHINE_VERBS`) and a help
+of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`), whatever the context. Nothing is forwarded: a
+word typed under a remote context that the client does not answer and this machine does not own is refused, exit 2, naming `nemia
+--help` and `NEMIA_CONTEXT=local`. `--local` is refused, exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is
+this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
 (`src/route.ts`), a pure decision proved by its contract, each verb list spelled once there and read by the code (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
@@ -33,30 +35,30 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
   TABLE_ACCEPT` and print the `Table`'s columns of priority 0 (every one with `-o wide`, `Labels` with `--show-labels`, a column per
   `-L <key>` off each row's object), kubectl's way. The client keeps no printer of a list but the lines `nemia ls` says around
   the runs' Table, from server reads that serve no Table: the pause first, how old where the branches stand is (`Daemon.branchesLine`), a
-  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, goes to the old path on this machine's context;
-  under a remote one it is refused, exit 2, naming `nemia show <run>` (`oneRunAway`): forwarded, the old path would print the Run
-  `GET /api/runs/:name` answers with its in-process listing's printer.
+  line per schedule and the daemon's last (`src/reads/standing.ts`). `nemia ls <run>`, which no server table prints yet, reads the Run
+  `GET /api/runs/:name` answers under every context and prints it a step a line (`src/reads/run-lines.ts`).
 - **Which daemon, in `src/context.ts`**: kubectl's contexts, the client's own config (`${XDG_CONFIG_HOME:-~/.config}/nemia/config.yaml`,
   0600) written by `nemia config`, and `NEMIA_CONTEXT` for one command, judged by `contextOf` (`contracts/context.contract.ts`). Under a
-  remote context a read asks its server with its token and nothing reads this machine's store or starts a daemon; `routeOf` forwards a
-  verb about the store only the old path has (`forwarded`), and `handedOn` (`src/local.ts`) the words a moved read hands on: the old path
-  spawned with `forwardedEnv(chosen)` (`src/where.ts`, the one file that spells the store's variable), the context's server and token
-  in `NEMIA_SERVER` and `NEMIA_SERVER_TOKEN` (never on argv; the orchestrator's `FORWARD_VARIABLES`, spelled once there, since `src`
-  imports nothing of it) and no `WF_ROOT`, so it calls that daemon's endpoints and refuses in its own words a command none serves. A machine verb (`MACHINE_VERBS`:
-  `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and `template`, `frontmatter`, `admit`, which touch this
-  machine's files and no store) runs here whatever the context (`nemia upgrade` upgrades this machine's install under a remote one
-  too, then names `nemia server upgrade` on stderr, `serverHint`), but for `template export --factory`, which reads a factory from the
-  store in process: under a remote context `main` refuses it, naming `NEMIA_CONTEXT=local` (`factoryNotHere`).
+  remote context every command asks its server with its token and nothing reads this machine's store or starts a daemon; a word the
+  client does not answer and that is no verb of this machine is refused (`routeOf`'s `refused`, `stranded` in `src/main.ts`). A machine
+  verb (`MACHINE_VERBS`: `service`, `upgrade`, `up`, `tick`, `version`, `token`, `claude-token`, and `template`, `frontmatter`,
+  `admit`, which touch this machine's files and no store) runs here whatever the context. `template export --factory`, the one of them
+  that holds a store's part, reads the factory, its rules and its instruction through the api of the context in use and hands them to
+  the spawned export on stdin, `--factory-parts -` (`src/template-export.ts`).
+  `nemia upgrade` upgrades this machine's install under a remote context too, then names `nemia server upgrade` on stderr
+  (`serverHint`): the server a context names is upgraded by that verb of the client's own, through its api.
   On a store marked exposed, its own machine's reads present the token kept for `local` (`nemia config set-context local --token-file
   <file>`, `local-token` in the file, `chosenToken`).
   `ambient()` drops `NEMIA_CONTEXT` and `XDG_CONFIG_HOME`, so no test asks the daemon a person's config names.
-- **A command whose words the client holds is run under `src/commands/`** (`commanded.ts`): parsed by `objects`' `parseArgv` against
+- **A command whose words the client holds is run under `src/commands/`** (`commanded.ts`, a runner per verb under its group's folder,
+  `<group>/runners.ts`): parsed by `objects`' `parseArgv` against
   its `COMMAND_WORDS` spec, its help printed from those words, a `CommandRefused` a `Refused`, exit 2. The person's files are read here
   (`files.ts`: a folder's regular files directly in it, a link refused by name, a subfolder not read), read into the kind's spec by the
   api (`workflows.read`, `agents.read`, `skills.read`, which write nothing: the client never parses a definition's frontmatter), and
   written through `create` or `replace` in `default`, the board's one write path; on `factory`, proposed to `--factory` through the call
-  `nemia propose` makes (`proposalMade`), since a factory's own definitions change by a proposal. A command moves by joining
-  `COMMAND_WORDS`, and its old path's runner is deleted with the move.
+  `nemia propose` makes (`proposalMade`), since a factory's own definitions change by a proposal. Each links the endpoint its runner
+  calls (`served`), which the api's MCP port makes a tool of; the orchestrator's `commandBreaks` refuses one that links none, a stream
+  (`STREAM_COMMANDS`: `watch`) aside.
 - **A client and a daemon of two releases are refused** (`src/release.ts`, `releaseMet`, proved by `contracts/release.contract.ts`): the
   client's release is its install's `release.json` `tag`, the daemon's `GET /api/health`'s `release`, either null for a checkout;
   `served` refuses one that `differs`, exit 2, naming `nemia version`. One `unsaid` is let through, and the decode guards it: an answer
@@ -65,30 +67,28 @@ exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is 
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
   live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
-  (`daemon.json`), read only under this machine's context, and `forwardedEnv`, which drops `WF_ROOT` from a forwarded CLI's
-  environment. No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
+  (`daemon.json`), read only under this machine's context. No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with
   this process's stdio and environment, never imported (`binBreaches` in `packages/agent-orchestrator/test/contract.test.ts`); no
-  other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it. `agent-orchestrator` is in
-  `dependencies` for that resolve alone.
+  other file imports `node:child_process`. A daemon started on demand (`src/daemon.ts`) starts through it, spawning the old path's
+  `daemon --json`, which that CLI keeps for it; `nemia daemon` typed is a read of the client's (`src/reads/daemon.ts`, `GET
+  /api/daemon`). `agent-orchestrator` is in `dependencies` for that resolve alone.
+- **The printers are the client's alone**: each moved command prints from the api's decoded answer, its printer typed by the api's
+  Schema; no line is printed by the orchestrator for a store verb, and no test compares the two paths' lines.
 - **The feed's stream is followed under `src/watch/` alone**: no other file names `/api/feed/stream` or an `EventSource`. `nemia watch`
   prints its lines; `nemia channel` (`src/watch/channel.ts`, a verb of `CLIENT_VERBS`) pushes them into a Claude Code session as its
   notifications, a stdio MCP server Claude Code spawns. Its notifications are `objects`' Events, read off the Event list's watch
   (`?watch=true&resourceVersion=`), each by `channelNotice` (proved by `contracts/channel-notice.contract.ts`), and its Claude Code words
   (`claude/channel`, the notification's method, the instructions) stay in that file: no other file of the repository's layers says them
   (`packages/agent-orchestrator/test/words.test.ts`). Its stdout is the MCP connection: it prints nothing there but its help.
-- **The printers it still has hold parity with the in-process reads until those retire**: `nemia show`, `nemia closeout` and `nemia
-  watch`'s lines (`src/watch/lines.ts`: the feed has no server table) print what the old path prints for the same store, line for line,
-  and their tests compare the two. A change to one of those outputs on either side changes both.
 - **`nemia decide` is a verb of the client's own** (`src/objects/decide.ts`, the untangle intent's Q14): it prints the screen of the
   api's one decide read model and, at a terminal, runs the `nemia` command a person picks as this client runs it; a `git` command it
-  prints and never runs. **Every write but `apply`, the proposals' and the moved commands' stays on the old path.** The client judges nothing, and moves `nemia apply -f`
+  prints and never runs. The client judges nothing: `nemia apply -f`
   (`src/objects/apply.ts`, resource-objects' decision 5), which writes each object a file holds through the typed client as its kind
   takes it (`applyOf`, proved by `contracts/apply.contract.ts`), and `nemia propose` and `nemia proposals approve|decline`
-  (`src/objects/propose.ts`), which ask the api to make and judge a proposal; the api judges who may. A verb in neither `READ_VERBS` nor `CLIENT_VERBS` goes to the old path
-  unchanged, and a verb moves by joining one of them, whose laws say the rest. A command's name is the longest of `MOVED_COMMANDS` its words
-  open with, else its first word (`nameOf`): a moved read
-  typed with words it does not read (`inbox rm <card>`) hands them to the old path itself (`apps/cli/test/route.test.ts`).
+  (`src/objects/propose.ts`), which ask the api to make and judge a proposal; the api judges who may. A command's name is the longest of
+  `MOVED_COMMANDS` its words open with, else its first word (`nameOf`, after `objects`' `renamedIn`): `inbox add` over `inbox`, and a
+  word a command does not take refused by its words (`apps/cli/test/route.test.ts`).
 - **The client's own verbs, `get`, `apply` and `explain`, call each kind through `KIND_CALLS`** (`src/objects/kinds.ts`), a table total
   over `objects`' `KINDS`: a kind added to the package fails the typecheck here until it is mapped. Each says its own `--help`. A word names a resource by discovery (`GET /api`,
   `resourceNamed`), and `explain` reads the fields off `OpenApi.fromApi(Api)`, the document the api serves, computed here. YAML is read

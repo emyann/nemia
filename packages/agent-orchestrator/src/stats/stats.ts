@@ -8,8 +8,8 @@
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
- * `stats.verb.ts` reads the store and the engine and hands them here; `stats-words.ts` says the answer. A number with nothing measured
- * under it is `null`, never 0.
+ * `stats.verb.ts` reads the store and the engine and hands them here; the client (`apps/cli`) says the answer. A number with nothing
+ * measured under it is `null`, never 0.
  */
 import { runNamespace } from '../run-list/index.ts';
 import path from 'node:path';

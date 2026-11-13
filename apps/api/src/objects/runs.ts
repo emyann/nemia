@@ -25,6 +25,7 @@ import {
   informerMemo,
   LABEL_RUN,
   PRUNE,
+  pruningBytes,
   REFRESH,
   RETRY,
   RM,
@@ -43,6 +44,7 @@ import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type Run
 import type { Served } from '../layer.ts';
 import { workflowPageOf } from '../step/step.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
+import { forgottenOf } from './forgotten.ts';
 import { runStart } from '../runs/start.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
@@ -131,15 +133,17 @@ type At = { readonly namespace: string; readonly name: string; readonly step?: s
 /**
  * The named action `work` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace,
  * and where it has no step `at.step`), then `work`, the run taken out of the app's informer once it has run (`dropInformed`). A refusal
- * it throws is answered by its kind (`refusedAs`); a failure that is none is a `WriteFailed` in its words.
+ * it throws is answered by its kind (`refusedAs`); a failure that is none is a `WriteFailed` in its words. With `unrecorded`, a run the
+ * store has no record of is no refusal here: `work` runs all the same, and says what it found (a whole removal, which forgets what was
+ * left under the run's id).
  */
-const acted = <A>(at: At, work: (s: Served) => Promise<A>) =>
+const acted = <A>(at: At, work: (s: Served) => Promise<A>, unrecorded = false) =>
   Effect.gen(function* () {
     const s = yield* ServedNow;
     return yield* Effect.tryPromise({
       try: async () => {
-        const run = found(s.home, at.name);
-        await Effect.runPromise(runIn(run, at.namespace));
+        const run = unrecorded ? findRun(s.home, at.name) : found(s.home, at.name);
+        if (run) await Effect.runPromise(runIn(run, at.namespace));
         if (at.step !== undefined) {
           const step = taskOfStep(at.name, at.step, s.home);
           if ('error' in step) throw new Missing({ error: step.error });
@@ -170,17 +174,34 @@ const given = <K extends string, V>(key: K, value: V | undefined): Partial<Recor
  */
 const asJson = <A>(value: A): A => JSON.parse(JSON.stringify(value)) as A;
 
-/** A try removed (`nemia rm`, a try alone, its refusals thrown): what the engine forgot of it. */
-const removed = (at: At) =>
-  acted(at, async (s) => {
-    const { id, removed, engine } = await s.inRequest(RM.handler({ runId: at.name, onlyTry: true, refuses: true }));
-    return { id, removed, engine };
-  });
+/** The query of a removal: `whole`, `deleteBranches` and `forceUnmerged`, each asked where it is `true`. */
+type RemoveQuery = { readonly whole?: string; readonly deleteBranches?: string; readonly forceUnmerged?: string };
+
+/**
+ * A try removed (`nemia rm`, a try alone, its refusals thrown), or with `whole` any run as `nemia rm` removes it, its branches deleted as
+ * `deleteBranches` and `forceUnmerged` ask: what the engine forgot of it, and what was done with its worktrees, branches and files
+ * (`forgottenOf`), what `nemia rm` prints. A whole removal of a run with no record still forgets what was left under its id, and answers
+ * `Missing` in words that say what it removed (`RM`'s `forgetRefusal`).
+ */
+const removed = (at: At, query: RemoveQuery) =>
+  acted(
+    at,
+    async (s) => {
+      const branches = {
+        ...(query.deleteBranches === 'true' ? { deleteBranches: true } : {}),
+        ...(query.forceUnmerged === 'true' ? { forceUnmerged: true } : {}),
+      };
+      const asked = { runId: at.name, ...branches, ...(query.whole === 'true' ? {} : { onlyTry: true }), refuses: true };
+      const { id, removed, engine, forgot } = await s.inRequest(RM.handler(asked));
+      return { id, removed, engine, ...forgottenOf(forgot) };
+    },
+    query.whole === 'true',
+  );
 
 /** The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given. */
 const refreshed = (at: At, payload: RunRefresh) =>
   acted(at, async (s) => {
-    const { drift, step, target, onto, sha, round, file } = await s.inRequest(REFRESH.handler({ runId: at.name, ...payload }));
+    const { drift, step, target, onto, sha, round, file, said } = await s.inRequest(REFRESH.handler({ runId: at.name, ...payload }));
     return {
       ...given('drift', drift),
       ...given('step', step),
@@ -189,15 +210,19 @@ const refreshed = (at: At, payload: RunRefresh) =>
       ...given('sha', sha),
       ...given('round', round),
       ...given('file', file),
+      ...given('said', said),
     };
   });
 
-/** The run pruned (`nemia prune`, asked once, its refusals thrown): what it let go and what it left. */
-const pruned = (at: At, payload: RunPrune) =>
+/**
+ * The run pruned (`nemia prune`, asked once, its refusals thrown): what it let go and what it left; with `preview`, judged and listed with
+ * the bytes it would free, nothing removed.
+ */
+const pruned = (at: At, { preview, ...payload }: RunPrune) =>
   acted(at, async (s) => {
-    const done = await s.inRequest(PRUNE.handler({ runId: at.name, ...payload, yes: true, refuses: true }));
+    const done = await s.inRequest(PRUNE.handler({ runId: at.name, ...payload, yes: preview !== true, refuses: true }));
     const { id, lines, worktrees, artifacts, left } = done;
-    return { id, pruned: done.pruned, lines, worktrees, artifacts, left };
+    return { id, pruned: done.pruned, lines, worktrees, artifacts, left, bytes: pruningBytes(done.pruning) };
   });
 
 /** Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked. */
@@ -210,6 +235,7 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
       ...given('stopFirst', asked.stopFirst),
       ...given('step', asked.step),
       ...given('round', asked.round),
+      ...given('budget', asked.budget),
       ...given('hint', asked.hint),
     };
   });
@@ -218,7 +244,8 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
 const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
   acted(at, async (s) => {
     const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload }));
-    return { step: done.step, try: done.try, at: done.at, message: done.message, file: done.file };
+    const { step, try: tried, at: when, message, file, loop, next, caps } = done;
+    return { step, try: tried, at: when, message, file, loop, next, caps };
   });
 
 /**
@@ -231,7 +258,7 @@ const said = (at: At & { readonly step: string }, payload: RunSay) =>
   acted(at, async (s) => {
     const done = await s.inRequest(SAY.handler({ runId: at.name, step: at.step, caller: s.caller, ...payload }));
     const { at: when, attempt, text, after } = done;
-    const said = { at: when, attempt, text, after, ...(done.kept ? { kept: done.kept } : {}) };
+    const said = { at: when, attempt, text, after, try: done.try, taskId: done.taskId, ...(done.kept ? { kept: done.kept } : {}) };
     return done.from === undefined ? said : { ...said, from: done.from, words: done.words };
   });
 
@@ -243,7 +270,7 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
     .handle('create', ({ params: { namespace }, payload }) =>
       answeredIn(namespace, (s) => runStart(s, payload)).pipe(Effect.tap(({ id }) => locatedAt(id))),
     )
-    .handle('delete', ({ params: { namespace, name } }) => removed({ namespace, name }))
+    .handle('delete', ({ params: { namespace, name }, query }) => removed({ namespace, name }, query))
     .handle('refresh', ({ params: { namespace, name }, payload }) => refreshed({ namespace, name }, payload))
     .handle('prune', ({ params: { namespace, name }, payload }) => pruned({ namespace, name }, payload))
     .handle('labels', ({ params: { namespace, name }, payload }) =>

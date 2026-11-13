@@ -47,7 +47,6 @@ export {
   maxConcurrent,
   maxRuns,
   SESSION_VARIABLES,
-  FORWARD_VARIABLES,
   SERVING_VARIABLES,
   setting,
   type Settings,
@@ -127,7 +126,6 @@ export {
   toDecideWords,
   roundBudgetRefusal,
   ceilingLines,
-  forgetLine,
   idRefusal,
   costLine,
   slotWord,
@@ -330,7 +328,7 @@ export { draftSteps, loadWorkflows, workflowDraftOfFiles, writeWorkflow, type Wo
 export { isMarkdown, textIn, workflowStale, workflowTaken } from './folder/folder.ts';
 export { workflowVersion } from './folder/version.store.ts';
 export { foldersIn } from './folder/lookup.store.ts';
-export { agentRead, agentSkillsFound, listAgents, type Readings } from './roster/roster.store.ts';
+export { agentRead, agentSkillsFound, customOf, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
 export { TRY_STEP, triesDir, tryDir, tryFolder, writeTryFolder } from './try/try.store.ts';
@@ -442,16 +440,17 @@ export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
-export { cardRepoRefusal, CONCLUDED, folderRefusal, START, StartInput } from './start/commands.verb.ts';
+export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts } from './start/commands.verb.ts';
+export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';
 export { FACTORY_RULES, factoryRules, type FactoryRules } from './factory/rules/rules.verb.ts';
 export { FACTORY_COST_LINE_RM, FACTORY_COST_LINE_SET } from './factory/cost-line/cost-line.verb.ts';
 /**
- * A factory's own MCP servers: the entries that list its record with each server's state, record one (its flags mapped by `serverAddOf`)
- * and take one off, and the name rule the board shares.
+ * A factory's own MCP servers: the entries that list its record with each server's state, record one and take one off, and the name
+ * rule the board shares.
  */
-export { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS, serverAddOf } from './factory/servers/servers.verb.ts';
+export { FACTORY_SERVER_ADD, FACTORY_SERVER_RM, FACTORY_SERVERS } from './factory/servers/servers.verb.ts';
 export { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from './factory/schedule/schedule.verb.ts';
 export { serverNameRefusal, type BuiltinServer } from './factory/servers/index.ts';
 export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store.ts';
@@ -459,7 +458,7 @@ export { BUILTIN_SERVERS, builtinServers } from './factory/servers/servers.store
 export { serverSignIn, serverSignInCallback, serverSignInState, serverSignOut } from './factory/servers/sign-in.verb.ts';
 export { AGENTS_CUSTOM } from './custom/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
-export type { Command, Ran } from './command/entry.verb.ts';
+export type { Command, Ran, Served } from './command/entry.verb.ts';
 /**
  * The table's entries the api calls by type, each with its `input` (`Command<D, I>`): `factory hire` and `factory fire`, the Hire's writes;
  * and the Factory's own writes, a workflow attached and detached, its revisions policy, its removal, the trust of its places and its
@@ -495,7 +494,7 @@ export { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } from './skills/skills.verb.ts'
 export { WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } from './workflows/workflows.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, helpOf, leftOut, parseArgv } from './command/command.ts';
 export { toolsOf } from './command/command.ts';
-export type { EndpointLink, LinkedTool } from './command/command.ts';
+export type { LinkedTool } from './command/command.ts';
 export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Spec } from './command/command.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
@@ -503,7 +502,7 @@ export { freeingMany, judgingMany, prune, type Listed, type Turned } from './for
 export { decideRun, type Answered, type Decided } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun, type StatsMemo } from './stats/stats.verb.ts';
 export { seriesMemo, type Health, type SeriesMemo, type SeriesRead } from './series/series.ts';
-export { statsLine, statsLines, statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
+export { statsQueryOf, type QueryKey, type Stats, type StatsQuery } from './stats/index.ts';
 export { list, listReading, pausedRead, unjudgedOf, type ListReading } from './list/list.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
 export type { ListedStanding, RunsListed, Unjudged } from './list/list.ts';
@@ -585,7 +584,7 @@ export { delegationGet, delegationPut, delegationRemove, delegationsList } from 
 export { DelegationDoor, delegationDoorFiles, type DelegationDoorShape } from './delegation/delegation.store.ts';
 export { decisionRead, diffFiles, DIFF_LINES, runDecision, type DecisionRead } from './decide/decision.verb.ts';
 export { CEILINGS } from './cap/commands.verb.ts';
-export { PAUSE, PAUSE_NOW, PAUSED, RESUME, pauseNowPreview, pauseNowPreviewLines } from './pause/commands.verb.ts';
+export { PAUSE, PAUSE_NOW, PAUSED, RESUME } from './pause/commands.verb.ts';
 export { TIMEOUT as PAUSE_TIMEOUT } from './pause/pause-timeout.verb.ts';
 export { PASSES } from './meter/passes.verb.ts';
 export { SERIES } from './series/commands.verb.ts';

@@ -27,9 +27,7 @@ import { main } from '../src/cli/main.ts';
 import { AGENTS_COPY } from '../src/sources/copy.verb.ts';
 import { agentsRead as agentsReadAt } from '../src/roster/roster.store.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
-import { agentsLines } from '../src/roster/roster.ts';
 import { agentSources } from '../src/sources/sources.store.ts';
-import { sourcesLines } from '../src/sources/sources.ts';
 import { AgentDoor } from '../src/agents/agent-door.store.ts';
 import { agentDoorMemory } from '../src/agents/agent-memory.store.ts';
 import { SkillDoor } from '../src/skills/skill-door.store.ts';
@@ -108,7 +106,6 @@ test('copy an agent into the library: hired and run under its new name, copied a
   const file = path.join(team, 'agents', 'reviewer.md');
   const record = path.join(libraryOf(ROOT).records, 'critic.json');
   const none = scratch('wf-agents-copy-none-');
-  const copiedLines = () => agentsLines(agentsRead({ repo: none, home: ROOT })).filter((l) => l.includes('copied from'));
   const reading = () => agentsRead({ repo: none, home: ROOT }).agents.find((a) => a.name === 'critic')?.copied;
   let version = '';
 
@@ -162,29 +159,26 @@ test('copy an agent into the library: hired and run under its new name, copied a
 
   await s.test('nemia agents says where it came from, at the version it was copied at', () => {
     assert.deepEqual(reading(), { source: file, version, now: 'same' });
-    assert.deepEqual(copiedLines(), [`   copied from ${file} at ${version}`]);
   });
 
   await s.test(
     'its source changed: said so, a copy refused naming --keep, and the copy kept moving the record to the version now',
     async () => {
       fs.appendFileSync(path.join(team, 'skills', 'review-a-change', 'SKILL.md'), 'Read the tests first.\n');
-      assert.equal(reading()?.now, 'changed');
-      assert.deepEqual(copiedLines(), [`   copied from ${file} at ${version}; the source has changed since`]);
+      assert.deepEqual(reading(), { source: file, version, now: 'changed' });
       await assert.rejects(copy({ file, as: 'critic' }, ROOT), refusedWith('Conflict', '--keep review-a-change'));
       await copy({ file, as: 'critic', keep: ['review-a-change'] }, ROOT);
       const now = JSON.parse(fs.readFileSync(record, 'utf8'));
       assert.equal(now.source, file);
       assert.notEqual(now.version, version, 'the version moved');
       version = now.version;
-      assert.deepEqual(copiedLines(), [`   copied from ${file} at ${version}`]);
+      assert.deepEqual(reading(), { source: file, version, now: 'same' });
     },
   );
 
   await s.test('its source gone: said so', () => {
     fs.rmSync(file);
-    assert.equal(reading()?.now, 'gone');
-    assert.deepEqual(copiedLines(), [`   copied from ${file} at ${version}; the source is gone`]);
+    assert.deepEqual(reading(), { source: file, version, now: 'gone' });
   });
 });
 
@@ -222,9 +216,10 @@ test('copy from a repository: its places listed by nemia agents sources, each ag
       assert.equal(scout.description, 'Reads a codebase ahead of a change and says where it lands.');
       assert.match(scout.version ?? '', /^[0-9a-f]{16}$/);
       assert.match(sources.find((s) => s.name === 'counted')?.error ?? '', /`maxTurns`/);
-      const lines = sourcesLines({ sources: ours });
-      assert.equal(lines.at(-1), 'copy one into your library: nemia agents copy <file> [--as <name>]');
-      assert.ok(lines.includes(`${path.join(repo, '.claude', 'agents')}  (the repository ${repo})`));
+      assert.ok(
+        ours.some((s) => s.place === 'repository' && s.repo === repo && s.dir === path.join(repo, '.claude', 'agents')),
+        "a repository's .claude/agents is listed under that repository",
+      );
       await assert.rejects(sourcesAt({ at: path.join(home, 'none'), home }), refusedWith('Missing', 'none is not a folder'));
     },
   );

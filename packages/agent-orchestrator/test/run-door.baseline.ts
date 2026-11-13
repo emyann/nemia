@@ -14,7 +14,6 @@ export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/branches/merges.verb.ts': 1,
   'src/brief/handed.verb.ts': 1,
   'src/cap/cap.verb.ts': 1,
-  'src/cli/runs.ts': 1,
   'src/collide/collisions.verb.ts': 1,
   'src/costs/costs.verb.ts': 1,
   'src/ending/ending.verb.ts': 2,

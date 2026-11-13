@@ -69,6 +69,10 @@ export const AgentStatus = Schema.Struct({
   card: Schema.NullOr(Schema.Array(CardSkill)),
   cardError: Text,
   error: Text,
+  /** The file of a person's custom instructions for it (`nemia agents custom`), null where they wrote none; absent from an older api. */
+  custom: Schema.optionalKey(Text),
+  /** The files a removal took (`DELETE …/agents/<name>`), on that answer alone: the agent's file and a schema no other agent names. */
+  removed: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type AgentStatus = typeof AgentStatus.Type;
 
@@ -121,6 +125,8 @@ export const AgentCard = Schema.Struct({
   }),
   servedOverA2A: Schema.Literal(false),
   why: Schema.String,
+  /** The place the agent was read from, which `nemia agents card` says beside the card; absent from an older api. */
+  from: Schema.optionalKey(AgentPlace),
 });
 export type AgentCard = typeof AgentCard.Type;
 

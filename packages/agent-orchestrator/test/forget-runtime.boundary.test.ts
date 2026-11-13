@@ -26,7 +26,7 @@ import { advanceRun, forgetRun, retryRun, startRun, runWith as runEngine, gitPla
 import { runRecord } from '../src/record/record.store.ts';
 import { runTasks } from '../src/record/record.ts';
 import { tickRun } from '../src/tick/tick.verb.ts';
-import { main } from '../src/cli/main.ts';
+import { forgetTyped } from './forgetting.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -161,21 +161,8 @@ const finished = async () => {
 
 const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 
-/** `nemia <args>` through the CLI over the engine `engine`: the lines it printed, and the error it ended with, if it did. */
-const typedOn = async (t: TestContext, engine: Engine, ...args: string[]) => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => {
-    printed.push(a.join(' '));
-  });
-  try {
-    await main(args, engine, undefined, undefined, ENV);
-    return { printed, error: undefined };
-  } catch (err) {
-    return { printed, error: err as Error & { exitCode?: number } };
-  } finally {
-    log.mock.restore();
-  }
-};
+/** `nemia rm <args>`, as the client runs it over the api, on the engine `engine`: what it answered of each run, and its error. */
+const typedOn = (_t: TestContext, engine: Engine, ...args: string[]) => forgetTyped((effect) => runWith(engine, effect), ROOT, args);
 
 test("`nemia rm` of a repository run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed then read with the lines forgotten counted, the kept run's filings on it", async () => {
   const { run, tasks } = await finished();
@@ -212,10 +199,14 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   const said = await typedOn(t, lacking, 'rm', run.id);
   assert.equal(said.error, undefined, 'exit 0: the run is removed');
   const marker = markerOf(run.id);
-  const words = `the engine refused to forget 1 task of it: task ${task} ran on the \`codex\` harness, which this engine does not have`;
-  assert.ok(said.printed[0].includes(words), said.printed.join('\n'));
-  assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
-  assert.ok(!said.printed[0].includes('waits'), said.printed[0]);
+  const why = `task ${task} ran on the \`codex\` harness, which this engine does not have`;
+  const words = `the engine refused to forget 1 task of it: ${why}`;
+  const engine = said.forgot[0]?.engine;
+  assert.deepEqual(
+    [said.forgot.length, engine?.refused, engine?.refusedWhy.length, engine?.marker, engine?.waiting],
+    [1, [task], 1, marker, []],
+  );
+  assert.ok(engine?.refusedWhy[0]?.startsWith(why), `in the runtime's words: ${engine?.refusedWhy[0]}`);
   assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');
 
   const before = lackingForgets.length;

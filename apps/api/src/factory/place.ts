@@ -34,6 +34,15 @@ function knownRepos(home: string): string[] {
   return [...new Set(listedAtOnce(home).flatMap((listing) => ('error' in listing ? [] : listing.repos.map((repo) => path.resolve(repo)))))];
 }
 
+/**
+ * The repository of `known` that holds the folder `named`: itself where it is one, else the deepest one it is under, as a command typed
+ * in a subfolder of a repository is about that repository; none where no known repository holds it.
+ */
+const holdingOf = (named: string, known: readonly string[]): string | undefined =>
+  known
+    .filter((repo) => named === repo || named.startsWith(repo.endsWith(path.sep) ? repo : `${repo}${path.sep}`))
+    .sort((a, b) => b.length - a.length)[0];
+
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
 const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
   new Invalid({
@@ -54,8 +63,9 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
 /**
  * The factory and the repository a request is answered in, read off its query, the store's factories read at `home`.
  *
- * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else none. A `?repo=` that no factory in
- *   the store works on (`knownRepos`) is refused, `Invalid`.
+ * - No factory, or `default`: the default factory, on `?repo=` resolved from where the api runs, else none. A `?repo=` is a repository a
+ *   factory in the store works on (`knownRepos`), or a folder under one, read as the repository that holds it (`holdingOf`); any other is
+ *   refused, `Invalid`.
  * - A factory named: read from the store at `home`, as a start reads it (`filedAtOnce`: `Invalid` for a name that is no slug or a file that
  *   does not read, `Missing` for none of that name). Its repository is `?repo=`, else its only one, else none; a `?repo=` that is not among
  *   its repositories (`outsideRefusal`) is refused, `Invalid`.
@@ -74,8 +84,9 @@ function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
   if (factory === undefined) {
     if (named === undefined) return { repo: undefined, factory: undefined, named: query.factory !== undefined };
     const known = knownRepos(home);
-    if (!known.includes(named)) throw unknownRepo(named, known);
-    return { repo: named, factory: undefined, named: true };
+    const holding = holdingOf(named, known);
+    if (holding === undefined) throw unknownRepo(named, known);
+    return { repo: holding, factory: undefined, named: true };
   }
   if (named !== undefined) {
     if (outsideRefusal(factory, named) !== undefined) throw outsideRepo(factory, named);

@@ -10,7 +10,6 @@ import path from 'node:path';
 import { REGENERATE, verbsSkill, verbsSkillOf } from '../src/nemia/verbs.verb.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { CLI_VERBS, toolsOf } from '../src/command/command.ts';
-import { VERBS } from '../src/cli/main.ts';
 import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from './command-words.ts';
 
 const SKILL = path.join(import.meta.dirname, '..', 'nemia', 'skills', 'verbs', 'SKILL.md');
@@ -61,14 +60,10 @@ test('the library’s writers are listed by who answers for them: a write or a r
   assert.ok(lists(sectionOf(text, 'Yours'), 'agents run'), 'agents run is hers to run unasked');
 });
 
-test('the CLI’s own verbs are said once, each with its class, and none is an entry of the table too', () => {
+test('the verbs the api serves beside the table are said once, each with its class, and none is an entry of the table too', () => {
   assert.deepEqual(
     CLI_VERBS.map((v) => [v.name, v.class]),
     [['decide', 'read']],
-  );
-  assert.deepEqual(
-    CLI_VERBS.map((v) => v.name),
-    [...VERBS.keys()],
   );
   assert.deepEqual(
     CLI_VERBS.filter((verb) => TABLE.some((c) => c.name === verb.name)).map((v) => v.name),

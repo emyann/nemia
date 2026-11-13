@@ -29,7 +29,6 @@ const LEFT_OUT = [
   'frontmatter rewrite',
   'tick',
   'up',
-  'watch',
   'admit',
 ];
 

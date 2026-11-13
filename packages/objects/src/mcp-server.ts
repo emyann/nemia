@@ -8,6 +8,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { FactoryWritten } from './written.ts';
 import { MCP_STATES, MCP_TRANSPORTS, SIGN_IN_STATES } from './words.ts';
 
 /** The OAuth client a server signs in with: its id, and the port its callback listens on, where it names one. */
@@ -34,13 +35,14 @@ export const McpServerStatus = Schema.Struct({
 });
 export type McpServerStatus = typeof McpServerStatus.Type;
 
-/** An MCP server, as an object: a builtin one carries its spec alone. */
+/** An MCP server, as an object: a builtin one carries its spec alone; a write's answer says what it wrote (`written`). */
 export const McpServer = Schema.Struct({
   apiVersion: Schema.Literal(API_VERSION),
   kind: Schema.Literal('McpServer'),
   metadata: ObjectMeta,
   spec: McpServerSpec,
   status: Schema.optionalKey(McpServerStatus),
+  written: Schema.optionalKey(FactoryWritten),
 });
 export type McpServer = typeof McpServer.Type;
 

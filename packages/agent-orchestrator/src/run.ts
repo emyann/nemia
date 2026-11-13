@@ -134,7 +134,7 @@ export { assess } from './tick/assess.ts';
 export type { Assessment } from './tick/assess.ts';
 export { acceptAsk, roundAsk, roundBudgetRefusal, roundDueNote, roundFiled, roundLines, roundsDue, spentRoundAsks } from './round/round.ts';
 export { cancelPlan } from './cancel/cancel.ts';
-export { branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees } from './forget/forget.ts';
+export { branchFates, checkLogsOf, forgetRefusal, heldWorktree, idRefusal, runWorktrees } from './forget/forget.ts';
 export type { AskName, ForgetHow, Forgot } from './forget/forget.ts';
 export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/index.ts';
 export type { InputFile } from './start/index.ts';

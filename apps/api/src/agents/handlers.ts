@@ -28,6 +28,7 @@ import {
   AGENTS_TRY,
   agentRead,
   customInstructionsFile,
+  customOf,
   definitionRevision,
   factoriesFilling,
   inFactory,
@@ -110,8 +111,12 @@ async function heldIn(s: Served): Promise<Held<LibraryAgent>[]> {
   return [...own, ...elsewhere.map((item) => ({ name: item.name, origin: item.from, item }))];
 }
 
-/** The object of one agent served, its revision read through the ledger; with neither namespace nor revision for a template's. */
+/**
+ * The object of one agent served, its revision read through the ledger, and the file of its custom instructions in the store `home`; with
+ * neither namespace nor revision for a template's.
+ */
 const agentObject = (
+  home: string,
   namespace: string | undefined,
   origin: Origin,
   shadowedBy: Origin | null,
@@ -152,6 +157,7 @@ const agentObject = (
     card: a.card,
     cardError: a.cardError,
     error: a.error,
+    custom: customOf(home, a.name),
   },
 });
 
@@ -163,9 +169,9 @@ export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<Lib
   s.inRequest(
     Effect.forEach(served, ({ origin, shadowedBy, item }) =>
       namespace === undefined
-        ? Effect.succeed(agentObject(undefined, origin, shadowedBy, item, undefined))
+        ? Effect.succeed(agentObject(s.home, undefined, origin, shadowedBy, item, undefined))
         : Effect.map(definitionRevision('agent', item.name, item.version), (revision) =>
-            agentObject(namespace, origin, shadowedBy, item, revision),
+            agentObject(s.home, namespace, origin, shadowedBy, item, revision),
           ),
     ),
   );
@@ -267,9 +273,9 @@ async function cardIn(s: Served, namespace: string, name: string, origin: string
     throw new Invalid({
       error: `${name} is the factory's own agent, whose card is not drawn here: its skills are \`status.card\` of GET /api/namespaces/${namespace}/agents/${name}?origin=factory.`,
     });
-  const from = served.origin === 'yours' ? 'yours' : 'repo';
+  const from: 'yours' | 'repo' = served.origin === 'yours' ? 'yours' : 'repo';
   const { card } = await s.inRequest(AGENT_CARD.handler({ name, repo: s.repo, from }));
-  return { card, servedOverA2A: false as const, why: A2A_WHY(name) };
+  return { card, servedOverA2A: false as const, why: A2A_WHY(name), from };
 }
 
 const READ_ROUTE = 'POST /api/agents/read';
@@ -346,8 +352,8 @@ export const agentsHandlers = readsBounded(Api, 'agents', (handlers) =>
         writeGoes(namespace, 'remove', thereOf(await heldIn(s), name));
         const version = versioned(route, query.resourceVersion);
         const before = await agentAt(s, namespace, name, 'yours');
-        await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
-        return before;
+        const { removed } = await s.inRequest(AGENTS_REMOVE.handler({ from: 'yours', name, version, repo: s.repo }));
+        return { ...before, status: { ...before.status, removed } };
       }),
     )
     .handle('try', ({ params: { namespace, name }, payload }) =>

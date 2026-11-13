@@ -10,7 +10,7 @@
  * store is its own, at `ROOT`, given as `ENV`.
 
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,13 +25,13 @@ import { readPause } from '../src/pause/pause.store.ts';
 import { parseSelectors, selects } from '../src/watch/selector.ts';
 import { NEMIA_SELECTORS } from '../src/nemia/nemia.ts';
 import { engineOf } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { typed as onHandler } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-level-feed-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+const stage = staged({ runWith, main: onHandler, engineOf, env: ENV });
 
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view. */
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
@@ -40,14 +40,9 @@ const NOW = '2026-11-05T13:00:00.000Z';
 /** An hour, the stretch the story raises for. */
 const HOUR = 3_600_000;
 
-/** What `nemia <argv>` printed, its console muted. */
-const typed = async (t: TestContext, ...argv: string[]): Promise<void> => {
-  const log = t.mock.method(console, 'log', () => {});
-  try {
-    await stage.main(argv);
-  } finally {
-    log.mock.restore();
-  }
+/** `nemia <argv>` run on its entry's handler (`typed.ts`), over the stage's engine. */
+const typed = async (...argv: string[]): Promise<void> => {
+  await stage.main(argv);
 };
 
 /** The feed's level lines: the factory each is labelled with, its reason, its source and its note. */
@@ -70,8 +65,8 @@ test("a factory's level said on the feed: each change of the level in force is o
     await pass();
     assert.deepEqual(levelSaid(), []);
   });
-  await s.test('nemia level auto --factory acme, then a pass, is one LevelChanged line labelled acme, a person’s deed', async (sub) => {
-    await typed(sub, 'level', 'auto', '--factory', 'acme');
+  await s.test('nemia level auto --factory acme, then a pass, is one LevelChanged line labelled acme, a person’s deed', async () => {
+    await typed('level', 'auto', '--factory', 'acme');
     await pass();
     assert.deepEqual(levelSaid(), [['acme', STORE, 'person', 'acme is at auto']]);
     const [line] = readFeed(ROOT, 0).lines.filter((l) => l.reason === 'LevelChanged');
@@ -85,10 +80,10 @@ test("a factory's level said on the feed: each change of the level in force is o
   });
   await s.test(
     'a default set lower, then a raise for an hour: each is a line, the raise with its end and what it falls back to',
-    async (sub) => {
-      await typed(sub, 'level', 'semi-auto', '--factory', 'acme');
+    async () => {
+      await typed('level', 'semi-auto', '--factory', 'acme');
       await pass();
-      await typed(sub, 'level', 'auto', '--factory', 'acme', '--for', '1h');
+      await typed('level', 'auto', '--factory', 'acme', '--for', '1h');
       await pass();
       const until = new Date(Date.parse(NOW) + HOUR).toISOString();
       assert.deepEqual(levelSaid().slice(1), [
@@ -106,11 +101,11 @@ test("a factory's level said on the feed: each change of the level in force is o
     await pass();
     assert.deepEqual(levelSaid().slice(3), [['acme', STORE, 'person', 'acme is at semi-auto']]);
   });
-  await s.test('a raise ended by --end is a line of its own', async (sub) => {
-    await typed(sub, 'level', 'auto', '--factory', 'acme', '--for', '2h');
+  await s.test('a raise ended by --end is a line of its own', async () => {
+    await typed('level', 'auto', '--factory', 'acme', '--for', '2h');
     const raisedAt = Date.now();
     await pass();
-    await typed(sub, 'level', '--factory', 'acme', '--end');
+    await typed('level', '--factory', 'acme', '--end');
     await pass();
     assert.deepEqual(
       levelSaid()

@@ -1,10 +1,10 @@
 /**
  * The mcpservers and builtin groups' handlers (`objects`' `Api`): a factory's MCP servers as objects, in its namespace — a page of them
- * (`mcpServerList`), one (`mcpServerObject`), each header masked — recorded (`nemia factory server add`, a header sent as the mask
- * keeping the value stored, `headerWritten`) and taken off (`server rm`); its sign-in to one started, read, completed with the address
- * a person's browser landed on (the body's `url`, which no answer or log carries) and signed out (`serverSignIn`, `serverSignInState`,
- * `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and Nemia's builtin servers
- * (`builtinServerList`), a spec each and no namespace.
+ * (`mcpServerList`), one (`mcpServerObject`), each header masked — recorded (`nemia factory server add`, a header sent as the mask keeping
+ * the value stored, `headerWritten`) and taken off (`server rm`), each answered with what it wrote (`written`); its sign-in to one
+ * started, read, completed with the address a person's browser landed on (the body's `url`, which no answer or log carries) and signed out
+ * (`serverSignIn`, `serverSignInState`, `serverSignInCallback`, `serverSignOut`), each writing the harness's own store; and Nemia's
+ * builtin servers (`builtinServerList`), a spec each and no namespace.
  */
 import { Effect } from 'effect';
 import {
@@ -62,16 +62,16 @@ export const mcpServersHandlers = readsBounded(Api, 'mcpservers', (handlers) =>
     .handle('put', ({ params: { namespace, name }, payload }) =>
       answered(async (s) => {
         named(routeOf('PUT', namespace, name), namespace, name);
-        await s.inRequest(FACTORY_SERVER_ADD.handler({ factory: namespace, server: name, ...payload }));
-        return serverIn(s, namespace, name);
+        const { file, replaced } = await s.inRequest(FACTORY_SERVER_ADD.handler({ factory: namespace, server: name, ...payload }));
+        return { ...(await serverIn(s, namespace, name)), written: { file, was: replaced?.url ?? null } };
       }),
     )
     .handle('delete', ({ params: { namespace, name } }) =>
       answered(async (s) => {
         named(routeOf('DELETE', namespace, name), namespace, name);
         const server = await serverIn(s, namespace, name);
-        await s.inRequest(FACTORY_SERVER_RM.handler({ factory: namespace, server: name }));
-        return server;
+        const { file } = await s.inRequest(FACTORY_SERVER_RM.handler({ factory: namespace, server: name }));
+        return { ...server, written: { file } };
       }),
     )
     .handle('signIn', ({ params: { namespace, name } }) =>

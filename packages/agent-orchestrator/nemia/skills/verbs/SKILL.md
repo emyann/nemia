@@ -21,8 +21,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia inbox
                                the cards still in play: name, first line, workflow when set,
                                and started as <runId>, <phase> (nemia inbox --help); --all: those whose
-                               run ended too; -l: the cards a selector takes; --show-labels, -L <key>:
-                               their labels on each line
+                               run ended too; -l: the cards whose labels match; --show-labels, -L <key>:
+                               their labels on each line; -o wide: every column
                                on the port: inbox, inbox_card
   nemia factory
                                the store's factories: the default first — every run and card that
@@ -63,18 +63,19 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                check a template's folder or archive: every problem at once, each at its
                                file and line
                                CLI only: a template is a folder on the machine nemia runs on; the board reads none yet
-  nemia ls [<runId>] [-l <selector>] [--show-labels] [-L <key>]
+  nemia ls [<runId>] [-l <key>=<value>] [--show-labels] [-L <key>] [-o wide]
                                runs and their steps — a run waiting on another says waiting on <run>,
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
                                last, whether a nemia up ticks the store and when its last pass was;
                                first, while the store is paused, Pausing: N finishing and each
                                session, check or landing at work, or Paused once none is, then each
-                               check it holds, a landing with its merge staged in the checkout
-                               (MERGE_HEAD) among them; a step whose check it holds says waiting on
-                               the pause. -l: the runs whose labels a selector takes (team=core,
+                               check it holds, a landing with its merge staged in the repository's
+                               own working tree (MERGE_HEAD) among them; a step whose check it holds
+                               says waiting on the pause. -l: the runs whose labels match (team=core,
                                given again for another); --show-labels: each run with its labels;
-                               -L <key>: that label beside each run, given again for another
+                               -L <key>: that label beside each run, given again for another; -o
+                               wide: every column, each step among them
                                on the port: ls, ls_run
   nemia show <runId> [--raw]
                                the run as one object (nemia/v1 Run); --raw: its record, and
@@ -86,14 +87,14 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia logs <runId> <step>
                                that step's session output
                                on the port: logs
-  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <selector>] [--line|--json]
+  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [-l <key>=<value>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: base step
                                and on which try, cost and time per landed run, and each step's
                                tries, time, cost, checks and gate waits; first the last 14 days
                                against the 14 before. A number nothing measured reads —, never 0.
                                --line: one line, for a recap; --json: the whole answer; -l: the
-                               runs whose labels a selector takes, as nemia ls -l takes them
+                               runs whose labels it takes, as nemia ls -l takes them
                                on the port: stats
   nemia passes [--last <n>] [--json]
                                what the recent passes of the tick cost: their median and slowest
@@ -133,12 +134,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                store's own agent, is told them in her open session
                                reads bare; prompts the person given --file, --clear
                                on the port: agents_custom, agents_custom_put, agents_custom_delete, nemia_instructions, nemia_instructions_put, nemia_instructions_delete
-  nemia wait [-l <selector>]... [--from <cursor>] [--for <duration>]
-                               wait for the feed's next line a selector takes, and print it with the
+  nemia wait [-l <key>=<value>]... [--from <cursor>] [--for <duration>]
+                               wait for the feed's next line -l takes, and print it with the
                                cursor after it: from --from (a cursor a wait or nemia watch printed),
-                               else from the feed's end now. It ends on the first lines a selector
-                               takes, or after --for (4m by default, at most 270s) with none, and
-                               prints the cursor either way: wait again from it and no line is lost.
+                               else from the feed's end now. It ends on the first lines -l takes, or
+                               after --for (4m by default, at most 270s) with none, and prints the
+                               cursor either way: wait again from it and no line is lost.
                                -l: as nemia watch -l takes it, given again for another; none takes
                                every line.
                                on the port: wait
@@ -216,24 +217,6 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                version, off their records; and a newer release, where the daemon's
                                release check read one. --json: the whole answer
                                CLI only: it says which code the command runs from; the api answers its own at GET /api/version
-  nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]
-                               the feed's lines, followed as the tick writes them, until ^C, and a
-                               daemon down line when nothing ticks the store, daemon up when it does
-                               again: a run's status, a step's word as nemia ls says it, and what a
-                               person's word changed. --once: read from the cursor to the feed's end,
-                               print cursor: <n> and stop; from the start with no cursor. -l: the
-                               lines a selector takes, given again for another (key=v, key!=v, "key in
-                               (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
-                               agent, kind, reason, on, via, type, waits and source. --cursor-file:
-                               keep the cursor read to in a file, and start from it where it is there.
-                               --json: one JSON object a line, a feed line with its cursor, and a
-                               cursor of its own every 30 seconds while the feed is still. With no -l,
-                               every line; -l waits=person takes the lines that wait on a person. A
-                               step with no agent carries agent: none, which -l agent!=none leaves out.
-                               A line's reason is a step's code as the api gives the step (reason);
-                               its word and message are for people: select on the reason, never on
-                               the words.
-                               CLI only: it follows the feed on a terminal until ^C; the board reads what changed from the api
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
@@ -251,9 +234,12 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]
-                               start a run of a workflow from a brief, a text, a card of the inbox or a
-                               folder of cards
+  nemia start <brief.md|card|"text"> --workflows <name> [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--card <name> ...] [--gate <step> ...] [--model <step>=<model> ...] [--factory <name>] [--brief "<brief>"]
+                               start a run of a workflow from a brief, a text, or a card of the inbox
+                               --workflows <name>: the workflow, by its name, as its factory offers
+                               it (nemia workflows lists them); a card's own workflow: where it names
+                               one. A path to a workflow folder, and a folder of cards, are refused:
+                               file each card (nemia inbox add <card>) and start it by its name
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -269,13 +255,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                per step, over an inbox card's model: for the same step. Refused, naming
                                the models that keep it, where the step's harness refuses the model or
                                its permission mode is dropped on it
-                               --workflows takes a folder, or a name under <repo>/workflows/: dev
-                               a folder of cards starts a plan, a run per card, parents first, at
-                               the command line alone (nemia start --help)
-                               a card of a plan (nemia start --help) starts its body: --workflows is its
-                               workflow: unless given, and its after: needs an --after for each
-                               a frontmatter block of keys a plan's card lacks is refused by its key,
-                               never taken as the brief: file an inbox card with nemia inbox add <file>
+                               a file that opens with a frontmatter block of workflow: and after: starts
+                               its body, on its workflow: unless --workflows is given; its after: needs
+                               an --after for each. Any other key is refused by its name, never taken
+                               as the brief: file an inbox card with nemia inbox add <file>
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
                                --card <name>: an inbox card, as nemia inbox lists it, copied as it
@@ -285,19 +268,18 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --factory <name>: the workflow must be attached to the factory, whose
                                hires fill its steps, and a step left with no agent is refused (nemia
                                factory --help). Without it, the run is started in the factory whose
-                               repository holds --repo, else where nemia start is typed, when one
+                               repository holds --repo, else the daemon's own repository, when one
                                factory alone does; none, or two, is refused, naming the fix. In a
                                factory the run works on the repository it names for the workflow
                                (nemia factory attach <factory> <workflow> --repo <name>), else its
                                only one: --repo only finds the factory, and the start says so where
                                it differs
                                The default factory is history only: --factory default is refused
-                               a card of the inbox (nemia inbox --help), by its path or its name,
-                               starts its body, or --brief "<brief>" in its place, and stays in the
-                               inbox, listed as started: --workflows, a name, is its workflow:
-                               unless given, --factory its factory:, and a card that names no
-                               factory either way is refused; --repo is refused: its factory places
-                               the run
+                               a card of the inbox (nemia inbox --help), by its name, starts its body,
+                               or --brief "<brief>" in its place, and stays in the inbox, listed as
+                               started: --workflows, a name, is its workflow: unless given, --factory
+                               its factory:, and a card that names no factory either way is refused;
+                               --repo is refused: its factory places the run
                                on the port: start, inbox_start
   nemia inbox add "<idea>"|<file> [--workflow <name>] [--factory <name>] [--label <key=value>]...
                                park an idea as a card in the inbox, named from its first line
@@ -401,12 +383,12 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                resume the store: each session parked goes on as the same try, and the
                                next pass files what waits
                                on the port: resume
-  nemia subscribe <name> <task> [-l <selector>]... [--digest-every <minutes>] [--at-least <level>]
+  nemia subscribe <name> <task> [-l <key>=<value>]... [--digest-every <minutes>] [--at-least <level>]
                                give the engine's long-lived task <task> a subscription to the feed,
                                named <name>, from its end: a line one of its selectors takes is said to
                                it at once, and the rest folded into a digest said with the next wake,
                                or after --digest-every minutes (default 60) with none.
-                               -l: the lines a selector takes, given again for another (default:
+                               -l: the lines it takes, given again for another (default:
                                waits=person, the lines that wait on a person). Refused for a task not
                                long-lived.
                                --at-least: only the lines of runs whose factory's level is at least
@@ -721,7 +703,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                where it has one loop — enough: the loop ends on your words, with its
                                findings open, --message "<why>" required. What waits on the looping
                                step is filed as if it had said again: false, and every step after
-                               the loop is handed your words and those findings under ## Accepted.
+                               the loop is handed your words and those findings, under the heading
+                               of a loop ended as it stands.
                                To go round once more instead: nemia retry <runId> [<step>] --round
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each

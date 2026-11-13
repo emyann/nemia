@@ -286,7 +286,7 @@ export const runs = {
     ),
   /** A try's run removed: its record and the folders it worked in. */
   delete: (namespace: string, name: string, may: string): Promise<RunRemoved> =>
-    call((c) => c.runs.delete({ params: { namespace, name } }), write(RunRemoved, may)),
+    call((c) => c.runs.delete({ params: { namespace, name }, query: {} }), write(RunRemoved, may)),
   /** A finished run pruned: its worktrees, and its files with `artifacts`. */
   prune: (namespace: string, name: string, how: RunPrune, may: string): Promise<RunPruned> =>
     call((c) => c.runs.prune({ params: { namespace, name }, payload: how }), write(RunPruned, may)),
@@ -405,7 +405,7 @@ export const cards = {
   /** A card queued to start on its own: answers the card as it now reads. */
   queue: (namespace: string, name: string): Promise<Card> =>
     call(
-      (c) => c.cards.queue({ params: { namespace, name } }),
+      (c) => c.cards.queue({ params: { namespace, name }, query: {} }),
       write(Card, 'The card may be queued, or not: look in the inbox before asking again.'),
     ),
   /** A card taken off the queue: answers the card as it now reads. */

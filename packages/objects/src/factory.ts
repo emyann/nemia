@@ -21,6 +21,7 @@
  */
 import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { FactoryWritten } from './written.ts';
 import {
   FACTORY_CONDITION_REASONS,
   FACTORY_CONDITION_STATUSES,
@@ -138,13 +139,14 @@ export const FactoryStatus = Schema.Struct({
 });
 export type FactoryStatus = typeof FactoryStatus.Type;
 
-/** A factory, as an object. */
+/** A factory, as an object; a write's answer says what it wrote (`written`). */
 export const Factory = Schema.Struct({
   apiVersion: Schema.Literal(API_VERSION),
   kind: Schema.Literal('Factory'),
   metadata: ObjectMeta,
   spec: FactorySpec,
   status: FactoryStatus,
+  written: Schema.optionalKey(FactoryWritten),
 });
 export type Factory = typeof Factory.Type;
 
@@ -225,7 +227,8 @@ export type FactoryRemoved = typeof FactoryRemoved.Type;
 
 /**
  * A factory's instruction: the factory, the path its file names (null for none), whether the store keeps it, the file it is read from,
- * its words (null where none), why the file there does not read (null where it does), and whether the store keeps text for it.
+ * its words (null where none), why the file there does not read (null where it does), whether the store keeps text for it, and, on the
+ * answer of a delete of that text alone, whether there was any to take off (`removed`).
  */
 export const FactoryInstruction = Schema.Struct({
   name: Schema.String,
@@ -235,6 +238,7 @@ export const FactoryInstruction = Schema.Struct({
   words: Schema.NullOr(Schema.String),
   error: Schema.NullOr(Schema.String),
   stored: Schema.Boolean,
+  removed: Schema.optionalKey(Schema.Boolean),
 });
 export type FactoryInstruction = typeof FactoryInstruction.Type;
 
@@ -267,10 +271,14 @@ export const FactoryCommands = Schema.Struct({
 export type FactoryCommands = typeof FactoryCommands.Type;
 
 /**
- * A template as a request gives it: a builtin template by its name (`{ name }`), or a template's folder or archive packed as `nemia
- * template pack` packs one — a gzipped tar of its one folder — in base64 (`{ archive }`). The api reads no path of the caller's machine.
+ * A template as a request gives it: a builtin's name (`{ name }`), a folder or archive packed as `nemia template pack` packs one, in
+ * base64 (`{ archive }`), or a folder or archive of the api's machine by its whole path, read again on every pass (`{ path }`).
  */
-export const TemplateGiven = Schema.Union([Schema.Struct({ name: Schema.String }), Schema.Struct({ archive: Schema.String })]);
+export const TemplateGiven = Schema.Union([
+  Schema.Struct({ name: Schema.String }),
+  Schema.Struct({ archive: Schema.String }),
+  Schema.Struct({ path: Schema.String }),
+]);
 export type TemplateGiven = typeof TemplateGiven.Type;
 
 /**

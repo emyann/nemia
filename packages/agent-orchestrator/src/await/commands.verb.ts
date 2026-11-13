@@ -1,11 +1,10 @@
 /** `nemia wait`, an entry of the command table: the feed read from a cursor until a line its selectors take, or its bound (`waitFeed`). */
-import { renamed, selectorQuery } from '../command/requests.verb.ts';
+import { WAIT_WORDS } from 'objects';
 import { Effect, Schema } from 'effect';
-import { checked, type Command } from '../command/entry.verb.ts';
+import { checked, type Served } from '../command/entry.verb.ts';
 import type { Args } from '../command/command.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { watchedLine } from '../subscription/index.ts';
-import { parseSelectors, SELECTOR_FORM, selectorsRefusal } from '../watch/selector.ts';
+import { parseSelectors, selectorsRefusal } from '../watch/selector.ts';
 import { waitForBound } from './await.ts';
 import { waitFeed, type WaitAnswer } from './await.verb.ts';
 
@@ -15,19 +14,10 @@ const WAIT_USAGE = '[-l <selector>]... [--from <cursor>] [--for <duration>]';
 /** The command line `nemia wait`'s refusals end on. */
 const WAIT_FORM = `nemia wait ${WAIT_USAGE}`;
 
-/** The refusal of a `-l` given no selector. */
-const SELECTOR_TAKES = `nemia wait -l takes a selector of the feed's lines: ${SELECTOR_FORM}`;
-
 /** The refusal of a `--from` given no cursor, or one that is no whole number. */
 const FROM_TAKES =
   'nemia wait --from takes a cursor, a whole number of bytes — 0, or the cursor a wait or nemia watch printed — or none for the ' +
   `feed's end: ${WAIT_FORM}`;
-
-/** The refusal of a `--for` given no bound. */
-const FOR_TAKES = `nemia wait --for takes how long the wait waits, as --for 30s or --for 4m: ${WAIT_FORM}`;
-
-/** What each value flag of `nemia wait` takes, by its name: the refusal of a value given apart that is one of its own flags. */
-const WAIT_TAKES: Readonly<Record<string, string>> = { '-l': SELECTOR_TAKES, '--from': FROM_TAKES, '--for': FOR_TAKES };
 
 /**
  * What `nemia wait` takes: its selectors (`-l`, each given again for another), the cursor it reads from (`--from`), and its bound
@@ -71,37 +61,8 @@ function waitArgsRefusal(args: Args | WaitInput): string | null {
  * line with none — or its bound, four minutes where none is given; it prints the lines it took and the cursor to wait again from, so a
  * line written between two waits is never lost. The api serves it as `GET /api/feed/wait`, calling this handler.
  */
-export const WAIT: Command<WaitAnswer, WaitInput> = {
-  name: 'wait',
-  usage: WAIT_USAGE,
-  help: [
-    "wait for the feed's next line a selector takes, and print it with the",
-    'cursor after it: from --from (a cursor a wait or nemia watch printed),',
-    "else from the feed's end now. It ends on the first lines a selector",
-    'takes, or after --for (4m by default, at most 270s) with none, and',
-    'prints the cursor either way: wait again from it and no line is lost.',
-    '-l: as nemia watch -l takes it, given again for another; none takes',
-    'every line.',
-  ],
-  spec: {
-    positionals: [],
-    flags: [
-      { flag: '-l', kind: 'text', key: 'selector', many: true, takes: SELECTOR_TAKES },
-      { flag: '--from', kind: 'text', key: 'from', takes: FROM_TAKES, twice: `nemia wait takes --from once: ${WAIT_FORM}` },
-      { flag: '--for', kind: 'text', key: 'for', takes: FOR_TAKES, twice: `nemia wait takes --for once: ${WAIT_FORM}` },
-    ],
-    unknown: (arg) => `nemia wait does not take ${arg}: ${WAIT_FORM}`,
-    apart: (_value, flag) => WAIT_TAKES[flag] ?? FROM_TAKES,
-  },
-  check: waitArgsRefusal,
-  writes: false,
-  class: 'read',
-  served: [
-    {
-      endpoint: 'server.wait',
-      request: (input) => renamed({}, ['selector'])(input).then((rest) => ({ ...rest, ...selectorQuery(input) })),
-    },
-  ],
+export const WAIT: Served<WaitAnswer, WaitInput> = {
+  ...WAIT_WORDS,
   input: WaitInput,
   handler: Effect.fnUntraced(function* (input: WaitInput) {
     yield* checked(waitArgsRefusal(input));
@@ -110,5 +71,4 @@ export const WAIT: Command<WaitAnswer, WaitInput> = {
     const from = input.from === undefined ? undefined : Number(input.from);
     return yield* waitFeed({ selectors: parseSelectors(selectorsOf(input)), ms: bound.ms, ...(from === undefined ? {} : { from }) });
   }),
-  print: ({ lines, cursor }) => [...lines.map(({ line, to }) => watchedLine(line, to, {})), `cursor: ${cursor}`],
 };

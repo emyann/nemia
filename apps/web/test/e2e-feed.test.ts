@@ -3,12 +3,12 @@
  * and a run's, appended after what is there. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { after, test } from 'node:test';
+import { after, test, type TestContext } from 'node:test';
 import { fed } from './e2e/board.ts';
-import { REPO, setStore } from './e2e/world.ts';
+import { API, setStore } from './e2e/world.ts';
 import { scratch } from 'test-kit/scratch';
 
 type Line = { at: string; run: string; step?: string; word: string; note?: string };
@@ -17,28 +17,42 @@ const dir = scratch('e2e-feed-');
 after(() => setStore(undefined));
 
 /**
- * The feed as the package reads it back: `nemia watch --once 0` over the store, its CLI. The web imports nothing of the package, and
- * reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. Each
- * line is printed as `<time>  <run>  <step or —>  <word>`, and the last is `cursor: <bytes>`. Answers the words after each line's time,
- * which is the line's own and says nothing of what the package read, and the cursor.
+ * The feed as the api reads it back: `GET /api/feed/wait?from=0` of an api served over the store, ticking nothing, the read `nemia watch
+ * --once 0` asks. The web imports nothing of the packages, so the store is asked as the board asks it. Answers each line's run, step (`—`
+ * for a run's own line) and word, and the cursor.
  */
-function wfFeed(store: string): { said: string[]; cursor: number } {
-  const out = execFileSync(
-    process.execPath,
-    [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'watch', '--once', '0'],
-    {
-      env: { ...process.env, WF_ROOT: store },
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  const lines = out.trimEnd().split('\n');
-  const last = /^cursor: (\d+)$/.exec(lines.at(-1) ?? '');
-  assert.ok(last, `nemia watch --once ends with its cursor: ${out}`);
-  return { said: lines.slice(0, -1).map((l) => l.replace(/^\S+ {2}/, '')), cursor: Number(last[1]) };
+async function apiFeed(t: TestContext, store: string): Promise<{ said: string[]; cursor: number }> {
+  const child = spawn(process.execPath, ['src/main.ts', '--no-tick'], {
+    cwd: API,
+    env: { ...process.env, WF_ROOT: store, PORT: '0', OTEL_EXPORTER_OTLP_ENDPOINT: '', NEMIA_BIND: '', WF_EXPOSED: '' },
+  });
+  let printed = '';
+  const ended = new Promise<void>((resolve) => child.on('close', () => resolve()));
+  t.after(async () => {
+    child.kill();
+    await ended;
+  });
+  const url = await new Promise<string>((resolve, reject) => {
+    const look = (chunk: Buffer) => {
+      printed += chunk.toString();
+      const m = /api listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(printed);
+      if (m?.[1]) resolve(m[1]);
+    };
+    child.stdout.on('data', look);
+    child.stderr.on('data', look);
+    void ended.then(() => reject(new Error(`the api ended before it listened:\n${printed}`)));
+  });
+  const answer = await fetch(`${url}/api/feed/wait?from=0&for=1s`);
+  assert.equal(answer.status, 200, `the api answers the feed's wait: ${await answer.clone().text()}`);
+  const body = (await answer.json()) as {
+    lines: { metadata: { labels: { run: string; step?: string } }; message: string }[];
+    cursor: string;
+  };
+  const said = body.lines.map(({ metadata: { labels }, message }) => `${labels.run}  ${labels.step ?? '—'}  ${message}`);
+  return { said, cursor: Number(body.cursor) };
 }
 
-test('fed appends a line the package reads back, with a step and without', (t) => {
+test('fed appends a line the package reads back, with a step and without', async (t) => {
   const file = path.join(dir, 'feed.jsonl');
   const before = { at: '2026-09-22T00:00:00.000Z', run: 'r-0', word: 'running' };
   fs.writeFileSync(file, `${JSON.stringify(before)}\n`);
@@ -48,7 +62,7 @@ test('fed appends a line the package reads back, with a step and without', (t) =
   fed('r-1', 'implement', 'blocked');
   fed('r-1', 'awaiting approval');
   t.mock.timers.reset();
-  const { said, cursor } = wfFeed(dir);
+  const { said, cursor } = await apiFeed(t, dir);
   assert.equal(cursor, fs.statSync(file).size, 'every line is whole');
   assert.deepEqual(said, ['r-0  —  running', 'r-1  implement  blocked', 'r-1  —  awaiting approval']);
   const lines = fs

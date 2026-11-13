@@ -8,15 +8,12 @@
  */
 import { type Args, DEFAULT_NAMESPACE } from 'objects';
 import { Refused } from '../refused.ts';
+import { textArg } from './requests.ts';
+
+export { textArg };
 
 /** Where a writer writes: yours, or a proposal to the factory `factory`. */
 export type Place = { readonly kind: 'yours' } | { readonly kind: 'factory'; readonly factory: string };
-
-/** The text `args` holds under `key`, or undefined where none was given. */
-export const textArg = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
 
 /** The path `args` holds under `key`; refused, naming the command's usage, where none was given. */
 export function pathArg(args: Args, key: string, command: string, usage: string, what: string): string {

@@ -19,9 +19,8 @@ import { HOLD } from '../wait/commands.verb.ts';
 import { WAIT } from '../await/commands.verb.ts';
 import { PRUNE, RM } from '../forget/commands.verb.ts';
 import { TICK, UP } from '../tick/commands.verb.ts';
-import { WATCH } from '../watch/commands.verb.ts';
 import { AGENTS_SOURCES } from '../sources/sources.verb.ts';
-import { type Command, type Ran, tableEntry } from './entry.verb.ts';
+import { type Command, type Ran, type Served, tableEntry } from './entry.verb.ts';
 import { AGENTS_CUSTOM } from '../custom/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
@@ -51,13 +50,13 @@ import { CHAT_SPEAKER_ENTRIES } from '../chat/speakers.verb.ts';
 import { POLICY_REACH } from '../reach/reach.verb.ts';
 
 /** The reads of the store, in the order `nemia`'s help lists them. */
-const READS: readonly Command[] = [tableEntry(SHOW), CLOSEOUT, TRIES, TRY, TOLD, LOGS, STATS];
+const READS: readonly (Command | Served)[] = [tableEntry(SHOW), tableEntry(CLOSEOUT), TRIES, TRY, TOLD, LOGS, STATS];
 
 /** The commands the CLI serves alone and runs itself, in the order `nemia`'s help lists them. */
-export const RAN: readonly Ran[] = [TICK, UP, WATCH];
+export const RAN: readonly Ran[] = [TICK, UP];
 
 /** Every command with a handler defined once, in the order `nemia`'s help lists them: the in-process CLI's list of entries. */
-export const COMMANDS: readonly Command[] = [
+export const COMMANDS: readonly (Command | Served)[] = [
   START,
   tableEntry(CONCLUDED),
   ...INBOXES,
@@ -110,4 +109,4 @@ export const COMMANDS: readonly Command[] = [
  * The whole table, in the order `nemia`'s help lists them: `nemia start`, then every other command with a handler, then
  * those the CLI runs itself (`RAN`).
  */
-export const TABLE: readonly (Command | Ran)[] = [...COMMANDS, ...RAN, ADMIT];
+export const TABLE: readonly (Command | Served | Ran)[] = [...COMMANDS, ...RAN, ADMIT];

@@ -28,7 +28,7 @@ import {
   setScheduleAt,
 } from './factory.store.ts';
 import { detached } from '../../test/factory-planted.ts';
-import { main as cli } from '../cli/main.ts';
+import { typed } from '../../test/typed.ts';
 import { engineOf } from '../runtime-client.ts';
 import { revisionsOf } from './factory.ts';
 import type { Env } from '../config/config.store.ts';
@@ -37,8 +37,8 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
-/** The CLI over this file's store, `ENV`. */
-const main: typeof cli = (argv, e, demand, place) => cli(argv, e, demand, place, ENV);
+/** A command line run onto its entry's handler over this file's store, `ENV`, as the api calls it (`typed`). */
+const main = (argv: readonly string[], e: ReturnType<typeof noEngine>) => typed(argv, e, undefined, undefined, ENV);
 
 const engine = eachTest(testEngine);
 heldUnasked(engine);
@@ -57,20 +57,12 @@ const refused =
     return true;
   };
 
-type Mocker = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
-
-/** What `main` printed, line by line, for one verb. */
-const printedBy = async (t: Mocker, ...argv: string[]): Promise<string[]> => {
-  const printed: string[] = [];
-  const log = t.mock.method(console, 'log', (...args: unknown[]) => {
-    printed.push(args.join(' '));
-  });
-  try {
-    await main(argv, noEngine());
-  } finally {
-    log.mock.restore();
-  }
-  return printed.join('\n').split('\n');
+/** The factories `nemia factory ls` reads, by name: each with its repositories, or the file that does not read and why. */
+const listedBy = async (): Promise<Array<[string, unknown]>> => {
+  const { factories } = (await main(['factory', 'ls'], noEngine())) as {
+    factories: Array<{ name: string; repos?: readonly string[]; file: string; error?: string }>;
+  };
+  return factories.map((f) => [f.name, f.error === undefined ? f.repos : `${f.file} ${f.error}`]);
 };
 
 /** The files in the factories folder, hidden ones too, by name. */
@@ -489,7 +481,7 @@ test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', asyn
 });
 
 test('a factory file that does not read: listed with why, the others still listed, and refused to hire, fire, attach, detach and start', async (t) => {
-  await t.test('`nemia factory ls` lists each with why, by name, a hidden file not at all', async (sub) => {
+  await t.test('`nemia factory ls` lists each with why, by name, a hidden file not at all', async () => {
     const repo = fresh();
     await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
     fs.writeFileSync(path.join(FACTORIES, 'empty.json'), '{}\n');
@@ -497,24 +489,24 @@ test('a factory file that does not read: listed with why, the others still liste
     fs.writeFileSync(path.join(FACTORIES, 'none.json'), '{"repos": []}\n');
     fs.writeFileSync(path.join(FACTORIES, '.pipao.json.123.abcd'), '{"repos": ["/x"]}\n');
     fs.writeFileSync(path.join(FACTORIES, '.hidden.json'), '{"repos": ["/x"]}\n');
-    const listed = await printedBy(sub, 'factory', 'ls');
-    assert.equal(listed[0].split(' ')[0], 'default');
-    assert.match(listed[1], /^empty {4}\S*empty\.json .*`repos`.* nemia factory rm empty/);
-    assert.match(listed[2], /^none {5}\S*none\.json .*`repos.0`.* nemia factory rm none/);
-    assert.equal(listed[3], `pipao    ${repo}`);
-    assert.match(listed[4], /^torn {5}\S*torn\.json .*JSON/);
-    assert.deepEqual([listed[5], listed.length], ['', 7]);
+    const listed = await listedBy();
+    const [empty, none, made, torn] = listed;
+    assert.deepEqual([empty?.[0], none?.[0], torn?.[0], listed.length], ['empty', 'none', 'torn', 4]);
+    assert.match(String(empty?.[1]), /empty\.json .*`repos`.* nemia factory rm empty/);
+    assert.match(String(none?.[1]), /none\.json .*`repos.0`.* nemia factory rm none/);
+    assert.deepEqual(made, ['pipao', [repo]]);
+    assert.match(String(torn?.[1]), /torn\.json .*JSON/);
   });
 
-  await t.test('a default.json written by hand is listed as a file to remove, never as the default factory or a factory', async (sub) => {
+  await t.test('a default.json written by hand is listed as a file to remove, never as the default factory or a factory', async () => {
     const repo = fresh();
     await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
     fs.writeFileSync(path.join(FACTORIES, 'default.json'), '{"repos": ["/x"]}\n');
-    const listed = await printedBy(sub, 'factory', 'ls');
-    assert.equal(listed[0], 'default  every run and card that names no factory — read, never written');
-    assert.ok(listed[1].startsWith(`default  ${path.join(FACTORIES, 'default.json')} `), listed[1]);
-    names(listed[1], 'nemia factory rm');
-    assert.equal(listed[2], `pipao    ${repo}`);
+    const listed = await listedBy();
+    assert.deepEqual([listed[0]?.[0], listed.length], ['default', 2]);
+    assert.ok(String(listed[0]?.[1]).startsWith(`${path.join(FACTORIES, 'default.json')} `), String(listed[0]?.[1]));
+    names(String(listed[0]?.[1]), 'nemia factory rm');
+    assert.deepEqual(listed[1], ['pipao', [repo]]);
     assert.deepEqual(
       readFactoriesAt(ROOT).flatMap((f) => ('repos' in f ? [f.name] : [])),
       ['pipao'],
@@ -548,7 +540,7 @@ test('a factory file that does not read: listed with why, the others still liste
 });
 
 test("a factory's revisions: pinned when its file says nothing, written by `nemia factory revisions`, and a third value refused", async (t) => {
-  await t.test('absent reads pinned; the verb writes follow, every other key kept, and ls prints it', async (sub) => {
+  await t.test('absent reads pinned; the verb writes follow, every other key kept, and ls reads it', async () => {
     pipao('build');
     assert.equal(revisionsOf(readFactoryAt(ROOT, 'pipao')), 'pinned', 'a factory that says nothing keeps its runs pinned');
     await main(['factory', 'revisions', 'pipao', 'follow'], noEngine());
@@ -556,7 +548,11 @@ test("a factory's revisions: pinned when its file says nothing, written by `nemi
       [fileOf('pipao').revisions, fileOf('pipao').workflows, revisionsOf(readFactoryAt(ROOT, 'pipao'))],
       ['follow', ['build'], 'follow'],
     );
-    names((await printedBy(sub, 'factory', 'ls')).join('\n'), 'revisions: follow');
+    const { factories } = (await main(['factory', 'ls'], noEngine())) as { factories: Array<{ name: string; revisions?: string }> };
+    assert.ok(
+      factories.some((f) => f.revisions === 'follow'),
+      'the listing reads the policy written',
+    );
   });
 
   await t.test('a file whose `revisions` is neither follow nor pinned does not read, naming the key', () => {

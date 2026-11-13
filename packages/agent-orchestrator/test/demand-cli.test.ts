@@ -15,6 +15,7 @@ import { main } from '../src/cli/main.ts';
 import { liveDemandHost } from '../src/demand/demand.verb.ts';
 import { DEMAND_OFF } from '../src/demand/demand.ts';
 import { TABLE } from '../src/runner.ts';
+import { COMMAND_WORDS } from 'objects';
 import { engineOf } from '../src/runtime-client.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -31,19 +32,14 @@ heldUnasked(engine);
 /** The engine of this test: the stand-in, which no command here files on, stops, says to or forgets from (`heldUnasked`). */
 const noEngine = () => engineOf(engine().layer);
 
-/** Each command that ticks, typed with arguments it parses and its check lets through, on runs, cards and folders that are not there. */
+/** The commands the client holds (`objects`' `COMMAND_WORDS`), which ask the api and never reach `main`'s demand. */
+const MOVED: readonly string[] = COMMAND_WORDS.map((w) => w.name);
+
+/**
+ * Each command `main` still runs that ticks, typed with arguments it parses and its check lets through, on runs, cards and folders that
+ * are not there.
+ */
 const TICKING: Record<string, string[]> = {
-  start: ['start', 'do it', '--workflows', NOWHERE, '--repo', NOWHERE],
-  'inbox queue': ['inbox', 'queue', 'no-card'],
-  retry: ['retry', 'no-run', 'implement'],
-  approve: ['approve', 'no-run', 'design'],
-  route: ['route', 'no-run', 'next', 'build'],
-  refresh: ['refresh', 'no-run'],
-  cancel: ['cancel', 'no-run'],
-  resume: ['resume'],
-  'agents run': ['agents', 'run', 'yours', 'nobody', '--brief', 'Do it.'],
-  'factory upgrade': ['factory', 'upgrade', 'no-factory', '--to', '0.2.0'],
-  'factory resolve': ['factory', 'resolve', 'no-factory', 'review.md#rounds', '--ours'],
   daemon: ['daemon'],
   'doctor fix': ['doctor', 'fix', 'no-piece'],
 };
@@ -86,10 +82,10 @@ async function typed(t: TestContext, argv: string[], host: () => DemandHost): Pr
 /** Whatever a daemon would leave in the store: its log and its lease. */
 const leftInStore = () => ['daemon.log', 'daemon.json'].filter((name) => fs.existsSync(path.join(ROOT, name)));
 
-test('the commands typed here are the ones that tick', () => {
+test('the commands typed here are the ones that tick and the client does not hold', () => {
   assert.deepEqual(
     Object.keys(TICKING).sort(),
-    TABLE.filter((c) => c.ticks === true)
+    TABLE.filter((c) => c.ticks === true && !MOVED.includes(c.name))
       .map((c) => c.name)
       .sort(),
   );

@@ -18,9 +18,7 @@ import {
   type Place,
   runWith,
   type Command,
-  type EngineService,
 } from '../runner.ts';
-import { forwardedAnswer, forwardedCall, forwardedOf } from '../command/forward.verb.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
@@ -37,42 +35,23 @@ export const placedIn = <A, E, R>(
 ): Effect.Effect<A, E, Exclude<Exclude<R, PlaceService>, StoreRoot | StoreConfig>> =>
   Effect.provide(Effect.provide(program, PlaceService.layer(place)), storeConfigLayer(env));
 
-/** A program as `answered` may wrap an entry's handler in process: the handler's own, with what it requires. */
-type Handled<D> = Effect.Effect<D, unknown, EngineService | PlaceService | StoreRoot | StoreConfig>;
-
 /**
- * What `command`'s handler answers for `input`, the one seam every runner and `commanded` call an entry through: in process, its handler
- * run over the engine `e`, given `place` and the store `env` names (`placedIn`), `around` wrapping it where the caller adds to it; or,
- * where `env` forwards the command line to another machine's api (`NEMIA_SERVER`), the endpoint the entry links called there
- * (`forwardedCall`), its answer what the entry prints. A refusal is thrown as it was, of its kind either way.
+ * What `command`'s handler answers for `input`, the one seam `commanded` calls an entry through: its handler run over the engine `e`,
+ * given `place` and the store `env` names (`placedIn`). A refusal is thrown as it was.
  */
 export function answered<D extends object, I>(
   env: Env,
   e: Engine,
   place: Place,
-  command: Pick<Command<D, I>, 'name' | 'served' | 'handler'>,
+  command: Pick<Command<D, I>, 'handler'>,
   input: I,
-  around: (program: Handled<D>) => Handled<D> = (program) => program,
 ): Promise<D> {
-  return forwardedOr(env, command, input, () => runWith(e, placedIn(env, place, around(command.handler(input)))));
+  return runWith(e, placedIn(env, place, command.handler(input)));
 }
 
-/**
- * What `entry`'s endpoint answers for `input` where `env` forwards the command line (`forwardedCall`), else what `here` answers in
- * process: for a runner whose call here is a program of its own rather than the entry's handler (`nemia pause --now`'s preview), and
- * whose endpoint answers what that program does.
- */
-export function forwardedOr<D>(env: Env, entry: Pick<Command, 'name' | 'served'>, input: unknown, here: () => Promise<D>): Promise<D> {
-  const forwarded = forwardedOf(env);
-  if (forwarded === undefined) return here();
-  return forwardedAnswer(forwardedCall(forwarded, entry, input as Readonly<Record<string, unknown>>)) as Promise<D>;
-}
-
-/**
- * A verb: it takes the environment `main` composes from, what follows it on the command line, the engine and the place, and prints what
- * it did, or throws a refusal.
- */
-export type Verb = (env: Env, rest: string[], e: Engine, place: Place) => void | Promise<void>;
+/** The lines `command` prints of `data`, where it prints: a command the client holds prints there, and none here. */
+export const printed = <D extends object, I>(command: Partial<Pick<Command<D, I>, 'print'>>, data: D, input: I): readonly string[] =>
+  command.print?.(data, input) ?? [];
 
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
 export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';

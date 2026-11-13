@@ -26,10 +26,21 @@ import { PRECEDENCE } from '../src/brief/index.ts';
 import { headedLayers } from '../src/workflow/index.ts';
 import { WorkflowError } from '../src/workflow.ts';
 import type { Env } from '../src/config/config.store.ts';
+import { factsOf, typed } from './typed.ts';
+import type { Started } from '../src/start/commands.verb.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-agent-session-');
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1' };
-const stage = staged({ runWith: runEngine, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith: runEngine, main: typedOrMain, engineOf, env: ENV });
 
 const SKILL = (name: string, extra = '') =>
   `---\nname: ${name}\ndescription: Use this when ${name.replace(/-/g, ' ')} is asked.\n${extra}---\nHow to ${name.replace(/-/g, ' ')}.\n`;
@@ -106,7 +117,7 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
 
   await s.test(
     "`nemia start` names each node's agent beside it — by the agent's name — and a node with no agent by its name alone",
-    async (sub) => {
+    async () => {
       const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
       stage.place().world.repository(repo, { 'README.md': 'x\n' });
       const named = storeTeam('named', {
@@ -114,10 +125,12 @@ test('hire an agent and render its session: frozen at the start, rendered for Cl
         judge: '---\nafter: build\nplace: git\nagent: coder\n---\n',
         wrap: '---\nafter: judge\nplace: git\n---\nWrap it up.\n',
       });
-      const printed: string[] = [];
-      sub.mock.method(console, 'log', (...args: unknown[]) => void printed.push(args.map(String).join(' ')));
-      await stage.main(['start', 'build it', '--workflows', named, '--repo', repo]);
-      assert.equal(printed[0].split('  ')[1], '3 step(s): build (plain) → judge (coder) → wrap', printed.join('\n'));
+      const started = factsOf((await stage.main(['start', 'build it', '--workflows', named, '--repo', repo])) as Started);
+      assert.deepEqual(
+        started.facts.steps,
+        [{ name: 'build', agent: 'plain' }, { name: 'judge', agent: 'coder' }, { name: 'wrap' }],
+        'each step in order, with its agent where it has one',
+      );
       id = (await stage.runPlaced(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }))).id;
     },
   );

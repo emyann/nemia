@@ -5,19 +5,17 @@
  * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the read and the write as the nemia group's
  * `level` and `setLevel` (`objects`' Api), each calling its handler by type (`LevelInput`).
  */
-import { givesNone, refusing, renamed } from '../command/requests.verb.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
-import { NemiaLevelSet, DEFAULT_NAMESPACE } from 'objects';
+import { LEVEL_WORDS, NemiaLevelSet, DEFAULT_NAMESPACE } from 'objects';
 import type { Args } from '../command/command.ts';
-import type { Command } from '../command/entry.verb.ts';
+import type { Served } from '../command/entry.verb.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import {
   durationOf,
   durationRefusal,
   factoryAsked,
-  factoryLevelWords,
   levelsAfter,
   type FactoryAsk,
   type FactoryLevel,
@@ -28,11 +26,10 @@ import { FactoryDoor } from '../factory/door/factories.store.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { taskSpend, type Spend } from '../status/status.ts';
-import { dollars } from '../money/money.ts';
 import { bridgeOf, type Bridge } from '../views/views.verb.ts';
 import type { EnginePhase } from '../views/views-words.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
-import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
+import { LEVEL_FORM, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: the store's `level` and since when; each factory's level (`factories`), the default factory
@@ -178,39 +175,6 @@ const levelBy = (args: LevelInput, home: string) =>
     return yield* levelNow(e);
   });
 
-/** What her sessions cost, as `nemia level` says it: each counted as it ends, her open one not yet. */
-const spendLine = ({ usd, measured, unmeasured }: Spend): string =>
-  `spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends`;
-
-/** What `nemia level` prints of her folder not trusted: the command `trust` to run once, and what then follows. */
-const trustLine = (trust: string): string =>
-  `her folder is not trusted yet, and her session starts only once it is: run once in a terminal ${trust}, accept the prompt, then /exit; the keeper files her at its next beat`;
-
-/** What `nemia level` prints of where she is. */
-function levelLines(data: NemiaLevel): string[] {
-  const head = `Nemia: the store at ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
-  const factories = [
-    'factories (a raise ends by itself, read as it passes):',
-    ...data.factories.map((row) => `  ${factoryLevelWords(row, DEFAULT_NAMESPACE)}`),
-  ];
-  const session =
-    data.task === null
-      ? []
-      : data.phase === null
-        ? [
-            `her session ${data.task}: not filed yet, ${data.trust === null ? 'the keeper files it at its next beat (nemia up, or the api, keeps her)' : 'it waits for her folder to be trusted'}`,
-          ]
-        : [`her session ${data.task}: ${data.phase}`];
-  const spent = data.spend === null ? [] : [spendLine(data.spend)];
-  const stopped = data.stopped ? ['it was stopped from outside and is not filed again: a level set above manual starts a fresh one'] : [];
-  const trust = data.trust === null ? [] : [trustLine(data.trust)];
-  const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
-  const allows = data.allows.length
-    ? ['allowed at a prompt, beyond what is built in (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
-    : [];
-  return [head, ...factories, ...session, ...trust, ...spent, ...stopped, ...reach, ...allows];
-}
-
 /**
  * The refusal of a factory write's arguments, or null: `--for` or `--end` with no factory, a raise with no level, an end with one, both,
  * the default factory named (the store's level is its own), and a stretch that is none (`durationRefusal`).
@@ -237,41 +201,8 @@ function factoryArgsRefusal(args: Args): string | null {
  * (`Invalid`); an end with no raise in force (`Conflict`); a level file that does not read (`Invalid`). Never refused for her folder's
  * trust: her session waits for it, and `trust` names the command that gives it.
  */
-export const LEVEL: Command<NemiaLevel, LevelInput> = {
-  name: 'level',
-  served: [
-    { endpoint: 'nemia.level', takes: givesNone('level'), request: refusing('level', ['factory', 'for', 'end'], renamed({}, ['level'])) },
-    { endpoint: 'nemia.setLevel', as: 'level_set' },
-  ],
-  usage: '[manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]]',
-  help: [
-    "Nemia, the store's own agent: bare, where she is, each factory's level and",
-    "how to reach her; a level sets the store's, which every factory follows",
-    "unless it has its own; --factory sets that factory's, --for raises it for",
-    'a stretch (90m, 2h, 1d; up to 7d) and --end ends the raise. semi-auto keeps',
-    "her session: what waits on you (a gate, a step's question, a loop out of",
-    'rounds, a cap) is asked of you, and a write that cannot be undone or',
-    'changes your settings or a factory; the rest is hers. auto is semi-auto,',
-    "but an answer your confirmed list allows in the run's state is given",
-    'unasked (nemia policy <agent>), in a session of hers filed since auto came:',
-    'one kept from before asks every answer until filed again (manual, then',
-    'auto once it is off). A factory at manual is left alone, and her session',
-    'stops once none is above manual',
-  ],
-  spec: {
-    positionals: [{ key: 'level', takes: 'optional', kind: 'name' }],
-    flags: [
-      { flag: '--factory', kind: 'name', key: 'factory', takes: `--factory takes the factory whose level is set: ${LEVEL_FORM}.` },
-      { flag: '--for', kind: 'name', key: 'for', takes: `--for takes the stretch a raise lasts, like 2h: ${LEVEL_FORM}.` },
-      { flag: '--end', kind: 'switch', key: 'end' },
-    ],
-    unknown: (arg) => `nemia level takes one level, not ${arg}: ${LEVEL_FORM}.`,
-  },
-  check: (args) => (typeof args.level === 'string' ? levelRefusal(args.level) : undefined) ?? factoryArgsRefusal(args),
-  writes: true,
-  class: { bare: 'read', sets: 'ask', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
-  only: { side: 'cli', why: "the api serves it as the nemia group's `level` and `setLevel` of `objects`' Api, calling this handler" },
+export const LEVEL: Served<NemiaLevel, LevelInput> = {
+  ...LEVEL_WORDS,
   input: NemiaLevelSet,
   handler: (args) => Effect.flatMap(StoreRoot, (home) => levelBy(args, home)),
-  print: levelLines,
 };

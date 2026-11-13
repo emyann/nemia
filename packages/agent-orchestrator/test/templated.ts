@@ -11,6 +11,11 @@ import { BuiltinTemplates, TemplateDoor } from '../src/template/door/templates.s
 import { TemplateSource } from '../src/template/door/templates.model.ts';
 import { openedTree, packageSkillNames } from '../src/template/template.store.ts';
 import { exportedTemplate } from '../src/template/template.verb.ts';
+import type { FactoryParts } from '../src/template/template.store.ts';
+import { instructionAt } from '../src/factory/factory.ts';
+import { instructionFile, readInstructionAt } from '../src/factory/instruction.store.ts';
+import { factoriesDirAt, FactoryDoor, filedFactory } from '../src/factory/door/factories.store.ts';
+import { FactoryName } from '../src/factory/factory.model.ts';
 import { reconcileFactory } from '../src/factory/applied/applied.verb.ts';
 
 /** A clock that says the time is `ms` (epoch milliseconds) whenever it is asked, and sleeps no one: a controller's pass, seeded. */
@@ -28,6 +33,23 @@ export const seededClock = (ms: number): Clock.Clock => ({
 export const withBuiltins = <A, E, R>(program: Effect.Effect<A, E, R>, builtins?: string): Effect.Effect<A, E, R> =>
   builtins === undefined ? program : Effect.provideService(program, BuiltinTemplates, builtins);
 
+/**
+ * The factory `name`'s parts an export holds, read from the store through the Factory door, as the api answers them to the client, which
+ * hands them to `nemia template export` on stdin: the factory, its file, its instruction and its rules.
+ */
+export const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
+  const home = yield* StoreRoot;
+  const factory = yield* filedFactory(name, 'rules');
+  const rules = yield* (yield* FactoryDoor).rules.read(FactoryName.read(name));
+  const at = instructionAt(factory, instructionFile(home, factory.name));
+  const instruction = { ...readInstructionAt(at), file: at.file };
+  return { factory, file: path.join(factoriesDirAt(home), `${name}.json`), instruction, rules } satisfies FactoryParts;
+});
+
+/** `nemia template export`'s program with the parts of the factory `factory` names read from the store, as the client hands them. */
+export const exportedWithFactory = (dir: string, from: string, factory: string | undefined) =>
+  Effect.flatMap(factory === undefined ? Effect.succeed(undefined) : factoryParts(factory), (parts) => exportedTemplate(dir, from, parts));
+
 /** The programs at the store `root`, each answering what its program answers, or throwing the refusal it failed with. */
 export function templated(root: string, builtins?: string) {
   const run = <A>(program: Effect.Effect<A, unknown, StoreRoot>): A => {
@@ -43,7 +65,7 @@ export function templated(root: string, builtins?: string) {
     );
   return {
     /** `nemia template export`'s program: the folder `dir` written from the repository `from`. */
-    exportTemplate: (ask: { dir: string; from: string; factory?: string }) => run(exportedTemplate(ask.dir, ask.from, ask.factory)),
+    exportTemplate: (ask: { dir: string; from: string; factory?: string }) => run(exportedWithFactory(ask.dir, ask.from, ask.factory)),
     /** The template at `source`, read through the door and opened for a render. */
     openTemplate: (source: string) => openedTree(source, read(source), packageSkillNames()),
     /** One pass of the factory controller over `factory`: the status it observed. */

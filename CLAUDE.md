@@ -5,7 +5,7 @@ job that runs to its end, and a long-lived session that runs until stopped (`res
 `src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
 markdown is a workflow (its in-process CLI). `packages/objects` holds the shapes of the objects Nemia serves, `nemia/v1`, and the
 HttpApi that serves them, importing only `effect`. `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person;
-`apps/cli`, beside it, is `nemia` and `wf`, a client of the api that spawns the orchestrator's CLI for every verb it has not moved.
+`apps/cli`, beside it, is `nemia` and `wf`, a client of the api for every store verb, that spawns the orchestrator's CLI for the verbs about this machine.
 
 The order is `web, cli → api → orchestrator → runtime`, with `objects` at the bottom beside the runtime: each layer reaches exactly the
 one below it, and nothing reaches up or skips one, but that every layer above the runtime imports `objects` by its entry and the runtime

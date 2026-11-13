@@ -152,7 +152,7 @@ function clauseRefusal(text: string): string | undefined {
 /**
  * Why the selectors `values` spell are refused before anything is read — in the words of the first that is wrong — or undefined where
  * every one of them is a selector. A selector with no clause at all is refused too: `-l ''` and `-l ,` select nothing and say nothing.
- * Pure: what `WATCH.check` answers, and what a loader of a stored selector throws.
+ * Pure: what the api's feed refuses a label query in (422), and what a loader of a stored selector throws.
  */
 export function selectorsRefusal(values: readonly string[]): string | undefined {
   for (const value of values) {

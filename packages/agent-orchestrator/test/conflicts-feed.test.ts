@@ -30,25 +30,40 @@ import { recordFeed, freshFeedMemo } from '../src/feed/feed.store.ts';
 import { parseSelectors, selects } from '../src/watch/selector.ts';
 import { NEMIA_SELECTORS } from '../src/nemia/nemia.ts';
 import { engineOf, runWith } from '../src/runtime-client.ts';
-import { main } from '../src/cli/main.ts';
+import { told } from './typed.ts';
+import { factoryTyped } from './factory-typed.ts';
+import { typed } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-conflicts-feed-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_VERIFY_REST: '1', WF_MAX_RUNS: undefined, WF_MAX_CONCURRENT: undefined };
 const { exportTemplate, reconciled } = programsAt(ROOT);
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/** `nemia`, typed here: a factory's verb as `factoryTyped` runs it, a resolution proposed as a folder here proposes it; else `told`. */
+const typedHere: typeof told = async (argv, ...over) => {
+  if (argv[0] === 'factory') await factoryTyped(argv, ...over);
+  else await told(argv, ...over);
+};
+const stage = staged({ runWith, main: typedHere, engineOf, env: ENV });
 
 /** What the engine's own pass answers here: nothing admitted, nothing started, no view. */
 const QUIET = { tasks: 0, actions: [], running: {}, views: [] };
 const RULES = 'RULES.md';
 const LINE = `${RULES}:1-1`;
 
-/** `nemia <argv>`, its console muted. */
-const typed = async (t: TestContext, ...argv: string[]): Promise<void> => {
+/** `nemia <argv>` read by its entry's words and run on its handler, over the board's engine and the test's place. */
+const handedTo = async (...argv: string[]): Promise<void> => {
+  await typed(argv, stage.board().e, undefined, stage.place().place, ENV);
+};
+
+/**
+ * `nemia factory resolve <argv>` on its entry's handler with this machine's proposer (`factoryTyped`), its console muted: a resolution
+ * is proposed only where a template is a folder on the machine, so its handler refuses it from anywhere else.
+ */
+const resolvedBy = async (t: TestContext, ...argv: string[]): Promise<void> => {
   const log = t.mock.method(console, 'log', () => {});
   try {
-    await stage.main(argv);
+    await stage.main(['factory', 'resolve', ...argv]);
   } finally {
     log.mock.restore();
   }
@@ -79,7 +94,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
   const pass = () => stage.runWith(b.e, tickRun());
   const dir = path.join(scratch('wf-conflicts-feed-template-'), 'team');
 
-  await s.test('a factory applied at 0.1.0 with its rules, and one with no conflict: a pass says no factory', async (sub) => {
+  await s.test('a factory applied at 0.1.0 with its rules, and one with no conflict: a pass says no factory', async () => {
     const repo = scratch('wf-conflicts-feed-repo-');
     fs.renameSync(teamCopy(), path.join(repo, 'workflows'));
     stage.place().world.repository(repo, {});
@@ -87,36 +102,33 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
     exportTemplate({ dir, from: repo });
     fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n\nWrite the tests first.\n');
     for (const name of ['acme', 'quiet']) {
-      await typed(sub, 'factory', 'apply', name, '--template', dir, '--repo', repo);
+      await handedTo('factory', 'apply', name, '--template', dir, '--repo', repo);
       reconciled(factory(name));
     }
     await pass();
     assert.deepEqual(factorySaid(), []);
   });
 
-  await s.test(
-    'the upgrade filed over a line both changed, the controller says ConflictsPending True: a pass says it once',
-    async (sub) => {
-      rewrite(treeDir(ROOT, 'acme'), 'on a Friday', 'on a Friday, nor on a Monday');
-      const doc = parse(fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8'));
-      doc.spec.version = '0.2.0';
-      fs.writeFileSync(path.join(dir, 'nemia.yaml'), stringify(doc, { lineWidth: 0 }));
-      rewrite(dir, 'Never push on a Friday.', 'Never push on a weekend.');
-      await typed(sub, 'factory', 'upgrade', 'acme', '--to', '0.2.0');
-      const status = reconciled(factory('acme'));
-      assert.deepEqual(
-        status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => c.status),
-        ['True'],
-      );
-      await pass();
-      assert.deepEqual(factorySaid(), [['acme', 'ConflictsPending', { factory: 'acme' }, 'tick']]);
-      const [line] = readFeed(ROOT, 0).lines.filter((l) => l.reason === 'ConflictsPending');
-      assert.ok(line !== undefined);
-      assert.equal(line.type, 'Normal', 'a wait on a person, not a fault');
-      assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
-      assert.equal(selects(parseSelectors(['kind=Factory,factory=acme']), line), true);
-    },
-  );
+  await s.test('the upgrade filed over a line both changed, the controller says ConflictsPending True: a pass says it once', async () => {
+    rewrite(treeDir(ROOT, 'acme'), 'on a Friday', 'on a Friday, nor on a Monday');
+    const doc = parse(fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8'));
+    doc.spec.version = '0.2.0';
+    fs.writeFileSync(path.join(dir, 'nemia.yaml'), stringify(doc, { lineWidth: 0 }));
+    rewrite(dir, 'Never push on a Friday.', 'Never push on a weekend.');
+    await handedTo('factory', 'upgrade', 'acme', '--to', '0.2.0');
+    const status = reconciled(factory('acme'));
+    assert.deepEqual(
+      status.conditions.filter((c) => c.type === 'ConflictsPending').map((c) => c.status),
+      ['True'],
+    );
+    await pass();
+    assert.deepEqual(factorySaid(), [['acme', 'ConflictsPending', { factory: 'acme' }, 'tick']]);
+    const [line] = readFeed(ROOT, 0).lines.filter((l) => l.reason === 'ConflictsPending');
+    assert.ok(line !== undefined);
+    assert.equal(line.type, 'Normal', 'a wait on a person, not a fault');
+    assert.equal(selects(parseSelectors([...NEMIA_SELECTORS]), line), true, 'her selectors wake her on it');
+    assert.equal(selects(parseSelectors(['kind=Factory,factory=acme']), line), true);
+  });
 
   await s.test('more passes, and a daemon restarted with no fold of its own, say it no second time', async () => {
     await pass();
@@ -129,7 +141,7 @@ test("a factory's upgrade conflicts said on the feed: one line when they turn pe
   await s.test(
     'the person chooses and approves the rules as the Factory, the controller merges and says it False: a pass says it settled, once',
     async (sub) => {
-      await typed(sub, 'factory', 'resolve', 'acme', LINE, '--theirs');
+      await resolvedBy(sub, 'acme', LINE, '--theirs');
       const proposal = readResolutions(ROOT, 'acme')?.proposals?.['Factory/acme'] ?? '';
       await stage.runWith(stage.board().e, approveProgram(PERSON, 'acme', proposal, { home: ROOT }));
       const status = reconciled(factory('acme'));

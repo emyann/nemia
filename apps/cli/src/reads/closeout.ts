@@ -1,22 +1,26 @@
 /**
- * `nemia closeout <run> <step> [--try <n>]`, read from the api through the objects' client: what a try of a step signed off with — the
- * one `--try` names (`…/tries/:try/closeout`), else its latest, the last of its tries (`…/tries`) — printed as the in-process command
- * prints it (`closeoutLines`, the orchestrator's `object/commands.verb.ts`, ported word for word). Any other words go to the old path.
+ * `nemia closeout <run> <step> [--try <n>]`, its words parsed against `objects`' `CLOSEOUT_WORDS`, read from the api through the
+ * objects' client: what a try of a step signed off with — the one `--try` names (`…/tries/:try/closeout`), else its latest, the last of
+ * its tries (`…/tries`) — printed a field a line (`closeoutLines`).
  *
  * The api answers a closeout's short output fields and a page of its body unless asked for more: the command prints it whole, so it asks
  * every field (`fields=*`) and reads the body on from each page's `bodyNext` until none is left (`whole`), of the one try it prints: the
  * latest is found off the tries' summaries, each asked as the api keeps it by default, so a step of many tries is never asked whole.
  */
 import { Effect } from 'effect';
-import { BODY_PAGE, type StepCloseout, type TryCloseout } from 'objects';
+import { type Args, BODY_PAGE, type StepCloseout, type TryCloseout } from 'objects';
 import { Refused } from '../client.ts';
-import { handedOn } from '../local.ts';
+import { textArg } from '../commands/requests.ts';
 import { asked, type ObjectsClient } from '../objects.ts';
 
 /** A field's value on one line: a string as it is, anything else as JSON. */
 const valueLine = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value));
 
-/** A closeout as a person reads it at the command line: the in-process `closeoutLines`. */
+/**
+ * A closeout as a person reads it at the command line: its outcome and summary, the question a blocked step asks (`needs`), its body, the
+ * files and values it handed on, the fields its workflow asked for (`output`), each reply to a finding with its why under it, and what it
+ * left out or was refused.
+ */
 const closeoutLines = (n: number, c: StepCloseout): string[] => [
   `try ${n}: ${c.outcome}: ${c.summary}`,
   ...(c.needs ? [`needs: ${c.needs}`] : []),
@@ -35,24 +39,6 @@ export const closeoutPrinted = ({ try: n, closeout, unreadable }: TryCloseout, s
   closeout
     ? closeoutLines(n, closeout)
     : [`try ${n} of ${step}: ${unreadable ? `its closeout does not read: ${unreadable.error}` : 'no closeout yet'}`];
-
-/** The run, the step and the try typed, or none for words the old path is to read. */
-function parsed(args: readonly string[]): { runId: string; step: string; tryNo?: string } | undefined {
-  const positionals: string[] = [];
-  let tryNo: string | undefined;
-  for (let i = 0; i < args.length; i++) {
-    const word = args[i] ?? '';
-    if (word === '--try') {
-      const value = args[i + 1];
-      if (tryNo !== undefined || value === undefined || value === '' || value.startsWith('--')) return undefined;
-      tryNo = value;
-      i++;
-    } else if (word.startsWith('-') || word === '') return undefined;
-    else positionals.push(word);
-  }
-  const [runId, step] = positionals;
-  return positionals.length === 2 && runId !== undefined && step !== undefined ? { runId, step, ...(tryNo ? { tryNo } : {}) } : undefined;
-}
 
 /** What a closeout is asked with to be read whole: every output field, and the body in pages of the most the api answers. */
 const WHOLE = { fields: '*', bodyLimit: String(BODY_PAGE.most) } as const;
@@ -78,10 +64,11 @@ const whole = (client: ObjectsClient, runId: string, step: string, read: TryClos
     return { ...read, closeout };
   });
 
-export async function closeout(args: readonly string[]): Promise<number> {
-  const typed = parsed(args);
-  if (typed === undefined) return handedOn(['closeout', ...args]);
-  const { runId, step, tryNo } = typed;
+/** Prints what the try of the step `args` names signed off with, its latest where no `--try` is given; answers 0. */
+export async function closeout(args: Args): Promise<number> {
+  const runId = textArg(args, 'runId') ?? '';
+  const step = textArg(args, 'step') ?? '';
+  const tryNo = textArg(args, 'try');
   const read = await asked('closeout', (client) =>
     Effect.flatMap(
       tryNo !== undefined

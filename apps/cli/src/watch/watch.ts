@@ -6,17 +6,19 @@
  * cursor every `RECONNECT_EVERY`, `daemon up` when it opens again; it runs until a signal, which exits 128 and its number. It reads no
  * file of the store.
  *
- * What it does not read itself goes to the old path (`handedOn`), which refuses it in its own words, exactly as before: a flag or form it
- * does not know, a cursor beside a cursor file, a cursor file in no directory or holding no number, a selector the grammar refuses.
+ * Its words are parsed against `objects`' `WATCH_WORDS`, whose refusals and check say a flag or form it does not take and a cursor beside a
+ * cursor file; it refuses a cursor file in no directory or holding no number itself, and a label query the api's grammar refuses in the
+ * api's words.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Cause, Effect, Exit, Fiber, Schedule } from 'effect';
+import type { Args } from 'objects';
 import { sessionHeaders, urlOf } from '../client.ts';
 import { served } from '../daemon.ts';
 import { asked as objectsAsked } from '../objects.ts';
-import { handedOn } from '../local.ts';
+import { listArg, switchArg, textArg } from '../commands/requests.ts';
 import { Refused } from '../refused.ts';
 import { servedAt } from '../where.ts';
 import { bookmarkLine, livenessOf, livenessWords, pausedWords, watchedLine, type Watched } from './lines.ts';
@@ -28,37 +30,46 @@ export const RECONNECT_EVERY = '1 second';
 type Asked = { once: boolean; how: Watched; selectors: string[]; cursorFile?: string; cursor?: number };
 
 /**
- * Takes the word at `i` (and the value after it) into `asked`: answers how many words it took, or 0 for one this client leaves to the
- * old path.
+ * What the parsed words ask (`objects`' `WATCH_WORDS`, its cursor checked by their `check`): refused, exit 2, where a cursor file is named
+ * in no directory, which the watch could not keep its place in, naming what to make.
  */
-function took(asked: Asked, word: string, next: string | undefined): number {
-  if (word === '--once') return ((asked.once = true), 1);
-  if (word === '--json') return ((asked.how = { json: true }), 1);
-  if (next === undefined) return /^\d+$/.test(word) && asked.cursor === undefined ? ((asked.cursor = Number(word)), 1) : 0;
-  if (word === '-l') return (asked.selectors.push(next), 2);
-  if (word === '--cursor-file' && asked.cursorFile === undefined) return ((asked.cursorFile = next), 2);
-  return /^\d+$/.test(word) && asked.cursor === undefined ? ((asked.cursor = Number(word)), 1) : 0;
+function askedOf(args: Args): Asked {
+  const cursorFile = textArg(args, 'cursorFile');
+  const cursor = textArg(args, 'cursor');
+  const dir = cursorFile === undefined ? undefined : path.dirname(cursorFile);
+  if (dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() !== true)
+    throw new Refused(
+      `nemia watch --cursor-file ${cursorFile ?? ''}: ${dir} is no directory, so the watch could not keep its cursor there — make it, ` +
+        'or name a file in a directory that is: nemia watch --cursor-file <path>',
+    );
+  return {
+    once: switchArg(args, 'once'),
+    how: { json: switchArg(args, 'json') },
+    selectors: [...listArg(args, 'selector')],
+    ...(cursorFile === undefined ? {} : { cursorFile }),
+    ...(cursor === undefined ? {} : { cursor: Number(cursor) }),
+  };
 }
 
-/** The words read as this client reads them, or undefined for any it leaves to the old path. */
-function askedOf(args: readonly string[]): Asked | undefined {
-  const asked: Asked = { once: false, how: { json: false }, selectors: [] };
-  for (let i = 0; i < args.length;) {
-    const n = took(asked, args[i] ?? '', args[i + 1]);
-    if (n === 0) return undefined;
-    i += n;
-  }
-  if (asked.cursor !== undefined && asked.cursorFile !== undefined) return undefined;
-  const dir = asked.cursorFile === undefined ? undefined : path.dirname(asked.cursorFile);
-  if (dir !== undefined && fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() !== true) return undefined;
-  return asked;
-}
-
-/** The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no number. */
+/** The cursor a cursor file holds, none where there is no file, or `'refused'` for one holding no whole number. */
 export function savedIn(file: string | undefined): number | undefined | 'refused' {
   if (file === undefined || fs.statSync(file, { throwIfNoEntry: false }) === undefined) return undefined;
   const text = fs.readFileSync(file, 'utf8').trim();
   return /^\d+$/.test(text) ? Number(text) : 'refused';
+}
+
+/**
+ * The cursor `nemia watch`'s cursor file holds, none where there is none; refused, exit 2, naming the file, where it holds no whole
+ * number.
+ */
+function watchSaved(file: string | undefined): number | undefined {
+  const saved = savedIn(file);
+  if (saved !== 'refused') return saved;
+  const text = fs.readFileSync(file ?? '', 'utf8').trim();
+  throw new Refused(
+    `${file ?? ''} is no cursor file: it holds ${JSON.stringify(text.slice(0, 40))}, where a watch keeps a whole number of bytes. Delete it to ` +
+      `read the feed from its start, or name another: nemia watch --cursor-file <path>`,
+  );
 }
 
 /** Writes `cursor` to the cursor file, whole: to a temp name beside it, then renamed over it, as the in-process watch writes it. */
@@ -206,12 +217,11 @@ const noneAnswers = (base: string, why: string): Refused =>
 
 /**
  * Opens the stream for the first time, from the saved cursor, the typed one or 0: a saved cursor the api refuses (400) starts over at 0,
- * said once; a typed one is refused in the api's words; a selector the api refuses (422) is the old path's to refuse. Answers the open
- * (or none, where no api answers), or `old`.
+ * said once; a typed one, and a label query the api refuses (422), are refused in the api's words. Answers the open, or none where no
+ * api answers.
  */
-async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened | 'old'> {
-  const saved = savedIn(asked.cursorFile);
-  if (saved === 'refused') return 'old';
+async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened> {
+  const saved = watchSaved(asked.cursorFile);
   at.cursor = saved ?? asked.cursor ?? 0;
   let got = await opened(base, asked, at.cursor);
   if (got.kind === 'refused' && got.status === 400 && saved !== undefined && asked.cursorFile !== undefined) {
@@ -219,7 +229,6 @@ async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened | '
     at.cursor = 0;
     got = await opened(base, asked, 0);
   }
-  if (got.kind === 'refused' && got.status === 422) return 'old';
   if (got.kind === 'refused')
     throw new Refused(
       got.status === 404 && got.bare
@@ -231,11 +240,10 @@ async function firstOpen(asked: Asked, at: At, base: string): Promise<Opened | '
 }
 
 /** `nemia watch --once`: the pause in words, the lines to the feed's end as the stream opened, and where that is. */
-async function once(asked: Asked, args: readonly string[]): Promise<number> {
+async function once(asked: Asked): Promise<number> {
   const at: At = { cursor: 0, hinted: false };
   const base = await served('watch');
   const got = await firstOpen(asked, at, base);
-  if (got === 'old') return handedOn(['watch', ...args]);
   if (got.kind !== 'open') throw noneAnswers(base, got.kind === 'none' ? got.why : got.said);
   if (asked.how.json !== true) {
     const paused = pausedWords(await objectsAsked('watch', (client) => client.server.paused()));
@@ -318,11 +326,10 @@ function runMain<E>(program: Effect.Effect<never, E>): Promise<number> {
 }
 
 /** `nemia watch`, followed: the first open as `--once` opens, the banner, then the stream reopened every `RECONNECT_EVERY` it drops. */
-async function followed(asked: Asked, args: readonly string[]): Promise<number> {
+async function followed(asked: Asked): Promise<number> {
   const at: At = { cursor: 0, hinted: false };
   const base = await served('watch');
   const got = await firstOpen(asked, at, base);
-  if (got === 'old') return handedOn(['watch', ...args]);
   (asked.how.json === true ? console.error : console.log)(`watching from ${at.cursor}, ^C to stop`);
   const live: { state: 'up' | 'down'; base: string } = { state: 'up', base };
   const first =
@@ -354,9 +361,8 @@ async function followed(asked: Asked, args: readonly string[]): Promise<number> 
   return runMain(program);
 }
 
-/** `nemia watch <args>`: over the api where it reads the words, else on the old path; answers its exit code. */
-export const watch = (args: readonly string[]): Promise<number> => {
+/** `nemia watch`, its words parsed against `objects`' `WATCH_WORDS`, over the api's stream; answers its exit code. */
+export const watch = (args: Args): Promise<number> => {
   const asked = askedOf(args);
-  if (asked === undefined) return handedOn(['watch', ...args]);
-  return asked.once ? once(asked, args) : followed(asked, args);
+  return asked.once ? once(asked) : followed(asked);
 };

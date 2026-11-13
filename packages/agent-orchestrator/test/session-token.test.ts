@@ -25,12 +25,24 @@ import { tokenDigest, tokensDir, mintToken, mintPersonToken, revokePersonToken }
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
 import { writeSpeakers } from '../src/chat/chat.store.ts';
+import { typed } from './typed.ts';
+import { SAY } from '../src/say/commands.verb.ts';
+import { Conflict } from '../src/runner.ts';
+import { COMMAND_WORDS } from 'objects';
+import type { Place } from '../src/runner.ts';
+import type { Engine } from '../src/cli/flags.ts';
 
 const ROOT = scratch('wf-session-token-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.NEMIA_DAEMON_START = 'off';
 const ENV: Env = { ...process.env, WF_ROOT: ROOT, WF_DEFAULT_FACTORY_STARTS: '1', WF_MAX_CONCURRENT: undefined, WF_MAX_RUNS: undefined };
-const stage = staged({ runWith, main, engineOf, env: ENV });
+/**
+ * A command line as a person types it: a verb the client holds (`objects`' `COMMAND_WORDS`) run on its entry's handler (`typed`), as the
+ * api runs it; any other through this CLI's `main`.
+ */
+const typedOrMain = (argv: string[], e?: Engine, _demand?: unknown, place?: Place, env?: Env): Promise<unknown> =>
+  COMMAND_WORDS.some((w) => w.name === argv[0]) ? typed(argv, e, undefined, place, env) : main(argv, e, undefined, place, env);
+const stage = staged({ runWith, main: typedOrMain, engineOf, env: ENV });
 
 /** A repository of the stage's place with one file, so `nemia start` has a base to record. */
 const aRepo = (): string => {
@@ -192,12 +204,32 @@ test('nemia token add prints the token once with its header, ls lists it by name
   await assert.rejects(stage.main(['token', 'rm', 'cli-laptop']), (err: unknown) => (err as { _tag?: string })._tag === 'Missing');
 });
 
+/**
+ * `nemia say` to `runId`'s `implement` as the api takes it from a client in `env`: who calls read off the session token it presents
+ * (`sessionCaller`), refused (`Conflict`) where it names no live try, and `--as` the name the words say they are from.
+ */
+const sayAs = async (runId: string, env: Env, ...words: string[]) => {
+  const token = env[SESSION_TOKEN];
+  const caller = await callerBy(token === undefined || token === '' ? undefined : token);
+  if (caller.kind === 'refused') throw new Conflict({ message: `the session's token is refused: ${caller.reason}` });
+  const as = words[0] === '--as' ? words[1] : undefined;
+  const text = (as === undefined ? words : words.slice(2)).join(' ');
+  return stage.runWith(
+    stage.board().e,
+    SAY.handler({
+      runId,
+      step: 'implement',
+      text,
+      caller: caller.kind === 'agent' ? { kind: 'agent', agent: caller.agent, factory: caller.factory } : { kind: 'person' },
+      ...(as === undefined ? {} : { from: { kind: 'agent', name: as } }),
+    }),
+  );
+};
+
 test("`nemia say` from a step's session says its words as its agent's, by the token in its environment; an ended one is refused", async (t) => {
   const s = story(t);
   let id = '';
   let token = '';
-  const sayAs = (env: Env, ...words: string[]) =>
-    main(['say', id, 'implement', ...words], stage.board().e, undefined, stage.place().place, env);
   const heard = () =>
     stage
       .board()
@@ -210,20 +242,20 @@ test("`nemia say` from a step's session says its words as its agent's, by the to
     await pass(id);
     stage.board().settle(`${id}-implement`, 'working');
     token = tokenOf(`${id}-implement`) ?? '';
-    await sayAs({ ...ENV, [SESSION_TOKEN]: token }, 'Start', 'with', 'the', 'parser.');
+    await sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'Start', 'with', 'the', 'parser.');
     assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.']);
   });
 
   await s.test('with no token, `--as` an allowed name frames them under it; the person says them as ever', async () => {
     writeSpeakers(path.join(ROOT, 'nemia'), ['operator']);
-    await sayAs(ENV, '--as', 'operator', 'Cut', 'it.');
-    await sayAs({ ...ENV, [SESSION_TOKEN]: '' }, 'Widen', 'it.');
+    await sayAs(id, ENV, '--as', 'operator', 'Cut', 'it.');
+    await sayAs(id, { ...ENV, [SESSION_TOKEN]: '' }, 'Widen', 'it.');
     assert.deepEqual(heard().slice(1), ['The agent operator writes, not the person: Cut it.', 'Widen it.']);
   });
 
   await s.test('REFUSED: a token whose try ended is a Conflict, never taken as the person, and nothing is said', async () => {
     stage.board().settle(`${id}-implement`, 'failed', { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: null });
-    await assert.rejects(sayAs({ ...ENV, [SESSION_TOKEN]: token }, 'hello'), (err: Error & { exitCode?: number }) => {
+    await assert.rejects(sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'hello'), (err: Error & { exitCode?: number }) => {
       assert.equal(err.name, 'Conflict');
       assert.equal(err.exitCode, 2);
       return true;

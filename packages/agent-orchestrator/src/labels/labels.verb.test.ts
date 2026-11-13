@@ -8,7 +8,6 @@ import assert from 'node:assert/strict';
 import { Effect, Exit, Layer } from 'effect';
 import { names } from '../../test/assessed.ts';
 import { labelCard, labelRun } from './labels.verb.ts';
-import { LABEL_RUN } from './commands.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { runDoorMemory } from '../runs/memory.store.ts';
 import { CardDoor } from '../cards/cards.store.ts';
@@ -65,15 +64,7 @@ test('`nemia label run`: set, change refused without --overwrite and taken with 
   assert.deepEqual(stored.removed.labels, {});
   assert.equal(stored.labels, undefined, 'the map emptied leaves the run with none');
 
-  const lines = LABEL_RUN.print(stored.removed, { runId: 'r-1', labels: ['team-', 'x-'] });
-  assert.ok(
-    lines.some((line) => line.includes('team removed') && line.includes('infra')),
-    lines.join('\n'),
-  );
-  assert.ok(
-    lines.some((line) => line.includes('x already absent')),
-    'an absent key removed is said as no change',
-  );
+  assert.deepEqual(stored.removed.was, { team: 'infra' }, 'what the removal took off, which the client says as removed');
 });
 
 test('`nemia label inbox`: its labels: written, every other key and the body kept, and edited again', () => {

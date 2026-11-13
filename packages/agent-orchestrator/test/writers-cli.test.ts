@@ -1,10 +1,10 @@
 /**
- * The library's writers — `agents write`, `skills write` and `workflows write` on their entries' handlers, which the api calls once the
- * client (`apps/cli`) has had its files read, and `agents rm`, `agents run` and `workflows rm` at the command line — told as a person's
- * story into yours under a scratch `WF_ROOT`, and read back from disk. And a table: each refusal at shipped defaults — the place, a
- * version left out, taken or moved on from, a name, a key the api alone takes — by its kind and exit 2, naming the fix, yours left as it
- * was. And the rules both sides keep: the command line hands each writer it still runs only the keys the api's body could, read off its
- * spec; and a command the client holds (`objects`' `COMMAND_WORDS`) is no name of this CLI's, which prints its help for it.
+ * The library's writers — `agents write`, `skills write` and `workflows write`, and `agents rm`, `agents run` and `workflows rm` — on
+ * their entries' handlers, which the api calls once the client (`apps/cli`) has read the person's files and words: the last three read
+ * by their words (`test/typed.ts`), as the client parses them. Told as a person's story into yours under a scratch `WF_ROOT`, and read
+ * back from disk. And a table: each refusal at shipped defaults — the place, a version left out, taken or moved on from, a name — by its
+ * kind and exit 2, naming the fix, yours left as it was. And the rule both sides keep: a command the client holds (`objects`'
+ * `COMMAND_WORDS`) is no name of this CLI's, which prints its help for it; no writer is left to it.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +20,7 @@ import { TEAM } from './team.ts';
 import { names } from './assessed.ts';
 import { story } from './story.ts';
 import { main } from '../src/cli/main.ts';
+import { typed as asked } from './typed.ts';
 import { HELP } from '../src/cli/flags.ts';
 import {
   AGENTS_WRITE,
@@ -50,8 +51,8 @@ const runWith = runOver(runEngine, () => stand().layer, ENV);
 const YOURS = path.join(ROOT, 'workflows');
 const DRAFTS = scratch('wf-writers-cli-drafts-');
 
-/** What `nemia <argv>` printed on stdout, or the words it was refused with, its kind (`_tag`) and its exit code. */
-async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; refused?: string; tag?: string; exitCode?: number }> {
+/** What this CLI's `main` printed on stdout for `nemia <argv>`, or the words it was refused with, its kind (`_tag`) and its exit code. */
+async function said(t: TestContext, ...argv: string[]): Promise<{ out: string; refused?: string; tag?: string; exitCode?: number }> {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => void out.push(args.join(' ')));
   const err = t.mock.method(console, 'error', () => undefined);
@@ -67,11 +68,18 @@ async function typed(t: TestContext, ...argv: string[]): Promise<{ out: string; 
   }
 }
 
-/** What `nemia <argv>` printed, which it must not have been refused. */
-async function done(t: TestContext, ...argv: string[]): Promise<string> {
-  const { out, refused } = await typed(t, ...argv);
-  assert.equal(refused, undefined, refused);
-  return out;
+/** What the handler of the entry `nemia <argv>` names answers, read by its words (`asked`, `test/typed.ts`), over the test's engine. */
+const answered = <D>(...argv: string[]): Promise<D> => asked(argv, engineOf(engine().layer), undefined, undefined, ENV) as Promise<D>;
+
+/** What the handler of `nemia <argv>` was refused with, its kind (`_tag`) and its exit code; none where it answered. */
+async function typed(_t: TestContext, ...argv: string[]): Promise<{ refused?: string; tag?: string; exitCode?: number }> {
+  try {
+    await answered(...argv);
+    return {};
+  } catch (e) {
+    const { message, _tag, exitCode } = e as Error & { _tag?: string; exitCode?: number };
+    return { refused: message, tag: _tag, exitCode };
+  }
 }
 
 /** What `program` — an entry's handler, as the api calls it — answers at the test's store. */
@@ -211,8 +219,8 @@ test('a person writes their library: an agent, a skill and a workflow, each chan
     at = renamed.version;
   });
 
-  await s.test('nemia agents rm removes it at the version it was read at', async (sub) => {
-    assert.equal(await done(sub, 'agents', 'remove', 'yours', 'notary', '--version', at), `removed from ${agents}: notary.md`);
+  await s.test('nemia agents rm removes it at the version it was read at', async () => {
+    assert.deepEqual(await answered('agents', 'remove', 'yours', 'notary', '--version', at), { dir: agents, removed: ['notary.md'] });
     assert.equal(fs.existsSync(path.join(agents, 'notary.md')), false);
   });
 
@@ -231,7 +239,7 @@ test('a person writes their library: an agent, a skill and a workflow, each chan
 
   await s.test(
     "workflows write's handler writes a draft folder into yours and changes it at its version; nemia workflows rm removes it at its version",
-    async (sub) => {
+    async () => {
       const folder = draftWorkflow('notes');
       const made = await handled(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'notes', ...(await workflowInput('notes', folder)) }));
       assert.deepEqual(
@@ -244,8 +252,8 @@ test('a person writes their library: an agent, a skill and a workflow, each chan
         WORKFLOWS_WRITE.handler({ from: 'yours', name: 'notes', version: made.version, ...(await workflowInput('notes', folder)) }),
       );
       assert.match(fs.readFileSync(path.join(YOURS, 'notes', 'README.md'), 'utf8'), /Changed\.$/m);
-      const gone = await done(sub, 'workflows', 'remove', 'yours', 'notes', '--version', changed.version);
-      assert.equal(gone, `removed ${path.join(YOURS, 'notes')}: README.md, implement.md, review.md, ship.md`);
+      const gone = await answered('workflows', 'remove', 'yours', 'notes', '--version', changed.version);
+      assert.deepEqual(gone, { dir: path.join(YOURS, 'notes'), removed: ['README.md', 'implement.md', 'review.md', 'ship.md'] });
       assert.equal(fs.existsSync(path.join(YOURS, 'notes')), false);
     },
   );
@@ -305,8 +313,7 @@ test('a person writes their library: an agent, a skill and a workflow, each chan
     async (sub) => {
       const taster = agentDraft('taster', '---\ndescription: Use this to taste it.\nmodel: sonnet\n---\nTaste it.\n');
       await handled(AGENTS_WRITE.handler({ from: 'yours', draft: taster, schema: null }));
-      const started = await done(sub, 'agents', 'try', 'yours', 'taster', '--brief', '  Taste the soup.  ');
-      const id = /^(\S+) {2}a try of taster started: nemia ls shows how it goes/.exec(started)?.[1] ?? assert.fail(started);
+      const { id } = await answered<{ id: string }>('agents', 'try', 'yours', 'taster', '--brief', '  Taste the soup.  ');
       const run = JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'));
       assert.equal(run.repo, undefined, 'with no repository');
       assert.equal(run.brief, 'Taste the soup.');
@@ -380,13 +387,6 @@ test('REFUSED at shipped defaults: a writer, by its kind and exit 2, naming the 
       ...repo('agents'),
       'only yours is written',
       'copy the file into',
-    ],
-    [
-      'a key the api alone takes: agents rm --repo',
-      'Invalid',
-      typedAt(['agents', 'remove', 'yours', 'plain', '--repo', DRAFTS]),
-      'nemia agents rm takes no --repo',
-      'nemia agents rm yours <name> --version <v>',
     ],
     [
       'an agent removed with no version, naming the one it is at',
@@ -496,6 +496,7 @@ const handlerKeys = (command: Command): Set<string> =>
 /** The keys `handed` that `command`'s handler is never handed by the api: none, where the two sides read one spec. */
 const strayKeys = (command: Command, handed: Args): string[] => Object.keys(handed).filter((key) => !handlerKeys(command).has(key));
 
+/** The entry of the table `name` names, none for a stream the client alone runs (`watch`). */
 const entry = (name: string): Command => TABLE.find((c) => c.name === name) as Command;
 
 /** The names of the commands the client holds, which this CLI no longer runs. */
@@ -507,29 +508,14 @@ test('the command line hands each writer it still runs only what the api’s bod
     assert.deepEqual(strayKeys(entry('workflows write'), { from: 'yours', name: 'dev', folder: 'dev', steps: '[]' }), ['folder', 'steps']);
     assert.deepEqual(strayKeys(entry('skills write'), { from: 'yours', change: '{}', copy: 'tidy' }), []);
   });
-  const typedArgs: Record<string, string[]> = {
-    'agents rm': ['agents', 'rm', 'yours', 'spec', '--version', 'v'],
-    'agents run': ['agents', 'run', 'yours', 'spec', '--brief', 'Do it.'],
-    'workflows rm': ['workflows', 'rm', 'yours', 'spec', '--version', 'v'],
-  };
   const writers = (TABLE as readonly Command[]).filter(
     (c) => c.writes && c.only?.side !== 'api' && !MOVED.includes(c.name) && /^(agents|skills|workflows) (write|rm|run)$/.test(c.name),
   );
-  assert.deepEqual(writers.map((c) => c.name).sort(), Object.keys(typedArgs).sort(), 'the writers this CLI still runs, each typed here');
-  for (const command of writers)
-    await t.test(`nemia ${command.name}`, async (sub) => {
-      const handed: Args[] = [];
-      const handler = sub.mock.method(command as unknown as { handler: (args: Args) => never }, 'handler', (args: Args) => {
-        handed.push(args);
-        throw new Error('handed');
-      });
-      await typed(sub, ...typedArgs[command.name]);
-      handler.mock.restore();
-      assert.equal(handed.length, 1, `nemia ${command.name} reached its handler`);
-      assert.deepEqual(strayKeys(command, handed[0]), [], `nemia ${command.name} hands its handler only what the api's body could`);
-      const flagged = command.spec.flags.flatMap((f) => (f.only?.side === 'cli' && f.key !== undefined ? [f.key] : []));
-      for (const key of flagged) assert.equal(handed[0][key], undefined, `nemia ${command.name} reads --${key}, and hands what it read`);
-    });
+  assert.deepEqual(
+    writers.map((c) => c.name),
+    [],
+    "every writer is the client's: this CLI runs none",
+  );
 });
 
 test("a command the client holds is no name of this CLI's: typed here, it prints the help, reaches no handler and writes nothing", async (t) => {
@@ -541,17 +527,24 @@ test("a command the client holds is no name of this CLI's: typed here, it prints
     'agents write': ['agents', 'write', 'yours', '--file', file],
     'skills write': ['skills', 'write', 'yours', '--file', skill],
   };
-  assert.deepEqual(Object.keys(typedArgs).sort(), [...MOVED].sort(), 'every command the client holds, typed here');
+  assert.deepEqual(
+    Object.keys(typedArgs).filter((name) => !MOVED.includes(name)),
+    [],
+    'each typed here is one the client holds',
+  );
   for (const name of MOVED)
     await t.test(`nemia ${name}`, async (sub) => {
       const handed: unknown[] = [];
-      const handler = sub.mock.method(entry(name) as unknown as { handler: (args: Args) => never }, 'handler', (args: Args) => {
-        handed.push(args);
-        throw new Error('handed');
-      });
+      const held = entry(name) as unknown as { handler: (args: Args) => never } | undefined;
+      const handler =
+        held &&
+        sub.mock.method(held, 'handler', (args: Args) => {
+          handed.push(args);
+          throw new Error('handed');
+        });
       const before = snapshot(YOURS);
-      const { out, refused } = await typed(sub, ...(typedArgs[name] ?? []));
-      handler.mock.restore();
+      const { out, refused } = await said(sub, ...(typedArgs[name] ?? [...name.split(' '), 'x']));
+      handler?.mock.restore();
       assert.equal(refused, undefined, refused);
       assert.equal(out, HELP, `nemia ${name} prints the help`);
       assert.deepEqual(handed, [], `nemia ${name} reaches no handler here`);

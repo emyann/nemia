@@ -12,8 +12,8 @@
 import fs from 'node:fs';
 import { Cause, Clock, Duration, Effect } from 'effect';
 import { tried } from '../../runtime-client.ts';
-import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
-import type { Command } from '../../command/entry.verb.ts';
+import type { Args } from '../../command/command.ts';
+import type { Served } from '../../command/entry.verb.ts';
 import { Invalid, type Refusal } from '../../refusal/refusal.ts';
 import type { FeedConflicts } from '../../feed/index.ts';
 import { FactoryDoor, factoryRepos, originsOf, refuseName } from '../door/factories.store.ts';
@@ -45,8 +45,8 @@ import {
 import { overlaid, renderFactory, resolveParams, type Params } from './index.ts';
 import { transitionedAt } from './condition-time.ts';
 import { generationOf } from '../door/generation.ts';
-import { trustedLines, type PlaceTrust } from '../../trust/trust.ts';
-import { NO_TRUST, trustPlaces } from '../../trust/trust.verb.ts';
+import type { PlaceTrust } from '../../trust/trust.ts';
+import { trustPlaces } from '../../trust/trust.verb.ts';
 import {
   approveLine,
   baseTemplateOf,
@@ -68,9 +68,8 @@ import {
   type TreeMerge,
   type UpgradeResolution,
 } from '../upgrade/index.ts';
-import type { ProposalPhase } from 'objects';
+import { FACTORY_APPLY_WORDS, type ProposalPhase } from 'objects';
 import { ProposalDoor } from '../../proposal/proposal.store.ts';
-import { templatePacked } from '../../template/given.store.ts';
 
 /**
  * A template rendered with a factory's parameters: its name (its tree's, which the lint holds equal to its manifest's), its version, the
@@ -609,15 +608,6 @@ export const reconcile = (): Effect.Effect<never, never, StoreRoot> => {
   return Effect.forever(pass.pipe(Effect.andThen(Effect.sleep(RECONCILE_EVERY))));
 };
 
-/**
- * Why the command line takes an apply by its arguments: the api serves it as the Factory's `apply`, calling its handler with the template
- * by a builtin's name or packed, kept under its store.
- */
-const HERE = {
-  side: 'cli',
-  why: "the api serves it as the Factory's `apply` of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name",
-} as const;
-
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
   const value = args[key];
@@ -628,43 +618,6 @@ const textOf = (args: Args, key: string): string | undefined => {
 const manyOf = (args: Args, key: string): string[] => {
   const value = args[key];
   return Array.isArray(value) ? value.map(String) : [];
-};
-
-/** `nemia factory apply`'s spec: the factory's name, its template (a folder or an archive), a `--repo` or more, a `--set` a parameter. */
-const APPLY_SPEC: Spec = {
-  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
-  flags: [
-    {
-      flag: '--template',
-      kind: 'text',
-      key: 'template',
-      takes:
-        "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote: nemia factory apply <name> --template <name|folder|archive>",
-      twice: 'nemia factory apply takes --template once: a factory is made from one template.',
-    },
-    {
-      flag: '--repo',
-      kind: 'text',
-      key: 'repos',
-      many: true,
-      takes:
-        "--repo takes a repository's directory or its git URL: nemia factory apply <name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...]",
-    },
-    {
-      flag: '--set',
-      kind: 'text',
-      key: 'sets',
-      many: true,
-      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
-    } satisfies Flag,
-    NO_TRUST,
-  ],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory apply does not take ${arg}. It takes the name, --template <name|folder|archive>, --repo <path|url> once per repository, --set <key>=<value> once per parameter, and --no-trust.`
-      : `nemia factory apply makes one factory, and ${arg} is a second name: nemia factory apply <name> --template <name|folder|archive> --repo <path>.`,
-  missing:
-    "nemia factory apply takes the new factory's name: nemia factory apply <name> --template <name|folder|archive> --repo <path> [--set <key>=<value> ...].",
 };
 
 /**
@@ -709,34 +662,15 @@ const applied = Effect.fn('applied')(function* (args: Args) {
   return { name, repos, file, template, place, tree } satisfies Applied;
 });
 
-/** What `nemia factory apply` takes after its verb, said by its usage and by `nemia factory add`'s refusal of a `--template`. */
-export const APPLY_USAGE =
-  '<name> --template <name|folder|archive> --repo <path|url> [--repo <path|url> ...] [--set <key>=<value> ...] [--no-trust]';
-
 /**
  * `nemia factory apply`: a factory filed from a template, its places then trusted as `nemia factory add` trusts them unless
  * `--no-trust` (`trustPlaces`); the daemon renders its tree.
  */
-export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }> = {
-  name: 'factory apply',
-  served: [{ endpoint: 'factories.apply', request: templatePacked }],
-  usage: APPLY_USAGE,
-  help: ['make a factory from a template that passes its check, its parameters', 'given with --set; the daemon renders its tree'],
-  spec: APPLY_SPEC,
-  check: (args) => leftOut(APPLY_SPEC, args),
-  writes: true,
-  class: 'ask',
-  asksAlways: true,
-  only: HERE,
+export const FACTORY_APPLY: Served<Applied & { trusts: readonly PlaceTrust[] }> = {
+  ...FACTORY_APPLY_WORDS,
   handler: (args) =>
     Effect.gen(function* () {
       const filed = yield* applied(args);
       return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
     }),
-  print: ({ name, repos, file, template, place, tree, trusts }) => [
-    `${name}  ${repos.join(', ')}`,
-    `filed: ${file}`,
-    `made from ${place === template.source ? template.source : `the builtin template ${template.source} (${place})`} at ${template.version}; the daemon renders its tree into ${tree} on its next pass (nemia up)`,
-    ...trustedLines(name, trusts),
-  ],
 };

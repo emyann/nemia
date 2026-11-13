@@ -32,7 +32,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { scratch } from 'test-kit/scratch';
 import type { Engine } from '../src/runtime-client.ts';
-import { decideScreen as screenOf } from './screens.ts';
+import { decisionOf } from './screens.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
 import { storeGiven } from './config-given.ts';
@@ -40,7 +40,9 @@ import type { StoreRoot } from '../src/config/root.store.ts';
 import type { StoreConfig } from '../src/config/config.store.ts';
 import {
   advanceRun,
+  artifactFiles,
   decideRun,
+  isRepositoryRun,
   forgetRun,
   list,
   queueLine,
@@ -52,8 +54,9 @@ import {
 } from '../src/runner.ts';
 import * as verbs from '../src/runner.ts';
 import { runRecord } from '../src/record/record.store.ts';
-import { forgetLine, sentBack, stepTaskId } from '../src/run.ts';
-import { main } from '../src/cli/main.ts';
+import { sentBack, stepTaskId } from '../src/run.ts';
+import { builtinGitPlace, engine, START, type StartInput } from '../src/runner.ts';
+import { factsOf, handled } from './typed.ts';
 import type { Env } from '../src/config/config.store.ts';
 
 const ROOT = scratch('wf-folder-');
@@ -109,8 +112,12 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 const ENV: Env = { ...process.env, WF_ROOT: ROOT };
 
-/** `nemia decide`'s screen over this file's store, `ENV` (`decideScreen`). */
-const decideScreen = (...[t, e, argv, as, place]: Parameters<typeof screenOf>): Promise<string[]> => screenOf(t, e, argv, as, place, ENV);
+/** Run `id`'s decision over this file's store, `ENV`, on the git place, as the api reads it (`decisionOf`). */
+const decisionAt = (e: Engine, id: string) => decisionOf(e, id, { place: builtinGitPlace, env: ENV });
+/** The one command a folder run's decision offers: `nemia rm`, which forgets it with its folders. */
+const forgetOffered = (id: string) => [
+  { label: 'forget it', command: `nemia rm ${id}`, said: 'forgets the run with its folders and files', step: null },
+];
 /** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const atRoot = <A, E>(program: Effect.Effect<A, E, StoreRoot | StoreConfig>): A => Effect.runSync(storeGiven(ROOT, ENV)(program));
 const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
@@ -118,20 +125,8 @@ const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(
 const runWith = runOver(runEngine, gitPlaceLayer, ENV);
 const runPlaced = runGiven(gitPlaceLayer, ENV);
 
-/** What `main` printed, line by line, while it ran. */
-const printed = async (argv: string[], e?: Engine): Promise<string[]> => {
-  const lines: string[] = [];
-  const log = console.log;
-  console.log = (...args: unknown[]) => {
-    lines.push(args.join(' '));
-  };
-  try {
-    await main(argv, e, undefined, undefined, ENV);
-  } finally {
-    console.log = log;
-  }
-  return lines.join('\n').split('\n');
-};
+/** `nemia start` on its entry's handler, as the api calls it once the client has sent what it read: the run started, or its refusal. */
+const started = async (input: StartInput) => factsOf(await handled(START, input, { e: engine(ENV), place: builtinGitPlace, env: ENV }));
 
 const SIGNED = { outcome: 'done', summary: 'wrote it', artifacts: ['note.md'], needs: null };
 
@@ -319,28 +314,24 @@ test('a folder run advances, is decided and is forgotten with no git: each step 
     'no branch to list',
   );
 
-  const screen = await printed(['decide', run.id], e);
-  assert.ok(
-    screen.includes(
-      `  worked in folders, with no git repository: ${path.join(ROOT, 'runs', run.id, 'work')}, a folder per step; nothing to merge`,
-    ),
-    `nemia decide says where the work is:\n${screen.join('\n')}`,
+  const read = await decisionAt(e, run.id);
+  assert.deepEqual(
+    [isRepositoryRun(read.run), read.run.workspace],
+    [false, path.join(ROOT, 'runs', run.id, 'work')],
+    'the decision says where the work is: in folders, with no git repository, a folder per step',
   );
-  assert.equal(
-    screen.at(-1),
-    `  done with it   nemia rm ${run.id}  — forgets the run with its folders and files`,
-    'and the one command there is',
-  );
-  assert.equal(screen.filter((l) => /\bgit (-C|merge|branch|diff)/.test(l)).length, 0, `and no git command:\n${screen.join('\n')}`);
+  assert.deepEqual('commands' in read.decision && read.decision.commands, forgetOffered(run.id), 'and the one command there is');
+  assert.doesNotMatch(JSON.stringify(read.decision), /\bgit (-C|merge|branch|diff)/, 'and no git command');
 
   const forgot = await runWith(e, forgetRun(run.id));
   assert.equal(forgot.kind, 'forgotten');
   assert.equal(forgot.folder, true);
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', run.id)), false, 'its folders went with it');
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), false);
-  assert.match(
-    forgetLine(forgot),
-    new RegExp(`^${run.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`),
+  assert.deepEqual(
+    [forgot.removed, forgot.gone, forgot.handedOff, forgot.branches],
+    [[], [], [], []],
+    'a folder run, whose steps worked in its own directory: no worktrees, no branches',
   );
   assert.deepEqual(gitAsked(), [], 'and nothing asked git');
 });
@@ -370,15 +361,16 @@ test('nemia start from a directory that is no repository: a folder team starts, 
   const cwd = process.cwd();
   process.chdir(NOT_A_REPO);
   try {
-    const out = await printed(['start', 'a note on tides', '--workflows', TEAM]);
-    const id = out[0].split(' ')[0];
+    const out = await started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO });
+    const id = out.id;
     assert.equal(runRecord(ROOT, id).place?.kind, 'folder');
-    assert.ok(
-      out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`),
-      out.join('\n'),
+    assert.deepEqual(
+      [out.facts.workspace, out.facts.repository],
+      [path.join(ROOT, 'runs', id, 'work'), false],
+      'the start says where it works: a folder per step, with no git repository',
     );
     await assert.rejects(
-      main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.'], undefined, undefined, undefined, ENV),
+      started({ brief: 'a note on tides', workflows: TEAM, repo: NOT_A_REPO, repoNamed: true }),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`place: folder\``),
     );
@@ -418,21 +410,18 @@ test('an old inbox card of a folder team: --repo at its start is refused, as on 
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `---\nworkflow: note\nrepo: ${NOT_A_REPO}\n---\na note on tides\n`);
     await assert.rejects(
-      main(['start', file, '--repo', '.'], undefined, undefined, undefined, ENV),
+      started({ card: 'a-note-on-tides-old', at: NOT_A_REPO, repo: NOT_A_REPO, repoNamed: true }),
       (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes('--repo'),
     );
     assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
-    const out = await printed(['start', file]);
-    const run = runRecord(ROOT, out[0].split(' ')[0]);
+    const out = await started({ card: 'a-note-on-tides-old', at: NOT_A_REPO });
+    const run = runRecord(ROOT, out.id);
     assert.deepEqual(
       [run.place?.kind, run.from?.inbox, 'repo' in run],
       ['folder', 'a-note-on-tides-old', false],
       'the repository is ignored: the record has none',
     );
-    assert.ok(
-      out.some((line) => line.includes(`repo: ${NOT_A_REPO}`) && line.includes('retired')),
-      `the start says so, rather than leaving a person to look for the work in it:\n${out.join('\n')}`,
-    );
+    assert.equal(out.ignoredRepo, NOT_A_REPO, 'the start says so, rather than leaving a person to look for the work in it');
     assert.ok(fs.existsSync(file), 'started, the card stays in the inbox');
   } finally {
     process.chdir(cwd);
@@ -700,7 +689,7 @@ test("REFUSED: a step's given/ that is a link is never followed — filed again,
   await runWith(e, forgetRun(run.id));
 });
 
-test('the whole screen of a folder run: where the work is, and the one command there is', async (t) => {
+test('the whole decision of a folder run: where the work is, and the one command there is', async () => {
   const run = await runPlaced(startRun({ brief: 'a note on tides', repo: NOT_A_REPO, workflowDir: TEAM }));
   const { e, settle } = board();
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
@@ -709,32 +698,31 @@ test('the whole screen of a folder run: where the work is, and the one command t
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
   settle(`${run.id}-review`, 'succeeded', { ...SIGNED, artifacts: [] });
   await runWith(e, advanceRun(runRecord(ROOT, run.id)));
-  assert.deepEqual(await decideScreen(t, e, [run.id], { '<id>': run.id, '<root>': ROOT }), [
-    '<id>  a note on tides',
-    '',
-    '  UNVERIFIED: review, write  — no check: declared; only its own word says it worked',
-    '',
-    '  write',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    wrote it',
-    '    files:',
-    '      <root>/runs/<id>/artifacts/write/note.md  8 B',
-    '',
-    '  review',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed not known  settled before it spawned  used not measured',
-    '    wrote it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued —  ran —  wall not known',
-    '',
-    '',
-    '  worked in folders, with no git repository: <root>/runs/<id>/work, a folder per step; nothing to merge',
-    '',
-    '  done with it   nemia rm <id>  — forgets the run with its folders and files',
-  ]);
+  const read = await decisionAt(e, run.id);
+  const decided = read.decided!;
+  const d = read.decision;
+  assert.ok('commands' in d && decided.decision.kind === 'awaiting', JSON.stringify(d));
+  assert.deepEqual(decided.decision.unverified, ['review', 'write'], 'no check: declared; only its own word says it worked');
+  assert.deepEqual([d.touched, d.sensitive, d.standings, read.results], [[], [], [], []], 'no branch to read');
+  for (const name of ['write', 'review']) {
+    const c = decided.closeouts[name];
+    assert.equal(c && !('error' in c) ? c.summary : c, 'wrote it');
+    assert.equal(d.used[name]?.used, 'not measured');
+    assert.deepEqual(
+      decided.timeline.steps[name]?.map((x) => [x.try, x.session?.at, x.session?.filedAt]),
+      [[1, 'unspawned', null]],
+      'settled before it spawned, its filing not known',
+    );
+  }
+  assert.deepEqual(
+    artifactFiles(ROOT, read.run, 'write').map((f) => [path.relative(ROOT, f.path), f.bytes]),
+    [[path.join('runs', run.id, 'artifacts', 'write', 'note.md'), 8]],
+  );
+  assert.deepEqual(artifactFiles(ROOT, read.run, 'review'), []);
+  assert.equal(d.cost, 'run not measured');
+  const { queued, ran, wall } = decided.timeline.run;
+  assert.deepEqual([queued, ran, wall], ['—', '—', 'not known']);
+  assert.deepEqual([isRepositoryRun(read.run), read.run.workspace], [false, path.join(ROOT, 'runs', run.id, 'work')]);
+  assert.deepEqual(d.commands, forgetOffered(run.id));
   assert.deepEqual(gitAsked(), []);
 });

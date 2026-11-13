@@ -30,6 +30,8 @@ export { StepTold } from './run-told.ts';
 export { LabelEdit, Labelled, Labels } from './labels.ts';
 export { RunClock, RunListMeta } from './run-frame.ts';
 export {
+  BranchWhy,
+  CardStarted,
   RETRY_ASKED_MODES,
   RunApprove,
   RunApproved,
@@ -38,6 +40,7 @@ export {
   RunCancelled,
   RunHeld,
   RunHold,
+  RunInput,
   RunPrune,
   RunPruned,
   RunRefresh,
@@ -50,6 +53,7 @@ export {
   RunSay,
   RunStart,
   RunStarted,
+  RunStartedFacts,
 } from './run-actions.ts';
 export {
   ANSWER_VIA,
@@ -208,6 +212,8 @@ export {
   MERGE_BASES,
   HIRE_CHANGE_KINDS,
 } from './factory.ts';
+/** What a write of a factory or of one of its parts did, on its answer alone. */
+export { FactoryWritten } from './written.ts';
 export {
   McpServer,
   McpServerList,
@@ -609,14 +615,162 @@ export {
   type Spec,
 } from './command.ts';
 export {
-  AGENTS_WRITE_WORDS,
   COMMAND_WORDS,
+  MOVED_COMMANDS,
+  type DefinitionCommand,
+  type FactoryCommand,
+  type InboxCommand,
+  type MovedCommand,
+  type ReadCommand,
+  type RestCommand,
+  type RunCommand,
+  type WriterCommand,
+} from './commands.ts';
+export {
+  AGENTS_WRITE_WORDS,
   FROM,
   SKILLS_WRITE_WORDS,
   WORKFLOWS_WRITE_WORDS,
+  WRITER_WORDS,
   cliPath,
   factoryFlag,
   versionFlag,
   writerSpec,
-  type MovedCommand,
-} from './commands.ts';
+} from './commands-writers.ts';
+export { RENAMED, RENAMED_FLAGS, renamedIn, type Renamed } from './commands-renamed.ts';
+export {
+  SELECTOR_FLAG_FORM,
+  labelFlags,
+  leftOut,
+  saidFlags,
+  saidOf,
+  saidRefusal,
+  selectorFlag,
+  takesFor,
+  takesOf,
+  type Said,
+} from './commands-flags.ts';
+export { MACHINE_VERBS, type MachineVerb, STREAM_COMMANDS, type StreamCommand } from './commands-machine.ts';
+export {
+  ANSWER_HELP,
+  APPROVE_WORDS,
+  BY_CAP,
+  CANCEL_WORDS,
+  HOLD_WORDS,
+  PAUSE_TIMEOUT_WORDS,
+  PAUSE_WORDS,
+  PRUNE_WORDS,
+  REFRESH_WORDS,
+  RESUME_WORDS,
+  RETRY_WORDS,
+  RM_WORDS,
+  ROUTE_WORDS,
+  RUN_WORDS,
+  SAY_WORDS,
+  START_WORDS,
+  WAIT_WORDS,
+  WHY_CAP,
+  answerFlag,
+  approveRefusal,
+  holdRefusal,
+  pauseRefusal,
+  pauseTimeoutCheck,
+  refreshRefusal,
+  retryRefusal,
+  rmRefusal,
+  timeoutRefusal,
+  waitRefusal,
+} from './commands-runs.ts';
+export {
+  INBOX_ADD_WORDS,
+  INBOX_FROM_WORDS,
+  INBOX_QUEUE_WORDS,
+  INBOX_RM_WORDS,
+  INBOX_WORDS,
+  LABEL_INBOX_WORDS,
+  LABEL_RUN_WORDS,
+  labelEdits,
+  noEdits,
+  runsNamed,
+} from './commands-inbox.ts';
+export { CardLabelLeftOut, CardQueue } from './card.ts';
+export {
+  FACTORY_ADD_WORDS,
+  FACTORY_ATTACH_WORDS,
+  FACTORY_DETACH_WORDS,
+  FACTORY_LIST_WORDS,
+  FACTORY_LS_WORDS,
+  FACTORY_REVISIONS_WORDS,
+  FACTORY_RM_WORDS,
+  FACTORY_TRUST_WORDS,
+  FACTORY_WORDS,
+} from './commands-factories.ts';
+export {
+  FACTORY_FIRE_WORDS,
+  FACTORY_HIRE_WORDS,
+  FACTORY_SCHEDULE_WORDS,
+  FACTORY_SERVER_ADD_WORDS,
+  FACTORY_SERVER_RM_WORDS,
+  FACTORY_SERVERS_WORDS,
+  FACTORY_UNSCHEDULE_WORDS,
+} from './commands-factories-parts.ts';
+export {
+  COST_LINE_FORMS,
+  FACTORY_COST_LINE_RM_WORDS,
+  FACTORY_COST_LINE_SET_WORDS,
+  FACTORY_SETTABLE,
+  FACTORY_SETTING_RM_WORDS,
+  FACTORY_SETTING_SET_WORDS,
+  FACTORY_SETTINGS_HARNESS,
+  FACTORY_VOLUME_ADD_WORDS,
+  FACTORY_VOLUME_RM_WORDS,
+  NOT_THE_WORKSPACE,
+  SETTING_FORMS,
+  VOLUME_FORMS,
+} from './commands-factories-settings.ts';
+export {
+  APPLY_USAGE,
+  FACTORY_ADOPT_WORDS,
+  FACTORY_APPLY_WORDS,
+  FACTORY_DIFF_WORDS,
+  FACTORY_RESOLVE_WORDS,
+  FACTORY_UPGRADE_WORDS,
+  NO_TRUST,
+} from './commands-factories-templated.ts';
+export { FACTORY_INSTRUCT_WORDS, FACTORY_INSTRUCTION_WORDS, FACTORY_RULES_WORDS } from './commands-factories-words.ts';
+export { FACTORY_MANUAL } from './commands-factories-manual.ts';
+export {
+  DEFINITION_WORDS,
+  POLICY_CONFIRM_WORDS,
+  POLICY_PROPOSE_WORDS,
+  POLICY_REACH_WORDS,
+  POLICY_RM_WORDS,
+  POLICY_WORDS,
+  WORKFLOWS_RM_WORDS,
+} from './commands-definitions.ts';
+export {
+  AGENTS_CARD_WORDS,
+  AGENTS_COPY_WORDS,
+  AGENTS_CUSTOM_WORDS,
+  AGENTS_RM_WORDS,
+  AGENTS_RUN_WORDS,
+  AGENTS_SOURCES_WORDS,
+  AGENTS_WORDS,
+} from './commands-definitions-agents.ts';
+export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
+export { REST_WORDS } from './commands-rest.ts';
+export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
+export {
+  CHAT_ALLOW_WORDS,
+  CHAT_DISALLOW_WORDS,
+  CHAT_SPEAKERS_WORDS,
+  LEVEL_FORM,
+  LEVEL_WORDS,
+  SUBSCRIBE_FORM,
+  SUBSCRIBE_WORDS,
+  UNSUBSCRIBE_WORDS,
+  levelWritten,
+} from './commands-rest-nemia.ts';
+export { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
+export { STATS_KEYS, STATS_MANUAL, STATS_WORDS, statsRefusal } from './commands-rest-stats.ts';
+export { STATS_MARK_KINDS, StatsGroup, StatsHeadline, StatsHealth, StatsKeyedGroup, StatsStepRow } from './stats-read.ts';

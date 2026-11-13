@@ -12,8 +12,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { tried } from '../../runtime-client.ts';
-import { leftOut, type Args, type Flag, type Spec } from '../../command/command.ts';
-import type { Command } from '../../command/entry.verb.ts';
+import { FACTORY_DIFF_WORDS, FACTORY_RESOLVE_WORDS, FACTORY_UPGRADE_WORDS } from 'objects';
+import type { Args } from '../../command/command.ts';
+import type { Served } from '../../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../../refusal/refusal.ts';
 import { ownerSpec } from './owner-spec.ts';
 import { ResolutionProposer } from './proposer.verb.ts';
@@ -57,8 +58,6 @@ import {
   mergeBaseOf,
   mergeTrees,
   ownerOfKey,
-  planLines,
-  resolveLine,
   sameVersionChange,
   switchTrees,
   type Choice,
@@ -72,8 +71,6 @@ import {
 import type { Status } from '../applied/applied.store.ts';
 import { adoptPreview, shellArg, type AdoptPreview } from '../../adopt/adopt.verb.ts';
 import { planDigest } from '../../adopt/adopt.store.ts';
-import { adoptLines } from '../../adopt/adopt.ts';
-import { templatePacked } from '../../template/given.store.ts';
 
 /** A factory made from a template. */
 type Templated = Factory & { template: FactoryTemplate };
@@ -119,18 +116,6 @@ const switchOf = (status: Status | undefined, render: RenderedAt): Switched | un
   status?.template !== undefined && mergeBaseOf(status.template, render.name) === 'none'
     ? { from: status.template, to: render.name }
     : undefined;
-
-/** The version a base holds where no status names it, as the plan and the upgrade print it. */
-const UNKNOWN = 'a version no status names';
-
-/**
- * Why the command line takes a preview, an upgrade and a choice by their arguments: the api serves each as the Factory's `diff`, `upgrade`
- * and `resolve`, calling its handler with a template by a builtin's name or packed, and a choice's file by its text.
- */
-const HERE = {
-  side: 'cli',
-  why: "the api serves it as the Factory's diff, upgrade or resolve of `objects`' Api, calling this handler: a template travels there packed, or by a builtin template's name, and a file by its text",
-} as const;
 
 /** The words under `key`, or none. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -347,45 +332,6 @@ const mergeOf = (home: string, name: string, base: readonly Entry[], render: Ren
     ? mergeTrees(base, entriesIn(treeDir(home, name)), render.entries)
     : switchTrees(entriesIn(treeDir(home, name)), render.entries);
 
-/** The flags plan and upgrade take: `--to`, and `--template` where the template is at another place than the one the factory names. */
-const TO: Flag = {
-  flag: '--to',
-  kind: 'text',
-  key: 'to',
-  takes: '--to takes the version to upgrade to, three numbers: --to <x.y.z>',
-  twice: 'take --to once: a factory is upgraded to one version.',
-};
-const FROM_TEMPLATE: Flag = {
-  flag: '--template',
-  kind: 'text',
-  key: 'template',
-  takes:
-    "--template takes the name of a builtin template, a template's folder, the one that holds its nemia.yaml, or an archive nemia template pack wrote",
-  twice: 'take --template once: a factory is made from one template.',
-};
-
-/** `nemia factory diff`'s spec: the factory, `--to`, `--template`, and a `--set` per parameter. */
-const PLAN_SPEC: Spec = {
-  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [
-    TO,
-    FROM_TEMPLATE,
-    {
-      flag: '--set',
-      kind: 'text',
-      key: 'sets',
-      many: true,
-      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
-    },
-  ],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z>, --template <name|folder|archive> and --set <key>=<value> once per parameter.`
-      : `nemia factory diff previews one factory, and ${arg} is a second: nemia factory diff <name> --to <x.y.z>.`,
-  missing:
-    'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...], or, made by hand, nemia factory diff <name> --template <name|folder|archive> [--set <key>=<value> ...].',
-};
-
 /** What `nemia factory diff` previews of a templated factory: the factory, the versions, the merge, and what files it. */
 type Planned = {
   kind: 'upgrade';
@@ -402,24 +348,8 @@ type Planned = {
  * it drops, the plan's digest and the upgrade line that files it; on one made by hand, the takeover a template would make
  * (`adoptPreview`). Nothing written.
  */
-export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
-  name: 'factory diff',
-  served: [{ endpoint: 'factories.diff', request: templatePacked }],
-  usage:
-    '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] | <name> --template <name|folder|archive> [--set <key>=<value> ...]',
-  help: [
-    "preview a templated factory's upgrade: what merges cleanly, and each",
-    'conflict with its sides; onto a template of another name, a switch',
-    "with no common base; or a hand-made factory's takeover by a",
-    'template, and the plan nemia factory adopt takes; nothing is written.',
-    'To change a parameter alone: --to the version applied, and',
-    '--set <key>=<value> for each; it prints the line that files it',
-  ],
-  spec: PLAN_SPEC,
-  check: (args) => leftOut(PLAN_SPEC, args),
-  writes: false,
-  class: 'read',
-  only: HERE,
+export const FACTORY_PLAN: Served<Planned | AdoptPreview> = {
+  ...FACTORY_DIFF_WORDS,
   handler: (args) =>
     Effect.gen(function* () {
       const verb = 'nemia factory diff';
@@ -434,40 +364,6 @@ export const FACTORY_PLAN: Command<Planned | AdoptPreview> = {
       const next = yield* tried(() => nextOf(home, asked, args));
       return { kind: 'upgrade', name: factory.name, from, to, merge, next, ...(switched ? { switched } : {}) } satisfies Planned;
     }),
-  print: (planned) =>
-    planned.kind === 'adopt'
-      ? adoptLines(planned.plan, planned.digest, planned.line)
-      : planLines(planned.name, planned.from ?? UNKNOWN, planned.to, planned.merge, planned.next, planned.switched),
-};
-
-/** `nemia factory upgrade`'s spec: the factory, `--to`, `--template`, a `--set` per parameter, `--plan` and `--downgrade`. */
-const UPGRADE_SPEC: Spec = {
-  positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
-  flags: [
-    TO,
-    FROM_TEMPLATE,
-    {
-      flag: '--set',
-      kind: 'text',
-      key: 'sets',
-      many: true,
-      takes: '--set takes a parameter of the template and its value: --set <key>=<value>',
-    },
-    {
-      flag: '--plan',
-      kind: 'text',
-      key: 'plan',
-      takes: '--plan takes the digest nemia factory diff printed for this upgrade: --plan sha256:<hex>',
-      twice: 'take --plan once: an upgrade files one plan.',
-    },
-    { flag: '--downgrade', kind: 'switch', key: 'downgrade' },
-  ],
-  unknown: (arg) =>
-    arg.startsWith('-')
-      ? `nemia factory upgrade does not take ${arg}. It takes the factory, --to <x.y.z>, --template <name|folder|archive>, --set <key>=<value> once per parameter, --plan <digest> and --downgrade.`
-      : `nemia factory upgrade upgrades one factory, and ${arg} is a second: nemia factory upgrade <name> --to <x.y.z>.`,
-  missing:
-    'nemia factory upgrade takes the factory to upgrade: nemia factory upgrade <name> --to <x.y.z> [--template <name|folder|archive>].',
 };
 
 /** What `nemia factory upgrade` filed: the factory, the versions, its file, the parameters dropped, and the conflicts it waits on. */
@@ -478,23 +374,8 @@ type Upgraded = { name: string; from: string | undefined; to: string; file: stri
  * file; the daemon merges it. One that changes the parameters, a `--set` given or one dropped, is held to its preview's `--plan`
  * (`planHeld`).
  */
-export const FACTORY_UPGRADE: Command<Upgraded> = {
-  name: 'factory upgrade',
-  served: [{ endpoint: 'factories.upgrade', request: templatePacked }],
-  usage: '<name> --to <x.y.z> [--template <name|folder|archive>] [--set <key>=<value> ...] [--plan <digest>] [--downgrade]',
-  help: [
-    'upgrade a templated factory: its file wants --to, and the daemon merges',
-    "the template's change into its tree once each conflict is resolved;",
-    'with --to the version applied and --set, a change of its parameters',
-    'alone, filed with the --plan nemia factory diff printed for it',
-  ],
-  spec: UPGRADE_SPEC,
-  check: (args) => leftOut(UPGRADE_SPEC, args),
-  writes: true,
-  ticks: true,
-  class: 'ask',
-  asksAlways: true,
-  only: HERE,
+export const FACTORY_UPGRADE: Served<Upgraded> = {
+  ...FACTORY_UPGRADE_WORDS,
   handler: (args) =>
     Effect.gen(function* () {
       const verb = 'nemia factory upgrade';
@@ -509,38 +390,6 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
       const file = yield* door.factories.rewrite({ ...now, template: { ...template, version: to, source, params: render.params } });
       return { name: factory.name, from, to, file, dropped: render.dropped, conflicts };
     }),
-  print: ({ name, from, to, file, dropped, conflicts }) => [
-    from === to ? `${name}: its parameters at ${to}` : `${name}: ${from ?? UNKNOWN} → ${to}`,
-    `filed: ${file}`,
-    ...(dropped.length ? [`dropped: ${dropped.join(', ')}`] : []),
-    conflicts
-      ? `${conflicts} conflict${conflicts === 1 ? '' : 's'} wait for a choice: nemia factory diff ${name} --to ${to} shows each, and nemia factory resolve its line; the daemon merges once each has one`
-      : 'the daemon merges it on its next pass (nemia up)',
-  ],
-};
-
-/** `nemia factory resolve`'s spec: the factory, the conflict's address, and one of `--ours`, `--theirs` and `--file`. */
-const RESOLVE_SPEC: Spec = {
-  positionals: [
-    { key: 'factory', takes: 'required', kind: 'name' },
-    { key: 'conflict', takes: 'required', kind: 'name' },
-  ],
-  flags: [
-    { flag: '--ours', kind: 'switch', key: 'ours', way: true },
-    { flag: '--theirs', kind: 'switch', key: 'theirs', way: true },
-    {
-      flag: '--file',
-      kind: 'text',
-      key: 'file',
-      way: true,
-      takes: '--file takes the file that holds what the conflict becomes: nemia factory resolve <name> <conflict> --file <path>',
-    },
-  ],
-  unknown: (arg) =>
-    `nemia factory resolve does not take ${arg}. It takes the factory, the conflict as nemia factory diff names it, and one of --ours, --theirs and --file <path>.`,
-  oneWay: 'nemia factory resolve takes one choice: --ours keeps your tree, --theirs takes the template, --file <path> gives the text.',
-  missing:
-    'nemia factory resolve takes the factory and the conflict, as nemia factory diff names it: nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>.',
 };
 
 /** The text of the file `given` resolves a conflict with, refused where it is not there (`Invalid`). */
@@ -563,17 +412,11 @@ function choiceOf(args: Args): Choice {
   const text = textOf(args, 'text');
   if (text !== undefined) return { text };
   const file = textOf(args, 'file');
-  if (file === undefined) throw new Invalid({ message: RESOLVE_SPEC.oneWay ?? 'nemia factory resolve takes one choice.' });
+  if (file === undefined)
+    throw new Invalid({
+      message: FACTORY_RESOLVE_WORDS.spec.oneWay ?? 'nemia factory resolve takes one choice: --ours, --theirs, --text or --file.',
+    });
   return { text: fileText(file) };
-}
-
-/**
- * A forwarded resolve's input as the api takes it: the factory, the conflict and the choice, a `--file` sent as its text, read here
- * (`fileText`), never as a path of this machine.
- */
-function choiceSent(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  const { file, ...rest } = input;
-  return typeof file === 'string' ? { ...rest, text: fileText(file) } : rest;
 }
 
 /**
@@ -740,39 +583,7 @@ const resolvedWith = Effect.fn('resolvedWith')(function* (
  * Skill, a Hire or the Factory — once each has one, the proposal of that owner, to approve; the daemon merges once each conflict has a
  * choice and each such proposal applied.
  */
-export const FACTORY_RESOLVE: Command<Resolved> = {
-  name: 'factory resolve',
-  served: [{ endpoint: 'factories.resolve', request: (input) => Effect.runPromise(tried(() => choiceSent(input))) }],
-  usage: '<name> <conflict> --ours|--theirs|--file <path>',
-  help: [
-    "choose for one conflict of a templated factory's upgrade or switch: your",
-    'tree, the template (none: drop the file), or the text of a file; once',
-    'each conflict of a workflow, an agent, a skill, a hire or the rules and',
-    'instruction has one, that object is proposed as they compose it, to',
-    'approve (nemia proposals approve <p> -n <name>); a carried file stays',
-    'a choice; the daemon merges once each has one and each proposal applied',
-  ],
-  spec: RESOLVE_SPEC,
-  check: (args) =>
-    leftOut(RESOLVE_SPEC, args) ??
-    (args.ours === true || args.theirs === true || args.file !== undefined ? null : (RESOLVE_SPEC.oneWay ?? null)),
-  writes: true,
-  ticks: true,
-  class: 'ask',
-  asksAlways: true,
-  only: HERE,
+export const FACTORY_RESOLVE: Served<Resolved> = {
+  ...FACTORY_RESOLVE_WORDS,
   handler: (args) => resolved(args),
-  print: ({ name, at, to, file, left, proposed, waits }) => [
-    `${name}: ${at} resolved for the upgrade to ${to} — ${file}`,
-    ...(proposed === undefined
-      ? []
-      : [
-          `the ${proposed.kind} ${proposed.name} is proposed as your choices compose it, ${proposed.proposal}: ${approveLine(name, proposed.proposal)}`,
-        ]),
-    left.length
-      ? `${left.length} conflict${left.length === 1 ? '' : 's'} still wait for a choice: ${left.map((c) => resolveLine(name, c)).join('; ')}`
-      : waits.length
-        ? `every conflict has a choice: the daemon merges once ${waits.join(', ')} applied (${waits.map((p) => approveLine(name, p)).join('; ')})`
-        : 'every conflict has a choice: the daemon merges on its next pass (nemia up)',
-  ],
 };

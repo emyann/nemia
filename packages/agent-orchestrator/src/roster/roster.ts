@@ -1,8 +1,8 @@
 /**
  * One reading of an agent, as `nemia agents` prints it and the api answers it (`AgentReading`): the one with nothing in it, which each
  * reading starts from (`emptyReading`), the one of a file that does not read as an agent, its lines as written so a form can show what to
- * fix (`unreadReading`), the lines `nemia agents` and `nemia agents card` print of what was read (`agentsLines`, `cardNote`), and the
- * agents the Agents page lists with the steps each fills (`inFactory`). Pure: the reading off disk is `roster.store.ts`, and the steps
+ * fix (`unreadReading`), and the agents the Agents page lists with the steps each fills (`inFactory`). The client prints what `nemia
+ * agents` and `nemia agents card` read. Pure: the reading off disk is `roster.store.ts`, and the steps
  * filled `fills.store.ts`.
  */
 import path from 'node:path';
@@ -203,34 +203,3 @@ export function unreadReading(
     error: agent ? agent.message : `${AGENTS_FOLDER}/${base.name}.md does not read.`,
   };
 }
-
-/** The line of an agent copied in: the file and version it came from, and whether that file has changed since or is gone. */
-const copiedLine = ({ source, version, now }: AgentCopiedFrom): string =>
-  `   copied from ${source} at ${version}${now === 'changed' ? '; the source has changed since' : now === 'gone' ? '; the source is gone' : ''}`;
-
-/** One agent's lines on `nemia agents`: what it is for, what it says it can do, and the skills it is given; or why it does not read. */
-function agentLines(agent: AgentReading): string[] {
-  const { name, from } = agent;
-  if (agent.error !== null) return [`${name}  ${from}  does not read: ${agent.error.split('\n')[0]}`];
-  return [
-    `${name}  ${from}  ${agent.description ?? 'no description:'}`,
-    ...(agent.cardError !== null ? [`   says nothing it can do — ${agent.cardError.split('\n')[0]}`] : []),
-    ...(agent.card ?? []).map((skill) => `   ${skill.id}  ${skill.name} — ${skill.description}`),
-    ...(agent.skills ? [`   given the skills ${agent.skills}`] : []),
-    ...(agent.harnessPrompt !== null && agent.harnessPrompt !== 'keep' ? [`   harness prompt: ${agent.harnessPrompt}`] : []),
-    ...(agent.mcp ? [`   loads the MCP servers ${agent.mcp}`] : []),
-    ...(agent.custom !== null ? [`   custom instructions: ${agent.custom}`] : []),
-    ...(agent.copied !== null ? [copiedLine(agent.copied)] : []),
-  ];
-}
-
-/** `nemia agents`' lines: each agent, the repository's then yours, and how to get one's card; or where an agent would be, for none. */
-export const agentsLines = ({ agents, places }: AgentsRead): string[] =>
-  agents.length
-    ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
-    : [`no agents — an agent is a file in <workflows>/agents: ${places.map((p) => p.dir).join(' or ')}`];
-
-/** What `nemia agents card` says of the card `name` has, on stderr beside it: what it is not. */
-export const cardNote = ({ from }: CardRead, name: string): string[] => [
-  `${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`,
-];

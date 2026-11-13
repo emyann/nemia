@@ -28,7 +28,8 @@ import type { Engine } from '../src/runtime-client.ts';
 import { tickRun, runWith as runEngine } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt, setScheduleAt } from '../src/factory/factory.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
-import { main as cli } from '../src/cli/main.ts';
+import { told } from './typed.ts';
+import { typed } from './typed.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 
@@ -42,10 +43,12 @@ const ENV: Record<string, string | undefined> = {
   WF_MAX_CONCURRENT: undefined,
 };
 const filesStore = filesStoreAt(ROOT);
-const stage = staged({ runWith: runEngine, main: cli, engineOf, env: ENV });
+const stage = staged({ runWith: runEngine, main: told, engineOf, env: ENV });
 const { runWith } = stage;
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Engine) => stage.main(argv, e);
+/** A store verb typed, run on its entry's handler as the api calls it (`typed`), over `e`, given this test's place. */
+const verb = (argv: string[], e?: Engine) => typed(argv, e, undefined, stage.place().place, ENV);
 /**
  * A fake runtime whose tasks are all `pending` once filed: a run started stays in flight, and nothing it files is ever admitted. Made by
  * hand, since the tick asks the engine for a tally (`tallied`) the stage's stand-in does not keep.
@@ -186,7 +189,7 @@ test('a due fire waits behind the run cap and behind the queue, then starts', as
   await s.test('the queue goes first: a queued card and the next due fire on one pass start the card alone', async () => {
     fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'inbox', 'a-card.md'), '---\nworkflow: dev\nfactory: solo\n---\nBuild it.\n');
-    await main(['inbox', 'queue', 'a-card'], e);
+    await verb(['inbox', 'queue', 'a-card'], e);
     t.mock.timers.setTime(Date.parse('2026-10-12T13:00:30Z'));
     const first = await runWith(e, tickRun());
     assert.deepEqual([first.queue && 'run' in first.queue, first.scheduled, scheduledDues()], [true, undefined, [MONDAY]]);
@@ -242,8 +245,8 @@ test("at Manual, with no Nemia, a due schedule starts all the same: the schedule
   aStore(t, '2026-10-04T12:00:00Z');
   weekly();
   const e = runtime();
-  await main(['level', 'manual'], e);
-  await main(['level', 'manual', '--factory', 'solo'], e);
+  await verb(['level', 'manual'], e);
+  await verb(['level', 'manual', '--factory', 'solo'], e);
   t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
   await runWith(e, tickRun());
   assert.deepEqual(scheduledDues(), [MONDAY]);

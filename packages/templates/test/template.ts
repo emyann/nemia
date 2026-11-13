@@ -12,7 +12,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scratch } from 'test-kit/scratch';
-import { FORWARD_VARIABLES, SERVING_VARIABLES, SESSION_VARIABLES } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import {
+  builtinGitPlace,
+  engine,
+  FACTORY_APPLY,
+  parseArgv,
+  PlaceService,
+  runWith,
+  type Served,
+  SERVING_VARIABLES,
+  SESSION_VARIABLES,
+  storeConfigLayer,
+} from 'agent-orchestrator';
 
 /** This workspace: the folder each template is a folder of. */
 export const TEMPLATES = path.join(import.meta.dirname, '..');
@@ -20,13 +32,25 @@ export const TEMPLATES = path.join(import.meta.dirname, '..');
 /** The template this workspace ships. */
 export const SDLC = path.join(TEMPLATES, 'sdlc');
 
+/**
+ * The command `entry`, typed with `words` after its name, on the store `env` names, run on its handler as the api runs it, over the real
+ * engine and the built-in git place: a verb the client holds, which the orchestrator's CLI serves no more. Its data, or refused as the
+ * handler refuses it.
+ */
+export async function handled<A extends object>(env: NodeJS.ProcessEnv, entry: Served<A>, words: readonly string[]): Promise<A> {
+  const args = parseArgv(entry.spec, [...words]);
+  if (args === undefined) throw new Error(`nemia ${entry.name} was given too little: ${words.join(' ')}`);
+  const program = Effect.provide(Effect.provide(entry.handler(args as never), PlaceService.layer(builtinGitPlace)), storeConfigLayer(env));
+  return runWith(engine(env), program);
+}
+
 /** The orchestrator's CLI, `nemia`, at the entry its package exports for a spawn (`agent-orchestrator/bin`). */
 export const BIN = fileURLToPath(import.meta.resolve('agent-orchestrator/bin'));
 
 /**
  * An environment on its own scratch store and home, with nothing of the test runner's: no telemetry, and none of the daemon's
  * per-session variables (`SESSION_VARIABLES`, the orchestrator's one list), which CI never sets and a step's session does, nor its
- * serving ones (`SERVING_VARIABLES`), nor the forwarding ones (`FORWARD_VARIABLES`).
+ * serving ones (`SERVING_VARIABLES`).
  */
 export function storeEnv(root: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
@@ -39,7 +63,7 @@ export function storeEnv(root: string): NodeJS.ProcessEnv {
     WF_MAX_RUNS: '2',
   };
   delete env.NODE_TEST_CONTEXT;
-  for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, ...FORWARD_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
+  for (const name of [...SESSION_VARIABLES, ...SERVING_VARIABLES, 'OTEL_EXPORTER_OTLP_ENDPOINT']) delete env[name];
   fs.mkdirSync(env.HOME!, { recursive: true });
   return env;
 }
@@ -80,19 +104,7 @@ export async function rendered(factories: readonly Applied[]): Promise<Record<st
     const repo = path.join(root, 'repos', name);
     fs.mkdirSync(repo, { recursive: true });
     spawnSync('git', ['init', '-q'], { cwd: repo, env });
-    const applied = nemia(
-      env,
-      'factory',
-      'apply',
-      name,
-      '--template',
-      template,
-      '--repo',
-      repo,
-      '--no-trust',
-      ...sets.flatMap((s) => ['--set', s]),
-    );
-    if (applied.code !== 0) throw new Error(`nemia factory apply ${name} exited ${applied.code}: ${applied.err}`);
+    await handled(env, FACTORY_APPLY, [name, '--template', template, '--repo', repo, '--no-trust', ...sets.flatMap((s) => ['--set', s])]);
   }
   const folderOf = (name: string): string => path.join(env.WF_ROOT!, 'factories', name);
   const statusOf = (name: string): Pick<Tree, 'conditions'> | undefined => {

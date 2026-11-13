@@ -47,7 +47,6 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/src/tick/pause.test.ts': ['engine'],
   'packages/agent-orchestrator/src/tick/rest-store.test.ts': ['engine'],
   'packages/agent-orchestrator/src/views/viewed-once.test.ts': ['hand'],
-  'packages/agent-orchestrator/test/agents-cli.test.ts': ['process'],
   'packages/agent-orchestrator/test/ambient.test.ts': ['process'],
   'packages/agent-orchestrator/test/check-handed.test.ts': ['engine'],
   'packages/agent-orchestrator/test/check-views.test.ts': ['engine'],

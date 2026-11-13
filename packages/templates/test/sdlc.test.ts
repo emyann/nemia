@@ -507,3 +507,19 @@ test('review-a-change names what Agora requires a round to say it read and misse
   const skill = fs.readFileSync(path.join(SDLC, 'skills', 'review-a-change', 'SKILL.md'), 'utf8');
   for (const name of names) assert.ok(skill.includes(`\`${name}\``) || skill.includes(`\`read.${name}\``), `the skill names \`${name}\``);
 });
+
+/** The paragraph of a review note that opens with `**Say whether the branch holds the base**`, up to the blank line that ends it. */
+const baseParagraph = (workflow: string): string => {
+  const note = fs.readFileSync(path.join(SDLC, 'workflows', workflow, 'review.md'), 'utf8');
+  const start = note.indexOf('**Say whether the branch holds the base**');
+  assert.ok(start >= 0, `${workflow}'s review says whether the branch holds the base`);
+  const end = note.indexOf('\n\n', start);
+  return note.slice(start, end < 0 ? undefined : end);
+};
+
+test("build's and quick's review weigh a moved base alike, by the reads that say whether it can change the verdict", () => {
+  const build = baseParagraph('build');
+  assert.equal(baseParagraph('quick'), build, "quick's paragraph on the base is build's");
+  for (const read of ['git diff -U0', 'git merge-tree --write-tree', 'mergeable'])
+    assert.ok(build.includes(read), `the paragraph names ${read}`);
+});

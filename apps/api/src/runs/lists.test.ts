@@ -1,7 +1,8 @@
 /**
- * The board's list of the runs, the RunList asked by state (`GET /api/runs?fieldSelector=status.state…`): the runs not finished by name
- * and the finished newest first by when their work stopped, a page at a time by their own token, each kept to its namespace; a plain list
- * carries no frame; a selector that is none is a 422; and the three reads it replaced are gone, 404.
+ * The board's list of the runs, the RunList asked by a field (`GET /api/runs?fieldSelector=status.state…` or `status.outcome…`): the runs
+ * not finished by name and the finished newest first by when their work stopped, those of one outcome too, a page at a time by their own
+ * token, each kept to its namespace; a plain list carries no frame; a selector that is none is a 422; and the three reads it replaced are
+ * gone, 404.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -107,6 +108,18 @@ test('the runs not finished by name, and the finished newest first, each with th
   );
 });
 
+test('the finished runs of one outcome, newest first, with the frame and the counts of the whole namespace', async () => {
+  const succeeded = await read<RunList>('/api/runs?fieldSelector=status.outcome%3Dsucceeded');
+  assert.deepEqual(namesOf(succeeded), ['l-first', 'l-fifth', 'l-fourth', 'l-third', 'l-second']);
+  assert.deepEqual(succeeded.metadata.counts, { waiting: 1, inFlight: 1, finished: 5 });
+  assert.deepEqual(namesOf(await read<RunList>('/api/runs?fieldSelector=status.outcome%3Dundecided')), []);
+  assert.deepEqual(
+    namesOf(await read<RunList>('/api/runs?fieldSelector=status.outcome!%3Dsucceeded')),
+    ['l-asks', 'l-moves'],
+    'every other run, those not finished among them',
+  );
+});
+
 test('a finished list of two a page gives a continue whose follow gives the next two, newest first', async () => {
   const first = await read<RunList>('/api/runs?fieldSelector=status.state%3Dfinished&limit=2');
   assert.deepEqual(namesOf(first), ['l-first', 'l-fifth']);
@@ -126,10 +139,11 @@ test("a namespace's list by state keeps its factory's runs, and default those wh
   assert.deepEqual(plain.metadata.counts, { waiting: 0, inFlight: 1, finished: 2 });
 });
 
-test('REFUSED 422: a fieldSelector that is none of the three forms, and a token of the other order', async () => {
+test('REFUSED 422: a fieldSelector that is none of the forms, and a token of the other order', async () => {
   for (const query of [
     'fieldSelector=spec.repo%3Dx',
     'fieldSelector=status.state%3Ddone',
+    'fieldSelector=status.outcome%3Ddone',
     'fieldSelector=status.state%3Dwaiting,status.state%3DinFlight',
   ]) {
     const res = await app().request(`/api/runs?${query}`);

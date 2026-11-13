@@ -80,9 +80,9 @@ type ListQuery = {
 
 /**
  * A page of the runs of `namespace` (every run for none) the query asks for, `?selector=` read as `?labelSelector=`: a limit, a token or a
- * selector the package refuses is its `Invalid`, a 422. `?fieldSelector=status.state…` asks the board's list by state (`runList`). Asked
- * for a `Table` (`wantsTable`), the page's table (`runTable`), the orchestrator's columns and cells; never on a watch, whose events carry
- * the runs themselves.
+ * selector the package refuses is its `Invalid`, a 422. `?fieldSelector=status.state…` or `status.outcome…` asks the board's list by a
+ * field (`runList`). Asked for a `Table` (`wantsTable`), the page's table (`runTable`), the orchestrator's columns and cells; never on a
+ * watch, whose events carry the runs themselves.
  */
 const page = (namespace: string | undefined, query: ListQuery) =>
   Effect.gen(function* () {

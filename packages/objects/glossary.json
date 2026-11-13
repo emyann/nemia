@@ -54,7 +54,7 @@
     },
     {
       "term": "fieldSelector",
-      "meaning": "a list of runs asked for the runs in one state: `?fieldSelector=status.state=<state>` (or `==`), or `status.state!=<state>`, one term, as Kubernetes spells a field selector. A list asked by it carries the frame's parts on each run's status and its `counts` and `asOf` on its metadata (`RunListMeta`, `packages/objects/src/run.ts`); anything else is refused, a 422 (`packages/objects/src/run-api.ts`)."
+      "meaning": "a list of runs asked for the runs in one state: `?fieldSelector=status.state=<state>` (or `==`), or `status.state!=<state>`; or for the finished runs of one outcome, `status.outcome=<outcome>` (or `==`), or every other run, `status.outcome!=<outcome>`; one term, as Kubernetes spells a field selector. A list asked by it carries the frame's parts on each run's status and its `counts` and `asOf` on its metadata (`RunListMeta`, `packages/objects/src/run.ts`); anything else is refused, a 422 (`packages/objects/src/run-api.ts`)."
     },
     {
       "term": "Run state",

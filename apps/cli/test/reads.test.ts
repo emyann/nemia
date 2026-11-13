@@ -115,6 +115,8 @@ waitingRun('r-parked', {});
 write(path.join(root, 'runs', 'r-parked.hold'), JSON.stringify({ at: at(71), until: [], why: 'folded into an intake', by: 'operator' }));
 write(path.join(root, 'cordon'), JSON.stringify({ at: at(90), by: 'operator', why: 'a release' }));
 waitingRun('r-cancelled', { cancelledAt: at(80), from: { inbox: 'called-off' } });
+waitingRun('r-pruned', {});
+write(path.join(root, 'runs', 'r-pruned.pruned'), JSON.stringify({ at: at(85), worktrees: [] }));
 settled('t-build-1', { outcome: 'done', summary: 'A first cut.', needs: null, artifacts: [] }, 10);
 settled('t-build-2', { outcome: 'done', summary: 'Built it.', needs: null, artifacts: ['NOTES.md'] }, 30);
 settled('t-review', { outcome: 'blocked', summary: 'Half reviewed.', needs: 'Which database?', artifacts: [] }, 50);
@@ -643,6 +645,7 @@ const ONE_RUN: Readonly<Record<string, readonly string[]>> = {
     '   → waiting on you: the store has no run r-missing — yours to resolve: nemia cancel r-after, or start the work again without --after r-missing',
   ],
   'r-cancelled': ['r-cancelled  The run r-cancelled  (cancelled)', '   build          pending              '],
+  'r-pruned': ['r-pruned  The run r-pruned  (pruned)', '   build          pending              '],
 };
 
 test("`nemia ls <run>` prints the run off its object, its steps and what it asks, under this machine's context and a remote one", async () => {

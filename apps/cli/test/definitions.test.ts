@@ -37,9 +37,9 @@ const seed = (root: string): void => {
 const store = await servedStore('nemia-definitions-', seed);
 after(store.stop);
 
-/** `nemia <argv>` on `env`, `stdin` its input, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = ''): Promise<Said> {
-  const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+/** `nemia <argv>` on `env`, `stdin` its input, typed in the folder `cwd` (this test's own where none is named), waited on for its end. */
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, stdin = '', cwd?: string): Promise<Said> {
+  const child = spawn(process.execPath, [CLI, ...argv], { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
   child.stdout.on('data', (chunk) => (out += chunk));
@@ -100,6 +100,20 @@ test("`nemia policy reach` reads a factory's gates; REFUSED, exit 2, given neith
   const nowhere = await store.nemia(['policy', 'propose', 'nemia', '--file', path.join(LOOSE, 'nowhere.json')]);
   assert.equal(nowhere.code, 2, nowhere.err);
   assert.match(nowhere.err, /nowhere\.json/);
+});
+
+test('`nemia agents` and its card, typed in a repository with no --repo, read that repository; in a folder of no repository, yours', async () => {
+  const sub = path.join(THEIRS, 'workflows');
+  for (const here of [THEIRS, sub]) {
+    const listed = ok(await nemia(['agents'], store.env, '', here), `agents typed in ${here}`);
+    assert.match(listed, /^outrider {2}repo {2}Rides out\.$/m, `typed in ${here}`);
+    assert.match(listed, /^archivist {2}yours {2}Files it away\.$/m);
+  }
+  const card = ok(await nemia(['agents', 'card', 'outrider'], store.env, '', THEIRS), 'card typed in THEIRS');
+  assert.equal((JSON.parse(card) as { name: string }).name, 'outrider');
+  const loose = ok(await nemia(['agents'], store.env, '', LOOSE), 'agents typed in a folder of no repository');
+  assert.match(loose, /^archivist {2}yours {2}Files it away\.$/m);
+  assert.doesNotMatch(loose, /outrider/);
 });
 
 test('`nemia agents` lists yours and the repository --repo names, with what each can do; its card on stdout, what it is not on stderr', async () => {

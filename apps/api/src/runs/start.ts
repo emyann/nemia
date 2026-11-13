@@ -16,9 +16,10 @@ import {
   sentInputRefusal,
   sentInputsRemoved,
   sentInputsWritten,
-  startedLines,
+  startedFacts,
   startFactoryAtOnce,
   wiredRepoFor,
+  type Factory,
   type StartInput,
 } from 'agent-orchestrator';
 import { type CardStart, type CardStarted, Conflict, Invalid, Missing, type RunStart, type RunStarted } from 'objects';
@@ -67,7 +68,7 @@ async function withInputs<A>(inputs: RunStart['inputs'], start: (files: string[]
   }
 }
 
-/** What a start answers beside the run's id, off what `START` answered: what `nemia start` prints of it, its lines among them. */
+/** What a start answers beside the run's id, off what `START` answered: what `nemia start` prints of it, as data (`startedFacts`). */
 const startedOf = (started: Awaited<ReturnType<typeof runStarted>>): RunStarted => ({
   id: started.id,
   ...(started.card !== undefined ? { card: started.card } : {}),
@@ -78,7 +79,8 @@ const startedOf = (started: Awaited<ReturnType<typeof runStarted>>): RunStarted 
   ...(started.hints !== undefined ? { hints: [...started.hints] } : {}),
   ...(started.notMounted !== undefined ? { notMounted: [...started.notMounted] } : {}),
   ...(started.notVolumes !== undefined ? { notVolumes: [...started.notVolumes] } : {}),
-  lines: startedLines(started),
+  ...(started.repoFoundFactory !== undefined ? { repoFoundFactory: started.repoFoundFactory } : {}),
+  run: startedFacts(started),
 });
 
 /** `START`'s handler on `given`, in the request `s` serves. */
@@ -143,6 +145,23 @@ export async function cardStart(s: Served, card: string, body: CardStart, factor
 }
 
 /**
+ * The factory a start in `default` runs in, found from `repo` (`startFactoryAtOnce`): the one whose repository holds it. Where none or two
+ * do, the start's own refusal (`first`) where it has one, said before the factory's, else the factory's.
+ */
+function foundFactory(s: Served, repo: string, first: Asked | Refusal): { factory?: Factory; repo?: string } {
+  try {
+    return startFactoryAtOnce(s.home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts);
+  } catch (err) {
+    if ('status' in first) throw declaredAs(START_REFUSALS, first);
+    throw err;
+  }
+}
+
+/** The `?repo=` that only found the factory, where its wiring placed the run on another (`wired`): what the start says of it. */
+const foundFactoryBy = (s: Served, wired: string | undefined): { repoFoundFactory?: string } =>
+  wired !== undefined && s.repoNamed && s.repo !== undefined && s.repo !== wired ? { repoFoundFactory: s.repo } : {};
+
+/**
  * A run started in the request's namespace off its decoded body, as `nemia start <brief> --workflows <folder> --repo <repo> --after
  * <runId> --from <runId>` starts one: what the Run's `create` runs (objects/runs.ts), the request placed in the namespace's factory and on
  * its `?repo=` (`placedIn`). Through the entry's handler (`START`); refused as `startOf` says, by its status (`START_REFUSALS`). Its
@@ -155,10 +174,11 @@ export async function cardStart(s: Served, card: string, body: CardStart, factor
  * checkout, no commit — which the queue tries again on its next pass. In a factory (the namespace of one), the run is started in it
  * (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a repository outside it, each
  * an `Invalid`. In a factory named or found, the run works on the repository its wiring names for the workflow (`wiredRepoFor`),
- * `?repo=` having only found the factory, which the answer's lines say where it names another (`repoFoundFactory`); one it names none for
+ * `?repo=` having only found the factory, which the answer says where it names another (`repoFoundFactory`); one it names none for
  * is refused, `Invalid`, naming the attach. Every run is started in a factory: a start in `default`, which names none, runs in the one
- * factory whose repository holds the api's repository, or `?repo=`, on that repository (`startFactoryAtOnce`, as `nemia start` finds it),
- * and is refused, `Invalid`, where none or two do, naming the namespace to start it in.
+ * factory whose repository holds the api's repository, or `?repo=`, on that repository (`foundFactory`, as `nemia start` finds it), its
+ * workflow found in that factory's tree where it is made from a template, and is refused, `Invalid`, where none or two do, naming the
+ * namespace to start it in.
  */
 export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
   const { home, factory } = s;
@@ -166,13 +186,11 @@ export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
   const named = factory === undefined ? undefined : wiredIn(factory.name);
   const repo = named ?? repoNeeded(s);
   const first = startOf(body, repo, home, factory?.tree);
-  if ('status' in first) throw declaredAs(START_REFUSALS, first);
-  const found = factory
-    ? { factory, repo }
-    : startFactoryAtOnce(home, undefined, repo, 'POST /api/namespaces/<name>/runs', s.config.defaultFactoryStarts);
+  if ('status' in first && factory !== undefined) throw declaredAs(START_REFUSALS, first);
+  const found = factory ? { factory, repo } : foundFactory(s, repo, first);
   const wired = named ?? (found.factory === undefined ? undefined : wiredIn(found.factory.name));
   const at = wired ?? found.repo ?? repo;
-  const asked = at === repo ? first : startOf(body, at, home, found.factory?.tree);
+  const asked = at === repo && found.factory?.tree === factory?.tree ? first : startOf(body, at, home, found.factory?.tree);
   if ('status' in asked) throw declaredAs(START_REFUSALS, asked);
   const given: StartInput = {
     brief: asked.brief,
@@ -183,7 +201,7 @@ export async function runStart(s: Served, body: RunStart): Promise<RunStarted> {
     cards: asked.cards,
     label: asked.label,
     factory: found.factory?.name,
-    ...(wired !== undefined && s.repoNamed && s.repo !== undefined && s.repo !== wired ? { repoFoundFactory: s.repo } : {}),
+    ...foundFactoryBy(s, wired),
     ...extrasOf(body),
   };
   return startedOf(await withInputs(body.inputs, (inputs) => runStarted(s, { ...given, ...(inputs ? { inputs } : {}) })));

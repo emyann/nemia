@@ -15,6 +15,9 @@ import { approveLines, budgetsOf, retryLines, sayLines } from '../src/commands/r
 import { numberedAnswers } from '../src/commands/runs/answers.ts';
 import { nowLines, pauseLines, timeoutLines } from '../src/commands/runs/pause.ts';
 import { inputOf, modelsOf, planCardOf } from '../src/commands/runs/start.ts';
+import { startedLines } from '../src/commands/runs/started.ts';
+import { forgottenLine } from '../src/commands/runs/forgotten.ts';
+import type { RunRemoved, RunStarted } from 'objects';
 
 /** `act` refused, exit 2, its words naming each of `named`. */
 const refused = (act: () => unknown, ...named: (string | RegExp)[]): void =>
@@ -173,4 +176,235 @@ test('pause, pause --now and pause-timeout print what they did or would do', () 
     "the store's pause timeout is 10m (the default)",
   ]);
   assert.match(timeoutLines({ timeout: { ms: 900_000, set: true }, wrote: true })[0] ?? '', /is now 15m/);
+});
+
+/** A run of the test team's `dev` as a start answers it, in the factory `acme` on `/r`, its workflow's files copied. */
+const DEV: NonNullable<RunStarted['run']> = {
+  steps: [
+    { name: 'implement', agent: 'implementer' },
+    { name: 'review', agent: 'reviewer' },
+    { name: 'ship', agent: 'shipper' },
+  ],
+  factory: 'acme',
+  repo: '/r',
+  repository: true,
+  workflow: 'dev',
+  workspace: '/r',
+  workflowFiles: '/s/runs/r-1/workflow/5b5d',
+  branch: 'main',
+  ends: ['ship'],
+};
+
+test('nemia start prints the run it started, worded off the answer, line for line as it printed the api’s lines', () => {
+  const rows: [string, RunStarted, string[]][] = [
+    [
+      'a brief with a model, a gate, an input and a label',
+      {
+        id: 'r-1',
+        run: {
+          ...DEV,
+          inputs: { names: ['notes.md'], dir: '/s/runs/r-1/inputs' },
+          gated: ['implement'],
+          models: { implement: 'sonnet' },
+          labels: { team: 'core', area: 'cache' },
+        },
+      },
+      [
+        'r-1  3 step(s): implement (implementer) → review (reviewer) → ship (shipper)',
+        'factory: acme, on /r',
+        'workspace: /r',
+        'inputs: notes.md — copied into /s/runs/r-1/inputs',
+        'workflow files: copied into /s/runs/r-1/workflow/5b5d',
+        'gated at: implement — nothing after it is filed until nemia approve r-1 <step>, once it has signed off',
+        'ends at: ship — nothing of it runs until nemia approve r-1 ship, which is what files it',
+        "models: implement=sonnet — for this run alone; its other steps run on their agents'",
+        'labels: area=cache,team=core',
+        "run 'nemia tick' (or 'nemia up') to start it",
+      ],
+    ],
+    [
+      'a card queued, its retired repo:, after a run, reading two, a label not inherited, in a paused store',
+      {
+        id: 'r-2',
+        card: 'cache-card',
+        queueLeft: 'queued: 2026-11-01',
+        ignoredRepo: '/old/place',
+        landed: ['r-0'],
+        hints: ['dev/implement.md still writes `nudge`'],
+        paused: { pause: { at: 't', by: 'ann', why: 'upgrade' }, finishing: [], parked: [], staged: [], held: [] },
+        run: {
+          ...DEV,
+          from: 'cache-card',
+          after: ['r-0'],
+          context: ['r-0', 'r-9'],
+          labelsLeftOut: [
+            {
+              key: 'team',
+              values: [
+                { run: 'r-0', value: 'core' },
+                { run: 'r-9', value: 'edge' },
+              ],
+            },
+          ],
+        },
+      },
+      [
+        'r-2  3 step(s): implement (implementer) → review (reviewer) → ship (shipper)',
+        'from inbox card cache-card — kept in the inbox, listed as started',
+        "queued: 2026-11-01: the tick does not start it again while r-2's record stands; take the line off with nemia inbox queue cache-card --off",
+        'factory: acme, on /r',
+        'workspace: /r',
+        'workflow files: copied into /s/runs/r-1/workflow/5b5d',
+        'waits on: r-0 — nothing is filed until nemia decide says each has landed on main',
+        'reads: r-0 — handed what it concluded, as context; not waited on',
+        "reads: r-9, still in flight — what it has when this run's steps are filed is handed, not landed, not judged",
+        'ends at: ship — nothing of it runs until nemia approve r-2 ship, which is what files it',
+        'label team not inherited: r-0 has team=core, r-9 has team=edge — set it with nemia label run r-2 team=<value>',
+        "run 'nemia tick' (or 'nemia up') to start it",
+        'Paused since t by ann: upgrade — nothing runs and nothing new starts; nemia resume resumes it: nothing of this run is filed until then',
+        'dev/implement.md still writes `nudge`',
+        "the card's repo: /old/place is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line",
+      ],
+    ],
+    [
+      'a folder run that mounts, writes and leaves out folders and volumes, its --repo having only found the factory',
+      {
+        id: 'r-3',
+        repoFoundFactory: '/elsewhere',
+        notMounted: ['/gone'],
+        notVolumes: ['/v-gone'],
+        run: {
+          ...DEV,
+          repository: false,
+          workspace: '/s/runs/r-3/work',
+          mounts: ['/a', '/b'],
+          writable: [{ path: '/b', steps: ['implement'] }],
+          volumes: ['/v-read'],
+          writableVolumes: [
+            { path: '/v-mine', steps: ['implement', 'review'] },
+            { path: '/v-none', steps: [] },
+          ],
+          settings: ['team-hooks'],
+          cards: { names: ['spec'], dir: '/s/runs/r-3/inputs/cards' },
+          carriedFiles: '/s/runs/r-3/carried/9e88',
+          ends: [],
+        },
+      },
+      [
+        'r-3  3 step(s): implement (implementer) → review (reviewer) → ship (shipper)',
+        'factory: acme',
+        '--repo /elsewhere only found the factory acme: dev works on /r',
+        'mounts: /a, /b — read-only, for every local step but where written below',
+        'writable: /b — for implement alone',
+        "not mounted: /gone — of the factory's repositories, and no directory now; start again once it is there",
+        'volumes: /v-read — read-only, for every local step',
+        "volume: /v-mine — writable for implement, review, read-only for every other local step; not the run's workspace: nothing commits or lands what a step writes there",
+        "volume: /v-none — writable, and read-only for every step here, since none writes; not the run's workspace: nothing commits or lands what a step writes there",
+        "not mounted: /v-gone — of the factory's volumes, and no directory now; start again once it is there",
+        "harness settings: team-hooks — for every step on their harness, beneath its agent's own",
+        'workspace: /s/runs/r-3/work — a folder per step, made as each is filed, with no git repository',
+        'cards: spec — copied into /s/runs/r-3/inputs/cards',
+        'workflow files: copied into /s/runs/r-1/workflow/5b5d',
+        'carried files: copied into /s/runs/r-3/carried/9e88',
+        "run 'nemia tick' (or 'nemia up') to start it",
+      ],
+    ],
+    [
+      'an api that says nothing of the run',
+      { id: 'r-4' },
+      ["r-4  started on the daemon — nemia show r-4 reads it, and the daemon's next pass files its first step"],
+    ],
+  ];
+  for (const [what, answer, lines] of rows) assert.deepEqual(startedLines(answer, new Date('2026-11-12T00:00:00Z')), lines, what);
+});
+
+/** What the engine forgot of a run's tasks: none. */
+const NO_TASKS = { forgotten: [], waiting: [], why: [], refused: [], refusedWhy: [], left: [], journalBytes: 0, feedLines: 0 };
+
+test('nemia rm prints the run it forgot in one line, worded off the answer, as it printed the api’s line', () => {
+  const rows: [string, RunRemoved, string][] = [
+    [
+      'a cancelled run with nothing cut',
+      {
+        id: 'r-1',
+        removed: true,
+        engine: null,
+        worktrees: [],
+        handedOff: [],
+        gone: [],
+        files: ['runs/r-1.json', 'runs/r-1/'],
+        branches: [],
+      },
+      'r-1  forgotten: no worktrees; removed runs/r-1.json, runs/r-1/; no branches left',
+    ],
+    [
+      'worktrees removed, handed off and gone; each branch’s fate; the engine’s tasks forgotten, waiting and refused',
+      {
+        id: 'r-2',
+        removed: true,
+        engine: {
+          ...NO_TASKS,
+          forgotten: ['r-2-implement'],
+          journalBytes: 2048,
+          feedLines: 1,
+          left: ['~/.claude/projects/x'],
+          waiting: ['r-2-review'],
+          why: ['still running'],
+          refused: ['r-2-ship'],
+          refusedWhy: ['not settled'],
+          marker: 'runs/r-2.forgetting',
+        },
+        worktrees: ['/w/a', '/w/b'],
+        handedOff: [{ step: 'implement', branch: 'wf/r-2/implement', commit: 'abcdef1234' }],
+        gone: ['/w/c'],
+        files: ['runs/r-2.json'],
+        branches: [
+          { branch: 'wf/r-2/a', deleted: true, why: 'merged' },
+          { branch: 'wf/r-2/b', deleted: true, why: 'forced' },
+          { branch: 'wf/r-2/c', deleted: false, why: 'default' },
+          { branch: 'wf/r-2/d', deleted: false, why: 'unmerged' },
+          { branch: 'wf/r-2/e', deleted: false, why: { git: 'checked out at /x' } },
+          { branch: 'wf/r-2/f', deleted: false, why: { unread: 'timed out' } },
+        ],
+        base: 'main',
+        repo: '/r',
+        isolate: true,
+      },
+      [
+        'r-2  forgotten: removed 2 worktrees, committed what implement left uncommitted on wf/r-2/implement as abcdef1, 1 worktree was already gone',
+        'removed runs/r-2.json',
+        'deleted wf/r-2/a (merged into main), wf/r-2/b (not merged into main, forced)',
+        'kept wf/r-2/c — branches are kept unless asked: --delete-branches deletes those merged into main',
+        'kept wf/r-2/d: not merged into main — --force-unmerged deletes it, and the work on it',
+        'kept wf/r-2/e: git would not delete it — checked out at /x',
+        "kept wf/r-2/f: the place's remove did not answer — timed out; nemia rm r-2 again deletes it once it does",
+        'the engine forgot 1 task of it (2.0 KB of journal, 1 feed line)',
+        'it left ~/.claude/projects/x',
+        "1 task of it waits — still running — and the daemon's passes forget it once it settles, from runs/r-2.forgetting",
+        'the engine refused to forget 1 task of it: not settled runs/r-2.forgetting keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm runs/r-2.forgetting',
+      ].join('; '),
+    ],
+    [
+      'a run on the base itself, and a folder run whose workflow was never frozen',
+      {
+        id: 'r-3',
+        removed: true,
+        engine: null,
+        worktrees: [],
+        handedOff: [],
+        gone: [],
+        files: [],
+        branches: [],
+        repo: '/r',
+        isolate: false,
+      },
+      'r-3  forgotten: no worktrees, it worked in /r itself; no branch of its own',
+    ],
+    [
+      'a folder run',
+      { id: 'r-4', removed: true, engine: null, files: ['runs/r-4.json'], folder: true, unfrozen: 'its folder does not read' },
+      'r-4  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches; removed runs/r-4.json; its workflow was never frozen, and its folder does not read',
+    ],
+  ];
+  for (const [what, answer, line] of rows) assert.equal(forgottenLine(answer), line, what);
 });

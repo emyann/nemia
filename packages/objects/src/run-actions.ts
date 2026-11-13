@@ -71,12 +71,58 @@ export const RunStart = Schema.Struct({
 }).annotate({ identifier: 'RunStart' });
 export type RunStart = typeof RunStart.Type;
 
+/** A folder of a run's factory and the steps that write it: each other local step reads it alone. */
+const WrittenBy = Schema.Struct({ path: Schema.String, steps: Strings });
+
+/** A folder a run copied files into: the files by name, and the folder. */
+const CopiedInto = Schema.Struct({ names: Strings, dir: Schema.String });
+
 /**
- * What a start answers: the run's name; and what `nemia start` prints of it, where the api says it: the store's pause as it stood once
- * the run was written (`paused`), the runs handed as context that had landed (`landed`), a line for each file of its folder that still
- * writes a former spelling (`hints`), the factory's repositories and volumes left out of its mounts, being no directory (`notMounted`,
- * `notVolumes`), and the lines the command line prints of it (`lines`). Of an inbox card's start, the card, why its `queued:` line is
- * still on it (`queueLeft`), and a `repo:` the start did not take (`ignoredRepo`).
+ * A run as it was started, what `nemia start` prints of it: its steps, each with the agent it is filed with; the inbox card it came from
+ * (`from`); its factory; its repository, and whether it works in one (`repository`: a folder run's steps work in a folder each); its
+ * workflow's name; the factory's folders it mounts read-only (`mounts`) and those some steps write (`writable`); its volumes, read-only
+ * (`volumes`) and writable (`writableVolumes`); the harness settings it froze (`settings`); where it works (`workspace`); the inputs and
+ * cards it copied, and where its workflow's and carried files were copied; the runs it waits on to land on its `branch` (`after`) and is
+ * handed as context (`context`); the steps gated (`gated`) and the endings a person approves first (`ends`); each step's model for it
+ * alone (`models`); its labels, and each key it did not inherit since the runs it names disagree on it (`labelsLeftOut`).
+ */
+export const RunStartedFacts = Schema.Struct({
+  steps: Schema.Array(Schema.Struct({ name: Schema.String, agent: Schema.optionalKey(Schema.String) })),
+  from: Schema.optionalKey(Schema.String),
+  factory: Schema.optionalKey(Schema.String),
+  repo: Schema.String,
+  repository: Schema.Boolean,
+  workflow: Schema.String,
+  mounts: Schema.optionalKey(Strings),
+  writable: Schema.optionalKey(Schema.Array(WrittenBy)),
+  volumes: Schema.optionalKey(Strings),
+  writableVolumes: Schema.optionalKey(Schema.Array(WrittenBy)),
+  settings: Schema.optionalKey(Strings),
+  workspace: Schema.String,
+  inputs: Schema.optionalKey(CopiedInto),
+  cards: Schema.optionalKey(CopiedInto),
+  workflowFiles: Schema.optionalKey(Schema.String),
+  carriedFiles: Schema.optionalKey(Schema.String),
+  after: Schema.optionalKey(Strings),
+  branch: Schema.String,
+  context: Schema.optionalKey(Strings),
+  gated: Schema.optionalKey(Strings),
+  ends: Schema.optionalKey(Strings),
+  models: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  labelsLeftOut: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ key: Schema.String, values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })) })),
+  ),
+}).annotate({ identifier: 'RunStartedFacts' });
+export type RunStartedFacts = typeof RunStartedFacts.Type;
+
+/**
+ * What a start answers: the run's name; and what `nemia start` prints of it, where the api says it: the run as it was started (`run`),
+ * the store's pause as it stood once the run was written (`paused`), the runs handed as context that had landed (`landed`), a line for
+ * each file of its folder that still writes a former spelling (`hints`), the factory's repositories and volumes left out of its mounts,
+ * being no directory (`notMounted`, `notVolumes`), and the `?repo=` that only found the factory, its wiring placing the run on another
+ * (`repoFoundFactory`). Of an inbox card's start, the card, why its `queued:` line is still on it (`queueLeft`), and a `repo:` the start
+ * did not take (`ignoredRepo`).
  */
 export const RunStarted = Schema.Struct({
   id: Schema.String,
@@ -88,7 +134,8 @@ export const RunStarted = Schema.Struct({
   hints: Schema.optionalKey(Strings),
   notMounted: Schema.optionalKey(Strings),
   notVolumes: Schema.optionalKey(Strings),
-  lines: Schema.optionalKey(Strings),
+  repoFoundFactory: Schema.optionalKey(Schema.String),
+  run: Schema.optionalKey(RunStartedFacts),
 }).annotate({ identifier: 'RunStarted' });
 export type RunStarted = typeof RunStarted.Type;
 
@@ -282,14 +329,38 @@ const EngineForgetting = Schema.Struct({
 });
 
 /**
- * What a removal answers: the run, that it was removed, what the engine forgot of its tasks (null with none), and the line `nemia rm`
- * prints of it (`line`): what it removed, handed off and left.
+ * Why a run's branch was deleted or kept by its removal: merged into its base, or not and forced, deleted; kept, unasked (`default`), not
+ * merged (`unmerged`), git's refusal in its words (`git`), or the place's remove unanswered (`unread`).
+ */
+export const BranchWhy = Schema.Union([
+  Schema.Literals(['merged', 'forced', 'default', 'unmerged']),
+  Schema.Struct({ git: Schema.String }),
+  Schema.Struct({ unread: Schema.String }),
+]);
+export type BranchWhy = typeof BranchWhy.Type;
+
+/**
+ * What a removal answers: the run, that it was removed, what the engine forgot of its tasks (null with none); and what `nemia rm` prints
+ * of it: the worktrees removed (`worktrees`), what each held uncommitted, committed first (`handedOff`), those already gone (`gone`), the
+ * files removed, the record first (`files`), what became of each branch and why (`branches`), its base branch and repository, whether it
+ * cut worktrees (`isolate`), whether it was a folder run (`folder`), and why its unfrozen workflow did not read (`unfrozen`).
  */
 export const RunRemoved = Schema.Struct({
   id: Schema.String,
   removed: Schema.Boolean,
   engine: Schema.NullOr(EngineForgetting),
-  line: Schema.optionalKey(Schema.String),
+  worktrees: Schema.optionalKey(Strings),
+  handedOff: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ step: Schema.String, branch: Schema.optionalKey(Schema.String), commit: Schema.String })),
+  ),
+  gone: Schema.optionalKey(Strings),
+  files: Schema.optionalKey(Strings),
+  branches: Schema.optionalKey(Schema.Array(Schema.Struct({ branch: Schema.String, deleted: Schema.Boolean, why: BranchWhy }))),
+  base: Schema.optionalKey(Schema.String),
+  repo: Schema.optionalKey(Schema.String),
+  isolate: Schema.optionalKey(Schema.Boolean),
+  folder: Schema.optionalKey(Schema.Literal(true)),
+  unfrozen: Schema.optionalKey(Schema.String),
 }).annotate({ identifier: 'RunRemoved' });
 export type RunRemoved = typeof RunRemoved.Type;
 

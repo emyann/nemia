@@ -12,7 +12,7 @@ import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven } from '../../test/placed.ts';
 import { names } from '../../test/assessed.ts';
 import { startRun } from './start.verb.ts';
-import { startedLines } from './commands.verb.ts';
+import { startedFacts, startedLines } from './commands.verb.ts';
 import { filesStoreAt } from '../record/files.store.ts';
 import type { Env } from '../config/config.store.ts';
 
@@ -85,6 +85,8 @@ test('a key two named runs disagree on is left out, and `nemia start` names it, 
   ]);
   const line = startedLines({ home: ROOT, id: run.id, run }).find((l) => l.includes('team') && l.includes('not inherited'));
   names(line, 'team', a, 'core', b, 'infra', `nemia label run ${run.id} team=`);
+  const facts = startedFacts({ home: ROOT, run });
+  assert.deepEqual([facts.labels, facts.labelsLeftOut], [run.labels, run.labelsLeftOut], 'what the api answers the client to say it by');
   const typed = await runPlaced(
     startRun({ brief: 'typed', repo, workflowDir: folder(), context: [a, b], labels: { edits: ['team=ops'] } }),
   );
@@ -99,6 +101,8 @@ test('a run started with no labels writes no .labels file, and its start prints 
     startedLines({ home: ROOT, id: run.id, run }).some((l) => l.startsWith('label')),
     false,
   );
+  const facts = startedFacts({ home: ROOT, run });
+  assert.deepEqual([facts.labels, facts.labelsLeftOut], [undefined, undefined], 'nor a key of them in what the api answers');
 });
 
 test('REFUSED before any file is written: a reserved key, a closed key and an edit that is neither key=value nor key-', async (t) => {

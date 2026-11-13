@@ -4,7 +4,7 @@
  * sends their text. The lines `nemia start` prints of a run it started are made here (`startedLines`), which the api answers beside it.
  */
 import path from 'node:path';
-import { START_WORDS } from 'objects';
+import { type RunStartedFacts, START_WORDS } from 'objects';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect, Schema } from 'effect';
 import type { Served } from '../command/entry.verb.ts';
@@ -95,19 +95,26 @@ function settingsLine(run: Run): string[] {
   return named.length ? [`harness settings: ${named.join(', ')} — for every step on their harness, beneath its agent's own`] : [];
 }
 
+/** The factory's volumes a run mounts: the paths of those read-only, and each writable one with the local steps whose fence writes it. */
+function volumesOf(run: Run): { reads: string[]; writes: { path: string; steps: string[] }[] } {
+  const volumes = run.volumes ?? [];
+  const local = startedSteps(run).filter((s) => !isRemoteHarness(s.harness));
+  return {
+    reads: volumes.filter((v) => v.readOnly).map((v) => v.path),
+    writes: volumes
+      .filter((v) => !v.readOnly)
+      .map((v) => ({ path: v.path, steps: local.filter((s) => volumeMounts(s, [v])[0]?.readOnly === false).map((s) => s.name) })),
+  };
+}
+
 /**
  * The factory's volumes a run mounts: those read-only, then each writable one with the steps whose fence writes it (`volumeMounts`), and
  * that it is not the run's workspace; then those left out because they were no directory.
  */
 function volumeLines(run: Run, missing: readonly string[]): string[] {
-  const volumes = run.volumes ?? [];
-  const local = startedSteps(run).filter((s) => !isRemoteHarness(s.harness));
-  const reads = volumes.filter((v) => v.readOnly);
-  const writes = volumes
-    .filter((v) => !v.readOnly)
-    .map((v) => ({ path: v.path, steps: local.filter((s) => volumeMounts(s, [v])[0]?.readOnly === false).map((s) => s.name) }));
+  const { reads, writes } = volumesOf(run);
   return [
-    ...(reads.length ? [`volumes: ${reads.map((v) => v.path).join(', ')} — read-only, for every local step`] : []),
+    ...(reads.length ? [`volumes: ${reads.join(', ')} — read-only, for every local step`] : []),
     ...writes.map(
       (w) =>
         `volume: ${w.path} — ${w.steps.length ? `writable for ${w.steps.join(', ')}, read-only for every other local step` : 'writable, and read-only for every step here, since none writes'}; not the run's workspace: nothing commits or lands what a step writes there`,
@@ -118,14 +125,18 @@ function volumeLines(run: Run, missing: readonly string[]): string[] {
   ];
 }
 
-/** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
-function gateLines(run: Run): string[] {
+/** The steps of a run just started that wait on a person: those gated (`held`), and the endings a person approves first (`ends`). */
+function gatesHeld(run: Run): { held: string[]; ends: string[] } {
   const steps = startedSteps(run);
-  const gates = gatesOf(steps, run);
   const ends = endingSteps(steps, run)
     .filter((s) => approvedFirst(s, run))
     .map((s) => s.name);
-  const held = gates.filter((name) => !ends.includes(name));
+  return { held: gatesOf(steps, run).filter((name) => !ends.includes(name)), ends };
+}
+
+/** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
+function gateLines(run: Run): string[] {
+  const { held, ends } = gatesHeld(run);
   return [
     ...(held.length
       ? [
@@ -211,6 +222,62 @@ export function startedLines(started: Started): string[] {
     ...(started.hints ?? []),
     ...(started.ignoredRepo !== undefined ? [ignoredRepoLine(started.ignoredRepo)] : []),
   ];
+}
+
+/** `list` under `key` where it holds any, else nothing: a key an answer leaves out rather than send empty. */
+const some = <K extends string, V>(key: K, list: readonly V[] | undefined): Partial<Record<K, V[]>> =>
+  list?.length ? ({ [key]: [...list] } as Record<K, V[]>) : {};
+
+/**
+ * What `nemia start` prints of a run it started, as data (`objects`' `RunStartedFacts`), which the api answers and the client words: the
+ * facts `startedLines` says, each read as it reads them.
+ */
+export function startedFacts({ run, home }: Pick<Started, 'run' | 'home'>): RunStartedFacts {
+  const steps = startedSteps(run);
+  const { reads, writes } = volumesOf(run);
+  const { held, ends } = gatesHeld(run);
+  const named = (map: Readonly<Record<string, string>> | undefined) =>
+    map !== undefined && Object.keys(map).length ? { ...map } : undefined;
+  const models = named(run.models);
+  const labels = named(run.labels);
+  return {
+    steps: steps.map((s) => ({ name: s.name, ...(s.agent ? { agent: s.agent.name } : {}) })),
+    ...(run.from ? { from: run.from.inbox } : {}),
+    ...(run.factory ? { factory: run.factory } : {}),
+    repo: run.repo ?? '',
+    repository: isRepositoryRun(run),
+    workflow: path.basename(run.workflowDir),
+    ...some(
+      'mounts',
+      run.mounts?.map((m) => m.path),
+    ),
+    ...some(
+      'writable',
+      writersOf(steps, run.mounts).map((w) => ({ path: w.path, steps: [...w.steps] })),
+    ),
+    ...some('volumes', reads),
+    ...some('writableVolumes', writes),
+    ...some(
+      'settings',
+      settingsNamed(run.harnessSettings).map((s) => s.name),
+    ),
+    workspace: run.workspace ?? '',
+    ...(run.inputs?.length ? { inputs: { names: [...run.inputs], dir: inputsDir(home, run) } } : {}),
+    ...(run.cards?.length ? { cards: { names: [...run.cards], dir: cardsDir(home, run) } } : {}),
+    ...(run.workflowFiles === undefined ? {} : { workflowFiles: workflowFilesDir(home, run, run.workflowFiles) }),
+    ...(run.carriedFiles === undefined ? {} : { carriedFiles: carriedFilesDir(home, run, run.carriedFiles) }),
+    ...some('after', run.after),
+    branch: run.branch ?? '',
+    ...some('context', run.context),
+    ...some('gated', held),
+    ...some('ends', ends),
+    ...(models !== undefined ? { models } : {}),
+    ...(labels !== undefined ? { labels } : {}),
+    ...some(
+      'labelsLeftOut',
+      run.labelsLeftOut?.map(({ key, values }) => ({ key, values: values.map((v) => ({ run: v.run, value: v.value })) })),
+    ),
+  };
 }
 
 /**

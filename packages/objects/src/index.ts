@@ -30,6 +30,7 @@ export { StepTold } from './run-told.ts';
 export { LabelEdit, Labelled, Labels } from './labels.ts';
 export { RunClock, RunListMeta } from './run-frame.ts';
 export {
+  BranchWhy,
   CardStarted,
   RETRY_ASKED_MODES,
   RunApprove,
@@ -52,6 +53,7 @@ export {
   RunSay,
   RunStart,
   RunStarted,
+  RunStartedFacts,
 } from './run-actions.ts';
 export {
   ANSWER_VIA,

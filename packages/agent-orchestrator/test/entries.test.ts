@@ -670,6 +670,7 @@ const PINNED: Record<string, string[]> = {
     'sayRun',
     'startRun',
     'startedLines',
+    'startedFacts',
     'sentInputRefusal',
     'sentInputsRemoved',
     'sentInputsWritten',

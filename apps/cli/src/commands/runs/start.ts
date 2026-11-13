@@ -2,17 +2,19 @@
  * The runner of `nemia start`: a run of a workflow named by its name (the Run's `create`), from a brief in words or a file's text read
  * here — a file that opens with a plan card's frontmatter giving its body and its `workflow:` — or of an inbox card named by its name (the
  * Card's `start`). What the api cannot read from where it runs is read here and sent as data: the brief's file, each `--input` file by
- * its name and its bytes, and `--repo` as `pathSent` sends a path, which only finds the factory of a brief's start (its run works on the
- * repository the factory's wiring names) and is refused on a card's, whose factory places its run. A plan folder and a workflow given as
- * a path are refused, naming the start by name; so is a brief whose workflow is not named. It prints the lines the api answers
- * (`RunStarted.lines`).
+ * its name and its bytes, and `--repo` as `pathSent` sends a path — else, under this machine's context and with no `--factory`, the
+ * repository the start is typed in, or the folder where it is in none (`repoQueryOf`) — which only finds the factory of a brief's start
+ * (its run works on the repository the factory's wiring names) and is refused on a card's, whose factory places its run. A plan folder
+ * and a workflow given as a path are refused, naming the start by name; so is a brief whose workflow is not named. It prints what the api
+ * answers of the run, worded here (`startedLines`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { type Args, type CardStart, DEFAULT_NAMESPACE, type RunStart, START_WORDS } from 'objects';
 import { asked } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
-import { listArg, pathSent, said, switchArg, textArg } from '../requests.ts';
+import { listArg, repoQueryOf, said, switchArg, textArg } from '../requests.ts';
+import { startedLines } from './started.ts';
 
 /** The command, as its refusals name it. */
 const COMMAND = START_WORDS.name;
@@ -139,12 +141,6 @@ async function cardNamed(word: string): Promise<{ name: string; namespace: strin
 const insteadOf = (instead: string): string =>
   fs.statSync(instead, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(instead, 'utf8') : instead;
 
-/** The lines a start prints: the api's, or, of an api that says none, the run started and what reads it. */
-const startedLines = ({ id, lines }: { id: string; lines?: readonly string[] }): string[] =>
-  lines?.length
-    ? [...lines]
-    : [`${id}  started on the daemon — nemia show ${id} reads it, and the daemon's next pass files its first step`];
-
 /** `nemia start` of the inbox card `card`: its body, or `--brief` in its place, on its own workflow unless `--workflows` names one. */
 async function cardStart(card: { name: string; namespace: string }, args: Args): Promise<number> {
   const workflows = textArg(args, 'workflows');
@@ -190,11 +186,8 @@ export async function start(args: Args): Promise<number> {
   const brief = plan ? plan.body : (text?.trim() ?? arg);
   const factory = textArg(args, 'factory');
   const namespace = factory ?? DEFAULT_NAMESPACE;
-  const typedRepo = textArg(args, 'repo');
-  const repo = typedRepo === undefined ? undefined : pathSent(typedRepo);
+  const query = repoQueryOf(textArg(args, 'repo'), factory, 'folder');
   const payload: RunStart = { ...extrasOf(args), workflow, brief };
-  said(
-    startedLines(await asked(COMMAND, (c) => c.runs.create({ params: { namespace }, query: repo !== undefined ? { repo } : {}, payload }))),
-  );
+  said(startedLines(await asked(COMMAND, (c) => c.runs.create({ params: { namespace }, query, payload }))));
   return 0;
 }

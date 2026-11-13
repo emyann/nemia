@@ -20,7 +20,6 @@ import {
   CANCEL,
   CONCLUDED,
   dropInformed,
-  forgetLine,
   HOLD,
   Informer,
   informerMemo,
@@ -45,6 +44,7 @@ import { Api, Missing, type RunApprove, type RunPrune, type RunRefresh, type Run
 import type { Served } from '../layer.ts';
 import { workflowPageOf } from '../step/step.ts';
 import { findRun, noSuchRun, taskOfStep } from '../store.ts';
+import { forgottenOf } from './forgotten.ts';
 import { runStart } from '../runs/start.ts';
 import { answered, answeredIn, locatedAt, refusedAs, ServedNow } from './refused.ts';
 import { wantsTable } from './table.ts';
@@ -133,15 +133,17 @@ type At = { readonly namespace: string; readonly name: string; readonly step?: s
 /**
  * The named action `work` on the run `at` names, in its namespace: the run found (`Missing` where none is, or it is in another namespace,
  * and where it has no step `at.step`), then `work`, the run taken out of the app's informer once it has run (`dropInformed`). A refusal
- * it throws is answered by its kind (`refusedAs`); a failure that is none is a `WriteFailed` in its words.
+ * it throws is answered by its kind (`refusedAs`); a failure that is none is a `WriteFailed` in its words. With `unrecorded`, a run the
+ * store has no record of is no refusal here: `work` runs all the same, and says what it found (a whole removal, which forgets what was
+ * left under the run's id).
  */
-const acted = <A>(at: At, work: (s: Served) => Promise<A>) =>
+const acted = <A>(at: At, work: (s: Served) => Promise<A>, unrecorded = false) =>
   Effect.gen(function* () {
     const s = yield* ServedNow;
     return yield* Effect.tryPromise({
       try: async () => {
-        const run = found(s.home, at.name);
-        await Effect.runPromise(runIn(run, at.namespace));
+        const run = unrecorded ? findRun(s.home, at.name) : found(s.home, at.name);
+        if (run) await Effect.runPromise(runIn(run, at.namespace));
         if (at.step !== undefined) {
           const step = taskOfStep(at.name, at.step, s.home);
           if ('error' in step) throw new Missing({ error: step.error });
@@ -177,18 +179,24 @@ type RemoveQuery = { readonly whole?: string; readonly deleteBranches?: string; 
 
 /**
  * A try removed (`nemia rm`, a try alone, its refusals thrown), or with `whole` any run as `nemia rm` removes it, its branches deleted as
- * `deleteBranches` and `forceUnmerged` ask: what the engine forgot of it, and the line `nemia rm` prints of it.
+ * `deleteBranches` and `forceUnmerged` ask: what the engine forgot of it, and what was done with its worktrees, branches and files
+ * (`forgottenOf`), what `nemia rm` prints. A whole removal of a run with no record still forgets what was left under its id, and answers
+ * `Missing` in words that say what it removed (`RM`'s `forgetRefusal`).
  */
 const removed = (at: At, query: RemoveQuery) =>
-  acted(at, async (s) => {
-    const branches = {
-      ...(query.deleteBranches === 'true' ? { deleteBranches: true } : {}),
-      ...(query.forceUnmerged === 'true' ? { forceUnmerged: true } : {}),
-    };
-    const asked = { runId: at.name, ...branches, ...(query.whole === 'true' ? {} : { onlyTry: true }), refuses: true };
-    const { id, removed, engine, forgot } = await s.inRequest(RM.handler(asked));
-    return { id, removed, engine, line: forgetLine(forgot) };
-  });
+  acted(
+    at,
+    async (s) => {
+      const branches = {
+        ...(query.deleteBranches === 'true' ? { deleteBranches: true } : {}),
+        ...(query.forceUnmerged === 'true' ? { forceUnmerged: true } : {}),
+      };
+      const asked = { runId: at.name, ...branches, ...(query.whole === 'true' ? {} : { onlyTry: true }), refuses: true };
+      const { id, removed, engine, forgot } = await s.inRequest(RM.handler(asked));
+      return { id, removed, engine, ...forgottenOf(forgot) };
+    },
+    query.whole === 'true',
+  );
 
 /** The run brought onto its workflow's newest revision or merged with its base (`nemia refresh`): what it asked, its keys given. */
 const refreshed = (at: At, payload: RunRefresh) =>

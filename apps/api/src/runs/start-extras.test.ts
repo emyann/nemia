@@ -1,8 +1,9 @@
 /**
  * What a start takes beyond a workflow and a brief, on the Run's `create` and the Card's `start` alike (`objects`' `startExtras`): each
  * step's model for this run alone, the steps gated, a run with no worktree, and the files handed to its steps, sent by their names and
- * their bytes; and what a start answers beside its id, the lines `nemia start` prints of it. Then the run's removal whole
- * (`DELETE …/runs/:name?whole=true`), with its branches deleted where asked (`deleteBranches`, `forceUnmerged`).
+ * their bytes; and what a start answers beside its id, the facts `nemia start` prints of it. Then the run's removal whole
+ * (`DELETE …/runs/:name?whole=true`), with its branches deleted where asked (`deleteBranches`, `forceUnmerged`), and of a run with no
+ * record, what was left under its id forgotten all the same.
  *
  * In a factory of the store (`acme`, the orchestrator's test team's `dev`), on a scratch repository: each run is written and nothing is
  * filed.
@@ -67,20 +68,17 @@ const EXTRAS = {
 test("POST /api/namespaces/acme/runs with models, gates and inputs starts a run whose record has them, the inputs' bytes copied by name", async () => {
   const res = await post('runs', { workflow: 'dev', brief: 'Add a cache.', ...EXTRAS });
   assert.equal(res.status, 201, await res.clone().text());
-  const started = (await res.json()) as { id: string; lines?: string[] };
+  const started = (await res.json()) as { id: string; run?: { models?: Record<string, string>; gated?: string[] } };
   const run = runsAtOnce(root).runs.read(started.id);
   assert.deepEqual(run.models, { implement: 'sonnet' });
   assert.deepEqual(run.inputs, ['notes.md', 'shot.png']);
   const inputs = path.join(root, 'runs', started.id, 'inputs');
   assert.equal(fs.readFileSync(path.join(inputs, 'notes.md'), 'utf8'), 'Read me first.\n');
   assert.deepEqual(fs.readFileSync(path.join(inputs, 'shot.png')), PNG);
-  assert.ok(
-    started.lines?.some((line) => line.startsWith('models: ')),
-    `the lines nemia start prints: ${started.lines?.join('\n')}`,
-  );
-  assert.ok(
-    started.lines?.some((line) => line.startsWith('gated at: implement')),
-    started.lines?.join('\n'),
+  assert.deepEqual(
+    [started.run?.models, started.run?.gated],
+    [{ implement: 'sonnet' }, ['implement']],
+    'what nemia start prints of it: its models and its gates',
   );
 });
 
@@ -88,13 +86,10 @@ test('POST /api/namespaces/acme/cards/:name/start with models starts a run whose
   write(path.join(root, 'inbox', 'cache-card.md'), '---\nworkflow: dev\nfactory: acme\n---\nAdd a cache, from the card\n');
   const res = await post('cards/cache-card/start', { models: { implement: 'sonnet' }, gates: ['implement'] });
   assert.equal(res.status, 201, await res.clone().text());
-  const started = (await res.json()) as { id: string; card: string; lines?: string[] };
+  const started = (await res.json()) as { id: string; card: string; run?: { from?: string } };
   assert.equal(started.card, 'cache-card');
   assert.deepEqual(runsAtOnce(root).runs.read(started.id).models, { implement: 'sonnet' });
-  assert.ok(
-    started.lines?.some((line) => line.startsWith('from inbox card cache-card')),
-    started.lines?.join('\n'),
-  );
+  assert.equal(started.run?.from, 'cache-card', 'what nemia start prints of it: the card it came from');
 });
 
 test('`noWorktree` reaches the start: a workflow that ends by merging its result branch is refused it, naming --no-worktree', async () => {
@@ -134,8 +129,50 @@ test('DELETE a run of a workflow: refused as a try alone, removed whole with ?wh
   );
   const gone = await del('?whole=true&deleteBranches=true');
   assert.equal(gone.status, 200, await gone.clone().text());
-  const removed = (await gone.json()) as { id: string; removed: boolean; line?: string };
+  const removed = (await gone.json()) as { id: string; removed: boolean };
   assert.deepEqual([removed.id, removed.removed], [id, true]);
-  assert.ok(removed.line?.startsWith(id), removed.line);
   assert.equal(runsAtOnce(root).runs.exists(id), false);
+});
+
+/** What a removal answers of the run's branches. */
+type Branched = { branches?: { branch: string; deleted: boolean }[] };
+
+test("DELETE ?whole=true deletes the run's branch merged into its base with deleteBranches, and keeps it without", async () => {
+  const { world } = stand();
+  const forgotten = async (query: string): Promise<{ branch: string; removed: Branched }> => {
+    const res = await post('runs', { workflow: 'dev', brief: 'Branch me.' });
+    assert.equal(res.status, 201, await res.clone().text());
+    const { id } = (await res.json()) as { id: string };
+    const branch = `wf/${id}/work`;
+    world.putBack(repo, world.branch(repo, branch, { [`${id}.txt`]: 'done\n' }, 'main'));
+    const cancel = await post(`runs/${id}/cancel`, {});
+    assert.equal(cancel.status, 200, await cancel.clone().text());
+    const url = `/api/namespaces/acme/runs/${id}?whole=true${query}`;
+    const gone = await app().request(url, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
+    assert.equal(gone.status, 200, await gone.clone().text());
+    return { branch, removed: (await gone.json()) as Branched };
+  };
+  const kept = await forgotten('');
+  assert.notEqual(world.tip(repo, kept.branch), null, 'no deleteBranches: the branch is kept');
+  const deleted = await forgotten('&deleteBranches=true');
+  assert.equal(world.tip(repo, deleted.branch), null, 'deleteBranches: the branch merged into main is deleted');
+  assert.deepEqual(
+    deleted.removed.branches?.map((b) => [b.branch, b.deleted]),
+    [[deleted.branch, true]],
+  );
+});
+
+test('DELETE ?whole=true of a run with no record forgets what was left under its id, and answers 404 naming what it removed', async () => {
+  const left = path.join(root, 'runs', 'ghost-abcd.asks');
+  write(path.join(left, 'implement.json'), '{}');
+  const gone = await app().request('/api/namespaces/default/runs/ghost-abcd?whole=true', {
+    method: 'DELETE',
+    headers: JSON_TYPE,
+    body: '{}',
+  });
+  assert.equal(gone.status, 404, await gone.clone().text());
+  assert.match(((await gone.json()) as { error: string }).error, /runs\/ghost-abcd\.asks/);
+  assert.equal(fs.existsSync(left), false, 'what was left under its id is gone');
+  const alone = await app().request('/api/namespaces/default/runs/ghost-abcd', { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
+  assert.equal(alone.status, 404, 'a try alone of no record is still no such run');
 });

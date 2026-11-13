@@ -1,8 +1,8 @@
 /**
  * The agents' reads and copy, each asked of the api's Agent group in `default`: `nemia agents` (every page of the listing, on the
- * repository `--repo` names, else the api's own), `nemia agents card` (the A2A card on stdout, what it is not on stderr), `nemia agents
- * sources` (the agent files the store knows of) and `nemia agents copy` (one copied into yours: its file a path on the daemon's machine);
- * and the lines each prints of what the api answers.
+ * repository `--repo` names, else the one it is typed in, `repoQuery`), `nemia agents card` (the A2A card on stdout, what it is not on
+ * stderr), `nemia agents sources` (the agent files the store knows of) and `nemia agents copy` (one copied into yours: its file a path on
+ * the daemon's machine); and the lines each prints of what the api answers.
  */
 import {
   AGENTS_CARD_WORDS,
@@ -47,7 +47,7 @@ export const agentsLines = (agents: readonly Agent[]): string[] =>
     ? [...agents.flatMap(agentLines), `\none in A2A's shape: nemia agents card <name>`]
     : ["no agents — an agent is a file in <workflows>/agents: the repository's, or yours in the store"];
 
-/** `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names. */
+/** `nemia agents`' runner: every agent the api lists in `default`, on the repository `--repo` names or it is typed in. */
 export async function agentsListed(args: Args): Promise<number> {
   const repo = repoQuery(args);
   const list = await asked(AGENTS_WORDS.name, (c) =>

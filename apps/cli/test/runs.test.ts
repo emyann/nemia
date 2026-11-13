@@ -26,19 +26,31 @@ function repoMade(prefix: string): string {
   return repo;
 }
 
-/** The factory `acme` on `repo`, its tree holding the test team's `dev`, written into the store `root`. */
-const acmeIn = (repo: string) => (root: string) => {
-  const tree = path.join(root, 'factories', 'acme', 'tree');
+/** The factory `name` on `repo`, its tree holding the test team's `dev`, written into the store `root`. */
+const factoryIn = (name: string, repo: string) => (root: string) => {
+  const tree = path.join(root, 'factories', name, 'tree');
   fs.cpSync(TEAM, path.join(tree, 'workflows'), { recursive: true });
   write(
-    path.join(root, 'factories', 'acme.json'),
+    path.join(root, 'factories', `${name}.json`),
     JSON.stringify({ repos: [repo], template: { source: '/t/team', version: '0.1.0', params: {} } }),
   );
   write(path.join(tree, 'factory.json'), JSON.stringify({ workflows: ['dev'], hires: {} }));
 };
 
+/** The factory `acme` on `repo`. */
+const acmeIn = (repo: string) => factoryIn('acme', repo);
+
 const REPO = repoMade('nemia-runs-repo-');
-const store = await servedStore('nemia-runs-', acmeIn(REPO), { HKB_REPO: REPO });
+/** A second repository, the factory `beta`'s: not the api's own. */
+const SECOND = repoMade('nemia-runs-second-');
+const store = await servedStore(
+  'nemia-runs-',
+  (root) => {
+    acmeIn(REPO)(root);
+    factoryIn('beta', SECOND)(root);
+  },
+  { HKB_REPO: REPO },
+);
 after(store.stop);
 const DRAFTS = scratch('nemia-runs-drafts-');
 
@@ -48,6 +60,8 @@ const idIn = (said: Said): string => /^(\S+)\s/.exec(said.out)?.[1] ?? assert.fa
 /** The run's record as the store keeps it. */
 const recordOf = (root: string, id: string) =>
   JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
+    factory?: string;
+    repo?: string;
     brief: string;
     models?: Record<string, string>;
     inputs?: string[];
@@ -125,6 +139,26 @@ test('REFUSED, exit 2, nothing started: a folder, a workflow as a path, no workf
   assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
 });
 
+test('nemia start typed in a repository with no --repo nor --factory starts there: in the factory on it, on it', async () => {
+  const sub = path.join(SECOND, 'src', 'deep');
+  fs.mkdirSync(sub, { recursive: true });
+  for (const here of [SECOND, sub]) {
+    const said = await nemia(['start', 'Add a cache, here.', '--workflows', 'dev'], store.env, here);
+    assert.equal(said.code, 0, `typed in ${here}: ${said.out}${said.err}`);
+    const run = recordOf(store.root, idIn(said));
+    assert.deepEqual([run.factory, run.repo], ['beta', SECOND], `typed in ${here}`);
+    assert.match(said.out, new RegExp(`^factory: beta, on ${SECOND.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+  }
+});
+
+test('REFUSED, exit 2, nothing started: nemia start typed in a folder of no repository, naming the factory that would serve it', async () => {
+  const before = fs.readdirSync(path.join(store.root, 'runs')).length;
+  const said = await nemia(['start', 'Add a cache, nowhere.', '--workflows', 'dev'], store.env, DRAFTS);
+  assert.equal(said.code, 2, `${said.out}${said.err}`);
+  assert.match(said.err, /nemia factory add/);
+  assert.equal(fs.readdirSync(path.join(store.root, 'runs')).length, before);
+});
+
 test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a step not filed yet', async () => {
   const id = await started('Hold me.');
   const held = await store.nemia(['hold', id, '--why', 'waiting on legal']);
@@ -139,16 +173,19 @@ test('nemia hold puts a hold and --off lifts it; nemia say keeps words for a ste
   assert.ok(kept.out.includes('mind the cache'), kept.out);
 });
 
-test('nemia cancel stops the run; nemia rm forgets it, its branches deleted; a run not there is not forgotten, exit 2', async () => {
+test('nemia cancel stops the run; nemia rm forgets it, its branches deleted, and of a run with no record, what was left under its id', async () => {
   const id = await started('Cancel me.');
   const cancelled = await store.nemia(['cancel', id]);
   assert.equal(cancelled.code, 0, cancelled.err);
   assert.ok(fs.existsSync(path.join(store.root, 'runs', `${id}.cancelled`)));
+  const asks = path.join(store.root, 'runs', 'nobody-1.asks');
+  write(path.join(asks, 'implement.json'), '{}');
   const gone = await store.nemia(['rm', id, 'nobody-1', '--delete-branches']);
-  assert.equal(gone.code, 2, `${gone.out}${gone.err}`);
-  assert.match(gone.out, new RegExp(`^${id}`, 'm'));
-  assert.match(gone.out, /^nobody-1 {2}not forgotten/m);
+  assert.equal(gone.code, 0, `${gone.out}${gone.err}`);
+  assert.match(gone.out, new RegExp(`^${id} {2}forgotten: no worktrees; removed runs/${id}\\.json`, 'm'));
+  assert.match(gone.out, /^nobody-1 {2}no such run — nothing to forget but what was left under its id: removed runs\/nobody-1\.asks\/$/m);
   assert.equal(fs.existsSync(path.join(store.root, 'runs', `${id}.json`)), false);
+  assert.equal(fs.existsSync(asks), false, 'the leftovers of a run with no record are gone');
 });
 
 test('nemia prune of a run with nothing to prune says so, and of none lists nothing to prune, exit 0; of a run not there, exit 2', async () => {
@@ -200,9 +237,9 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
   };
 }
 
-/** `nemia <argv>` on `env`, waited on for its end. */
-function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
-  const child = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+/** `nemia <argv>` on `env`, typed in the folder `cwd` (this test's own where none is named), waited on for its end. */
+function nemia(argv: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): Promise<Said> {
+  const child = spawn(process.execPath, [CLI, ...argv], { env, cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
   child.stdout.on('data', (chunk) => (out += chunk));

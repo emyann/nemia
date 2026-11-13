@@ -13,7 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, forgetLine, parseArgv, RM, triesDir } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, parseArgv, RM, triesDir } from 'agent-orchestrator';
+import { forgottenOf } from '../objects/forgotten.ts';
 import { runWith } from '../../test/builtin-place.ts';
 
 const T0 = Date.parse('2026-10-02T09:00:00.000Z');
@@ -294,7 +295,7 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       assert.deepEqual(
         answered,
         JSON.parse(
-          JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine, line: forgetLine(typed.forgot) }).replaceAll(
+          JSON.stringify({ id: typed.id, removed: typed.removed, engine: typed.engine, ...forgottenOf(typed.forgot) }).replaceAll(
             'r-cli-rm',
             'r-api-rm',
           ),

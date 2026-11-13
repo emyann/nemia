@@ -1,14 +1,17 @@
 /**
  * The runners that forget runs: `nemia rm` (the Run's `delete`, the run whole, `?whole=true`) and `nemia prune` (`prune`). Each run named
  * is judged on its own, a line each, a refusal included, and once every run has had its say the runner exits 2 naming those left, or 1
- * where one failed otherwise. `nemia prune` asks first: each run previewed by the api (`preview`), the space it holds listed, then
- * removed on `--yes` or a person's y at the terminal.
+ * where one failed otherwise. `nemia rm` of a run the store has no record of still asks the api to forget what was left under its id, in
+ * the default namespace, and says what it removed, which leaves nothing to tally. `nemia prune` asks first: each run previewed by the api
+ * (`preview`), the space it holds listed, then removed on `--yes` or a person's y at the terminal.
  */
 import readline from 'node:readline/promises';
-import { type Args, helpOf, PRUNE_WORDS, RM_WORDS, type RunPruned } from 'objects';
+import { Effect } from 'effect';
+import { type Args, DEFAULT_NAMESPACE, helpOf, Missing, PRUNE_WORDS, RM_WORDS, type RunPruned } from 'objects';
 import { asked, everyPage, pageOf } from '../../objects.ts';
 import { Refused } from '../../refused.ts';
 import { listArg, namespaceOfRun, said, switchArg } from '../requests.ts';
+import { forgottenLine, sizeOf } from './forgotten.ts';
 
 /** The runs named, in the order typed. */
 const idsOf = (args: Args): readonly string[] => listArg(args, 'runId');
@@ -51,9 +54,20 @@ export async function rm(args: Args): Promise<number> {
   const tally: Tally = { left: [], failed: false };
   for (const name of ids) {
     try {
-      const namespace = await namespaceOfRun(RM_WORDS.name, name);
-      const removed = await asked(RM_WORDS.name, (c) => c.runs.delete({ params: { namespace, name }, query }));
-      said([removed.line ?? `${name}  forgotten`]);
+      const namespace = await namespaceToForget(name);
+      const removed = await asked(RM_WORDS.name, (c) =>
+        c.runs.delete({ params: { namespace, name }, query }).pipe(
+          Effect.catchIf(
+            (err): err is Missing => err instanceof Missing,
+            (missing) => Effect.succeed({ missing: missing.error }),
+          ),
+        ),
+      );
+      if ('missing' in removed) {
+        said([refusedLine(name, 'forgotten', removed.missing)]);
+        continue;
+      }
+      said([forgottenLine(removed)]);
       if (!removed.removed) tally.left.push(name);
     } catch (err) {
       leftLine(name, 'forgotten', err, tally);
@@ -62,15 +76,20 @@ export async function rm(args: Args): Promise<number> {
   return tallied(RM_WORDS.name, 'forgotten', tally);
 }
 
-/** Bytes, as a person reads them. */
-const sizeOf = (bytes: number): string =>
-  bytes < 1024
-    ? `${bytes} B`
-    : bytes < 1024 ** 2
-      ? `${(bytes / 1024).toFixed(1)} KB`
-      : bytes < 1024 ** 3
-        ? `${(bytes / 1024 ** 2).toFixed(1)} MB`
-        : `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+/**
+ * The namespace `nemia rm` asks to forget the run `name` in: its own, read across namespaces (`namespaceOfRun`); the default namespace
+ * where the store has no record of it, where the api still forgets what was left under its id.
+ */
+const namespaceToForget = async (name: string): Promise<string> =>
+  asked(RM_WORDS.name, (c) =>
+    c.runs.show({ params: { name } }).pipe(
+      Effect.map((run) => run.metadata.namespace ?? DEFAULT_NAMESPACE),
+      Effect.catchIf(
+        (err): err is Missing => err instanceof Missing,
+        () => Effect.succeed(DEFAULT_NAMESPACE),
+      ),
+    ),
+  );
 
 /** Whether the person at the terminal says y to `question`; no terminal, no. */
 async function confirmed(question: string): Promise<boolean> {

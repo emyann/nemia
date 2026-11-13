@@ -441,7 +441,7 @@ export { volumeList, volumeObject } from './factory/object/volume.verb.ts';
 export { eventKept, eventList, eventObject } from './event-object/event.verb.ts';
 export { subscriptionList, subscriptionObject } from './subscription-object/subscription.verb.ts';
 export { templateList, templateObject, templateTree, TemplateRenders } from './template/object/template.verb.ts';
-export { cardRepoRefusal, CONCLUDED, START, StartInput, startedLines } from './start/commands.verb.ts';
+export { cardRepoRefusal, CONCLUDED, START, StartInput, startedFacts, startedLines } from './start/commands.verb.ts';
 export { sentInputRefusal, sentInputsRemoved, sentInputsWritten, type SentInput } from './start/sent.store.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM } from './inbox/commands.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction, type FactoryInstruction } from './factory/instruction.verb.ts';

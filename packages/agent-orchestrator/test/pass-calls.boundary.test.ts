@@ -125,7 +125,8 @@ const board = () => {
 /**
  * One pass over the run, metered as `tick` meters it: the engine's calls it made, in order, each with the run's id cut to `R`, and the
  * meter's count of calls in the phases a pass asks the engine in: `journals`, a read, and `act`, which is also every pass's hand-off and
- * its asks consumed (`consumeAsks`), each step's workspace cut, and the record written (`rewriteRun`).
+ * its asks consumed (`consumeAsks`), each step's workspace cut, each worktree read against its lockfile before a try, a round or a check
+ * is filed in it (`depsBefore`), and the record written (`rewriteRun`).
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {
   b.calls.length = 0;
@@ -269,7 +270,11 @@ row(FILED, 'a try and a round due on one pass: the try is filed first, then the 
     ],
     "the pass's reads, then the try looked for and filed, then the round",
   );
-  assert.deepEqual(both.counted, { journals: 10, act: 5 });
+  assert.deepEqual(
+    both.counted,
+    { journals: 10, act: 7 },
+    'the try and the round each read their worktree against its lockfile first, in the act (`depsBefore`)',
+  );
 });
 
 row(FILED, "a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {

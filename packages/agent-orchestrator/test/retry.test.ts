@@ -301,7 +301,7 @@ test('a planner blocked on two questions is answered at the terminal', async (t)
         { question: where.title, chose: ['retry', 'gate'], own: 'both' },
       ],
       undefined,
-      'at the terminal',
+      'the person, at the terminal',
     );
     assert.equal(askRead(id, ask).message, expected);
     assert.equal(asked.try, 2, 'the answers ask for try 2 of plan');
@@ -343,7 +343,7 @@ test("a gated planner's questions are answered with its approval", async (t) => 
         { question: where.title, chose: ['gate'] },
       ],
       'go',
-      'at the terminal',
+      'the person, at the terminal',
     );
     assert.equal(askRead(id, 'approve-plan-1').message, expected);
     assert.deepEqual([approved.step, approved.try], ['plan', 1]);

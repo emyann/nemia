@@ -34,6 +34,7 @@ import { stepPlace } from '../src/workflow.ts';
 import { renderedFlags } from '../src/agents/agents.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { told, type StartedAnswer } from './typed.ts';
+import type { RunsListed } from '../src/list/list.ts';
 import { RM } from '../src/forget/commands.verb.ts';
 import type { Env } from '../src/config/config.store.ts';
 
@@ -64,18 +65,14 @@ const written = (id: string): Record<string, unknown> & { workflow: Array<Record
 /** Whether `object` holds any of `keys` as its own. */
 const holdsAny = (object: unknown, ...keys: string[]): boolean => keys.some((key) => Object.hasOwn(object as object, key));
 
-/** What `nemia argv` printed on stdout, a line each. */
-const printed = async (t: { mock: test.TestContext['mock'] }, argv: string[]): Promise<string[]> => {
-  const out: string[] = [];
-  const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
+/** What `nemia ls` answers (`RunsListed`), with what it says on stderr kept off the test's output. */
+const listed = async (t: { mock: test.TestContext['mock'] }): Promise<RunsListed> => {
   const error = t.mock.method(console, 'error', () => {});
   try {
-    await stage.main(argv);
+    return (await stage.main(['ls'])) as RunsListed;
   } finally {
-    log.mock.restore();
     error.mock.restore();
   }
-  return out.join('\n').split('\n');
 };
 
 test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemia rm` over it, and each record written back under the names it has now', async (t) => {
@@ -232,13 +229,14 @@ test('the oldest store still works: a pass, `nemia ls`, `nemia decide` and `nemi
   });
 
   await s.test('`nemia ls` lists every run of the old store, and none unreadable', async (c) => {
-    const lines = await printed(c, ['ls']);
-    for (const id of ['tides', 'notes', 'drafts'])
-      assert.ok(
-        lines.some((l) => l.startsWith(`${id}  `)),
-        lines.join('\n'),
-      );
-    assert.doesNotMatch(lines.join('\n'), /unreadable/);
+    const { runs } = await listed(c);
+    const ids = runs.map((r) => r.run.id);
+    for (const id of ['tides', 'notes', 'drafts']) assert.ok(ids.includes(id), ids.join(', '));
+    assert.deepEqual(
+      runs.filter((r) => 'said' in r.listed).map((r) => r.run.id),
+      [],
+      'none left unjudged',
+    );
   });
 
   await s.test('the decision of a run of the old store is read', async () => {

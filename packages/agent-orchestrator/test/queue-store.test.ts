@@ -48,7 +48,8 @@ import {
 } from '../src/runner.ts';
 import { addFactoryAt, attachWorkflowAt } from '../src/factory/factory.store.ts';
 import { listRuns, runRecord } from '../src/record/record.store.ts';
-import { told } from './typed.ts';
+import { listedRow, stepRow, told } from './typed.ts';
+import { shownStatus, type RunsListed } from '../src/list/list.ts';
 import { cardFiles } from '../src/cards/cards.store.ts';
 import { engineOf } from '../src/runtime-client.ts';
 import { passParents } from '../src/views/views.verb.ts';
@@ -196,6 +197,19 @@ const printedBy = async (t: TestContext, argv: string[], e?: Engine): Promise<st
   return printed.join('\n').split('\n');
 };
 
+/** What `nemia ls argv…` answers (`RunsListed`), over the stage's engine. */
+const listedBy = async (...argv: string[]): Promise<RunsListed> => (await stage.main(['ls', ...argv])) as RunsListed;
+
+/** Each step `nemia ls` answers waiting for a run slot, as its run, its name and its word, in the order the listing answers them. */
+const slotHeld = (listed: RunsListed): Array<[run: string, step: string, word: string]> =>
+  listed.runs.flatMap(({ run, listed: l }) =>
+    'said' in l
+      ? []
+      : l.steps
+          .filter((st) => shownStatus(st).includes('waiting for a run slot'))
+          .map((st): [string, string, string] => [run.id, st.name, shownStatus(st)]),
+  );
+
 /** A repository with one commit and a one-step workflow under its workflows/ for each name. */
 const aRepoWith = (...workflows: string[]): string => {
   const repo = aRepo();
@@ -275,14 +289,17 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       assert.ok(runRecord(ROOT, older.id).slotHeldAt, 'the pass that held it wrote when');
       assert.deepEqual(runRecord(ROOT, one.id).slotHeldAt, undefined, 'a run the cap never held has no time written');
 
-      const listed = await printedBy(c, ['ls']);
-      assert.ok(
-        listed.some((l) => /^ {3}implement +waiting for a run slot \(2 of 2 in flight\)/.test(l)),
-        listed.join('\n'),
+      assert.deepEqual(
+        slotHeld(await listedBy()).sort(([a], [b]) => a.localeCompare(b)),
+        [
+          [younger.id, 'implement', HELD],
+          [older.id, 'implement', HELD],
+        ],
+        'the two the cap holds say so, and no other',
       );
-      assert.equal(listed.filter((l) => l.includes('waiting for a run slot')).length, 2, 'the two in flight say pending');
-      assert.ok(
-        (await printedBy(c, ['ls', older.id])).some((l) => /^ {3}implement +waiting for a run slot \(2 of 2 in flight\)/.test(l)),
+      assert.equal(
+        stepRow(listedRow(await listedBy(older.id), older.id), 'implement').message,
+        HELD,
         'judged over the store for one run too',
       );
       assert.deepEqual(await decisionNow(older.id), heldDecided, 'held at the cap: 2 in flight of 2');
@@ -312,12 +329,18 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
 
   await s.test(
     "`nemia ls` and `nemia decide` judge by the cap the last pass ran with, not their own shell's: whatever WF_MAX_RUNS a shell sets",
-    async (c) => {
+    async () => {
       const seen = async () => ({
-        listed: (await printedBy(c, ['ls'])).filter((l) => l.includes('waiting for a run slot')).map((l) => l.trim()),
+        listed: slotHeld(await listedBy()).map(([, step, word]) => [step, word]),
         decided: await decisionNow(older.id),
       });
-      const held = { listed: [`implement      ${HELD}`, `implement      ${HELD}`], decided: heldDecided };
+      const held = {
+        listed: [
+          ['implement', HELD],
+          ['implement', HELD],
+        ],
+        decided: heldDecided,
+      };
       try {
         for (const shell of [undefined, '5', '1', 'two']) {
           ENV.WF_MAX_RUNS = shell;
@@ -425,7 +448,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
 
   await s.test(
     'a run waiting on `--after` counts only once filed: with one run in flight, a run started after it is filed — and the one after that is held at 2 of 2',
-    async (c) => {
+    async () => {
       const child = await started('child', at(5), { after: [older.id], isolate: true, repo: older.repo });
       const plain = await started('plain', at(6));
       const { runs: pass } = await runWith(b.e, tickRun());
@@ -437,20 +460,18 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
       const filed = b.filings.length;
       await runWith(b.e, tickRun());
       assert.equal(b.filings.length, filed);
-      const listed = await printedBy(c, ['ls']);
-      assert.ok(
-        listed.some((l) => new RegExp(`^ {3}implement +waiting on ${older.id}`).test(l)),
-        listed.join('\n'),
-      );
-      assert.equal(listed.filter((l) => l.includes(HELD)).length, 1, `only ${later.id}`);
+      const listed = await listedBy();
+      const childWord = stepRow(listedRow(listed, child.id), 'implement').message;
+      assert.ok(childWord.startsWith(`waiting on ${older.id}`), childWord);
+      assert.deepEqual(slotHeld(listed), [[later.id, 'implement', HELD]], `only ${later.id}`);
     },
   );
 
   await s.test(
     "with no cap — WF_MAX_RUNS unset, or 0 — a pass files every run and writes nothing of a slot; before any pass, a shell's own cap, and none the daemon does not run with",
-    async (c) => {
+    async () => {
       const recorded = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'tick.json'), 'utf8')) as { sessions: number; runs: number };
-      const listedHeld = async () => (await printedBy(c, ['ls'])).filter((l) => l.includes('waiting for a run slot'));
+      const listedHeld = async () => slotHeld(await listedBy());
       fs.rmSync(path.join(ROOT, 'tick.json'));
       ENV.WF_MAX_RUNS = undefined;
       assert.deepEqual(await listedHeld(), [], "before any pass has written its ceilings, the shell's own: with none, nothing is held");
@@ -1261,10 +1282,10 @@ test('a record that does not read as a run stops no other run: the pass files th
     const ticked = await printedBy(t, ['tick']);
     assert.deepEqual(b.filings, [`${run.id}-implement`]);
     assert.ok(!ticked.some((l) => l.includes('r-broken')), ticked.join('\n'));
-    const listed = await printedBy(t, ['ls']);
+    const listed = await listedBy();
     assert.ok(
-      listed.some((l) => l.startsWith(run.id)),
-      listed.join('\n'),
+      listed.runs.some((r) => r.run.id === run.id),
+      listed.runs.map((r) => r.run.id).join(', '),
     );
     await runWith(b.e, tickRun());
   } finally {

@@ -1,6 +1,6 @@
 /**
  * Nemia's chat as a page of its own, which the panel's `Open as a page` control leads to: the same panel (`ChatPanel`), full-bleed, the
- * talk filling the frame. The docked face is not drawn here — the page is the panel, so a face to open it would open nothing. It reads
+ * talk filling the frame. Her face in the rail shows the page is hers and opens no side sheet over it — the page is the panel. It reads
  * the frame's one holder of her chat (`NemiaChatProvider`), so coming here from another page opens no stream of its own.
  */
 import { createFileRoute } from '@tanstack/react-router';
@@ -34,7 +34,6 @@ function ChatPage() {
           atWork={open ? atWork(open).runs : 0}
           now={now}
           mode="page"
-          onGrow={() => undefined}
           onClose={() => undefined}
         />
       </div>

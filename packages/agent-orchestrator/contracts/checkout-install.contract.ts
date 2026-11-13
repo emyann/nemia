@@ -45,8 +45,7 @@ const checkoutInstallSpec = spec<(seen: CheckoutSeen) => CheckoutInstall>({
     },
     uninstalledCloneInstalled: {
       description: 'A clone with a lockfile and no node_modules is installed: nobody else will, and its worktrees would start with none',
-      condition: ({ input: [seen], output }) =>
-        !(seen.cloned && seen.lockfile && !seen.tree) || (output.due && output.because === NO_TREE),
+      condition: ({ input: [seen], output }) => !(seen.cloned && seen.lockfile && !seen.tree) || (output.due && output.because === NO_TREE),
     },
     partedCloneInstalled: {
       description: 'A clone whose lockfile asks for a package its own tree does not have as named is installed, saying where they part',

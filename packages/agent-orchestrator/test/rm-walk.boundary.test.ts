@@ -270,7 +270,6 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
         run.branch,
       ],
     ],
-    'its worktree removed, what implement left committed on its branch first, its own files alone, its branch kept unless asked',
   );
   assert.deepEqual(
     [forgot[0].engine?.forgotten.length, forgot[0].engine?.journalBytes, forgot[0].engine?.feedLines],

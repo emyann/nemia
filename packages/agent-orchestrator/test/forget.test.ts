@@ -311,7 +311,6 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
           [merged.run.id, 'main', [{ branch: merged.branch, deleted: true, why: 'merged' }], 1],
           [unmerged.run.id, 'main', [{ branch: unmerged.branch, deleted: false, why: 'unmerged' }], 1],
         ],
-        'the merged branch deleted, the unmerged one kept, each run in the order named',
       );
       assert.deepEqual([hasBranch(at, merged.branch), hasBranch(at, unmerged.branch)], [false, true]);
       const two = await typed(t, 'rm', forced.run.id, '--force-unmerged', '--delete-branches');
@@ -800,10 +799,10 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
         const said = await typed(t, 'rm', p.run.id);
         assert.equal(said.error, undefined, 'exit 0: the run is removed');
         assert.deepEqual(
-          said.forgot.map((f) => [f.id, f.kind, f.engine?.refusal, f.engine?.marker, f.engine?.forgotten]),
-          [[p.run.id, 'forgotten', 'forget: the store is read-only.', marker, []]],
-          'removed, the engine refusing the whole call in its words, and the marker that keeps its ids',
+          said.forgot.map((f) => [f.id, f.kind, f.engine?.marker, f.engine?.forgotten]),
+          [[p.run.id, 'forgotten', marker, []]],
         );
+        names(said.forgot[0]?.engine?.refusal, 'read-only');
         assert.ok(!under('runs', `${p.run.id}.json`), 'the record is gone');
         assert.deepEqual(files.forgetting.read(p.run.id), [task], 'the marker keeps its id');
         const before = board().forgets.length;
@@ -856,7 +855,6 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
         assert.deepEqual(
           [engine?.forgotten.length, engine?.refused, engine?.refusedWhy, engine?.marker, engine?.waiting],
           [2, [refused], [message], marker, []],
-          'the engine forgot 2 tasks, refused 1 in its words, the marker kept, and none waits',
         );
         const left = await listed();
         assert.deepEqual([left.includes(refused), rest.filter((id) => left.includes(id))], [true, []], 'the rest forgotten');

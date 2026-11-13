@@ -205,7 +205,6 @@ test("an engine without the harness a task ran on refuses it by name: `nemia rm`
   assert.deepEqual(
     [said.forgot.length, engine?.refused, engine?.refusedWhy.length, engine?.marker, engine?.waiting],
     [1, [task], 1, marker, []],
-    'removed, the engine refusing the task by name, the marker kept, and none waits',
   );
   assert.ok(engine?.refusedWhy[0]?.startsWith(why), `in the runtime's words: ${engine?.refusedWhy[0]}`);
   assert.deepEqual(files.forgetting.read(run.id), [task], 'the marker keeps its id');

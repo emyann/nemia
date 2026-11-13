@@ -238,6 +238,7 @@ jobs:
       - name: Visit this shard's pages
         # The shard is the leg's own and the count is read back off the matrix: a literal here would leave a shard's pages unvisited the
         # day the matrix changes. A shard is a run of some pages, so it is held to no bound itself; the bound is the e2e-bound job's.
+        # A shard runs none of the look's browser tests (apps/web/test/e2e/*.test.ts): the e2e-look job runs them, once per push.
         run: npm run e2e -- --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
         env:
           # The e2e writes its pictures and this shard's page times here (OUT, apps/web/test/e2e/world.ts).
@@ -267,6 +268,51 @@ jobs:
           # As above: .e2e is hidden, so the pictures would be skipped without this — silently here, since nothing is found is ignored.
           include-hidden-files: true
           if-no-files-found: ignore
+
+  e2e-look:
+    # The look's browser tests (apps/web/test/e2e/*.test.ts), once per push, beside the shards, which run none of them: each file
+    # launches Chromium and three build the look's stories page, so in every shard they cost four times what they prove once. Two
+    # files at a time, the bound of every package's suite (LOOK_TESTS, apps/web/test/e2e/look.ts). The bound is a guess until the
+    # first runs are read off, set at the shards' own.
+    name: e2e look
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        # No cache: npm, as the legs above.
+        with:
+          node-version: '24.16.0'
+      - run: npm ci
+        timeout-minutes: 10
+      - name: Read the Playwright the lockfile pins
+        id: playwright
+        # The browsers' cache key, as the shards read it: the same key restores the same builds.
+        run: |
+          node -e '
+            const version = require("./package-lock.json").packages["node_modules/playwright"]?.version;
+            if (!version || !process.env.ImageOS) throw new Error("no playwright in package-lock.json or no ImageOS on the runner: the browsers cache key needs both");
+            console.log(`key=playwright-${process.env.ImageOS}-${version}`);
+          ' >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright's browsers
+        id: browsers
+        # The browsers alone, keyed and saved as the shards' are, with no restore-keys.
+        uses: actions/cache@v6
+        timeout-minutes: 5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright.outputs.key }}
+      - name: Install Chromium
+        # On a miss alone, from the checkout's own playwright, as the shards install it.
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        timeout-minutes: 15
+        working-directory: apps/web
+      - name: Run the look's browser tests
+        # --look alone: the look's tests and no page, which the shards visit.
+        run: npm run e2e -- --look
 
   e2e-bound:
     # The whole e2e's page time, summed across the shards and held to PAGES_BOUND_MS — the bound that is additive and that a shard, like
@@ -544,7 +590,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [test, lint, typecheck, contracts, e2e, e2e-bound, build, gitleaks, guards]
+    needs: [test, lint, typecheck, contracts, e2e, e2e-look, e2e-bound, build, gitleaks, guards]
     # A dispatched run — the release workflow's, on the release pull request's head — also posts the ci context as a commit status. Its
     # check runs belong to a check suite no pull request is linked to, so the pull request never counts them; a status belongs to the
     # commit, and one posted with this token is set by GitHub Actions, the app branch protection pins. This job alone may write one,

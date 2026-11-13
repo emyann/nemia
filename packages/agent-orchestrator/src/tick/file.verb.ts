@@ -36,6 +36,7 @@ import {
   type Round,
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
+import type { Provisioned } from '../workspace/workspace.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -47,7 +48,15 @@ import { modeWord, nextTry, sessionModel, tryWord, type Retry } from '../retry/i
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
 import { carriedFilesDir, workflowFilesDir } from '../frozen/frozen.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
-import { checkoutParts, cutNotes, workspaceFor, type Cut } from '../workspace/worktree.store.ts';
+import {
+  checkoutParts,
+  cutNotes,
+  keepWorktreeInstalled,
+  reinstalledNotes,
+  workspaceFor,
+  type Cut,
+  type Reinstalled,
+} from '../workspace/worktree.store.ts';
 import { checksHandedRead, landingSaidRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { noteFiledCheck, withinEffect } from '../meter/tally.store.ts';
 import { PlaceService } from '../place/place.store.ts';
@@ -115,6 +124,21 @@ const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.valu
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
 const closeFirst = (f: Filing, name: string, taskId: string | null | undefined): Effect.Effect<string | undefined> =>
   taskId && f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId) : Effect.succeed(undefined);
+
+/**
+ * A run's worktree brought to its lockfile before step `name` files a try, a round or a check in it (`keepWorktreeInstalled`), within
+ * the pass's `act`, its notes the step's: what it did, or undefined where nothing was due — and for a run that cuts no worktree.
+ */
+const depsBefore = Effect.fnUntraced(function* (f: Filing, name: string, workspace: string) {
+  const { run } = f;
+  if (!isRepositoryRun(run) || !run.isolate) return undefined;
+  const again: Reinstalled | undefined = yield* withinEffect(
+    'act',
+    Effect.promise(() => keepWorktreeInstalled(f.home, run.id, run.repo, workspace)),
+  );
+  if (again) f.notes.push(...reinstalledNotes(run.repo, again).map((note) => `${name}: ${note}`));
+  return again;
+});
 
 /** The steps a pass tried again, and those of them whose try is a recheck, whose checks are filed with the others. */
 type Tried = { tried: string[]; rechecked: string[] };
@@ -239,7 +263,8 @@ const remoteTry = (r: Retry, status: StepStatus): RetryBriefing => ({
 
 /**
  * Send a try to the engine, told what its place says to it (`PlaceTold`): filed as a task of its own, or given as the answer to the
- * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined.
+ * task held open (`answers`). Answers with the engine's refusal of the answer, or undefined. A try filed as a task of its own on a local
+ * harness is filed on a tree brought to its lockfile (`depsBefore`), and told where that failed; a held session keeps the tree it has.
  */
 const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec, taskId: string, answers: boolean, landing: PlaceTold) {
   const home = yield* StoreRoot;
@@ -256,6 +281,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told: Told = { ...(yield* toldOf(run, step)), ...landing };
+  const deps = remote || answers ? undefined : (yield* depsBefore(f, r.step, record.workspace ?? run.workspace))?.deps;
   const brief = remote
     ? remoteBrief(step, run, reads.steps, closeouts, remoteTry(r, status), undefined, reads.answers)
     : composeBrief(
@@ -264,7 +290,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: StepSpec
         reads.steps,
         closeouts,
         files,
-        undefined,
+        deps,
         tryTold(home, f, r, record, { status, resumeFrom, refusal }),
         undefined,
         undefined,
@@ -364,6 +390,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
       targets: landing.targets,
       landing: yield* landingOf(f, r),
       costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
+      deps: isRemoteHarness(target.harness) ? undefined : (yield* depsBefore(f, r.target, record.workspace ?? run.workspace))?.deps,
     };
     yield* asked('file', e.file(roundSpec(home, f, r, looping, target, taskId, yield* toldOf(run, target), said)));
   }
@@ -395,7 +422,7 @@ function roundSpec(
   target: StepSpec,
   taskId: string,
   told: StepTold,
-  said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
+  said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts; deps?: Provisioned },
 ): Spec {
   const { run, reads } = f;
   const record = recordNamed(run, r.target);
@@ -411,7 +438,7 @@ function roundSpec(
       reads.steps,
       reads.signedOff,
       files,
-      undefined,
+      said.deps,
       undefined,
       {
         ...roundBriefed(r, looping, said.landing),
@@ -465,7 +492,9 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
- * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so;
+ * any other's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
+ * with no verdict (`checkArgv`'s `unprovisioned`).
  * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
@@ -481,12 +510,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     const files = artifactsDir(home, run, name);
     fs.mkdirSync(files, { recursive: true });
     const lands = isRepositoryRun(run) && landsOnCheck(step, run);
-    const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
+    const first = yield* checkFirst(f, name, lands, workspace);
     const closeout = f.reads.signedOff(name);
-    if (install)
-      f.notes.push(
-        `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
-      );
     const env = checkEnvOf(run, step, {
       workspace,
       files,
@@ -503,13 +528,32 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         brief: command,
         cwd: workspace,
         deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
-        config: { command: checkArgv(command, install === undefined ? undefined : 'install'), env, niceness: CHECK_NICENESS },
+        config: { command: checkArgv(command, first), env, niceness: CHECK_NICENESS },
       }),
     );
     const { factory, workflow } = keysOf(run);
     noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
   }
   run.steps[name] = { ...record, check: { taskId } };
+});
+
+/**
+ * What a check's script runs before its command, said in the pass's notes: an ending's (`lands`) installs first what the staged merge's
+ * lockfile asks for (`checkoutParts`); any other's worktree is brought to its lockfile (`depsBefore`), and where that failed the check
+ * runs no command (`unprovisioned`).
+ */
+const checkFirst = Effect.fnUntraced(function* (f: Filing, name: string, lands: boolean, workspace: string) {
+  if (lands) {
+    const install = checkoutParts(workspace);
+    if (!install) return undefined;
+    f.notes.push(
+      `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
+    );
+    return 'install' as const;
+  }
+  if ((yield* depsBefore(f, name, workspace))?.deps.tree !== 'failed') return undefined;
+  f.notes.push(`${name}: its worktree's node_modules could not be installed: its check runs no command, and ends with no verdict`);
+  return 'unprovisioned' as const;
 });
 
 /**

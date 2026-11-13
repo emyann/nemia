@@ -443,12 +443,7 @@ export type Reinstalled = {
  * `node_modules` that is one link (`shared`) is left as it is. It does not throw: a failed install is said in `deps`, and tried again
  * at the next filing.
  */
-export async function keepWorktreeInstalled(
-  home: string,
-  runId: string,
-  repo: string,
-  worktree: string,
-): Promise<Reinstalled | undefined> {
+export async function keepWorktreeInstalled(home: string, runId: string, repo: string, worktree: string): Promise<Reinstalled | undefined> {
   const modules = lstatOf(path.join(worktree, 'node_modules'));
   const tree = !modules ? 'none' : modules.isSymbolicLink() ? 'shared' : 'own';
   const due = worktreeDeps({
@@ -476,9 +471,7 @@ function isRunWorktree(home: string, runId: string, repo: string, worktree: stri
   try {
     const real = fs.realpathSync(worktree);
     const repoReal = realOr(repo);
-    return (
-      inside(realOr(path.join(home, 'worktrees', runId)), real) !== null && real !== repoReal && inside(repoReal, real) === null
-    );
+    return inside(realOr(path.join(home, 'worktrees', runId)), real) !== null && real !== repoReal && inside(repoReal, real) === null;
   } catch {
     return false;
   }

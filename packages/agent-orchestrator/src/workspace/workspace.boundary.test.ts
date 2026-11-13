@@ -713,7 +713,7 @@ const lockfileGainsY = (wt: string) => {
 };
 
 test("a worktree's own tree read against its lockfile: current as cut, as npm installed it and as linked; parted once the lockfile moves", async (t) => {
-  const { main, wt } = await aRunWorktree();
+  const { wt } = await aRunWorktree();
   assert.equal(worktreeParts(wt), null, 'a tree hardlinked at the cut has what its lockfile names');
   lockfileGainsY(wt);
   assert.equal(worktreeParts(wt), 'node_modules/y', 'a package the lockfile now names, and the tree lacks');

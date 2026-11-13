@@ -182,8 +182,8 @@ export type CheckFirst = 'install' | 'unprovisioned';
  *   verdict on the work, so the script says so and kills itself: the runtime records no exit code for a process a signal ended, and the
  *   run reads a check that did not finish (`attemptVerdict`).
  * - **No command at all, when `first` is `unprovisioned`**: the pass could not install the worktree's `node_modules` from its lockfile
- *   (`keepWorktreeInstalled`), so a verdict there would judge the workspace, not the work. The script says so (`UNPROVISIONED`) and kills
- *   itself the same way: the check ends unfinished, and the step's next session is told.
+ *   (`keepWorktreeInstalled`), so a verdict there would judge the workspace, not the work. The script holds no command: it says so
+ *   (`UNPROVISIONED`) and kills itself the same way, so the check ends unfinished, and the step's next session is told.
  *
  * The text is fixed here: nothing of the checkout's reaches the script.
  */
@@ -196,10 +196,8 @@ export const checkArgv = (command: string, first?: CheckFirst): string[] => [
           `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`,
           `${INSTALL} 2>&1 || { printf '\\n${INSTALL_FAILED} %d: no verdict on the work\\n' "$?"; kill -s KILL $$; }`,
         ]
-      : first === 'unprovisioned'
-        ? [`echo '${UNPROVISIONED}'`, 'kill -s KILL $$']
-        : []),
-    command,
+      : []),
+    ...(first === 'unprovisioned' ? [`echo '${UNPROVISIONED}'`, 'kill -s KILL $$'] : [command]),
   ].join('\n'),
 ];
 

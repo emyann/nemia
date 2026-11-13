@@ -28,7 +28,10 @@ export type WorktreeSeen = {
   readonly lockfile: boolean;
   /** Its `node_modules`: absent, one link to a whole tree, or a directory of its own. */
   readonly tree: 'none' | 'shared' | 'own';
-  /** Where its lockfile parts from its own `node_modules` on disk (`lockfileParting`), null where they agree or where it has no tree of its own. */
+  /**
+   * Where its lockfile parts from its own `node_modules` on disk (`lockfileParting`), null where they agree or where it has no tree of
+   * its own.
+   */
   readonly parting: string | null;
 };
 
@@ -45,15 +48,16 @@ const NO_TREE = 'node_modules';
 const writes = (out: WorktreeDeps): boolean => out.act !== 'keep';
 
 const worktreeDepsSpec = spec<(seen: WorktreeSeen) => WorktreeDeps>({
-  requires: ({ input: [seen] }) =>
-    (seen.tree === 'own' || seen.parting === null) && (seen.parting === null || seen.parting.length > 0),
+  requires: ({ input: [seen] }) => (seen.tree === 'own' || seen.parting === null) && (seen.parting === null || seen.parting.length > 0),
   ensures: {
     othersUntouched: {
-      description: "A workspace that is not one of this run's worktrees — the repository's checkout, a person's or a clone — is never written",
+      description:
+        "A workspace that is not one of this run's worktrees — the repository's checkout, a person's or a clone — is never written",
       condition: ({ input: [seen], output }) => seen.ours || !writes(output),
     },
     sharedTreeUntouched: {
-      description: 'A worktree whose node_modules is one link to a whole tree is left as it is: writing it would write the tree it leads to',
+      description:
+        'A worktree whose node_modules is one link to a whole tree is left as it is: writing it would write the tree it leads to',
       condition: ({ input: [seen], output }) => seen.tree !== 'shared' || !writes(output),
     },
     notNpmsUntouched: {

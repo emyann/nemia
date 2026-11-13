@@ -186,7 +186,6 @@ const board = () => {
   return { e, tasks, filings, stopped, forgets, settle, logs, outputs, said, deaf, waiting, denials, closedOut };
 };
 
-/** What `nemia rm` says the board's `forget` did with a run's one task. */
 /** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
 const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));

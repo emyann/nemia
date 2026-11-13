@@ -9,10 +9,10 @@
  */
 
 /** The exact version of `@anthropic-ai/claude-agent-sdk` the runtime declares: npm's `latest` when it was chosen. */
-export const SDK_VERSION = '0.3.322';
+export const SDK_VERSION = '0.3.323';
 
-/** The Claude Code that SDK bundles, as its own `package.json` says (`claudeCodeVersion`). Read off the installed 0.3.322. */
-export const CLAUDE_CODE_VERSION = '2.1.322';
+/** The Claude Code that SDK bundles, as its own `package.json` says (`claudeCodeVersion`). Read off the installed 0.3.323. */
+export const CLAUDE_CODE_VERSION = '2.1.323';
 
 /**
  * What that Claude Code resolves the model alias `opus` to, measured off a real session's `init` line (`live-sdk.boundary.test.ts`, which

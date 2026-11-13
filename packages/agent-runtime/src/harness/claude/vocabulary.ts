@@ -23,8 +23,8 @@ export const CLAUDE_SIGN_IN = {
  * `claude` answers `CLAUDE_PIN` (the SDK's `claudeCodeVersion`). Both move with the SDK's exact pin, held equal to its `package.json`
  * by `test/harness-needs.test.ts`.
  */
-export const CLAUDE_SDK_VERSION = '0.3.322';
-export const CLAUDE_PIN = '2.1.322';
+export const CLAUDE_SDK_VERSION = '0.3.323';
+export const CLAUDE_PIN = '2.1.323';
 
 /**
  * Claude Code's needs: the SDK's platform package for this machine (`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, the package the

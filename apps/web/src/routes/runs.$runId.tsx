@@ -403,7 +403,6 @@ function AtGate({ run, step, acts }: { run: RunDetail; step: StepView; acts: boo
           step={step.name}
           approveLine={step.commands.approve}
           back={back}
-          closeout={step.closeout}
           questions={askedIn(step.closeout)}
           budgets={step.gate?.budgets}
         />

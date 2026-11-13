@@ -18,7 +18,6 @@ import './tsx.ts';
 import {
   at,
   atGate,
-  closeoutSaying,
   commandsOf,
   cut,
   endingRun,
@@ -27,10 +26,8 @@ import {
   offersMarkup,
   planCloseout,
   proposalIn,
-  ranOnce,
   routedWith,
   textsOf,
-  threeTries,
   toShip,
   unescaped,
   UNMEASURED,
@@ -47,7 +44,7 @@ const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
 type RunDetail = import('../src/lib/runView.ts').RunDetail;
 type Decidable = import('../src/lib/api/decision.ts').Decidable;
-const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
+const { FieldWidgetView } = await import('../src/components/field/widgets/FieldWidgetView.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
 type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
@@ -447,9 +444,9 @@ test('a question that takes several marks each label it recommends as a list, an
   const many: Question = { ...where, recommended: ['retry', 'gate'] };
   const html = renderToStaticMarkup(createElement(RecommendButton, { questions: [many], draft: {}, onDraft: () => {} }));
   assert.match(html, /data-recommend-all/);
-  const said = closeoutSaying('A design.', { output: { open: [many] }, questions: [{ field: 'open', questions: [many] }] });
-  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: said }];
-  const read = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
+  const read = renderToStaticMarkup(
+    createElement(FieldWidgetView, { name: 'open', widget: 'questions', value: [many], given: true, questions: [many] }),
+  );
   assert.equal([...read.matchAll(/data-recommended="true"/g)].length, 2);
 });
 
@@ -804,14 +801,9 @@ const decidedAs = (standings: unknown[]) => ({
   commands: [],
 });
 
-/**
- * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
- */
-function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
-  const client = new QueryClient();
-  client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
-  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
-}
+/** What an ending's gate would act on, drawn in a router (each work step a link to its part) with the run's decision already read. */
+const actsOn = (run: RunDetail, decision: unknown): Promise<string> =>
+  routedWith(createElement(Gates.ActsOn, { run, step: run.steps[1] }), [[['runs', run.id, 'decision', decisionStamp(run)], decision]]);
 
 test("the to-decide banner says what `wf ls` says after `→ to decide:`, and links an ending step's gate to its section — and nothing where there is nothing to decide", () => {
   const run = endingRun();
@@ -883,7 +875,7 @@ test('the step that ends the run in the checkout is known by its `workspace`, an
   );
 });
 
-test("what an ending step would act on, beside its gate: the branch's standing and counts, and each work step's closeout with its files", () => {
+test("what an ending step would act on, beside its gate: the branch's standing and counts, and a link to each work step's part with its summary", async () => {
   const run = endingRun();
   const standing = {
     branch: 'wf/r-1/implement',
@@ -892,26 +884,31 @@ test("what an ending step would act on, beside its gate: the branch's standing a
     said: 'wf/r-1/implement is ahead of main by 3 commits',
     stat: '4 files: +456 −2',
   };
-  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const html = await actsOn(run, decidedAs([standing]));
   assert.match(html, /^<section aria-label="What ship would act on"/);
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
   assert.ok(texts.includes(standing.said), html);
   assert.ok(texts.includes(standing.stat), 'how much it changed, as `wf decide` prints it');
-  assert.ok(texts.includes('implement'), `the work it waits on, off the graph\n${html}`);
-  assert.match(html, /<h4[^>]*>What changed<\/h4>/, 'its closeout rendered as the markdown it is');
-  assert.ok(texts.includes('the cap on runs in flight'), html);
-  assert.match(html, /aria-label="Artifacts of implement"/, 'and the files it named');
-  assert.ok(texts.includes('RESPONSE.md'), html);
+  assert.match(
+    html,
+    /<li data-acts-on="implement"[^>]*><a [^>]*href="\/runs\/r-1#step-implement"[^>]*>What implement gave<\/a>/,
+    `the work it waits on, off the graph, a link to its part on the run's page\n${html}`,
+  );
+  assert.doesNotMatch(
+    html,
+    /<h4[^>]*>What changed|Artifacts of implement|data-artifact/,
+    'what it gave is its part, drawn once, not here again',
+  );
 
-  const none = withDecision(run, decidedAs([]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const none = await actsOn(run, decidedAs([]));
   assert.ok(
     textsOf(none).includes('No result branch of its own: the work is on the base branch.'),
     `a run with no result branch of its own: said, not left blank\n${none}`,
   );
 });
 
-test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", () => {
+test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", async () => {
   const run = endingRun();
   const why = 'the place was not heard: timed out';
   const standing = {
@@ -921,7 +918,7 @@ test("a result branch whose place was not heard reads unread beside an ending's 
     said: `wf/r-1/implement: where it stands is not read (${why})`,
     stat: null,
   };
-  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const html = await actsOn(run, decidedAs([standing]));
   assert.match(html, /data-standing="unread"/);
   assert.ok(textsOf(html).includes(standing.said), html);
   assert.doesNotMatch(html, /data-standing="(on|ahead|gone)"|data-stat/, 'no standing of its own, and no counts');
@@ -1180,17 +1177,10 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
 });
 
-test("the run page's gate draws what is being approved beside Approve and Send back; the inspector's, whose Output tab has it, does not", () => {
-  const html = withClient(
-    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
-  );
-  const handed = html.indexOf('aria-label="What plan handed on"');
-  assert.ok(handed >= 0, html);
-  assert.ok(handed < html.indexOf('aria-label="Approve plan"'), 'what it handed on comes before the answer: read, then decided');
-  assert.match(html, /data-field="approach"/);
-  assert.match(html, /lg:grid-cols-2/, 'beside the answer where the page is wide');
-  const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', framed: false }));
-  assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
+test("a gate draws no closeout of its own: what it approves is its step's part, above it", () => {
+  const html = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
+  assert.ok(html.indexOf('aria-label="Approve plan"') >= 0, html);
+  assert.doesNotMatch(html, /What plan handed on|data-handed-on|data-field=|lg:grid-cols-2/);
 });
 
 /** A design's closeout at its gate, asking two questions as data in its `open` field. */
@@ -1201,21 +1191,19 @@ const askingCloseout: StepCloseout = {
   questions: [{ field: 'open', questions: [cut, where] }],
 };
 
-test('a gate whose step asks questions draws them in the answer column, after what it handed on, with the recommended answers offered — and Approve and Send back wait until each is answered', () => {
+test('a gate whose step asks questions draws them before its answer, with the recommended answers offered — and Approve and Send back wait until each is answered', () => {
   const html = withClient(
     createElement(Gate, {
       runId: 'r-1',
       step: 'design',
       approveLine: 'nemia approve r-1 design',
-      closeout: askingCloseout,
       questions: [cut, where],
     }),
   );
-  const handed = html.indexOf('aria-label="What design handed on"');
   const asked = html.indexOf('aria-label="What design asks"');
   const approve = html.indexOf('aria-label="Approve design"');
-  assert.ok(handed >= 0 && handed < asked && asked < approve, html);
-  assert.doesNotMatch(html.slice(handed, asked), /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
+  assert.ok(asked >= 0 && asked < approve, html);
+  assert.doesNotMatch(html, /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
   assert.match(html, /<fieldset data-question="How is the card cut\?"/);
   assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
   assert.match(html, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
@@ -1228,9 +1216,7 @@ test('a gate whose step asks questions draws them in the answer column, after wh
     /placeholder="A note beside the answers \(optional\): every step after the gate is handed it with the answers, under “Approved”\."/,
   );
   assert.match(html, /<button type="submit" disabled=""[^>]*>Send back<\/button>/, 'nothing to send back yet: no words, no answers');
-  const plain = withClient(
-    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
-  );
+  const plain = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
   assert.match(plain, /<button type="submit"[^>]*>Approve<\/button>/);
   assert.doesNotMatch(plain, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);

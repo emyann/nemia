@@ -12,6 +12,7 @@ import { NewerRelease } from '@/components/frame/NewerRelease';
 import { SetupBanner } from '@/components/frame/SetupBanner';
 import { DOCK_ROOM, NemiaDock } from '@/components/nemia/NemiaDock';
 import { OpenBar } from '@/components/factory/OpenBar';
+import { ViewerSheet } from '@/components/view/ViewerSheet';
 import { SidebarProvider, sidebarOpenOf } from '@/components/ui/sidebar';
 import { barSearch } from '@/lib/bar';
 import { trySearch } from '@/lib/tryAddress';
@@ -39,7 +40,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * takes off its height beside `--frame-top`, so no page's height assumes they are not there. Then the page, under the strip of Settings'
  * tabs on one of them (`FrameTabs`), in a centred column unless a matched route's `staticData` asks for `fullBleed`. Over the page, under
  * the top bar, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to another page,
- * which carries no `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again at once, the
+ * which carries no `bar`, closes it. Over that, the viewer's sheet shows the step's file the address's `?view=` names (`ViewerSheet`), its
+ * own place, which Back closes. It follows the workflow feed once for the whole page: what moves on it is read again at once, the
  * polls slow while it is open, and the gauges say which. Her chat is held over the whole frame too (`NemiaChatProvider`), one stream of
  * hers for the visit, which her docked face and the chat page both read, so a navigation neither closes it nor opens another; her docked
  * face is drawn on every page but one whose route's `staticData` says it `ownsChat`, the chat page, which is the panel itself. Under every
@@ -90,6 +92,7 @@ function Root() {
           </div>
         </SidebarProvider>
         <OpenBar feed={feed} />
+        <ViewerSheet />
         {!ownsChat && <NemiaDock path={path} search={search} />}
       </NemiaChatProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />

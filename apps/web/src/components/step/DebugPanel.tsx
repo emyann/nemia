@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Button as AriaButton, Slider, SliderThumb, SliderTrack, ToggleButton, ToggleButtonGroup } from 'react-aria-components';
+import { Button as AriaButton, Slider, SliderThumb, SliderTrack } from 'react-aria-components';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -9,7 +9,9 @@ import type { RunDetail, StepView } from '@/lib/runView';
 import { byPerson, centredScroll, litAt, pathPoll, stepStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
+import { cn } from '@/lib/utils';
 import { MachineCanvas } from './MachineCanvas';
+import { focusRing } from '@/components/ui/ds/utils';
 
 type Step = StepView;
 
@@ -23,20 +25,23 @@ const CANVAS_MAX_HEIGHT = 420;
 const PATH_TITLE = "The task's path through the runtime's lifecycle";
 
 /**
- * A step's Debug panel, closed by default: opened, the task of one of its tries — the current one unless a person picks another — as it
- * moved through the runtime's lifecycle, drawn over the lifecycle's graph, with a timeline to scrub back through, and a button that opens
- * the same lit graph full width, at a size its names can be read. Nothing of it is read or drawn while it is closed.
+ * A step's Debug panel, in its part's detail, closed by default: opened, the task of the try the part shows (`shown`, the address's
+ * choice, else its current) as it moved through the runtime's lifecycle, drawn over the lifecycle's graph, with a timeline to scrub back
+ * through, and a button that opens the same lit graph full width, at a size its names can be read. Nothing of it is read or drawn while
+ * it is closed.
  */
-export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
+export function DebugPanel({ run, step, shown }: { run: RunDetail; step: Step; shown: number | null }) {
   return (
-    <section aria-label="Debug" className="shrink-0 border-b">
+    <section aria-label="Debug" className="shrink-0">
       <Collapsible>
         {({ isExpanded }) => (
           <>
-            <CollapsibleTrigger className="w-full px-4 py-1.5 text-left text-body-small text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+            <CollapsibleTrigger
+              className={cn('w-full px-4 py-1.5 text-left text-body-small text-muted-foreground hover:text-foreground', focusRing())}
+            >
               {isExpanded ? '▾' : '▸'} Debug
             </CollapsibleTrigger>
-            <CollapsibleContent>{isExpanded && <PathOf run={run} step={step} />}</CollapsibleContent>
+            <CollapsibleContent>{isExpanded && <PathOf run={run} step={step} shown={shown} />}</CollapsibleContent>
           </>
         )}
       </Collapsible>
@@ -44,29 +49,29 @@ export function DebugPanel({ run, step }: { run: RunDetail; step: Step }) {
   );
 }
 
+/** The try whose path is read: none for the current one, which is read again as the step moves. */
+const pathTry = (step: Step, shown: number | null): number | null =>
+  shown === null || shown === (step.tries.find((t) => t.current)?.try ?? null) ? null : shown;
+
 /**
  * One try's path on the lifecycle, which the path's read carries (`StepPath`'s `lifecycle`): the state it stands in lit, the routes it took
  * to get there drawn over the graph, and a timeline of every entry of its journal. The timeline follows the newest entry until a person
- * moves it, and again once they move it back to the end; picking another try follows that try's newest. The graph opened full width is
- * drawn from the same read and the same entry shown.
+ * moves it, and again once they move it back to the end; the part showing another try follows that try's newest. The graph opened full
+ * width is drawn from the same read and the same entry shown. The current try's path is read as the current one (`tryNumber` null), so
+ * it is read again as the step moves.
  */
-function PathOf({ run, step }: { run: RunDetail; step: Step }) {
-  const [tryNumber, setTryNumber] = useState<number | null>(null);
-  const [pinned, setPinned] = useState<number | null>(null);
+function PathOf({ run, step, shown }: { run: RunDetail; step: Step; shown: number | null }) {
+  const tryNumber = pathTry(step, shown);
+  const [pinned, setPinned] = useState<{ try: number | null; at: number } | null>(null);
   const poll = (r: StepPath | undefined) => pathPoll(r, r?.lifecycle.final ?? [], tryNumber === null);
   const read = useQuery(stepPathQuery(run.id, step.name, stepStamp({ ...step, current: step.current ?? null }), tryNumber, poll));
   const machine = read.data?.lifecycle;
   const path = read.data?.path ?? [];
   const last = path.length - 1;
-  const at = pinned === null ? last : Math.min(pinned, last);
+  const at = pinned === null || pinned.try !== tryNumber ? last : Math.min(pinned.at, last);
   const lit = litAt(path, at);
   const taken = machine ? takenRoutes(path, at, machine) : [];
-  const current = step.tries.find((t) => t.current)?.try ?? step.tries.length;
-  const pick = (n: number) => {
-    setTryNumber(n === current ? null : n);
-    setPinned(null);
-  };
-  const onScrub = (i: number) => setPinned(i >= last ? null : i);
+  const onScrub = (i: number) => setPinned(i >= last ? null : { try: tryNumber, at: i });
 
   return (
     <div className="max-h-[60svh] space-y-2 overflow-y-auto px-4 pb-3">
@@ -83,7 +88,7 @@ function PathOf({ run, step }: { run: RunDetail; step: Step }) {
         {machine && read.data?.taskId && path.length > 0 ? (
           <WideGraph machine={machine} taskId={read.data.taskId} path={path} at={at} lit={lit} taken={taken} onScrub={onScrub} />
         ) : null}
-        {step.tries.length > 1 && <TryPicker step={step} shown={tryNumber ?? current} onPick={pick} />}
+        {step.tries.length > 1 && <span data-path-try={shown}>try {shown}</span>}
       </div>
       {read.error ? (
         <p className="text-body-medium text-failure">Could not read the path: {read.error.message}</p>
@@ -125,30 +130,6 @@ function PathDrawn({
       <MachineCanvas machine={read.lifecycle} {...LIFECYCLE} id="debug-lifecycle" lit={lit} taken={taken} maxHeight={CANVAS_MAX_HEIGHT} />
       <Timeline path={read.path} at={at} machine={read.lifecycle} onScrub={onScrub} />
     </div>
-  );
-}
-
-/** Which of a step's tries the panel shows: one toggle a try, the current one said so. */
-function TryPicker({ step, shown, onPick }: { step: Step; shown: number; onPick: (n: number) => void }) {
-  return (
-    <ToggleButtonGroup
-      aria-label="Which try"
-      selectionMode="single"
-      disallowEmptySelection
-      selectedKeys={[String(shown)]}
-      onSelectionChange={(keys) => onPick(Number([...keys][0]))}
-      className="flex gap-1"
-    >
-      {step.tries.map((t) => (
-        <ToggleButton
-          key={t.try}
-          id={String(t.try)}
-          className="rounded border px-1.5 py-0.5 text-body-small outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-selected:border-alive data-selected:text-foreground"
-        >
-          {t.current ? `try ${t.try} (current)` : `try ${t.try}`}
-        </ToggleButton>
-      ))}
-    </ToggleButtonGroup>
   );
 }
 
@@ -242,7 +223,7 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[];
       >
         <SliderTrack className="relative h-5 w-full">
           <div className="absolute top-1/2 h-1 w-full -translate-y-1/2 rounded bg-surface-container-highest" />
-          <SliderThumb className="top-1/2 size-4 rounded-full border-2 border-alive bg-card outline-none focus-visible:ring-2 focus-visible:ring-ring/50" />
+          <SliderThumb className={cn('top-1/2 size-4 rounded-full border-2 border-alive bg-card', focusRing())} />
         </SliderTrack>
       </Slider>
       <p data-shown className="text-body-small text-muted-foreground">
@@ -283,7 +264,12 @@ function Timeline({
             <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
               <AriaButton
                 onPress={() => onScrub(i)}
-                className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 ${i === at ? 'bg-alive-container text-on-alive-container' : ''} ${i > at ? 'text-muted-foreground' : ''}`}
+                className={cn(
+                  'flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left hover:bg-accent',
+                  focusRing(),
+                  i === at && 'bg-alive-container text-on-alive-container',
+                  i > at && 'text-muted-foreground',
+                )}
               >
                 <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
                   <span data-said>

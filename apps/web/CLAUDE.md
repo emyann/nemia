@@ -147,7 +147,7 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs
-  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepCard.ts` compose.
+  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepPart.ts` compose.
   `test/structure.test.ts` refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`,
   `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the word a route kept on Hono reads for a workflow's

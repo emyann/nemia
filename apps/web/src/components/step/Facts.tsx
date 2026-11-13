@@ -15,13 +15,13 @@ import { RouteLink } from '../agent/AgentParts';
 import { CopyButton } from '../command/CopyButton';
 import { Instant } from '../time/Instant';
 import type { Frozen } from '../../lib/frozen';
+import { focusRing } from '../ui/ds/utils';
 
 /** A section's quiet heading: small, medium weight, in the muted ink. */
 export const HEADING = 'text-body-small font-medium text-muted-foreground';
 
 /** A link's look in a fact's words. */
-export const LINK =
-  'rounded-sm underline decoration-outline underline-offset-2 outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring/50';
+export const LINK = cn('rounded-sm underline decoration-outline underline-offset-2 hover:decoration-foreground', focusRing());
 
 const STATE = {
   good: 'text-foreground',

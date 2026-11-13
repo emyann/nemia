@@ -597,3 +597,4 @@ export { FACTORY_ADOPT } from './adopt/adopt.verb.ts';
 export { FACTORY_PLAN, FACTORY_RESOLVE, FACTORY_UPGRADE } from './factory/upgrade/upgrade.verb.ts';
 export { withResolutionProposerAs } from './factory/upgrade/proposed.verb.ts';
 export { sentTemplatesDir, templateGiven, withTemplateTaken } from './template/given.store.ts';
+export { factoryExported, factoryImported } from './factory/move/move.verb.ts';

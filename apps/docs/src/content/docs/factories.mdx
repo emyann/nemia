@@ -226,10 +226,51 @@ whole, a file nested deeper in a workflow's folder, and a file that is not text.
 check runs, stays your choice too: every workflow shares it, so no object holds it, and a proposal's access judgement reads what an
 agent may do, not what a script does. Giving carried files a kind of their own waits on a way to judge that code.
 
+## Move it to another store
+
+A factory moves from one store to another, from your laptop's to a server's say, with no shell on either machine. Each store is a
+[context](/install/#a-client-of-another-machine) of `nemia config`: `--to` names the store it moves to, and `--from` the store it is in,
+the context in use when left out.
+
+```bash
+nemia factory move shop --to vps
+nemia factory move shop --from local --to vps --repo /home/me/code/shop=https://example.com/me/shop.git --volume notes=/srv/notes
+```
+
+What follows the factory:
+
+- Its file, with the template, version and parameters it was applied with, so a later `nemia factory upgrade` on the target still
+  merges three ways against the base it was applied at.
+- Its folder: its tree with every edit made to it, its level, its MCP servers, its harness settings, its schedules, its cost lines and
+  its revisions policy.
+- Its cards in play that no run has started. Each is filed on the target without `repo:`, `from:` and `queued:`, so none starts before
+  you trust the factory there, and its text ends with a line naming the card it was on the source. `--cards stay` leaves them all.
+
+What stays on the source: its runs, the cards a run was started from, and its folder's proposals and delegations, which name the
+source's runs and callers.
+
+- **Repositories** are cloned on the target from their origins. One with no origin, or one you would rather take from elsewhere, is
+  given with `--repo <source>=<url|path>`, its path in the source's file on the left; one with neither is refused, naming the flag.
+- **Volumes** keep their path where the target takes it, judged as `nemia factory volume add` judges one there. Where it does not, the
+  move is refused, naming the `--volume <name>=<path>` to give: the volume's name, or its path on the source where it has none.
+- **Nothing is written on the target** when the move is refused or fails partway: no file, no folder, no card. A repository already
+  cloned may remain on its disk, and a second try reuses it.
+- **The move never trusts the factory.** Type `nemia factory trust <name>` under the target's context once you have read what it
+  trusts.
+- **An MCP server's sign-in does not follow.** Its token is kept in the harness's own store on the machine whose daemon signed in, not
+  in the factory's folder: on the target, press _Sign in_ on the server's row again ([from a remote
+  browser](/install/#signing-in-from-a-remote-browser) where the daemon runs on a server).
+- **The source keeps its factory**, untouched, until you type `nemia factory rm <name>` under the source's context. Until then both
+  stores have it, and both may fire its schedules.
+
+Both daemons must run your client's release: upgrade an older one first.
+
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
 _A factory's instruction_, and _Five layers_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
 `packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts`,
 `packages/agent-orchestrator/src/revisions/pin.verb.ts`, `packages/agent-orchestrator/src/factory/rules/rules.store.ts`,
-`packages/agent-orchestrator/src/factory/upgrade/upgrade.verb.ts` and `packages/agent-orchestrator/src/factory/applied/applied.verb.ts`.
+`packages/agent-orchestrator/src/factory/upgrade/upgrade.verb.ts`, `packages/agent-orchestrator/src/factory/applied/applied.verb.ts`,
+`packages/objects/src/commands-factories-move.ts`, `packages/objects/src/factory-move.ts` and
+`packages/agent-orchestrator/src/factory/servers/sign-in.verb.ts`.

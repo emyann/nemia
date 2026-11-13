@@ -235,7 +235,7 @@ test('an archive that answers 404: Conflict where its release is published witho
   const github = await stubGitHub({ 'v1.5.0': ['SHA256SUMS', 'install.sh'] });
   t.after(github.close);
   const install = { ...FIRST, source: github.source };
-  const refused = async (tag: string): Promise<string> => {
+  const kindOf = async (tag: string): Promise<string> => {
     const err = await runWith(engineOf(engine().layer), upgrade({ tag }, idle, ENV, install)).then(
       () => assert.fail('the upgrade was expected to be refused'),
       (e: Error & { _tag?: string; exitCode?: number }) => e,
@@ -245,8 +245,8 @@ test('an archive that answers 404: Conflict where its release is published witho
   };
   const before = currentRelease(ROOT)?.tag;
 
-  assert.equal(await refused('v1.5.0'), 'Conflict', 'a published release whose archive is not attached yet: upgrade again later');
-  assert.equal(await refused('v9.8.7'), 'Missing', 'no release by that tag');
+  assert.equal(await kindOf('v1.5.0'), 'Conflict', 'a published release whose archive is not attached yet: upgrade again later');
+  assert.equal(await kindOf('v9.8.7'), 'Missing', 'no release by that tag');
   assert.equal(currentRelease(ROOT)?.tag, before, 'nothing switched');
   assert.equal(fs.existsSync(releaseDir('v1.5.0', ROOT)), false);
   assert.deepEqual(leftovers(), []);

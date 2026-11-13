@@ -2,7 +2,8 @@
  * `tools/release/release.ts` run for real on a scratch repository — a bare origin and a clone of it, with the tags this repository has
  * (`v0.3.0`, `v1-final`, `legacy/v1-final`) and the operator's local `nemia-2026.11.03` — and a stub `gh` first on PATH that logs each
  * call and answers GitHub's part from a state file: the merged pull requests (more than one page of them), the open ones, one pull
- * request by its number, the generated notes, and a workflow's dispatched runs on a head, which a dispatch it records adds to. What it
+ * request by its number, the generated notes, a workflow's dispatched runs on a head, which a dispatch it records adds to, and the
+ * releases made, a tag it is asked for pushed to the origin. What it
  * asserts is the exit code, the calls made and positions in a body, never a sentence.
  */
 import { test } from 'node:test';
@@ -35,6 +36,8 @@ type State = {
   labels: { name: string; color: string; description: string }[];
   next: number;
   runs?: Run[];
+  /** The tags a release, draft or published, is made on. */
+  releases?: string[];
 };
 
 /**
@@ -87,6 +90,10 @@ if (args[0] === 'api') {
     const runs = (state.runs || []).filter((run) => run.file === m[1] && run.head === q.get('head_sha') && q.get('event') === 'workflow_dispatch');
     print({ total_count: runs.length, workflow_runs: runs.map((run) => ({ head_sha: run.head, event: 'workflow_dispatch', status: run.status, conclusion: run.conclusion })) });
   }
+  else if (method === 'POST' && route === 'repos/{owner}/{repo}/git/refs') {
+    execFileSync('git', ['push', '--quiet', 'origin', field('sha') + ':' + field('ref')]);
+    print({ ref: field('ref'), object: { sha: field('sha') } });
+  }
   else if (method === 'POST' && route === 'repos/{owner}/{repo}/releases/generate-notes') { print({ name: field('tag_name'), body: '## Fixes\\n* a fix, up to ' + field('target_commitish') }); }
   else { process.stderr.write('stub gh: no answer for ' + args.join(' ')); process.exit(9); }
   process.exit(0);
@@ -97,7 +104,11 @@ if (args[0] === 'pr' && args[1] === 'create') {
   state.pulls.push({ number, title: args[args.indexOf('--title') + 1], body: stdin, labels: [], merged_at: null, head: { ref: args[args.indexOf('--head') + 1], sha: releaseHead() } });
   save(); process.stdout.write('https://github.com/o/r/pull/' + number + '\\n'); process.exit(0);
 }
-if (args[0] === 'release' && args[1] === 'create') process.exit(0);
+if (args[0] === 'release' && args[1] === 'create') { state.releases = [...(state.releases || []), args[2]]; save(); process.exit(0); }
+if (args[0] === 'release' && args[1] === 'view') {
+  if (!(state.releases || []).includes(args[2])) { process.stderr.write('release not found'); process.exit(1); }
+  print({ isDraft: true }); process.exit(0);
+}
 if (args[0] === 'workflow' && args[1] === 'run' && args[3] === '--ref' && args[4] === 'release') {
   const pr = args.indexOf('-f') >= 0 ? args[args.indexOf('-f') + 1] : undefined;
   state.runs = [...(state.runs || []), { file: args[2], head: releaseHead(), pr: pr && pr.startsWith('pr=') ? pr.slice(3) : pr, status: 'queued', conclusion: null }];
@@ -421,7 +432,7 @@ test('REFUSED: GitHub refusing the token a pull request exits 1 naming the setti
   assert.ok(ran.out.includes(CREATE_SETTING), 'the refusal names the setting');
 });
 
-test('tag releases the version main names on the commit that set it, and does nothing once its tag is there', () => {
+test('tag tags the version main names on the commit that set it with a draft release on the tag, gives a tag left with none its draft, and does nothing once both are there', () => {
   const w = world();
   const fix = w.land('a fix');
   w.state({ pulls: [merged(1, ['fix'], fix)], labels: [], next: 900 });
@@ -434,16 +445,34 @@ test('tag releases the version main names on the commit that set it, and does no
 
   const ran = w.run('tag');
   assert.equal(ran.status, 0, ran.out);
-  assert.ok(has(ran.calls, 'release', 'create', 'v1.0.0', '--target', merge), 'released on the first-parent commit that set 1.0.0');
+  const tagged = ran.calls.findIndex((call) => call.args.includes('repos/{owner}/{repo}/git/refs'));
+  const created = ran.calls.findIndex((call) => call.args[0] === 'release' && call.args[1] === 'create');
+  assert.ok(
+    has(ran.calls, 'POST', 'repos/{owner}/{repo}/git/refs', 'ref=refs/tags/v1.0.0', `sha=${merge}`),
+    'tagged on the first-parent commit that set 1.0.0',
+  );
+  assert.ok(has(ran.calls, 'release', 'create', 'v1.0.0', '--draft', '--verify-tag'), 'a draft on the tag, published by the upload job');
+  assert.ok(tagged >= 0 && tagged < created, 'the tag before the release, which a draft does not make');
   const notes = named(ran.calls, 'repos/{owner}/{repo}/releases/generate-notes');
   assert.ok(notes[0]?.args.includes('previous_tag_name=v0.3.0'));
   assert.ok(named(ran.calls, 'release', 'create')[0].stdin?.endsWith(merge), 'the release carries the notes generated up to it');
 
-  w.git(w.seed, 'tag', 'v1.0.0', merge);
-  w.git(w.seed, 'push', '--quiet', 'origin', 'v1.0.0');
   const again = w.run('tag');
   assert.equal(again.status, 0, again.out);
-  assert.deepEqual(again.calls, [], 'a released version calls nothing');
+  assert.deepEqual(
+    again.calls.map((call) => call.args.slice(0, 3)),
+    [['release', 'view', 'v1.0.0']],
+    'a tag with its release calls nothing but the read of it',
+  );
+
+  w.state({ ...w.read(), releases: [] });
+  const cut = w.run('tag');
+  assert.equal(cut.status, 0, cut.out);
+  assert.ok(!has(cut.calls, 'repos/{owner}/{repo}/git/refs'), 'the tag there is not made again');
+  assert.ok(
+    has(cut.calls, 'release', 'create', 'v1.0.0', '--draft', '--verify-tag'),
+    'a tag a cut-off run left with no release is given its draft',
+  );
 });
 
 test('tag does nothing where package.json names no version', () => {

@@ -92,7 +92,7 @@ export async function releaseAssets(source: string, tag: string): Promise<readon
   const url = releaseApiUrl(source, tag);
   if (url === undefined) return undefined;
   try {
-    const response = await fetch(url, { headers: { 'user-agent': CLIENT_NAME, accept: 'application/vnd.github+json' } });
+    const response = await fetch(url, { headers: { 'user-agent': CLIENT_NAME } });
     if (!response.ok) return undefined;
     const decoded = Schema.decodeUnknownResult(ReleaseSchema)(await response.json());
     return Result.isFailure(decoded) ? undefined : decoded.success.assets.map((asset) => asset.name);

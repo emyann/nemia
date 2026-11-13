@@ -6,7 +6,7 @@
 import { Effect, Layer } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Event, FeedEntry, HarnessConfig, Sighting, TaskPhase, TaskView } from '../src/index.ts';
+import type { Event, FeedEntry, HarnessConfig, Sighting, SpawnRequest, TaskPhase, TaskView } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { nameFor } from '../src/core/domain.ts';
 import { Journal } from '../src/core/engine/journal.ts';
@@ -208,6 +208,7 @@ test('the engine admits by its ceiling and pools alone: a pool its own admits ap
 });
 
 const GI = 2 ** 30;
+const MI = 2 ** 20;
 
 /**
  * A board of harnesses `a` (pool `claude`) and `checks` under a ceiling of 6, whose machine is what `machine` says on each pass, and
@@ -407,27 +408,83 @@ test('the memory gate under a memo that verifies every task it skips: a pass tha
   assert.equal((await run(view('r', new Map()))).waits, undefined, 'admitted or started: no wait on record');
 });
 
-test("a task filed with no resources of its own is filed with the engine's default request beside its default limit, as a LimitRange writes both; one with its own keeps them", async () => {
+/**
+ * An engine over `journal` and `machine` whose sessions are `sessions`, holding `defaults` as its default limit and request: the
+ * daemon as one unit sets it, a resize being another engine on the same store. Each spawn request its harness is asked is kept.
+ */
+const resizedBoard = (
+  journal: AsyncJournal,
+  sessions: Map<string, Sighting>,
+  machine: { totalBytes: number; availableBytes: number },
+  defaults: { limit: string; request?: string },
+) => {
+  const asked: SpawnRequest[] = [];
+  const runner = fake(sessions);
   const engine = builtEngine(
     Engine.layer({
       root: scratch('ae-admission-root-'),
-      journal: asyncStore(memoryJournal()),
-      harnesses: { a: asyncOps(fake(new Map())) },
+      journal: asyncStore(journal),
+      harnesses: { a: asyncOps({ ...runner, spawn: async (r) => (asked.push(r), runner.spawn(r)) }) },
       defaultHarness: 'a',
-      defaultLimits: { memory: '8Gi' },
-      defaultRequests: { memory: '2560Mi' },
+      maxConcurrent: 5,
+      reserved: { memory: '1Gi' },
+      machine: () => ({ ...machine }),
+      defaultLimits: { memory: defaults.limit },
+      ...(defaults.request ? { defaultRequests: { memory: defaults.request } } : {}),
     }),
   );
-  const bare = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', queued: true }));
-  const own = await Effect.runPromise(engine.file({ brief: 'o', cwd: '/r', queued: true, resources: { limits: { memory: '4Gi' } } }));
-  assert.deepEqual((await Effect.runPromise(engine.view(bare))).state.resources, {
-    limits: { memory: '8Gi' },
-    requests: { memory: '2560Mi' },
+  return { engine, asked };
+};
+
+test("a task queued under one default and admitted under a smaller one counts at the smaller: the engine's defaults land on a task with none of its own as its attempt starts, as a LimitRange's on a Pod when it is created, and a session already started keeps its own", async (t) => {
+  const s = story(t);
+  const journal = memoryJournal();
+  const sessions = new Map<string, Sighting>();
+  const machine = { totalBytes: 16 * GI, availableBytes: 6 * GI };
+  const before = resizedBoard(journal, sessions, machine, { limit: '8Gi' });
+  const after = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '2560Mi' });
+  const id = await Effect.runPromise(before.engine.file({ brief: 'land', cwd: '/r', queued: true }));
+
+  await s.test('filed under an 8Gi default and no request, it waits for memory counted at 8Gi, and its filing carries no resources', async () => {
+    const pass = await Effect.runPromise(before.engine.tick());
+    assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 8 * GI, roomBytes: 5 * GI });
+    assert.equal((await journal.read(id)).find((e) => e.kind === 'filed')?.resources, undefined);
+    assert.equal((await Effect.runPromise(before.engine.view(id))).state.resources, undefined);
   });
-  assert.deepEqual(
-    (await Effect.runPromise(engine.view(own))).state.resources,
-    { limits: { memory: '4Gi' } },
-    'its limit stands for its request',
+
+  await s.test('the engine resized to a 2560Mi default request: the same queued task now says it needs 2560Mi', async () => {
+    machine.availableBytes = 3 * GI;
+    const pass = await Effect.runPromise(after.engine.tick());
+    assert.deepEqual(pass.views.find((v) => v.id === id)?.waits, { for: 'memory', needBytes: 2560 * MI, roomBytes: 2 * GI });
+  });
+
+  await s.test('with the room an 8Gi count never had, it is admitted at 2560Mi', async () => {
+    machine.availableBytes = 6 * GI;
+    const pass = await Effect.runPromise(after.engine.tick());
+    assert.equal(pass.views.find((v) => v.id === id)?.admission, 'admitted');
+  });
+
+  await s.test('it starts under the defaults in force then: its `starting` entry, its attempt and its spawn request say the same', async () => {
+    await Effect.runPromise(after.engine.tick());
+    const resized = { limits: { memory: '8Gi' }, requests: { memory: '2560Mi' } };
+    assert.deepEqual((await journal.read(id)).find((e) => e.kind === 'starting')?.resources, resized);
+    assert.deepEqual((await Effect.runPromise(after.engine.view(id))).state.attempts[0]?.resources, resized);
+    assert.deepEqual(
+      after.asked.map((r) => r.resources),
+      [resized],
+    );
+  });
+
+  await s.test(
+    'resized again to a 6Gi request, the running session is still counted at the 2560Mi it started under: a 10Gi task of its own fits the 12.5Gi that leaves, where 9Gi would not hold it',
+    async () => {
+      machine.availableBytes = 14 * GI;
+      const again = resizedBoard(journal, sessions, machine, { limit: '8Gi', request: '6Gi' });
+      const big = await Effect.runPromise(again.engine.file({ brief: 'big', cwd: '/r', queued: true, resources: { limits: { memory: '10Gi' } } }));
+      const pass = await Effect.runPromise(again.engine.tick());
+      assert.equal(pass.views.find((v) => v.id === big)?.admission, 'admitted');
+      assert.deepEqual((await Effect.runPromise(again.engine.view(big))).state.resources, { limits: { memory: '10Gi' } }, 'its own kept');
+    },
   );
 });
 
@@ -465,6 +522,38 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
         'stopped',
       ] as const)
         assert.equal(holdsSlot({ phase }), false, phase);
+    },
+  );
+  await t.test(
+    'a task counts at what it runs under: one with none of its own at the defaults the rule holds now, one with its own at them whatever the defaults, a started attempt at what it recorded, and an attempt an older runtime started at its filing',
+    () => {
+      const room = { totalBytes: 16 * GI, availableBytes: 16 * GI, reservedBytes: 15 * GI };
+      const rule: AdmissionRule = {
+        ceiling: 5,
+        poolOf: ownPool,
+        machine: () => room,
+        defaultsOf: () => ({ limits: { memory: '4Gi' }, requests: { memory: '2Gi' } }),
+      };
+      const waitOf = (view: AdmissionView, holders: AdmissionView[] = []) =>
+        toAdmit([...holders, view], rule).waits.find((w) => w.id === view.id)?.wait;
+      assert.deepEqual(waitOf(queued('bare', 1)), { for: 'memory', needBytes: 2 * GI, roomBytes: GI });
+      const own = queued('own', 1);
+      assert.deepEqual(waitOf({ ...own, state: { ...own.state, resources: { limits: { memory: '3Gi' } } } }), {
+        for: 'memory',
+        needBytes: 3 * GI,
+        roomBytes: GI,
+      });
+      const started = (resources?: { limits: { memory: string } }): AdmissionView => ({
+        ...live('held', 'starting'),
+        state: {
+          harness: 'a',
+          resources: { limits: { memory: '512Mi' } },
+          attempts: [{ ended: null, ...(resources ? { resources } : {}) }],
+        },
+      });
+      const small = { ...queued('small', 2), state: { ...queued('small', 2).state, resources: { limits: { memory: '256Mi' } } } };
+      assert.deepEqual(waitOf(small, [started({ limits: { memory: '1Gi' } })]), { for: 'memory', needBytes: GI / 4, roomBytes: 0 });
+      assert.equal(waitOf(small, [started()]), undefined, 'counted at its filed 512Mi: 768Mi of 1Gi');
     },
   );
   await t.test(

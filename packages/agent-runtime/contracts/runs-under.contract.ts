@@ -26,9 +26,14 @@ export type Sizing = {
   readonly defaults: TaskResources | undefined;
 };
 
-/** Two sets of resources say the same: both given or both absent, with the same memory limit and the same memory request. */
+/**
+ * Two sets of resources say the same: both given or both absent, each with its limits and its requests given or absent alike, and
+ * the same memory limit and the same memory request.
+ */
 const same = (a: TaskResources | undefined, b: TaskResources | undefined): boolean =>
   (a === undefined) === (b === undefined) &&
+  (a?.limits === undefined) === (b?.limits === undefined) &&
+  (a?.requests === undefined) === (b?.requests === undefined) &&
   a?.limits?.memory === b?.limits?.memory &&
   a?.requests?.memory === b?.requests?.memory;
 

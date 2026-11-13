@@ -137,6 +137,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `chat`, a step's session `session`, and `test/conversation.test.ts` reads both forms off every `.tsx` of the folder — and what is one
   conversation's alone stays in that conversation's folder: hers is `components/nemia/chat/` (her kept message, her asks), a step's session's
   is `components/step/session/` (its brief, its told turns, its closeout, its bands, its composer).
+- How the frame stands around Nemia's side sheet — the rail folded for it under 1600, docked or modal — is `frameFold` (`lib/frameFold.ts`,
+  proved by `contracts/frame-fold.contract.ts`), read through `useFrameFold` and never written to the `sidebar_state` cookie; her face
+  is `components/nemia/NemiaRailFace.tsx`, her sheet `components/frame/HerSheet.tsx`, and her presence for both `useNemiaPresence`.
 - A step her message links to (`/runs/<run>?step=<step>`, read by `broughtOf` in `lib/stepLink.ts`) is drawn under her words by
   `components/nemia/chat/ChatBrought.tsx` from the run's page's own parts, never a copy: `GateBrief`, Decide's `AnswerRow`, `Continue`,
   `AskedRow`. Which one is `broughtPart` (`lib/brought.ts`, proved by `contracts/brought.contract.ts`), off the run's page's own reads.

@@ -3,7 +3,7 @@ import { Avatar, SearchBar } from '@/components/ui/ds';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { FeedStatus } from '@/lib/feed';
 import { FactoryPicker } from '../factory/FactoryPicker';
-import { MenuButton } from './FrameRail';
+import { HerFace, MenuButton } from './FrameRail';
 import { GaugesButton } from './GaugesButton';
 import { destinationOf, pickedOf } from '../nav/nav';
 import { PauseButton } from './PauseButton';
@@ -42,7 +42,7 @@ function AccountToCome() {
  * address with `search` picks; then at its right the search and the account, both to come, the pause of every factory (`PauseButton`) and
  * the machine's gauges (`GaugesButton`, which carries `feed`). Under 80rem the bar takes two lines, the page's name over the rest: one
  * line holds them all beside an open rail only on a window that wide. On a narrow screen the menu button that opens the drawer of
- * destinations comes first.
+ * destinations comes first, and Nemia's face beside it (`HerFace`), the rail that holds it elsewhere being a drawer there.
  */
 export function FrameHeader({ path, search, feed }: { path: string; search: Record<string, unknown>; feed: FeedStatus }) {
   const { isMobile } = useSidebar();
@@ -53,6 +53,7 @@ export function FrameHeader({ path, search, feed }: { path: string; search: Reco
       className="sticky top-0 z-20 flex h-(--frame-top) shrink-0 flex-wrap content-center items-center gap-x-3 gap-y-2 border-b border-outline-variant bg-surface px-6 py-2 max-md:px-3 xl:flex-nowrap"
     >
       {isMobile && <MenuButton />}
+      {isMobile && <HerFace path={path} search={search} />}
       {name && <PageName>{name}</PageName>}
       <span className="basis-full xl:hidden" />
       <div className="min-w-0 max-md:flex-1 md:shrink-0 xl:ml-4">

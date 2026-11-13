@@ -5,7 +5,7 @@
  */
 import type { FrameAt, FrameFold, FrameFoldOf } from '../../contracts/frame-fold.contract.ts';
 
-export type { FrameAt, FrameFold, FrameWidth } from '../../contracts/frame-fold.contract.ts';
+export type { FrameFold } from '../../contracts/frame-fold.contract.ts';
 
 /**
  * Her sheet is drawn where her face opened it off her own page: modal on a narrow screen, docked wider. The rail is the drawer on a narrow

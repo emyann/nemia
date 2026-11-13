@@ -238,20 +238,21 @@ test("her session stopped is a status, the daemon lost an alert in the failure's
   for (const html of [stopped, lost]) assert.doesNotMatch(html, /\sopacity-\d/, 'a dimmed text falls under 4.5:1');
 });
 
-test("her docked face is called by the presence that gives it its expression, in the owner's order", () => {
-  assert.equal(dockWords(UP, false), "Open Nemia's chat. Her session is up.");
-  assert.equal(dockWords(UP, true), "Close Nemia's chat. Her session is up.");
-  assert.equal(dockWords({ ...UP, runsWaiting: 2 }, false), "Open Nemia's chat. 2 wait on you.");
-  assert.equal(dockWords({ ...UP, runsWaiting: 1 }, false), "Open Nemia's chat. 1 waits on you.");
-  assert.equal(dockWords({ ...UP, asksWaiting: 2 }, false), "Open Nemia's chat. 2 asks of hers wait on you.");
-  assert.equal(dockWords({ ...UP, asksWaiting: 1 }, false), "Open Nemia's chat. 1 ask of hers waits on you.");
-  assert.equal(dockWords({ ...UP, notSent: true }, false), "Open Nemia's chat. A message was not sent.");
-  assert.equal(dockWords({ ...UP, down: true }, false), "Open Nemia's chat. Her session is down.");
-  assert.equal(dockWords({ ...UP, answering: true }, false), "Open Nemia's chat. She is answering.");
-  assert.equal(dockWords({ ...UP, unread: 2 }, true), "Close Nemia's chat. 2 new answers.");
-  assert.equal(dockWords({ ...UP, unread: 1 }, false), "Open Nemia's chat. 1 new answer.");
+test("her face in the rail is called by the presence that gives it its expression, in the owner's order", () => {
+  assert.equal(dockWords(UP, 'closed'), "Open Nemia's chat. Her session is up.");
+  assert.equal(dockWords(UP, 'open'), "Close Nemia's chat. Her session is up.");
+  assert.equal(dockWords(UP, 'page'), "Nemia's chat is this page. Her session is up.");
+  assert.equal(dockWords({ ...UP, runsWaiting: 2 }, 'closed'), "Open Nemia's chat. 2 wait on you.");
+  assert.equal(dockWords({ ...UP, runsWaiting: 1 }, 'closed'), "Open Nemia's chat. 1 waits on you.");
+  assert.equal(dockWords({ ...UP, asksWaiting: 2 }, 'closed'), "Open Nemia's chat. 2 asks of hers wait on you.");
+  assert.equal(dockWords({ ...UP, asksWaiting: 1 }, 'closed'), "Open Nemia's chat. 1 ask of hers waits on you.");
+  assert.equal(dockWords({ ...UP, notSent: true }, 'closed'), "Open Nemia's chat. A message was not sent.");
+  assert.equal(dockWords({ ...UP, down: true }, 'closed'), "Open Nemia's chat. Her session is down.");
+  assert.equal(dockWords({ ...UP, answering: true }, 'closed'), "Open Nemia's chat. She is answering.");
+  assert.equal(dockWords({ ...UP, unread: 2 }, 'open'), "Close Nemia's chat. 2 new answers.");
+  assert.equal(dockWords({ ...UP, unread: 1 }, 'closed'), "Open Nemia's chat. 1 new answer.");
   assert.equal(
-    dockWords({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 3 }, false),
+    dockWords({ runsWaiting: 2, asksWaiting: 1, notSent: true, down: true, answering: true, unread: 3 }, 'closed'),
     "Open Nemia's chat. 2 wait on you.",
     'what waits on a person comes first, as her face does',
   );

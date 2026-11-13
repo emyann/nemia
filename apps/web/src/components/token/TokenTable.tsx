@@ -101,7 +101,7 @@ export function TokenTable({ tokens }: { tokens: readonly Token[] }) {
               <Column id="factory" className={cn(HEAD, 'w-32')}>
                 Factory
               </Column>
-              <Column id="narrowed" className={cn(HEAD, 'w-24')}>
+              <Column id="narrowed" className={cn(HEAD, 'w-32')}>
                 Narrowed
               </Column>
               <Column id="minted" className={cn(HEAD, 'w-36')}>

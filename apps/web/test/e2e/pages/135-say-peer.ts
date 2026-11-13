@@ -20,8 +20,9 @@ export default {
    * Another agent's words to a step's running session: the person mints `operator` a standing token of its own (`POST /api/tokens`, as
    * `nemia token add <name> --agent operator` does), the operator posts words with it and names no one, the session's say file hears them
    * in the frame that names it, and the step's conversation draws them at the left in a ringed bubble under `operator · agent`, unframed
-   * and once, never as the person's. It takes its writes back — the token, draft's task journal, the engine's feed, its conversation and
-   * its say file, as `say` does — so each page after it reads the store as seeded.
+   * and once, never as the person's. An agent's token acts no lower than semi-auto (its floor), so the page puts the store's level there
+   * first, as `nemia level semi-auto` writes it. It takes its writes back — the token, the level, draft's task journal, the engine's feed,
+   * its conversation and its say file, as `say` does — so each page after it reads the store as seeded.
    */
   name: 'say-peer',
   route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
@@ -36,7 +37,11 @@ export default {
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
     const tokens = new URL('/api/tokens', page.url()).href;
+    const levelFile = path.join(store!, 'nemia', 'level.json');
+    const levelBefore = fs.existsSync(levelFile) ? fs.readFileSync(levelFile, 'utf8') : null;
     try {
+      fs.mkdirSync(path.dirname(levelFile), { recursive: true });
+      fs.writeFileSync(levelFile, `${JSON.stringify({ level: 'semi-auto', since: new Date().toISOString() })}\n`);
       const minted = await page.request.post(tokens, { data: { name: OPS_TOKEN, agent: 'operator' } });
       if (minted.status() !== 201)
         throw new Refused(`the person mints the operator a token of its own — it answered ${minted.status()}: ${await minted.text()}`);
@@ -75,7 +80,9 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `say-peer-told-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
-      await page.request.delete(`${tokens}/${OPS_TOKEN}`);
+      await page.request.delete(`${tokens}/${OPS_TOKEN}`, { data: {} });
+      if (levelBefore === null) fs.rmSync(levelFile, { force: true });
+      else fs.writeFileSync(levelFile, levelBefore);
       fs.writeFileSync(journal, seeded);
       fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);

@@ -334,9 +334,13 @@ type PartAsks = {
   waitingFor: StepView['waitingFor'];
 };
 
-/** What the step asks of a person while its state waits on one, and what it waits for whatever its state; none where it asks nothing. */
-function asksOf(step: StepView, state: StepState): PartAsks | None {
-  const yours = waitsOnYou(state);
+/**
+ * What the step asks of a person while its state waits on one, or the run says it waits on one for it (`waitedOn`, a check refused
+ * among them), and what it waits for whatever its state; none where it asks nothing. A step that waits on a person asks even where none
+ * of the five says what (a check refused, a loop out of rounds, a budget past): its part answers it there (`offersOf`).
+ */
+export function asksOf(step: StepView, state: StepState, waitedOn: boolean): PartAsks | None {
+  const yours = waitsOnYou(state) || waitedOn;
   const asks: PartAsks = {
     gate: yours && step.gate?.awaiting ? step.gate : null,
     questions: yours ? (step.closeout?.questions ?? []) : [],
@@ -344,7 +348,7 @@ function asksOf(step: StepView, state: StepState): PartAsks | None {
     denied: yours ? step.denied : null,
     waitingFor: step.waitingFor,
   };
-  const asked = asks.gate || asks.questions.length > 0 || asks.needs || asks.denied || asks.waitingFor;
+  const asked = yours || asks.gate || asks.questions.length > 0 || asks.needs || asks.denied || asks.waitingFor;
   return asked ? asks : 'none';
 }
 
@@ -553,7 +557,7 @@ export function stepPartOf(
   const got = gotOf(own, packets);
   return {
     head,
-    asks: asksOf(own, head.state),
+    asks: asksOf(own, head.state, view.waitingOnYou.includes(step)),
     got: got.length > 0 ? got : 'none',
     said: saidOf(own),
     gave: gaveOf(own, packets),

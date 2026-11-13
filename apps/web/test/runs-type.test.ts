@@ -55,6 +55,7 @@ const FILES = [
   'components/step/DebugPanel.tsx',
   'components/step/Enough.tsx',
   'components/step/Facts.tsx',
+  'components/step/PacketChip.tsx',
   'components/step/MachineCanvas.tsx',
   'components/step/MachineEdge.tsx',
   'components/step/MachineNode.tsx',

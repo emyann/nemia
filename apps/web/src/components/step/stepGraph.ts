@@ -1,6 +1,6 @@
 import { MarkerType } from '@xyflow/react';
 import type { RunDetail, StepView } from '../../lib/runView';
-import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../../lib/canvas';
+import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState, type Packet } from '../../lib/canvas';
 import { contextEdges, runEdges } from '../../lib/factory';
 import { nodeKinds, routedOf, routesOf, takenRoutes } from '../../lib/routing';
 import { statePaint, stepState, type StepState } from '../../lib/status';
@@ -60,9 +60,10 @@ export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'
  * A graph's edges as a run's page draws them, on the Factory and a workflow's page alike: the api's `graph`, never a step's spec —
  * an edge per `after`, and for a loop, the edge back from its looping step to the step a round runs again, under both
  * nodes and labelled with the round once past the first; a route's edge labelled with its route, thin and faint where it was not
- * taken. Each says what `edgesOf` reads off the steps at its ends.
+ * taken. Each says what `edgesOf` reads off the steps at its ends; an edge along which a step handed its declared output carries that
+ * packet of `packets` (a run's page passes its own, `packetsOfView`), which `StateEdge` draws as a chip.
  */
-export function stepEdges(facts: StepGraphFacts): StateFlowEdge[] {
+export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []): StateFlowEdge[] {
   const runCancelled = facts.cancelledAt !== null;
   const runHeld = facts.holding != null;
   const steps = facts.steps.map((s) => ({
@@ -71,8 +72,9 @@ export function stepEdges(facts: StepGraphFacts): StateFlowEdge[] {
     note: s.note,
     roundDue: s.roundDue,
   }));
-  return edgesOf(facts.graph, steps, takenRoutes(facts.steps)).map((e) => {
-    const edge = drawn(e.id, e.source, e.target, e.state, e.kind === 'loop', e.untaken);
+  return edgesOf(facts.graph, steps, takenRoutes(facts.steps), packets).map((e) => {
+    const plain = drawn(e.id, e.source, e.target, e.state, e.kind === 'loop', e.untaken);
+    const edge = e.packet && plain.data ? { ...plain, data: { ...plain.data, packet: e.packet } } : plain;
     const labelled = e.label ? { ...edge, label: e.label } : edge;
     return e.kind === 'loop' ? { ...labelled, sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : labelled;
   });

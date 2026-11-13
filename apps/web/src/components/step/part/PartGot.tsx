@@ -9,6 +9,7 @@ import { stepAnchor } from '@/lib/asks';
 import { RouteLink } from '../../agent/AgentParts';
 import { Markdown } from '../../markdown/Markdown';
 import { LINK } from '../Facts';
+import { packetWords } from '../PacketChip';
 import { Fold } from './Fold';
 
 /** One line of what the step got. */
@@ -17,13 +18,11 @@ type GotLine = Exclude<StepPartModel['got'], 'none'>[number];
 /** A packet as its chip says it: the giver's name, and how many fields and files it carried. */
 type Packet = NonNullable<Extract<GotLine, { from: 'step' }>['packet']>;
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /** A packet's chip, as the graph's edge names it: its label, then its fields and files. */
 function PacketChip({ packet }: { packet: Packet }) {
   return (
     <span data-packet={packet.label} className="border border-outline-variant px-1.5 py-0.5 font-mono text-body-small">
-      {packet.label} · {plural(packet.fields, 'field')} · {plural(packet.files, 'file')}
+      {packetWords(packet)}
     </span>
   );
 }

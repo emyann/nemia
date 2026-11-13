@@ -8,7 +8,7 @@ import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
 import { FloatingBar } from '../frame/FloatingBar';
 import { Markdown } from '../markdown/Markdown';
-import { NeedsBanner, ToDecideBanner } from '../gate/Needs';
+import { AsksOfYou } from './AsksOfYou';
 import { RunGone } from './RunGone';
 import { StatusChip } from '../step/StatusChip';
 import { Unread } from '../step/StepBar';
@@ -28,8 +28,8 @@ export function RunBar({ run: id }: { run: string }) {
 }
 
 /**
- * What the run bar holds for the run `id`, as `run` was last read and `error` its read's failure, if any: what is to decide and who it
- * waits on, as the run's page says them, each step they name a button that shows the step in the bar; its steps, each a button with its
+ * What the run bar holds for the run `id`, as `run` was last read and `error` its read's failure, if any: what it asks of a person, as
+ * the run's page lists it, each step a line names a button that shows the step in the bar; its steps, each a button with its
  * status that shows it in the bar; and its brief.
  */
 export function RunBody({ id, run, error }: { id: string; run: RunDetail | undefined; error: unknown }) {
@@ -39,8 +39,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
   const onStep = (step: string) => show({ kind: 'step', run: id, step });
   return (
     <>
-      <ToDecideBanner run={run} onStep={onStep} />
-      <NeedsBanner run={run} onStep={onStep} />
+      <AsksOfYou run={run} onStep={onStep} />
       <section aria-label="Steps" className="space-y-1">
         <h3 className="text-label-medium text-muted-foreground">Steps</h3>
         <ul className="space-y-0.5">

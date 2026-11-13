@@ -4,10 +4,10 @@
  * (`AnswerRow`); Continue for a session the harness blocked; the note of a try already asked (`AskedRow`); else, in words, what it needs,
  * the calls its harness denied, and what it waits for. On the graph's node, one line of it.
  */
-import { askedOf, needNodeText, needOf, offersOf, type Answer } from '@/lib/asks';
+import { askedOf, offersOf, type Answer } from '@/lib/asks';
 import { broughtFacts, broughtPart } from '@/lib/brought';
-import { gateNodeLine, gateOfStep } from '@/lib/gate';
 import { ink } from '@/lib/meaning';
+import { askOf } from '@/lib/runAsks';
 import type { RunDetail, StepView } from '@/lib/runView';
 import type { PartSize, StepPartModel } from '@/lib/stepPart';
 import { cn } from '@/lib/utils';
@@ -19,15 +19,6 @@ import { Markdown } from '../../markdown/Markdown';
 
 /** What the step asks, as its part's model has it. */
 type Asks = Exclude<StepPartModel['asks'], 'none'>;
-
-/** What the step asks, in one line: its gate's, its need's, or what it waits for. */
-function lineOf(run: RunDetail, step: StepView, asks: Asks): string {
-  const gate = gateOfStep(run, step);
-  if (gate) return gateNodeLine(gate);
-  const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
-  if (need) return needNodeText(need);
-  return asks.denied?.words ?? asks.waitingFor?.words ?? asks.needs ?? '';
-}
 
 /** What it asks where no form answers it here: what it needs, the calls denied, and what it waits for with the advice beside it. */
 function Words({ asks }: { asks: Asks }) {
@@ -84,7 +75,7 @@ function Answered({ run, step, asks }: { run: RunDetail; step: StepView; asks: A
 /** What the step `step` of `run` asks of a person (`asks`), at `size`: one line on the graph's node, else the form that answers it. */
 export function PartAsks({ run, step, asks, size }: { run: RunDetail; step: StepView; asks: Asks; size: PartSize }) {
   if (size === 'S') {
-    const line = lineOf(run, step, asks);
+    const { line } = askOf(run, step, asks);
     return (
       <p data-part-asks="S" title={line} className={cn('truncate text-body-small', ink.yours)}>
         {line}

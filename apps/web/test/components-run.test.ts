@@ -15,7 +15,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { behind, coded, detail as detailOf, readsOf, unpinned } from './run-fixtures.ts';
 import './tsx.ts';
-import { at, atGate, endingRun, pagedWith, routedWith, runWith, textsOf, unescaped, UNMEASURED } from './markup-fixtures.ts';
+import {
+  at,
+  atGate,
+  endingRun,
+  LOGIN,
+  needing,
+  pagedWith,
+  routedWith,
+  runWith,
+  textsOf,
+  unescaped,
+  UNMEASURED,
+  WAIT,
+  withClient,
+} from './markup-fixtures.ts';
 
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
@@ -31,6 +45,16 @@ const { timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/runView.ts').RunDetail;
 type StepUsed = import('../src/lib/api/usage.ts').StepUsed;
 const { Timeline } = await import('../src/components/run/Timeline.tsx');
+const { container } = await import('../src/lib/meaning.ts');
+
+/** A person's hold on a run, until they lift it. */
+const HELD: NonNullable<RunDetail['holding']> = {
+  at,
+  runs: [],
+  word: 'held until a person lifts it',
+  advice: 'lift it',
+  waitingOnYou: true,
+};
 
 test('a run visited by its address that the store does not have is said gone by its id, and where the runs are listed', () => {
   const html = renderToStaticMarkup(createElement(RunGone, { id: 'r-9z8y' }));
@@ -407,7 +431,7 @@ test("a ghost's card writes the api's word for what it waits on, then an arrow t
   );
 });
 
-test("the run bar: the run's title and id, what it asks of a person, its steps each a button with its status, and its brief", async () => {
+test("the run bar: the run's title and id, what it asks of a person (`AsksOfYou`), its steps each a button with its status, and its brief", async () => {
   const { RunBar } = await import('../src/components/run/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
@@ -419,8 +443,9 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const html = await pagedWith(createElement(RunBar, { run: run.id }), readsOf(run));
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
   assert.ok(textsOf(html).includes(run.id), `the bar says the run's id\n${html}`);
-  assert.match(html, /<section aria-label="Waiting on you"/);
-  assert.match(html, /<button type="button" data-approve="review"/, "a step the banner names opens that step's bar");
+  assert.match(html, /<section aria-label="Asks of you"/);
+  assert.match(html, /<button type="button" data-ask-link="review"/, "a step a line names opens that step's bar");
+  assert.doesNotMatch(html, /data-fold="decide"/, "what there is to decide is the page's, not the bar's");
   const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual(
     [...steps.matchAll(/<button type="button" data-step="([^"]+)"[\s\S]*?data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
@@ -432,7 +457,7 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   assert.match(/<section aria-label="Brief"[\s\S]*?<\/section>/.exec(html)![0], /<strong>floor<\/strong>/);
 
   const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), readsOf(endingRun()));
-  assert.match(decide, /<section aria-label="To decide"[^>]*>[\s\S]*?<button type="button" data-approve="ship"/);
+  assert.match(decide, /<li data-ask="decide" data-step="ship"[^>]*><button type="button" data-ask-link="ship"/);
 });
 
 test('the run bar says a run not read yet, a read that failed, and a run gone from the store, and draws nothing of it under them', async () => {
@@ -536,4 +561,115 @@ test('REFUSED: a Cost cell the keyboard cannot reach to open its tokens: a row w
   assert.match(untokened, /<span[^>]*data-cost-words[^>]*>\$5\.63<\/span>/);
   assert.doesNotMatch(untokened, /<button/, 'no tokens to break down, so nothing for the keyboard to open');
   assert.equal(costCell(null, TOKENS), '', 'a row with no cost says nothing');
+});
+
+test("runAsksOf: a line per ask, each of its kind and step — the result to decide first, then each step whose part asks, in the run's order", async () => {
+  const { runAsksOf } = await import('../src/lib/runAsks.ts');
+  const kinds = (run: RunDetail) => runAsksOf(run).map((a) => [a.kind, a.step]);
+  assert.deepEqual(kinds(atGate()), [['gate', 'review']], 'a step at its gate');
+  assert.deepEqual(kinds(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] })), [['harness', 'review']]);
+  assert.deepEqual(kinds(needing('succeeded · BLOCKED', { needs: 'Which?' }, { waitingOnYou: ['review'] })), [['needs', 'review']]);
+  assert.deepEqual(
+    kinds(needing('denied', { denied: { words: 'denied Bash(pytest)', calls: ['Bash(pytest)'] } }, { waitingOnYou: ['review'] })),
+    [['denied', 'review']],
+  );
+  assert.deepEqual(kinds(needing('waiting', { waitingFor: { words: 'a slot', advice: 'wait' } }, { waitingOnYou: [] })), [
+    ['waiting', 'review'],
+  ]);
+  const exhausted = needing('rounds exhausted', {}, { waitingOnYou: ['review'] });
+  assert.deepEqual(
+    kinds(exhausted),
+    [['offer', 'review']],
+    'a loop out of rounds asks, though none of the five says what: its part answers it',
+  );
+  assert.ok(runAsksOf(exhausted)[0].line.length > 0, 'and says it in words');
+  const asked = needing('failed ✗ check (exit 1)', {}, { waitingOnYou: [] });
+  const tried = {
+    ...asked,
+    steps: [
+      { ...asked.steps[0], note: 'try 2 asked', asked: { try: 2, mode: 'fresh' as const, model: null, message: null, stopFirst: false } },
+    ],
+  };
+  assert.deepEqual(
+    runAsksOf(tried).map((a) => [a.kind, a.line]),
+    [['asked', 'try 2 asked']],
+    'a try asked is noted until the tick files it',
+  );
+  assert.deepEqual(kinds(endingRun()), [['decide', 'ship']], "the ending's approval is the result to decide, and is not asked for twice");
+  assert.deepEqual(kinds(needing('running (working)', {}, { waitingOnYou: [] })), [], 'a step at work asks nothing');
+  assert.deepEqual(kinds({ ...atGate(), cancelledAt: at }), [], 'a run called off asks nothing');
+});
+
+test("AsksOfYou lists each ask as one line linked to its step's part on the page, its try the current one; in the bar, a button that shows the step", async () => {
+  const { AsksOfYou } = await import('../src/components/run/AsksOfYou.tsx');
+  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
+  const base = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
+  const run = { ...base, steps: [base.steps[0], theme] };
+  const page = await routedWith(createElement(AsksOfYou, { run }));
+  assert.match(page, /^<div data-asks="2"/);
+  assert.deepEqual(
+    [...page.matchAll(/<li data-ask="(\w+)" data-step="(\w+)"[^>]*><a [^>]*href="([^"]+)"/g)].map((m) => [m[1], m[2], m[3]]),
+    [
+      ['gate', 'review', '/runs/r-1#step-review'],
+      ['offer', 'theme', '/runs/r-1#step-theme'],
+    ],
+    "each line links to its step's part",
+  );
+  assert.doesNotMatch(page, /<form|<textarea/, 'it lists and points: the answers are in each part');
+  assert.match(page, /data-fold="decide"/, 'what there is to decide, folded under the asks');
+  const section = /<section aria-label="Asks of you"[^>]*class="([^"]*)"/.exec(page)![1];
+  assert.ok(section.includes(container.yours), `drawn yours: ${section}`);
+
+  const bar = withClient(createElement(AsksOfYou, { run, onStep: () => {} }));
+  assert.doesNotMatch(bar, /href=/, 'in the bar a hash would point nowhere');
+  assert.match(bar, /<button type="button" data-ask-link="review"/);
+
+  assert.equal(await routedWith(createElement(AsksOfYou, { run: needing('running (working)', {}, { waitingOnYou: [] }) })), '');
+});
+
+test("the run's menu holds its actions behind one button, each its own question: Remove for a try, Lift while held, else Hold, and Prune", async () => {
+  const { RunMenu, runActionsOf } = await import('../src/components/run/RunMenu.tsx');
+  const run = atGate();
+  const kept = { onDisk: { worktrees: false, files: false } };
+  assert.deepEqual(runActionsOf({ ...run, ...kept, try: null, status: 'running', moving: true }), ['hold']);
+  assert.deepEqual(runActionsOf({ ...run, ...kept, try: { agent: 'coder' }, holding: HELD }), ['remove', 'lift']);
+  const html = withClient(createElement(RunMenu, { run: { ...run, ...kept, try: null, status: 'running', moving: true } }));
+  assert.equal([...html.matchAll(/<button /g)].length, 1, 'one button');
+  assert.match(html, /data-run-menu="hold"/);
+  assert.doesNotMatch(html, /data-hold-open|data-remove-run|data-prune-open/, 'its actions are drawn once it is opened');
+});
+
+test('the receipts are five folds, closed at first, in their order — and opened, the timeline, the checks, the specs, the tokens and where it ran', async () => {
+  const { Receipts, RECEIPTS } = await import('../src/components/run/Receipts.tsx');
+  const run = atGate();
+  const closed = await routedWith(createElement(Receipts, { run }));
+  assert.deepEqual(
+    [...closed.matchAll(/data-fold="(\w+)"/g)].map((m) => m[1]),
+    [...RECEIPTS],
+  );
+  assert.doesNotMatch(closed, /data-started|data-receipt=/, 'a closed fold draws nothing it holds');
+  const open = await routedWith(createElement(Receipts, { run, open: true }));
+  assert.match(open, /data-fact="repo"/, 'where it ran: its repository');
+  assert.match(open, /data-started/, 'and when it started');
+  assert.match(open, /data-receipt="tokens" data-step="review"/, "each step's tokens");
+});
+
+test("the result: until the graph's final steps have given, where the run stands, linked to the step that says it — beside the ask", async () => {
+  const { RunResult } = await import('../src/components/run/RunResult.tsx');
+  const html = await routedWith(createElement(RunResult, { run: atGate({}, { brief: 'Make the **floor** clear.' }) }));
+  assert.match(html, /<section aria-label="The ask" data-run-ask="true"[\s\S]*<strong>floor<\/strong>/, 'the ask is the brief');
+  assert.match(html, /<section aria-label="The result" data-run-result="stands"/);
+  assert.match(html, /<p data-result-stands="yours"[\s\S]*?<a [^>]*href="\/runs\/r-1#step-review"/, 'waiting on you, at review');
+});
+
+test("the header: the brief's first line for a title, where the run stands, its id to copy, and three tiles — took, cost, rounds", async () => {
+  const { RunHeader } = await import('../src/components/run/RunHeader.tsx');
+  const html = await routedWith(createElement(RunHeader, { run: atGate({}, { brief: '# Make the floor clear\n\nMore.' }) }));
+  assert.match(html, /<h1 data-run-title="true"[^>]*>Make the floor clear<\/h1>/);
+  assert.match(html, /data-run-state="waiting on you"/);
+  assert.deepEqual(
+    [...html.matchAll(/data-stat-tile="(\w+)"/g)].map((m) => m[1]),
+    ['took', 'cost', 'rounds'],
+  );
+  assert.ok(textsOf(html).includes('r-1'), 'its id');
 });

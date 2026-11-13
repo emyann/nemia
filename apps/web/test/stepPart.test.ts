@@ -222,6 +222,14 @@ test('the asks slot holds what a waiting step asks of a person, and what any ste
   assert.equal(waiting !== 'none' && waiting.waitingFor?.words, 'a slot');
 });
 
+test('a step the run waits on a person for asks, though none of the five says what: its part offers the answer (a check refused, a loop out of rounds)', () => {
+  const refused = step({ ...coded('failed ✗ check (exit 1)'), gate: null });
+  const waited = stepPartOf(detail({ holding: null, waitingOnYou: ['implement'], steps: [refused] }), 'implement', NOW).asks;
+  assert.notEqual(waited, 'none');
+  const out = step({ ...coded('rounds exhausted'), gate: null });
+  assert.notEqual(stepPartOf(detail({ holding: null, waitingOnYou: [], steps: [out] }), 'implement', NOW).asks, 'none');
+});
+
 test('the detail is of the try shown, and the head offers every try with it', () => {
   const part = stepPartOf(run(), 'implement', NOW);
   assert.deepEqual(part.head.tries, [1, 2]);

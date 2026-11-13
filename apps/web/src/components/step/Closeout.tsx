@@ -8,7 +8,7 @@ import { Markdown } from '../markdown/Markdown';
 import { Json } from './Outcome';
 import type { Frozen } from '../../lib/frozen';
 
-export { Artifacts, bytesWord } from '../run/Artifacts';
+export { Artifacts } from '../run/Artifacts';
 
 /** A check's verdict: its result, and the code it exited with. */
 type CheckVerdict = NonNullable<StepCheck['verdict']>;

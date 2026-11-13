@@ -367,7 +367,10 @@ export default {
 
     await showFinished(page);
     const unmerged = cardOf(page, UNMERGED.id);
-    await expectVisible(unmerged, `with the finished shown, the newest page of them, a finished run whose branch nobody merged has its card (${UNMERGED.id})`);
+    await expectVisible(
+      unmerged,
+      `with the finished shown, the newest page of them, a finished run whose branch nobody merged has its card (${UNMERGED.id})`,
+    );
     await expectVisible(
       unmerged.locator('[data-to-decide="result"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }),
       'its card says the branch is ahead, a link to where it is decided',

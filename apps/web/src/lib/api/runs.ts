@@ -295,4 +295,3 @@ export async function pruneRun(namespace: string, id: string, how: PruneHow): Pr
   const answer = await runs.prune(namespace, id, how, 'The run may be pruned: look at its page before pruning it again.');
   return { id, pruned: true, lines: [...answer.lines], left: answer.left.length };
 }
-

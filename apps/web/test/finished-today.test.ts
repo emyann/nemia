@@ -62,7 +62,7 @@ test('finishedTodayQuery: reads the finished pages until one reaches into the da
     assert.equal((await readToday()).length, 0);
     assert.equal(asked.length, 1);
   });
-  await t.test('a run that finished at the very instant the day began is today\'s: kept, and the read goes on past it', async (tt) => {
+  await t.test("a run that finished at the very instant the day began is today's: kept, and the read goes on past it", async (tt) => {
     assert.equal(readsOnToday({ finishedMs: [DAY_START], next: true }, DAY_START), true);
     answering(tt, { '': runList([finishedRun('r-1', new Date(DAY_START).toISOString())]) });
     assert.deepEqual(

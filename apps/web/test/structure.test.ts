@@ -364,7 +364,9 @@ const pagesOf = (texts: ReadonlyMap<string, string>): string[] => [...texts.keys
 const wholeListBreaks = (texts: ReadonlyMap<string, string>, kept: Readonly<Record<string, string>> = KEPT_WHOLE): string[] => [
   ...frameReach(texts, pagesOf(texts))
     .filter((file) => !(file in kept) && WHOLE.test(withoutComments(texts.get(file)!)))
-    .map((file) => `${file} reads every run: a page reads the light answer (openRunsQuery) and a page of the finished, never the whole list`),
+    .map(
+      (file) => `${file} reads every run: a page reads the light answer (openRunsQuery) and a page of the finished, never the whole list`,
+    ),
   ...Object.keys(kept)
     .filter((file) => !texts.has(file) || !WHOLE.test(withoutComments(texts.get(file)!)))
     .map((file) => `${file} reads the whole list no more, or is gone: take it off KEPT_WHOLE`),

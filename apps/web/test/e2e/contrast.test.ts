@@ -1,6 +1,6 @@
 /**
  * The contrast measure on pages made for it: what it reads, what it composites, and what it answers unmeasured or exempt. Launches
- * Chromium, so it runs with the e2e (`npm run e2e`), not with the node tests.
+ * Chromium, so it runs with the look's tests (`npm run e2e -- --look`), not with the node tests.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';

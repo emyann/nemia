@@ -2,7 +2,7 @@
  * `photograph`'s full-page picture made to refuse: a page taller than the window, framed as the board is — a sticky header, a fixed sidebar
  * as tall as the window less the header and the footer, a sticky footer — is pictured with each part of the frame once, where a person
  * sees it, and every row of its content visible; the same page taken as Chromium takes a picture beyond the window is refused, its frame
- * drawn where the window was. A page that fits is taken without a resize. `npm run e2e` runs this first; it needs Chromium.
+ * drawn where the window was. A page that fits is taken without a resize. `npm run e2e -- --look` runs this, and a whole `npm run e2e` first; it needs Chromium.
  */
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';

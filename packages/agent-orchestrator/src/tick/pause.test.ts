@@ -135,7 +135,8 @@ const engine = () => {
       journal: asyncStore(memoryJournal(tasks, starts)),
       harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
       defaultHarness: 'claude',
-      ...storeAdmission(ROOT, settingsOf(ENV)),
+      ...storeAdmission(ROOT, settingsOf(ENV), () => 64 * 2 ** 30),
+      machine: () => ({ totalBytes: 64 * 2 ** 30, availableBytes: 64 * 2 ** 30 }),
     }),
   );
   const of = (name: string, runs: readonly Run[]) => runs.some((r) => name.startsWith(`ae/${r.id}-`));

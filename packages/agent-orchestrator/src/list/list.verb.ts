@@ -30,6 +30,7 @@ import { headsOver, standingReader, standingSnapshot, type PassStanding } from '
 import { daemonStanding } from '../daemon/daemon.store.ts';
 import { schedulesListed } from '../factory/schedule/listed.store.ts';
 import {
+  admissionWaitOf,
   closeoutOf,
   deniedOf,
   ranOnOf,
@@ -108,10 +109,10 @@ export type ListReading = Listing & {
  * The package's one reading of a run, over one read of each task: what `nemia ls` and the api's list both answer from.
  *
  * Each step's status is `listing`'s, the engine's bare word while a step runs (`needs-human`, compared exactly), with what the harness says
- * it waits for and what it was denied as fields beside it. A refused check's verdict is its exit off the engine's record of the check
- * (`exitVerdicts`), never its output or logs: the check prints the code it exits with, so the two agree, and a read of either per refused
- * check would cost every poll of the list. The runs it waits on and is held until are each read once (`parentsRead`), and where its result
- * branches stand is asked once its status is known.
+ * it waits for and what it was denied as fields beside it, and why the runtime holds a queued one in its note (`admissionWaitOf`). A
+ * refused check's verdict is its exit off the engine's record of the check (`exitVerdicts`), never its output or logs: the check prints
+ * the code it exits with, so the two agree, and a read of either per refused check would cost every poll of the list. The runs it waits
+ * on and is held until are each read once (`parentsRead`), and where its result branches stand is asked once its status is known.
  * Untraced: a list runs it once per run, and a span each would bury the list's trace under hundreds.
  */
 export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how: ListReadingHow) {
@@ -144,6 +145,7 @@ export const listReading = Effect.fnUntraced(function* (e: Engine, run: Run, how
     saidTo: saidCount(views, run),
     slot: how.slot,
     waitingOf: waitingOf(views),
+    admissionWaitOf: admissionWaitOf(views),
     deniedOf: deniedOf(views),
     ...(how.releases === undefined ? {} : { ranOnOf: ranOnOf(views, how.releases) }),
     parkedOf: (taskId) => parkedOf(views.get(taskId)),

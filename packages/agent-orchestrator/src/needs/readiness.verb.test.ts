@@ -30,6 +30,7 @@ import { sweptFacts } from './sweep.verb.ts';
 import { RunDoor, type RunDoorShape } from '../runs/runs.store.ts';
 import type { Run } from '../record/record.ts';
 import { aRun } from '../../test/run-walks.ts';
+import { names } from '../../test/assessed.ts';
 
 const ROOT = scratch('wf-readiness-');
 delete process.env[TOKEN_VARIABLE];
@@ -349,6 +350,40 @@ test('cgroup v2 and the user manager cost a run only where the daemon files its 
   const limited = await read({ ...facts({ PATH: '/usr/bin', WF_MEMORY_LIMIT: '2Gi' }), exists: () => false }, identity('exit 0'));
   assert.equal(limited.pieces.find((p) => p.name === 'cgroup-v2')?.cost, 'run');
   assert.equal(limited.pieces.find((p) => p.name === 'systemd-user')?.cost, 'run');
+});
+
+test('memory-fit: the sessions at once, each at its request else its limit, against the machine less its floor, naming how many fit and the setting to change', async () => {
+  const GIB = 2 ** 30;
+  const fitOf = async (env: Record<string, string>) =>
+    (await read({ ...facts({ PATH: '/usr/bin', ...env }), memoryBytes: 16 * GIB }, identity('exit 0'))).pieces.find(
+      (p) => p.name === 'memory-fit',
+    );
+  const over = await fitOf({ WF_MAX_CONCURRENT: '6', WF_MEMORY_LIMIT: '7782Mi' });
+  assert.equal(over?.state, 'missing', 'six sessions at their 7.6 GiB limit do not fit 16 GiB less 2 GiB kept');
+  assert.equal(over?.area, 'machine');
+  assert.equal(over?.cost, 'server');
+  names(over?.message, '1 session', 'WF_MAX_CONCURRENT=1', 'WF_MEMORY_REQUEST', '14336 MiB');
+  assert.deepEqual(
+    over?.fixes.map((f) => [f.command, f.kind]),
+    [['nemia service install --size auto', 'typed']],
+  );
+  const fits = await fitOf({ WF_MAX_CONCURRENT: '5', WF_MEMORY_LIMIT: '7782Mi', WF_MEMORY_REQUEST: '2560Mi' });
+  assert.equal(fits?.state, 'met', 'five sessions asking 2.5 GiB fit 14 GiB');
+  assert.deepEqual(fits?.fixes, []);
+  const floored = await fitOf({ WF_MAX_CONCURRENT: '5', WF_MEMORY_REQUEST: '2560Mi', WF_MEMORY_RESERVED: '8Gi' });
+  assert.equal(floored?.state, 'missing', 'a floor set higher leaves less to allocate');
+  names(floored?.message, 'WF_MEMORY_RESERVED', '3 sessions');
+  const limitOver = await fitOf({ WF_MAX_CONCURRENT: '2', WF_MEMORY_LIMIT: '15Gi', WF_MEMORY_REQUEST: '2Gi' });
+  assert.equal(limitOver?.state, 'missing', 'one session may grow past what the machine allocates');
+  names(limitOver?.message, 'WF_MEMORY_LIMIT');
+  const uncounted = await fitOf({ WF_MAX_CONCURRENT: '6' });
+  assert.equal(uncounted?.state, 'unknown', 'no limit and no request: nothing is counted, which is no fault');
+  names(uncounted?.message, 'WF_MEMORY_LIMIT', 'WF_MEMORY_REQUEST');
+  const unread = await read(facts({ PATH: '/usr/bin', WF_MEMORY_REQUEST: '2560Mi' }), identity('exit 0'));
+  assert.equal(unread.pieces.find((p) => p.name === 'memory-fit')?.state, 'unknown', "the machine's memory not read");
+  const refused = await fitOf({ WF_MEMORY_LIMIT: '2Gi', WF_MEMORY_REQUEST: '4Gi' });
+  assert.equal(refused?.state, 'missing', 'a request above the limit is a setting the daemon refuses');
+  names(refused?.message, 'WF_MEMORY_REQUEST=4Gi');
 });
 
 test("an archive install's tools piece reads its nemia: missing with no link, naming nemia doctor fix tools; met once linked; a checkout reads none", async () => {

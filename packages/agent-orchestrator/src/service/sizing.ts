@@ -1,21 +1,52 @@
 /**
- * How much work a machine takes (`sizedFor`): the sessions at once and the memory limit of each, read off its memory and CPUs when
- * `nemia service install --size auto` writes its unit (`WF_MAX_CONCURRENT`, `WF_MEMORY_LIMIT`). Each session is given its share of the
- * memory (`MIB_PER_SESSION`) and one CPU is left to the daemon and the machine; each is held under half the machine. Pure: the verb
- * reads the machine (`os.totalmem()`, `os.availableParallelism()`).
+ * How much work a machine takes (`sizedFor`): the sessions at once, the memory limit and the request of each, and the floor kept for the
+ * daemon and the machine, read off its memory and CPUs when `nemia service install --size auto` writes its unit (`WF_MAX_CONCURRENT`,
+ * `WF_MEMORY_LIMIT`, `WF_MEMORY_REQUEST`; the floor, `WF_MEMORY_RESERVED`, is its default and not written). Each session asks its share
+ * of the memory (`MIB_PER_SESSION`), the requests of all of them fit the machine less the floor (`reservedFor`), one CPU is left to the
+ * daemon and the machine, and each is held under half the machine. And whether the settings a daemon runs under fit its machine
+ * (`memoryFit`), which `nemia doctor` says. Pure: the verbs read the machine (`os.totalmem()`, `os.availableParallelism()`).
  */
-import type { Machine, Sized, SizedFor } from '../../contracts/sizing.contract.ts';
+import type { Configured, Machine, MemoryFit, MemoryFitOf, Sized, SizedFor } from '../../contracts/sizing.contract.ts';
 
-export type { Machine as MachineSize, Sized };
+export type { Configured, Machine as MachineSize, MemoryFit, Sized };
 
-/** The machine's memory each session is given on average, in MiB: the contract's own number, which a law reads. */
+/** The machine's memory each session asks on average, in MiB: the contract's own number, which a law reads. */
 export const MIB_PER_SESSION = 2560;
 
-/** The sessions at once and the limit of each, in MiB, on a machine of `memoryMiB` and `cpus`. */
-export const sizedFor: SizedFor = (machine) => ({
-  maxConcurrent: Math.max(1, Math.min(Math.floor(machine.memoryMiB / MIB_PER_SESSION), machine.cpus - 1)),
-  memoryLimitMiB: Math.floor(machine.memoryMiB / 2),
-});
+/** The floor kept for the daemon and the machine on a machine of `memoryMiB`, in MiB: an eighth of it, and 1 GiB at least. */
+export const reservedFor = (memoryMiB: number): number => Math.max(1024, Math.floor(memoryMiB / 8));
+
+/** The sessions at once, the limit and the request of each and the floor kept, in MiB, on a machine of `memoryMiB` and `cpus`. */
+export const sizedFor: SizedFor = (machine) => {
+  const memoryLimitMiB = Math.floor(machine.memoryMiB / 2);
+  const memoryReservedMiB = reservedFor(machine.memoryMiB);
+  const allocatable = machine.memoryMiB - memoryReservedMiB;
+  const memoryRequestMiB = Math.min(MIB_PER_SESSION, memoryLimitMiB, allocatable);
+  return {
+    maxConcurrent: Math.max(1, Math.min(Math.floor(allocatable / memoryRequestMiB), machine.cpus - 1)),
+    memoryLimitMiB,
+    memoryRequestMiB,
+    memoryReservedMiB,
+  };
+};
+
+/**
+ * Whether `configured` fits its machine: each session counted at its request, else its limit, as Kubernetes defaults a request, and
+ * none where it has neither (`uncounted`); the sessions at once over what the machine allocates (its memory less the floor), with how
+ * many would fit — fewer than are set; or, where they fit, one session's limit over it. `asked * 1` is `asked`: tsverify divides no
+ * value read off `number | null`, even narrowed, and reads the product as a number.
+ */
+export const memoryFit: MemoryFitOf = (configured) => {
+  const asked = configured.requestBytes ?? configured.limitBytes;
+  if (asked === null) return { verdict: 'uncounted' };
+  const per = asked * 1;
+  const room = configured.totalBytes - configured.reservedBytes;
+  if (per > Math.floor(room / configured.maxConcurrent))
+    return { verdict: 'over', perSessionBytes: per, sessionsFit: Math.floor(room / per), allocatableBytes: room };
+  if (configured.limitBytes !== null && configured.limitBytes > room)
+    return { verdict: 'limitOver', limitBytes: configured.limitBytes, allocatableBytes: room };
+  return { verdict: 'fits' };
+};
 
 /**
  * Why `machine` cannot be sized, or null: under 2 GiB or no CPU, or past a pebibyte or 65,536 CPUs, as the contract's `requires` rules

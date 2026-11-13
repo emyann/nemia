@@ -1,8 +1,94 @@
 /**
- * Which queued tasks a pass admits: a ceiling on the sessions at work in each pool, and the order waiting tasks are given a free slot.
- * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and journals what it returns.
+ * Which queued tasks a pass admits: a ceiling on the sessions at work in each pool, the machine's memory beside it (the requests of
+ * what holds a slot against its total, and what has no process yet against what is available now, each less a floor), and the order
+ * waiting tasks are given a free slot — and why each other one waits.
+ * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and one reading of the machine,
+ * and journals what it returns.
  */
+import type {
+  AdmissionPass,
+  AdmissionWait,
+  Admitted,
+  AdmitOne,
+  Holder,
+  MachineMemory,
+  Waiter,
+} from '../../contracts/admission.contract.ts';
 import type { TaskPhase } from './session.ts';
+import type { TaskResources } from './domain.ts';
+import { memoryBytesOf } from './memory.ts';
+
+export type {
+  AdmissionPass,
+  OneWaiter,
+  AdmissionWait,
+  Admit,
+  Admitted,
+  Holder,
+  MachineMemory,
+  Waiter,
+} from '../../contracts/admission.contract.ts';
+
+/**
+ * The room the machine has for newcomers before a pass admits any, in bytes: the lesser of its total less the floor and what every
+ * holder needs (what is promised), and what is available now less the floor and what the holders with no process yet need (what the
+ * kernel does not see yet). Below nothing where the machine is already past either.
+ * Exported only for the tests that import it.
+ */
+export const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
+  let promised = 0;
+  let unseen = 0;
+  for (const h of holders) {
+    promised += h.needBytes;
+    if (!h.running) unseen += h.needBytes;
+  }
+  return Math.min(m.totalBytes - m.reservedBytes - promised, m.availableBytes - m.reservedBytes - unseen);
+};
+
+/**
+ * What a pass decides of one waiter, in turn: a waiter whose pool has no free slot under the ceiling waits for a slot; one that needs
+ * more than the room the machine has left waits for memory, told its need and the room; any other is admitted, its need taken off
+ * the room and its slot counted. A waiter that needs nothing always fits, and with no reading of the machine only the ceiling
+ * decides. Proved by `contracts/admission.contract.ts`.
+ */
+export const admitOne: AdmitOne = (one) => {
+  if (one.inPool >= one.ceiling) return { for: 'slot', pool: one.pool, ceiling: one.ceiling };
+  const room = one.roomBytes;
+  if (room !== null && one.needBytes > 0 && one.needBytes > room) {
+    return { for: 'memory', needBytes: one.needBytes, roomBytes: room < 0 ? 0 : room };
+  }
+  return { for: 'admitted', roomBytes: room === null ? null : room - one.needBytes, inPool: one.inPool + 1 };
+};
+
+/**
+ * Which waiters a pass admits, in turn, and why each other waits: `admitOne` taken at each waiter, handed its pool's count and the
+ * room the waiters before it left. A waiter that waits never stops the ones after it, as a scheduler goes on to the next Pod: a smaller
+ * one behind it may fit. The laws of the whole pass, which sum over its waiters, are held by `test/admission.test.ts`.
+ */
+export const admitting = (pass: AdmissionPass): Admitted => {
+  let room = pass.machine === null ? null : roomOf(pass.machine, pass.holders);
+  const inPool = new Map<string, number>();
+  for (const h of pass.holders) inPool.set(h.pool, (inPool.get(h.pool) ?? 0) + 1);
+  const admit: string[] = [];
+  const waits: { id: string; wait: AdmissionWait }[] = [];
+  for (const w of pass.waiting) {
+    const answer = admitOne({
+      ceiling: pass.ceiling,
+      inPool: inPool.get(w.pool) ?? 0,
+      roomBytes: room,
+      needBytes: w.needBytes,
+      pool: w.pool,
+    });
+    if (answer.for !== 'admitted') {
+      waits.push({ id: w.id, wait: answer });
+      continue;
+    }
+    room = answer.roomBytes;
+    inPool.set(w.pool, answer.inPool);
+    admit.push(w.id);
+  }
+  return { admit, waits };
+};
 
 /**
  * The part of a task's view admission reads.
@@ -12,15 +98,31 @@ export type AdmissionView = {
   id: string;
   phase: TaskPhase;
   admission?: 'queued' | 'admitted';
-  state: { harness?: string; filedAt?: string; priority?: number };
+  state: { harness?: string; filedAt?: string; priority?: number; resources?: TaskResources };
 };
 
 /**
  * What the engine admits under: `ceiling`, the sessions at work at once in each pool; `unschedulable`, asked on every pass, true while
- * the engine admits nothing, as a node marked `unschedulable` takes no new Pod; and `poolOf`, the pool a harness's sessions count
- * against. No ceiling admits nothing: a task filed `queued` then waits for `admit`.
+ * the engine admits nothing, as a node marked `unschedulable` takes no new Pod; `poolOf`, the pool a harness's sessions count
+ * against; and `machine`, asked once per pass, the machine's memory and the floor kept off it (`MachineMemory`), or `undefined` where
+ * it could not be read — absent, or answering nothing, the ceiling alone admits. No ceiling admits nothing: a task filed `queued`
+ * then waits for `admit`.
  */
-export type AdmissionRule = { ceiling?: number; unschedulable?: () => boolean; poolOf: (harness: string | undefined) => string };
+export type AdmissionRule = {
+  ceiling?: number;
+  unschedulable?: () => boolean;
+  poolOf: (harness: string | undefined) => string;
+  machine?: () => MachineMemory | undefined;
+};
+
+/**
+ * What a task needs of the machine's memory, in bytes, as admission counts it: its request (`resources.requests.memory`), else its
+ * limit, which stands for its request as Kubernetes gives a container that names a limit and no request, else nothing.
+ */
+export const needBytesOf = (resources: TaskResources | undefined): number => {
+  const quantity = resources?.requests?.memory ?? resources?.limits?.memory;
+  return (quantity === undefined ? undefined : memoryBytesOf(quantity)) ?? 0;
+};
 
 /** The pool a harness counts against when the engine names none for it: its own name, and `default` for a task with no harness. */
 export const ownPool = (harness: string | undefined): string => harness ?? 'default';
@@ -73,22 +175,22 @@ const byTurn = (a: AdmissionView, b: AdmissionView): number => {
 };
 
 /**
- * The queued tasks to admit: per pool, while the sessions holding a slot (`holdsSlot`) are under the ceiling, the waiting tasks in turn
- * (`byTurn`), each one admitted counted at once. Nothing running is stopped for a waiting task; no ceiling admits nothing, and nor does
- * a rule `unschedulable` says true of as the pass asks it.
+ * The queued tasks to admit, and why each other one waits: the tasks holding a slot (`holdsSlot`), each with its pool, its need
+ * (`needBytesOf`) and whether its process is there (`working`, `quiescent`), and the waiting tasks in turn (`byTurn`), handed to
+ * `admitting` with the machine as `rule.machine` reads it once. Nothing running is stopped for a waiting task; no ceiling admits
+ * nothing, and nor does a rule `unschedulable` says true of as the pass asks it, each saying no wait.
  */
-export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): string[] {
+export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): Admitted {
   const { ceiling, poolOf } = rule;
-  if (ceiling === undefined || rule.unschedulable?.()) return [];
-  const used = new Map<string, number>();
-  for (const v of views) if (holdsSlot(v)) used.set(poolOf(v.state.harness), (used.get(poolOf(v.state.harness)) ?? 0) + 1);
-  const admitted: string[] = [];
-  for (const v of views.filter((w) => w.admission === 'queued').sort(byTurn)) {
-    const pool = poolOf(v.state.harness);
-    const n = used.get(pool) ?? 0;
-    if (n >= ceiling) continue;
-    used.set(pool, n + 1);
-    admitted.push(v.id);
-  }
-  return admitted;
+  if (ceiling === undefined || rule.unschedulable?.()) return { admit: [], waits: [] };
+  const holders = views.filter(holdsSlot).map((v): Holder => ({
+    pool: poolOf(v.state.harness),
+    needBytes: needBytesOf(v.state.resources),
+    running: v.phase === 'working' || v.phase === 'quiescent',
+  }));
+  const waiting = views
+    .filter((w) => w.admission === 'queued')
+    .sort(byTurn)
+    .map((v): Waiter => ({ id: v.id, pool: poolOf(v.state.harness), needBytes: needBytesOf(v.state.resources) }));
+  return admitting({ ceiling, machine: rule.machine?.() ?? null, holders, waiting });
 }

@@ -629,6 +629,7 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
   await t.test('`nemia up` says both ceilings in words before its first pass, and the store it takes, once per start', async (c) => {
     const { e } = stoppedBy(stop);
     ENV.WF_MAX_CONCURRENT = '4';
+    ENV.WF_MEMORY_RESERVED = '2Gi';
     const printed: string[] = [];
     const log = c.mock.method(console, 'log', (...args: unknown[]) => {
       printed.push(args.join(' '));
@@ -641,7 +642,9 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       log.mock.restore();
       ENV.WF_MAX_CONCURRENT = undefined;
       ENV.WF_MAX_RUNS = undefined;
+      ENV.WF_MEMORY_RESERVED = undefined;
     }
+    const memory = `   sessions admitted by memory: a session waits until what it asks — its step's memory:, where it names one — fits the machine above the 2Gi kept for the daemon and the machine (WF_MEMORY_REQUEST, WF_MEMORY_RESERVED)`;
     const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a nemia up, or a nemia tick, on this store is refused while it ticks (daemon.json)`;
     const promise = checkoutPromiseLine(runningRelease());
     const promised = promise ? [`   ${promise}`] : [];
@@ -657,11 +660,13 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
         'up — every 4000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: no cap (WF_MAX_RUNS)',
+        memory,
         holds,
         ...promised,
         'up — every 1000ms, ^C to stop',
         '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
+        memory,
         holds,
         ...promised,
       ],

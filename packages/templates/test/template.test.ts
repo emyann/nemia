@@ -18,6 +18,8 @@ const DAEMONS: Record<(typeof SESSION_VARIABLES)[number] | (typeof SERVING_VARIA
   OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9',
   WF_SESSION_TOKEN: 'a-token-no-test-minted',
   WF_MEMORY_LIMIT: '6Gi',
+  WF_MEMORY_REQUEST: '2560Mi',
+  WF_MEMORY_RESERVED: '2Gi',
   WF_CGROUP_PARENT: 'sessions.slice',
 };
 

@@ -115,8 +115,20 @@ const BriefPartsSchema = Schema.mutable(Schema.Array(Schema.Union([Schema.String
 const event = <const K extends string, const F extends Schema.Struct.Fields>(kind: K, fields: F) =>
   Schema.StructWithRest(Schema.Struct({ kind: Schema.Literal(kind), at: Schema.String, ...fields }), Rest);
 
-/** What a task asks of its host's resources (`TaskResources`, `domain.ts`): a memory limit, a quantity `file` read. */
-export const ResourcesSchema = Schema.Struct({ limits: Schema.optional(Schema.Struct({ memory: Schema.optional(Schema.String) })) });
+/** What a task asks of its host's resources (`TaskResources`, `domain.ts`): a memory limit and request, each a quantity `file` read. */
+export const ResourcesSchema = Schema.Struct({
+  limits: Schema.optional(Schema.Struct({ memory: Schema.optional(Schema.String) })),
+  requests: Schema.optional(Schema.Struct({ memory: Schema.optional(Schema.String) })),
+});
+
+/** A whole number of bytes, from nothing. */
+const Bytes = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+/** Why a pass left a queued task waiting (`AdmissionWait`, `contracts/admission.contract.ts`): its pool's slot, or the machine's memory. */
+export const AdmissionWaitSchema = Schema.Union([
+  Schema.Struct({ for: Schema.Literal('slot'), pool: Schema.String, ceiling: Schema.Int }),
+  Schema.Struct({ for: Schema.Literal('memory'), needBytes: Bytes, roomBytes: Bytes }),
+]);
 
 /** What a task's cgroup said of its memory as an attempt ended (`MemoryUse`, `domain.ts`). */
 export const MemoryUseSchema = Schema.Struct({
@@ -254,6 +266,7 @@ export const StoredEventSchema = Schema.Union([
   Input,
   event('closed', {}),
   event('admitted', {}),
+  event('waits', { wait: Schema.optional(AdmissionWaitSchema) }),
   event('settled', {
     outcome: Schema.Literals(['succeeded', 'failed', 'stopped']),
     note: Schema.optional(Schema.String),

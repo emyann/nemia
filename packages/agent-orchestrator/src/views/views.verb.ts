@@ -9,7 +9,7 @@
  * What reads only views already read is plain.
  */
 import { Cause, Deferred, Effect, Exit } from 'effect';
-import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, asked, denialText, tried, type AdmissionWait, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   attemptVerdict,
   CHECK_TAIL_LINES,
@@ -273,6 +273,18 @@ export const waitingOf =
   (views: ReadonlyMap<string, TaskView>) =>
   (taskId: string): string | undefined =>
     views.get(taskId)?.waitingFor;
+
+/**
+ * Why the runtime holds a queued task back from its admission (`TaskView.waits`), off views already read: a slot of its pool, under its
+ * ceiling, or the memory it asks and the room the machine has above its floor. `undefined` for a task the runtime holds for nothing, or
+ * that is not queued, and for one not read: the runtime says it only while the task waits. Costs no observation of its own.
+ *
+ * Exported, log-free, for a consumer that words a step as `nemia ls` does. The words themselves are `admissionWords` in list/list.ts.
+ */
+export const admissionWaitOf =
+  (views: ReadonlyMap<string, TaskView>) =>
+  (taskId: string): AdmissionWait | undefined =>
+    views.get(taskId)?.waits;
 
 /**
  * Why the runtime could not read a task's session alone, in its own words (`TaskView.unreadWhy`), off its view already read: what one

@@ -3,9 +3,10 @@
  * fixture tree with a stand-in Node (a shell script that prints what it was asked to run) packed for this machine's platform by
  * `pack`, laid out under a `file://` download base as GitHub lays a release out (`<base>/download/<tag>/<asset>`,
  * `<base>/latest/download/latest.json`), and the installer run with `--yes --no-service` into a scratch HOME and `WF_ROOT`. It asserts
- * the release folder and its `release.json`, the relative `releases/current`, the `~/.local/bin/nemia` link and that the launcher runs
- * the release's own Node on the cli through both links; then a release whose `SHA256SUMS` line is wrong refused with exit 1, leaving
- * `current`, the releases and the link as they were. What it asserts is exit codes and files, never a sentence.
+ * the release folder and its `release.json`, the relative `releases/current`, the `~/.local/bin/nemia` link, the store's
+ * `tools/bin/nemia` link to the same launcher, and that the launcher runs the release's own Node on the cli through both links; then a
+ * release whose `SHA256SUMS` line is wrong refused with exit 1, leaving `current`, the releases and the link as they were. What it
+ * asserts is exit codes and files, never a sentence.
  *
  * The stand-in Node is also the stand-in `nemia` of the steps after the unpacking: given `STUB_LOG`, it logs each verb it is asked,
  * answers `service addresses` with one address of each kind, `token add` with a person token (on its `Authorization:` line and
@@ -112,6 +113,9 @@ test(
     assert.equal(fs.readlinkSync(path.join(releases, 'current')), 'v1.2.3', 'current is the relative link to the tag');
     const link = path.join(home, '.local', 'bin', 'nemia');
     assert.equal(fs.readlinkSync(link), path.join(releases, 'current', 'bin', 'nemia'));
+    const tools = path.join(root, 'tools', 'bin', 'nemia');
+    assert.equal(fs.readlinkSync(tools), path.join(releases, 'current', 'bin', 'nemia'), "the tools folder's nemia names the pointer");
+    assert.equal(fs.realpathSync(tools), fs.realpathSync(path.join(releases, 'v1.2.3', 'bin', 'nemia')));
     assert.deepEqual(
       fs.readdirSync(releases).filter((name) => name.startsWith('.')),
       [],

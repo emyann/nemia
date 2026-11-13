@@ -248,11 +248,20 @@ export default {
       await expectRail(page, 'expanded', 'and the rail comes back as it was');
 
       await page.setViewportSize({ width: 1600, height: 900 });
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-wide-closed-${await themeOf(page)}.png`), { fullPage: true });
       await openChat(page);
       await expectDocked(page);
       await expectRail(page, 'expanded', 'at 1600 the open rail stays open beside her sheet');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-wide-${await themeOf(page)}.png`), { fullPage: true });
+      await page.locator('[data-menu-button]').click();
+      await expectRail(page, 'collapsed', 'at 1600 the menu button folds the rail as the person keeps it');
+      await expectDocked(page);
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-wide-folded-${await themeOf(page)}.png`), { fullPage: true });
+      await page.locator('[data-menu-button]').click();
+      await expectRail(page, 'expanded', 'and brings it back');
       await chatPanelOf(page).getByRole('button', { name: 'Close' }).click();
       await expectCount(chatPanelOf(page), 0, 'its Close closes her sheet at 1600 too');
 

@@ -115,6 +115,12 @@ export default {
       await expectCues(page, (words) => words.includes('2 new'), 'two answers of hers are unread, and a cue at her face says so');
       await settled(page);
       await photograph(page, path.join(OUT, `chat-talk-cues-${await themeOf(page)}.png`));
+      const was = page.viewportSize();
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await expectCues(page, (words) => words.includes('2 new'), 'at 1600 the cues are said at her face too');
+      await settled(page);
+      await photograph(page, path.join(OUT, `chat-talk-cues-wide-${await themeOf(page)}.png`));
+      if (was) await page.setViewportSize(was);
       await page.mouse.move(640, 400);
 
       const panel = await openChat(page);

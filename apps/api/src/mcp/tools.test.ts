@@ -83,6 +83,13 @@ test('factory_add and factory_apply are tools that POST their repositories, each
   }
 });
 
+test("inbox_edit PUTs a card's text to its source, the card's path and its text required", () => {
+  const edit = tool('inbox_edit');
+  assert.equal(edit.method, 'PUT');
+  assert.deepEqual([...(edit.inputSchema.required ?? [])].sort(), ['name', 'namespace', 'source']);
+  assert.ok('resourceVersion' in edit.inputSchema.properties, 'the payload key resourceVersion');
+});
+
 test('wait takes the query of GET /api/feed/wait', () => {
   const wait = tool('wait');
   for (const key of ['labelSelector', 'from', 'for']) assert.ok(key in wait.inputSchema.properties, key);

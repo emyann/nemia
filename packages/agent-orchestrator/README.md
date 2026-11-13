@@ -890,7 +890,7 @@ session cannot load is a name in its prompt (F11); skills or a harness prompt on
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`:
-`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316 and 2.1.322), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+`claude-haiku-4-5` or `claude-sonnet-4-5`; the `haiku` alias keeps `auto` on Claude Code 2.1.316, 2.1.322 and 2.1.323), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -3187,6 +3187,16 @@ run 'wf tick' (or 'wf up') to start it
   refused, naming the attach. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the
   body whole, as `wf start` takes a brief that is not a card. `--repo`, and a file's `repo:`, are refused: the factory names
   the repository.
+- **`nemia inbox edit <name> <file>`, or `nemia inbox edit <name> -- "<card>"`, changes a card where it lives.** It takes a
+  card's text, frontmatter and body, as `status.source` serves it, and reads it as the card's own file is read: a key no card has,
+  or one whose value does not read, is refused by name, and nothing is written. The body and the keys `workflow:`, `gate:`,
+  `model:` and `from:` are the text's, a key left out taken off; the card keeps its name, so every reference to it still holds,
+  though its title may no longer slug to it. Its labels are `nemia label inbox`'s, and its factory and `queued:` its own: a text
+  that says other labels, another factory or another `queued:` is refused, naming the verb that does it, and one that leaves them
+  out or says them as they are keeps them. A started card is refused (`Conflict`), since its run copied it, naming `nemia inbox
+  add` for a new card. The api serves it as the Card's `edit`, `PUT /api/namespaces/<factory>/cards/<name>/source`, which takes
+  the `resourceVersion` it was read at, and the MCP port as `inbox_edit`; the card is written whole, by the Card's update, or not
+  at all.
 - **`wf inbox` lists the cards**: name, first line, workflow when set, an old card's `repo:` marked `(retired)`, `queued 2 of 3` for a queued card, and
   `started as <runId>` for a card whose name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
   refusal, never hidden. A hidden file and a README are not listed.

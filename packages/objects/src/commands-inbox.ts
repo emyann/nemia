@@ -144,6 +144,36 @@ export const INBOX_FROM_WORDS = {
   },
 } as const satisfies CommandWords;
 
+/**
+ * `nemia inbox edit`: a card's body and keys replaced by a card's text — its file as it is to be, typed or a file — read as the card's own
+ * file is read; its name kept, its labels left to `nemia label inbox`.
+ */
+export const INBOX_EDIT_WORDS = {
+  name: 'inbox edit',
+  served: [{ endpoint: 'cards.edit' }],
+  usage: '<name> "<card>"|<file>',
+  help: [
+    "replace a card's body and keys with a card's text, typed or a file;",
+    'the card keeps its name, and its labels: nemia label inbox edits those',
+  ],
+  spec: {
+    positionals: [
+      { key: 'name', takes: 'required', kind: 'name' },
+      { key: 'source', takes: 'required', kind: 'text' },
+    ],
+    flags: [],
+    unknown: (arg) =>
+      `${CLI} inbox edit takes the card's name, then its text as one argument or a file, and ${arg} is a third: quote the text, ${CLI} inbox edit <name> "<card>", or give a file: ${CLI} inbox edit <name> ./card.md.`,
+    missing: `${CLI} inbox edit takes the name of the card, as ${CLI} inbox lists it, then the card's text or a file of it: ${CLI} inbox edit <name> ./card.md.`,
+  },
+  writes: true,
+  class: 'act',
+  only: {
+    side: 'cli',
+    why: "the api serves it as the Card's `edit` of `objects`' Api (`/api/namespaces/:namespace/cards/:name/source`), which calls this entry's handler: no route of its own",
+  },
+} as const satisfies CommandWords;
+
 /** `nemia inbox rm`: one card dropped without starting it. */
 export const INBOX_RM_WORDS = {
   name: 'inbox rm',
@@ -227,6 +257,7 @@ export const INBOX_WORDS = [
   INBOX_ADD_WORDS,
   INBOX_QUEUE_WORDS,
   INBOX_FROM_WORDS,
+  INBOX_EDIT_WORDS,
   INBOX_RM_WORDS,
   LABEL_RUN_WORDS,
   LABEL_INBOX_WORDS,

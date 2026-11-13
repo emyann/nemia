@@ -2,7 +2,8 @@
  * How the frame stands around Nemia's side sheet (`frameFold`, src/lib/frameFold.ts), from what holds now: how wide the window is, whether
  * the person keeps the rail open (the `sidebar_state` cookie's fold, as the sidebar provider holds it), whether they opened her sheet,
  * whether they asked for the rail back while it was folded for the sheet, and whether the page is her chat's own (`/chat`).
- * Level-triggered: the rail folded for her sheet is never written as the person's fold, so it comes back as it was the moment the sheet closes.
+ * Level-triggered: the rail folded for her sheet is never written as the person's fold, so it comes back as it was the moment the sheet
+ * closes.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 

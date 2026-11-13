@@ -217,8 +217,9 @@ export const RunApproved = Schema.Struct({
 export type RunApproved = typeof RunApproved.Type;
 
 /**
- * Words said to a step's running session, as `nemia say` says them, and who wrote them (`from`): none is the caller the request is —
- * the person with no session's token, a session by its own.
+ * Words said to a step's running session, as `nemia say` says them, and `from`, retired: who wrote them is the caller the request's
+ * token says — the person under any token of theirs, an agent by a standing token minted for it or by its session's. A `from` naming an
+ * agent is refused (422), naming `nemia token add <name> --agent <agent>`; one naming the person is read no further.
  */
 export const RunSay = Schema.Struct({ text: Schema.String, from: Schema.optionalKey(ChatSpeaker) }).annotate({
   identifier: 'RunSay',

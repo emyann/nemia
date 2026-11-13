@@ -488,7 +488,6 @@ export {
   PolicyReachQuery,
   GateReach,
   RuleMiss,
-  ChatSpeakers,
   AskOption,
   AskQuestion,
   PermissionFacts,
@@ -647,7 +646,7 @@ export {
   versionFlag,
   writerSpec,
 } from './commands-writers.ts';
-export { RENAMED, RENAMED_FLAGS, renamedIn, type Renamed } from './commands-renamed.ts';
+export { RENAMED, RENAMED_FLAGS, RETIRED_COMMANDS, renamedIn, retiredIn, type Renamed } from './commands-renamed.ts';
 export {
   SELECTOR_FLAG_FORM,
   labelFlags,
@@ -770,17 +769,7 @@ export {
 export { CLOSEOUT_WORDS, INBOX_READ_WORDS, LS_WORDS, READ_WORDS, SHOW_WORDS, WATCH_WORDS } from './commands-reads.ts';
 export { REST_WORDS } from './commands-rest.ts';
 export { CONCLUDED_WORDS, LAST_TAKES, LOGS_WORDS, MEMORY_WORDS, PASSES_WORDS, RANGE_TAKES, SERIES_WORDS } from './commands-rest-reads.ts';
-export {
-  CHAT_ALLOW_WORDS,
-  CHAT_DISALLOW_WORDS,
-  CHAT_SPEAKERS_WORDS,
-  LEVEL_FORM,
-  LEVEL_WORDS,
-  SUBSCRIBE_FORM,
-  SUBSCRIBE_WORDS,
-  UNSUBSCRIBE_WORDS,
-  levelWritten,
-} from './commands-rest-nemia.ts';
+export { LEVEL_FORM, LEVEL_WORDS, SUBSCRIBE_FORM, SUBSCRIBE_WORDS, UNSUBSCRIBE_WORDS, levelWritten } from './commands-rest-nemia.ts';
 export { BOARD_LINK_WORDS, PAIRINGS_APPROVE_WORDS, PAIRINGS_LS_WORDS } from './commands-rest-pairing.ts';
 export { TOKEN_ADD_WORDS, TOKEN_LS_WORDS, TOKEN_RM_WORDS } from './commands-rest-tokens.ts';
 export { Actor, actorWords, Token, TokenList, TokenMint, TokenMinted, TokensGroup } from './token.ts';

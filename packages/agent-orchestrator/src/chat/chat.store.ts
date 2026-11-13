@@ -5,9 +5,9 @@
  * read mark (`read.json`, written whole by the person's verb alone), the questions of hers the keeper saw waiting on the person
  * (`asks.jsonl`, appended by the keeper's record alone), their answers to them (`answers.jsonl`, appended by the person's verb alone)
  * the keeper's marks of each answer owed no longer (`answers-done.jsonl`, appended by the delivery alone) and its marks of an ask
- * whose call is gone or asking again (`asks-closed.jsonl`, appended by the keeper's record alone), and the names the person allowed
- * an agent to speak under in the chat (`speakers.json`, written whole by the person's commands alone, `speakers.verb.ts`). One writer
- * each, composed on read; none is ever rewritten but the read mark and the speakers, which their one writer replaces.
+ * whose call is gone or asking again (`asks-closed.jsonl`, appended by the keeper's record alone). One writer each, composed on read;
+ * none is ever rewritten but the read mark, which its one writer replaces. The names the person once allowed an agent to speak under
+ * (`speakers.json`) are read no more, an agent speaking with a token of its own: the file is left where it is, unread.
  *
  * Beneath the controllers: it imports no runtime.
  */
@@ -33,9 +33,6 @@ export const stopsFile = (dir: string): string => path.join(chatDir(dir), 'stops
 /** The person's read mark. */
 export const readMarkFile = (dir: string): string => path.join(chatDir(dir), 'read.json');
 
-/** The names the person allowed an agent to speak under in the chat. */
-export const speakersFile = (dir: string): string => path.join(chatDir(dir), 'speakers.json');
-
 /** The asks the keeper saw waiting on the person — her questions and her session's permissions — one ask a line. */
 export const asksFile = (dir: string): string => path.join(chatDir(dir), 'asks.jsonl');
 
@@ -60,10 +57,6 @@ const SpeakerSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('person') }),
 ]);
 const OutboxSchema = Schema.Struct({ id: Moment, at: Moment, text: Schema.String, from: Schema.optionalKey(SpeakerSchema) });
-/** Written back whole, so a key a newer writer adds is kept. */
-const SpeakersSchema = Schema.StructWithRest(Schema.Struct({ allowed: Schema.Array(Moment) }), [
-  Schema.Record(Schema.String, Schema.Unknown),
-]);
 const DeliveredSchema = Schema.Struct({ id: Moment, said: Moment, attempt: Schema.Finite });
 const ReadSchema = Schema.Struct({ through: Moment, at: Moment });
 
@@ -207,39 +200,6 @@ export const appendDelivered = (dir: string, mark: DeliveredMark): void => appen
 
 /** Appends a turn the person stopped. `chatStop` is its one writer. */
 export const appendStop = (dir: string, stop: SourceStop): void => appendLine(stopsFile(dir), stop);
-
-/**
- * The names the person allowed an agent to speak under in the chat: none where there is no file. Refused (`Invalid`) where the file does
- * not read as the list, naming it.
- */
-export const readSpeakers = (dir: string): string[] => [...speakersRead(dir).allowed];
-
-/** The speakers file as it reads, every key of it: an empty list where there is none. Refused as `readSpeakers` says. */
-function speakersRead(dir: string): (typeof SpeakersSchema)['Type'] {
-  const text = textOf(speakersFile(dir));
-  if (text === undefined) return { allowed: [] };
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    raw = undefined;
-  }
-  const read = Schema.decodeUnknownResult(SpeakersSchema)(raw);
-  if (Result.isSuccess(read)) return read.success;
-  throw new Invalid({
-    message: `${speakersFile(dir)} is not the list of names allowed to speak in the chat: move it aside and allow each name again with \`nemia chat allow <name>\`.`,
-  });
-}
-
-/**
- * Writes the names the person allowed whole, through a hidden file renamed over it, keeping each other key the file holds. The person's
- * commands are its one writer.
- */
-export function writeSpeakers(dir: string, allowed: readonly string[]): void {
-  const kept = speakersRead(dir);
-  fs.mkdirSync(chatDir(dir), { recursive: true });
-  writeWhole(speakersFile(dir), `${JSON.stringify({ ...kept, allowed })}\n`);
-}
 
 /** Writes the person's read mark whole, through a hidden file renamed over it. The person's verb is its one writer. */
 export function writeReadMark(dir: string, mark: ReadMark): void {

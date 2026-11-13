@@ -477,14 +477,13 @@ export { RETRY } from './retry/commands.verb.ts';
 export { SAY } from './say/commands.verb.ts';
 export { APPROVE } from './gate/commands.verb.ts';
 /**
- * Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, an agent's rules for auto, what they
- * reach, and the names an agent may speak under in her chat.
+ * Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, an agent's rules for auto, and what
+ * they reach.
  */
 export { LEVEL } from './nemia/level.verb.ts';
 export { MEMORY } from './nemia/memory.verb.ts';
 export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
 export { POLICY_REACH } from './reach/reach.verb.ts';
-export { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './chat/speakers.verb.ts';
 /**
  * The definitions' entries the api calls by type, each with its `input`: the agents listed, read as a card, written, removed,
  * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder

@@ -3,7 +3,7 @@
  * factory's (`NemiaLevelSet`); the facts she keeps (`NemiaMemory`); an agent's rules for auto (`PolicyList`), a rule confirmed as the
  * person read it (`PolicyRuleConfirm`), the agent's proposal (`PolicyProposal`) and what its rules reach (`PolicyReach`); her chat — a
  * page of it (`ChatHistory`), each event (`ChatEvent`), what is sent, answered, read and stopped, the stream's frames
- * (`ChatStreamEvent`), and the names an agent may speak under (`ChatSpeakers`); and her custom instructions (`NemiaInstructions`).
+ * (`ChatStreamEvent`); and her custom instructions (`NemiaInstructions`).
  *
  * The orchestrator's verbs answer these shapes, its types assignable to each: a key the verb answers and the Schema does not say would be
  * dropped from the wire, so each says every key.
@@ -227,10 +227,6 @@ export const PolicyReach = Schema.Struct({
 });
 export type PolicyReach = typeof PolicyReach.Type;
 
-/** The names the person allowed an agent to speak under in her chat, as `nemia chat speakers` lists them and each write answers. */
-export const ChatSpeakers = Schema.Struct({ allowed: Schema.Array(Schema.String) });
-export type ChatSpeakers = typeof ChatSpeakers.Type;
-
 /** One choice of a question: what it reads as, what it means, and whether she recommended it. */
 export const AskOption = Schema.Struct({ label: Schema.String, description: Schema.String, recommended: Schema.Boolean });
 
@@ -332,13 +328,17 @@ export const ChatHistoryQuery = {
   limit: Schema.optionalKey(Schema.String),
 };
 
-/** Who wrote words to her: the person, from the board, or an agent under a name the person allowed. */
+/** Who wrote words to her: the person, or an agent under its own name, as the token that sent them says. */
 export const ChatSpeaker = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('person') }),
   Schema.Struct({ kind: Schema.Literal('agent'), name: Schema.String }),
 ]);
 
-/** Words sent to her: the words, and who wrote them (none is the person). */
+/**
+ * Words sent to her: the words, and `from`, retired: who wrote them is the caller the request's token says. A `from` naming an agent is
+ * refused (422), naming the token an agent speaks with (`nemia token add <name> --agent <agent>`); one naming the person is read no
+ * further.
+ */
 export const ChatSend = Schema.Struct({ text: Schema.String, from: Schema.optionalKey(ChatSpeaker) });
 
 /** Words as her outbox keeps them: its id, when, the words, and the agent that wrote them where one did. */

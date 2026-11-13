@@ -46,7 +46,6 @@ import { DAEMON } from '../daemon/daemon.verb.ts';
 import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { POLICY_ENTRIES } from '../auto/auto.verb.ts';
-import { CHAT_SPEAKER_ENTRIES } from '../chat/speakers.verb.ts';
 import { POLICY_REACH } from '../reach/reach.verb.ts';
 
 /** The reads of the store, in the order `nemia`'s help lists them. */
@@ -92,7 +91,6 @@ export const COMMANDS: readonly (Command | Served)[] = [
   MEMORY,
   ...POLICY_ENTRIES,
   POLICY_REACH,
-  ...CHAT_SPEAKER_ENTRIES,
   ...SERVICE_COMMANDS,
   ...NEEDS_COMMANDS,
   ...TOKEN_COMMANDS,

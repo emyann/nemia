@@ -1,79 +1,40 @@
 /**
  * Who speaks to a step's session (agent-orchestrator, src/chat/chat.ts and src/say/say.ts): `nemia say` and the api's
- * `POST /api/namespaces/:namespace/runs/:name/steps/:step/say`. Who the words are from (`stepSpeaker`), off the caller the request is
- * (a session's token, or none: `Caller`), who the words say they are from (`from`) and the names the person allowed in her chat
- * (`nemia chat allow`, the same list); the words the session is handed (`framedForStep`); and who the words a step's journal holds
- * are from, read back off them (`saidBy`), so the board draws an agent's apart from the person's with nothing kept beside the journal.
+ * `POST /api/namespaces/:namespace/runs/:name/steps/:step/say`, and to her chat (`chatSay`), which takes its speaker from the same rule.
+ * Who the words are from (`stepSpeaker`), off the caller the request's token says (`Caller`): the person under any token they hold, an
+ * agent under its standing token, a session under the token its run gave it; the words the session is handed (`framedForStep`); and who
+ * the words a step's journal holds are from, read back off them (`saidBy`), so the board draws an agent's apart from the person's with
+ * nothing kept beside the journal.
  *
- * The laws are the card's: an agent's words are never said nor shown as the person's; a session that presents its token speaks as
- * its own agent and as no one else; an agent with no token speaks only under a name the person allowed, as in her chat; and the
- * person's words reach a step as they always did, byte for byte. The words of each refusal are nobody's law, only its kind.
+ * The laws are the card's: an agent's words are never said nor shown as the person's; an agent, by a session's token or a standing one,
+ * speaks as its own agent and as no one else; the person speaks as the person; and the person's words reach a step as they always did,
+ * byte for byte. No word of the request says who it is from: the token does.
  *
- * Where a step's rule departs from her chat's: the person's words are taken from anywhere, not from the board alone, since the person
- * types `nemia say` in a shell as often as on the board; and a session's own name, which the store filed it under and its token
- * proves, is on no list and refused for no reserved word (Nemia's own session speaks to a step as `nemia`).
+ * Where a step's rule departs from her chat's: a session's own name, which the store filed it under and its token proves, is refused for
+ * no reserved word (Nemia's own session speaks to a step as `nemia`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { Caller } from './proposal-approval.contract.ts';
-import { AGENT_OPENS, AGENT_WRITES, framedFor, type Speaker, type SpeakerRefused, speakerNameRefusal } from '../src/chat/chat.ts';
+import { AGENT_OPENS, AGENT_WRITES, framedFor, type Speaker } from '../src/chat/chat.ts';
 
-/** Whether the caller is a session that presents its token and names no one but itself, the agent the store filed it under. */
-const isItself = (caller: Caller, from: Speaker | undefined): boolean =>
-  caller.kind === 'agent' && (from === undefined || (from.kind === 'agent' && from.name === caller.agent));
-
-/** Whether `from` is an agent under a name an agent speaks under (`speakerNameRefusal`, the chat's own). */
-const wellNamed = (from: Speaker | undefined): boolean => from?.kind === 'agent' && speakerNameRefusal(from.name) === undefined;
-
-const stepSpeakerSpec = spec<(caller: Caller, from: Speaker | undefined, allowed: readonly string[]) => Speaker | SpeakerRefused>({
+const stepSpeakerSpec = spec<(caller: Caller) => Speaker>({
   ensures: {
-    aSessionIsItself: {
+    anAgentIsItself: {
       description:
-        'A session that presents its token, naming no one or itself, speaks as its own agent under the name its token proves, whatever the person allowed',
-      condition: ({ input: [caller, from], output }) =>
-        !isItself(caller, from) || (caller.kind === 'agent' && output.kind === 'agent' && output.name === caller.agent),
+        'An agent — a session by the token its run gave it, or an agent by a standing token the person minted for it — speaks as its own agent, under the name its token proves',
+      condition: ({ input: [caller], output }) => caller.kind !== 'agent' || (output.kind === 'agent' && output.name === caller.agent),
     },
-    aSessionIsNeverThePerson: {
-      description: 'A session that presents its token is never taken as the person',
+    anAgentIsNeverThePerson: {
+      description: 'An agent’s token is never taken as the person',
       condition: ({ input: [caller], output }) => caller.kind !== 'agent' || output.kind !== 'person',
     },
-    aSessionNamesNoOther: {
-      description: 'A session that presents its token and says it is someone else — the person or another agent — is refused as Invalid',
-      condition: ({ input: [caller, from], output }) =>
-        caller.kind !== 'agent' || from === undefined || isItself(caller, from) || output.kind === 'Invalid',
-    },
-    thePersonByDefault: {
-      description: 'Words with no token that name no one are the person’s, from the board or from a shell, as every say was before',
-      condition: ({ input: [caller, from], output }) => caller.kind !== 'person' || from !== undefined || output.kind === 'person',
-    },
-    thePersonNamed: {
-      description: 'Words with no token that say they are the person’s are the person’s',
-      condition: ({ input: [caller, from], output }) => caller.kind !== 'person' || from?.kind !== 'person' || output.kind === 'person',
-    },
-    aBadNameIsInvalid: {
-      description: 'An agent with no token, under a name no agent speaks under, is refused as Invalid, whatever the person allowed',
-      condition: ({ input: [caller, from], output }) =>
-        caller.kind !== 'person' || from?.kind !== 'agent' || wellNamed(from) || output.kind === 'Invalid',
-    },
-    unallowedIsConflict: {
-      description: 'An agent with no token, under a name the person has not allowed with `nemia chat allow`, is refused as Conflict',
-      condition: ({ input: [caller, from, allowed], output }) =>
-        caller.kind !== 'person' || from?.kind !== 'agent' || !wellNamed(from) || allowed.includes(from.name) || output.kind === 'Conflict',
-    },
-    allowedIsItsName: {
-      description: 'An agent with no token, under a name the person allowed, speaks under that name',
-      condition: ({ input: [caller, from, allowed], output }) =>
-        caller.kind !== 'person' ||
-        from?.kind !== 'agent' ||
-        !wellNamed(from) ||
-        !allowed.includes(from.name) ||
-        (output.kind === 'agent' && output.name === from.name),
+    thePersonIsThePerson: {
+      description: 'The person, under any token they hold — the board’s, a shell’s — speaks as the person',
+      condition: ({ input: [caller], output }) => caller.kind !== 'person' || output.kind === 'person',
     },
   },
 });
-/**
- * `stepSpeaker`'s type, which `src/chat/chat.ts` takes, beside her chat's rule it reuses: who words to a step's session are from, or why
- * they are refused.
- */
+/** `stepSpeaker`'s type, which `src/chat/chat.ts` takes: who words to a step's session, or to her chat, are from, by the caller's token. */
 export type StepSpeaker = Implementation<typeof stepSpeakerSpec>;
 
 const framedForStepSpec = spec<(speaker: Speaker, text: string) => string>({

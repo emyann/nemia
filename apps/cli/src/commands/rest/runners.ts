@@ -6,7 +6,7 @@
 import type { RestCommand } from 'objects';
 import type { Runner } from '../runner.ts';
 import { passes, series } from './meters.ts';
-import { chatAllow, chatDisallow, chatSpeakers, level } from './nemia.ts';
+import { level } from './nemia.ts';
 import { boardLink, pairingsApprove, pairingsLs } from './pairing.ts';
 import { concluded, logs, memory } from './reads.ts';
 import { stats } from './stats.ts';
@@ -24,9 +24,6 @@ export const REST_RUNNERS: Readonly<Record<RestCommand, Runner>> = {
   unsubscribe,
   level,
   memory,
-  'chat speakers': chatSpeakers,
-  'chat allow': chatAllow,
-  'chat disallow': chatDisallow,
   'pairings ls': pairingsLs,
   'pairings approve': pairingsApprove,
   'board link': boardLink,

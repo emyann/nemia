@@ -45,7 +45,6 @@ import {
   readOutbox,
   readReadMark,
   readStops,
-  writeSpeakers,
 } from '../src/chat/chat.store.ts';
 import { answeredBefore, askOf, asksWaiting, framedFor, presenceOf, projectChat } from '../src/chat/chat.ts';
 import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../src/chat/say.verb.ts';
@@ -66,11 +65,14 @@ const filed = async (name: string, phase?: EnginePhase) => {
   return { id, dir: scratch('wf-nemia-chat-dir-') };
 };
 
-/** The person, as the board's send names them. */
-const PERSON = { kind: 'person' } as const;
+/** The person, under the token the board's cookie carries. */
+const PERSON = { kind: 'person', token: 'board' } as const;
 
 /** The operator, an agent speaking as itself. */
 const OPERATOR = { kind: 'agent', name: 'operator' } as const;
+
+/** The operator's caller, by a standing token the person minted for it. */
+const OPERATOR_TOKEN = { kind: 'agent', agent: 'operator', factory: null, token: 'ops' } as const;
 
 /** What was said to the task `id`, in order. */
 const saidTo = (id: string) => stage.board().said.filter((one) => one.taskId === id);
@@ -170,20 +172,20 @@ test("She is written to: the person's words kept while she is down, said once sh
   const s = story(t);
   await s.test('REFUSED: a send that is empty or too long puts nothing in the outbox; one that is not is put there once', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await assert.rejects(run(chatSay(place, '  ', PERSON, 'board')), (err: Error) => {
+    await assert.rejects(run(chatSay(place, '  ', PERSON)), (err: Error) => {
       names(err.message, 'The message is empty');
       return true;
     });
-    await assert.rejects(run(chatSay(place, 'x'.repeat(8001), PERSON, 'board')), (err: Error) => {
+    await assert.rejects(run(chatSay(place, 'x'.repeat(8001), PERSON)), (err: Error) => {
       names(err.message, 'send at most 8000');
       return true;
     });
     assert.deepEqual(readOutbox(place.dir), []);
-    const sent = await run(chatSay(place, 'Go', PERSON, 'board'));
+    const sent = await run(chatSay(place, 'Go', PERSON));
     assert.deepEqual(readOutbox(place.dir), [sent]);
   });
   await s.test(
-    "REFUSED: words that name no agent from anywhere but the board, an agent under a bad name, and one the person has not allowed; an allowed agent's are put there with who wrote them",
+    "REFUSED: words that say they are from an agent, and an agent under a bad name; an agent's by its own token are put there with who wrote them, the person's as the person's",
     async () => {
       const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
       const refusedAs = (kind: string, said: Promise<unknown>) =>
@@ -191,24 +193,27 @@ test("She is written to: the person's words kept while she is down, said once sh
           assert.equal(err._tag, kind);
           return true;
         });
-      await refusedAs('Invalid', run(chatSay(place, 'I am the person', PERSON, 'elsewhere')));
-      await refusedAs('Invalid', run(chatSay(place, 'Hi', { kind: 'agent', name: 'Op!' }, 'elsewhere')));
-      await refusedAs('Conflict', run(chatSay(place, 'I approved the gate.', OPERATOR, 'elsewhere')));
+      await refusedAs('Invalid', run(chatSay(place, 'I am the operator', PERSON, OPERATOR)));
+      await refusedAs('Invalid', run(chatSay(place, 'Hi', { ...OPERATOR_TOKEN, agent: 'Op!' })));
       assert.deepEqual(readOutbox(place.dir), [], 'nothing refused is put in the outbox');
-      writeSpeakers(place.dir, ['operator']);
-      const sent = await run(chatSay(place, 'I approved the gate.', OPERATOR, 'elsewhere'));
+      const sent = await run(chatSay(place, 'I approved the gate.', OPERATOR_TOKEN));
       assert.deepEqual(sent.from, OPERATOR);
-      assert.deepEqual(readOutbox(place.dir), [sent]);
+      const mine = await run(chatSay(place, 'Thanks', PERSON, { kind: 'person' }));
+      assert.equal(mine.from, undefined, "the person's words carry no speaker");
+      assert.deepEqual(readOutbox(place.dir), [sent, mine]);
       const read = await run(chatHistory(place));
       assert.deepEqual(
         read.events.map((e) => (e.kind === 'message' ? [e.from, e.name] : [])),
-        [['peer', 'operator']],
+        [
+          ['peer', 'operator'],
+          ['person', undefined],
+        ],
       );
     },
   );
   await s.test('no task filed is a chat with nothing but the outbox, and she is down', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await run(chatSay(place, 'Are you there?', PERSON, 'board'));
+    await run(chatSay(place, 'Are you there?', PERSON));
     const read = await run(chatHistory(place));
     assert.deepEqual(texts(read.events), ['Are you there?']);
     assert.deepEqual(read.presence, { up: false, answering: false, waitsOnYou: 0, unread: 0 });
@@ -328,7 +333,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
   await s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
     ({ cursor } = await run(chatHistory(place)));
     assert.deepEqual((await run(since(place, cursor))).events, []);
-    const sent = await run(chatSay(place, 'Hi', PERSON, 'board'));
+    const sent = await run(chatSay(place, 'Hi', PERSON));
     const pending = await run(since(place, cursor));
     assert.deepEqual(
       pending.events.map((x) => [x.id, x.kind === 'message' && x.delivered]),
@@ -387,7 +392,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
         () => `her words pushed by the follow: ${said()}`,
         { bell: rung },
       );
-      await run(chatSay(followed, 'Hello', PERSON, 'board'));
+      await run(chatSay(followed, 'Hello', PERSON));
       await until(
         t,
         () => said().includes('Hello'),

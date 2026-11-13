@@ -6,19 +6,22 @@ import { attachedFiles, DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { heard, OUT, store } from '../world.ts';
 
-/** What the operator, an agent the person allowed, tells draft's running session. */
+/** What the operator, an agent the person minted a token for, tells draft's running session. */
 const WORDS = 'Keep the outline to five sections.';
+
+/** The name of the operator's standing token, minted for the page and retired after it. */
+const OPS_TOKEN = 'e2e-say-peer-ops';
 
 /** The words as the session is handed them: in the frame that names the agent, never as the person's. */
 const FRAMED = `The agent operator writes, not the person: ${WORDS}`;
 
 export default {
   /**
-   * Another agent's words to a step's running session: the person allows `operator` (`nemia chat allow`, planted as it writes the list),
-   * the operator posts words with `from` naming itself, the session's say file hears them in the frame that names it, and the step's
-   * conversation draws them at the left in a ringed bubble under `operator · agent`, unframed and once, never as the person's. It takes
-   * its writes back — the list, draft's task journal, the engine's feed, its conversation and its say file, as `say` does — so each page
-   * after it reads the store as seeded.
+   * Another agent's words to a step's running session: the person mints `operator` a standing token of its own (`POST /api/tokens`, as
+   * `nemia token add <name> --agent operator` does), the operator posts words with it and names no one, the session's say file hears them
+   * in the frame that names it, and the step's conversation draws them at the left in a ringed bubble under `operator · agent`, unframed
+   * and once, never as the person's. It takes its writes back — the token, draft's task journal, the engine's feed, its conversation and
+   * its say file, as `say` does — so each page after it reads the store as seeded.
    */
   name: 'say-peer',
   route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
@@ -32,20 +35,19 @@ export default {
     const seeded = fs.readFileSync(journal, 'utf8');
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
-    const speakers = path.join(store!, 'nemia', 'chat', 'speakers.json');
-    const speakersBefore = fs.existsSync(speakers) ? fs.readFileSync(speakers, 'utf8') : null;
-    const chatHome = path.join(store!, 'nemia');
-    const chatHomeBefore = fs.existsSync(chatHome);
+    const tokens = new URL('/api/tokens', page.url()).href;
     try {
-      fs.mkdirSync(path.dirname(speakers), { recursive: true });
-      fs.writeFileSync(speakers, `${JSON.stringify({ allowed: ['operator'] })}\n`);
+      const minted = await page.request.post(tokens, { data: { name: OPS_TOKEN, agent: 'operator' } });
+      if (minted.status() !== 201)
+        throw new Refused(`the person mints the operator a token of its own — it answered ${minted.status()}: ${await minted.text()}`);
+      const { token } = (await minted.json()) as { token: string };
       const before = heard.length;
       const answered = await page.request.post(
         new URL(`/api/namespaces/default/runs/${SAYING.run}/steps/${SAYING.step}/say`, page.url()).href,
-        { data: { text: WORDS, from: { kind: 'agent', name: 'operator' } } },
+        { data: { text: WORDS }, headers: { authorization: `Bearer ${token}` } },
       );
       if (answered.status() !== 202)
-        throw new Refused(`the api takes an allowed agent's words — it answered ${answered.status()}: ${await answered.text()}`);
+        throw new Refused(`the api takes an agent's words by its own token — it answered ${answered.status()}: ${await answered.text()}`);
       const entry = (await answered.json()) as { text?: unknown; from?: unknown; words?: unknown };
       if (
         entry.text !== FRAMED ||
@@ -73,9 +75,7 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `say-peer-told-${await themeOf(page)}.png`), { fullPage: true });
     } finally {
-      if (speakersBefore !== null) fs.writeFileSync(speakers, speakersBefore);
-      else if (chatHomeBefore) fs.rmSync(speakers, { force: true });
-      else fs.rmSync(chatHome, { recursive: true, force: true });
+      await page.request.delete(`${tokens}/${OPS_TOKEN}`);
       fs.writeFileSync(journal, seeded);
       fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);

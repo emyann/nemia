@@ -1,7 +1,7 @@
 /**
  * The runners of the run's verbs that answer a step: `nemia retry` (the Run's `retry`), `nemia approve` (`approve`) and `nemia say`
  * (`say`). A person's `--answer`s are resolved here against the questions the step's current try asks (`answers.ts`), `--budget
- * <step>=<amount>` read into the `budgets` the api takes, and who says the words is the caller the request is, by its session token,
+ * <step>=<amount>` read into the `budgets` the api takes, and who says the words is the caller the request is, by the token it presents,
  * which the api reads. Each prints the lines the old path printed, from what the api answers.
  */
 import {
@@ -187,14 +187,16 @@ export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSai
     .map((line) => `   ${line}`),
 ];
 
-/** `nemia say <runId> <step> [--as <name>] <words...>`: the words to the step's running session, from the caller the token says. */
+/**
+ * `nemia say <runId> <step> <words...>`: the words to the step's running session, from the caller the token says. `--as`, retired, never
+ * reaches here: its words' check refuses it (`SAY_WORDS`).
+ */
 export async function say(args: Args): Promise<number> {
   const command = SAY_WORDS.name;
   const runId = runOf(args);
   const step = textArg(args, 'step') ?? '';
-  const as = textArg(args, 'as');
   const namespace = await namespaceOfRun(command, runId);
-  const payload = { text: textArg(args, 'text') ?? '', ...(as !== undefined ? { from: { kind: 'agent' as const, name: as } } : {}) };
+  const payload = { text: textArg(args, 'text') ?? '' };
   said(sayLines(await asked(command, (c) => c.runs.say({ params: { namespace, name: runId, step }, payload })), runId, step));
   return 0;
 }

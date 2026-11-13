@@ -25,7 +25,6 @@ import { tokenDigest, tokensDir, mintToken, mintPersonToken, personTokensDir, re
 import { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from '../src/token/commands.verb.ts';
 import { main } from '../src/cli/main.ts';
 import type { Env } from '../src/config/config.store.ts';
-import { writeSpeakers } from '../src/chat/chat.store.ts';
 import { handled, typed } from './typed.ts';
 import { SAY } from '../src/say/commands.verb.ts';
 import { Conflict } from '../src/runner.ts';
@@ -242,25 +241,14 @@ test('nemia token add mints a token for a holder, answered once; ls lists it by 
 });
 
 /**
- * `nemia say` to `runId`'s `implement` as the api takes it from a client in `env`: who calls read off the session token it presents
- * (`sessionCaller`), refused (`Conflict`) where it names no live try, and `--as` the name the words say they are from.
+ * `nemia say` to `runId`'s `implement` as the api takes it from a client presenting `token`: who calls read off the token
+ * (`sessionCaller`, the need the api's routes ask: a token), refused (`Conflict`) where it names no live try, the caller as the api hands
+ * it on.
  */
-const sayAs = async (runId: string, env: Env, ...words: string[]) => {
-  const token = env[SESSION_TOKEN];
-  const caller = await callerBy(token === undefined || token === '' ? undefined : token);
-  if (caller.kind === 'refused') throw new Conflict({ message: `the session's token is refused: ${caller.reason}` });
-  const as = words[0] === '--as' ? words[1] : undefined;
-  const text = (as === undefined ? words : words.slice(2)).join(' ');
-  return stage.runWith(
-    stage.board().e,
-    SAY.handler({
-      runId,
-      step: 'implement',
-      text,
-      caller: caller.kind === 'agent' ? { kind: 'agent', agent: caller.agent, factory: caller.factory } : { kind: 'person' },
-      ...(as === undefined ? {} : { from: { kind: 'agent', name: as } }),
-    }),
-  );
+const sayAs = async (runId: string, token: string, ...words: string[]) => {
+  const caller = await callerBy(token, 'token');
+  if (caller.kind === 'refused') throw new Conflict({ message: `the token is refused: ${caller.reason}` });
+  return stage.runWith(stage.board().e, SAY.handler({ runId, step: 'implement', text: words.join(' '), caller }));
 };
 
 test("`nemia say` from a step's session says its words as its agent's, by the token in its environment; an ended one is refused", async (t) => {
@@ -279,20 +267,21 @@ test("`nemia say` from a step's session says its words as its agent's, by the to
     await pass(id);
     stage.board().settle(`${id}-implement`, 'working');
     token = tokenOf(`${id}-implement`) ?? '';
-    await sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'Start', 'with', 'the', 'parser.');
+    await sayAs(id, token, 'Start', 'with', 'the', 'parser.');
     assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.']);
   });
 
-  await s.test('with no token, `--as` an allowed name frames them under it; the person says them as ever', async () => {
-    writeSpeakers(path.join(ROOT, 'nemia'), ['operator']);
-    await sayAs(id, ENV, '--as', 'operator', 'Cut', 'it.');
-    await sayAs(id, { ...ENV, [SESSION_TOKEN]: '' }, 'Widen', 'it.');
+  await s.test("an agent's standing token frames them under its agent; the person's token says them as ever", async () => {
+    const ops = mintPersonToken(ROOT, 'say-ops', new Date(), { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
+    const laptop = mintPersonToken(ROOT, 'say-laptop');
+    await sayAs(id, ops, 'Cut', 'it.');
+    await sayAs(id, laptop, 'Widen', 'it.');
     assert.deepEqual(heard().slice(1), ['The agent operator writes, not the person: Cut it.', 'Widen it.']);
   });
 
   await s.test('REFUSED: a token whose try ended is a Conflict, never taken as the person, and nothing is said', async () => {
     stage.board().settle(`${id}-implement`, 'failed', { outcome: 'blocked', summary: 'stuck', artifacts: [], needs: null });
-    await assert.rejects(sayAs(id, { ...ENV, [SESSION_TOKEN]: token }, 'hello'), (err: Error & { exitCode?: number }) => {
+    await assert.rejects(sayAs(id, token, 'hello'), (err: Error & { exitCode?: number }) => {
       assert.equal(err.name, 'Conflict');
       assert.equal(err.exitCode, 2);
       return true;

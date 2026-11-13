@@ -207,11 +207,19 @@ export const APPROVE_WORDS = {
   only: { side: 'cli', why: "the api serves it as the Run's `approve` of `objects`' Api, calling this handler" },
 } as const satisfies CommandWords;
 
-/** `nemia say`: words to a step's running session, or kept for its first try; who says them is read off the session's token. */
+/** The refusal of `nemia say --as`, retired: an agent speaks with a token of its own, which says who it is. */
+const SAY_AS_RETIRED =
+  'nemia say --as is retired: an agent speaks with a token of its own, which says who it is. The person mints one with `nemia token add <name> --agent <agent>`, and the agent sends its words with it, no --as.';
+
+/**
+ * `nemia say`: words to a step's running session, or kept for its first try; who says them is read off the token the client presents.
+ * `--as`, the name an agent once spoke under, is retired: still read, so it is refused naming the token an agent speaks with, never
+ * taken as words.
+ */
 export const SAY_WORDS = {
   name: 'say',
   served: [{ endpoint: 'runs.say' }],
-  usage: '<runId> <step> [--as <name>] "<words>"',
+  usage: '<runId> <step> "<words>"',
   help: [
     "tell a step's running session something, through its harness: the",
     "engine journals the words on the step's task, nemia ls notes the step",
@@ -220,10 +228,10 @@ export const SAY_WORDS = {
     'Words to a step not filed yet (waiting on --after, a hold or an',
     'earlier step) are kept, not delivered: its first try is handed them,',
     'as ## Said before you started, and no try after it.',
-    "Words from a session its run filed are its agent's, by its token",
-    '(WF_SESSION_TOKEN); an agent with none says --as <name> before its',
-    "words, a name the person allowed with nemia chat allow. An agent's",
-    'words reach the step under its name, never as yours',
+    'Words are from whoever holds the token sent: a session its run filed',
+    'speaks as its agent (WF_SESSION_TOKEN), an agent given a token of its',
+    'own (nemia token add <name> --agent <agent>) as that agent. An',
+    "agent's words reach the step under its name, never as yours",
   ],
   spec: {
     positionals: [
@@ -236,12 +244,12 @@ export const SAY_WORDS = {
         flag: '--as',
         kind: 'name',
         key: 'as',
-        takes:
-          '--as takes the name an agent with no session token speaks under, one the person allowed: nemia say <runId> <step> --as <name> "<words>".',
+        takes: SAY_AS_RETIRED,
       },
     ],
     unknown: (arg) => `nemia say does not take ${arg}.`,
   },
+  check: (args) => (args['as'] === undefined ? null : SAY_AS_RETIRED),
   writes: true,
   class: 'act',
   only: { side: 'cli', why: "the api serves it as the Run's `say` of `objects`' Api, calling this handler" },

@@ -1,12 +1,12 @@
 /**
  * Who speaks to a long-lived session in its chat (agent-orchestrator, src/chat/chat.ts): the person, or an agent named as itself
- * (`Speaker`). A name an agent may speak under (`speakerNameRefusal`); whether words from a speaker are taken, given where they came
- * from (`Via`, which the api reads off the request) and the names the person allowed (`speakerRefusal`); the words the keeper says
- * them to the session in (`framedFor`); and the person's list of allowed names, one allowed (`withSpeaker`) or taken back
- * (`withoutSpeaker`).
+ * (`Speaker`), which is the caller the request's token says (`stepSpeaker`, step-speaker.contract.ts). A name an agent may speak under
+ * (`speakerNameRefusal`); whether words from a speaker are taken (`speakerRefusal`); whether a request that still says who its words are
+ * from, a field retired for the caller's own token, is refused (`fromRefusal`); and the words the keeper says them to the session in
+ * (`framedFor`).
  *
- * The laws are the card's: an agent's words are never said nor shown as the person's, the person's words come from the board, and an
- * agent speaks only under a name the person allowed. The words of each refusal are nobody's law, only its kind.
+ * The laws are the card's: an agent's words are never said nor shown as the person's, and who speaks is who holds the token, never who
+ * the words say they are from. The words of each refusal are nobody's law, only its kind.
  *
  * The types and constants the laws read are `src/chat/chat.ts`'s, and so is the `speakerNameRefusal` that `speakerRefusal`'s laws read.
  */
@@ -18,15 +18,11 @@ import {
   type Speaker,
   type SpeakerRefused,
   speakerNameRefusal,
-  type Via,
   wellSpelt,
 } from '../src/chat/chat.ts';
 
 /** The characters a name takes, which no law reads (`speakerNameRefusal`'s `open`): declared pure, and nothing more. */
 export const spelt = assume(wellSpelt, { pure: true });
-
-/** Whether no name of `names` is there twice: each differs from every name before it. */
-const distinct = (names: readonly string[]): boolean => names.every((n, i) => !names.slice(0, i).includes(n));
 
 const speakerNameRefusalSpec = spec<(name: string) => string | undefined>({
   /**
@@ -56,34 +52,43 @@ export type SpeakerNameRefusal = Implementation<typeof speakerNameRefusalSpec>;
 /** Whether `speaker` is an agent whose name is one an agent speaks under. */
 const wellNamedAgent = (speaker: Speaker): boolean => speaker.kind === 'agent' && speakerNameRefusal(speaker.name) === undefined;
 
-const speakerRefusalSpec = spec<(speaker: Speaker, via: Via, allowed: readonly string[]) => SpeakerRefused | null>({
+const speakerRefusalSpec = spec<(speaker: Speaker) => SpeakerRefused | null>({
   ensures: {
-    thePersonFromTheBoard: {
-      description: 'The person’s words from the board are taken',
-      condition: ({ input: [speaker, via], output }) => speaker.kind !== 'person' || via !== 'board' || output === null,
-    },
-    thePersonOnlyFromTheBoard: {
-      description: 'Words from anywhere but the board that name no agent are refused as Invalid: they must say who wrote them',
-      condition: ({ input: [speaker, via], output }) => speaker.kind !== 'person' || via === 'board' || output?.kind === 'Invalid',
+    thePersonIsTaken: {
+      description: 'The person’s words are taken, whatever token of theirs carried them: the board’s, a shell’s or a script’s',
+      condition: ({ input: [speaker], output }) => speaker.kind !== 'person' || output === null,
     },
     aBadNameIsInvalid: {
-      description: 'An agent under a name no agent speaks under is refused as Invalid, whatever the person allowed',
+      description: 'An agent under a name no agent speaks under is refused as Invalid',
       condition: ({ input: [speaker], output }) => speaker.kind !== 'agent' || wellNamedAgent(speaker) || output?.kind === 'Invalid',
     },
-    unallowedIsConflict: {
-      description: 'An agent whose name the person has not allowed is refused as Conflict',
-      condition: ({ input: [speaker, , allowed], output }) =>
-        !wellNamedAgent(speaker) || speaker.kind !== 'agent' || allowed.includes(speaker.name) || output?.kind === 'Conflict',
-    },
-    allowedIsTaken: {
-      description: 'An agent whose name the person allowed is taken, from the board or elsewhere',
-      condition: ({ input: [speaker, , allowed], output }) =>
-        !wellNamedAgent(speaker) || speaker.kind !== 'agent' || !allowed.includes(speaker.name) || output === null,
+    aWellNamedAgentIsTaken: {
+      description: 'An agent under a name an agent speaks under is taken: its token says who it is, and no list of the person’s is read',
+      condition: ({ input: [speaker], output }) => !wellNamedAgent(speaker) || output === null,
     },
   },
 });
 /** `speakerRefusal`'s type, which `src/chat/chat.ts` takes. */
 export type SpeakerRefusal = Implementation<typeof speakerRefusalSpec>;
+
+const fromRefusalSpec = spec<(from: Speaker | undefined) => SpeakerRefused | null>({
+  ensures: {
+    anAgentNamedIsInvalid: {
+      description:
+        'Words that say they are from an agent are refused as Invalid: an agent speaks with a token of its own, and words name no one else',
+      condition: ({ input: [from], output }) => from?.kind !== 'agent' || output?.kind === 'Invalid',
+    },
+    thePersonOrNoneIsIgnored: {
+      description: 'Words that name no one, or the person, are refused for nothing: the caller the token says speaks',
+      condition: ({ input: [from], output }) => from?.kind === 'agent' || output === null,
+    },
+  },
+});
+/**
+ * `fromRefusal`'s type, which `src/chat/chat.ts` takes: why a request whose words say who they are from (`from`, retired) is refused, or
+ * null where it is not.
+ */
+export type FromRefusal = Implementation<typeof fromRefusalSpec>;
 
 const framedForSpec = spec<(speaker: Speaker, text: string) => string>({
   ensures: {
@@ -114,46 +119,3 @@ const framedForSpec = spec<(speaker: Speaker, text: string) => string>({
 });
 /** `framedFor`'s type, which `src/chat/chat.ts` takes: the words `text` from `speaker` are said to the session in. */
 export type FramedFor = Implementation<typeof framedForSpec>;
-
-const withSpeakerSpec = spec<(allowed: readonly string[], name: string) => string[]>({
-  requires: ({ input: [allowed] }) => distinct(allowed),
-  ensures: {
-    holdsIt: {
-      description: 'A name the person allows is allowed after',
-      condition: ({ input: [, name], output }) => output.includes(name),
-    },
-    keepsEach: {
-      description: 'Allowing a name takes back no other',
-      condition: ({ input: [allowed], output }) => allowed.every((n) => output.includes(n)),
-    },
-    noOther: {
-      description: 'Allowing a name allows no name besides it',
-      condition: ({ input: [allowed, name], output }) => output.every((n) => n === name || allowed.includes(n)),
-    },
-    once: {
-      description: 'A name allowed twice is listed once',
-      condition: ({ output }) => distinct(output),
-    },
-  },
-});
-/** `withSpeaker`'s type, which `src/chat/chat.ts` takes. */
-export type WithSpeaker = Implementation<typeof withSpeakerSpec>;
-
-const withoutSpeakerSpec = spec<(allowed: readonly string[], name: string) => string[]>({
-  ensures: {
-    holdsNone: {
-      description: 'A name the person takes back is allowed no more',
-      condition: ({ input: [, name], output }) => !output.includes(name),
-    },
-    keepsOthers: {
-      description: 'Taking a name back takes back no other',
-      condition: ({ input: [allowed, name], output }) => allowed.every((n) => n === name || output.includes(n)),
-    },
-    noOther: {
-      description: 'Taking a name back allows nothing new',
-      condition: ({ input: [allowed], output }) => output.every((n) => allowed.includes(n)),
-    },
-  },
-});
-/** `withoutSpeaker`'s type, which `src/chat/chat.ts` takes. */
-export type WithoutSpeaker = Implementation<typeof withoutSpeakerSpec>;

@@ -24,6 +24,7 @@ import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
+import { actorWords } from 'objects';
 
 /** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
 const SEATED = { kind: 'person', token: 'harness' } as const;
@@ -215,7 +216,7 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
       assert.equal(res.status, 202, await res.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(root, R, 'design', 2), 'utf8')) as { mode: string; message: string };
       assert.equal(written.mode, 'continue');
-      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.', SEATED));
+      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.', actorWords(SEATED)));
       assert.ok(written.message.endsWith('Answered by: the person, on harness'), written.message);
 
       const plain = await ask('plain', { mode: 'continue', message: 'Postgres.' });

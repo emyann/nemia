@@ -394,9 +394,7 @@ export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { TOKEN_LEAST, tokenFloor, type FloorRequest } from './admission/floor.verb.ts';
-export { floorOf, type FloorAnswer, type FloorRefusal } from './admission/floor.ts';
-export type { AdmissionEntry } from './admission/admission.ts';
-export { agentClassOf } from './admission/class.ts';
+export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type FloorRefusal } from './admission/index.ts';
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
@@ -567,7 +565,7 @@ export type { CallerOf, PersonTokenFiled, StandingRecord, TokenHolder, TokenNeed
 export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
 export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
 export { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from './token/commands.verb.ts';
-export { credentialKept } from './token/credential.store.ts';
+export { credentialKept } from './token/token.store.ts';
 export { LINK_TTL_MS, PAIRING_TTL_MS, ticketState, type Ticket } from './pairing/ticket.ts';
 export {
   addressKind,

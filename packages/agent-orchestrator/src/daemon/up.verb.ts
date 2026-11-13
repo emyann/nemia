@@ -38,7 +38,7 @@ import { leaseRelease } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
 import { raiseStoreFloor } from '../release/archive.store.ts';
-import { credentialKept } from '../token/credential.store.ts';
+import { credentialKept } from '../token/token.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
 import { upgradeCarries, type Running } from '../release/index.ts';
 import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';

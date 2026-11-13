@@ -5,7 +5,7 @@
  * `nemia retry` and `nemia approve` take (`answerFlag`), what their help says of it (`ANSWER_HELP`) and the values typed (`typedOf`).
  */
 import { Effect } from 'effect';
-import type { Actor } from 'objects';
+import { actorWords, type Actor } from 'objects';
 import type { Args, Flag } from '../command/command.ts';
 import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
@@ -17,8 +17,8 @@ import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
-/** Where a person answered at the terminal, as the words their answers become say it. */
-const AT_THE_TERMINAL = 'at the terminal';
+/** Who answered at the terminal, in-process: the person, and where. */
+const AT_THE_TERMINAL = `${actorWords({ kind: 'person' })}, at the terminal`;
 
 /** How a person says what they mean to a step that asks no questions, at the terminal. */
 const INSTEAD = 'with --message "<words>", without --answer';
@@ -53,7 +53,7 @@ export const typedAnswers = Effect.fn('typedAnswers')(function* (
   const answers = numberedAnswers(questions, typed, `nemia decide ${runId}`);
   const wrong = Array.isArray(answers) ? answerRefusal(questions, answers, INSTEAD) : answers.error;
   if (wrong !== null || !Array.isArray(answers)) return yield* Effect.fail(new Invalid({ message: wrong ?? '' }));
-  const by = actor ?? AT_THE_TERMINAL;
+  const by = actor === undefined ? AT_THE_TERMINAL : actorWords(actor);
   return approval ? approvedAnswerText(step, questions, answers, note, by) : answerText(questions, answers, note, by);
 });
 
@@ -79,7 +79,8 @@ export const givenAnswers = Effect.fn('givenAnswers')(function* (
   const questions = (yield* askedNow(home ?? (yield* StoreRoot), run, step)).flatMap((a) => a.questions);
   const wrong = answerRefusal(questions, answers);
   if (wrong !== null) return yield* Effect.fail(new Invalid({ message: wrong }));
-  return approval ? approvedAnswerText(step, questions, answers, note, actor) : answerText(questions, answers, note, actor);
+  const by = actor === undefined ? undefined : actorWords(actor);
+  return approval ? approvedAnswerText(step, questions, answers, note, by) : answerText(questions, answers, note, by);
 });
 
 /** What `nemia retry`'s and `nemia approve`'s help say of `--answer`. */

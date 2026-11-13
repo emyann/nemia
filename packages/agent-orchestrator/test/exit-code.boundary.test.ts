@@ -43,7 +43,7 @@ test('a refusal exits 2 and prints its sentence: nemia doctor fix of a need noth
 test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relative or empty, exits 2 as the package loads, with its sentence alone, and nothing is written', () => {
   for (const root of ['relative/store', '']) {
     const cwd = scratch('wf-exit-code-root-');
-    const { status, stderr } = wf(root, ['token', 'ls'], cwd);
+    const { status, stderr } = wf(root, ['claude-token', 'status'], cwd);
     assert.equal(status, 2, `WF_ROOT=${root} exits with the refusal's code; it said: ${stderr}`);
     assert.equal(
       stderr,

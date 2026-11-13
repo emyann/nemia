@@ -15,7 +15,7 @@
  * stories write beside the runs, and what they write stays.
  */
 import { root } from '../../test/harness.ts';
-import type { DecideCommand, Decidable } from 'objects';
+import { actorWords, type DecideCommand, type Decidable } from 'objects';
 import { closeoutOf, listedOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -506,7 +506,7 @@ test('a person approves a gate on the board: the need on the list and the detail
       const res = await approveOver('design', { message: 'Go.', answers }, BOARD, id);
       assert.equal(res.status, 202, await res.clone().text());
       const answered = (await res.json()) as Approved;
-      const words = approvedAnswerText('design', [cut, where], answers, 'Go.', SEATED);
+      const words = approvedAnswerText('design', [cut, where], answers, 'Go.', actorWords(SEATED));
       assert.equal(answered.message, words);
       const written = JSON.parse(fs.readFileSync(approvalFile(root, id, 'design', 1), 'utf8')) as { message: string };
       assert.equal(written.message, words);
@@ -592,7 +592,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
       const back = await ask('design', { mode: 'continue', message: 'Cut it smaller.', answers }, asks);
       assert.equal(back.status, 202, await back.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(root, asks, 'design', 2), 'utf8')) as { message: string };
-      assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.', SEATED));
+      assert.equal(written.message, answerText([cut, where], answers, 'Cut it smaller.', actorWords(SEATED)));
       assert.deepEqual(asked(asks), ['retry-design-2']);
     },
   );

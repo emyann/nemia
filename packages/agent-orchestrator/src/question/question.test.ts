@@ -353,14 +353,18 @@ test('answerText and approvedAnswerText', async (t) => {
   });
   await t.test('each says where the person answered: at the terminal when it says so, on the board by default', () => {
     const answers = [{ question: cut.title, chose: ['a'] }];
-    assert.ok(answerText([cut], answers, undefined, 'at the terminal').endsWith('\n\nAnswered by: the person, at the terminal'));
     assert.ok(
-      approvedAnswerText('design', [cut], answers, 'n', 'at the terminal').endsWith('Note: n\n\nAnswered by: the person, at the terminal'),
+      answerText([cut], answers, undefined, 'the person, at the terminal').endsWith('\n\nAnswered by: the person, at the terminal'),
+    );
+    assert.ok(
+      approvedAnswerText('design', [cut], answers, 'n', 'the person, at the terminal').endsWith(
+        'Note: n\n\nAnswered by: the person, at the terminal',
+      ),
     );
     assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
     assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
   });
-  await t.test('each says who answered by the actor the caller is, in its words, where one is handed', () => {
+  await t.test("each says who answered in the actor's words, where they are handed", () => {
     const answers = [{ question: cut.title, chose: ['a'] }];
     const actors: Array<[Actor, readonly string[]]> = [
       [{ kind: 'person', token: 'laptop' }, ['laptop']],
@@ -368,7 +372,10 @@ test('answerText and approvedAnswerText', async (t) => {
       [{ kind: 'agent', agent: 'review', run: 'r-1', step: 'review' }, ['review', 'r-1/review']],
     ];
     for (const [actor, named] of actors) {
-      for (const text of [answerText([cut], answers, undefined, actor), approvedAnswerText('design', [cut], answers, 'n', actor)]) {
+      for (const text of [
+        answerText([cut], answers, undefined, actorWords(actor)),
+        approvedAnswerText('design', [cut], answers, 'n', actorWords(actor)),
+      ]) {
         const last = text.split('\n\n').at(-1) ?? '';
         assert.equal(last, `Answered by: ${actorWords(actor)}`, `the last block is who answered, ${JSON.stringify(actor)}`);
         for (const name of named) assert.ok(last.includes(name), `${last} names ${name}`);

@@ -10,7 +10,6 @@ import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
 import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
-import { actorWords, type Actor } from 'objects';
 
 /** One option of a question: its label, which an answer names, and what choosing it means. */
 export type QuestionOption = { label: string; meaning: string };
@@ -343,15 +342,17 @@ export function answerRefusal(
 }
 
 /**
- * Who answered, as the last of the words a step reads (`Answered by: …`): the caller who sent the answers (objects' `Actor`, in its words,
- * `actorWords`) — the person under the name of their token, an agent by its token or of its session — or, for answers given in-process,
- * where the person gave them (`on the board`, `at the terminal`).
+ * Who answered, in the words a person reads after `Answered by: ` — objects' `actorWords` of the caller who sent the answers (the person
+ * under the name of their token, an agent by its token or of its session), worded by the verb that knows the caller (`asked.verb.ts`), so
+ * this file loads no value of `objects`; or, for answers given in-process, the person and where they gave them.
  */
-export type AnsweredBy = Actor | string;
+export type AnsweredBy = string;
+
+/** Who answered where no caller is handed: the person, on the board (`actorWords` of the person, and where). */
+const ON_THE_BOARD: AnsweredBy = 'the person, on the board';
 
 /** The last line of the words answers become: who answered (`AnsweredBy`). */
-const answeredLine = (by: AnsweredBy): string =>
-  typeof by === 'string' ? `Answered by: ${actorWords({ kind: 'person' })}, ${by}` : `Answered by: ${actorWords(by)}`;
+const answeredLine = (by: AnsweredBy): string => `Answered by: ${by}`;
 
 /**
  * Each question in the order asked, what was chosen with what it means, and the person's own words; then `note`; then who answered
@@ -373,12 +374,8 @@ function answerBlocks(asked: readonly Question[], answers: readonly Answer[], no
  * chosen with what it means, and the person's own words; then `note`, when there is one; and last, who answered (`by`): the caller's actor,
  * or where the person answered in-process, on the board unless the terminal says otherwise.
  */
-export const answerText = (
-  asked: readonly Question[],
-  answers: readonly Answer[],
-  note?: string,
-  by: AnsweredBy = 'on the board',
-): string => ['Answers to your questions:', ...answerBlocks(asked, answers, note, by)].join('\n\n');
+export const answerText = (asked: readonly Question[], answers: readonly Answer[], note?: string, by: AnsweredBy = ON_THE_BOARD): string =>
+  ['Answers to your questions:', ...answerBlocks(asked, answers, note, by)].join('\n\n');
 
 /**
  * The words an approval carries for `answers` to the questions `step` asked at its gate, which `answerRefusal` let through: read under
@@ -390,5 +387,5 @@ export const approvedAnswerText = (
   asked: readonly Question[],
   answers: readonly Answer[],
   note?: string,
-  by: AnsweredBy = 'on the board',
+  by: AnsweredBy = ON_THE_BOARD,
 ): string => [`The person's answers to ${step}'s questions:`, ...answerBlocks(asked, answers, note, by)].join('\n\n');

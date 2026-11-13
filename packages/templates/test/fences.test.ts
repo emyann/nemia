@@ -249,6 +249,8 @@ const READS: Call[] = [
   'git log --oneline -5',
   'git grep -n foo HEAD',
   'git merge-base --is-ancestor a HEAD',
+  'git diff -U0 HEAD...main-worktree/HEAD -- a.ts',
+  'git merge-tree --write-tree --name-only HEAD main-worktree/HEAD',
   'git branch --list',
   'git worktree list',
   'cat README.md',

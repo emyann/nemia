@@ -1475,30 +1475,36 @@ test('parentsWanted and floorRowsOf: the finished runs the floor reads beside th
     const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], context: ['source'] });
     assert.deepEqual(parentsWanted([reader, waiting]), ['done', 'source']);
   });
-  await t.test('the rows are the waiting, then in flight, then the parents read, then the finished page, each id once', () => {
-    const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], createdAt: at(0) });
-    const flying = run([], { id: 'b', after: ['p'], waiting: waitsOn('p'), createdAt: at(1) });
-    const parent = run([], { id: 'p', status: 'succeeded', createdAt: at(2) });
-    const older = run([], { id: 'old', status: 'succeeded', createdAt: at(3) });
-    const rows = floorRowsOf(
-      { waiting: [waiting, waiting], inFlight: [flying, unjudged] },
-      [parent],
-      [{ ...parent }, older, { ...flying }],
-    );
-    assert.deepEqual(
-      rows.map((row) => row.id),
-      ['w', 'b', 'u', 'p', 'old'],
-    );
-    assert.equal(rows[3], parent, 'the first read of an id is the one kept');
-    assert.deepEqual(
-      floorRuns(
-        rows.filter((row): row is RunView => !('unjudged' in row)),
-        false,
-      ).map((r) => r.id),
-      ['w', 'b', 'p'],
-      'with Show finished off, the parent read is a card for its edge, and the finished page brings none',
-    );
-  });
+  await t.test(
+    'the rows are the waiting, then in flight, then the parents read, then the undecided, then the finished page, each id once',
+    () => {
+      const waiting = run(['awaiting approval'], { id: 'w', status: 'failed', waitingOnYou: ['step-0'], createdAt: at(0) });
+      const flying = run([], { id: 'b', after: ['p'], waiting: waitsOn('p'), createdAt: at(1) });
+      const parent = run([], { id: 'p', status: 'succeeded', createdAt: at(2) });
+      const older = run([], { id: 'old', status: 'succeeded', createdAt: at(3) });
+      const undecided = run([], { id: 'ahead', status: 'succeeded', toDecide: merge('ahead', 'wf/ahead/run'), createdAt: at(4) });
+      const rows = floorRowsOf(
+        { waiting: [waiting, waiting], inFlight: [flying, unjudged] },
+        [parent],
+        [undecided],
+        [{ ...parent }, { ...undecided }, older, { ...flying }],
+      );
+      assert.deepEqual(
+        rows.map((row) => row.id),
+        ['w', 'b', 'u', 'p', 'ahead', 'old'],
+      );
+      assert.equal(rows[3], parent, 'the first read of an id is the one kept');
+      assert.equal(rows[4], undecided, 'an undecided run on the finished page too is the undecided read');
+      assert.deepEqual(
+        floorRuns(
+          rows.filter((row): row is RunView => !('unjudged' in row)),
+          false,
+        ).map((r) => r.id),
+        ['w', 'b', 'p', 'ahead'],
+        'with Show finished off, the parent read is a card for its edge, an undecided run a card to decide, and the finished page brings none',
+      );
+    },
+  );
 });
 
 test('runEdges and contextEdges: the edges drawn between cards', async (t) => {

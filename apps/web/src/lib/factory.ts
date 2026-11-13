@@ -248,15 +248,17 @@ export function parentsWanted(rows: readonly ((FloorRun & Pick<RunView, 'context
 
 /**
  * The rows the floor is drawn from (`floorRuns` picks its cards): the light answer's waiting, then its in flight, then the parents read
- * by id (`parentsWanted`), then the page of the finished runs while Show finished is on, each run once, the first read of it kept.
+ * by id (`parentsWanted`), then the finished runs nobody decided (`undecided`), then the page of the finished runs while Show finished is
+ * on, each run once, the first read of it kept.
  */
 export function floorRowsOf<T extends { id: string }>(
   open: { waiting: readonly T[]; inFlight: readonly T[] },
   parents: readonly T[],
+  undecided: readonly T[],
   finished: readonly T[],
 ): T[] {
   const seen = new Set<string>();
-  return [...openRows(open), ...parents, ...finished].filter((row) => !seen.has(row.id) && Boolean(seen.add(row.id)));
+  return [...openRows(open), ...parents, ...undecided, ...finished].filter((row) => !seen.has(row.id) && Boolean(seen.add(row.id)));
 }
 
 /** What a card's live waits are read off: the runs its roots still wait on, and a person's hold. */

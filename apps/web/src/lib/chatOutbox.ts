@@ -57,7 +57,7 @@ export function editKept(text: string): void {
  * What the api said where `failure` is its refusal, an answer with a 4xx status: its own words. Null where nothing answered (the fetch
  * failed) or the api failed (a 5xx): the board lost the daemon.
  */
-export function refusalOf(failure: unknown): string | null {
+function refusalOf(failure: unknown): string | null {
   return failure instanceof WriteRefusal && failure.status >= 400 && failure.status < 500 ? failure.message : null;
 }
 

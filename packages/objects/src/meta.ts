@@ -9,10 +9,13 @@ import { Schema } from 'effect';
 export const API_VERSION = 'nemia/v1';
 
 /**
- * A number that says what it is: `Schema.Number`'s own description never reaches the document, whose JSON side of it is a union with the
- * non-finite words, so it is described as a union of that one member, which reads and writes the same.
+ * A schema that says what it is where its own description never reaches the document: `Schema.Number`, whose JSON side is a union with
+ * the non-finite words, and `Schema.Unknown`, written as `{}`. Described as a union of that one member, which reads and writes the same.
  */
-export const describedNumber = (description: string) => Schema.Union([Schema.Number]).annotate({ description });
+export const describedOne = <S extends Schema.Top>(member: S, description: string) => Schema.Union([member]).annotate({ description });
+
+/** A number that says what it is (`describedOne`). */
+export const describedNumber = (description: string) => describedOne(Schema.Number, description);
 
 /** The namespace an object is in when nobody names one. */
 export const DEFAULT_NAMESPACE = 'default';

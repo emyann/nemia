@@ -10,7 +10,7 @@
  */
 import { Schema } from 'effect';
 import { Actor } from './token.ts';
-import { API_VERSION, listOf } from './meta.ts';
+import { API_VERSION, describedOne, listOf } from './meta.ts';
 import { BODY_PAGE, SHORT_FIELD } from './reads.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
 import { ObjectGraph } from './graph.ts';
@@ -876,7 +876,7 @@ export const StepCloseout = Schema.Struct({
     }),
   ),
   questions: List(Asked).annotate({ description: 'Its questions, by the output field they were asked under, each with its options.' }),
-  raw: Schema.Unknown.annotate({ description: 'The closeout as it came, on a read that names every field (?fields=*); null otherwise.' }),
+  raw: describedOne(Schema.Unknown, 'The closeout as it came, on a read that names every field (?fields=*); null otherwise.'),
   /**
    * The names of the fields of `output` a narrowed read left out (`closeoutNarrowed`, asked with `?fields=`), each to be asked for by
    * name; absent from a whole read.
@@ -956,7 +956,7 @@ export const closeoutNarrowed = (
 /** Why a try's closeout does not read, and what it held (`StepUnreadable`, tries.verb.ts). */
 export const StepUnreadable = Schema.Struct({
   error: Schema.String.annotate({ description: "Why the try's closeout does not read." }),
-  raw: Schema.Unknown.annotate({ description: 'What it held, as it came.' }),
+  raw: describedOne(Schema.Unknown, 'What it held, as it came.'),
 }).annotate({ identifier: 'StepUnreadable' });
 export type StepUnreadable = typeof StepUnreadable.Type;
 

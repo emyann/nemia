@@ -11,12 +11,12 @@ import { ListMeta } from './meta.ts';
  * five adding up to `wallMs`, measured to the instant the run's own `wallMs` is.
  */
 export const RunClock = Schema.Struct({
-  wallMs: Schema.Finite,
-  sessionsMs: Schema.Finite,
-  checksMs: Schema.Finite,
-  personMs: Schema.Finite,
-  slotMs: Schema.Finite,
-  restMs: Schema.Finite,
+  wallMs: Schema.Finite.annotate({ description: "The run's wall time in milliseconds, the sum of the five below." }),
+  sessionsMs: Schema.Finite.annotate({ description: 'The milliseconds its sessions were at work.' }),
+  checksMs: Schema.Finite.annotate({ description: 'The milliseconds its checks were at work.' }),
+  personMs: Schema.Finite.annotate({ description: "The milliseconds it waited on a person's turn." }),
+  slotMs: Schema.Finite.annotate({ description: 'The milliseconds it waited for a run slot.' }),
+  restMs: Schema.Finite.annotate({ description: 'The rest of its wall time, none of the four above.' }),
 }).annotate({ identifier: 'RunClock' });
 export type RunClock = typeof RunClock.Type;
 
@@ -27,7 +27,18 @@ export type RunClock = typeof RunClock.Type;
  */
 export const RunListMeta = Schema.Struct({
   ...ListMeta.fields,
-  counts: Schema.optionalKey(Schema.Struct({ waiting: Schema.Finite, inFlight: Schema.Finite, finished: Schema.Finite })),
-  asOf: Schema.optionalKey(Schema.String),
-}).annotate({ identifier: 'RunListMeta' });
+  counts: Schema.optionalKey(
+    Schema.Struct({ waiting: Schema.Finite, inFlight: Schema.Finite, finished: Schema.Finite }).annotate({
+      description:
+        'How many runs of its namespace and labels are in each state, counted before its fieldSelector and its page; on a list asked by state alone.',
+    }),
+  ),
+  asOf: Schema.optionalKey(
+    Schema.String.annotate({ description: "The instant its runs' durations are measured to; on a list asked by state alone." }),
+  ),
+}).annotate({
+  identifier: 'RunListMeta',
+  description:
+    "A page of runs' metadata: where the page stands, and on a list asked by state, its counts per state and the instant it is measured to.",
+});
 export type RunListMeta = typeof RunListMeta.Type;

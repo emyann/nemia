@@ -19,8 +19,8 @@ orchestrator, the api, the board and the client import it through its one entry,
   read holds no comment. A field that is another schema whole (a bare `$ref` in the document) keeps no word of its own, so that
   schema's own `description` says it, set where it is defined: annotated where it is used, a schema with an `identifier` becomes a
   second component, `<Name>_1`, whose every field is owed again. On a schema that takes a `.check(…)`, the description goes before the
-  check: after it, the document drops it. So does `Schema.Number`, whose own description never reaches the document: a number is described by
-  `describedNumber` (`src/meta.ts`). `test/described.test.ts` counts the properties still said nowhere, per schema, in `test/described.baseline.json`,
+  check: after it, the document drops it. So does `Schema.Number`'s own description, and `Schema.Unknown`'s: a number is described by
+  `describedNumber`, an unknown by `describedOne` (`src/meta.ts`). `test/described.test.ts` counts the properties still said nowhere, per schema, in `test/described.baseline.json`,
   which only shrinks: describe a field and lower its count in the same commit (`node test/described.test.ts --print` prints today's).
 
 - **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same

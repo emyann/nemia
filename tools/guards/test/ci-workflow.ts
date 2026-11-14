@@ -26,6 +26,15 @@ export const LEGS = 'test';
 /** The job whose matrix holds the e2e's shards: one shard of the pages each. */
 export const E2E = 'e2e';
 
+/**
+ * The job that runs the look's browser tests (`apps/web/test/e2e/*.test.ts`) once per push, beside the shards, which run none: the look's
+ * tests each build the stories page and launch Chromium, and run in every shard they cost four times what they prove once.
+ */
+export const LOOK = 'e2e-look';
+
+/** The e2e's flag that runs the look's tests (`planOf`, `apps/web/test/e2e/pages.ts`): the look job passes it, and a shard never does. */
+export const LOOK_FLAG = '--look';
+
 /** The job that sums every shard's page time against the bound a whole e2e run is held to. */
 export const BOUND = 'e2e-bound';
 

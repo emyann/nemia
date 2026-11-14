@@ -18,27 +18,44 @@ import { digestOf } from '../../revisions/revisions.ts';
  */
 export type RulesRead = { words: string | null; error: string | null };
 
-/** The folder the store keeps for the factory `name`, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name (`Invalid`). */
+/**
+ * The folder the store keeps for the factory `name`, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name (`Invalid`).
+ * @param home The store's root ($WF_ROOT).
+ * @param name The factory's name.
+ */
 export const rulesFolder = (home: string, name: string): string => rulesFolderAt(home, name);
 
-/** The folder the store `home` keeps for the factory `name` (`rulesFolder`). Refused: a bad name (`Invalid`). */
+/**
+ * The folder the store `home` keeps for the factory `name` (`rulesFolder`). Refused: a bad name (`Invalid`).
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function rulesFolderAt(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name);
 }
 
-/** The file the rules of `factory` are kept in (`rulesFile`): its tree's, or the store's folder's for its name. */
+/**
+ * The file the rules of `factory` are kept in (`rulesFile`): its tree's, or the store's folder's for its name.
+ * @param home The store's root ($WF_ROOT).
+ * @param factory The factory: its name, and its tree where it was made from a template.
+ */
 export const rulesAt = (home: string, factory: Pick<Factory, 'name' | 'tree'>): string =>
   rulesFile(factory, rulesFolder(home, factory.name));
 
-/** The file the rules of `factory` are kept in, in the store `home` (`rulesAt`). */
+/**
+ * The file the rules of `factory` are kept in, in the store `home` (`rulesAt`).
+ * @param home The store's root.
+ * @param factory The factory: its name, and its tree where it was made from a template.
+ */
 export const rulesAtHome = (home: string, factory: Pick<Factory, 'name' | 'tree'>): string =>
   rulesFile(factory, rulesFolderAt(home, factory.name));
 
 /**
  * The rules kept at `file`, read afresh (`RulesRead`). A link is not read: the store keeps its own file, and words read through a link
  * would change with what it points at. Nothing is written, and nothing thrown.
+ * @param file The path of the rules' file.
  */
 export function readRules(file: string): RulesRead {
   const stat = fs.lstatSync(file, { throwIfNoEntry: false });
@@ -58,6 +75,8 @@ export function readRules(file: string): RulesRead {
  * What a factory's rules hold, as one word, or `null` for a factory with no rules — no file, or a blank one. A digest of the words as they
  * read and of why they cannot be told (`readRules`), so mending a rules file that does not read moves it, as editing the words does. It is
  * the fourth kind a run resolves, beside its workflow folder, its agents and its skills (`revisions/pin.verb.ts`).
+ * @param home The store's root ($WF_ROOT).
+ * @param factory The factory: its name, and its tree where it was made from a template.
  */
 export function rulesVersion(home: string, factory: Pick<Factory, 'name' | 'tree'>): string | null {
   const { words, error } = readRules(rulesAt(home, factory));
@@ -70,6 +89,9 @@ export function rulesVersion(home: string, factory: Pick<Factory, 'name' | 'tree
  * (`fillsOf`), and its rules where their file reads and is not blank. `error` is why the rules file cannot be told (`readRules`), null
  * where it can or there is none: a start refuses on it, and a read that only loads leaves the rules out. Refused: a name that is no slug
  * (`rulesFolder`, `Invalid`).
+ * @param home The store's root ($WF_ROOT).
+ * @param factory The factory: its name, its hires, and its tree where it was made from a template.
+ * @param workflow The name of the workflow whose folder is read, whose hires are handed.
  */
 export function factoryFills(
   home: string,
@@ -85,11 +107,19 @@ export function factoryFills(
  * `words` written as the rules of `factory`, trimmed, and the file. A link at the file is replaced, never written through. Refused,
  * writing nothing: blank words and a frontmatter block (`Invalid`), and a tree not rendered yet (`Conflict`), which a write would leave
  * unseeded.
+ * @param home The store's root ($WF_ROOT).
+ * @param factory The factory: its name, and its tree where it was made from a template.
+ * @param words The rules' words, written trimmed.
  */
 export const writeRules = (home: string, factory: Pick<Factory, 'name' | 'tree'>, words: string): string =>
   rulesWritten(rulesAt(home, factory), factory, words);
 
-/** The rules of `factory` written onto `file`, its rules' file in a store (`rulesAtHome`), refused as `writeRules` refuses. */
+/**
+ * The rules of `factory` written onto `file`, its rules' file in a store (`rulesAtHome`), refused as `writeRules` refuses.
+ * @param file The path of the rules' file, its folder made where it is not there.
+ * @param factory The factory: its name, said in a refusal, and its tree where it was made from a template.
+ * @param words The rules' words, written trimmed.
+ */
 export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree'>, words: string): string {
   const { name } = factory;
   if (!words.trim())
@@ -111,10 +141,17 @@ export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree
   return file;
 }
 
-/** The rules of `factory` removed, whatever is at their file: whether there was anything. */
+/**
+ * The rules of `factory` removed, whatever is at their file: whether there was anything.
+ * @param home The store's root ($WF_ROOT).
+ * @param factory The factory: its name, and its tree where it was made from a template.
+ */
 export const clearRules = (home: string, factory: Pick<Factory, 'name' | 'tree'>): boolean => rulesCleared(rulesAt(home, factory));
 
-/** The rules at `file`, its rules' file in a store, removed whatever is there: whether there was anything. */
+/**
+ * The rules at `file`, its rules' file in a store, removed whatever is there: whether there was anything.
+ * @param file The path of the rules' file.
+ */
 export function rulesCleared(file: string): boolean {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });

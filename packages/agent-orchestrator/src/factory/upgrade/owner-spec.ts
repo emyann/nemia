@@ -23,7 +23,11 @@ type Texts = ReadonlyMap<string, string>;
 const filledFor = (merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Record<string, Choice> =>
   Object.fromEntries(merge.conflicts.map((c) => [c.at, choices[c.at] ?? 'ours']));
 
-/** The text files of the tree `merge` composes with `choices`, a conflict with no choice taken as the tree has it. */
+/**
+ * The text files of the tree `merge` composes with `choices`, a conflict with no choice taken as the tree has it.
+ * @param merge The merge of the trees: its clean entries and its conflicts.
+ * @param choices The person's choice for each conflict, by where it is; a conflict with none is taken as the tree has it.
+ */
 export function composedTexts(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): Texts {
   const composed = compose(merge, filledFor(merge, choices));
   const entries = 'entries' in composed ? composed.entries : [];
@@ -41,7 +45,11 @@ const under = (texts: Texts, prefix: string, direct: boolean): { path: string; t
     .filter(([at]) => at.startsWith(prefix) && !(direct && at.slice(prefix.length).includes('/')))
     .map(([at, text]) => ({ path: at.slice(prefix.length), text }));
 
-/** What a refusal of `nemia factory resolve` says last: nothing proposed, the choice kept, and how to choose again. */
+/**
+ * What a refusal of `nemia factory resolve` says last: nothing proposed, the choice kept, and how to choose again.
+ * @param factory The factory's name.
+ * @param owner The owner of the conflicts chosen for: its kind and name.
+ */
 export const keptLine = (factory: string, owner: ResolutionOwner): string =>
   `Nothing was proposed; your choice is kept. Choose again for a conflict of the ${owner.kind} ${owner.name} to propose it again ` +
   `(nemia factory resolve ${factory} <conflict> --ours|--theirs|--file <path>).`;
@@ -118,6 +126,11 @@ function factoryOf(factory: string, owner: ResolutionOwner, texts: Texts, ours: 
 /**
  * The spec `owner` of `factory` proposes as `merge` composes its files with `choices`, or its removal (`undefined`); `ours`, the tree's
  * text files now, says what a removal of the rules or the instruction takes away. Thrown `Invalid` as the file's head says.
+ * @param factory The factory's name.
+ * @param owner The owner of the conflicts: its kind and name.
+ * @param merge The merge of the trees: its clean entries and its conflicts.
+ * @param choices The person's choice for each conflict, by where it is; a conflict with none is taken as the tree has it.
+ * @param ours The tree's text files now, by their path in it.
  */
 export function ownerSpec(
   factory: string,

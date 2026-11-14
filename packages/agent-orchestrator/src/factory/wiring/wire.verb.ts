@@ -15,6 +15,10 @@ import type { WiringChange } from './wiring.ts';
  * The factory `name` changed by `change` through the door: the names refused first (`wiringNamesRefused`), the factory read, judged
  * (`wiringChecked`, with `onDisk`'s facts) and written back, which writes no file whose words it leaves as they were. Answers what it
  * was, what it is — the very factory it was where the change changes nothing (an attach of one offered) — and the file written back.
+ * @param name The factory's name.
+ * @param change The change of its wiring: the verb and what it names.
+ * @param onDisk What a fact of the disk or the clock refuses of the changed factory, its error, or undefined where it allows it;
+ *   absent, nothing is refused so.
  */
 export const wire = (
   name: string,

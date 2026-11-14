@@ -17,6 +17,8 @@ const SPELLED = '<path>:ro to read it, <path>:rw to write it';
  * The volume `spelled` names, resolved from `cwd`: `<path>:ro` read-only, `<path>:rw` writable, the mark split off the last colon so a
  * path may hold one; or why it names none, a string: no mark, a mark that is neither, or no path. The mark is required, as the runtime's
  * mount is marked: a volume left unmarked would be writable, compose's default, without anyone having said so.
+ * @param spelled The volume as a person typed it, `<path>:ro` or `<path>:rw`.
+ * @param cwd The folder a relative path is resolved from.
  */
 export function volumeOf(spelled: string, cwd: string): Volume | string {
   const at = spelled.lastIndexOf(':');
@@ -41,6 +43,10 @@ const within = (inner: string, outer: string): boolean => {
  * one, which would let a step write a repository outside its worktree, the run's own included, which no run mounts; one at or inside the
  * store `storeRoot`, whose runs, cards and worktrees no step reads around its doors; and a writable one that holds the store, which would
  * let a step write them. A read-only one that holds it, a person's home say, is taken.
+ * @param factory The factory: its name, said in a refusal, and its repositories.
+ * @param volume The volume to mount: its path and whether it is read-only.
+ * @param storeRoot The store's root.
+ * @param isDirectory Whether a path is a folder of this machine, as the caller looked.
  */
 export function volumeRefusal(
   factory: Pick<Factory, 'name' | 'repos'>,
@@ -67,6 +73,8 @@ export function volumeRefusal(
  * `factory`'s volumes with `volume` among them, replacing one of its path, and what that one was marked (`was`), null for a new one:
  * each with its name, the one it is named on read for one its file stores none of (`volumesNamed`), and the new one's taken among them
  * (`volumeNameAt`), so the file stores every name and none moves.
+ * @param factory The factory: its volumes as its file holds them.
+ * @param volume The volume added: its path and whether it is read-only.
  */
 export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): { volumes: Volume[]; was: boolean | null } {
   const volumes = factoryVolumesNamed(factory);
@@ -80,6 +88,8 @@ export function withVolume(factory: Pick<Factory, 'volumes'>, volume: Volume): {
  * The volumes `step` is filed with, of those its run mounts (`volumes`): each read-only as it was marked, and a writable one writable only
  * where the step's fence writes (`writesNothing`), since a volume widens where a step's writes reach, never what it may do. None for a
  * step on a remote agent, filed no local field. `writable:` never names one: it names a repository of the factory, by its folder's name.
+ * @param step The step filed: its harness and its fence.
+ * @param volumes The volumes its run mounts, or undefined where it mounts none.
  */
 export const volumeMounts = (step: Fenced, volumes: readonly Mount[] | undefined): Mount[] => {
   if (!volumes?.length || isRemoteHarness(step.harness)) return [];
@@ -93,6 +103,7 @@ export type NamedVolume = Volume & { readonly name: string };
 /**
  * The name a volume's folder gives it (`volumeNameAmong`'s `base`): the basename of its path as a slug, lowercase letters, digits and
  * dashes, each run of anything else one dash, none at either end; `volume` where nothing of it is left, the root's say.
+ * @param at The volume's path.
  */
 export const volumeBase = (at: string): string =>
   path
@@ -105,6 +116,7 @@ export const volumeBase = (at: string): string =>
  * `volumes`, each with its name: the one its file stores, kept so a link to it stays, and for each with none, in path order, the first
  * its folder gives it that no volume before it holds (`volumeNameAmong`, among the stored names and those named before it). Answered
  * in the order given.
+ * @param volumes The volumes, each with the name its file stores, where it stores one.
  */
 export function volumesNamed(volumes: readonly Volume[]): NamedVolume[] {
   const taken = volumes.flatMap((v) => (v.name === undefined ? [] : [v.name]));
@@ -120,6 +132,7 @@ export function volumesNamed(volumes: readonly Volume[]): NamedVolume[] {
 /**
  * The volumes of `factory` as `factoryVolumes` gives them, each with its name: the one its file stores for the first of its path, else
  * the one `volumesNamed` gives it.
+ * @param factory The factory: its volumes as its file holds them.
  */
 export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVolume[] {
   const stored = new Map<string, string>();
@@ -139,6 +152,8 @@ export function factoryVolumesNamed(factory: Pick<Factory, 'volumes'>): NamedVol
  * The name a volume of `path` is stored under at `nemia factory volume add`, among `volumes`, the factory's others: its own where one of
  * that path is named already (a second add replaces it, and a link to it stays), else the first its folder gives it that none of them
  * holds, as each is named on read (`volumesNamed`), so none of theirs moves.
+ * @param volumes The factory's other volumes, each with the name its file stores, where it stores one.
+ * @param at The added volume's path, resolved.
  */
 export function volumeNameAt(volumes: readonly Volume[], at: string): string {
   const named = volumesNamed(volumes);
@@ -154,6 +169,8 @@ export function volumeNameAt(volumes: readonly Volume[], at: string): string {
  * The name of a volume with none stored, its folder's `base`, among the names other volumes of its factory hold (`taken`): `base` where
  * none holds it, else the first of `<base>-2`, `<base>-3`, … that none holds. One is free by the count of `taken`'s names, so the loop
  * ends.
+ * @param base The name the volume's folder gives it (`volumeBase`).
+ * @param taken The names the factory's other volumes hold.
  */
 export const volumeNameAmong: VolumeNameAmong = (base, taken) => {
   if (!taken.includes(base)) return base;

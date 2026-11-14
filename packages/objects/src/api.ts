@@ -97,6 +97,26 @@ import { Skill, SkillDrafted, SkillFiles, SkillList, SkillWrite } from './skill.
 import { LabelEdit, Labelled } from './labels.ts';
 import { Template, TemplateList } from './template.ts';
 import { BadRequest, Conflict, Failed, Forbidden, Invalid, listQuery, Missing, Unauthorized, Unjudged, WriteFailed } from './api-errors.ts';
+import {
+  stepName,
+  cardParams,
+  cardNameParams,
+  namespaceParams,
+  factoryParams,
+  factoryWorkflowParams,
+  factorySettingParams,
+  factoryOwnParams,
+  cardListQuery,
+  originQuery,
+  instructionsQuery,
+  removeQuery,
+  repoQuery,
+  draftReadQuery,
+  templateParams,
+  documentParams,
+  subscriptionParams,
+  eventNameParams,
+} from './api-params.ts';
 import { DelegationsGroup, ProposalsGroup } from './proposal-api.ts';
 import { RunsGroup } from './run-api.ts';
 import { CardStarted } from './run-actions.ts';
@@ -175,27 +195,6 @@ const SubscriptionListObject = SubscriptionList.annotate({ identifier: 'Subscrip
 const EventObject = Event.annotate({ identifier: 'Event' });
 const EventListObject = EventList.annotate({ identifier: 'EventList' });
 
-/** A card, or any object a namespace holds, by its namespace and its name. */
-const cardParams = { namespace: Schema.String, name: Schema.String };
-
-/** A namespace, for a list in it. */
-const namespaceParams = { namespace: Schema.String };
-
-/** A factory, by its name. */
-const factoryParams = { name: Schema.String };
-const factoryWorkflowParams = { name: Schema.String, workflow: Schema.String };
-const factorySettingParams = { name: Schema.String, setting: Schema.String };
-
-/** The path of a factory's write that a command of the factory's own spells `<factory>`: its name, under that key. */
-const factoryOwnParams = { factory: Schema.String };
-
-/**
- * The query of a list of cards: a list's (`listQuery`), and `fieldSelector`, the cards by whether they are still in play, in Kubernetes'
- * spelling: `status.inPlay=true` (or `==true`, `!=false`) the cards not started or whose run has not ended, `status.inPlay=false` those
- * whose run ended; an empty one, or none, every card. Any other is refused `Invalid`, naming the forms it takes.
- */
-const cardListQuery = { ...listQuery, fieldSelector: Schema.optionalKey(Schema.String) };
-
 /** What a card's verbs refuse with: a request its reader refuses before the package is asked (400) among them. */
 const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 
@@ -203,13 +202,13 @@ const cardErrors = [BadRequest, Missing, Conflict, Invalid];
 export class CardsGroup extends HttpApiGroup.make('cards').add(
   HttpApiEndpoint.get('listAll', '/api/cards', { query: cardListQuery, success: CardListOrTable, error: cardErrors }),
   HttpApiEndpoint.get('list', '/api/namespaces/:namespace/cards', {
-    params: { namespace: Schema.String },
+    params: namespaceParams,
     query: cardListQuery,
     success: CardListOrTable,
     error: cardErrors,
   }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/cards/:name', { params: cardParams, success: CardObject, error: cardErrors }),
-  HttpApiEndpoint.get('getAll', '/api/cards/:name', { params: factoryParams, success: CardObject, error: cardErrors }),
+  HttpApiEndpoint.get('getAll', '/api/cards/:name', { params: cardNameParams, success: CardObject, error: cardErrors }),
   HttpApiEndpoint.put('update', '/api/namespaces/:namespace/cards/:name', {
     params: cardParams,
     payload: CardWrite,
@@ -223,7 +222,7 @@ export class CardsGroup extends HttpApiGroup.make('cards').add(
     error: cardErrors,
   }),
   HttpApiEndpoint.post('create', '/api/namespaces/:namespace/cards', {
-    params: { namespace: Schema.String },
+    params: namespaceParams,
     payload: CardFile,
     success: CardObject.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: cardErrors,
@@ -373,7 +372,11 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }),
   HttpApiEndpoint.delete('removeVolume', '/api/factories/:factory/volumes', {
     params: factoryOwnParams,
-    query: { path: Schema.String },
+    query: {
+      path: Schema.String.annotate({
+        description: 'The folder of the machine the api runs on whose volume is taken off, as it was mounted.',
+      }),
+    },
     success: VolumeRemoved,
     error: objectErrors,
   }),
@@ -385,7 +388,13 @@ export class FactoriesGroup extends HttpApiGroup.make('factories').add(
   }),
   HttpApiEndpoint.get('export', '/api/factories/:name/export', {
     params: factoryParams,
-    query: { cards: Schema.optionalKey(Schema.Literals(MOVE_CARDS)) },
+    query: {
+      cards: Schema.optionalKey(
+        Schema.Literals(MOVE_CARDS).annotate({
+          description: "Whether the factory's cards follow it to another store (follow, the default) or stay on the source (stay).",
+        }),
+      ),
+    },
     success: FactoryExport,
     error: objectErrors,
   }),
@@ -537,33 +546,6 @@ export class VolumesGroup extends HttpApiGroup.make('volumes').add(
 ) {}
 
 /**
- * The query of a definition's read: `origin`, the one origin asked for (`DEFINITION_ORIGINS`), whose definitions are served shadowed or
- * not, each saying what shadows it; kept as the text it was sent as, so a wrong word is refused in the package's words, a 422.
- */
-const originQuery = { origin: Schema.optionalKey(Schema.String) };
-
-/**
- * The query of an agent's custom instructions: the repository whose agents the name is looked for in, one a factory works on; none for
- * yours and the builtins alone.
- */
-const instructionsQuery = { repo: Schema.optionalKey(Schema.String) };
-
-/** The query of a removal: the `resourceVersion` it was read at, refused where the files now hold another. */
-const removeQuery = { resourceVersion: Schema.optionalKey(Schema.String) };
-
-/**
- * The repository a definition is read or judged on beside yours (`?repo=`), a path on the api's machine: one a factory works on, or a
- * folder under one, read as that repository; none where none is named, yours and the builtins alone.
- */
-const repoQuery = { repo: Schema.optionalKey(Schema.String) };
-
-/**
- * The query of a workflow's draft read (`POST /api/workflows/read`): the factory it is read for (`?factory=`), whose hires fill its steps
- * as a run of it there would read them, and the repository (`?repo=`) among the factory's; none for yours and the builtins alone.
- */
-const draftReadQuery = { factory: Schema.optionalKey(Schema.String), ...repoQuery };
-
-/**
  * A namespace's workflows: the factory's resolved view of each name (`default`: the api's repository and your library), listed, read,
  * and — yours, in `default` alone — made, written whole and removed; a step of one read for its page, in the namespace's factory. And
  * the builder's form (`keys`), in no namespace: under one, `keys` would read as a workflow's name.
@@ -600,7 +582,7 @@ export class WorkflowsGroup extends HttpApiGroup.make('workflows').add(
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('step', '/api/namespaces/:namespace/workflows/:name/steps/:step', {
-    params: { ...cardParams, step: Schema.String },
+    params: { ...cardParams, step: stepName },
     query: originQuery,
     success: WorkflowStepPage,
     error: definitionErrors,
@@ -664,7 +646,13 @@ export class AgentsGroup extends HttpApiGroup.make('agents').add(
     error: definitionErrors,
   }),
   HttpApiEndpoint.get('sources', '/api/agents/sources', {
-    query: { path: Schema.optionalKey(Schema.String) },
+    query: {
+      path: Schema.optionalKey(
+        Schema.String.annotate({
+          description: "A folder of agent files on the api's machine, listed besides those the store knows of; absent, the store's alone.",
+        }),
+      ),
+    },
     success: AgentSources,
     error: definitionErrors,
   }),
@@ -736,10 +724,6 @@ export class SkillsGroup extends HttpApiGroup.make('skills').add(
   HttpApiEndpoint.post('read', '/api/skills/read', { payload: DefinitionFiles, success: SkillDrafted, error: definitionErrors }),
 ) {}
 
-/** A template, by its name, and one of its documents, by the template's name and the document's. */
-const templateParams = { name: Schema.String };
-const documentParams = { name: Schema.String, doc: Schema.String };
-
 /**
  * The templates Nemia builds in, which no namespace holds, listed and read; and each one's documents, its workflows, agents and skills,
  * rendered with its parameters' defaults and served in the Schemas a namespace serves them in, with origin `builtin`.
@@ -789,18 +773,18 @@ export class TemplatesGroup extends HttpApiGroup.make('templates').add(
 export class SubscriptionsGroup extends HttpApiGroup.make('subscriptions').add(
   HttpApiEndpoint.get('listAll', '/api/subscriptions', { query: listQuery, success: SubscriptionListObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/subscriptions/:name', {
-    params: templateParams,
+    params: subscriptionParams,
     success: SubscriptionObject,
     error: objectErrors,
   }),
   HttpApiEndpoint.post('subscribe', '/api/subscriptions/:name', {
-    params: templateParams,
+    params: subscriptionParams,
     payload: SubscriptionWrite,
     success: Subscribed.pipe(Schema.annotate({ httpApiStatus: 201 })),
     error: [...objectErrors, Failed],
   }),
   HttpApiEndpoint.delete('unsubscribe', '/api/subscriptions/:name', {
-    params: templateParams,
+    params: subscriptionParams,
     success: Unsubscribed,
     error: [...objectErrors, Failed],
   }),
@@ -818,7 +802,7 @@ export class EventsGroup extends HttpApiGroup.make('events').add(
     success: EventListObject,
     error: objectErrors,
   }),
-  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: templateParams, success: EventObject, error: objectErrors }),
+  HttpApiEndpoint.get('getAll', '/api/events/:name', { params: eventNameParams, success: EventObject, error: objectErrors }),
   HttpApiEndpoint.get('get', '/api/namespaces/:namespace/events/:name', {
     params: cardParams,
     success: EventObject,

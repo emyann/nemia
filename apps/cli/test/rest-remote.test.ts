@@ -60,9 +60,7 @@ test("under a remote context, each verb reads and writes that context's store, p
   };
   assert.equal((await typed(['memory', 'feed-cursor'])).out, '42\n');
   assert.match((await typed(['memory'])).out, /^ {2}feed-cursor$/m);
-  assert.match((await typed(['chat', 'allow', 'operator'])).out, /^operator$/m);
-  assert.match(fs.readFileSync(path.join(exposed.root, 'nemia', 'chat', 'speakers.json'), 'utf8'), /operator/, 'written there');
-  assert.equal((await typed(['chat', 'speakers'])).out, 'operator\n');
+  assert.match((await typed(['chat', 'allow', 'operator'], 2)).err, /nemia token add/, 'retired, here as there');
   assert.match((await typed(['level'])).out, /^Nemia: the store at manual$/m);
   assert.match((await typed(['passes'])).out, /^no pass is kept yet/);
   assert.match((await typed(['series'])).out, /^nothing is kept for 24h yet/);

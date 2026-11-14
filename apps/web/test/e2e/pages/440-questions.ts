@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
+import { actorWords, type Actor } from 'objects';
 import { fed, partOf, photograph, sidebar, themeOf, stepBar, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
@@ -223,14 +224,18 @@ export default {
           `the api takes the answers, through the board's proxy — it answered ${response.status()}: ${await response.text()}`,
         );
       const file = path.join(store!, 'runs', `${id}.asks`, 'retry-spec-2');
-      const ask = (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as { mode?: string; message?: string };
+      const ask = (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}) as {
+        mode?: string;
+        message?: string;
+        actor?: Actor;
+      };
       const lines = [
         'Answers to your questions:',
         `1. ${cut.title}\n   Chose: ${cut.recommended} — ${cut.options[0].meaning}`,
         `2. ${where.title}\n   Chose: ${where.options[0].label} — ${where.options[0].meaning}\n   In my own words: ${QUESTIONS.own}`,
-        'Answered by: person, on the board',
+        `Answered by: ${ask.actor ? actorWords(ask.actor) : 'nobody'}`,
       ];
-      if (ask.mode !== 'continue' || ask.message !== lines.join('\n\n'))
+      if (ask.mode !== 'continue' || !ask.actor || ask.message !== lines.join('\n\n'))
         throw new Refused(`the answers are the next try's message, in the package's words — ${file} holds ${JSON.stringify(ask)}`);
       await expectVisible(
         partOf(page, 'spec').locator(`[data-part-asks] [data-asked][data-step="spec"]`),

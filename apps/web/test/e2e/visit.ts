@@ -9,7 +9,8 @@ import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { expectTheme, facesLoaded, idle, Refused, settled, track, watch } from './checks.ts';
 import { bannerShown, photograph } from './board.ts';
-import { photographing, setMeasuring, setPhotographing } from './world.ts';
+import { seated } from './served.ts';
+import { photographing, seatToken, setMeasuring, setPhotographing } from './world.ts';
 import { costLine, PHASES, type PageTiming, type Phase } from './timing.ts';
 
 export const THEMES = ['light', 'dark'] as const;
@@ -107,7 +108,8 @@ async function visit(
  * screenshots, and what each page took in each theme, stamped with `worker`, the worker that visited it. Rejects on the first page that
  * fails, naming the page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place
  * of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its
- * requests counted from its first, for `idle`.
+ * requests counted from its first, for `idle`. Each theme's browser holds the seat's token as the board's cookie (`seated`) where a store
+ * was seeded in this process, so every page is read as the person's.
  *
  * Before any visit it removes from `out` what this run will take again, and nothing else: every page's `-failed.png`, and the picture of
  * a page `pictured` names, in the themes visited. A run that pictures no page leaves the pictures an earlier run took where they are.
@@ -139,6 +141,7 @@ export async function visitAll(
     console.log(
       `e2e: the ${theme} theme's browser is in ${timezoneId}, where it is ${middayClock(now)}: its day began hours before the seed`,
     );
+    if (seatToken !== undefined) await seated(context, base);
     context.on('page', track);
     await bannerShown(context);
     try {

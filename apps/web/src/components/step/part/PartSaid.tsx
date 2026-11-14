@@ -23,7 +23,7 @@ export function PartSaid({ step, said }: { step: StepView; said: Said }) {
     <section data-part-said={step.name} aria-label="What it said" className="min-w-0 scroll-mt-4 space-y-2 text-body-medium">
       <h3 className="text-label-medium text-on-surface-variant uppercase">Said</h3>
       {outcome && <OutcomeHead outcome={outcome} />}
-      {shown?.answer && <YourAnswer answer={shown.answer} />}
+      {shown?.answer && <YourAnswer answer={shown.answer} by={shown.answeredBy} />}
       {said.kind === 'unreadable' ? (
         <AsItCame raw={step.unreadable?.raw ?? said.error} />
       ) : (

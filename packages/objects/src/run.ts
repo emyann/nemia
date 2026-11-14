@@ -9,6 +9,7 @@
  * writes each into a document that imports back into a Schema decoding the same object.
  */
 import { Schema } from 'effect';
+import { Actor } from './token.ts';
 import { API_VERSION, listOf } from './meta.ts';
 import { BODY_PAGE, SHORT_FIELD } from './reads.ts';
 import { RunClock, RunListMeta } from './run-frame.ts';
@@ -331,7 +332,7 @@ const GateBudgets = Schema.Struct({
  */
 const StepGate = Schema.Struct({
   awaiting: Schema.Boolean,
-  approval: Schema.NullOr(Schema.Struct({ try: Schema.Finite, at: Schema.String, message: NullString })),
+  approval: Schema.NullOr(Schema.Struct({ try: Schema.Finite, at: Schema.String, message: NullString, actor: Schema.optionalKey(Actor) })),
   budgets: Schema.optionalKey(GateBudgets),
 });
 
@@ -429,6 +430,7 @@ export const RunHolding = Schema.Struct({
   word: Schema.String,
   advice: Schema.String,
   waitingOnYou: Schema.Boolean,
+  actor: Schema.optionalKey(Actor),
 }).annotate({ identifier: 'RunHolding' });
 export type RunHolding = typeof RunHolding.Type;
 
@@ -502,6 +504,7 @@ export const RunStatus = Schema.Struct({
   steps: List(RunStepStatus),
   startedAt: NullString,
   cancelledAt: NullString,
+  cancelledBy: Schema.optionalKey(Actor),
   pruned: Schema.NullOr(
     Schema.Struct({
       at: Schema.String,
@@ -715,6 +718,7 @@ export const StepTry = Schema.Struct({
   closeout: Schema.NullOr(StepCloseout),
   unreadable: Schema.NullOr(StepUnreadable),
   answer: NullString,
+  answeredBy: Schema.optionalKey(Actor),
 }).annotate({ identifier: 'StepTry' });
 export type StepTry = typeof StepTry.Type;
 

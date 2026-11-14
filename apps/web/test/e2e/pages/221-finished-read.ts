@@ -4,6 +4,7 @@ import { FINISHED_SIZE, finishedRunsQuery, type FinishedPage } from '../../../sr
 import { pageSaid, pastLast } from '../../../src/lib/finished.ts';
 import { Refused } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
+import { bearer } from '../served.ts';
 import type { PageSpec } from '../visit.ts';
 
 /** A factory of the seed that holds a run. */
@@ -11,12 +12,16 @@ const FACTORY = FACTORIES.hiring.name;
 
 /**
  * The board's own read of the page of the finished runs the trail `older` leads to, of `factory` or of every one, asked of the api the
- * page is served beside: the query's function, its address resolved against the page's. Refused with why where the api refuses it or
- * it does not decode.
+ * page is served beside: the query's function, its address resolved against the page's, presenting the seat's token as the browser's
+ * cookie would (`bearer`). Refused with why where the api refuses it or it does not decode.
  */
 async function finished(page: Page, factory: string | undefined, older: string[]): Promise<FinishedPage> {
   const before = globalThis.fetch;
-  globalThis.fetch = (input, init) => before(new URL(String(input), page.url()), init);
+  globalThis.fetch = (input, init) => {
+    const headers = new Headers(init?.headers);
+    for (const [name, value] of Object.entries(bearer())) headers.set(name, value);
+    return before(new URL(String(input), page.url()), { ...init, headers });
+  };
   const client = new QueryClient();
   try {
     return await client.fetchQuery(finishedRunsQuery(factory, older));

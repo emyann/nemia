@@ -13,7 +13,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Result, Schema } from 'effect';
+import { Actor } from 'objects';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
@@ -34,8 +35,18 @@ const Said = Schema.optional(Schema.String);
 
 /** The pause's file as `putPause` writes it; a field it does not read is left empty, never a reason to lift the pause. */
 const isPauseFile = Schema.is(
-  Schema.Struct({ at: Said, by: Said, why: Said, timeoutMs: Schema.optional(Schema.Unknown), heldBy: Schema.optional(Schema.Unknown) }),
+  Schema.Struct({
+    at: Said,
+    by: Said,
+    why: Said,
+    timeoutMs: Schema.optional(Schema.Unknown),
+    heldBy: Schema.optional(Schema.Unknown),
+    actor: Schema.optional(Schema.Unknown),
+  }),
 );
+
+/** The caller the file names as who put the pause, where it reads as an actor: none where it names none or one that does not read. */
+const actorRead = (value: unknown): Actor | undefined => Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
 
 /** The pause's holder as the file names it: a pid and, where written, its start. One that does not read is none, so the pause stands. */
 const isHolder = Schema.is(Schema.Struct({ pid: Schema.Int.check(Schema.isGreaterThan(0)), procStart: Schema.optional(Schema.Int) }));
@@ -72,6 +83,7 @@ export function readPauseFile(home: string): PauseFileRead | null {
   const why = oneLine(file.why ?? '', Infinity);
   const timeoutMs = timeoutRead('timeoutMs' in file ? file.timeoutMs : undefined);
   const held = 'heldBy' in file ? file.heldBy : undefined;
+  const actor = actorRead('actor' in file ? file.actor : undefined);
   const heldBy: PauseHolder | undefined = isHolder(held)
     ? { pid: held.pid, ...(held.procStart === undefined ? {} : { procStart: held.procStart }) }
     : undefined;
@@ -80,6 +92,7 @@ export function readPauseFile(home: string): PauseFileRead | null {
     by: oneLine(file.by ?? '', Infinity),
     ...(why ? { why } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(actor ? { actor } : {}),
   };
   return { pause, ...(heldBy ? { heldBy } : {}), text };
 }
@@ -98,13 +111,14 @@ function osUser(): string | undefined {
 
 /**
  * Pauses the store: writes its file, created only where none is, and answers the pause as written — `by` the name given, else the
- * machine's user, and `timeoutMs` where one is given, which the pass puts on the sessions' drain; with none the pause parks no session.
+ * machine's user, the caller who puts it (`actor`) where it is known, and `timeoutMs` where one is given, which the pass puts on the
+ * sessions' drain; with none the pause parks no session.
  * A take-over names itself as the pause's holder (`heldBy`), written to the file and not answered, so the pass lifts the pause once that
  * process is gone. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
  */
 export function putPause(
   home: string,
-  said: { why?: string; by?: string },
+  said: { why?: string; by?: string; actor?: Actor },
   now: Date = new Date(),
   timeoutMs?: number,
   heldBy?: PauseHolder,
@@ -115,6 +129,7 @@ export function putPause(
     by,
     ...(said.why ? { why: said.why } : {}),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    ...(said.actor ? { actor: said.actor } : {}),
   };
   fs.mkdirSync(home, { recursive: true });
   try {
@@ -143,9 +158,34 @@ export function cutPause(home: string): Pause {
   return pause;
 }
 
-/** Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. */
-export function resumePause(home: string): Pause {
+/**
+ * Who last lifted the store's pause by hand: `{ since, actor }`, a file of its own beside the pause's, written whole by the lift before the
+ * pause's file is taken away (`resumePause`), so the pass that reads the pause gone reads who lifted it, paired by the moment of the pause
+ * lifted (`since`); overwritten by the next such lift.
+ */
+export const resumedFile = (home: string): string => path.join(home, `${PAUSE_FILE}.lifted`);
+
+/** Who last lifted the store's pause by hand (`resumedFile`): undefined where no file is there, or it does not read as one. */
+export function readResumed(home: string): { since: string; actor: Actor } | undefined {
+  let read: unknown;
+  try {
+    read = jsonOr(fs.readFileSync(resumedFile(home), 'utf8'));
+  } catch {
+    return undefined;
+  }
+  if (typeof read !== 'object' || read === null) return undefined;
+  const since = 'since' in read && typeof read.since === 'string' ? read.since : undefined;
+  const actor = actorRead('actor' in read ? read.actor : undefined);
+  return since !== undefined && actor ? { since, actor } : undefined;
+}
+
+/**
+ * Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. Given who lifts it (`actor`), that
+ * is written first, beside the pause's file (`resumedFile`), so the feed's lift of the pause names them.
+ */
+export function resumePause(home: string, actor?: Actor): Pause {
   const pause = readPause(home);
+  if (pause !== null && actor) writeWhole(resumedFile(home), `${JSON.stringify({ since: pause.at, actor })}\n`);
   try {
     fs.unlinkSync(pauseFile(home));
   } catch (err) {

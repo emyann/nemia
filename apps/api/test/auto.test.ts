@@ -8,12 +8,13 @@
  *
  * At shipped defaults, over the harness's scratch store (`root`).
  */
-import { root } from './harness.ts';
+import { PERSON_TOKEN, root } from './harness.ts';
 import { test } from 'node:test';
 import { story } from 'test-kit/checkpoints';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { TOKEN_COOKIE } from 'objects';
 import { appOf, liveOf } from '../src/app.ts';
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
@@ -82,8 +83,14 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
       const blank = await asked('PUT', '/api/policy/nemia/rules/tries', { words: '  ' });
       assert.equal(blank.status, 422);
       assert.match(String(blank.body.error), /takes the rule's words as you read them/);
-      const foreign = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-      assert.equal(foreign.status, 403);
+      const foreign = await asked(
+        'PUT',
+        '/api/policy/nemia/rules/tries',
+        { words: WORDS },
+        { ...BOARD, 'sec-fetch-site': 'cross-site', cookie: `${TOKEN_COOKIE}=${PERSON_TOKEN}` },
+      );
+      assert.equal(foreign.status, 403, "a page on another site, the browser sending it the board's cookie");
+      assert.equal(foreign.body.reason, 'site');
       assert.equal(fs.existsSync(CONFIRMED), false);
       const hidden = await asked('GET', '/api/policy/.nemia');
       assert.equal(hidden.status, 422);

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { actorWords, type Actor } from 'objects';
 import { fed, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { ASKING, writeAsking } from '../seed.ts';
@@ -50,13 +51,14 @@ export default {
         mode?: string;
         budget?: number;
         message?: string;
+        actor?: Actor;
       };
       const told = [
         'Answers to your questions:',
         `1. ${tone.title}\n   Chose: ${tone.recommended} — ${tone.options[1].meaning}`,
-        'Answered by: person, on the board',
+        `Answered by: ${ask.actor ? actorWords(ask.actor) : 'nobody'}`,
       ].join('\n\n');
-      if (ask.mode !== 'continue' || ask.budget !== 2 || ask.message !== told)
+      if (ask.mode !== 'continue' || ask.budget !== 2 || !ask.actor || ask.message !== told)
         throw new Refused(`the try is asked with the budget, the answer its words — ${file} holds ${JSON.stringify(ask)}`);
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });

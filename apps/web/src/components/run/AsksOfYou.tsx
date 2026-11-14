@@ -98,7 +98,7 @@ export function AsksOfYou({ run, onStep }: { run: RunDetail; onStep?: (step: str
         </Fold>
       )}
       {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
-      {run.holding && <RunWait label="Held" wait={run.holding} />}
+      {run.holding && <RunWait label="Held" wait={run.holding} actor={run.holding.actor} />}
     </div>
   );
 }

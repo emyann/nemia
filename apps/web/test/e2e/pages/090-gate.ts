@@ -6,6 +6,10 @@ import { expectCount, expectInside, expectLeftOf, expectVisible, idle, Refused, 
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+import { SEAT_TOKEN } from '../served.ts';
+
+/** Who the board's write is, as the approval records it: the person, under the seat's token, which the browser presents as its cookie. */
+const SEATED = { kind: 'person', token: SEAT_TOKEN };
 
 /**
  * Refuses unless `policy`, the step's policy at the gate `where`, is drawn open once: plan's own words and the deny its file adds, named as
@@ -251,11 +255,11 @@ export default {
     }
     const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
     if (
-      JSON.stringify(written) !== JSON.stringify({ step: gated, try: 1, at: took.at, message: GATED.words }) ||
+      JSON.stringify(written) !== JSON.stringify({ step: gated, try: 1, at: took.at, message: GATED.words, actor: SEATED }) ||
       fs.readdirSync(asks).length !== 1
     ) {
       throw new Refused(
-        `the approval is written as wf approve writes it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
+        `the approval is written as wf approve writes it beside who sent it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
       );
     }
     if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)

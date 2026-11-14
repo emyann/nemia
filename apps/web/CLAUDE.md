@@ -52,7 +52,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
-  `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`).
+  `vite preview` and Chromium (`e2e/worker.ts`); `--workers <n>` sets how many, else the machine does (`workersFor`), and either way free memory caps it: `--workers` can lower the
+  count, never raise it past what free memory holds, and a run given fewer than it asked says so before it starts them.
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
@@ -66,6 +67,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   build`: `test/e2e/parts.test.ts` presses it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
+  on <url>`, and on a fourth the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every
+  api route asks for one, loopback too; `npm run board:stop` ends its holder, which else ends by itself.
+- Every api route asks for a token, so each browser context the e2e opens on a worker's seat is given the seed's (`SEAT_TOKEN`) as the
+  board's cookie before a page loads (`seated`, `e2e/served.ts`; `visitAll` does it for every page), and a request made from Node presents
+  it as its bearer (`bearer`); a context meant to meet the token page is opened bare.
   on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
   `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 

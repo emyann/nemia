@@ -87,7 +87,7 @@ const shots = () =>
  * What a pass judged of a run a person has acted on, with the one-shots the pass read of it beside its words: a person's acts
  * (`actsOf`), the runtime's faults (`faultsOf`), and the two moments a hold is paired by.
  */
-const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted'>): FeedWords => ({
+const withOnce = (once: Pick<FeedWords, 'acts' | 'faults' | 'held' | 'lifted' | 'unheld'>): FeedWords => ({
   run: { word: 'running' },
   labels: { run: 'r-1', factory: 'nemia', workflow: 'build' },
   steps: [{ name: 'plan', word: 'running', labels: { run: 'r-1', factory: 'nemia', workflow: 'build', step: 'plan', agent: 'ada' } }],
@@ -215,6 +215,35 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       'a daemon with no fold reads the feed and writes none of them again',
     );
   });
+  await t.test("a person's act says who acted where the record says, and who acted is no part of what counts it", () => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const person = { kind: 'person', token: 'laptop' } as const;
+    const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+    const acts = withOnce({
+      acts: [
+        { ...APPROVED, actor: person },
+        { ...CANCELLED, actor: agent },
+      ],
+      held: '2026-10-16T03:45:00.000Z',
+    });
+    for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', { ...acts, holder: person }]]), { at: AT, memo });
+    assert.deepEqual([...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length, 3, 'one line per act over three passes');
+    assert.deepEqual(
+      ['Approved', 'CancelAsked', 'HoldPut'].map((reason) => lines().find((l) => l.reason === reason)?.actor),
+      [person, agent, person],
+      'each line carries who acted',
+    );
+    recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [APPROVED, CANCELLED], held: '2026-10-16T03:45:00.000Z' })]]), {
+      at: AT,
+      memo: freshFeedMemo(),
+    });
+    assert.equal(
+      [...said('Approved'), ...said('CancelAsked'), ...said('HoldPut')].length,
+      3,
+      'the same acts read with no actor are the occurrences already said, and a restarted daemon writes none again',
+    );
+  });
   await t.test('a second act of the same kind gets its own line: the try an approval opens is part of what counts it', () => {
     emptyStore();
     const memo = freshFeedMemo();
@@ -271,6 +300,31 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
     for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map([['r-1', withOnce(none)]]), { at: AT, memo: restarted });
     assert.equal(said('HoldLifted').length, 2, 'and a daemon with no fold writes neither lift a second time');
   });
+  await t.test(
+    'a hold lifted by hand says who lifted it where the lift left that beside the run, and a lift of another hold names nobody',
+    () => {
+      emptyStore();
+      const memo = freshFeedMemo();
+      const [first, second] = ['2026-10-16T03:45:00.000Z', '2026-10-16T06:00:00.000Z'];
+      const agent = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: first })]]), { at: AT, memo });
+      for (let i = 0; i < 3; i++)
+        recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+      recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], held: second, unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+      for (let i = 0; i < 3; i++)
+        recordFeed(ROOT, new Map([['r-1', withOnce({ acts: [], unheld: { since: first, actor: agent } })]]), { at: AT, memo });
+      assert.deepEqual(
+        lines()
+          .filter((l) => l.reason === 'HoldLifted')
+          .map((l) => [l.note, l.actor, l.source]),
+        [
+          [`since ${first}`, agent, 'person'],
+          [`since ${second}`, undefined, 'person'],
+        ],
+        'the lift of the hold the receipt names carries its caller; the second hold, lifted with no receipt of its own, names nobody',
+      );
+    },
+  );
   await t.test(
     "a hold the tick lifted itself is the tick's deed, not the person's — the pass that lifted it is the only thing that knows",
     () => {
@@ -362,6 +416,18 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
         pass({ at: bare, by: '' });
         assert.deepEqual(told().at(-1), [undefined, undefined, `store paused · since ${bare}`]);
         pass(null);
+      });
+      await t.test('a pause lifted by a caller the api resolved says who lifted it, paired by the moment of the pause it lifted', () => {
+        const lifted = '2026-10-16T05:00:00.000Z';
+        const person = { kind: 'person', token: 'laptop' } as const;
+        pass({ at: lifted, by: 'yrnd1' });
+        for (let i = 0; i < 3; i++) recordFeed(ROOT, new Map(), { at: AT, memo, pause: null, resumed: { since: lifted, actor: person } });
+        const [put, lift] = storeLines().slice(-2);
+        assert.deepEqual(
+          [put?.word, put?.actor, lift?.word, lift?.note, lift?.actor],
+          ['store paused', undefined, 'store resumed', `since ${lifted}`, person],
+          'the lift names its caller, once over three passes',
+        );
       });
       await t.test('a caller that read no pause says nothing of the store, however the feed stands', () => {
         pass({ at: '2026-10-16T07:00:00.000Z' });

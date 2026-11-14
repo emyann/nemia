@@ -9,6 +9,9 @@
  * On the stand-ins: the runtime's test engine, each step's task filed and left where this file says, and the test place, under the run
  * records this file seeds. The successes of a removal, a prune and a start, which need a try, git worktrees or a workflow folder, are
  * `routes.test.ts`'s, `prune.test.ts`'s and `workflows.test.ts`'s, on the same paths.
+ *
+ * Last, who acted: each write keeps the actor of the token its request presented — the person under its name, an agent by its standing
+ * token or by its session — and the run serves it where the write is read.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -19,8 +22,10 @@ import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import { TABLE_ACCEPT } from 'objects';
+import { TokenDoor, tokenDoorFiles } from 'agent-orchestrator';
 import { appOver, eachTest, engineFor } from '../../test/placed.ts';
 import { OBJECT_BODY_LIMIT } from './serve.ts';
+import { objectOf } from '../../test/run-reads.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -264,4 +269,82 @@ test("REFUSED: a run's action whose body is over the limit is a 413, as every ob
     assert.equal(res.status, 413, route);
     assert.equal(typeof ((await res.json()) as { error?: unknown }).error, 'string', `${route}: the 413 says why`);
   }
+});
+
+/** A token the person minted for the agent `operator`, store-wide and not narrowed, named `ops`, through the package's token door. */
+const operatorToken = () =>
+  Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).persons.mint('ops', { kind: 'agent', agent: 'operator', factory: null, narrowed: null });
+    }).pipe(Effect.provide(tokenDoorFiles(root))),
+  );
+
+/** The token of the session of `step` of run `id`, its task `task`, as the store mints it when it files the try. */
+const sessionToken = (id: string, step: string, task: string) =>
+  Effect.runSync(
+    Effect.gen(function* () {
+      return yield* (yield* TokenDoor).tokens.mint({ agent: 'reviewer', factory: null, run: id, step, attempt: 1, task });
+    }).pipe(Effect.provide(tokenDoorFiles(root))),
+  );
+
+test('each write keeps who acted, by the token its request presented, and the run serves it where the write is read', async (t) => {
+  seed();
+  const status = async (id: string) => (await objectOf(app(), id)).status;
+  const person = { kind: 'person', token: 'harness' } as const;
+
+  await t.test("the person's approval at a gate, under the token the seat presents: answered and served on the step's gate", async () => {
+    task('t-by-plan', 'succeeded', DONE);
+    record('ra-by-person', { plan: 't-by-plan', implement: null }, { gated: 'plan' });
+    const approved = await answered(await send('POST', `${run('ra-by-person')}/steps/plan/approve`, { message: 'Go.' }));
+    assert.equal(approved.status, 202, JSON.stringify(approved.body));
+    assert.deepEqual(approved.body.actor, person, 'the approval answered with who gave it');
+    const gate = (await status('ra-by-person')).steps.find((s) => s.name === 'plan')?.gate;
+    assert.deepEqual(gate?.approval?.actor, person, "and served on the step's gate");
+  });
+
+  await t.test("an agent's standing token, let through by the person's rule: the approval names the agent and its token", async () => {
+    const level = path.join(root, 'nemia', 'level.json');
+    const rules = path.join(root, 'auto', 'operator.json');
+    write(level, JSON.stringify({ level: 'auto', since: at(0) }));
+    write(
+      rules,
+      JSON.stringify({ since: at(0), rules: [{ id: 'plans', answer: 'approve', steps: ['plan'], when: [], from: 'proposed' }] }),
+    );
+    try {
+      task('t-by-agent-plan', 'succeeded', DONE);
+      record('ra-by-agent', { plan: 't-by-agent-plan', implement: null }, { gated: 'plan' });
+      const asOperator = { ...BOARD, authorization: `Bearer ${operatorToken()}` };
+      const approved = await answered(await send('POST', `${run('ra-by-agent')}/steps/plan/approve`, { message: 'Go.' }, asOperator));
+      assert.equal(approved.status, 202, JSON.stringify(approved.body));
+      const gate = (await status('ra-by-agent')).steps.find((s) => s.name === 'plan')?.gate;
+      assert.deepEqual(gate?.approval?.actor, { kind: 'agent', agent: 'operator', token: 'ops' });
+    } finally {
+      fs.rmSync(level, { force: true });
+      fs.rmSync(rules, { force: true });
+    }
+  });
+
+  await t.test("a session's token: a hold keeps its free-text `by` and, beside it, the session's agent, run and step", async () => {
+    task('t-by-session', 'working');
+    record('ra-by-session', { review: 't-by-session' });
+    const asSession = { ...BOARD, authorization: `Bearer ${sessionToken('ra-by-session', 'review', 't-by-session')}` };
+    const held = await answered(await send('POST', `${run(OTHER)}/hold`, { until: [MILL], by: 'ann' }, asSession));
+    assert.equal(held.status, 200, JSON.stringify(held.body));
+    const session = { kind: 'agent', agent: 'reviewer', run: 'ra-by-session', step: 'review' };
+    const hold = held.body.hold as { by?: string; actor?: unknown };
+    assert.deepEqual([hold.by, hold.actor], ['ann', session], 'the hold answered with both');
+    assert.deepEqual((await status(OTHER)).holding?.actor, session, "and served on the run's holding");
+    assert.equal((await send('DELETE', `${run(OTHER)}/hold`)).status, 200);
+  });
+
+  await t.test("a cancel keeps who called the run off, answered and served on the run's status", async () => {
+    task('t-by-called', 'working');
+    record('ra-by-called', { implement: 't-by-called' });
+    const cancelled = await answered(await send('POST', `${run('ra-by-called')}/cancel`, {}));
+    assert.equal(cancelled.status, 200, JSON.stringify(cancelled.body));
+    assert.deepEqual(cancelled.body.actor, person, 'the cancel answered with who called it off');
+    const called = await status('ra-by-called');
+    assert.equal(typeof called.cancelledAt, 'string');
+    assert.deepEqual(called.cancelledBy, person, "and served on the run's status beside its time");
+  });
 });

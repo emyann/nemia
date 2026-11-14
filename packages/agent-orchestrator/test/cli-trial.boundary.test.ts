@@ -38,7 +38,7 @@ function nemia(root: string, argv: string[], env: NodeJS.ProcessEnv = {}): { sta
 
 test('REFUSED at shipped defaults: the checkout on a store that runs an install exits 2, naming the trial store and the setting', () => {
   const root = store(true);
-  for (const argv of [['token', 'ls'], ['tick']]) {
+  for (const argv of [['claude-token', 'status'], ['tick']]) {
     const { status, stderr } = nemia(root, argv);
     assert.equal(status, 2, `nemia ${argv.join(' ')}: ${stderr}`);
     assert.ok(stderr.includes('this is the checkout'), stderr);

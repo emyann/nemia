@@ -266,8 +266,8 @@ const unfilledBy = (spec: Spec, p: Positional, word: Word | undefined): boolean 
 
 /**
  * A command whose last positional is a rest: its required positionals the first words, then the command's own flags given right after
- * them (`nemia say <runId> <step> --as <name> <words>`), each with its value, and every word after those its text, flags included; a flag
- * it has none of where a required argument stands is refused in its words.
+ * them (`nemia say <runId> <step> --as <name> <words>`, the retired `--as` read to be refused), each with its value, and every word
+ * after those its text, flags included; a flag it has none of where a required argument stands is refused in its words.
  */
 function parseRest(spec: Spec, rest: Positional, argv: readonly string[]): Args | undefined {
   const required = spec.positionals.filter((p) => p.takes === 'required');

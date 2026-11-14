@@ -27,6 +27,9 @@ import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../tes
 import { story } from 'test-kit/checkpoints';
 import { listedOf, objectOf, stepOf, triesOf } from '../../test/run-reads.ts';
 
+/** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
+const SEATED = { kind: 'person', token: 'harness' } as const;
+
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 const engine = () => engineFor(standIn());
@@ -298,7 +301,13 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.equal(res.status, 202, await res.clone().text());
       assert.deepEqual(await res.json(), { try: 2, file: askFile(root, R, 'implement', 2), stopFirst: false });
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'implement', 2), 'utf8'));
-      assert.deepEqual(written, { step: 'implement', try: 2, mode: 'continue', message: 'Postgres, the one in docker-compose.yml.' });
+      assert.deepEqual(written, {
+        step: 'implement',
+        try: 2,
+        mode: 'continue',
+        message: 'Postgres, the one in docker-compose.yml.',
+        actor: SEATED,
+      });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       assert.deepEqual(asked(), ['retry-implement-2']);
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
@@ -357,8 +366,8 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'held', 2), 'utf8'));
       assert.deepEqual(
         written,
-        { step: 'held', try: 2, mode: 'continue' },
-        'Continue, sent in its former spelling with nothing written: written as `continue`, and no message',
+        { step: 'held', try: 2, mode: 'continue', actor: SEATED },
+        'Continue, sent in its former spelling with nothing written: written as `continue`, and no message; who asked beside it',
       );
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       const fresh = await ask('idle', { mode: 'fresh', message: 'Sign in again first.' });
@@ -367,7 +376,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const { at: freshWhen, ...freshly } = JSON.parse(fs.readFileSync(askFile(root, R, 'idle', 2), 'utf8'));
       assert.deepEqual(
         freshly,
-        { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.' },
+        { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.', actor: SEATED },
         'both, as `nemia retry --fresh --message` writes them',
       );
       assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
@@ -418,7 +427,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
   );
 
   await s.test(
-    "a try a person answered carries the answer, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none",
+    "a try a person answered carries the answer and who gave it, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none",
     async () => {
       const A = 'r-answered';
       write(
@@ -451,9 +460,9 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       signedOff('t-a-plan-try2', { outcome: 'done', summary: 'Planned it.', artifacts: [] });
       write(
         path.join(root, 'runs', `${A}.asks`, 'done', 'retry-implement-2'),
-        JSON.stringify({ mode: 'continue', message: 'Postgres.', at: at(30) }),
+        JSON.stringify({ mode: 'continue', message: 'Postgres.', at: at(30), actor: SEATED }),
       );
-      write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30) }));
+      write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30), actor: SEATED }));
 
       const run = await object(A);
       const implement = stepOf(run, 'implement');
@@ -472,6 +481,11 @@ test('a person answers a blocked step, rechecks a refused check and continues th
           [1, null, null],
           [2, null, 'try 2, fresh, on your word'],
         ],
+      );
+      assert.deepEqual(
+        [...implementTries, ...planTries].map((t: { answeredBy?: unknown }) => t.answeredBy),
+        [undefined, SEATED, undefined, undefined],
+        'who answered, off the ask, on the try it answered; a try asked with nothing said answers nothing, so names no one',
       );
       assert.equal(implementTries[0].closeout!.needs, blocked.needs, "the question the answer answers is on the try before's closeout");
       assert.equal(implement.needs, null, 'the current try signed off done');

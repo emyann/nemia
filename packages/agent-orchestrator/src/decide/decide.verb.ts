@@ -7,12 +7,13 @@
 import { StoreConfig } from '../config/config.store.ts';
 import { gatesBudgets, type GateBudgets } from '../gate-budgets/gate-budgets.ts';
 import { Effect } from 'effect';
+import { actorWords, type Actor } from 'objects';
 import { asked as engineAsked, nameFor, over, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { ToDecide } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
-import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
+import { acceptanceOf, approvalOf, type BranchStanding, type Round, type SpendOf } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
 import { hasStarted, type Wait } from '../wait/wait.ts';
 import { roundOffers } from '../round/round.ts';
@@ -45,8 +46,11 @@ import { seenBy } from '../summary/reads.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
-/** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
-export type Answered = { try: number; message: string; needs?: string };
+/**
+ * A step's current try that a person answered: the try, what they said, what the try before it needed, when it said, and who answered
+ * (`actor`, off the ask), where the ask names a caller.
+ */
+export type Answered = { try: number; message: string; needs?: string; actor?: Actor };
 
 /** What `nemia decide` answers of one run (`decideRun`). */
 export type Decided = {
@@ -171,6 +175,19 @@ export type Decided = {
 };
 
 /**
+ * `lines`, a line by step, each of a person's word — an approval at a gate, a loop accepted as it stands — followed by who gave it
+ * (`by`, the word's actor, in `actorWords`) where its file names one: `approved 10:04Z — "go" · by the person, on laptop`. A step with
+ * no such word — a gate still awaiting its approval — has no actor, and its line is kept as it is.
+ */
+export const saidBy = (lines: Record<string, string>, by: (step: string) => Actor | undefined): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(lines).map(([step, line]) => {
+      const actor = by(step);
+      return [step, actor ? `${line} · by ${actorWords(actor)}` : line];
+    }),
+  );
+
+/**
  * For each step whose current try a person answered, the answer beside the `needs` of the try before it, off `views` or, for a try
  * not among them, the engine's view of it (`e`, the call's `viewedOnce`).
  */
@@ -183,7 +200,12 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
     const before = last.taskId;
     const closeout = (views.get(before) ?? (yield* engineAsked('view', e.view(before)))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
-    answers[name] = { try: answer.try, message: answer.message, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
+    answers[name] = {
+      try: answer.try,
+      message: answer.message,
+      ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}),
+      ...(answer.actor ? { actor: answer.actor } : {}),
+    };
   }
   return answers;
 });
@@ -296,9 +318,9 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCostSaid: runCostWords(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
-    gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
+    gates: saidBy(gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds), (name) => approvalOf(run, name)?.actor),
     budgets: gatesBudgets(run, steps, reader, spendOf),
-    accepted: acceptedLines(steps, run),
+    accepted: saidBy(acceptedLines(steps, run), (name) => acceptanceOf(run, name)?.actor),
     waitingOn: waitingOnOf(run.id, run, views),
     denied: deniedLinesOf(run, views),
     waiting: [...judged.waits],

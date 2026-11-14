@@ -11,7 +11,7 @@
  * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
  * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
-import { root } from './harness.ts';
+import { root, SEATED } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -603,14 +603,14 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       assert.equal(res.status, 202, await res.clone().text());
       assert.deepEqual(await res.json(), { try: 3, file: askFile(root, R, 'tokens', 3), stopFirst: false });
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R, 'tokens', 3), 'utf8'));
-      assert.deepEqual(written, { step: 'tokens', try: 3, mode: 'continue', budget: 5 });
+      assert.deepEqual(written, { step: 'tokens', try: 3, mode: 'continue', budget: 5, actor: SEATED }, 'the ask, and who asked it');
       assert.ok(!Number.isNaN(Date.parse(when)), when);
 
       const rounded = await askRound({ step: 'review', budget: 3 });
       assert.equal(rounded.status, 202, await rounded.clone().text());
       assert.deepEqual(await rounded.json(), { step: 'review', round: 3, budget: 3, file: roundAskFile(root, R, 'review', 3) });
       const { at: roundWhen, ...roundWritten } = JSON.parse(fs.readFileSync(roundAskFile(root, R, 'review', 3), 'utf8'));
-      assert.deepEqual(roundWritten, { step: 'review', round: 3, budget: 3 });
+      assert.deepEqual(roundWritten, { step: 'review', round: 3, budget: 3, actor: SEATED });
       assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
@@ -697,8 +697,8 @@ test('steps past their budget on their own work: one that signed off blocked is 
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(root, R2, 'palette', 2), 'utf8'));
       assert.deepEqual(
         written,
-        { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2 },
-        'one ask, the next try filed with it',
+        { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2, actor: SEATED },
+        'one ask, the next try filed with it, and who asked it',
       );
       assert.ok(!Number.isNaN(Date.parse(when)), when);
 
@@ -706,7 +706,11 @@ test('steps past their budget on their own work: one that signed off blocked is 
       assert.equal(rechecked.status, 202, await rechecked.clone().text());
       assert.deepEqual(await rechecked.json(), { try: 2, file: askFile(root, R2, 'lint', 2), stopFirst: false });
       const { at: _, ...recheck } = JSON.parse(fs.readFileSync(askFile(root, R2, 'lint', 2), 'utf8'));
-      assert.deepEqual(recheck, { step: 'lint', try: 2, mode: 'recheck' }, 'no budget: a recheck files no session to spend it');
+      assert.deepEqual(
+        recheck,
+        { step: 'lint', try: 2, mode: 'recheck', actor: SEATED },
+        'no budget: a recheck files no session to spend it',
+      );
     },
   );
 

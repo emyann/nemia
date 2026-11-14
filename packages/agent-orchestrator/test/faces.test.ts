@@ -59,7 +59,7 @@ import { main } from '../src/cli/main.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import * as views from '../src/views/views.verb.ts';
 import { standingLiveOf } from '../src/standing/standing.verb.ts';
-import { writeSpeakers } from '../src/chat/chat.store.ts';
+import { SAY } from '../src/say/commands.verb.ts';
 
 const ROOT = scratch('wf-faces-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -494,7 +494,7 @@ test("each verb's program, given its services, answers what its plain face answe
   );
 
   await t.test(
-    'who says words to a step: a session by its token as its own agent, framed; an agent with no token under a name the person allowed; the person as ever. REFUSED: a name not allowed (`Conflict`), a session naming another (`Invalid`), nothing said',
+    'who says words to a step: a session by its token as its own agent, framed; an agent by a standing token as its own agent, framed; the person as ever. REFUSED: words that say they are from an agent (`Invalid`), nothing said',
     async () => {
       const b = stage.board();
       const run = await started(folder());
@@ -503,35 +503,29 @@ test("each verb's program, given its services, answers what its plain face answe
       b.settle(taskId, 'working');
       const heard = () => b.tasks.get(taskId)!.said.map((s) => s.text);
       const session = { kind: 'agent', agent: 'implement', factory: null } as const;
+      const standing = { kind: 'agent', agent: 'operator', factory: null, token: 'ops', narrowed: null } as const;
       const operator = { kind: 'agent', name: 'operator' } as const;
 
       const told = await runWith(b.e, sayRun(run.id, 'implement', 'Start with the parser.', { caller: session }));
       assert.deepEqual(told.from, { kind: 'agent', name: 'implement' }, "a session's words are its agent's");
       assert.deepEqual(heard(), ['The agent implement writes, not the person: Start with the parser.'], 'handed in its frame');
 
-      const unallowed = await rejection(
-        runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: PERSON, from: operator })),
-        'an agent the person has not allowed',
+      const named = await rejection(
+        runWith(b.e, SAY.handler({ runId: run.id, step: 'implement', text: 'Cut it.', caller: PERSON, from: operator })),
+        'words that say they are from an agent',
       );
-      assert.ok(unallowed instanceof Conflict && unallowed.exitCode === 2, String(unallowed));
-      const another = await rejection(
-        runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: session, from: { kind: 'person' } })),
-        'a session that says it is the person',
+      assert.ok(named instanceof Invalid && named.exitCode === 2, String(named));
+      assert.equal(heard().length, 1, 'nothing said');
+
+      const byToken = await runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: standing }));
+      assert.deepEqual(byToken.from, operator);
+      assert.equal(heard()[1], 'The agent operator writes, not the person: Cut it.', "an agent's standing token under its name");
+
+      const person = await runWith(
+        b.e,
+        SAY.handler({ runId: run.id, step: 'implement', text: 'Widen the scope.', caller: PERSON, from: { kind: 'person' } }),
       );
-      assert.ok(another instanceof Invalid && another.exitCode === 2, String(another));
-      assert.equal(heard().length, 1, 'nothing said for either');
-
-      writeSpeakers(path.join(ROOT, 'nemia'), ['operator']);
-      try {
-        const allowed = await runWith(b.e, sayRun(run.id, 'implement', 'Cut it.', { caller: PERSON, from: operator }));
-        assert.deepEqual(allowed.from, operator);
-        assert.equal(heard()[1], 'The agent operator writes, not the person: Cut it.', 'an allowed agent under its name');
-      } finally {
-        writeSpeakers(path.join(ROOT, 'nemia'), []);
-      }
-
-      const person = await runWith(b.e, sayRun(run.id, 'implement', 'Widen the scope.', { caller: PERSON }));
-      assert.deepEqual(person.from, { kind: 'person' });
+      assert.equal(person.from, undefined, "the person's words carry no speaker");
       assert.equal(heard()[2], 'Widen the scope.', "the person's words as they always were, in no frame");
     },
   );

@@ -1,8 +1,8 @@
 /**
  * The rest of the store's verbs the client holds, typed as a person types them under this machine's context, against one seeded store
- * served by the api (`served.ts`): `nemia concluded`, `logs`, `passes`, `series`, `memory`, `chat speakers|allow|disallow`, `level`,
- * `subscribe`, `unsubscribe`, `pairings ls|approve`, `board link` and `stats`, each its exit code, what it changed in the store, and the
- * lines it prints. The same verbs under a remote context are `rest-remote.test.ts`'s.
+ * served by the api (`served.ts`): `nemia concluded`, `logs`, `passes`, `series`, `memory`, the retired `chat speakers|allow|disallow`
+ * and `say --as`, `level`, `subscribe`, `unsubscribe`, `pairings ls|approve`, `board link` and `stats`, each its exit code, what it
+ * changed in the store, and the lines it prints. The same verbs under a remote context are `rest-remote.test.ts`'s.
  *
  * Each refusal asserts its exit code and the command or the name it names, never its sentence.
  */
@@ -100,16 +100,17 @@ test('`nemia memory` lists the facts Nemia keeps, one fact prints its words, and
   assert.match((await typed(['memory', 'pending'], 2)).err, /pending/);
 });
 
-test('`nemia chat allow|disallow <name>` writes who may speak in her chat and prints the list after; `chat speakers` reads it', async () => {
-  assert.equal((await typed(['chat', 'speakers'])).out, 'no agent may speak in her chat — nemia chat allow <name>\n');
-  const allowed = await typed(['chat', 'allow', 'operator']);
-  assert.deepEqual(allowed.out.split('\n'), ["operator may speak in her chat and to a step's session, as itself.", 'operator', '']);
-  assert.match(fs.readFileSync(path.join(store.root, 'nemia', 'chat', 'speakers.json'), 'utf8'), /operator/);
-  assert.equal((await typed(['chat', 'speakers'])).out, 'operator\n');
-  const gone = await typed(['chat', 'disallow', 'operator']);
-  assert.equal(gone.out.split('\n')[0], "operator may no longer speak in her chat nor to a step's session.");
-  assert.equal((await typed(['chat', 'speakers'])).out, 'no agent may speak in her chat — nemia chat allow <name>\n');
-  assert.match((await typed(['chat', 'allow', 'Not/A Name'], 2)).err, /Not\/A Name/);
+test('REFUSED: the retired `nemia chat speakers|allow|disallow` and `nemia say --as`, exit 2, each naming the token an agent speaks with', async () => {
+  for (const argv of [
+    ['chat', 'speakers'],
+    ['chat', 'allow', 'operator'],
+    ['chat', 'disallow', 'operator'],
+    ['say', 'r-done', 'build', '--as', 'operator', 'Cut', 'it.'],
+  ]) {
+    const { err } = await typed(argv, 2);
+    for (const named of ['nemia token add', '--agent']) assert.ok(err.includes(named), `nemia ${argv.join(' ')} names ${named}: ${err}`);
+  }
+  assert.equal(fs.existsSync(path.join(store.root, 'nemia', 'chat', 'speakers.json')), false, 'no list is written');
 });
 
 test('`nemia level` reads where she is; a level, a factory raised for a stretch and its raise ended are written; what is no write is refused', async () => {

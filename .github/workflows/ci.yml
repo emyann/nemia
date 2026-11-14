@@ -19,9 +19,12 @@ permissions:
   contents: read
 
 # A superseded run of a branch is cancelled, but every push to main keeps its run to its end: the gate below reads a cancelled job as a
-# failure, so cancelling main's run would leave a landed commit red without having been tested.
+# failure, so cancelling main's run would leave a landed commit red without having been tested. cancel-in-progress alone does not hold
+# that: GitHub keeps at most one run pending per group and cancels the older pending one whatever it says, so when three pushes reach
+# main close together the middle one's run is cancelled before it starts, and a re-run of an older commit cancels the newest pending run
+# (2026-11-13, run 43518000520). So main's group names the commit, and no run on main waits behind another; a branch's names its ref.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # Every job, and every step that reaches the network (an action, npm ci, the Chromium install, a curl), carries a timeout-minutes of its

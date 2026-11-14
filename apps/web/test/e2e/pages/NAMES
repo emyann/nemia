@@ -141,6 +141,8 @@ token
 settings-end
 setup
 settings-release
+tokens
+actor
 light-readers
 step-got
 run-ledger

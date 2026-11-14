@@ -2,7 +2,7 @@
  * The api's layer (layer.ts, `appOf` and `liveOf` in app.ts): every route, a mounted router's among them, reads the services of the app it
  * was asked through, so an app built over a layer of a test's own answers from that layer and the process's app is untouched.
  */
-import './harness.ts';
+import { seatPerson } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -42,6 +42,7 @@ test("appOf: a mounted router reads the engine and the store's root of the app i
   });
   await t.test("a mounted router's route reads the store's root of the app it was asked through", async () => {
     const home = scratch('nemia-api-layer-home-');
+    seatPerson(home);
     fs.mkdirSync(path.join(home, 'workflows', 'elsewhere'), { recursive: true });
     fs.writeFileSync(path.join(home, 'workflows', 'elsewhere', 'plan.md'), '---\nplace: git\nharness: codex\n---\nWrite PLAN.md.\n');
     const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));

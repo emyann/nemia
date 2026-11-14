@@ -5,6 +5,7 @@
  * write through `Subscription`, `Delivery` and `FeedLine`, pattern on create, nominal on read.
  */
 import { Schema } from 'effect';
+import { Actor } from 'objects';
 import { brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { RunId, StepName, TaskId, TryNumber } from '../record/record.model.ts';
@@ -63,7 +64,10 @@ const signed = {
   call: Schema.optional(Schema.String),
 };
 
-/** A run's line (`RunLine`): which run, which step of it (none for the run's own), the word the tick judged and its note. */
+/**
+ * A run's line (`RunLine`): which run, which step of it (none for the run's own), the word the tick judged and its note; and who acted
+ * (`actor`, objects' `Actor`) on a line of a person's act, absent on every other and on a line written before actors were said.
+ */
 export const RunLine = Schema.Struct({
   at: Schema.String,
   run: RunId.OnRead,
@@ -72,6 +76,7 @@ export const RunLine = Schema.Struct({
   note: Schema.optional(Schema.String),
   ...signed,
   try: Schema.optional(TryNumber.OnRead),
+  actor: Schema.optional(Actor),
 }).annotate({ identifier: 'RunLine' });
 export type RunLine = typeof RunLine.Type;
 
@@ -85,7 +90,10 @@ export const DaemonLine = Schema.Struct({
 }).annotate({ identifier: 'DaemonLine' });
 export type DaemonLine = typeof DaemonLine.Type;
 
-/** The store's line (`StoreLine`): its pause put or lifted, a put with who put it and why where the pause's file says. */
+/**
+ * The store's line (`StoreLine`): its pause put or lifted, a put with who put it and why where the pause's file says, and the caller who
+ * put it (`actor`) where the file names one.
+ */
 export const StoreLine = Schema.Struct({
   at: Schema.String,
   store: Schema.String,
@@ -94,6 +102,7 @@ export const StoreLine = Schema.Struct({
   by: Schema.optional(Schema.String),
   why: Schema.optional(Schema.String),
   ...signed,
+  actor: Schema.optional(Actor),
 }).annotate({ identifier: 'StoreLine' });
 export type StoreLine = typeof StoreLine.Type;
 

@@ -41,9 +41,14 @@ function filesUnder(dir: string): Array<[string, Buffer]> {
   return fs.readdirSync(dir).flatMap((name) => filesUnder(path.join(dir, name)));
 }
 
-/** What a pause at once writes to: the runs, their asks beside them, the engine's journals and feed, the workflow feed and the pause. */
+/**
+ * What a pause at once writes to: the runs, their asks beside them, the engine's journals and feed, the workflow feed, the pause and who
+ * lifted it (`cordon.lifted`, which Resume leaves).
+ */
 const written = (): string[] =>
-  ['runs', path.join('engine', 'tasks'), path.join('engine', 'feed.jsonl'), 'feed.jsonl', 'cordon'].map((p) => path.join(store!, p));
+  ['runs', path.join('engine', 'tasks'), path.join('engine', 'feed.jsonl'), 'feed.jsonl', 'cordon', 'cordon.lifted'].map((p) =>
+    path.join(store!, p),
+  );
 
 /** The folders of asks beside the runs, by name. */
 const asksDirs = (): string[] => fs.readdirSync(path.join(store!, 'runs')).filter((name) => name.endsWith('.asks'));

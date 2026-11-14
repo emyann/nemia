@@ -9,6 +9,7 @@
 import { setting } from '../config/config.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { EngineService, asked, sessionsDrained, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { keptRuns } from '../record/files.store.ts';
@@ -85,7 +86,7 @@ export const nowRead = Effect.fn('nowRead')(function* (memo?: PauseRuns) {
  * its form (`Invalid`), as the command's check refuses it first.
  */
 export const pauseParked = Effect.fn('pauseParked')(function* (
-  said: { why?: string; by?: string },
+  said: { why?: string; by?: string; actor?: Actor },
   given: string | undefined,
   home: string,
   now: Date = new Date(),
@@ -105,7 +106,7 @@ export const pauseParked = Effect.fn('pauseParked')(function* (
  * it up. A check whose step already has an ask for that try is left at work (`skipped`). A stop the engine refuses — the task settled
  * since it was read — is passed over: the tick sets its ask aside (`pauseAskVoid`).
  */
-export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; by?: string }, now: Date = new Date()) {
+export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; by?: string; actor?: Actor }, now: Date = new Date()) {
   const home = yield* StoreRoot;
   const e = yield* EngineService;
   const stands = readPause(home);

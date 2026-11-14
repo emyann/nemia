@@ -70,8 +70,9 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   and closed with its streams when the api refuses it. A read answers the view's newest `PORT_PAGE` events within `ANSWER_BOUND`, and
   an empty page at the feed's end for a URI no listen holds. A test waits for `liveViews()` to fall with `until`.
   It says what Nemia is on `initialize` and `server/discover`, and which tools come first, for a host that defers its tools (`PORT_INSTRUCTIONS`,
-  `src/mcp/instructions.ts`), every tool it names one the port lists. A store marked exposed (`WF_EXPOSED=1`) refuses a request with
-  no token on every route of the api (`/api`, `/openapi`), and `/mcp` takes a person's token alone; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
+  `src/mcp/instructions.ts`), every tool it names one the port lists. Every store, marked exposed (`WF_EXPOSED=1`) or not, loopback
+  included, refuses a request with no token on every route of the api (`/api`, `/openapi`) but a pairing route; `/mcp` takes a standing
+  token, the person's or an agent's, never a session's; a page of the board needs none (`needOf`, `src/caller/caller.ts`).
 - **The board's built pages are host content, served after the mount** (`src/board/board.ts`, `GET /*`): `NEMIA_BOARD_DIR`, else the
   running code's `apps/web/dist`, `index.html` for a route of the board's, never a path under `/api`, `/openapi` or `/mcp`. The board's
   token is an HttpOnly cookie (`TOKEN_COOKIE`) the api sets and clears (`POST` and `DELETE /api/session`, `src/server/session.ts`);
@@ -79,7 +80,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **Who a request is from is resolved before any router** (`callerGate`, `src/caller/caller.ts`): a handler reads `caller` off `Served`,
   never the `Authorization` header, and hands it to the package's program, which judges it (`src/proposals/`). A token refused is a 401
   on every route, not the proposals' alone. A test that presents a live token mints it through the package's `TokenDoor`, its run
-  planted and its task filed on the stand-in (`src/proposals/proposals.test.ts`).
+  planted and its task filed on the stand-in (`src/proposals/proposals.test.ts`). No request is the person for presenting none, so the
+  test seat (`test/harness.ts`) presents the person's token (`PERSON_TOKEN`) on every in-process request that presents none of its own:
+  a test whose app reads a store of its own calls `seatPerson(home)`, one that means no token sends `NO_TOKEN`, and one that starts a
+  real api mints a token into that api's store and sends it (`test/main.test.ts`).
 - **Every list is watched by `watchable`** (`src/watch/watch.ts`, `?watch=true`): a GET whose success is a `<Kind>List` is watched by
   the mount with nothing to add (`src/objects/serve.ts`), which `src/watch/watch.test.ts` holds for every such endpoint of the `Api`; a
   watch asked for a `Table` is refused 406. A watch reads its list again, so each open one costs a list read per feed line (at most one

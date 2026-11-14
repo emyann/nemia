@@ -35,6 +35,7 @@ const FILES = [
   'components/step/StepPreview.tsx',
   'components/field/Labels.tsx',
   'components/field/SelectorField.tsx',
+  'components/actor/Actor.tsx',
   'components/agent/AgentParts.tsx',
   'components/ai-elements/code-block.tsx',
   'components/command/CommandLine.tsx',

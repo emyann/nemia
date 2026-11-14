@@ -69,6 +69,8 @@ export function wordFeed(
       faults: faultsOf(run, r),
       closeouts: closeoutsOf(run, r),
       ...(run.hold ? { held: run.hold.at } : {}),
+      ...(run.hold?.actor ? { holder: run.hold.actor } : {}),
+      ...(run.unheld ? { unheld: run.unheld } : {}),
       ...(lifted !== undefined ? { lifted } : {}),
     },
   );
@@ -77,7 +79,8 @@ export function wordFeed(
 /**
  * Every act a person took on `run`, as the pass reads it off the record: each approval at a gate (`nemia approve`), keyed by the step and
  * the try it opens, and the call-off (`nemia cancel`), keyed by the moment it was asked. Each carries the person's own moment in its note,
- * which is what tells one occurrence from another — the line's own `at` is the pass's, as a denial's is.
+ * which is what tells one occurrence from another — the line's own `at` is the pass's, as a denial's is — and who acted (`actor`) where
+ * the record says: the approval's, the call-off's `cancelledBy`.
  *
  * Each fact is already on the record as the pass read it, composed on read from the person's own file and never written into the record
  * (`runRecord`): so the feed keeps its one writer, the daemon, and no verb is touched. The hold is not here — it is answered by its put and
@@ -93,8 +96,17 @@ function actsOf(run: Run): Once[] {
       word: LINE_WORDS.Approved,
       note: `try ${a.try} · at ${a.at}`,
       try: a.try,
+      ...(a.actor ? { actor: a.actor } : {}),
     })),
-    ...(run.cancelledAt !== undefined ? [{ word: LINE_WORDS.CancelAsked, note: `at ${run.cancelledAt}` }] : []),
+    ...(run.cancelledAt !== undefined
+      ? [
+          {
+            word: LINE_WORDS.CancelAsked,
+            note: `at ${run.cancelledAt}`,
+            ...(run.cancelledBy ? { actor: run.cancelledBy } : {}),
+          },
+        ]
+      : []),
   ];
 }
 

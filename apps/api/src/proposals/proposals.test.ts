@@ -125,7 +125,7 @@ test('REFUSED: a forged bearer, and an Authorization that is no bearer, are 401 
     const shaped = await app().request(url, { headers: { authorization: 'Basic dXNlcjpwYXNz' } });
     assert.equal(shaped.status, 401, `${url}: no bearer`);
   }
-  assert.equal((await app().request('/api/health')).status, 200, 'no Authorization is the person');
+  assert.equal((await app().request('/api/health')).status, 200, "the person's token, the test seat's, passes");
 });
 
 test('REFUSED: a token whose session no longer runs is 401 session-ended', async () => {

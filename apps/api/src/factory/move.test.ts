@@ -14,7 +14,7 @@
  * `nemia factory volume add` refuses any folder inside the store. Refused too: a session's token whose session has ended, as create
  * refuses it, and a name the target holds, each leaving the target with no factory file, folder or card of it.
  */
-import { root } from '../../test/harness.ts';
+import { root, seatPerson } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -84,9 +84,13 @@ type Store = { readonly home: string; readonly app: () => ReturnType<typeof appO
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 
-/** A store of its own under a scratch root, shipping the builtins in `builtins`, its app new for each test. */
+/**
+ * A store of its own under a scratch root, shipping the builtins in `builtins`, its app new for each test, the person seated in it
+ * (`seatPerson`): every request to the api presents a token, and the harness's is the person's in this store too.
+ */
 function store(prefix: string, builtins: string): Store {
   const home = scratch(prefix);
+  seatPerson(home);
   const app = eachTest(() =>
     appOver(standIn(), stand(), storeConfigLayer({ ...process.env, WF_ROOT: home }), Layer.succeed(BuiltinTemplates)(builtins)),
   );

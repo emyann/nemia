@@ -393,6 +393,8 @@ export { retryRun, type Asked } from './retry/retry.verb.ts';
 export { sayRun, type Told } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
+export { TOKEN_LEAST, tokenFloor, type FloorRequest } from './admission/floor.verb.ts';
+export { agentClassOf, floorOf, type AdmissionEntry, type FloorAnswer, type FloorRefusal } from './admission/index.ts';
 export { CANCEL } from './cancel/commands.verb.ts';
 export { ROUTE } from './gate/route.verb.ts';
 export { HOLD } from './wait/commands.verb.ts';
@@ -473,14 +475,13 @@ export { RETRY } from './retry/commands.verb.ts';
 export { SAY } from './say/commands.verb.ts';
 export { APPROVE } from './gate/commands.verb.ts';
 /**
- * Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, an agent's rules for auto, what they
- * reach, and the names an agent may speak under in her chat.
+ * Nemia's entries the api calls by type (the nemia group of `objects`' Api): her level, her memory, an agent's rules for auto, and what
+ * they reach.
  */
 export { LEVEL } from './nemia/level.verb.ts';
 export { MEMORY } from './nemia/memory.verb.ts';
 export { POLICY, POLICY_CONFIRM, POLICY_DROP } from './auto/auto.verb.ts';
 export { POLICY_REACH } from './reach/reach.verb.ts';
-export { CHAT_ALLOW, CHAT_DISALLOW, CHAT_SPEAKERS } from './chat/speakers.verb.ts';
 /**
  * The definitions' entries the api calls by type, each with its `input`: the agents listed, read as a card, written, removed,
  * tried, looked for (`sources`), copied in and their custom instructions; the skills listed, shown and written; a workflow folder
@@ -560,9 +561,11 @@ import * as RunObject from './object/run.model.ts';
 export { RunModel, RunObject };
 
 export { sessionCaller, SESSION_TOKEN, TokenDoor, tokenDigest, tokenDoorFiles } from './token/caller.verb.ts';
-export type { CallerOf, PersonTokenFiled, TokenNeed } from './token/caller.verb.ts';
+export type { CallerOf, PersonTokenFiled, StandingRecord, TokenHolder, TokenNeed } from './token/caller.verb.ts';
 export { linkMinted, pairingApproved, pairingAsked, pairingsListed } from './pairing/pairing.store.ts';
 export { boardBase, linkClaimed, pairingClaimed } from './pairing/commands.verb.ts';
+export { TOKEN_ADD, TOKEN_LS, TOKEN_RM } from './token/commands.verb.ts';
+export { credentialKept } from './token/token.store.ts';
 export { LINK_TTL_MS, PAIRING_TTL_MS, ticketState, type Ticket } from './pairing/ticket.ts';
 export {
   addressKind,
@@ -575,7 +578,7 @@ export {
   type MachineAddress,
   type Parsed,
 } from './service/index.ts';
-export { PERSON, type Caller, type ProposalCaller } from './caller/index.ts';
+export { PERSON, actorOf, type Caller, type ProposalCaller } from './caller/index.ts';
 export { proposeProgram, undoProgram } from './propose/propose.verb.ts';
 export type { ProposalPlace } from './propose/current.verb.ts';
 export { approveProgram, declineProgram, proposalGet, proposalsList } from './approval/approve.verb.ts';

@@ -9,7 +9,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
-import { BY_CAP, CARDS_FOLDER, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
+import { Actor } from 'objects';
+import {
+  BY_CAP,
+  CARDS_FOLDER,
+  oneLine,
+  WHY_CAP,
+  type Acceptance,
+  type Approval,
+  type Hold,
+  type Pruned,
+  type Run,
+  type Unheld,
+} from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
@@ -22,6 +34,7 @@ import type { AsksRead, MergeAskHeld, SaidBefore } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
+import { writeWhole } from '../whole-file/whole-file.store.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -174,6 +187,15 @@ const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: S
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
 const jsonOr = (text: string): unknown => Result.getOrUndefined(Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(text));
 
+/**
+ * The actor a person's file names (objects' `Actor`), as a key to spread: none where the file names none — one written in-process, or
+ * by code older than actors — or names one that does not read as an actor, which is left out rather than refusing what the file asks.
+ */
+export const actorIn = (value: unknown): { actor?: Actor } => {
+  const read = Result.getOrUndefined(Schema.decodeUnknownResult(Actor)(value));
+  return read === undefined ? {} : { actor: read };
+};
+
 /** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
 const markerOf = (file: string): { json: unknown } | undefined => {
   try {
@@ -242,17 +264,34 @@ function readHold(home: string, id: string): Hold | undefined {
   if (!marker) return undefined;
   const [at, until] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'until')];
   const [why, by] = [wordsOf(fieldOf(marker.json, 'why'), WHY_CAP), wordsOf(fieldOf(marker.json, 'by'), BY_CAP)];
-  return { at: isText(at) ? at : '', until: isList(until) ? until.filter(isText) : [], ...(why ? { why } : {}), ...(by ? { by } : {}) };
+  return {
+    at: isText(at) ? at : '',
+    until: isList(until) ? until.filter(isText) : [],
+    ...(why ? { why } : {}),
+    ...(by ? { by } : {}),
+    ...actorIn(fieldOf(marker.json, 'actor')),
+  };
 }
 
 /**
- * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and answer with the
- * hold written — or null, when a hold already stands. `wx`, so a hold two people put at once is the first one's, whole, and a hold is
- * never edited: changing what it names or says is `--off` and a new hold.
+ * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and the caller who put
+ * it (`actor`) where it is known, and answer with the hold written — or null, when a hold already stands. `wx`, so a hold two people put
+ * at once is the first one's, whole, and a hold is never edited: changing what it names or says is `--off` and a new hold.
  */
-export const writeHold = (home: string, id: string, until: readonly string[], { why, by }: Pick<Hold, 'why' | 'by'> = {}): Hold | null => {
+export const writeHold = (
+  home: string,
+  id: string,
+  until: readonly string[],
+  { why, by, actor }: Pick<Hold, 'why' | 'by' | 'actor'> = {},
+): Hold | null => {
   fs.mkdirSync(runsDir(home), { recursive: true });
-  const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
+  const hold: Hold = {
+    at: new Date().toISOString(),
+    until: [...until],
+    ...(why ? { why } : {}),
+    ...(by ? { by } : {}),
+    ...(actor ? { actor } : {}),
+  };
   try {
     fs.writeFileSync(holdFile(home, id), JSON.stringify(hold, null, 2), { flag: 'wx' });
     return hold;
@@ -263,12 +302,29 @@ export const writeHold = (home: string, id: string, until: readonly string[], { 
 };
 
 /**
+ * Who lifted the run's last hold lifted by hand (`Unheld`): `{ since, actor }`, a file of its own beside the hold's, written by the lift
+ * whole before the hold's file is taken away (`removeHold`), so a pass that reads the hold gone reads who took it; overwritten by the next
+ * such lift, and removed by `nemia rm` with the run. Composed onto the run on read as `unheld`.
+ */
+export const unheldFile = (home: string, id: string) => path.join(runsDir(home), `${id}.unheld`);
+
+/** Who lifted the run's last hold by hand, read: undefined where no file is there, or it does not read as one. */
+function readUnheld(home: string, id: string): Unheld | undefined {
+  const marker = markerOf(unheldFile(home, id));
+  if (!marker) return undefined;
+  const since = fieldOf(marker.json, 'since');
+  const { actor } = actorIn(fieldOf(marker.json, 'actor'));
+  return isText(since) && actor ? { since, actor } : undefined;
+}
+
+/**
  * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
  * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
- * in those seconds put a hold the tick never read, and it stays.
+ * in those seconds put a hold the tick never read, and it stays. Given who lifts it (`actor`), that is written first (`unheldFile`).
  */
-export const removeHold = (home: string, id: string, at: string): boolean => {
+export const removeHold = (home: string, id: string, at: string, actor?: Actor): boolean => {
   if (readHold(home, id)?.at !== at) return false;
+  if (actor) writeWhole(unheldFile(home, id), JSON.stringify({ since: at, actor } satisfies Unheld, null, 2));
   try {
     fs.rmSync(holdFile(home, id));
     return true;
@@ -294,6 +350,12 @@ export const removeHold = (home: string, id: string, at: string): boolean => {
  */
 export const runRecord = (home: string, id: string): Run => within('records', () => readRecord(home, id));
 
+/** The run's hold (`holdFile`) and who last lifted one by hand (`unheldFile`), each where its file is there, as the run carries them. */
+const heldOf = (home: string, id: string): Pick<Run, 'hold' | 'unheld'> => {
+  const [hold, unheld] = [readHold(home, id), readUnheld(home, id)];
+  return { ...(hold ? { hold } : {}), ...(unheld ? { unheld } : {}) };
+};
+
 const readRecord = (home: string, id: string): Run => {
   if (!fs.existsSync(runFile(home, id))) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   countRecord();
@@ -306,15 +368,10 @@ const readRecord = (home: string, id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(home, id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'unheld', 'labels', 'saidBefore', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? keptDeclared({ ...read, workflow: workflow.map(asNamed) }) : unfrozen;
-  const [at, pruned, hold, saidBefore] = [
-    fs.existsSync(cancelFile(home, id)) ? readText(cancelFile(home, id)).trim() : '',
-    readPruned(home, id),
-    readHold(home, id),
-    readSaidBefore(home, id),
-  ];
+  const [cancelled, pruned, saidBefore] = [readCancelled(home, id), readPruned(home, id), readSaidBefore(home, id)];
   const { approvals, acceptances, routes } = within('asks', () => {
     const names = fileNames(asksDir(home, id));
     return {
@@ -325,9 +382,10 @@ const readRecord = (home: string, id: string): Run => {
   });
   return {
     ...withRoutes(run, routes),
-    ...(at ? { cancelledAt: at } : {}),
+    ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
+    ...(cancelled?.at && cancelled.by ? { cancelledBy: cancelled.by } : {}),
     ...(pruned ? { pruned } : {}),
-    ...(hold ? { hold } : {}),
+    ...heldOf(home, id),
     ...(saidBefore ? { saidBefore } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
@@ -407,21 +465,37 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
 }
 
 /**
- * Write down that this run is cancelled, and answer with the time that now stands.
+ * Write down that this run is cancelled, and by whom where the caller is known (`actor`), and answer with the time that now stands.
  *
- * `wx` so the FIRST cancellation is the one kept: two people calling the same run off should not
- * leave the record saying it happened at whichever moment the second one typed it.
+ * `wx` so the FIRST cancellation is the one kept, its actor with it: two people calling the same run off should not
+ * leave the record saying it happened at whichever moment the second one typed it. A cancellation with no actor is the time alone, as
+ * the file always held; one with an actor is JSON of both (`{ at, actor }`), in the one file, so the time and who are written at once.
  */
-export const markCancelled = (home: string, id: string): string => {
+export const markCancelled = (home: string, id: string, actor?: Actor): string => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const at = new Date().toISOString();
   try {
-    fs.writeFileSync(cancelFile(home, id), at, { flag: 'wx' });
+    fs.writeFileSync(cancelFile(home, id), actor ? JSON.stringify({ at, actor }) : at, { flag: 'wx' });
     return at;
   } catch {
-    return readText(cancelFile(home, id)).trim() || at;
+    return readCancelled(home, id)?.at || at;
   }
 };
+
+/**
+ * The cancellation, read: when, and who where the file says (`by`) — undefined for a run nobody cancelled. The file holds the time as
+ * text, as it always did, or JSON of the time and the actor (`markCancelled`); a file that is neither is its text, read as the time.
+ */
+export function readCancelled(home: string, id: string): { at: string; by?: Actor } | undefined {
+  const file = cancelFile(home, id);
+  if (!fs.existsSync(file)) return undefined;
+  const text = readText(file).trim();
+  const json = text.startsWith('{') ? jsonOr(text) : undefined;
+  const at = fieldOf(json, 'at');
+  if (!isText(at)) return { at: text };
+  const { actor } = actorIn(fieldOf(json, 'actor'));
+  return { at: at.trim(), ...(actor ? { by: actor } : {}) };
+}
 
 /**
  * A person's `nemia retry`, in files of its own: `runs/<id>.asks/retry-<step>-<n>`, one per try asked for.
@@ -542,7 +616,14 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
   const read = readAs(ApprovalFileSchema, held.read);
   if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
   const { at, message, budgets } = read.read;
-  return { step, try: n, at, ...(message === undefined ? {} : { message }), ...(budgets === undefined ? {} : { budgets: { ...budgets } }) };
+  return {
+    step,
+    try: n,
+    at,
+    ...(message === undefined ? {} : { message }),
+    ...(budgets === undefined ? {} : { budgets: { ...budgets } }),
+    ...actorIn(fieldOf(held.read, 'actor')),
+  };
 }
 
 /**
@@ -589,7 +670,7 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
       : 'it says nothing of why the work is good enough with its findings open';
   }
   const { at, message } = read.read;
-  return { step, try: n, at, message };
+  return { step, try: n, at, message, ...actorIn(fieldOf(held.read, 'actor')) };
 }
 
 /**
@@ -629,7 +710,7 @@ export function roundAskIn(file: string, step: string, round: number): RoundAsk 
   const read = readAs(RoundAskFileSchema, held.read);
   if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia retry --round wrote';
   const { at, budget } = read.read;
-  return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '' };
+  return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '', ...actorIn(fieldOf(held.read, 'actor')) };
 }
 
 /** Why an ask file cannot be read, by the field its schema refused (`refused`) of what it holds (`held`). */
@@ -664,6 +745,7 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     ...(budget === undefined ? {} : { budget }),
     ...(interrupted === undefined ? {} : { interrupted }),
     at: isText(at) ? at : '',
+    ...actorIn(fieldOf(held.read, 'actor')),
   };
 }
 

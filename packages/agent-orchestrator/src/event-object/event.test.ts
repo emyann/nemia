@@ -94,6 +94,25 @@ test('a v0 line and its v1 form are served as the same Event, which decodes', ()
   assert.equal(b.metadata.name, a.metadata.resourceVersion);
 });
 
+test("a person's act is served with who acted where its line says, and a line that names none with none", () => {
+  const actor = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+  const approved: FeedLine = {
+    ...v1,
+    step: 'plan',
+    word: 'approved',
+    reason: 'Approved',
+    source: 'person',
+    message: 'approved',
+    note: `try 1 · at ${AT}`,
+    try: 1,
+    actor,
+  };
+  const event = decode(eventOf(approved, 0, 10));
+  assert.equal(event.reason, 'Approved');
+  assert.deepEqual(event.actor, actor);
+  assert.equal('actor' in decode(eventOf(v1, 0, 10)), false);
+});
+
 test('a reason this nemia does not know is served Unknown, its type and source the table says of Unknown', () => {
   const line = { ...inMill('r-2'), reason: 'Frobbed', type: 'Severe', source: 'robot' } as unknown as FeedLine;
   const event = decode(eventOf(line, 0, 10));

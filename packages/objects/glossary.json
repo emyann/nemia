@@ -330,6 +330,11 @@
       "term": "Task source",
       "meaning": "where a part of a step's task came from: a person, a step before it, a check's verdict, or the run itself; carried on a text part of what a step was told (`TaskPart`'s `source`, `packages/objects/src/run-told.ts`; `TASK_SOURCES`, `packages/objects/src/words.ts`).",
       "type": "TaskSource"
+    },
+    {
+      "term": "Actor",
+      "meaning": "who made a write, as the record keeps it and the api serves it beside the write: the person, under the name of the token they presented, or an agent, under its own name, by a standing token or of its session's run and step (`Actor`, `packages/objects/src/token.ts`). An approval, an answer, a retry, a hold, a pause and a cancel each record theirs, and the board says it in one wording (`actorWords`). Every key but `kind` optional, so a record written before actors were said reads with none.",
+      "type": "Actor"
     }
   ]
 }

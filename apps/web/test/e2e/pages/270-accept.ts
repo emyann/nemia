@@ -5,6 +5,10 @@ import { expectCount, expectVisible, Refused, settled, WAIT_MS } from '../checks
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+import { SEAT_TOKEN } from '../served.ts';
+
+/** Who the board's write is, as the approval records it: the person, under the seat's token, which the browser presents as its cookie. */
+const SEATED = { kind: 'person', token: SEAT_TOKEN };
 
 export default {
   /**
@@ -70,9 +74,12 @@ export default {
         );
       }
       const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
-      if (JSON.stringify(written) !== JSON.stringify({ step, try: 3, at: took.at, message }) || fs.readdirSync(asks).length !== 1) {
+      if (
+        JSON.stringify(written) !== JSON.stringify({ step, try: 3, at: took.at, message, actor: SEATED }) ||
+        fs.readdirSync(asks).length !== 1
+      ) {
         throw new Refused(
-          `the acceptance is written as nemia approve writes it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
+          `the acceptance is written as nemia approve writes it beside who sent it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`,
         );
       }
       if (fs.readFileSync(recordFile, 'utf8') !== seededRecord)

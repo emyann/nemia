@@ -27,6 +27,11 @@
  * the same host is sent the cookie too (`SameSite=Strict` is by site, and a cookie is scoped by host, not port), so only the board's
  * own page, `same-origin`, or no browser, writes by it.
  *
+ * A write that presents no token at all reaches the guard on a pairing route alone (`PAIR_PATH`, src/caller/caller.ts), which judges its
+ * own secret: every other route under `/api/` needs a token on every store, loopback included, and the gate refuses one with none 401
+ * `token-required` before the guard reads it (`needOf`, `callerGate`). No write is the person's for presenting none, on loopback or not;
+ * the host and the site are still read for it, so a page on another site, or a site whose name points here, asks no pairing.
+ *
  * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own write would read as another
  * site's.
  */
@@ -66,8 +71,8 @@ export const cookieTokenOf = (c: Context): string | undefined => {
 export type WriteRefusal = 'host' | 'site' | 'media';
 
 /**
- * The names a write with no token may be addressed to: this machine's loopback, on any port. An api bound beyond it (`NEMIA_BIND`,
- * port.ts) serves a store marked exposed, where every write presents a token.
+ * The names a write with no token may be addressed to: this machine's loopback, on any port. Such a write is a pairing's alone, every
+ * other route needing a token (`needOf`, src/caller/caller.ts), whatever address the api is bound to (`NEMIA_BIND`, port.ts).
  */
 const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
 

@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 import { verdictWords } from '../../lib/words';
 import { Markdown } from '../markdown/Markdown';
 import { Json } from './Outcome';
+import { Actor } from '../actor/Actor';
 import type { Frozen } from '../../lib/frozen';
 
 export { Artifacts } from '../run/Artifacts';
@@ -66,12 +67,18 @@ export function AsItCame({ raw }: { raw: unknown }) {
   );
 }
 
-/** What a person said to a try when they asked for it, as the CLI's `decide` prints it under the try before's question: `your answer`. */
-export function YourAnswer({ answer }: { answer: string }) {
+/**
+ * What a person said to a try when they asked for it, as the CLI's `decide` prints it under the try before's question: `your answer`;
+ * under it who answered (`Actor`), where the try says.
+ */
+export function YourAnswer({ answer, by }: { answer: string; by: StepTry['answeredBy'] }) {
   return (
-    <p data-your-answer className="whitespace-pre-wrap break-words">
-      <span className="font-medium text-muted-foreground">your answer:</span> {answer}
-    </p>
+    <div className="space-y-0.5">
+      <p data-your-answer className="whitespace-pre-wrap break-words">
+        <span className="font-medium text-muted-foreground">your answer:</span> {answer}
+      </p>
+      <Actor actor={by} />
+    </div>
   );
 }
 

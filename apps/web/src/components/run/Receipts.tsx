@@ -13,6 +13,7 @@ import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when 
 import { Fold } from '../step/part/Fold';
 import { Timeline } from './Timeline';
 import { StartedFrom } from './TryTag';
+import { Actor } from '../actor/Actor';
 
 /** The folds of the receipts, in the page's order. */
 export const RECEIPTS = ['timeline', 'checks', 'specs', 'tokens', 'where'] as const;
@@ -132,6 +133,17 @@ function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<
   );
 }
 
+/** When the run was called off, and who called it off where its record says (`Actor`); nothing for a run never called off. */
+function cancelledRow(run: RunDetail): ReactNode {
+  if (!run.cancelledAt) return undefined;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2">
+      {when(run.cancelledAt)}
+      <Actor actor={run.cancelledBy} />
+    </span>
+  );
+}
+
 /**
  * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
  * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
@@ -166,7 +178,7 @@ function Where({ run }: { run: RunDetail }) {
               ] satisfies Array<[string, ReactNode]>)),
           ['created', when(run.createdAt)],
           ['started', startedRow(run)],
-          [ENDED.cancelled.word, run.cancelledAt && when(run.cancelledAt)],
+          [ENDED.cancelled.word, cancelledRow(run)],
           ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
           ['workflow', code(run.workflowDir)],
         ]}

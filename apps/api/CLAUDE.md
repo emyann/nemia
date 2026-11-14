@@ -12,7 +12,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
 - **The one surface at a glance needs no daemon and no token**: `npm run api:page` serves the reference page alone on this machine's
-  loopback (`src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links named `nemia <command>` with its MCP
+  loopback (`bin/page.ts` over `src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links named `nemia <command>` with its MCP
   tool, who answers for it when an agent calls it, and its help; `npm run api` prints the same table in a terminal — command, tool,
   endpoint, what it takes and answers — and `npm run api -- <group>` one group (`src/openapi/overview.ts`). Both read the command
   table (`COMMAND_WORDS`) and the document, never a store; `node apps/api/src/openapi/print.ts` prints the whole document.

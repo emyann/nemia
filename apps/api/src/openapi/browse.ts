@@ -2,19 +2,14 @@
  * The one surface as a page to browse, with no daemon, no store and no token: the api's own reference (`referenceOf`, Scalar's) over
  * its own document (`openapiDocument`), served alone on this machine's loopback, each operation a command links named by it — its
  * `nemia` line as the summary, and under it its tool on the MCP port, who answers for it when an agent calls it, and its help.
- * `npm run api:page` prints the address and serves until it is stopped; `PORT` moves it. It reads no store and takes no request but
- * its three reads, so it asks for no token: there is nothing behind it to guard.
+ * `npm run api:page` serves it (`bin/page.ts`, which alone touches the machine). It reads no store and takes no request but its three
+ * reads, so it asks for no token: there is nothing behind it to guard.
  */
-import fs from 'node:fs/promises';
-import { serve } from '@hono/node-server';
 import { toolsOf } from 'agent-orchestrator';
 import { Hono } from 'hono';
 import { COMMAND_WORDS } from 'objects';
 import { OPENAPI_PATH, openapiDocument } from './openapi.ts';
-import { REFERENCE_BUNDLE, REFERENCE_PATH, referenceOf } from './reference.ts';
-
-/** The port the page is served on when `PORT` is not set: beside the daemon's and the viewer's, and neither. */
-const PAGE_PORT = 8790;
+import { REFERENCE_PATH, referenceOf } from './reference.ts';
 
 /** An operation of the document, as far as the page words it. */
 type Operation = { operationId?: string; summary?: string; description?: string };
@@ -77,17 +72,14 @@ function worded(): unknown {
   return document;
 }
 
-let bundle: Promise<string> | undefined;
-const document = worded();
-const app = new Hono()
-  .get(OPENAPI_PATH, (c) => c.json(document))
-  .route(
-    '/',
-    referenceOf(() => (bundle ??= fs.readFile(REFERENCE_BUNDLE, 'utf8'))),
-  )
-  .get('/', (c) => c.redirect(REFERENCE_PATH));
-
-const port = Number(process.env.PORT ?? PAGE_PORT);
-serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {
-  process.stdout.write(`the api, to browse: http://127.0.0.1:${info.port}${REFERENCE_PATH}  (Ctrl-C stops it)\n`);
-});
+/**
+ * The page's app: the worded document at the document's path, the reference page and its script beside it (`script` gives the
+ * viewer's text), and the root sent to the page. It holds no store and guards nothing: there is nothing behind it but the document.
+ */
+export const browseApp = (script: () => Promise<string>) => {
+  const document = worded();
+  return new Hono()
+    .get(OPENAPI_PATH, (c) => c.json(document))
+    .route('/', referenceOf(script))
+    .get('/', (c) => c.redirect(REFERENCE_PATH));
+};

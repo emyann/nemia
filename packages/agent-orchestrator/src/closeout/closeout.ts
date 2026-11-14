@@ -54,6 +54,8 @@ export type CloseoutSchema = { type: string; properties: Record<string, object>;
  * frozen workflow alone and never from the round the run is on: the schema is the session's `StructuredOutput`
  * tool, and a session continued under another one pays for the whole conversation again. What
  * is owed, and when, is `owedFields`'. On a judge, `route` too, one of its routes (`judgeRouteSchema`).
+ * @param step The step as the run froze it.
+ * @param steps The workflow's steps as the run froze them, which say whether the step is a loop's target.
  */
 export function closeoutSchemaOf(step: StepSpec, steps: readonly StepSpec[]): CloseoutSchema {
   const replies = isLoopTarget(steps, step.name);
@@ -74,6 +76,8 @@ const judgeRouteSchema = (step: StepSpec): Record<string, object> =>
  * The digest of the schema a step is filed with (`closeoutSchemaOf`), kept on the step's record: read by a later filing that would continue
  * that session, which starts fresh instead where this has moved. A continued session is asked for its closeout by the tool it was given;
  * asked in another shape it would pay for the whole conversation again for an answer in the wrong one.
+ * @param step The step as the run froze it.
+ * @param steps The workflow's steps as the run froze them.
  */
 export const closeoutHashOf = (step: StepSpec, steps: readonly StepSpec[]): string => digestOf([closeoutSchemaOf(step, steps)]);
 
@@ -119,6 +123,7 @@ export type Closeout = {
  * By version: no `apiVersion` is v0 — its whole summary becomes the body when it is more than one line, its first line the summary,
  * its strings file artifacts — and `nemia/v1` is read as it is; any other is an `error`. Every summary is cut to a line
  * (`summaryLine`), the whole text leading the body when the cut changed it. The fields beyond the version's envelope are `output`.
+ * @param value The closeout as the engine recorded it: an object, or the text a harness handed back.
  */
 export function parseCloseout(value: unknown): Closeout | { error: string } {
   const read = objectOf(value);
@@ -167,6 +172,9 @@ function objectOf(value: unknown): Record<string, unknown> | string {
  * An empty `replies` is missing: the schema allows it, since round 1's answer is `[]` on a schema that is the same every round,
  * and a target handed findings that answers none of them has not answered. A field JSON names `__proto__` is given as a field of its
  * own, never as the prototype.
+ * @param step The step whose `output:` declares the fields.
+ * @param said The step's closeout, or undefined where it gave none, which gives nothing.
+ * @param fields The fields asked about: those the step's `output:` declares where none are given.
  */
 export function declaredOutput(
   step: StepSpec,
@@ -188,6 +196,9 @@ export function declaredOutput(
  * name — an item that says where it is leads with the place (`placeText`), its other fields beneath — and anything else as
  * `name: value`. A declared field the closeout did not give is named, since it is why the step reads
  * unsigned. `fields` as `declaredOutput` takes them: `owedFields`, so a loop's target's `replies` are printed too.
+ * @param step The step whose `output:` declares the fields.
+ * @param said The step's closeout.
+ * @param fields The fields printed: those the step's `output:` declares where none are given.
  */
 export function outputLines(step: StepSpec, said: Closeout, fields: readonly string[] = outputFields(step)): string[] {
   const { given, missing } = declaredOutput(step, said, fields);
@@ -213,6 +224,7 @@ const labelled = (name: string, value: unknown, first = '', next = first): strin
 /**
  * A place as `nemia decide` prints one, never as JSON: `file:line` (or the file, with no line), `page · theme`, a string as it
  * is, and any other object as its keys and values. What a place holds beside those follows it, the same way.
+ * @param where The place, of any shape: an object, a list of places, or a string.
  */
 export function placeText(where: unknown): string {
   if (!where || typeof where !== 'object') return textOf(where);
@@ -265,6 +277,9 @@ function itemLines(item: unknown): string[] {
  * to commit, says each named file is kept by being collected (`artifactsContract`). `replies` is
  * `owed` for a step answering findings, and `none` on a loop's target with none to answer, since its
  * schema asks for them on every try (`closeoutSchemaOf`).
+ * @param step The step, whose `output:` names the fields it declares; undefined names none.
+ * @param replies Whether the step owes `replies` (`owed`), owes an empty list (`none`), or neither (false, where none is given).
+ * @param inFolder Whether the run is a folder run, which has nothing to commit: false where none is given.
  */
 export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
   const output = step?.output;
@@ -329,6 +344,8 @@ export const closeoutContract = (step?: StepSpec, replies: 'owed' | 'none' | fal
 
 /**
  * Whether a step is some step's `loop:` target, in the workflow the run froze: filed with `replies` in its closeout schema on every try.
+ * @param steps The workflow's steps as the run froze them.
+ * @param name The step's name.
  */
 export const isLoopTarget = (steps: readonly StepSpec[], name: string): boolean => steps.some((s) => s.loop === name);
 
@@ -385,6 +402,8 @@ const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
  * checked. A reference is refused rather than followed: resolving one is a second reading of the
  * schema that can disagree with the harness's, and a loose object behind it would reach the harness
  * unchecked.
+ * @param node The schema, or a part of it, of any shape.
+ * @param at Where `node` is in the whole schema, said in the answer: empty at its root.
  */
 export function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
   if (!isObject(node)) return undefined;

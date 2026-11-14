@@ -46,7 +46,10 @@ export const BUDGETS_SCHEMA = {
   },
 };
 
-/** The fields a step's `output:` declares whose schema is `BUDGETS_SCHEMA`, in the schema's order: none for a step without `output:`. */
+/**
+ * The fields a step's `output:` declares whose schema is `BUDGETS_SCHEMA`, in the schema's order: none for a step without `output:`.
+ * @param step The step whose `output:` is read, or undefined where there is none, which declares no field.
+ */
 export const budgetFields = (step: StepSpec | undefined): string[] =>
   Object.entries(step?.output?.schema.properties ?? {})
     .filter(([, schema]) => sameSchema(schema, [BUDGETS_SCHEMA]))
@@ -73,6 +76,7 @@ function oneBudget(value: unknown, at: string): ProposedBudget | string {
 /**
  * A field's value read as budgets, strictly, or why it is not: an array of budgets, each with exactly the keys of `BUDGETS_SCHEMA`, a
  * step's name, a number and a text. Which steps they name and the amounts are `proposalRefusal`'s. Read afresh from `value`.
+ * @param value The field's value as the closeout gave it, of any shape.
  */
 export function budgetsOf(value: unknown): ProposedBudget[] | { error: string } {
   const items = itemsOf(value);
@@ -90,6 +94,8 @@ export function budgetsOf(value: unknown): ProposedBudget[] | { error: string } 
  * What a closeout proposes through its step's budget fields: each budget of each field it gave that decodes, in the schema's order. None
  * for a closeout that is not there or did not read. A closeout whose budgets the run refuses (`budgetRefusals`) reads `unsigned`, and no
  * gate waits on it.
+ * @param step The step that closed out, whose budget fields are read, or undefined where it is not in the workflow.
+ * @param said The step's closeout, an error where it did not read, or undefined where none is there.
  */
 export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { error: string } | undefined): ProposedBudget[] {
   if (!said || 'error' in said) return [];
@@ -99,7 +105,11 @@ export function proposedBudgets(step: StepSpec | undefined, said: Closeout | { e
   });
 }
 
-/** The steps a gate at `step` can set a cap for: every step that waits on it, directly or through another, in the workflow's order. */
+/**
+ * The steps a gate at `step` can set a cap for: every step that waits on it, directly or through another, in the workflow's order.
+ * @param steps The workflow's steps, in its order.
+ * @param step The name of the gated step.
+ */
 export const laterSteps = (steps: readonly StepSpec[], step: string): string[] => {
   const later = downstreamOf(steps, step);
   return steps.filter((s) => later.has(s.name)).map((s) => s.name);
@@ -109,6 +119,9 @@ export const laterSteps = (steps: readonly StepSpec[], step: string): string[] =
  * Why the run does not take a closeout's budget fields, each a sentence that names the field, says why and what to do: a field that does
  * not decode (`budgetsOf`), and budgets it cannot set (`proposalRefusal`) — over every field together, so a step named in two is named
  * twice. None for a closeout not there or unreadable, nor of a field it did not give.
+ * @param step The step that closed out, or undefined where it is not in the workflow, which refuses nothing.
+ * @param steps The workflow's steps, in its order, which say the steps after it.
+ * @param said The step's closeout, an error where it did not read, or undefined where none is there.
  */
 export function budgetRefusals(
   step: StepSpec | undefined,
@@ -136,6 +149,8 @@ const anAmount = (usd: number): boolean => usd > 0 && Number.isFinite(usd);
 /**
  * Why `budgets` cannot be the caps a gate sets for the steps `later` names, or null: a budget for a step not among them, one that is no
  * amount of dollars above zero, and two for one step. Each in words that say what to give instead.
+ * @param budgets The budgets proposed or given, each a step and dollars.
+ * @param later The names of the steps after the gate.
  */
 export const proposalRefusal: ProposalRefusal = (budgets, later) => {
   const stray = budgets.find((b) => !later.includes(b.step));
@@ -151,7 +166,11 @@ export const proposalRefusal: ProposalRefusal = (budgets, later) => {
   return null;
 };
 
-/** What stands of a proposal once a person gave amounts: each budget it made for a step they gave none, in its order. */
+/**
+ * What stands of a proposal once a person gave amounts: each budget it made for a step they gave none, in its order.
+ * @param proposed The budgets the gated step proposed.
+ * @param given The budgets the person gave.
+ */
 export const unchanged: Unchanged = (proposed, given) => {
   const kept: StepBudget[] = [];
   for (const p of proposed) if (!given.some((g) => g.step === p.step)) kept.push(p);
@@ -161,6 +180,9 @@ export const unchanged: Unchanged = (proposed, given) => {
 /**
  * The caps an approval sets: each budget the person gave, then each the step proposed that the person did not change. Refused where a
  * budget the person gave cannot be set (`proposalRefusal`).
+ * @param proposed The budgets the gated step proposed.
+ * @param given The budgets the person gave with the approval.
+ * @param later The names of the steps after the gate, the only ones a budget may name.
  */
 export const approvedCaps: ApprovedCaps = (proposed, given, later) => {
   const refused = proposalRefusal(given, later);
@@ -168,10 +190,18 @@ export const approvedCaps: ApprovedCaps = (proposed, given, later) => {
   return { caps: [...given, ...unchanged(proposed, given)] };
 };
 
-/** The cap a step is filed and judged under: a raise of its own try, else the last approval given, else its own `budget:`, or none. */
+/**
+ * The cap a step is filed and judged under: a raise of its own try, else the last approval given, else its own `budget:`, or none.
+ * @param i The step's caps: the raise of its own try (`raised`), the caps approvals in force set (`approved`, the last wins) and
+ * its own `budget:` (`workflow`), each undefined or empty where there is none.
+ */
 export const capInForce: CapInForce = (i) => i.raised ?? i.approved.at(-1) ?? i.workflow;
 
-/** The steps whose cap is above the budget `ceilings` give them, in the order of `caps`: a step with no budget of its own never is. */
+/**
+ * The steps whose cap is above the budget `ceilings` give them, in the order of `caps`: a step with no budget of its own never is.
+ * @param caps The caps a gate sets, each a step and dollars.
+ * @param ceilings The steps' own budgets (`ceilingsOf`).
+ */
 export const aboveTheWorkflow: AboveTheWorkflow = (caps, ceilings) => {
   const named: string[] = [];
   for (const c of caps) if (ceilings.some((w) => w.step === c.step && c.usd > w.usd)) named.push(c.step);
@@ -181,16 +211,22 @@ export const aboveTheWorkflow: AboveTheWorkflow = (caps, ceilings) => {
 /**
  * Whether the most a run may cost under a gate's caps (`most`) passes the cost line its factory set for its workflow, frozen on the run
  * at its start (`line`, undefined where none is set): the gate says it, and no rule of auto approves it unasked (`withinBudget`).
+ * @param most The most the run may cost under the gate's caps, in dollars.
+ * @param line The run's cost line in dollars, or undefined where none is set.
  */
 export const pastTheLine: PastTheLine = (most, line) => line !== undefined && most > line;
 
-/** The steps' own budgets, as the ceilings `aboveTheWorkflow` reads: none of a step with no `budget:`. */
+/**
+ * The steps' own budgets, as the ceilings `aboveTheWorkflow` reads: none of a step with no `budget:`.
+ * @param steps The workflow's steps.
+ */
 export const ceilingsOf = (steps: readonly StepSpec[]): StepBudget[] =>
   steps.flatMap((s) => (s.budget === undefined ? [] : [{ step: s.name, usd: s.budget }]));
 
 /**
  * Budgets as the approve command's `budgets` argument takes them, `<step>=<amount>` each, as `nemia approve --budget` types them: what
  * the api's fold of a body's `budgets` hands the command, so both sides are read by one parser.
+ * @param budgets The budgets, each a step and dollars.
  */
 export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.map((b) => `${b.step}=${String(b.usd)}`);
 
@@ -198,6 +234,8 @@ export const budgetArgs = (budgets: readonly StepBudget[]): string[] => budgets.
  * The cap the approvals in force set for a step, as a list of none or one: of each approval of a try its step is still on (`approvalOf`'s
  * rule: one of an earlier try was spent by the try after it) that names the step among its `budgets`, the last given (`at`, a later file
  * winning a tie). Read from the person's files as `runRecord` composes them, on every pass. Pure: it changes nothing it is given.
+ * @param run The run's record, its approvals and its steps' tries.
+ * @param step The name of the step.
  */
 export const approvedCapsOf = (run: Run, step: string): number[] => {
   let last: { at: string; usd: number } | undefined;
@@ -213,6 +251,8 @@ export const approvedCapsOf = (run: Run, step: string): number[] => {
  * The cap in force on a step (`capInForce`): the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry
  * --round --budget`), else the last cap an approval in force set for it (`approvedCapsOf`: `nemia approve --budget`, or the budgets its
  * gated step proposed), else its `budget:`. Read from the record and the approvals on every pass, nothing carried.
+ * @param step The step, whose own `budget:` is the last resort.
+ * @param run The run's record, its tries and its approvals.
  */
 export const budgetOf = (step: StepSpec, run: Run): number | undefined =>
   capInForce({

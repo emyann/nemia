@@ -87,10 +87,11 @@ export type Landing =
  * machine's — reads the checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once
  * nothing of it runs.
  *
- * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files its check,
- * with the merge staged or on HEAD, unless the run is held, which aborts it; nor on a merge that is not this run's (`other`), which is
- * never touched — the run did not start it; nor, but to `wait` with why, on a checkout the place gave no reading of (`unread`), which is
- * no verdict. Once neither runs:
+ * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files the check
+ * of a step that signed off done, whatever is staged — its merge, its result on HEAD already, or nothing, as when it pushed a head that
+ * its check is to merge: the check is the judge — unless the run is held, which aborts it; nor on a merge that is not this run's
+ * (`other`), which is never touched — the run did not start it; nor, but to `wait` with why, on a checkout the place gave no reading of
+ * (`unread`), which is no verdict. Once neither runs:
  * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
  *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
  *   person's approval, or by its workflow once the step before it — one that can send the work back — passed, and its check is the run's
@@ -99,10 +100,10 @@ export type Landing =
  *   merge waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
  *   step gave no message to commit it with. A check that refused it names the base the merge was staged on (`refusedBase`).
- * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having
- *   staged none (nothing is checked or committed); the check passed and the result is on the checkout's HEAD already (it landed there as
- *   the commit that brought it onto the base, the place's `landedBy`: never HEAD itself, which another landing may have moved on top of it
- *   while the check ran); or the check ended and the merge it judged is no longer staged.
+ * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; the check passed and the
+ *   result is on the checkout's HEAD already (it landed there as the commit that brought it onto the base, the place's `landedBy`: never
+ *   HEAD itself, which another landing may have moved on top of it while the check ran); or the check ended and the merge it judged is
+ *   no longer staged, or none was: a check that passed records it aborted, and one that refused is the step's failed check.
  */
 export function landingDue(
   step: StepSpec,
@@ -134,13 +135,7 @@ export function landingDue(
   if (run.cancelledAt) return end('the run was called off before its merge was committed');
   if (ours && conflicted) return end('the merge it staged has conflicts');
   if (ours && missing.length) return end(`the merge it staged leaves out ${andList(missing)}`);
-  if (!check) {
-    if (ours || onHead) return run.hold ? end('the run was held before its check was filed') : undefined;
-    return {
-      act: 'record',
-      landed: { aborted: `${step.name} signed off with no merge of the run's result staged, so nothing was checked or committed` },
-    };
-  }
+  if (!check) return run.hold ? end('the run was held before its check was filed') : undefined;
   if (check === 'succeeded') {
     if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
     if (onHead && read.landedBy) return { act: 'record', landed: { commit: read.landedBy } };

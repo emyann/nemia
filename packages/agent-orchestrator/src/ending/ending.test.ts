@@ -242,10 +242,30 @@ test('landingDue commits, aborts, waits or records', async (t) => {
           aborted: 'its check refused the merge (exit 1), and the result is on main already: it was committed before its check ran',
         }),
       );
+    },
+  );
+
+  await t.test(
+    'an ending signed off done with nothing staged and its result unmerged — a refreshed head its check merges — has its check filed, and the check judges it',
+    () => {
+      assert.equal(due(atLanding(), 'checking', 'succeeded', undefined, NOT_STAGED), undefined, 'the check is filed on this pass');
       assert.deepEqual(
-        due(atLanding(), 'checking', 'succeeded', undefined, NOT_STAGED),
-        record({ aborted: "ship signed off with no merge of the run's result staged, so nothing was checked or committed" }),
+        due(atLanding({ hold: { at: '2026-01-01T01:00:00Z', until: ['r-0'] } }), 'checking', 'succeeded', undefined, NOT_STAGED),
+        record({ aborted: 'the run was held before its check was filed' }),
+        'a held run files no check, as with its merge staged',
       );
+      assert.deepEqual(
+        due(atLanding(), 'checking', 'succeeded', 'succeeded', ON_HEAD),
+        record({ commit: 'merged0' }),
+        'the check merged it: the commit that brought it onto the base is recorded',
+      );
+      assert.deepEqual(
+        due(atLanding(), 'checking', 'succeeded', 'succeeded', NOT_STAGED),
+        record({ aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' }),
+        'the check passed with nothing on the base',
+      );
+      const refused = due(atLanding(), 'checking', 'succeeded', 'failed', NOT_STAGED, 'm', 1);
+      assert.ok(refused?.act === 'record' && 'aborted' in refused.landed, 'a refused check lands nothing');
     },
   );
 });

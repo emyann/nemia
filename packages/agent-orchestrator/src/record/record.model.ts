@@ -180,6 +180,7 @@ const Approval = Schema.Struct({
   at: Schema.String,
   message: Schema.optional(Schema.String),
   budgets: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
+  work: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
   actor: Schema.optional(Actor),
 });
 

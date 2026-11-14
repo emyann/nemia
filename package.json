@@ -28,6 +28,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
     "lint:fast": "oxlint -c .oxlintrc.fast.json && oxfmt --check",
+    "rules": "node tools/guards/rules.ts",
     "contracts": "node tools/contracts/prove.ts",
     "format": "oxfmt",
     "e2e": "npm run e2e --workspace web --",

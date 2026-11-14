@@ -126,6 +126,7 @@ export const runReading = Effect.fnUntraced(function* (run: Run) {
 /**
  * The run read once (`RunReading`) off its steps read (`StepsReading`): its timeline off the judgement's views, which hold every try's
  * task and check (`viewsFor`), each saying when it was filed.
+ * @param steps The run's steps read once, judged.
  */
 export const runReadingOf = (steps: StepsReading): RunReading => ({
   ...steps,
@@ -135,6 +136,9 @@ export const runReadingOf = (steps: StepsReading): RunReading => ({
 /**
  * What a step's raise and status word are read from, off the views already read (`RaiseReads`), as `nemia decide` reads them: the
  * closeouts with the run's `steps`, so a script condition's answer is read as its closeout.
+ * @param run The run's record.
+ * @param views The views of the run's tasks, already read.
+ * @param steps The run's steps, whose closeouts are read with them.
  */
 export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]): RaiseReads => ({
   phaseOf: (taskId) => phaseOfView(views.get(taskId)),
@@ -143,7 +147,11 @@ export const raiseReads = (run: Run, views: Views, steps: readonly StepSpec[]): 
   verdictOf: exitVerdicts(views, run),
 });
 
-/** The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts. */
+/**
+ * The step `name`'s current try as judged: its codes and word, its check, its closeout or why it does not read, and its attempts.
+ * @param home The store's root.
+ * @param name The step's name.
+ */
 export const currentOf = (home: string, { run, source, steps, views, judged, checks, releases }: StepsReading, name: string) => {
   const taskId = run.steps[name]?.taskId ?? null;
   const step = source?.find((s) => s.name === name);
@@ -156,6 +164,12 @@ export const currentOf = (home: string, { run, source, steps, views, judged, che
   };
 };
 
-/** The step `name`'s tries, earliest first, the current one last (`triesOf`), with its current try as judged (`currentOf`). */
+/**
+ * The step `name`'s tries, earliest first, the current one last (`triesOf`), with its current try as judged (`currentOf`).
+ * @param home The store's root.
+ * @param at The run's steps read once, judged.
+ * @param name The step's name.
+ * @param current The step's current try as judged, `currentOf`'s where none is given.
+ */
 export const triesIn = (home: string, at: StepsReading, name: string, current = currentOf(home, at, name)): StepTry[] =>
   triesOf(home, at.run, name, at.steps, at.views, current, at.judged.answers, at.stderr, at.releases);

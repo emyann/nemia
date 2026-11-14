@@ -15,6 +15,10 @@ const limitTaken = (limit: number | null): boolean => limit === null || (Number.
  * The page of `total` objects read from `start` with at most `limit` of them — `bounds.byDefault` where no `limit` is asked, and never
  * more than `bounds.most` — or the refusal of a `limit` that is no whole number from 1. The size is compared with what is left before
  * it is added, so the sum is taken only below `total`, where it is exact.
+ * @param total How many objects the list holds.
+ * @param start The index of the first object the page reads.
+ * @param limit The most objects the page is asked to hold, or null where none is asked.
+ * @param bounds The list's page sizes: the default and the most.
  */
 export const listPage: ListPage = (total, start, limit, bounds) => {
   if (!limitTaken(limit)) return { refused: 'limit' };
@@ -28,13 +32,18 @@ export const listPage: ListPage = (total, start, limit, bounds) => {
  * How many objects a page asked with `limit` holds where the list has more than that left — the limit or `bounds.byDefault`, never past
  * `bounds.most` — or undefined for a `limit` `listPage` refuses: the page `listPage` cuts of a list longer than any page, so a reader that
  * stops once it holds one object more than this knows whether a next page is there, and reads no further.
+ * @param limit The most objects the page is asked to hold, or null where none is asked.
+ * @param bounds The list's page sizes: the default and the most.
  */
 export const pageSizeOf = (limit: number | null, bounds: PageBounds): number | undefined => {
   const cut = listPage(Number.MAX_SAFE_INTEGER, 0, limit, bounds);
   return 'refused' in cut ? undefined : cut.to;
 };
 
-/** The `continue` token that asks for the objects after `name`: its UTF-8 in base64url, with no padding. */
+/**
+ * The `continue` token that asks for the objects after `name`: its UTF-8 in base64url, with no padding.
+ * @param name The name of the last object a page answered.
+ */
 export const continueToken = (name: string): string => Buffer.from(name, 'utf8').toString('base64url');
 
 /** The token's refusal: it names the fix. */
@@ -46,6 +55,7 @@ const badToken = (token: string): Invalid =>
 /**
  * The name `token` was made of (`continueToken`), or `Invalid` where it is not one: a letter out of base64url, or bytes that are no
  * UTF-8.
+ * @param token The `continue` token a request passed.
  */
 export const continuedAfter = (token: string): string | Invalid => {
   if (!/^[A-Za-z0-9_-]+$/.test(token)) return badToken(token);
@@ -61,7 +71,10 @@ export type PageAsked = { readonly limit: number | null; readonly continue?: str
 /** A page of a list: its objects, how many are after them, and the token of the next page, absent on the last. */
 export type Paged<T> = { readonly items: readonly T[]; readonly remainingItemCount: number; readonly continue?: string };
 
-/** The `limit`'s refusal: it names the fix. */
+/**
+ * The `limit`'s refusal: it names the fix.
+ * @param limit The limit asked, which a list does not take.
+ */
 export const badLimit = (limit: number | null): Invalid =>
   new Invalid({
     message: `limit ${String(limit)} is no whole number from 1: pass ?limit=<n>, n from 1, or leave limit out for the default page`,
@@ -71,6 +84,10 @@ export const badLimit = (limit: number | null): Invalid =>
  * The page `asked` cuts of `sorted`, a list in its order by name (`nameOf`): it starts at the first object whose name is after the token's,
  * so the next page holds what followed the last one answered though that one is gone, and is cut by `listPage` within `bounds` (a list's,
  * `LIST_PAGE`, unless a test shortens them). `Invalid` for a limit `listPage` refuses or a token that does not decode.
+ * @param sorted The list's objects, in its order by name.
+ * @param nameOf The name of an object, which the token carries and the list is sorted by.
+ * @param asked The page asked: its limit and its continue token.
+ * @param bounds The page sizes, `LIST_PAGE` where none is given.
  */
 export const pageOf = <T>(
   sorted: readonly T[],

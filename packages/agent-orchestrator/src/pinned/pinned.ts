@@ -17,6 +17,8 @@ type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly StepSpec[] 
 /**
  * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a landed step says which
  * revisions it ran on once a refresh has moved the run's own past them. None for a step with no agent.
+ * @param step The step, whose agent and its skills are read.
+ * @param pins The run's pins, of every agent and skill it resolved.
  */
 export const stepPins = (step: StepSpec, pins: readonly Pin[]): Pin[] => {
   const agent = step.agent;
@@ -29,6 +31,8 @@ export const stepPins = (step: StepSpec, pins: readonly Pin[]): Pin[] => {
  * What a step's record keeps of the filing: the agent and skill revisions it was filed on (`stepPins`), and the digest of the closeout
  * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
+ * @param f The run's pins and the steps it is filed from.
+ * @param step The step filed, or undefined where the steps given do not hold it.
  */
 export const filedOn = (f: PinsRead, step: StepSpec | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash' | 'declared'> => {
   if (!step) return {};
@@ -41,6 +45,9 @@ export const filedOn = (f: PinsRead, step: StepSpec | undefined): Pick<StepRecor
  * (`StepRecord.declared`), whatever its run follows later. A record written before they were kept owes what the step declares `now`
  * where its schema has not `moved` since it was filed, and where it has, those of them its closeout `gave`: the harness held it to the
  * schema it was handed, so a field it lacks is one that schema did not ask. Pure.
+ * @param filed What the step's record kept at the filing: the fields it was filed with, where kept, and whether its schema has moved.
+ * @param now The fields the step's `output:` declares now.
+ * @param gave The fields its closeout gave.
  */
 export const filedFields: FiledFields = (filed, now, gave) => {
   const declared = filed.declared;
@@ -58,6 +65,10 @@ export const filedFields: FiledFields = (filed, now, gave) => {
  *
  * A record with no `closeoutHash`, written before this was kept, resumes as it always did: the hash says a schema moved, and an absent one
  * says nothing. Pure.
+ * @param session The session the filing would continue, or undefined for none.
+ * @param step The step filed, whose closeout schema is digested.
+ * @param f The run's pins and the steps it is filed from.
+ * @param record The filing step's own record, or undefined where it has none.
  */
 export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRead, record: StepRecord | undefined): string | undefined =>
   record?.closeoutHash === undefined || record.closeoutHash === closeoutHashOf(step, f.reads.steps) ? session : undefined;
@@ -67,6 +78,7 @@ export const resumeOn = (session: string | undefined, step: StepSpec, f: PinsRea
  * are known: its closeout schema's digest (`closeoutHash`) is the one its step is filed with now, so the step declares now what it did
  * then. Where the digest has moved, the record is left without them, which `filedOwed` reads as moved. Read on every read of the record
  * (`readRun`), so nothing is carried: the digest is compared here, outside what a pass judges, since a judgement reads no hash. Pure.
+ * @param run The run as its record is read: its steps' records and its frozen workflow.
  */
 export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R): R => {
   const steps = run.workflow;
@@ -85,6 +97,9 @@ export const keptDeclared = <R extends Pick<Run, 'steps' | 'workflow'>>(run: R):
  * kept at the filing (`declared`), so a revision its run followed after it adds none. A record with none but a digest of its closeout
  * schema is one whose schema has moved since it was filed (`keptDeclared` gave the others theirs): it owes those of the fields declared
  * now its closeout gave. A record with neither owes what the step declares now.
+ * @param step The step, whose `output:` is read.
+ * @param run The run, whose record of the step is read.
+ * @param said The step's closeout, or undefined where it has none.
  */
 export const filedOwed = (step: StepSpec, run: Pick<Run, 'steps'>, said: Closeout | undefined): string[] => {
   const record = run.steps[step.name];

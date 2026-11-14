@@ -39,6 +39,7 @@ export type PauseHolder = { pid: number; procStart?: number };
  * Whether the store's pause has outlived the process that holds it, from what the process table says of that process (`holder`), or
  * null for a pause no process holds: a person's never lapses; a holder gone, or whose pid is another process's now, lapses it; a
  * holder alive or unconfirmed keeps it (contracts/pause-lapse.contract.ts).
+ * @param holder What the process table says of the pause's holder, or null for a pause no process holds.
  */
 export const pauseLapsed: PauseLapsed = (holder: Identity | null): boolean => holder === 'gone' || holder === 'other';
 
@@ -62,7 +63,10 @@ const formOf = (text: string): number | undefined => {
   return m ? Number(m[1]) * UNIT_MS[m[2] as keyof typeof UNIT_MS] : undefined;
 };
 
-/** Why `text` is no timeout, naming the form, or undefined for one that reads. */
+/**
+ * Why `text` is no timeout, naming the form, or undefined for one that reads.
+ * @param text The timeout as a person typed it.
+ */
 export const timeoutRefusal = (text: string): string | undefined => {
   const ms = formOf(text);
   if (ms === undefined) return `a timeout is ${TIMEOUT_FORM}; it was given ${JSON.stringify(text)}`;
@@ -71,10 +75,18 @@ export const timeoutRefusal = (text: string): string | undefined => {
     : undefined;
 };
 
-/** The timeout `text` says, in milliseconds, or undefined where `timeoutRefusal` refuses it. */
+/**
+ * The timeout `text` says, in milliseconds, or undefined where `timeoutRefusal` refuses it.
+ * @param text The timeout as a person typed it.
+ */
 export const timeoutOf = (text: string): number | undefined => (timeoutRefusal(text) === undefined ? formOf(text) : undefined);
 
-/** Why `nemia pause`'s `--timeout` is refused: a timeout out of its form, or one given with `--now`, which cuts at once; null when none. */
+/**
+ * Why `nemia pause`'s `--timeout` is refused: a timeout out of its form, or one given with `--now`, which cuts at once; null when none.
+ * @param timeout The `--timeout` given, or undefined where none is.
+ * @param now Whether `--now` is given.
+ * @param shape How the verb is typed, which the refusal ends on.
+ */
 export const pauseTimeoutRefusal = (timeout: string | undefined, now: boolean, shape: string): string | null => {
   if (timeout === undefined) return null;
   if (now) return `--timeout gives each call in flight a while to end, and --now cuts them at once: give one, ${shape}.`;
@@ -82,7 +94,10 @@ export const pauseTimeoutRefusal = (timeout: string | undefined, now: boolean, s
   return wrong === undefined ? null : `--timeout: ${wrong}: ${shape}, as nemia pause --timeout 10m.`;
 };
 
-/** A timeout in words, by its largest whole unit: `10m`, `90s`, `2h`. */
+/**
+ * A timeout in words, by its largest whole unit: `10m`, `90s`, `2h`.
+ * @param ms The timeout, in ms.
+ */
 export const timeoutWords = (ms: number): string =>
   ms % 3_600_000 === 0 ? `${ms / 3_600_000}h` : ms % 60_000 === 0 ? `${ms / 60_000}m` : `${Math.round(ms / 1_000)}s`;
 
@@ -90,6 +105,8 @@ export const timeoutWords = (ms: number): string =>
  * How many sessions are still finishing a tool call under a pause and when what is left is cut, in one line, as the pause and a restart
  * say it while they wait: "Pausing: 2 sessions finishing a tool call, cut in 9 min", `leftMs` rounded up to whole minutes; "…, cut now"
  * once none is left, under `nemia pause --now` or past the timeout, while the calls are being cut.
+ * @param sessions How many sessions are still finishing a tool call.
+ * @param leftMs How long is left before what is left is cut, in ms; 0 or less once none is.
  */
 export const pausingWords = (sessions: number, leftMs: number): string =>
   `Pausing: ${sessions} session${sessions === 1 ? '' : 's'} finishing a tool call, cut ${leftMs > 0 ? `in ${Math.ceil(leftMs / 60_000)} min` : 'now'}`;
@@ -165,6 +182,10 @@ export const RESUME_LINE = 'nemia resume';
  * one the runtime holds queued, which no pass admits under the pause; a session that waits on a person (`needs-human`), which holds no
  * slot and does no work until answered; a session the pause has parked (`parkedOf`); and one with no view. Each is `resumed` where one
  * of `asks`, the run's waiting asks, names it.
+ * @param run The run's record.
+ * @param steps The run's steps.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
+ * @param asks The run's waiting asks, none where none is given.
  */
 export function finishingOf(
   run: Run,
@@ -202,7 +223,11 @@ const stepAtWork = (
   });
 };
 
-/** Each session among `runs` the pause has parked (`parkedOf`): a step's current task, read off `viewOf`. */
+/**
+ * Each session among `runs` the pause has parked (`parkedOf`): a step's current task, read off `viewOf`.
+ * @param runs The runs' records.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
+ */
 export const parkedAmong = (runs: readonly Run[], viewOf: (taskId: string) => FinishingView | undefined): Parked[] =>
   runs.flatMap((run) =>
     Object.entries(run.steps).flatMap(([step, record]) => {
@@ -214,6 +239,9 @@ export const parkedAmong = (runs: readonly Run[], viewOf: (taskId: string) => Fi
 /**
  * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
  * checkout (`workspace: base`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
+ * @param run The run's record.
+ * @param steps The run's steps.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
  */
 export function interruptsOf(run: Run, steps: readonly StepSpec[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
   return steps
@@ -225,7 +253,12 @@ export function interruptsOf(run: Run, steps: readonly StepSpec[], viewOf: (task
     );
 }
 
-/** Each task a pause at once stops among `runs` (`interruptsOf`), a run's steps read (`stepsOf`) only where one of its tasks is at work. */
+/**
+ * Each task a pause at once stops among `runs` (`interruptsOf`), a run's steps read (`stepsOf`) only where one of its tasks is at work.
+ * @param runs The runs' records.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
+ * @param stepsOf The steps of a run.
+ */
 export function interruptsAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
@@ -241,6 +274,10 @@ const live = (run: Pick<Run, 'steps'>, viewOf: (taskId: string) => FinishingView
 /**
  * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) and its waiting asks
  * (`asksOf`) only where one of its current tasks or checks is at work.
+ * @param runs The runs' records.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
+ * @param stepsOf The steps of a run.
+ * @param asksOf The waiting asks of a run, none for each where none is given.
  */
 export function finishingAmong(
   runs: readonly Run[],
@@ -251,7 +288,10 @@ export function finishingAmong(
   return runs.filter((run) => live(run, viewOf)).flatMap((run) => finishingOf(run, stepsOf(run), viewOf, asksOf(run)));
 }
 
-/** Every step's current task and its check's, of `run`: what may still be at work. */
+/**
+ * Every step's current task and its check's, of `run`: what may still be at work.
+ * @param run The run, its steps read.
+ */
 export const currentTasks = (run: Pick<Run, 'steps'>): string[] =>
   Object.values(run.steps).flatMap((s) => [s.taskId, s.check?.taskId].filter((id): id is string => Boolean(id)));
 
@@ -267,6 +307,8 @@ export type PauseRuns = RecordMemo<RunTasks>;
 /**
  * The ids among `runs` one of whose current tasks is at work: the runs whose records a pause at once then reads, and no other. A run a
  * person called off is none, as `interruptsRead` leaves one out.
+ * @param runs Each run as first read: its id, whether it was called off, and its current tasks.
+ * @param viewOf The view of a task by its id, or undefined for a task with no view.
  */
 export const liveAmong = (runs: readonly RunTasks[], viewOf: (taskId: string) => FinishingView | undefined): string[] =>
   runs
@@ -300,7 +342,10 @@ const pauseDoes = (pause: Pause): string => `nothing new starts, and ${SESSIONS_
 /** Whether a pause in each mode counts its sessions down to a cut, as "Pausing" then says how long is left. */
 const COUNTS_DOWN: Readonly<Record<PausedMode, boolean>> = { holding: false, draining: true, cut: true };
 
-/** The pause as it was put, in one line: since when, by whom and why, what it stops, and the verb that resumes. */
+/**
+ * The pause as it was put, in one line: since when, by whom and why, what it stops, and the verb that resumes.
+ * @param pause The store's pause.
+ */
 export const pauseWords = (pause: Pause): string =>
   `the store is paused ${sinceWords(pause)} — ${pauseDoes(pause)}; ${RESUME_LINE} resumes it`;
 
@@ -314,6 +359,8 @@ const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string =>
  * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
  * it holds back (`staged` and `held`), when any. Under a pause with a timeout, while sessions finish, how many finish a tool call and in
  * how many minutes from `now` what is left is cut (`pausingWords`). Null when no pause stands.
+ * @param paused The pause, or null for none, and the tasks still finishing and the checks it holds back.
+ * @param now The time the minutes left are counted from; the present where none is given.
  */
 export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
@@ -344,7 +391,10 @@ const atWorkWords = (kind: Finishing['kind'], calling: string | undefined): stri
   return kind === 'check' ? 'its check runs' : 'the check of its landing runs';
 };
 
-/** Each session still finishing under the pause that is in a tool call (`calling`): what a stop of the daemon waits for. */
+/**
+ * Each session still finishing under the pause that is in a tool call (`calling`): what a stop of the daemon waits for.
+ * @param paused The pause as it stands, its tasks still finishing read.
+ */
 export const callsOf = (paused: { finishing: readonly Finishing[] }): Finishing[] =>
   paused.finishing.filter((f) => f.calling !== undefined);
 
@@ -369,6 +419,8 @@ export const NOW_LINE = 'nemia pause --now --yes';
  * What `nemia pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
  * cut — a session's tool call, which goes on as the same try, or a check, run again — what that costs (`NOW_COST`), that a landing
  * finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
+ * @param interrupts Each task it would cut.
+ * @param standing Whether a pause stands already, which it would keep; false where none is said.
  */
 export const nowLines = (interrupts: readonly Interrupt[], standing = false): string[] => {
   const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
@@ -414,6 +466,8 @@ export const heldLines = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): st
 /**
  * Every line said of the pause at `now`: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task
  * still finishing, each session parked (`parkedWords`) and each check it holds back (`heldLines`), indented.
+ * @param paused The pause, or null for none, with what still finishes, what it parked and what it holds back.
+ * @param now The time the minutes left are counted from; the present where none is given.
  */
 export const pausedLines = (paused: Paused, now: Date = new Date()): string[] => {
   const line = pausedWords(paused, now);
@@ -429,7 +483,10 @@ export const pausedLines = (paused: Paused, now: Date = new Date()): string[] =>
 /** What `nemia up` says once the pause it said is resumed. */
 export const RESUMED = 'the store is resumed — the next pass files what waits';
 
-/** The `--timeout <d>` flag of `nemia pause`, `nemia service restart` and `nemia upgrade`, its refusal ending on the verb's `shape`. */
+/**
+ * The `--timeout <d>` flag of `nemia pause`, `nemia service restart` and `nemia upgrade`, its refusal ending on the verb's `shape`.
+ * @param shape How the verb is typed, which the flag's refusal ends on.
+ */
 export const timeoutFlag = (shape: string): Flag => ({
   flag: '--timeout',
   kind: 'text',

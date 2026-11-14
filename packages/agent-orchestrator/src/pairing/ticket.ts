@@ -18,6 +18,8 @@ export const LINK_TTL_MS = 10 * 60_000;
 /**
  * Where a ticket stands at `nowMs`: claimed for good once claimed; else expired past its time; else waiting where it needs an approval
  * nobody gave; else claimable.
+ * @param ticket The ticket: when it was made, how long it waits, and whether it needs an approval and has one and its claim.
+ * @param nowMs The time it is judged at, in ms since the epoch.
  */
 export const ticketState: TicketStateOf = (ticket, nowMs) => {
   if (ticket.claimedAtMs !== undefined) return 'claimed';
@@ -35,12 +37,16 @@ const CODE_LENGTH = 8;
 export const shortCode = (): string =>
   Array.from({ length: CODE_LENGTH }, () => CODE_ALPHABET.charAt(crypto.randomInt(CODE_ALPHABET.length))).join('');
 
-/** A short code as a person is shown it: its two halves split by a dash, `XXXX-XXXX`. */
+/**
+ * A short code as a person is shown it: its two halves split by a dash, `XXXX-XXXX`.
+ * @param code The short code as the store keeps it, with no dash.
+ */
 export const codeShown = (code: string): string => `${code.slice(0, CODE_LENGTH / 2)}-${code.slice(CODE_LENGTH / 2)}`;
 
 /**
  * A short code as a person typed it, read as the store keeps it: its dash and spaces taken off, in capitals. Undefined for a text that is
  * no code: of another length, or holding a character outside the alphabet.
+ * @param typed The text the person typed.
  */
 export const codeRead = (typed: string): string | undefined => {
   const bare = typed.replace(/[\s-]/g, '').toUpperCase();

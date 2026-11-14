@@ -34,12 +34,16 @@ const DECIDE: Pick<CommandSpec, 'name' | 'spec'> = {
   },
 };
 
-/** The line that prints what there is to decide on a run: `nemia decide <run>`. */
+/**
+ * The line that prints what there is to decide on a run: `nemia decide <run>`.
+ * @param runId The run's id, said as the line's run.
+ */
 export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });
 
 /**
  * The line that takes the new revisions of every kind a run resolved: `nemia refresh <run>`, the run alone — the step refresh takes is
  * `--base`'s (`nemia refresh <run> [<step>] --base`), which this line does not ask, so it is not said, not even as `[<step>]`.
+ * @param runId The run's id, said as the line's run.
  */
 export const refreshLine = (runId: string): string =>
   commandLine(
@@ -50,7 +54,11 @@ export const refreshLine = (runId: string): string =>
 /** A step's lines beside its controls: its approval at its gate, a try in its session, and words said to it. */
 export type StepCommands = { approve: string; retry: string; say: string };
 
-/** A step's lines: `nemia approve <run> <step>`, `nemia retry <run> <step>` and `nemia say <run> <step>`. */
+/**
+ * A step's lines: `nemia approve <run> <step>`, `nemia retry <run> <step>` and `nemia say <run> <step>`.
+ * @param runId The run's id, said in each line.
+ * @param step The step's name, said in each line.
+ */
 export const stepCommands = (runId: string, step: string): StepCommands => ({
   approve: commandLine(APPROVE, { runId, step }),
   retry: commandLine(RETRY, { runId, step }),
@@ -68,6 +76,7 @@ export type RunLines = {
 /**
  * The lines of `run`, off its record alone: one entry per step it froze, in the order it froze them, then any its record holds besides
  * (a record with no frozen workflow names its steps there alone).
+ * @param run The run's record, its id, frozen workflow and steps read.
  */
 export const runLines = (run: Run): RunLines => {
   const names = [...new Set([...(run.workflow ?? []).map((s) => s.name), ...Object.keys(run.steps)])];

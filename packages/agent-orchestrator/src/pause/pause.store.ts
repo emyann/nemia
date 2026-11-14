@@ -32,12 +32,16 @@ import { writeWhole } from '../whole-file/whole-file.store.ts';
  */
 const PAUSE_FILE = 'cordon';
 
-/** The pause's file: one for the whole store. */
+/**
+ * The pause's file: one for the whole store.
+ * @param home The store's root.
+ */
 export const pauseFile = (home: string): string => path.join(home, PAUSE_FILE);
 
 /**
  * Whether a pause stands on the store: its file is there, whatever it holds. What a reader that needs no word of the pause asks — the
  * runtime's admission, a run's stamp — in place of the file's path.
+ * @param home The store's root.
  */
 export const pauseStands = (home: string): boolean => fs.existsSync(pauseFile(home));
 
@@ -81,6 +85,7 @@ export type PauseFileRead = { pause: Pause; heldBy?: PauseHolder; text: string }
 /**
  * The store's pause and its holder in one read, or null when none stands. A file that is there pauses the store whatever it holds: one
  * that does not read as the pause gives its fields empty, so a person's hand edit never lets new work start.
+ * @param home The store's root.
  */
 export function readPauseFile(home: string): PauseFileRead | null {
   let text: string;
@@ -108,10 +113,16 @@ export function readPauseFile(home: string): PauseFileRead | null {
   return { pause, ...(heldBy ? { heldBy } : {}), text };
 }
 
-/** The store's pause, or null when none stands (`readPauseFile`, its holder left in the file). */
+/**
+ * The store's pause, or null when none stands (`readPauseFile`, its holder left in the file).
+ * @param home The store's root.
+ */
 export const readPause = (home: string): Pause | null => readPauseFile(home)?.pause ?? null;
 
-/** The mode the store's pause stands in, read from its file now (`pauseModeOf`). */
+/**
+ * The mode the store's pause stands in, read from its file now (`pauseModeOf`).
+ * @param home The store's root.
+ */
 export const modeAt = (home: string): PauseMode => pauseModeOf(readPause(home));
 
 /** What each refusal of the machine is thrown as, by what the caller was doing. */
@@ -142,6 +153,11 @@ function osUser(): string | undefined {
  * sessions' drain; with none the pause parks no session.
  * A take-over names itself as the pause's holder (`heldBy`), written to the file and not answered, so the pass lifts the pause once that
  * process is gone. Refuses (`Conflict`) a store already paused, naming who paused it, `nemia resume`, and `nemia pause --now`.
+ * @param home The store's root.
+ * @param said What the person says of the pause: why, by whom, and the caller who puts it, each optional.
+ * @param now When the pause is put, its `at`; the present where none is given.
+ * @param timeoutMs How long each call in flight is given before it is cut, in ms, or undefined for a pause that parks no session.
+ * @param heldBy The process that holds the pause, for a take-over; undefined for a person's pause, which no process holds.
  */
 export function putPause(
   home: string,
@@ -177,6 +193,7 @@ export function putPause(
  * The store's pause with its timeout cut to 0, as `nemia pause --now` cuts every call in flight: since when, by whom and why kept as they
  * were put, the file written whole through a hidden file renamed over it. Answers the pause as written. Refuses (`Missing`) a store no
  * pause stands on.
+ * @param home The store's root.
  */
 export function cutPause(home: string): Pause {
   const nothing = 'the store is not paused: there is nothing to cut (nemia pause --now puts one).';
@@ -194,10 +211,14 @@ export function cutPause(home: string): Pause {
  * Who last lifted the store's pause by hand: `{ since, actor }`, a file of its own beside the pause's, written whole by the lift before the
  * pause's file is taken away (`resumePause`), so the pass that reads the pause gone reads who lifted it, paired by the moment of the pause
  * lifted (`since`); overwritten by the next such lift.
+ * @param home The store's root.
  */
 export const resumedFile = (home: string): string => path.join(home, `${PAUSE_FILE}.lifted`);
 
-/** Who last lifted the store's pause by hand (`resumedFile`): undefined where no file is there, or it does not read as one. */
+/**
+ * Who last lifted the store's pause by hand (`resumedFile`): undefined where no file is there, or it does not read as one.
+ * @param home The store's root.
+ */
 export function readResumed(home: string): { since: string; actor: Actor } | undefined {
   let read: unknown;
   try {
@@ -214,6 +235,8 @@ export function readResumed(home: string): { since: string; actor: Actor } | und
 /**
  * Lifts the store's pause and answers the pause lifted. Refuses (`Missing`) a store no pause stands on. Given who lifts it (`actor`), that
  * is written first, beside the pause's file (`resumedFile`), so the feed's lift of the pause names them.
+ * @param home The store's root.
+ * @param actor Who lifts the pause, or undefined where it is not known, in which case no lift is written beside it.
  */
 export function resumePause(home: string, actor?: Actor): Pause {
   const nothing = 'the store is not paused: there is nothing to resume (nemia pause puts one).';
@@ -234,6 +257,8 @@ export function resumePause(home: string, actor?: Actor): Pause {
  * answers the pause lifted with its holder; null where none stands, none is held, or its holder still runs. Judged afresh on each pass
  * from the file and the process table, never remembered. The file is unlinked only while it holds the text judged, so a pause put again
  * between the read and the lift — a person's `nemia resume` then `nemia pause` — stands.
+ * @param home The store's root.
+ * @param identify What the process table says now of the holder the file names: whether it still runs as the same process.
  */
 export function liftLapsedPause(home: string, identify: (holder: PauseHolder) => Identity): { pause: Pause; heldBy: PauseHolder } | null {
   const read = readPauseFile(home);

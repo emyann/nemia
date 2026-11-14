@@ -217,6 +217,8 @@ const stepLabel = (index: number): string => `step ${String(index + 1).padStart(
 /**
  * Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the
  * default.
+ *
+ * @param spec the step's agent, harness and model, each none where the step sets none
  */
 export const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
   `${spec.agent ? `${spec.agent} · ` : ''}${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
@@ -250,6 +252,8 @@ const HARNESS_OWN = "harness's own";
  * `harness's own` where it sets none — what a session runs with is the thing a person reads a workflow for, and a step that says nothing
  * gets the most. The rest of its keys are on the step's file. A line's `title`, when it has one, is what its value stands for — the tools'
  * names, where the value counts them — and is the value itself otherwise.
+ *
+ * @param spec the workflow step's spec
  */
 export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string, title?: string]> {
   const lines: Array<[string, string, string?]> = [];

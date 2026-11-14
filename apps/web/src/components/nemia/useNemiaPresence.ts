@@ -10,7 +10,12 @@ import { presenceOf } from '@/lib/chatFollowing';
 import type { Presence } from '@/lib/presence';
 import { useNemiaChat } from '@/lib/useNemiaChat';
 
-/** Her presence at the page at `path` with `search`. */
+/**
+ * Her presence at the page at `path` with `search`.
+ *
+ * @param path the address of the page
+ * @param search the page's search
+ */
 export function useNemiaPresence(path: string, search: Record<string, unknown>): Presence {
   const chat = useNemiaChat();
   const counted = useQuery(frameRunsQuery(path, search)).data;

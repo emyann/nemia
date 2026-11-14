@@ -33,6 +33,8 @@ export type LayerHomes = {
 /**
  * What the board calls each layer of what a step is told, with its number in the precedence order: where two of them say different
  * things, the higher number wins (`PRECEDENCE_NOTE`). The agent's own words are headed by whose they are.
+ *
+ * @param agent the agent's name
  */
 export const INSTRUCTIONS = (agent: string): string => `1. Instructions — ${agent}'s`;
 export const CUSTOM_INSTRUCTIONS = '2. Your custom instructions';
@@ -60,6 +62,9 @@ const NO_RULES_TOLD = 'This step is told none: the factory keeps none that can b
 /**
  * What a step's policy is told after, in words: agent `agent`'s instructions, then your custom instructions and the factory's rules,
  * each where `layers` holds some.
+ *
+ * @param agent the agent's name
+ * @param layers the layers of what the step is told, read for its custom and factory ones
  */
 export function toldBefore(agent: string, layers: Pick<Frozen<StepLayers>, 'custom' | 'factory'>): string {
   const first = `${agent}'s instructions`;

@@ -13,6 +13,9 @@ import { stepPartOf } from '../../lib/stepPart';
  * `waitingOnYou` decides the human gate beside the step's own word; for a condition or a workflow node, its graph node, and what its
  * sentence says of its route or its card (`routedOf`); and what its part says it gave, of the try it shows, whose first item the node draws
  * (`stepPartOf`, the one model of every size of a step).
+ *
+ * @param run the run, as the api gives it
+ * @param index the step's place in the run's steps
  */
 export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   step: run.steps[index],
@@ -62,6 +65,9 @@ export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'
  * nodes and labelled with the round once past the first; a route's edge labelled with its route, thin and faint where it was not
  * taken. Each says what `edgesOf` reads off the steps at its ends; an edge along which a step handed its declared output carries that
  * packet of `packets` (a run's page passes its own, `packetsOfView`), which `StateEdge` draws as a chip.
+ *
+ * @param facts what the graph's edges are drawn from
+ * @param packets the packets steps handed along edges, none by default
  */
 export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []): StateFlowEdge[] {
   const runCancelled = facts.cancelledAt !== null;
@@ -83,6 +89,8 @@ export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []
 /**
  * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that still waits on it, out of the one card's
  * right side and into the other's left, dashed: a wait that is over draws nothing.
+ *
+ * @param runs the runs on the Factory's floor
  */
 export function afterEdges(runs: Parameters<typeof runEdges>[0]): StateFlowEdge[] {
   return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
@@ -91,6 +99,9 @@ export function afterEdges(runs: Parameters<typeof runEdges>[0]): StateFlowEdge[
 /**
  * The lines of what the focused card reads as context (`contextEdges`): faint and dotted, with no arrow, under the class `context-edge`.
  * None without a focus.
+ *
+ * @param runs the runs on the Factory's floor
+ * @param focus the run whose context is drawn, null for none
  */
 export function readEdges(runs: Parameters<typeof contextEdges>[0], focus: string | null): StateFlowEdge[] {
   return contextEdges(runs, focus).map((e) => ({

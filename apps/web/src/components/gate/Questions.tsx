@@ -27,7 +27,12 @@ const said = (draft: Draft, q: Frozen<Question>) => draft[q.title] ?? { chose: [
 const recommendedOf = (q: Frozen<Question>): readonly string[] =>
   q.recommended === null ? [] : typeof q.recommended === 'string' ? [q.recommended] : q.recommended;
 
-/** `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was. */
+/**
+ * `draft` with every question that has a recommendation set to it, and their words kept; a question without one is left as it was.
+ *
+ * @param questions the questions a step asks
+ * @param draft what the person chose and wrote so far
+ */
 export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: Draft): Draft =>
   Object.fromEntries([
     ...Object.entries(draft),
@@ -40,17 +45,32 @@ export const recommendedDraft = (questions: readonly Frozen<Question>[], draft: 
 /**
  * `draft` with `label` chosen, or no longer chosen, on `q`: the one choice of a question that takes one, among others of one that takes
  * several.
+ *
+ * @param draft what the person chose and wrote so far
+ * @param q the question the choice is on
+ * @param label the option chosen or no longer chosen
+ * @param on whether the option is chosen
  */
 export const chosenDraft = (draft: Draft, q: Frozen<Question>, label: string, on: boolean): Draft => {
   const before = said(draft, q).chose.filter((l) => q.multiple && l !== label);
   return { ...draft, [q.title]: { ...said(draft, q), chose: on ? [...before, label] : before } };
 };
 
-/** The titles of the questions `draft` leaves with neither a choice nor words, in the order asked. */
+/**
+ * The titles of the questions `draft` leaves with neither a choice nor words, in the order asked.
+ *
+ * @param questions the questions a step asks, in the order asked
+ * @param draft what the person chose and wrote so far
+ */
 export const unanswered = (questions: readonly Frozen<Question>[], draft: Draft): string[] =>
   questions.filter((q) => said(draft, q).chose.length === 0 && !said(draft, q).own.trim()).map((q) => q.title);
 
-/** `draft` as the api takes it: an answer to each question, in the order asked, its own words only where there are any. */
+/**
+ * `draft` as the api takes it: an answer to each question, in the order asked, its own words only where there are any.
+ *
+ * @param questions the questions a step asks, in the order asked
+ * @param draft what the person chose and wrote so far
+ */
 export const answersFrom = (questions: readonly Frozen<Question>[], draft: Draft): QuestionAnswer[] =>
   questions.map((q) => {
     const { chose, own } = said(draft, q);

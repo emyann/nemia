@@ -390,6 +390,11 @@ function Choice<T extends string>({
  * What an approval sends: the answers to the questions the step asks, where it asks any, in the order asked; and the words, where any were
  * written — beside answers, their note; and the budgets the person changed (`budgetsGiven`), where they changed any, and no `budgets` at
  * all where they changed none, so the package writes the step's proposal as it stands.
+ *
+ * @param questions the questions the step asks, none where it asks none
+ * @param draft what the person chose and wrote for each question
+ * @param words the words written beside the approval, empty where none
+ * @param given the budgets the person changed, none where they changed none
  */
 export const approvalBody = (
   questions: readonly Frozen<Question>[],
@@ -469,6 +474,10 @@ function GateTaken({ step, taken }: { step: string; taken: { named: string; said
  * An approval is about the gated step, and what follows it is filed — except at an ending step's gate (`acts`), where nothing follows and
  * the approval files that step itself. A send-back is about the step whose try was asked for, which at such a gate is the work and not the
  * step at the gate (`sendBackTo` in agent-orchestrator): naming the ending there would say a try was filed for a step that has not run.
+ *
+ * @param taken what the api took: an approval, or an ask for a try of some step
+ * @param step the gated step
+ * @param acts whether the gated step ends the run in the checkout, where nothing follows its gate
  */
 export const takenOf = (
   taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string },
@@ -488,6 +497,8 @@ export const takenOf = (
  * ending step acts where nothing can be taken back, and has no closeout of its own — what a person approves is the work it would act on.
  * The two read the same off a step's record at its gate (unfiled, awaiting approval), so the key is what tells them apart; a detail from an
  * api that does not carry it reads as any other step, and its gate is drawn as §6's.
+ *
+ * @param step the step, read for its frozen spec
  */
 export const endsTheRun = (step: Pick<StepView, 'spec'>): boolean => step.spec?.workspace === 'base';
 
@@ -557,6 +568,9 @@ export function ActsOn({ run, step }: { run: RunDetail; step: StepView }) {
  * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off, and for a
  * step that ends the run in the checkout (`ends`, `endsTheRun`) once the work it acts on has, since such a step never signs off before its
  * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-orchestrator).
+ *
+ * @param gate the step's gate
+ * @param ends whether the step ends the run in the checkout (`endsTheRun`)
  */
 export const gateWord = (gate: StepGate, ends = false): string =>
   gate.approval

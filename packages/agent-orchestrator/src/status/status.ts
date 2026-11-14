@@ -97,7 +97,11 @@ export const approvedUnfiled = (step: StepSpec, run: Run): boolean => unfiledApp
  */
 export const takeBackWords = (step: StepSpec, run: Run): string => {
   const given = unfiledApproval(step, run);
-  if (!given || given.work !== undefined) return '';
+  return given && given.work === undefined ? takeBackOf(step, run, given) : '';
+};
+
+/** `takeBackWords` for the approval `given` of `step`, an ending approved and not filed whose approval names no work. Pure. */
+export const takeBackOf = (step: StepSpec, run: Run, given: Approval): string => {
   const back = sendBackTo(step, run)
     .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
     .join(' or ');

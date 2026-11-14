@@ -2795,8 +2795,9 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   tick moves it into `done/`, beside any spent there before, never over one, and
   once the work signs off again the ending waits at its gate for a new approval. A restart reads the same, since the record's tries are
   what spend it. `wf ls`, `wf decide` and a second `wf approve` offer that send-back beside what the ending waits for; a held or pruned
-  run offers none. An approval an older nemia wrote names no work, and counts as current. Once the ending is filed, the send-back is
-  refused as it was.
+  run offers none. An approval an older nemia wrote names no work, and counts as current; no try of the work would spend it, so nothing
+  offers its send-back, and `wf retry` and a second `wf approve` say to take it back first, moving `approve-<ending>-<try>` into the
+  run's `.asks/done/`. Once the ending is filed, the send-back is refused as it was.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the

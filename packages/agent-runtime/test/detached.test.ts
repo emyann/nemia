@@ -20,7 +20,9 @@
  *   kills it too, on a stop as on a run file taken away, within a heartbeat and five seconds of SIGTERM. A run file taken away
  *   while the worker writes its status is not made again: a hook freezes the worker in its temp write to hold the removal there.
  * - A second stop while one is under way is sent by the harness itself, half its grace into the first, off `/proc/uptime` with
- *   the shell's builtins alone: sent by the test, it waited on the test process too, which a loaded runner held past the kill.
+ *   the shell's builtins alone, so the test process's scheduling is not in its chain.
+ * - A test finds a worker by the pid its run file publishes (`workerOf`), never by a scan of its store's processes: where the host
+ *   makes scopes, the process the spawn launched lingers beside the worker it started, and a scan can find it first.
  * - Half a line, as a writer caught mid-append leaves it, is never written on as a line of its own; a wait longer than the
  *   worker's look at the inbox can only let that test pass wrongly under load, never fail it.
  * - A test that ticks the engine puts a fake `claude` on PATH: the `claude` harness is observed on every tick, and must not
@@ -262,7 +264,28 @@ const alive = (pid: number) => {
   }
 };
 /** Until `ok` holds, in test `t`, looked at every 50ms. */
-const within = (t: Waiter, ok: () => boolean, what: string) => until(t, ok, what, { everyMs: 50 });
+const within = (t: Waiter, ok: () => boolean, what: string | (() => string)) => until(t, ok, what, { everyMs: 50 });
+
+/**
+ * The worker of run `name` of spec `spec` in store `dir`, by the pid its run file says it published: what `stop` signals. Never by a
+ * scan of the processes in `dir`: where the host makes scopes, the process the spawn launched starts the worker behind `--scope-by`
+ * and lingers until it has read that pid, so a scan can find it first, and a signal sent to it never reaches the worker. Under load
+ * that left the second-stop test's harness running to its timeout on CI (2026-11-13, `e46b993eb`).
+ */
+const workerOf = async (t: Waiter, dir: string, name: string, spec = 'sh') => {
+  let pid = 0;
+  await within(
+    t,
+    () => {
+      try {
+        pid = (JSON.parse(fs.readFileSync(runFileOf(dir, spec, name), 'utf8')) as { pid: number }).pid;
+      } catch {}
+      return pid > 0;
+    },
+    `the worker of ${name} publishes its pid`,
+  );
+  return pid;
+};
 
 /** A worker's run of a harness that writes its pid in `cwd` and sleeps on, started, answering the worker's pid and the harness's. */
 const sleeper = async (t: Waiter, name: string) => {
@@ -296,7 +319,7 @@ const stubborn = async (t: Waiter, name: string) => {
   const ops = detachedOps(sh("(trap '' TERM; : > started; while :; do sleep 1; done) & wait"), dir, QUICK);
   await Effect.runPromise(ops.spawn(req(name, cwd)));
   await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
-  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  const worker = await workerOf(t, dir, name);
   return { dir, cwd, ops, worker };
 };
 
@@ -380,11 +403,8 @@ test('a worker ends all of its harness however its session ends: stopped, or its
       let worker = 0;
       let harness = 0;
       try {
-        await within(
-          sub,
-          () => (worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))?.pid ?? 0) > 0 && isFrozen(worker),
-          'the worker freezes in its write of the harness it started',
-        );
+        worker = await workerOf(sub, dir, 'ae/g1/2');
+        await within(sub, () => isFrozen(worker), 'the worker freezes in its write of the harness it started');
         await within(
           sub,
           () => {
@@ -2929,8 +2949,7 @@ const SECOND_STOP_GRACE_MS = 4000;
 
 /**
  * How far into the first stop's grace the harness itself sends the second, on its own clock: half of it, far over a tick's 0.1 s.
- * The harness sends it, not the test, so the test process's own scheduling is not in the chain: once the 0.8 s it was given lost
- * to a loaded runner, and the test waited out its timeout for a second stop that came after the kill.
+ * The harness sends it, not the test, so the test process's own scheduling is not in the chain.
  */
 const SECOND_STOP_INTO_MS = SECOND_STOP_GRACE_MS / 2;
 
@@ -2957,8 +2976,13 @@ test('a second stop while one is under way signals the harness again, and leaves
   const cwd = scratch('ae-harness-');
   const ops = detachedOps(sh(SECOND_STOP_SH), dir, { stopGraceMs: grace, beatMs: 200 });
   await Effect.runPromise(ops.spawn(req('ae/g5/1', cwd)));
-  await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
-  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  await within(
+    t,
+    () => fs.existsSync(path.join(cwd, 'started')),
+    () =>
+      `the harness started — run file: ${fs.existsSync(runFileOf(dir, 'sh', 'ae/g5/1')) ? fs.readFileSync(runFileOf(dir, 'sh', 'ae/g5/1'), 'utf8') : 'none'}`,
+  );
+  const worker = await workerOf(t, dir, 'ae/g5/1');
   const lines = (name: string) => {
     const file = path.join(cwd, name);
     return fs.existsSync(file)
@@ -2971,7 +2995,13 @@ test('a second stop while one is under way signals the harness again, and leaves
       : [];
   };
   process.kill(worker, 'SIGTERM');
-  await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and its harness ended');
+  const left = () => {
+    const read = (name: string) => (fs.existsSync(path.join(cwd, name)) ? fs.readFileSync(path.join(cwd, name), 'utf8').trim() : '');
+    const procs = runningIn([cwd]).map((p) => `${p.pid}/${p.pgid} ${p.state} ${p.args}`);
+    const status = fs.existsSync(runFileOf(dir, 'sh', 'ae/g5/1')) ? fs.readFileSync(runFileOf(dir, 'sh', 'ae/g5/1'), 'utf8') : 'none';
+    return `the worker and its harness ended — worker ${worker} alive: ${alive(worker)}; left in the harness's folder: ${procs.join('; ') || 'nothing'}; terms: ${read('terms').split('\n').join(' ')}; last tick: ${read('ticks').split('\n').at(-1)}; run file: ${status}`;
+  };
+  await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, left);
   const [first, second] = lines('terms');
   assert.equal(lines('terms').length, 2, 'the second stop reached the harness before the grace killed it');
   assert.ok(second - first >= into, `the second stop came ${second - first} ms into the first's grace, not ${into}`);

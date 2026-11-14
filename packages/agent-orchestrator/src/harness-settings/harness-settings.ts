@@ -92,6 +92,8 @@ const isAllowed = (key: string): key is FactorySetting => (SETTABLE as readonly 
  * Why `settings`, a factory's `harnessSettings` as it was written, cannot be given to its runs: not an object; a harness other than the
  * default one; a key off `SETTABLE`, naming where a widening one is owned; a value of the wrong type. Each names the fix, by
  * `nemia factory setting rm`. Undefined: none, or every key allowed.
+ * @param settings The factory's harness settings as written, or undefined where it names none.
+ * @param factory The factory's name, as a refusal names it.
  */
 export function harnessSettingsRefusal(settings: unknown, factory: string): string | undefined {
   if (settings === undefined) return undefined;
@@ -122,10 +124,16 @@ function keyRefusal(key: string, value: unknown, factory: string): string | unde
   return wrong && `${named} of ${factory} ${wrong}: nemia factory setting set ${factory} ${named} <json>, or ${rm}`;
 }
 
-/** Whether `settings` are what a factory may set (`harnessSettingsRefusal`). */
+/**
+ * Whether `settings` are what a factory may set (`harnessSettingsRefusal`).
+ * @param settings The harness settings as written.
+ */
 export const isHarnessSettings = (settings: unknown): settings is HarnessSettings => harnessSettingsRefusal(settings, '') === undefined;
 
-/** `<harness>.<key>` as a person types it, split; or why it is not one. */
+/**
+ * `<harness>.<key>` as a person types it, split; or why it is not one.
+ * @param spelled The setting's name as typed.
+ */
 export function settingKeyOf(spelled: string): { harness: string; key: string } | string {
   const dot = spelled.indexOf('.');
   if (dot <= 0 || dot === spelled.length - 1)
@@ -133,14 +141,25 @@ export function settingKeyOf(spelled: string): { harness: string; key: string } 
   return { harness: spelled.slice(0, dot), key: spelled.slice(dot + 1) };
 }
 
-/** `settings` with `harness`.`key` set to `value`, unjudged: the caller refuses what `harnessSettingsRefusal` refuses. */
+/**
+ * `settings` with `harness`.`key` set to `value`, unjudged: the caller refuses what `harnessSettingsRefusal` refuses.
+ * @param settings The settings as read, or undefined for none.
+ * @param harness The harness the setting is of.
+ * @param key The setting's key.
+ * @param value The value to set it to.
+ */
 export function withSetting(settings: SettingsAsRead | undefined, harness: string, key: string, value: unknown): Record<string, unknown> {
   const all: Record<string, unknown> = { ...settings };
   const was = all[harness];
   return { ...all, [harness]: { ...(isObject(was) ? was : {}), [key]: value } };
 }
 
-/** `settings` without `harness`.`key`, a harness with no key left gone, and undefined when none is left. */
+/**
+ * `settings` without `harness`.`key`, a harness with no key left gone, and undefined when none is left.
+ * @param settings The settings as read, or undefined for none.
+ * @param harness The harness the setting is of.
+ * @param key The setting's key.
+ */
 export function withoutSetting(settings: SettingsAsRead | undefined, harness: string, key: string): SettingsAsRead | undefined {
   const next: Record<string, Record<string, unknown>> = {};
   for (const [h, keys] of Object.entries(settings ?? {})) {
@@ -150,13 +169,20 @@ export function withoutSetting(settings: SettingsAsRead | undefined, harness: st
   return Object.keys(next).length ? next : undefined;
 }
 
-/** The settings `settings` names, each `<harness>.<key>` with its value: what `nemia factory`, adopt's plan and a start say of them. */
+/**
+ * The settings `settings` names, each `<harness>.<key>` with its value: what `nemia factory`, adopt's plan and a start say of them.
+ * @param settings The settings as read, or undefined for none.
+ */
 export const settingsNamed = (settings: SettingsAsRead | undefined): { name: string; value: unknown }[] =>
   Object.entries(settings ?? {}).flatMap(([harness, keys]) =>
     Object.entries(isObject(keys) ? keys : {}).map(([key, value]) => ({ name: `${harness}.${key}`, value })),
   );
 
-/** A factory's settings as `nemia factory ls` lists them under its line: `setting <harness>.attribution {"commit":"","pr":""}`. */
+/**
+ * A factory's settings as `nemia factory ls` lists them under its line: `setting <harness>.attribution {"commit":"","pr":""}`.
+ * @param settings The factory's settings as read, or undefined for none.
+ * @param width The width of the factory's name column, in characters, each line indented past.
+ */
 export const settingLines = (settings: SettingsAsRead | undefined, width: number): string[] =>
   settingsNamed(settings).map((s) => `${' '.repeat(width)}  setting ${s.name} ${JSON.stringify(s.value)}`);
 
@@ -165,6 +191,8 @@ export const settingLines = (settings: SettingsAsRead | undefined, width: number
  * settings of that harness (`frozen`) with a valid value, a key a hand-edited record holds off the list never filed, and the step's own
  * rendered settings (`rendered`) laid over them, so what its agent says wins. `rendered` as it was where the run froze none, or where it
  * is not an object (the runtime refuses it then, in its words).
+ * @param frozen The run's frozen settings of the default harness, as read.
+ * @param rendered The step's own settings, as rendered JSON, or undefined where it has none.
  */
 export function filedSettings(frozen: unknown, rendered: string | undefined): string | undefined {
   const given = isObject(frozen)

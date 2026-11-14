@@ -28,13 +28,18 @@ export const FORMER_REASONS: Readonly<Record<string, Converted>> = {
   Held: { Run: { reason: 'Waiting', on: 'run' } },
 };
 
-/** Whether `value` is a code the feed no longer names. */
+/**
+ * Whether `value` is a code the feed no longer names.
+ * @param value A reason code, as a line or a selector spells it.
+ */
 export const isFormerReason = (value: string): boolean => Object.hasOwn(FORMER_REASONS, value);
 
 /**
  * The current codes of a line of `kind` that names `codes`. A former code converts by the table; a step's `Waiting` with no `on` — a
  * line written before `on` was, which did not say whether it waited on its own steps or on other runs — reads as `Pending`, the common
  * case (the person's answer at this card's design); every other code is current, and kept as written. Pure.
+ * @param codes The codes as the line names them: its reason, and its `on` and `via` where it has them.
+ * @param kind Whether the line is a step's or a run's.
  */
 export function currentOf(codes: { reason: string; on?: string; via?: string }, kind: InvolvedKind): Codes {
   const converted = isFormerReason(codes.reason) ? FORMER_REASONS[codes.reason]?.[kind] : undefined;
@@ -48,6 +53,8 @@ export function currentOf(codes: { reason: string; on?: string; via?: string }, 
  * `reason=NeedsHuman` is evaluated against (`selects`). A run that waits on a person for anything but its gates was `Blocked`, whatever
  * step it now names. A step's `Waiting` on a run and its `Pending` were each written as they are now, or as `Waiting`, which is a current
  * code and read as one. Pure.
+ * @param codes The current codes of the line.
+ * @param kind Whether the line is a step's or a run's.
  */
 export function formerOf(codes: Codes, kind: InvolvedKind): string | undefined {
   if (kind === 'Run') {
@@ -76,6 +83,7 @@ const spelled = (former: string): string | undefined => {
 /**
  * The hint for each former code `selector` names, typed to `nemia watch -l` or `nemia subscribe`: the code is still read, and what to
  * type instead. Empty where it names none. Pure.
+ * @param selector The selector as typed.
  */
 export function formerHints(selector: string): string[] {
   const named = selector.match(/[A-Za-z][A-Za-z0-9]*/g) ?? [];

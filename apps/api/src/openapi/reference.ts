@@ -14,6 +14,12 @@ import type { ApiEnv } from '../layer.ts';
 /** The page's path, beside the document's. */
 export const REFERENCE_PATH = '/openapi';
 
+/**
+ * Where a page whose request client is on sends each request it tries, the address it is for in `scalar_url` (Scalar's own proxy
+ * protocol): the page forwards it, so the browser crosses no origin whatever address a person gives.
+ */
+export const REFERENCE_PROXY_PATH = '/proxy';
+
 /** Where the api serves the viewer's script, read from the installed package. */
 export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
 
@@ -44,6 +50,7 @@ export const referenceOf = (script: () => Promise<string>, client = false) =>
         hideClientButton: !client,
         hideTestRequestButton: !client,
         persistAuth: false,
+        ...(client ? { proxyUrl: REFERENCE_PROXY_PATH } : {}),
         agent: { disabled: true },
         mcp: { disabled: true },
         showDeveloperTools: 'never',

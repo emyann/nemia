@@ -220,7 +220,7 @@ function placeSkillRefusal(steps: readonly StepSpec[], found: SkillsFound | unde
  * @param places The repository and the store's root the run's agents and skills are found in.
  * @param gates The gates the run is started at, beside the workflow's own.
  * @param denied What the run's place denies a landing session.
- * @param written The `permissionMode:` line each step's file writes, by the step's name; none where not given.
+ * @param written The mode line each step's file writes, by the step's name; none where not given.
  * @param harnessSettings The factory's judged harness settings, or undefined where it sets none.
  */
 export const configRefused = (

@@ -192,7 +192,7 @@ export const withoutSkill = (line: string, name: string): string => skillLine(sk
 /**
  * Why the skills given reach nothing, as the package refuses it on save — `tools:` set without `Skill`, or `Skill` denied — or null. A tool
  * is read as the package reads it, one entry of the comma-separated list, exactly `Skill`.
- * @param form The form's skills line and its keys, `tools` and `disallowedTools` read.
+ * @param form The form's skills line and its keys, its tools and its deny rules read.
  */
 export function skillToolGap(form: Pick<AgentForm, 'skills' | 'keys'>): 'tools' | 'disallowedTools' | null {
   if (!skillList(form.skills).length) return null;
@@ -210,7 +210,7 @@ export const toolsWithSkill = (tools: string): string => skillLine([...skillList
 
 /**
  * `disallowedTools:` with `Skill` taken off.
- * @param denied The `disallowedTools:` line as typed.
+ * @param denied The deny line as typed.
  */
 export const deniedWithoutSkill = (denied: string): string => skillLine(skillList(denied).filter((tool) => tool !== 'Skill'));
 

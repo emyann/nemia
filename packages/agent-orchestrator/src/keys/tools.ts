@@ -233,14 +233,14 @@ function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
 
 /**
  * The first of a step's `disallowedTools:` rules that may be what denied a call, or undefined. Pure. A deny beats every allow, so a call
- * one of them denied is denied again in a new run whatever its `allowedTools:` says, and is offered no allow rule (`deniedOffer`). *May*:
+ * one of them denied is denied again in a new run whatever its allow rules say, and is offered no allow rule (`deniedOffer`). *May*:
  * the runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallowedTools: Bash(npm run build)` at work, or
  * `npm test` that nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names
  * nothing, or names that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's
  * directory for any other; `~` is nobody's here, and matches nothing), or exactly what the call names. An MCP tool's call is kept by its
  * name alone, so a rule on one of its parameters (`mcp__playwright__browser_navigate(url:*:8787*)`) may be what denied it.
  * @param denied The denied call, as the runtime words it.
- * @param disallowedTools The step's `disallowedTools:` rules.
+ * @param disallowedTools The step's deny rules.
  * @param at The session's directory and its run's id, which a path is matched from; none where neither is known.
  */
 export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}): string | undefined {

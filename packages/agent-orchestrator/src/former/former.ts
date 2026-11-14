@@ -158,7 +158,7 @@ const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? '
 /**
  * The sandbox a codex file's former `permissionMode: <word>` is read as. For code outside the package that reads a file's lines the
  * parser did not read — the api's picture of an agent that does not load — so it reads the former line as the parser would. Pure.
- * @param word The word the former `permissionMode:` line says.
+ * @param word The word the former mode line says.
  */
 export const formerSandbox = (word: string): string => sandboxNamed(word);
 
@@ -516,7 +516,7 @@ const renamed = (former: string): string | undefined => FORMER_KEYS[former] ?? F
  * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, which a file would read as its sandbox. It names no word for
  * the sandbox: which words are one is the runtime's to say at `nemia start`.
  * @param file The file the save was sent for.
- * @param word The mode the save sent as `permissionMode`.
+ * @param word The mode the save sent in the fence's mode key.
  */
 export const codexModeWritten = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send the sandbox as \`sandbox:\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
@@ -524,7 +524,7 @@ export const codexModeWritten = (file: string, word: string): string =>
 /**
  * What `nemia start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it.
  * @param file The file, as the line names it.
- * @param word The mode its `permissionMode:` line says.
+ * @param word The mode its mode line says.
  */
 export const codexModeLine = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` is read as \`sandbox: ${sandboxNamed(word)}\`, Codex's own name for its sandbox. The former line is still read; rename it, or save the file from the board, which writes \`sandbox:\`.`;

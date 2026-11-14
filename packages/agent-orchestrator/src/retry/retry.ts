@@ -883,7 +883,7 @@ const RULE_CAP = 240;
  * allow nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are
  * free text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
  * @param denied The calls the harness denied the step's try.
- * @param step The step's `disallowedTools:`, none where absent.
+ * @param step The step's deny rules, none where absent.
  * @param at The step's working folder and the run's id, which a path written from it is read against: none where absent.
  */
 export function deniedOffer(denied: readonly string[], step: Pick<StepSpec, 'disallowedTools'> = {}, at: DeniedAt = {}): string {

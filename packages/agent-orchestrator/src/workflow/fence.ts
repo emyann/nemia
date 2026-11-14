@@ -70,7 +70,7 @@ const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
  * covers. Undefined when the agent has allow rules and none is inside its directory: a step's allow list replaces its agent's and
  * cannot be empty, so the agent's own would run.
  * @param mode The agent's permission mode; undefined for the runtime's default.
- * @param allows The agent's `allowedTools:` line as written; undefined for none.
+ * @param allows The agent's allow line as written; undefined for none.
  */
 export function directoryFence(
   mode: string | undefined,
@@ -243,7 +243,7 @@ export const agentDeniesOf = (agent: Agent): string[] => agentRules(agent, `${AG
  * denies `agents` that no rule of its own already covers (`covers`). A step's line adds to its agent's, so a deny the team adds to an
  * agent reaches every step that hires it, and a line copied before it still reads; a line that repeats every one of its agent's denies,
  * as every step's had to before, resolves to itself.
- * @param own The step's own `disallowedTools:` rules, in their written order.
+ * @param own The step's own deny rules, in their written order.
  * @param agents Its agent's denies.
  */
 export const deniesWith = (own: readonly string[], agents: readonly string[]): string[] => [
@@ -255,7 +255,7 @@ export const deniesWith = (own: readonly string[], agents: readonly string[]): s
  * The denies step `step`'s own file writes, read back from the resolved step: its `disallowedTools` but those its agent gave it
  * (`StepAgent.agentDenies`), what `renderStep` writes and the brief tells as the step's own fence. The resolved list where the step's
  * provenance names none.
- * @param step The resolved step: its `disallowedTools` and its agent, which says the denies the agent gave it.
+ * @param step The resolved step: its deny rules and its agent, which says the denies the agent gave it.
  */
 export function ownDenies(step: { disallowedTools?: readonly string[] | null; agent?: string | StepAgent | null }): string[] {
   const given = typeof step.agent === 'object' && step.agent !== null ? step.agent.agentDenies : undefined;

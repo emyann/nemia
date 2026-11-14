@@ -429,7 +429,7 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
 }
 
 /**
- * Why a Claude Code session filed in `permissionMode` — the mode a step names, or `undefined` for none — would not run in it on `model`, as
+ * Why a Claude Code session filed in the mode a step names, or in none, would not run in it on `model`, as
  * the words after what names the model: `names no \`permissionMode:\`, …, and Claude Code drops \`auto\` …`. `undefined` when it would:
  * on a harness whose fence reach drops no word on that model (`fenceReach`): codex, which has sandboxes and not modes, a model that keeps
  * `auto`, or any mode but `auto`. Such a session says

@@ -212,12 +212,12 @@
     },
     {
       "term": "Memory limit",
-      "meaning": "a task's `resources.limits.memory`, a Kubernetes quantity (`8Gi`), or its engine's `defaultLimits` written onto it at filing: its harness and every child it starts run in a transient scope of systemd's user manager under that `MemoryMax=`, so a process passing it is killed by the kernel in that cgroup alone, and the attempt records what the cgroup saw (`memory`: `limitBytes`, `peakBytes`, `oomKills`). A host that cannot make the scope refuses a limited task `unstartable` (`packages/agent-runtime/src/harness/cgroup.ts`, `packages/agent-runtime/src/core/memory.ts`).",
+      "meaning": "a task's `resources.limits.memory`, a Kubernetes quantity (`8Gi`), or, where it names none, its engine's `defaultLimits` in force as each attempt starts, recorded on its `starting` entry: its harness and every child it starts run in a transient scope of systemd's user manager under that `MemoryMax=`, so a process passing it is killed by the kernel in that cgroup alone, and the attempt records what the cgroup saw (`memory`: `limitBytes`, `peakBytes`, `oomKills`). A host that cannot make the scope refuses a limited task `unstartable` (`packages/agent-runtime/src/harness/cgroup.ts`, `packages/agent-runtime/src/core/memory.ts`).",
       "type": "TaskResources"
     },
     {
       "term": "Memory request",
-      "meaning": "a task's `resources.requests.memory`, a Kubernetes quantity, or its engine's `defaultRequests` written onto it at filing: what admission counts it at against the machine's memory, its limit standing for it where it gives none, as Kubernetes gives a container that names a limit and no request. Refused above its limit (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/filing.ts`).",
+      "meaning": "a task's `resources.requests.memory`, a Kubernetes quantity, or, where it names no resources, its engine's `defaultRequests` in force when it is admitted and as each attempt starts, recorded on its `starting` entry: what admission counts it at against the machine's memory, its limit standing for it where it gives none, as Kubernetes gives a container that names a limit and no request. Refused above its limit (`packages/agent-runtime/src/core/admission.ts`, `packages/agent-runtime/src/core/engine/filing.ts`).",
       "type": "TaskResources"
     },
     {

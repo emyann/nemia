@@ -22,8 +22,8 @@ type Fix = { readonly leave: (spec: Filed) => string; readonly whose?: string; r
  * - `words`: the capabilities it is asked by; `asks`: those the task asks by it, in the order it asks them (a mount for each of `mounts`,
  *   in its mode);
  * - `only`: `'local'`, asked only of a harness that runs here, a remote agent's own `refuses` saying it in its own words with every other
- *   argument (`remoteRefuses`); `'remote'`, asked only of a remote agent, a spec's process always running here (`limitedBy` writes the
- *   engine's default limit on its tasks);
+ *   argument (`remoteRefuses`); `'remote'`, asked only of a remote agent, a spec's process always running here (its tasks start under
+ *   the engine's default limit, `defaultsOf` in `admissionOf`);
  * - `says`: what the key asks of a session and why the harness named cannot give it; `fix`: what it offers instead (`fixOf`), absent
  *   where `says` says that too.
  */
@@ -76,7 +76,8 @@ const mayAskWords = (spec: Filed, held: boolean): string =>
  * 12. a list in `enabledSkills` on a harness that cannot close a session's skills, whose session would hold every skill it finds;
  *     `'default'` goes anywhere;
  * 13. a memory limit (`resources.limits.memory`) on a remote agent, whose process is the other party's and no cgroup of this host's
- *     holds: an engine's `defaultLimits` is never written onto such a task, so a default makes none unfileable.
+ *     holds: an engine's `defaultLimits` never lands on such a task (`defaultsOf` in `admissionOf`), so a default makes none
+ *     unfileable.
  */
 const ASKED: readonly Asked[] = [
   {

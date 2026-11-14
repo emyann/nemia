@@ -334,13 +334,22 @@ export const Resumed = Schema.Struct({ pause: Pause });
 export type Resumed = typeof Resumed.Type;
 
 /** The store's pause timeout in force: its milliseconds, whether the store's file set it, and since when where it says. */
-export const PauseTimeout = Schema.Struct({ ms: Schema.Number, set: Schema.Boolean, at: Schema.optionalKey(Schema.String) });
+export const PauseTimeout = Schema.Struct({
+  ms: Schema.Number.annotate({ description: 'The timeout in milliseconds.' }),
+  set: Schema.Boolean.annotate({ description: "Whether the store's file set it; false for the default." }),
+  at: Schema.optionalKey(Schema.String.annotate({ description: 'When it was set, where the file says.' })),
+});
 export type PauseTimeout = typeof PauseTimeout.Type;
 
 /**
  * What `GET` and `PUT /api/pause/timeout` answer, as `nemia pause-timeout` does: the timeout in force, and whether this call wrote it.
  */
-export const PauseTimeoutAnswer = Schema.Struct({ timeout: PauseTimeout, wrote: Schema.Boolean }).annotate({
+export const PauseTimeoutAnswer = Schema.Struct({
+  timeout: PauseTimeout.annotate({
+    description: 'The pause timeout in force: what each later pause, restart and upgrade gives a call in flight to finish.',
+  }),
+  wrote: Schema.Boolean.annotate({ description: 'Whether this call wrote it (PUT); false for a read.' }),
+}).annotate({
   identifier: 'PauseTimeoutAnswer',
 });
 export type PauseTimeoutAnswer = typeof PauseTimeoutAnswer.Type;
@@ -349,7 +358,11 @@ export type PauseTimeoutAnswer = typeof PauseTimeoutAnswer.Type;
  * `PUT /api/pause/timeout`'s body, `nemia pause-timeout <d>`'s duration: digits and s, m or h, from 1s to 23h (`"10m"`), kept as the text
  * it was sent as, so a wrong one is refused in the package's words, a 422.
  */
-export const PauseTimeoutWrite = Schema.Struct({ timeout: Schema.String }).annotate({ identifier: 'PauseTimeoutWrite' });
+export const PauseTimeoutWrite = Schema.Struct({
+  timeout: Schema.String.annotate({
+    description: 'The new timeout (nemia pause-timeout <d>): digits and s, m or h, from 1s to 23h, as 10m.',
+  }),
+}).annotate({ identifier: 'PauseTimeoutWrite' });
 export type PauseTimeoutWrite = typeof PauseTimeoutWrite.Type;
 
 /** A file of the daemon's, read as it says itself: who it is, where it serves, and when it last moved. */

@@ -15,20 +15,24 @@ export type { ApiRoute, KindPlural, Resource, RouteMethod } from '../contracts/d
 
 /** One resource the api serves: its name (a plural, or `<plural>/<sub>`), its singular, its scope, its kind and its verbs. */
 export const APIResource = Schema.Struct({
-  name: Schema.String,
-  singularName: Schema.String,
-  namespaced: Schema.Boolean,
-  kind: Schema.Literals(KINDS),
-  verbs: Schema.Array(Schema.Literals(RESOURCE_VERBS)),
+  name: Schema.String.annotate({ description: 'The resource: a kind under its plural (runs), or a sub-resource of one (runs/hold).' }),
+  singularName: Schema.String.annotate({ description: "The kind's singular, in lower case (run)." }),
+  namespaced: Schema.Boolean.annotate({ description: 'Whether a namespace holds it (/api/namespaces/<namespace>/<plural>).' }),
+  kind: Schema.Literals(KINDS).annotate({ description: 'The kind of object it serves.' }),
+  verbs: Schema.Array(Schema.Literals(RESOURCE_VERBS)).annotate({
+    description: "What can be done to it, in Kubernetes' words (get, list, create…).",
+  }),
 });
 export type APIResource = typeof APIResource.Type;
 
 /** Every resource the api serves of `nemia/v1`. */
 export const APIResourceList = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('APIResourceList'),
-  groupVersion: Schema.Literal(API_VERSION),
-  resources: Schema.Array(APIResource),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: `The version the list is served under, ${API_VERSION}.` }),
+  kind: Schema.Literal('APIResourceList').annotate({ description: 'What the object is: the list of resources the api serves.' }),
+  groupVersion: Schema.Literal(API_VERSION).annotate({ description: `The one group version Nemia has, ${API_VERSION}.` }),
+  resources: Schema.Array(APIResource).annotate({
+    description: 'Every resource the api serves of it, each with its scope, kind and verbs.',
+  }),
 });
 export type APIResourceList = typeof APIResourceList.Type;
 

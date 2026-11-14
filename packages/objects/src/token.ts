@@ -16,11 +16,20 @@ import { CALLER_KINDS, FLOOR_NARROWINGS, TOKEN_HOLDERS } from './words.ts';
  * said reads with none.
  */
 export const Actor = Schema.Struct({
-  kind: Schema.Literals(CALLER_KINDS),
-  agent: Schema.optionalKey(Schema.String),
-  token: Schema.optionalKey(Schema.String),
-  run: Schema.optionalKey(Schema.String),
-  step: Schema.optionalKey(Schema.String),
+  kind: Schema.Literals(CALLER_KINDS).annotate({ description: 'Who made it: the person, or an agent.' }),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: "The agent's name, for a write an agent made; absent for the person." })),
+  token: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        'The name of the token presented: the device it is for, or the standing token minted for the agent. Absent where none was.',
+    }),
+  ),
+  run: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The run whose session made it; absent for a write no session of a run made.' }),
+  ),
+  step: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The step of that run whose session made it; absent where no session of a step did.' }),
+  ),
 }).annotate({
   identifier: 'Actor',
   description:
@@ -45,17 +54,23 @@ export function actorWords(actor: Actor): string {
  * (absent: store-wide) and its narrowing (absent: none), and when it was minted. Never the token, nor its digest.
  */
 export const Token = Schema.Struct({
-  name: Schema.String,
-  holder: Schema.Literals(TOKEN_HOLDERS),
-  agent: Schema.optionalKey(Schema.String),
-  factory: Schema.optionalKey(Schema.String),
-  narrowed: Schema.optionalKey(Schema.Literals(FLOOR_NARROWINGS)),
-  createdAt: Schema.String,
-}).annotate({ identifier: 'Token' });
+  name: Schema.String.annotate({ description: "The token's name: for the person's, the device it is for (laptop, board)." }),
+  holder: Schema.Literals(TOKEN_HOLDERS).annotate({ description: 'Who holds it: the person, or an agent.' }),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent that holds it; absent for a token of the person.' })),
+  factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory it is bound to; absent for a store-wide token.' })),
+  narrowed: Schema.optionalKey(
+    Schema.Literals(FLOOR_NARROWINGS).annotate({
+      description: "How an agent's token is narrowed below its floor; absent where it is not.",
+    }),
+  ),
+  createdAt: Schema.String.annotate({ description: 'When it was minted (nemia token add), as an ISO 8601 time.' }),
+}).annotate({ identifier: 'Token', description: 'A standing token as the store lists it, never the token itself nor its digest.' });
 export type Token = typeof Token.Type;
 
 /** `GET /api/tokens`: the standing tokens the store keeps, by name. */
-export const TokenList = Schema.Struct({ tokens: Schema.Array(Token) }).annotate({ identifier: 'TokenList' });
+export const TokenList = Schema.Struct({
+  tokens: Schema.Array(Token).annotate({ description: 'The standing tokens the store keeps, by name.' }),
+}).annotate({ identifier: 'TokenList' });
 export type TokenList = typeof TokenList.Type;
 
 /**
@@ -64,15 +79,26 @@ export type TokenList = typeof TokenList.Type;
  * `factory` or a `narrowed` beside it is refused.
  */
 export const TokenMint = Schema.Struct({
-  name: Schema.String,
-  agent: Schema.optionalKey(Schema.String),
-  factory: Schema.optionalKey(Schema.String),
-  narrowed: Schema.optionalKey(Schema.Literals(FLOOR_NARROWINGS)),
+  name: Schema.String.annotate({ description: "The new token's name: for the person's, the device it is for." }),
+  agent: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The agent that holds it; left out, the token is the person's, and factory and narrowed are refused.",
+    }),
+  ),
+  factory: Schema.optionalKey(
+    Schema.String.annotate({ description: "The factory an agent's token is bound to; left out, it is store-wide." }),
+  ),
+  narrowed: Schema.optionalKey(
+    Schema.Literals(FLOOR_NARROWINGS).annotate({ description: "How an agent's token is narrowed below its floor; left out, it is not." }),
+  ),
 }).annotate({ identifier: 'TokenMint' });
 export type TokenMint = typeof TokenMint.Type;
 
 /** What `POST /api/tokens` answers, once: the token as listed, and the token itself, which the store keeps only the digest of. */
-export const TokenMinted = Schema.Struct({ ...Token.fields, token: Schema.String }).annotate({ identifier: 'TokenMinted' });
+export const TokenMinted = Schema.Struct({
+  ...Token.fields,
+  token: Schema.String.annotate({ description: 'The token itself, answered this once: the store keeps only its digest.' }),
+}).annotate({ identifier: 'TokenMinted' });
 export type TokenMinted = typeof TokenMinted.Type;
 
 /**

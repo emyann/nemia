@@ -59,7 +59,8 @@ test("the system's tar opens an archive into the same files and modes as unpack 
   const dir = exported();
   const { out } = run(packedTemplate(dir, undefined, scratch('wf-template-tar-pack-')));
   const byTar = scratch('wf-template-tar-x-');
-  execFileSync('tar', ['-xzf', out, '-C', byTar], { stdio: ['ignore', 'pipe', 'pipe'] });
+  // -p: the modes the archive holds, whatever this process's umask takes off a file tar makes.
+  execFileSync('tar', ['-xpzf', out, '-C', byTar], { stdio: ['ignore', 'pipe', 'pipe'] });
   assert.deepEqual(fs.readdirSync(byTar), ['team']);
   assert.deepEqual(filesOf(path.join(byTar, 'team')), filesOf(dir));
 });

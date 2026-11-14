@@ -252,6 +252,21 @@ export const RUN_PHASE_OF: Record<RunReason, RunPhase> = {
 };
 
 /**
+ * Whether a run in each phase is still in play: it has not ended, and may yet run a step. What a reader that goes by a run's phase
+ * asks — a card's listing, a volume's mounting runs — in place of a list of phases of its own. Total, so a phase added to objects'
+ * `RUN_PHASES` is placed here before it typechecks.
+ */
+export const RUN_PHASE_IN_PLAY: Readonly<Record<RunPhase, boolean>> = {
+  pending: true,
+  running: true,
+  waiting: true,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+  cancelled: false,
+};
+
+/**
  * The reasons a line waits on a person by (`waits=person`): every reason whose phase is `waiting`, of a step or a run, and the two of a
  * step that broke, `Failed` and `CheckFailed`, which a person must look at before anything after them runs. Derived from `PHASE_OF` and
  * `RUN_PHASE_OF`, so the feed's `waits` cannot drift from the phases: the feed's table reads it (`reason.ts`).

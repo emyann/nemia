@@ -47,7 +47,7 @@ import { CARD_KEY_MEANINGS, CARD_KEYS, CARD_STATES, DEFAULT_NAMESPACE, headline 
 import { bodyOf, frontmatterKeys, type PlanFile } from '../plan/plan.ts';
 import { factoryNameRefusal, namedRepos, workflowNameRefusal, workflowRepo, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
-import type { RunPhase } from '../phase/phase.ts';
+import { RUN_PHASE_IN_PLAY, type RunPhase } from '../phase/phase.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import {
   frontmatterOrNull,
@@ -407,13 +407,7 @@ export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
   filed: true,
   queued: true,
   refused: true,
-  pending: true,
-  running: true,
-  waiting: true,
-  succeeded: false,
-  failed: false,
-  stopped: false,
-  cancelled: false,
+  ...RUN_PHASE_IN_PLAY,
 };
 
 /** Whether `l` is a card still in play (`CARD_IN_PLAY`). Pure. */

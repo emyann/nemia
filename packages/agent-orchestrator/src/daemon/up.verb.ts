@@ -210,6 +210,8 @@ function advancedLines(advanced: Pass['runs']): PassLine[] {
  * The store's pause (`pausedWords`) and each check it holds back (`heldLines`), a landing with its merge staged among them, once when it
  * is put, again each time their words change — Pausing with fewer finishing, then Paused, a check held — and once when it is resumed:
  * the lines said now, and the words to compare the next pass's with.
+ * @param pause The store's pause as the pass read it, or undefined where the store is not paused.
+ * @param said The pause's words said last, or undefined where none were (the store not paused).
  */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): { lines: string[]; said: string | undefined } {
   const lines = pause ? [pausedWords(pause) ?? '', ...heldLines(pause)] : [RESUMED];
@@ -225,6 +227,9 @@ const warnedOnce = (whys: readonly string[] | undefined, said: ReadonlySet<strin
  * One pass's lines, going by what the daemon has said (`was`), not by the store, at `now`: the pause, the summary when one is due, the
  * feed's failure, the moves refused, the journals left out and the harnesses not read each once, the queued card, the scheduled start,
  * and what it did to each run. Answers with them and what has been said once they are.
+ * @param pass What the pass did and read.
+ * @param was What the daemon has said before this pass.
+ * @param now The time of the pass, in epoch milliseconds.
  */
 export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLine[]; said: UpSaid } {
   const { runs: advanced, queue, feedError, cost, refused, unreadable, unobserved, forgetting } = pass;
@@ -276,6 +281,9 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * `scope` — the runtime's probe of a scope of systemd's user manager in `WF_CGROUP_PARENT`'s slice (`scopeRefusal`), a parameter so that a
  * test can stand another in — and the variable to unset. Every task it filed would be refused its start, so it refuses first, exit 2.
  * `undefined` where no limit is set, never probing, or where the host holds one; a value either variable refuses is thrown as it is.
+ * @param config The settings the daemon is given, its memory limit and slice read from them.
+ * @param scope Probes a scope in the slice it is given and answers why the host cannot hold one, or undefined where it can; `scopeRefusal`
+ * by default.
  */
 export const limitRefusal = (config: Settings, scope: (parent?: string) => string | undefined = scopeRefusal): Invalid | undefined => {
   const { memory, cgroupParent: parent } = ceilings(config);
@@ -318,6 +326,7 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * first pass has answered and every `NEEDS_EVERY` after, it reads the store's readiness over that memory (`readied`), and hands each
  * pass the latest read, whose moves the pass writes to the feed: `not ready` while a piece a run waits on is missing, `ready` once none
  * is.
+ * @param e The engine every pass runs on, whose sessions the daemon holds.
  */
 export const up = (
   e: Engine,
@@ -404,6 +413,9 @@ export const up = (
  * made absolute under the tools folder, all once: what the daemon does to its own environment as it starts, so every session, check
  * and fix it starts — whether the service or a person started it — finds a tool a fix installed there, and the tools mise installs, with
  * no profile edited. Answers the folder.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param env The environment whose PATH is led and whose tool variables are set, written in place; the process's own as the daemon starts.
+ * @param declared The place's tool folders, put on the PATH, and tool variables, each a folder under the tools folder; none by default.
  */
 export const toolsOnPath = (
   home: string,
@@ -422,6 +434,8 @@ export const toolsOnPath = (
 /**
  * The trees a harness may be carried in: the release `running` runs, where it is an install (a checkout's is its own), and each
  * installed release.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param running The release this process runs.
  */
 export const carryTrees = (home: string, running: Running): string[] => [
   ...(running.kind === 'install' ? [running.root] : []),
@@ -431,6 +445,8 @@ export const carryTrees = (home: string, running: Running): string[] => [
 /**
  * Before the daemon's first pass: each harness a release carries in its own tree and the tools folder has no program of, adopted into
  * it (`adoptBundled`), so a session runs on it at once. Said once each; an adoption that fails is a warning, and the daemon starts.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param running The release this process runs.
  */
 export const adoptedAtStart = (home: string, running: Running): Effect.Effect<readonly Adopted[]> =>
   Effect.try({ try: () => adoptBundled(home, carryTrees(home, running)), catch: (err) => err }).pipe(
@@ -488,6 +504,8 @@ export const carriedFiled = Effect.fn('carriedFiled')(function* (home: string, r
 /**
  * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds at the store `home`, so
  * `nemia ls`, `/api/daemon` and a refused daemon name it. Answers whether it was written: not when the lease is another's, or let go.
+ * @param home The store's directory (`WF_ROOT`).
+ * @param url Where the api serves the board.
  */
 export const holdUrl = (home: string, url: string): boolean => heldUrl(home, url);
 
@@ -509,6 +527,7 @@ const SIGNALS = [
  *
  * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
  * handles no SIGHUP, and it hands no failure back to the caller.
+ * @param program The command to run.
  */
 export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
   return new Promise<A>((resolve, reject) => {

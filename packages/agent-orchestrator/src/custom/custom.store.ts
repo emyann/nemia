@@ -14,7 +14,10 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 /** The store's own agent, Nemia, whom no place names: she is built into this package, and her custom instruction is the person's. */
 const STORE_AGENT = 'nemia';
 
-/** Whether `name` is the store's own agent (`STORE_AGENT`), whose open session is told her custom instructions, never frozen at a start. */
+/**
+ * Whether `name` is the store's own agent (`STORE_AGENT`), whose open session is told her custom instructions, never frozen at a start.
+ * @param name The agent's name.
+ */
 export const isStoreAgent = (name: string): boolean => name === STORE_AGENT;
 
 /**
@@ -37,6 +40,9 @@ function refuseNoAgent(home: string, name: string, repo: string | undefined): vo
 /**
  * The custom instructions for the agent `name` in the store `home`, as `readCustomInstructions` reads them, for a person's command and the
  * board alike. Refused, reading nothing: a name a run on `repo` could not name (`Missing`).
+ * @param home The store's directory.
+ * @param name The agent's name.
+ * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
 export function customInstructionsFor(home: string, name: string, repo: string | undefined): string | undefined {
   refuseNoAgent(home, name, repo);
@@ -47,6 +53,10 @@ export function customInstructionsFor(home: string, name: string, repo: string |
  * Write `text` as the custom instructions for the agent `name` in the store `home`, and the file written. Refused, writing nothing: a name
  * a run on `repo` could not name (`Missing`), blank text, a frontmatter block (`customInstructionsRefusal`), and anything at the file
  * that is neither a file nor a link (`notAFileRefusal`), which the read refuses too. A link at the file is replaced, never written through.
+ * @param home The store's directory.
+ * @param name The agent's name.
+ * @param text The custom instructions, written trimmed and ended by a newline.
+ * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
 export function writeCustomInstructions(home: string, name: string, text: string, repo: string | undefined): string {
   refuseNoAgent(home, name, repo);
@@ -68,6 +78,9 @@ export function writeCustomInstructions(home: string, name: string, text: string
 /**
  * Remove the custom instructions for the agent `name` from the store `home`: whether there were any. Refused, removing nothing, for a name
  * a run on `repo` could not name (`Missing`).
+ * @param home The store's directory.
+ * @param name The agent's name.
+ * @param repo The repository whose places for agents name it too, or undefined for yours and the builtins alone.
  */
 export function clearCustomInstructions(home: string, name: string, repo: string | undefined): boolean {
   refuseNoAgent(home, name, repo);

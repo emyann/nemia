@@ -28,6 +28,7 @@ function runLine(c: WorkflowCosts): string {
 /**
  * `## What runs of this workflow cost`, preceded by a blank line: over the window `c` covers, what each step and the whole run cost, at
  * most a line per step and three more; or one line saying no run of the workflow has finished in this factory yet.
+ * @param c What runs of the workflow cost, over the window of its newest finished runs (`costsOf`).
  */
 export function costsSection(c: WorkflowCosts): string {
   const head = ['', '## What runs of this workflow cost', ''];

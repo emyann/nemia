@@ -7,8 +7,9 @@
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
  * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is still not declared on the SDK's type for
  * an HTTP server (`sdk.d.ts:1284-1300`), so the cast is what lets it through and no typecheck reads it. What it does is measured rather
- * than typed: on 0.3.308, and again on 0.3.316 (its schema re-read unchanged on 0.3.322, 0.3.323 and 0.3.325), the SDK's own schema for an http
- * server declares `oauth` and the server comes back with it echoed on `McpServerStatus.config` (`seam.ts`, `docs/harness.md`). An SDK
+ * than typed: on 0.3.308, and again on 0.3.316 (its schema re-read unchanged on 0.3.322, 0.3.323 and 0.3.325), the SDK's own schema
+ * for an http server declares `oauth` and the server comes back with it echoed on `McpServerStatus.config` (`seam.ts`,
+ * `docs/harness.md`). An SDK
  * that renamed the field would break every sign-in silently — the server would simply come back `needs-auth` for ever — so it is
  * re-measured at each bump, not carried.
  */

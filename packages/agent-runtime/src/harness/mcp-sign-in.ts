@@ -178,8 +178,8 @@ export type McpSignInAsk = (
 ) => Promise<McpSignInSession>;
 
 /**
- * The SDK's authenticate and callback methods, which `sdk.mjs` 0.3.322, 0.3.323 and 0.3.325 define on `query()`'s object and `sdk.d.ts` does not
- * declare:
+ * The SDK's authenticate and callback methods, which `sdk.mjs` 0.3.322, 0.3.323 and 0.3.325 define on `query()`'s object and
+ * `sdk.d.ts` does not declare:
  * `mcpAuthenticate(e,t,n)`, a control request of the subtype mcp_authenticate (the third argument, `{ redirectUriOnly }`, new after
  * 0.3.316, is optional and not given here), and `mcpSubmitOAuthCallbackUrl(e,t)`, one of the subtype mcp_oauth_callback_url carrying
  * the server's name and the callback address. Called through this one type, so an SDK that renames either fails here, by name.

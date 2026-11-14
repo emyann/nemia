@@ -259,8 +259,8 @@ test('REFUSED: a file that loads the api or the package with import() is named; 
 
 /**
  * The flags the Agent SDK starts Claude Code with for an ask of the usage, read off one on 0.3.308 and re-read in `sdk.mjs` on 0.3.316,
- * 0.3.322, 0.3.323 and 0.3.325, the version `packages/agent-runtime/test/sdk-pin.ts` pins: no `-p` among them. The fake is spawned with them so
- * this test's start looks like the SDK's; the ask itself is the control request below, which is what the fake answers.
+ * 0.3.322, 0.3.323 and 0.3.325, the version `packages/agent-runtime/test/sdk-pin.ts` pins: no `-p` among them. The fake is spawned
+ * with them so this test's start looks like the SDK's; the ask itself is the control request below, which is what the fake answers.
  */
 const SDK_FLAGS = [
   '--output-format',

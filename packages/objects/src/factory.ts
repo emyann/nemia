@@ -74,6 +74,8 @@ export const FactorySpec = Schema.Struct({
   costLines: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
   origins: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
   workflowRepos: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+}).annotate({
+  description: "What the factory's file says: its repositories, workflows, hires, volumes, settings, template, level and cost lines.",
 });
 export type FactorySpec = typeof FactorySpec.Type;
 
@@ -136,13 +138,18 @@ export const FactoryStatus = Schema.Struct({
   upgrade: Schema.optionalKey(FactoryUpgrade),
   untrusted: Schema.Array(FactoryUntrusted),
   error: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    'What the controller last observed of the factory: its conditions, the template version applied, an upgrade waiting, its untrusted places, and why its file does not read.',
 });
 export type FactoryStatus = typeof FactoryStatus.Type;
 
 /** A factory, as an object; a write's answer says what it wrote (`written`). */
 export const Factory = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Factory'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Factory').annotate({
+    description: 'What the object is: a Factory, a team of workflows working on its repositories.',
+  }),
   metadata: ObjectMeta,
   spec: FactorySpec,
   status: FactoryStatus,
@@ -215,14 +222,26 @@ export const FactoryPlaceTrust = Schema.Union([
 export type FactoryPlaceTrust = typeof FactoryPlaceTrust.Type;
 
 /** A factory's places trusted again (`POST …/trust`): the factory, and what was asked for each place, one a harness that keeps a trust. */
-export const FactoryTrusted = Schema.Struct({ name: Schema.String, trusts: Schema.Array(FactoryPlaceTrust) });
+export const FactoryTrusted = Schema.Struct({
+  name: Schema.String.annotate({ description: 'The factory whose places were trusted again (nemia factory trust).' }),
+  trusts: Schema.Array(FactoryPlaceTrust).annotate({
+    description:
+      'What was asked for each place of the factory: the harness, the folder its trust is kept under, what it grants and how to take it back, or why the place was not asked.',
+  }),
+});
 export type FactoryTrusted = typeof FactoryTrusted.Type;
 
 /**
  * A factory removed (`DELETE /api/factories/<name>`): the factory, the file removed, and the folder of the instruction and the rules the
  * store kept for it, removed whole (null where it kept none). A trust given to its places is left.
  */
-export const FactoryRemoved = Schema.Struct({ name: Schema.String, file: Schema.String, instruction: Schema.NullOr(Schema.String) });
+export const FactoryRemoved = Schema.Struct({
+  name: Schema.String.annotate({ description: 'The factory removed.' }),
+  file: Schema.String.annotate({ description: "The factory's file that was removed." }),
+  instruction: Schema.NullOr(Schema.String).annotate({
+    description: 'The folder of the instruction and rules the store kept for it, removed whole; null where it kept none.',
+  }),
+});
 export type FactoryRemoved = typeof FactoryRemoved.Type;
 
 /**
@@ -259,14 +278,18 @@ export type FactoryInstructionWords = typeof FactoryInstructionWords.Type;
  * volume (by its stored name).
  */
 export const FactoryCommands = Schema.Struct({
-  attach: Schema.String,
-  rm: Schema.String,
-  add: Schema.String,
-  schedule: Schema.String,
-  trust: Schema.String,
-  volume: Schema.String,
-  unschedule: Schema.Record(Schema.String, Schema.String),
-  volumeRm: Schema.Record(Schema.String, Schema.String),
+  attach: Schema.String.annotate({ description: 'The line that attaches a workflow to the factory.' }),
+  rm: Schema.String.annotate({ description: "The line that removes the factory's file." }),
+  add: Schema.String.annotate({ description: 'The line that files the factory again.' }),
+  schedule: Schema.String.annotate({ description: 'The line that schedules one of its workflows.' }),
+  trust: Schema.String.annotate({ description: "The line that asks its places' trust again." }),
+  volume: Schema.String.annotate({ description: 'The line that mounts a volume for its local steps.' }),
+  unschedule: Schema.Record(Schema.String, Schema.String).annotate({
+    description: 'The line that takes back each schedule, by its workflow.',
+  }),
+  volumeRm: Schema.Record(Schema.String, Schema.String).annotate({
+    description: 'The line that takes back each volume, by its stored name.',
+  }),
 });
 export type FactoryCommands = typeof FactoryCommands.Type;
 

@@ -14,5 +14,7 @@ export const FactoryWritten = Schema.Struct({
   already: Schema.optionalKey(Schema.Boolean),
   was: Schema.optionalKey(Schema.NullOr(Schema.String)),
   replaced: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+}).annotate({
+  description: "What this write did, on a write's answer alone: the file it wrote, whether it was so already, and what it replaced.",
 });
 export type FactoryWritten = typeof FactoryWritten.Type;

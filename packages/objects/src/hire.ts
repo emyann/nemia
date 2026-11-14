@@ -17,7 +17,7 @@ export const HireSpec = Schema.Struct({
   workflow: Schema.String,
   step: Schema.String,
   agent: Schema.optionalKey(Schema.String),
-});
+}).annotate({ description: 'The step, by its workflow and name, and the agent the factory hires into it, absent where it hires none.' });
 export type HireSpec = typeof HireSpec.Type;
 
 /** A setting a session gets: its value (absent where the harness's own default holds) and where it came from. */
@@ -51,13 +51,18 @@ export const HireStatus = Schema.Struct({
   settings: HireSettings,
   harnessSettings: Schema.optionalKey(HarnessSettings),
   error: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    'Who fills the step and the agent that does, each setting a session there gets with where it came from, and why the hire does not read.',
 });
 export type HireStatus = typeof HireStatus.Type;
 
 /** A step's hire, as an object; a write's answer says what it wrote (`written`). */
 export const Hire = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Hire'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Hire').annotate({
+    description: 'What the object is: a Hire, one step a factory offers and the agent that fills it.',
+  }),
   metadata: ObjectMeta,
   spec: HireSpec,
   status: HireStatus,

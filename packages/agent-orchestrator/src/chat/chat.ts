@@ -17,7 +17,8 @@ import { framedFor } from './framed.ts';
 import { speakerNameRefusal } from './speaker-name.ts';
 
 export type { Speaker, SpeakerRefused } from '../../contracts/speaker.contract.ts';
-export { AGENT_OPENS, AGENT_WRITES, framedFor } from './framed.ts';
+export { AGENT_OPENS, AGENT_WRITES } from '../agent-frame/agent-frame.ts';
+export { framedFor } from './framed.ts';
 export { speakerNameRefusal } from './speaker-name.ts';
 export { PERSON_FRAME, RESERVED_SPEAKERS, SPEAKER_NAME_MAX, wellSpelt } from './speaker-words.ts';
 

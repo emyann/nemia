@@ -8,9 +8,9 @@ import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/
 import { holdWord } from '../wait/wait.ts';
 import type { SaidAfter } from 'objects';
 import type { SaidBy, SaidFrom } from '../../contracts/step-speaker.contract.ts';
-import { AGENT_OPENS, AGENT_WRITES } from '../chat/index.ts';
+import { AGENT_OPENS, AGENT_WRITES } from '../agent-frame/agent-frame.ts';
 
-export { AGENT_OPENS, AGENT_WRITES } from '../chat/index.ts';
+export { AGENT_OPENS, AGENT_WRITES } from '../agent-frame/agent-frame.ts';
 
 export type { SaidFrom } from '../../contracts/step-speaker.contract.ts';
 

@@ -16,5 +16,5 @@ export {
   type Presence,
   type Speaker,
 } from './chat.ts';
-export { AGENT_OPENS, AGENT_WRITES, framedFor } from './framed.ts';
+export { framedFor } from './framed.ts';
 export { speakerNameRefusal } from './speaker-name.ts';

@@ -13,7 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { INSTALL_ARGS, lastLines } from '../check/index.ts';
-import { isCloneFolder } from '../factory/clones/clones.ts';
+import { isCloneFolder } from '../factory/clones/index.ts';
 import {
   checkoutInstall,
   cutName,

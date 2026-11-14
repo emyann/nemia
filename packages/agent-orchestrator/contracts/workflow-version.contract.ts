@@ -4,7 +4,12 @@
  * kind, or null where the act goes on. The words are nobody's law; the kind is the api's answer (its `refusedAs`).
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { VersionRefused, WorkflowThere } from '../src/folder/folder.ts';
+
+/** What is at a workflow's folder before a write or a removal: nothing, a file, or a folder at its version (`workflowVersion`). */
+export type WorkflowThere = { kind: 'none' } | { kind: 'file' } | { kind: 'folder'; version: string };
+
+/** A refusal of a workflow's write or removal: the kind the api answers it with, and its words. */
+export type VersionRefused = { kind: 'Invalid' | 'Conflict' | 'Missing'; message: string };
 
 const workflowVersionRefusalSpec = spec<
   (dir: string, does: 'write' | 'remove', there: WorkflowThere, given: string | undefined) => VersionRefused | null

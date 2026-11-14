@@ -13,9 +13,9 @@ import path from 'node:path';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import { LABEL_KEYS, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
+import type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
 
-/** A person's labels: a key to its value, Kubernetes' `map[string]string`. */
-export type Labels = Readonly<Record<string, string>>;
+export type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
 
 /** The keys Nemia sets on every run's map itself, which a person's label may not take. */
 export const CLOSED_LABEL_KEYS: readonly string[] = ['factory', 'workflow'];
@@ -70,11 +70,6 @@ export function labelsRefusal(labels: Labels): string | undefined {
   return undefined;
 }
 
-/** One edit of a map, as kubectl spells it: `key=value` sets the key, `key-` removes it. */
-export type LabelChange =
-  | { readonly key: string; readonly op: 'set'; readonly value: string }
-  | { readonly key: string; readonly op: 'remove' };
-
 /** The command words that end a refusal of an edit's spelling. */
 const EDIT_FORM = 'label edits are key=value to set a key and key- to remove one';
 
@@ -100,9 +95,6 @@ export function parseLabelEdits(texts: readonly string[]): { readonly edits: rea
   }
   return { edits };
 }
-
-/** What `labelEdits` answers: the map after the edits, or why they were refused. */
-export type Edited = { readonly labels: Labels } | { readonly refused: string };
 
 /**
  * `current` after `edits`, as `kubectl label` applies them: each `key=value` sets its key, each `key-` removes it (no change where it

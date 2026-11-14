@@ -2,15 +2,12 @@
  * The pure part of `nemia wait`: how long a wait waits (`waitBound`), and the `--for` it is given read as milliseconds (`waitForOf`).
  */
 import type { WaitBoundOf } from '../../contracts/wait-bound.contract.ts';
+import type { WaitBound } from '../../contracts/wait-bound.contract.ts';
+import { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';
 
-/** The bound a wait takes when it is given none: four minutes. */
-export const WAIT_DEFAULT_MS = 240_000;
+export { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';
 
-/** The longest bound a wait takes: four minutes and a half, under every caller's five. */
-export const WAIT_MAX_MS = 270_000;
-
-/** The bound, or why the one given is refused: `not-positive`, none to wait; `above-max`, longer than a caller's call lives. */
-export type WaitBound = { readonly ms: number } | { readonly refused: 'not-positive' | 'above-max' };
+export type { WaitBound } from '../../contracts/wait-bound.contract.ts';
 
 /**
  * How long a wait waits, from the bound it was given in milliseconds (`undefined`: none): four minutes where none was given, the one given

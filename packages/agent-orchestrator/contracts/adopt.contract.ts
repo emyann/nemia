@@ -6,16 +6,29 @@
  * The words of each refusal are nobody's law, only that they are a sentence.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import type { Factory, FactoryTemplate } from '../src/factory/factory.ts';
-import {
-  leftoverRefusal,
-  strandedCardRefusal,
-  strandedScheduleRefusal,
-  templatedAdoptRefusal,
-  type Adoption,
-  type AdoptRefused,
-  type Wiring,
-} from '../src/adopt/adopt.ts';
+import type { Factory, FactoryTemplate, Hires, RevisionsPolicy } from '../src/factory/factory.ts';
+import { leftoverRefusal, strandedCardRefusal, strandedScheduleRefusal, templatedAdoptRefusal } from '../src/adopt/adopt-refusals.ts';
+import type { AdoptedCard } from '../src/adopt/adopt-refusals.ts';
+
+/** The wiring a template's render holds in its `factory.json`: its workflows, its hires, and its revisions policy where it says one. */
+export type Wiring = { readonly workflows: readonly string[]; readonly hires: Hires; readonly revisions?: RevisionsPolicy };
+
+/**
+ * What a takeover is judged against, read off the disk: the render's wiring, the cards filed for the factory, the digest of the base and
+ * of the tree already there (null where there is none), and the digest of the render.
+ */
+export type Adoption = {
+  readonly wiring: Wiring;
+  readonly cards: readonly AdoptedCard[];
+  readonly leftovers: { readonly base: string | null; readonly tree: string | null };
+  readonly render: string;
+};
+
+/**
+ * What a takeover is refused as: a factory made from a template already (`Templated`), a filed card or a schedule its workflow would be
+ * gone from (`Stranded`), and a base or tree already there that is not the render (`Leftover`).
+ */
+export type AdoptRefused = { readonly kind: 'Templated' | 'Stranded' | 'Leftover'; readonly message: string };
 
 /** The words of each refusal: what they say is nobody's law, only that they are a sentence. */
 export const words = [

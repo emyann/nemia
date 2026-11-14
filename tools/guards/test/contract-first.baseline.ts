@@ -7,13 +7,9 @@
  * contract off here in the same commit. A contract is never added.
  */
 export const READS_ITS_CODE: readonly string[] = [
-  'packages/agent-orchestrator/contracts/adopt.contract.ts',
-  'packages/agent-orchestrator/contracts/budget.contract.ts',
-  'packages/agent-orchestrator/contracts/clone-target.contract.ts',
   'packages/agent-orchestrator/contracts/gate.contract.ts',
   'packages/agent-orchestrator/contracts/handed-runs.contract.ts',
   'packages/agent-orchestrator/contracts/hold.contract.ts',
-  'packages/agent-orchestrator/contracts/labels.contract.ts',
   'packages/agent-orchestrator/contracts/leftovers.contract.ts',
   'packages/agent-orchestrator/contracts/reach.contract.ts',
   'packages/agent-orchestrator/contracts/retention.contract.ts',
@@ -23,11 +19,8 @@ export const READS_ITS_CODE: readonly string[] = [
   'packages/agent-orchestrator/contracts/step-machine.contract.ts',
   'packages/agent-orchestrator/contracts/step-speaker.contract.ts',
   'packages/agent-orchestrator/contracts/unit-running.contract.ts',
-  'packages/agent-orchestrator/contracts/wait-bound.contract.ts',
   'packages/agent-orchestrator/contracts/watch-changes.contract.ts',
-  'packages/agent-orchestrator/contracts/wiring.contract.ts',
   'packages/agent-orchestrator/contracts/workflow-graph.contract.ts',
-  'packages/agent-orchestrator/contracts/workflow-version.contract.ts',
   'packages/agent-runtime/contracts/decide.contract.ts',
   'packages/agent-runtime/contracts/lifecycle.contract.ts',
   'packages/agent-runtime/contracts/observe.contract.ts',

@@ -17,7 +17,7 @@
  * `src/factory/clones/clones.test.ts`, not by a law here: as laws they ran the solver out of work at twice its default.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { joinedFolder } from '../src/factory/clones/clones.ts';
+import { joinedFolder } from '../src/factory/clones/clone-folder.ts';
 
 /** What a `--repo` value names, which `src/factory/clones/clones.ts` re-exports. */
 export type CloneTarget =

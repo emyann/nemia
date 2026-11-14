@@ -12,7 +12,16 @@
  * The types the laws read (`StepBudget`, `CapInput`) are the code's, in `src/budget/budget.ts`.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { CapInput, StepBudget } from '../src/budget/budget.ts';
+
+/** A budget for one step, by its name, in dollars: what a gated step proposes, what a person gives, or a step's own `budget:`. */
+export type StepBudget = { step: string; usd: number };
+
+/**
+ * What a step's cap is chosen from. `raised`: the budget of its latest try that carries one — a person's `nemia retry --budget`, a
+ * round's raise — undefined where none does. `approved`: the caps the approvals in force set for it, in the order they were given,
+ * the earliest first. `workflow`: the step's own `budget:`, undefined where it has none.
+ */
+export type CapInput = { raised: number | undefined; approved: readonly number[]; workflow: number | undefined };
 
 /** An amount a cap can be: dollars above zero, and finite. */
 const anAmount = (usd: number): boolean => usd > 0 && Number.isFinite(usd);

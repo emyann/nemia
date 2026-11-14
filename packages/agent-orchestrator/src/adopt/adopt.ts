@@ -9,48 +9,14 @@
 import type { Adopted, AdoptRefusal } from '../../contracts/adopt.contract.ts';
 import { settingsNamed } from '../harness-settings/harness-settings.ts';
 import { DEFAULT_REVISIONS, factoryVolumes, volumeMark, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
+import type { Wiring, Adoption, AdoptRefused } from '../../contracts/adopt.contract.ts';
+import type { AdoptedCard } from './adopt-refusals.ts';
+import { templatedAdoptRefusal, strandedCardRefusal, strandedScheduleRefusal, leftoverRefusal } from './adopt-refusals.ts';
 
-/** The wiring a template's render holds in its `factory.json`: its workflows, its hires, and its revisions policy where it says one. */
-export type Wiring = { readonly workflows: readonly string[]; readonly hires: Hires; readonly revisions?: RevisionsPolicy };
+export { templatedAdoptRefusal, strandedCardRefusal, strandedScheduleRefusal, leftoverRefusal } from './adopt-refusals.ts';
 
-/**
- * A card filed for the factory: its name, the workflow it names by its folder's name (null where it names none), and whether a run was
- * started from it already.
- */
-export type AdoptedCard = { readonly name: string; readonly workflow: string | null; readonly started: boolean };
-
-/**
- * What a takeover is judged against, read off the disk: the render's wiring, the cards filed for the factory, the digest of the base and
- * of the tree already there (null where there is none), and the digest of the render.
- */
-export type Adoption = {
-  readonly wiring: Wiring;
-  readonly cards: readonly AdoptedCard[];
-  readonly leftovers: { readonly base: string | null; readonly tree: string | null };
-  readonly render: string;
-};
-
-/**
- * What a takeover is refused as: a factory made from a template already (`Templated`), a filed card or a schedule its workflow would be
- * gone from (`Stranded`), and a base or tree already there that is not the render (`Leftover`).
- */
-export type AdoptRefused = { readonly kind: 'Templated' | 'Stranded' | 'Leftover'; readonly message: string };
-
-/** Why the factory `name`, made from a template already, is not taken over: it is upgraded. */
-export const templatedAdoptRefusal = (name: string): string =>
-  `${name} is made from a template already, so it is upgraded, not taken over: nemia factory diff ${name} --to <x.y.z>, then nemia factory upgrade ${name} --to <x.y.z>.`;
-
-/** Why the factory `name` is not taken over: each card filed and not started, whose workflow the template does not offer. */
-export const strandedCardRefusal = (name: string, cards: readonly AdoptedCard[]): string =>
-  `${cards.map((c) => `the card ${c.name} names the workflow ${c.workflow ?? ''}`).join('; ')}, which the template does not offer, so ${cards.length === 1 ? 'it' : 'they'} could not start once ${name} is taken over: start ${cards.length === 1 ? 'it' : 'each'} first (nemia start <card>), or change ${cards.length === 1 ? 'its' : 'each'} workflow: line to one the template offers, then preview again.`;
-
-/** Why the factory `name` is not taken over: each schedule of a workflow the template does not offer. */
-export const strandedScheduleRefusal = (name: string, workflows: readonly string[]): string =>
-  `${name} schedules ${workflows.join(', ')}, which the template does not offer: unschedule ${workflows.length === 1 ? 'it' : 'each'} first — ${workflows.map((w) => `nemia factory unschedule ${name} ${w}`).join('; ')} — then preview again.`;
-
-/** Why the factory `name` is not taken over: its folders `folders` (`applied`, `tree`) are there already, and are not the render. */
-export const leftoverRefusal = (name: string, folders: readonly string[]): string =>
-  `${name} has ${folders.map((f) => `factories/${name}/${f}`).join(' and ')} in the store already, and ${folders.length === 1 ? 'it is' : 'they are'} not the template's render: keep what you need of ${folders.length === 1 ? 'it' : 'them'}, remove ${folders.length === 1 ? 'it' : 'them'}, then preview again.`;
+export type { Wiring, Adoption, AdoptRefused } from '../../contracts/adopt.contract.ts';
+export type { AdoptedCard } from './adopt-refusals.ts';
 
 /** The cards filed and not started whose workflow `offered` leaves out. */
 const strandedCards = (cards: readonly AdoptedCard[], offered: readonly string[]): AdoptedCard[] =>

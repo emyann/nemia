@@ -5,13 +5,67 @@
  */
 import { Hono } from 'hono';
 import { OpenApi } from 'effect/http-api';
-import { Api } from 'objects';
+import { toolsOf } from 'agent-orchestrator';
+import { Api, COMMAND_WORDS } from 'objects';
 import type { ApiEnv } from '../layer.ts';
 
 /** The path the document is served on, as Kubernetes serves a group's: `/openapi/v3/<group>/<version>`. */
 export const OPENAPI_PATH = '/openapi/v3/nemia/v1';
 
-/** The document: every group of the `Api`, its paths, and the Schemas of its objects and refusals under `components.schemas`. */
-export const openapiDocument = () => OpenApi.fromApi(Api);
+/** An operation of the document, as far as it is worded here. */
+type Operation = { operationId?: string; summary?: string; description?: string };
+
+/** What a command says of an operation it links: its line, and what stands under it. */
+type Said = { readonly summary: string; readonly description: string };
+
+/** Who answers for a command when an agent calls it, in words. */
+const AGENT: Readonly<Record<string, string>> = {
+  read: 'an agent reads it',
+  act: 'an agent acts',
+  ask: 'the person is asked',
+  answer: 'the person answers what waits on them',
+  none: 'out of an agent’s reach',
+};
+
+/** What each endpoint a command links is said as, by its id: the command's line, then its tool, its class and the command's help. */
+const saidByEndpoint = (): Map<string, Said> =>
+  new Map(
+    COMMAND_WORDS.flatMap((words) =>
+      toolsOf(words).map((tool) => {
+        const line = `nemia ${words.name}`;
+        const answers =
+          typeof words.class === 'string' ? (AGENT[words.class] ?? words.class) : 'an agent reads it, and the person is asked to set';
+        const said: Said = {
+          summary: tool.tool === words.name.replaceAll(' ', '_') ? line : `${line} (${tool.tool})`,
+          description: [
+            `**Command** \`${`${line} ${words.usage}`.trim()}\``,
+            `**MCP tool** \`${tool.tool}\` · **When an agent calls it** ${answers}`,
+            words.help.join('\n'),
+          ].join('\n\n'),
+        };
+        return [tool.endpoint, said] as const;
+      }),
+    ),
+  );
+
+/**
+ * The document: every group of the `Api`, its paths, and the Schemas of its objects and refusals under `components.schemas`, as Effect
+ * writes it (`OpenApi.fromApi`), each operation then said in the surface's own words: one a command of the table links
+ * (`COMMAND_WORDS`) takes that command's line as its summary and, under it, its tool on the MCP port, who answers for it when an agent
+ * calls it, and the command's help; one no command links keeps its id as its summary. The words are the table's, so a command's help
+ * changed there is changed here.
+ */
+export const openapiDocument = () => {
+  const document = OpenApi.fromApi(Api);
+  const said = saidByEndpoint();
+  for (const item of Object.values(document.paths as Record<string, Record<string, Operation>>))
+    for (const op of Object.values(item)) {
+      if (typeof op !== 'object' || op.operationId === undefined) continue;
+      const by = said.get(op.operationId);
+      op.summary = by?.summary ?? op.operationId;
+      if (by) op.description = by.description;
+    }
+  return document;
+};
 
 export const openapi = new Hono<ApiEnv>().get(OPENAPI_PATH, (c) => c.json(openapiDocument()));

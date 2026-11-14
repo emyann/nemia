@@ -87,7 +87,26 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     paths: Record<string, { get?: unknown; post?: unknown; put?: unknown }>;
     components: { schemas: Record<string, unknown> };
   };
-  assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
+  const unworded = (document: unknown): unknown => {
+    const copy = structuredClone(document) as { paths: Record<string, Record<string, { summary?: string; description?: string }>> };
+    for (const item of Object.values(copy.paths))
+      for (const op of Object.values(item)) {
+        delete op.summary;
+        delete op.description;
+      }
+    return copy;
+  };
+  assert.deepEqual(
+    unworded(doc),
+    unworded(JSON.parse(JSON.stringify(OpenApi.fromApi(Api)))),
+    'the document is OpenApi.fromApi(Api), as JSON, but for what each operation is said as',
+  );
+  const listed = (doc.paths['/api/runs']?.get ?? {}) as { summary?: string; description?: string };
+  assert.equal(listed.summary, 'nemia ls', "an operation a command links takes the command's line");
+  assert.ok(listed.description?.includes('`ls`'), 'and names its tool on the MCP port under it');
+  const direct = (doc.paths['/api/namespaces/{namespace}/runs']?.get ?? {}) as { summary?: string; description?: string };
+  assert.equal(direct.summary, 'runs.list', 'one no command links keeps its id');
+  assert.equal(direct.description, undefined);
   const GET_PATHS = {
     Run: '/api/runs/{name}',
     Card: '/api/namespaces/{namespace}/cards/{name}',

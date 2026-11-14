@@ -18,6 +18,8 @@ import { objectWritten } from './write.verb.ts';
 import { ProposalDoor } from '../proposal/proposal.store.ts';
 import { readResolutions } from '../factory/applied/applied.store.ts';
 import { resolvedAgain, type ResolvedAgain } from '../factory/upgrade/index.ts';
+import { upgradeComposed } from '../factory/applied/applied.verb.ts';
+import { StoreRoot } from '../config/root.store.ts';
 
 /** How a program reads the state of a proposal's run: as the tick judged it, or as its record says. */
 export type RunStateOf = (run: string) => Effect.Effect<RunState | undefined, Refusal>;
@@ -64,6 +66,16 @@ const doNext = (again: ResolvedAgain | undefined, otherwise: string): string =>
   again === undefined
     ? otherwise
     : `it resolves the upgrade's conflicts of ${again.owner}, so resolve them again on what the tree holds now: ${again.lines.join('; ') || 'nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>'}`;
+
+/**
+ * The tree a Workflow of `proposal` is judged against as it is written: where it resolves an upgrade's conflicts (`resolutionOf`) and an
+ * upgrade of `factory` is due, the tree that upgrade composes (`upgradeComposed`), whose clean merges land only once each conflict is
+ * resolved; else none, the factory's tree as it is.
+ */
+const composedFor = (place: ProposalPlace, factory: string, proposal: Proposal) =>
+  resolutionOf(place, factory, proposal) === undefined || !proposal.spec.objects.some((o) => o.kind === 'Workflow')
+    ? Effect.succeed(undefined)
+    : Effect.provideService(upgradeComposed(factory), StoreRoot, place.home);
 
 /**
  * What the action other than an apply makes of `proposal` of `factory`: its phase, and a sentence saying why — for a stale one, each
@@ -139,8 +151,9 @@ export const applyProgram = Effect.fn('applyProgram')(function* (
   );
   const revisions: string[] = [];
   const written: string[] = [];
+  const against = yield* composedFor(place, factory, proposal);
   for (const { object } of objects) {
-    const wrote = yield* Effect.result(objectWritten(place, factory, object));
+    const wrote = yield* Effect.result(objectWritten(place, factory, object, against));
     if (wrote._tag === 'Failure')
       return yield* door.write(
         withStatus(proposal, {

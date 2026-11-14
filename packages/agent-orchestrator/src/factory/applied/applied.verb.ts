@@ -16,7 +16,7 @@ import type { Args } from '../../command/command.ts';
 import type { Served } from '../../command/entry.verb.ts';
 import { Invalid, type Refusal } from '../../refusal/refusal.ts';
 import type { FeedConflicts } from '../../feed/index.ts';
-import { FactoryDoor, factoryRepos, originsOf, refuseName } from '../door/factories.store.ts';
+import { FactoryDoor, factoryOrNone, factoryRepos, originsOf, refuseName } from '../door/factories.store.ts';
 import { cloned } from '../clones/clones.verb.ts';
 import { StoreRoot } from '../../config/root.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory.ts';
@@ -364,6 +364,29 @@ const upgradeDue = (
     sameVersionChange({ base: digest, recorded, wanted: digestOf(now.entries) }) === 'params');
 
 /**
+ * The upgrade of `factory` from the version its base `base` holds (`last`) to the render `now`, as a pass reads it, writing nothing: the
+ * tree's files `ours`, the switch onto another template where it is one, the person's choices for this version and template, and the
+ * merge (`upgradeMerge`), an owner whose resolution's proposal applied, by `phases`, taken from the tree.
+ */
+function upgradeRead(
+  home: string,
+  factory: Factory & { template: FactoryTemplate },
+  now: RenderedAt,
+  base: readonly Entry[],
+  last: Status & { version: string },
+  phases: ProposalPhases,
+) {
+  const { name, template } = factory;
+  const ours = entriesIn(treeDir(home, name));
+  const switched: Switched | undefined =
+    last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
+  const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
+  const resolutions = readResolutions(home, name);
+  const read = upgradeMerge(name, base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
+  return { ours, switched, choices: choicesFor(resolutions, merging), read };
+}
+
+/**
  * The upgrade of a factory from the version its base holds (`last`) to the one its file wants, the template rendered at it (`now`): its
  * tree merged three ways with its base, or with no base where the template now is another than the base's (`switchTrees`), an owner
  * whose resolution's proposal applied taken from the tree (`upgradeMerge`, read with the proposals' `phases`), and the person's choices
@@ -382,13 +405,8 @@ function upgradePass(
   phases: ProposalPhases,
 ) {
   const { name, template } = factory;
-  const ours = entriesIn(treeDir(home, name));
-  const switched =
-    last.template !== undefined && mergeBaseOf(last.template, now.name) === 'none' ? { from: last.template, to: now.name } : undefined;
-  const merging = { from: last.version, to: template.version, template: now.name, base: digestOf(base) };
-  const resolutions = readResolutions(home, name);
-  const read = upgradeMerge(name, base, ours, now.entries, switched !== undefined, proposalsFor(resolutions, merging), phases);
-  const composed = compose(read.merge, choicesUnowned(choicesFor(resolutions, merging), read.owners));
+  const { ours, switched, choices, read } = upgradeRead(home, factory, now, base, last, phases);
+  const composed = compose(read.merge, choicesUnowned(choices, read.owners));
   if ('pending' in composed) {
     const status: Status = {
       version: last.version,
@@ -463,6 +481,31 @@ export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory
   const phases = yield* phasesNamed(factory.name, readResolutions(home, factory.name)?.proposals ?? {});
   const at = new Date(yield* Clock.currentTimeMillis).toISOString();
   return reconciledWith(home, factory, now, named, at, recorded, phases);
+});
+
+/**
+ * The files of the tree the upgrade of the factory `name` under way composes, as a pass will write it once each conflict has a choice
+ * (`upgradePass`): every clean merge, each owner whose resolution's proposal applied taken from the tree, and each choice the person made
+ * for this version and template, an owner's among them; a conflict with no choice yet taken as the tree holds it. Written nowhere: no
+ * base is rendered, no status written. None where `name` is no factory made from a template, its template does not render at the version
+ * wanted, its base is absent, or no upgrade is due. What a conflict's resolution is checked against as it applies (`applyProgram`).
+ */
+export const upgradeComposed = Effect.fn('upgradeComposed')(function* (name: string) {
+  const home = yield* StoreRoot;
+  const filed = yield* factoryOrNone(name);
+  if (filed?.template === undefined) return undefined;
+  const factory = { ...filed, template: filed.template };
+  const { now } = yield* templateNow(factory);
+  const base = entriesIn(appliedDir(home, name));
+  if ('type' in now || !base.length) return undefined;
+  const last = readStatus(home, name);
+  const recorded = yield* recordedOf(factory, now, last);
+  if (typeof last?.version !== 'string' || !upgradeDue(factory, now, digestOf(base), last, recorded)) return undefined;
+  const phases = yield* phasesNamed(name, readResolutions(home, name)?.proposals ?? {});
+  const { choices, read } = upgradeRead(home, factory, now, base, { ...last, version: last.version }, phases);
+  const unchosen = Object.fromEntries(read.merge.conflicts.map((c): [string, Choice] => [c.at, 'ours']));
+  const composed = compose(read.merge, { ...unchosen, ...choices });
+  return 'entries' in composed ? composed.entries : undefined;
 });
 
 /**

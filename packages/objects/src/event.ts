@@ -25,7 +25,12 @@ import { Actor } from './token.ts';
 import { ANSWER_VIA, EVENT_REASONS, EVENT_SOURCES, EVENT_TYPES, EVENT_WAITS, INVOLVED_KINDS, WAIT_ON } from './words.ts';
 
 /** What an Event is about: its kind, and its name — a run's id, `<run>/<step>`, a daemon's pid, or `store`. */
-export const EventInvolved = Schema.Struct({ kind: Schema.Literals(INVOLVED_KINDS), name: Schema.String });
+export const EventInvolved = Schema.Struct({
+  kind: Schema.Literals(INVOLVED_KINDS).annotate({
+    description: 'What kind of thing the line is about: Run, Step, Daemon, Store or Factory.',
+  }),
+  name: Schema.String.annotate({ description: "Its name: a run's id, `<run>/<step>`, a daemon's pid, or store." }),
+});
 export type EventInvolved = typeof EventInvolved.Type;
 
 /** A line of the feed, as an object. */

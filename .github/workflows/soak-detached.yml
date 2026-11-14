@@ -60,7 +60,25 @@ jobs:
           git config --global init.defaultBranch main
       - run: npm ci
         timeout-minutes: 10
+      # The log is kept beside the job's own, so the step after it can read which test failed.
       - name: test agent-runtime under TZ=UTC
-        run: npx turbo run test --force --filter=agent-runtime
+        shell: bash
+        run: npx turbo run test --force --filter=agent-runtime 2>&1 | tee soak.log
         env:
           TZ: UTC
+      # A job's log needs a sign-in to read, and an agent may not call gh; an annotation is shown on the run's summary to whoever sees
+      # the checks. So each failing test of the reporter's closing list is one, with the lines that say why, its stack left out:
+      # GitHub shows ten a step, which is more than a soak leg has failed with.
+      - name: name each failing test on the run's summary
+        if: failure()
+        shell: bash
+        run: |
+          sed 's/^agent-runtime:test: //' soak.log | awk '
+            function out() { if (msg != "") print msg; msg = "" }
+            /failing tests:/ { on = 1; next }
+            !on { next }
+            /^ *test at / { out(); at = $0; sub(/^ *test at /, "", at); next }
+            /^ *✖ / { out(); line = $0; sub(/^ *✖ /, "", line); gsub(/%/, "%25", line); msg = "::error title=soak: a test failed::" line " (" at ")"; at = ""; kept = 0; next }
+            msg != "" && kept < 8 && $0 !~ /^ +at / && $0 ~ /[^ ]/ { line = $0; gsub(/%/, "%25", line); msg = msg "%0A" line; kept++ }
+            END { out() }
+          '

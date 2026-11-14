@@ -18,7 +18,11 @@ export type AgentSpecRead = {
   instructions: string;
 };
 
-/** The spec `agent` says, as it parses (`parseAgent`), with the result schema `schema` its `output:` names, where one is given. */
+/**
+ * The spec `agent` says, as it parses (`parseAgent`), with the result schema `schema` its `output:` names, where one is given.
+ * @param agent The agent as it parses.
+ * @param schema The file and text of the result schema its `output:` names; absent or null where none is given.
+ */
 export function agentSpecOf(agent: Agent, schema?: { readonly file: string; readonly text: string } | null): AgentSpecRead {
   return {
     ...(agent.role !== undefined && { role: agent.role }),

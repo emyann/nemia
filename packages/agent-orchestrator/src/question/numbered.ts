@@ -9,7 +9,10 @@ import type { Closeout } from '../closeout/index.ts';
 import type { StepSpec } from '../step/step.ts';
 import { askedQuestions, recommendedOf, type Answer, type Asked, type Question } from './question.ts';
 
-/** The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`… */
+/**
+ * The letter of the option at `index` from 0: `a` to `z`, then `aa`, `ab`…
+ * @param index The option's place among its question's options, from 0.
+ */
 export const letterOf = (index: number): string =>
   index < 26 ? String.fromCharCode(97 + index) : `${letterOf(Math.floor(index / 26) - 1)}${letterOf(index % 26)}`;
 
@@ -17,6 +20,7 @@ export const letterOf = (index: number): string =>
  * What a closeout asks, as data an answer names back: each question numbered on across the fields from 1, under the field it was asked in,
  * each option lettered and marked where it is recommended. What the run's decision carries (`StepQuestions`), and what `questionLines`
  * prints.
+ * @param asked What the closeout asks, field by field, in the order `askedQuestions` gives them.
  */
 export function numberedQuestions(asked: readonly Asked[]): DecisionQuestion[] {
   let n = 0;
@@ -50,18 +54,27 @@ const questionBlock = (q: DecisionQuestion): string[] => [
   `     ${q.multiple ? 'choose one or more' : 'choose one'}, or answer in your own words`,
 ];
 
-/** What a closeout asks, as `nemia decide` prints it: each field's name, then its questions, numbered on across the fields. */
+/**
+ * What a closeout asks, as `nemia decide` prints it: each field's name, then its questions, numbered on across the fields.
+ * @param asked What the closeout asks, field by field, in the order `askedQuestions` gives them.
+ */
 export function questionLines(asked: readonly Asked[]): string[] {
   const numbered = numberedQuestions(asked);
   return asked.flatMap(({ field }) => [`${field}:`, ...numbered.filter((q) => q.field === field).flatMap(questionBlock)]);
 }
 
-/** The `--answer` a line that offers the verb shows, one for each question asked: `--answer 1=<letter> --answer 2=<letter>`. */
+/**
+ * The `--answer` a line that offers the verb shows, one for each question asked: `--answer 1=<letter> --answer 2=<letter>`.
+ * @param count How many questions are asked.
+ */
 export const answerForm = (count: number): string => Array.from({ length: count }, (_, i) => `--answer ${i + 1}=<letter>`).join(' ');
 
 /**
  * What a line offering `nemia retry` or `nemia approve` to `step` gives after its name: an `--answer` for each question its closeout
  * `said` asks, and the note beside them; or `words`, the `--message` it offers where the closeout asks none.
+ * @param step The step as its workflow says it; undefined where it is not known.
+ * @param said What the step's closeout said, or the error it was read with; undefined where it has said nothing.
+ * @param words What the line gives where the closeout asks no question.
  */
 export const answersOr = (step: StepSpec | undefined, said: Closeout | { error: string } | undefined, words: string): string => {
   const count = askedQuestions(step, said).flatMap((a) => a.questions).length;
@@ -105,6 +118,8 @@ function resolved(q: Question, typed: Typed, value: string): Answer | { error: s
  * none, which `answerRefusal` says itself. What is left to refuse — a question answered twice or not at all, several labels where one is
  * taken — is `answerRefusal`'s.
  *
+ * @param questions The questions the step asks now, numbered as `questionLines` numbers them.
+ * @param typed The `--answer` values typed, in the order given.
  * @param decide The command that prints the numbering, as the refusal of a number past them names it.
  */
 export function numberedAnswers(

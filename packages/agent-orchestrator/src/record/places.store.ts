@@ -24,13 +24,19 @@ export type Place = {
   handOff(run: FolderRun, step: string): void;
 };
 
-/** A folder run's folders: `runs/<id>/work`, beside its artifacts and inputs, and removed with them. `runs` is the store's `runs/`. */
+/**
+ * A folder run's folders: `runs/<id>/work`, beside its artifacts and inputs, and removed with them. `runs` is the store's `runs/`.
+ * @param runs The store's `runs/` folder.
+ * @param id The run's id.
+ */
 export const workRoot = (runs: string, id: string): string => path.join(runs, id, 'work');
 
 /**
  * Where `nemia start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir`
  * reads. Here because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts
  * apart.
+ * @param runs The store's `runs/` folder.
+ * @param id The run's id.
  */
 export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');
 
@@ -38,6 +44,9 @@ export const inputsRoot = (runs: string, id: string): string => path.join(runs, 
  * Where a run keeps its own copies of its workflow folder: `runs/<id>/workflow`, and with `hex` the one copy under that digest
  * (`Run.workflowFiles`), written once by `freezeWorkflowFiles` (frozen.store.ts) and never again, so a check or a session told it as
  * `WF_WORKFLOW_FILES` reads the files as the run took them, whatever the folder holds now. Beside the run's record, removed with it.
+ * @param runs The store's `runs/` folder.
+ * @param id The run's id.
+ * @param hex The digest of the one copy; absent for the folder of every copy.
  */
 export const workflowFilesRoot = (runs: string, id: string, hex?: string): string =>
   hex === undefined ? path.join(runs, id, 'workflow') : path.join(runs, id, 'workflow', hex);
@@ -46,6 +55,9 @@ export const workflowFilesRoot = (runs: string, id: string, hex?: string): strin
  * Where a run keeps its own copies of the carried folder beside its workflow's: `runs/<id>/carried`, and with `hex` the one copy under
  * that digest (`Run.carriedFiles`), written by `freezeCarriedFiles` (frozen.store.ts) as the workflow's copy is, beside it rather than in
  * it so the workflow's digest stays its own folder's. Told as `WF_CARRIED_FILES`; beside the run's record, removed with it.
+ * @param runs The store's `runs/` folder.
+ * @param id The run's id.
+ * @param hex The digest of the one copy; absent for the folder of every copy.
  */
 export const carriedFilesRoot = (runs: string, id: string, hex?: string): string =>
   hex === undefined ? path.join(runs, id, 'carried') : path.join(runs, id, 'carried', hex);
@@ -97,6 +109,7 @@ function ownGiven(workspace: string): void {
  *
  * `make` copies in what the step's brief tells it to read (`givenPlan`, which words the brief off the same plan): a folder team runs in
  * `dontAsk`, where a path outside its directory is denied without a prompt. With nothing to copy, the folder is left as it was.
+ * @param runs The store's `runs/` folder, under which each run's folders are made.
  */
 export const folderPlace = (runs: string): Place => ({
   make(run, plan, step) {

@@ -34,19 +34,29 @@ export type ProposalLayer = {
 /** The Proposal door's shape: each method of `ProposalLayer` answering an Effect. */
 export type ProposalDoorShape = DoorOf<ProposalLayer, string>;
 
-/** Why `name` is no proposal's name, or undefined where it is one: lowercase letters, digits and dashes, as the machinery mints them. */
+/**
+ * Why `name` is no proposal's name, or undefined where it is one: lowercase letters, digits and dashes, as the machinery mints them.
+ * @param name The name judged.
+ */
 export const proposalNameRefusal = (name: string): string | undefined =>
   /^[a-z0-9][a-z0-9-]*$/.test(name)
     ? undefined
     : `${JSON.stringify(name)} is no proposal's name: a proposal is named <proposer>-<five letters or digits>, as nemia get proposals -n <factory> lists them.`;
 
-/** The factory's and proposal's names, refused (`Invalid`) where either is no name; what both layers check before they touch a record. */
+/**
+ * The factory's and proposal's names, refused (`Invalid`) where either is no name; what both layers check before they touch a record.
+ * @param factory The factory's name.
+ * @param name The proposal's name.
+ */
 export function proposalNamed(factory: string, name: string): void {
   const bad = factoryNameRefusal(factory) ?? proposalNameRefusal(name);
   if (bad !== undefined) throw new Invalid({ message: bad });
 }
 
-/** The factory a proposal is in: its namespace, refused (`Invalid`) where it names none. */
+/**
+ * The factory a proposal is in: its namespace, refused (`Invalid`) where it names none.
+ * @param proposal The proposal, whose `metadata.namespace` names its factory.
+ */
 export function factoryOf(proposal: Proposal): string {
   const factory = proposal.metadata.namespace;
   if (factory === undefined)
@@ -55,11 +65,17 @@ export function factoryOf(proposal: Proposal): string {
   return factory;
 }
 
-/** The `resourceVersion` of a proposal: a digest of its spec and status, so every change of either is a new one. */
+/**
+ * The `resourceVersion` of a proposal: a digest of its spec and status, so every change of either is a new one.
+ * @param proposal The proposal's spec and status.
+ */
 export const proposalVersion = (proposal: Pick<Proposal, 'spec' | 'status'>): string =>
   valueVersion({ spec: proposal.spec, status: proposal.status });
 
-/** `proposal` stamped with its `resourceVersion`. */
+/**
+ * `proposal` stamped with its `resourceVersion`.
+ * @param proposal The proposal to stamp.
+ */
 export const stamped = (proposal: Proposal): Proposal => ({
   ...proposal,
   metadata: { ...proposal.metadata, resourceVersion: proposalVersion(proposal) },
@@ -68,7 +84,10 @@ export const stamped = (proposal: Proposal): Proposal => ({
 /** A proposal written: as objects' `Proposal` decodes it. */
 const proposalChecked = checked(Proposal, (proposal: Proposal) => `the proposal ${proposal.metadata.name}`);
 
-/** The door over `layer`: each method as `doorOf` makes it, each write checked and stamped before the layer writes. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each write checked and stamped before the layer writes.
+ * @param layer The layer the door reads and writes through.
+ */
 export function proposalDoorOver(layer: ProposalLayer): ProposalDoorShape {
   const door = doorOf<ProposalLayer, string>(layer);
   return {
@@ -80,11 +99,19 @@ export function proposalDoorOver(layer: ProposalLayer): ProposalDoorShape {
   };
 }
 
-/** The refusal of a proposal made at a name taken. */
+/**
+ * The refusal of a proposal made at a name taken.
+ * @param factory The factory the proposal was made in.
+ * @param name The name already taken there.
+ */
 export const takenProposal = (factory: string, name: string): Conflict =>
   new Conflict({ message: `${factory} has a proposal ${name} already: propose again, and the machinery names it anew.` });
 
-/** The refusal of a proposal written back that is not there. */
+/**
+ * The refusal of a proposal written back that is not there.
+ * @param factory The factory the proposal was written back in.
+ * @param name The name of the proposal it does not have.
+ */
 export const noProposal = (factory: string, name: string): Missing =>
   new Missing({ message: `${factory} has no proposal ${name}: list them with nemia get proposals -n ${factory}.` });
 
@@ -139,7 +166,10 @@ const entriesOf = (dir: string): string[] => {
   }
 };
 
-/** The proposals of the store `home`, as a layer of the door. */
+/**
+ * The proposals of the store `home`, as a layer of the door.
+ * @param home The store's root folder.
+ */
 export function proposalFiles(home: string): ProposalLayer {
   return {
     proposals: {
@@ -177,5 +207,8 @@ export const ProposalDoor = Context.Reference<ProposalDoorShape>('agent-orchestr
   defaultValue: () => rootedDoor((root) => proposalDoorOver(proposalFiles(root)), 'Proposal door'),
 });
 
-/** The Proposal door over the files of the store `root`, as a layer. */
+/**
+ * The Proposal door over the files of the store `root`, as a layer.
+ * @param root The store's root folder.
+ */
 export const proposalDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(ProposalDoor)(proposalDoorOver(proposalFiles(root)));

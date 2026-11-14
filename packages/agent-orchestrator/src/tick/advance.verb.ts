@@ -306,7 +306,8 @@ const timedOnce = Effect.fnUntraced(function* (e: Engine, run: Run, r: RunRead, 
 /**
  * The pass's assessment of a run, the truth every other reader of it agrees with (`test/one-read.test.ts` reads it by this name): its one
  * read (`reads`), the checkout another run's ending holds (`checkoutHold`, over `from` and `memo`), and where its branches stand
- * (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's recheck of a blocked step is judged on), judged by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
+ * (`withStandings`), and where its branches are now (`heads`, the pass's: what a person's recheck of a blocked step is judged on), judged
+ * by `assess`. Read after a hold the pass lifts, which `assess` reads off the run.
  */
 export const passAssessment = Effect.fnUntraced(function* (
   e: Engine,

@@ -471,7 +471,7 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
-  if (blockedAccepted(step, said, steps) && !(step.check && rechecked(st))) return 'blocked';
+  if (standsBlocked(step, st, said, steps)) return 'blocked';
 
   const signed = (s: StepStatus): StepStatus =>
     s === 'verified' && askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : s;
@@ -488,6 +488,10 @@ export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseo
   if (!step.check) return askedAgain(step, run, closeoutOf) && roundOf(run, step.name) >= capOf(step) ? 'exhausted' : 'unverified';
   return signed(onItsCheck(step, st, phaseOf));
 };
+
+/** Whether a step stands `blocked`: its closeout accepted as blocked, and its check not run again on that very task (`rechecked`). */
+const standsBlocked = (step: StepSpec, st: StepRecord, said: Closeout | undefined, steps: readonly StepSpec[]): boolean =>
+  blockedAccepted(step, said, steps) && !(step.check && rechecked(st));
 
 /** Whether the try just behind a step's current one is a recheck of that very task: its current task's check was run again. */
 const rechecked = (st: StepRecord): boolean => {

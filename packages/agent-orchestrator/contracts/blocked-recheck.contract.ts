@@ -56,8 +56,7 @@ export type BlockedRecheck =
 const didNotPass = (phase: TaskPhase): boolean => phase === 'failed' || phase === 'stopped';
 
 /** Whether the try behind is a check that did not pass, judging a session other than the current one. */
-const failedBefore = (i: BlockedRecheckRead): boolean =>
-  i.behind !== null && !i.behind.sameTask && didNotPass(i.behind.checkPhase);
+const failedBefore = (i: BlockedRecheckRead): boolean => i.behind !== null && !i.behind.sameTask && didNotPass(i.behind.checkPhase);
 
 /** Whether everything but the branch's place is as a recheck needs it. */
 const readyButTheBranch = (i: BlockedRecheckRead): boolean => i.blocked && i.settled && failedBefore(i) && i.handedOff;
@@ -93,9 +92,7 @@ const blockedRecheckSpec = spec<(i: BlockedRecheckRead) => BlockedRecheck>({
     anUnrecordedCheckIsNotGuessed: {
       description: 'A failed check whose commit was never recorded is not rechecked: what it judged is unknown',
       condition: ({ input: [i], output }) =>
-        readyButTheBranch(i) && i.behind !== null && i.behind.tip === null
-          ? !output.recheck && output.why === 'unrecorded'
-          : true,
+        readyButTheBranch(i) && i.behind !== null && i.behind.tip === null ? !output.recheck && output.why === 'unrecorded' : true,
     },
     anUnreadBranchIsNotGuessed: {
       description: 'Where the branch is now was not read, no recheck is taken on faith',

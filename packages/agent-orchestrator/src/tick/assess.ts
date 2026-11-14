@@ -200,19 +200,7 @@ export function assess(read: AssessRead): Assessment {
   if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' };
 
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
-  const due = retriesDue(
-    steps,
-    run,
-    phaseOf,
-    closeoutOf,
-    askedCloseout,
-    verdictOf,
-    asks,
-    sessionBlocked,
-    spendOf,
-    checkKillOf,
-    read.tipOf,
-  );
+  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf, read.tipOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');

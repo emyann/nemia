@@ -382,7 +382,7 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
       assert.deepEqual(rechecked.tries?.at(-1), {
         taskId: rechecked.taskId,
-        check: { taskId: checked, tip: world().tip(runs.checking.repo, rechecked.branch ?? runs.checking.branch) },
+        check: { taskId: checked, tip: world().tip(runs.checking.repo ?? '', rechecked.branch ?? runs.checking.branch ?? '') },
         cause: 'recheck',
         paused: true,
       });

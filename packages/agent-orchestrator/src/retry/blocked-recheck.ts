@@ -3,7 +3,7 @@
  * and why not: the judgement (`blockedRecheck`) and its read off the record (`blockedRecheckRead`). Pure; its laws are
  * `contracts/blocked-recheck.contract.ts`'s. `retryable`, `retriesDue` and `retryRefusal` read it alike, so they cannot disagree.
  */
-import type { BlockedRecheck, BlockedRecheckRead, BlockedRechecked } from '../../contracts/blocked-recheck.contract.ts';
+import type { BlockedRecheckRead, BlockedRechecked } from '../../contracts/blocked-recheck.contract.ts';
 import { SETTLED, type StepRecord, type TaskPhase } from '../record/record.ts';
 
 export type { BlockedRecheck, BlockedRecheckRead, BlockedRecheckWhy } from '../../contracts/blocked-recheck.contract.ts';
@@ -27,18 +27,18 @@ export const blockedRecheck: BlockedRechecked = (i) => {
 
 /**
  * What `blockedRecheck` is handed for a step, off its record as it is: `blocked`, whether it stands blocked on its own work (`ownStatus`,
- * the caller's reading); the try just behind the current one and its check; and where its branch is now (`tipOf`).
+ * the caller's reading); the try just behind the current one and its check; and where its branch is now (`tipOf`; left out, unread).
  */
 export const blockedRecheckRead = (
   record: StepRecord | undefined,
   blocked: boolean,
   phaseOf: (taskId: string) => TaskPhase,
-  tipOf: TipOf,
+  tipOf: TipOf | undefined,
 ): BlockedRecheckRead => {
   const taskId = record?.taskId;
   const last = record?.tries?.at(-1);
   const check = last?.check;
-  const now = record?.branch ? tipOf(record.branch) : undefined;
+  const now = record?.branch && tipOf ? tipOf(record.branch) : undefined;
   return {
     blocked,
     settled: Boolean(taskId && SETTLED.has(phaseOf(taskId))),

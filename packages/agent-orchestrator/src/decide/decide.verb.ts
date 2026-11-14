@@ -15,6 +15,7 @@ import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
 import { acceptanceOf, approvalOf, type BranchStanding, type Round, type SpendOf } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
+import type { AssessRead } from '../tick/assess.ts';
 import { hasStarted, type Wait } from '../wait/wait.ts';
 import { roundOffers } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
@@ -285,11 +286,41 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for whether a run nothing of which
  * is filed is held (`slotsOf`). Fails with a refusal a read threw.
  */
+/**
+ * The refusal of the first `nemia retry` a step's `needs` names that the store would refuse (`retriesNamed`, judged by `retryRefusal` on
+ * the reading `nemia decide` holds), said beside its answer (`answerLines`), or undefined.
+ */
+const needsRefusedOf =
+  (steps: readonly StepSpec[], run: Run, read: AssessRead) =>
+  (name: string): string | undefined => {
+    const { phaseOf, signedOff, asked, verdictOf, asks, spendOf, checkKillOf, tipOf } = read;
+    const needs = signedOff(name)?.needs;
+    for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
+      const refused = retryRefusal(
+        steps,
+        run,
+        step,
+        how,
+        phaseOf,
+        signedOff,
+        asked,
+        verdictOf,
+        asks,
+        () => false,
+        spendOf,
+        checkKillOf,
+        tipOf,
+      );
+      if (refused) return `the nemia retry its needs names is refused: ${refused}`;
+    }
+    return undefined;
+  };
+
 export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;
   const e = viewedOnce(seenBy(at.e, views));
-  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, checkout, tipOf } = judged.read;
+  const { phaseOf, signedOff: reader, asked, verdictOf, checkKillOf, asks, roundAsks: rounds, checkout } = judged.read;
   const steps = [...at.steps];
   const { decision: d, assessed, spendOf } = judged;
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
@@ -308,16 +339,20 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
-    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place), checkKillOf, tipOf),
+    ...retryOffers(
+      steps,
+      run,
+      d,
+      phaseOf,
+      reader,
+      asked,
+      spendOf,
+      verdictOf,
+      () => landingDenies(run, place),
+      checkKillOf,
+      judged.read.tipOf,
+    ),
   ];
-  const needsRefused = (name: string): string | undefined => {
-    const needs = reader(name)?.needs;
-    for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
-      const refused = retryRefusal(steps, run, step, how, phaseOf, reader, asked, verdictOf, asks, () => false, spendOf, checkKillOf, tipOf);
-      if (refused) return `the nemia retry its needs names is refused: ${refused}`;
-    }
-    return undefined;
-  };
   const answer: Decided = {
     run,
     steps,
@@ -334,7 +369,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCost: runCostLines(run, spendOf),
     runCostSaid: runCostWords(run, spendOf),
     answers,
-    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefused),
+    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefusedOf(steps, run, judged.read)),
     gates: saidBy(
       gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds, checkKillOf),
       (name) => approvalOf(run, name)?.actor,

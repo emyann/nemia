@@ -59,7 +59,8 @@ const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefin
  * that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config its harness refuses
  * (`tryRefused`). An ask `nemia pause --now` wrote for that try refuses it even once void (`pauseAskVoid`): the tick alone sets it aside,
  * by its name, which a person's ask written there first would lose. Where a blocked step's branch stands is asked of its place now
- * (`headsNow`), once and only where a refusal reads it: a `--recheck` of it is taken only on the commit its failed check judged. Like a cancellation, the ask is the person's own file, and
+ * (`headsNow`), once and only where a refusal reads it: a `--recheck` of it is taken only on the commit its failed check judged. Like a
+ * cancellation, the ask is the person's own file, and
  * the verb never writes the run's json, which the tick owns. What the person said goes in the ask, `message`, and nowhere else: the tick
  * carries it into the try's brief. An ask written by someone else between the look and the write is refused as the look would have
  * refused it, and a file at the ask's name that no pass reads as one is named (`strayAsk`).

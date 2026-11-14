@@ -1911,7 +1911,6 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
   const CHECKED: StepSpec[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
   const [implement] = CHECKED;
   const BRANCH = 'wf/r-1/implement';
-  /** Try 1 signed done and its check `c1`, filed on `c0ffee1`, failed; try 2, `t2`, continued by retries, signed off blocked. */
   const blockedAfter = (o: { handedOff?: boolean; tip?: string | null; tries?: EarlierTry[] } = {}): RepositoryRun =>
     run(
       {},
@@ -1934,7 +1933,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
   const at = (tip: string | undefined) => (branch: string) => (branch === BRANCH ? tip : undefined);
   const modes = (r: Run, p: Record<string, TaskPhase> = settled, tip: string | null = 'c0ffee1') =>
     retryable(
-      implement!,
+      implement,
       r,
       phases(p),
       blocked,
@@ -1943,7 +1942,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
       () => false,
       undefined,
       undefined,
-      at(tip),
+      at(tip ?? undefined),
     ).modes;
 
   await t.test('the ways a blocked step is tried: --recheck beside a session only where nothing changed since the failed check', () => {
@@ -2044,7 +2043,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
 
   await t.test('a session continued after its check refused is told that signing off again unchanged runs the check again', () => {
     const told = (status: RetryBriefing['status']) =>
-      retrySection(implement!, { try: 2, by: 'retries', mode: 'continue', resumed: true, status });
+      retrySection(implement, { try: 2, by: 'retries', mode: 'continue', resumed: true, status });
     assert.match(told('failed (check)'), /change nothing and sign off as before[\s\S]*files the check again/);
     assert.doesNotMatch(told('blocked'), /files the check again/);
   });
@@ -2054,11 +2053,11 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     () => {
       const rechecked = (check?: string): Run => {
         const r = blockedAfter();
-        const record = nextTry(r.steps.implement!, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
+        const record = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
         return { ...r, steps: { ...r.steps, implement: { ...record, ...(check ? { check: { taskId: check } } : {}) } } };
       };
       const status = (r: Run, p: Record<string, TaskPhase>, closeout = blocked) =>
-        stepStatus(implement!, r, phases(p), closeout, () => true, CHECKED);
+        stepStatus(implement, r, phases(p), closeout, () => true, CHECKED);
       assert.equal(status(blockedAfter(), settled), 'blocked', 'never rechecked, it stays blocked');
       assert.equal(status(rechecked(), settled), 'checking', 'its check not yet filed');
       assert.equal(status(rechecked('c3'), { ...settled, c3: 'running' }), 'checking');

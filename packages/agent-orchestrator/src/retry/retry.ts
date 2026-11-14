@@ -143,7 +143,7 @@ function triedOn(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  tipOf: TipOf = () => undefined,
+  tipOf?: TipOf,
 ): { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
@@ -168,7 +168,7 @@ function triedOn(
       (satisfiesAfter(status) &&
         noneFiled &&
         followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
-  const rechecks = tried === 'blocked' && blockedRecheck(blockedRecheckRead(run.steps[step.name], true, phaseOf, tipOf)).recheck;
+  const rechecks = blockedRechecks(run.steps[step.name], tried, phaseOf, tipOf);
   const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack, rechecks);
   const raise =
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
@@ -196,6 +196,14 @@ const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, 
   const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
   return ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : [];
 };
+
+/** Whether a step standing `tried` is blocked and its failed check may run again (`blockedRecheck`). */
+const blockedRechecks = (
+  record: StepRecord | undefined,
+  tried: StepStatus,
+  phaseOf: (taskId: string) => TaskPhase,
+  tipOf: TipOf | undefined,
+) => tried === 'blocked' && blockedRecheck(blockedRecheckRead(record, true, phaseOf, tipOf)).recheck;
 
 /** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
 const landingAborted = (step: StepSpec, run: Run): boolean => {
@@ -698,8 +706,7 @@ export function retryOffers(
       continue;
     }
     const machine = machineOffered(step.name, status, modes, checkKillOf);
-    const blocked = status === 'blocked' && modes.includes('recheck');
-    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, blocked, () =>
+    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, blockedOffered(status, modes), () =>
       personsOffered(step, status, modes, verdictOf),
     );
     if (recheck) {
@@ -741,6 +748,9 @@ function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Ver
 const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf): boolean =>
   status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step);
 
+/** Whether a blocked step is offered `--recheck` first: its failed check may run again (`retryable`, `blockedRecheck`). */
+const blockedOffered = (status: StepStatus, modes: readonly RetryMode[]): boolean => status === 'blocked' && modes.includes('recheck');
+
 /** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
 const personsOffered = (
   step: Pick<StepSpec, 'name' | 'checkFailurePolicy'>,
@@ -772,8 +782,7 @@ function recheckFirst(
   blocked: boolean,
   persons: () => number | undefined,
 ): [string, string, string] | undefined {
-  if (blocked)
-    return [`${command} --recheck`, BLOCKED_RECHECK, `  (or answer its session: ${command} --message "<answer>"${spent})`];
+  if (blocked) return [`${command} --recheck`, BLOCKED_RECHECK, `  (or answer its session: ${command} --message "<answer>"${spent})`];
   if (machine)
     return [
       `${command} --recheck`,

@@ -235,7 +235,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
         'replies',
       ]);
       const branch = run.steps.implement.branch;
-      const tip = branch ? stage.place().world.tip(run.repo, branch) : null;
+      const tip = branch ? stage.place().world.tip(run.repo ?? '', branch) : null;
       const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check`, tip }, cause: 'round' }];
       const reviewed = [{ taskId: `${id}-review`, cause: 'round' }];
       assert.deepEqual(Object.fromEntries(Object.entries(run.steps).map(([name, record]) => [name, filedAs(record)])), {

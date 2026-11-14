@@ -217,11 +217,9 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   const e = yield* EngineService;
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, yield* asked('view', e.view(taskId)));
-    if (check) views.set(check.taskId, yield* asked('view', e.view(check.taskId)));
-    const behind = tries?.at(-1)?.check;
-    if (behind && !views.has(behind.taskId)) views.set(behind.taskId, yield* asked('view', e.view(behind.taskId)));
-    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* asked('view', e.view(t.taskId)));
+    const behind = tries?.at(-1)?.check?.taskId;
+    const earlier = earlierTries ? (tries ?? []).map((t) => t.taskId) : [];
+    for (const id of [taskId, check?.taskId, behind, ...earlier]) if (id && !views.has(id)) views.set(id, yield* asked('view', e.view(id)));
   }
   return {
     views,

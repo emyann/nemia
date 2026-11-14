@@ -5,6 +5,7 @@
  * run by a caller with `runWith`.
  */
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
@@ -29,10 +30,10 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one
  * loop. `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps
  * it. An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
- * name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a read threw; dies of anything else
- * (`tried`).
+ * name that does not read as one is named (`strayAsk`). Who asks (`actor`, the caller where it is known) is kept on the ask. Fails with
+ * a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
-export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
+export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number, actor?: Actor) {
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* stepsOf(run);
   const { views, phaseOf } = yield* taskPhasesRead(run);
@@ -57,6 +58,7 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     round: first.round,
     ...(first.budget !== undefined ? { budget: first.budget } : {}),
     at: new Date().toISOString(),
+    ...(actor ? { actor } : {}),
   };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'retry', of: 'round', ask });
   const file = written.where;
@@ -86,10 +88,12 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * `stepName` may be left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as
  * the look would have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
+ * Who accepts (`actor`, the caller where it is known) is kept on the acceptance; one given in-process keeps none.
+ *
  * Going round once more is not this verb's: `nemia retry <run> [<step>] --round` — and the two are offered side by side (`roundLines`).
  * Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
-export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
+export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string, actor?: Actor) {
   const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
@@ -117,7 +121,13 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   const first = answer(run, (yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   if (message === undefined) return yield* Effect.fail(new Conflict({ message: acceptWordsRefusal(message, `nemia approve ${id}`) ?? '' }));
-  const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message };
+  const acceptance: Acceptance = {
+    step: first.step,
+    try: first.try,
+    at: new Date().toISOString(),
+    message,
+    ...(actor ? { actor } : {}),
+  };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'loop', ask: acceptance });
   const file = written.where;
   if (!written.written) {

@@ -173,9 +173,6 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                before it runs has done nothing to recommend or check; one with no check
                                never passed one), what keeps a rule from a run now, and the rules that would
                                on the port: policy_reach
-  nemia chat speakers
-                               the names an agent may speak under in her chat, each one you allowed
-                               on the port: chat_speakers
   nemia service status [--name <name>]
                                the login service and the lease: whether it is installed and runs,
                                the checkout it runs, who holds the store, and lingering
@@ -197,8 +194,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                retired: nemia doctor reads what it read
                                CLI only: retired: nemia doctor is the read, served on the port
   nemia token ls
-                               your tokens, by name, with when each was minted: never a token itself
-                               CLI only: a token is minted where the store is and printed once to the person there; a caller of the port holding one token mints and revokes no other
+                               the tokens you minted, by name: who holds each, the factory and the
+                               narrowing of an agent’s, and when it was minted. Never a token itself
+                               on the port: token_ls
   nemia pairings ls
                                the pairings the store keeps, newest first: the client that asked, and
                                whether it waits for your approval, is approved, was claimed or lapsed.
@@ -327,7 +325,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                is on, which the merge does not spend; the step is the one that closes
                                the loop, left out where the run has one loop
                                on the port: refresh
-  nemia say <runId> <step> [--as <name>] "<words>"
+  nemia say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
                                said to, and nemia decide prints them under it. A try that continues
@@ -335,10 +333,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                Words to a step not filed yet (waiting on --after, a hold or an
                                earlier step) are kept, not delivered: its first try is handed them,
                                as ## Said before you started, and no try after it.
-                               Words from a session its run filed are its agent's, by its token
-                               (WF_SESSION_TOKEN); an agent with none says --as <name> before its
-                               words, a name the person allowed with nemia chat allow. An agent's
-                               words reach the step under its name, never as yours
+                               Words are from whoever holds the token sent: a session its run filed
+                               speaks as its agent (WF_SESSION_TOKEN), an agent given a token of its
+                               own (nemia token add <name> --agent <agent>) as that agent. An
+                               agent's words reach the step under its name, never as yours
                                on the port: say
   nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
@@ -586,14 +584,6 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
                                on the port: policy_rm
-  nemia chat allow <name>
-                               let an agent speak in her chat under a name, and to a step's session
-                               (nemia say --as <name>): its words reach her, the step and the board as
-                               its own, never as yours. Asked of you every time
-                               on the port: chat_allow
-  nemia chat disallow <name>
-                               take a name back: words under it are refused. Asked of you every time
-                               on the port: chat_disallow
   nemia service install [--env KEY=VALUE ...] [--size auto] [--bind <addr> [--public]] [--name <name>] [--take-over <pid>]
                                install the daemon as a login service: a systemd user unit on Linux,
                                a launchd agent on macOS. It runs the api of this checkout with this

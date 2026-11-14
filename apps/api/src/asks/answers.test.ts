@@ -10,7 +10,7 @@
  * On the stand-ins: the runtime's test engine, each step's task filed and settled with its closeout by hand, and the test place, under
  * the run record this file seeds. The table runs first: the story writes asks beside the run, and they stay.
  */
-import { root } from '../../test/harness.ts';
+import { root, SEATED } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,6 +24,7 @@ import { closeoutOf, objectOf, stepOf } from '../../test/run-reads.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
+import { actorWords } from 'objects';
 
 const T0 = Date.parse('2026-09-30T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -212,8 +213,8 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
       assert.equal(res.status, 202, await res.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(root, R, 'design', 2), 'utf8')) as { mode: string; message: string };
       assert.equal(written.mode, 'continue');
-      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.'));
-      assert.ok(written.message.endsWith('Answered by: person, on the board'), written.message);
+      assert.equal(written.message, answerText([cut, where], answers, 'Thanks.', actorWords(SEATED)));
+      assert.ok(written.message.endsWith('Answered by: the person, on harness'), written.message);
 
       const plain = await ask('plain', { mode: 'continue', message: 'Postgres.' });
       assert.equal(plain.status, 202, await plain.clone().text());

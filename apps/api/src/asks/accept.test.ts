@@ -25,6 +25,9 @@ import { acceptFile, acceptRun, list, roundRun, runsAtOnce } from 'agent-orchest
 import { story } from 'test-kit/checkpoints';
 import { objectOf, stepOf } from '../../test/run-reads.ts';
 
+/** Who the api's requests are, the test seat's token presented (`PERSON_TOKEN`): the person, on the token named `harness`. */
+const SEATED = { kind: 'person', token: 'harness' } as const;
+
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
 const engine = () => engineFor(standIn());
@@ -257,13 +260,20 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
           at: undefined,
           message: WHY,
           file: acceptFile(root, R, 'review', 2),
+          actor: SEATED,
           loop: true,
           next: 'nothing',
           caps: [],
         },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
-      assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });
+      assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), {
+        step: 'review',
+        try: 2,
+        at: took.at,
+        message: WHY,
+        actor: SEATED,
+      });
       assert.deepEqual(asked(), ['accept-review-2']);
       assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
       assert.deepEqual(standIn().stopped, [], 'and stopped nothing');
@@ -276,7 +286,11 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.ok(took);
       const run = await objectOf(app(), R);
       const review = stepOf(run, 'review');
-      assert.deepEqual(review.gate, { awaiting: false, approval: { try: 2, at: took.at, message: WHY } });
+      assert.deepEqual(
+        review.gate,
+        { awaiting: false, approval: { try: 2, at: took.at, message: WHY, actor: SEATED } },
+        'the acceptance on the loop, with who accepted',
+      );
       const words = await runWith(engine(), list(engine(), runsAtOnce(root).runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
       assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');

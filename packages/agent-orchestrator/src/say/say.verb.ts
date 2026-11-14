@@ -4,18 +4,15 @@
  * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`sayRun`, over `EngineService`), run
  * by a caller with `runWith`.
  */
-import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
-import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
+import { EngineService, asked, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run, type SaidBefore } from '../record/record.ts';
 import { saidAhead, sayRefusal, type Said } from './say.ts';
 import type { Caller } from '../caller/index.ts';
 import { framedForStep, stepSpeaker, type Speaker } from '../chat/chat.ts';
-import { readSpeakers } from '../chat/chat.store.ts';
-import { StoreRoot } from '../config/root.store.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { Conflict, Invalid } from '../refusal/refusal.ts';
+import { Conflict } from '../refusal/refusal.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
 
@@ -33,28 +30,14 @@ export type Told = { run: Run; taskId: string; try: number; said: Said; from: Sp
 export type Kept = { run: Run; try: 1; kept: SaidBefore; from: Speaker };
 
 /**
- * Who says words to a step: the `caller` the request is (a session by its token, or the person with none), and who the words say they
- * are from (`from`, `--as <name>`), none being the caller itself.
+ * Who says words to a step: the `caller` the request's token says — the person under any token of theirs, an agent by a standing token
+ * minted for it, or a session by its run's token — which is who the words are from (`stepSpeaker`).
  */
-export type SaidWho = { readonly caller: Caller; readonly from?: Speaker };
-
-/**
- * Who the words are from, judged before anything else is read (`stepSpeaker`): the names the person allowed in her chat (`nemia chat
- * allow`, `<store>/nemia/speakers.json`) read only for an agent that presents no token; refused `Invalid` or `Conflict` as it refuses.
- */
-const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidWho) {
-  const home = yield* StoreRoot;
-  const allowed = caller.kind === 'person' && from?.kind === 'agent' ? yield* tried(() => readSpeakers(path.join(home, 'nemia'))) : [];
-  const speaker = stepSpeaker(caller, from, allowed);
-  if (speaker.kind === 'person' || speaker.kind === 'agent') return speaker;
-  return yield* Effect.fail(
-    speaker.kind === 'Conflict' ? new Conflict({ message: speaker.message }) : new Invalid({ message: speaker.message }),
-  );
-});
+export type SaidWho = { readonly caller: Caller };
 
 /**
  * Tell a step's running session something — `nemia say` — through the engine's `say`, on the step's current try's task: the one `retry`
- * would replace, as `run.steps[step].taskId` names it. Who the words are from is judged first, off `by` (`speakerOf`, `stepSpeaker`): the
+ * would replace, as `run.steps[step].taskId` names it. Who the words are from is the caller `by` names (`stepSpeaker`): the
  * person's words are said as they are, an agent's in the frame that names it (`framedForStep`), never as the person's. The engine hands the
  * words to the session through its harness, then journals them as a `said` entry on the task, which is the record: this verb writes nothing
  * of its own, and `nemia ls` and `nemia decide` read the words back off the engine's view of the task. Only the step's own task is read:
@@ -65,16 +48,15 @@ const speakerOf = Effect.fnUntraced(function* ({ caller, from }: SaidWho) {
  * and no try after it. The engine is not asked. A pass that files the step while the words are being kept may compose its brief before
  * they are there: the record is the tick's, and a person's file beside it is read on the next filing, which for that step is no first try.
  *
- * Refused before the engine is asked, with what to do instead: words from a speaker the step's rule refuses, `Invalid` or `Conflict`
- * (`stepSpeaker`); then (`sayRefusal`) a step the run does not have, a cancelled run, a pruned run's step not filed, a step whose tries are
- * behind it with none filed now, and one whose task has settled — each a `Conflict`; and empty words for a step not filed, a `Conflict` as
- * the engine's is. Then the engine's refusals, each a `Conflict` in the engine's words — empty words, an attempt not started, a
- * harness with no way in, a session its harness does not list running — and a failure to deliver, as the engine throws it, which journals
- * nothing and has no exit code: ask again. Fails with a refusal, the verb's, the engine's (`toldBy`) or one a read threw; dies of anything
- * else, a failure to deliver included (`tried`, `asked`).
+ * Refused before the engine is asked, with what to do instead (`sayRefusal`): a step the run does not have, a cancelled run, a pruned
+ * run's step not filed, a step whose tries are behind it with none filed now, and one whose task has settled — each a `Conflict`; and
+ * empty words for a step not filed, a `Conflict` as the engine's is. Then the engine's refusals, each a `Conflict` in the engine's words —
+ * empty words, an attempt not started, a harness with no way in, a session its harness does not list running — and a failure to
+ * deliver, as the engine throws it, which journals nothing and has no exit code: ask again. Fails with a refusal, the verb's, the
+ * engine's (`toldBy`) or one a read threw; dies of anything else, a failure to deliver included (`asked`).
  */
 export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string, by: SaidWho) {
-  const from = yield* speakerOf(by);
+  const from = stepSpeaker(by.caller);
   const e = yield* EngineService;
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* stepsOf(run);

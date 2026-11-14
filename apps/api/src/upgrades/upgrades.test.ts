@@ -1,5 +1,5 @@
 /**
- * The upgrades routes: a start with no token on an unexposed store files `nemia upgrade <tag>` on the engine and answers it pending; a
+ * The upgrades routes: a start by a token of the person's files `nemia upgrade <tag>` on the engine and answers it pending; a
  * session's token starts none (403); two starts at once are one 200 and one 409; a tag below the store's floor is a 409 and a tag no
  * release folder is named by a 422, nothing filed; an unknown upgrade is a 404 on its read; the output stream ends with `ended`; and the
  * read names the release going back goes to with the floor's words where the floor refuses it. Statuses, phases and event names are
@@ -57,7 +57,7 @@ const floorAt = (t: { after: (fn: () => void) => void }, tag: string) => {
   t.after(() => fs.rmSync(file, { force: true }));
 };
 
-test('a start with no token on an unexposed store files the upgrade and answers it pending; its output ends with ended', async () => {
+test("a start by a token of the person's files the upgrade and answers it pending; its output ends with ended", async () => {
   const started = await send('POST', '/api/upgrades', { tag: 'v1.4.0' });
   assert.equal(started.status, 200, await started.clone().text());
   const upgrade = (await started.json()) as Upgrade;
@@ -103,6 +103,7 @@ test("a session's token starts no upgrade: 403, and nothing is filed", async () 
   const before = engine().filings.length;
   const res = await send('POST', '/api/upgrades', { tag: 'v1.4.0' }, token);
   assert.equal(res.status, 403);
+  assert.equal(((await res.json()) as { reason?: string }).reason, 'person-only');
   assert.equal(engine().filings.length, before, 'no upgrade filed');
 });
 

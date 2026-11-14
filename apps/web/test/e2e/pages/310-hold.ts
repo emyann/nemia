@@ -85,6 +85,7 @@ export default {
       await photograph(page, path.join(OUT, `hold-run-${theme}.png`), { fullPage: true });
     } finally {
       fs.rmSync(hold, { force: true });
+      fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
       fed(id, gated, 'awaiting approval');
     }
 
@@ -157,6 +158,7 @@ async function heldWithWords(page: Page): Promise<void> {
     await photograph(page, path.join(OUT, `hold-said-run-${theme}.png`), { fullPage: true });
   } finally {
     fs.rmSync(hold, { force: true });
+    fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
     fed(id, gated, 'awaiting approval');
   }
   await expectCount(page.locator('section[aria-label="Held"]'), 0, 'with the hold with words lifted, the run page says no hold');
@@ -202,6 +204,7 @@ async function heldNotStarted(page: Page): Promise<void> {
     await photograph(page, path.join(OUT, `hold-not-started-run-${theme}.png`), { fullPage: true });
   } finally {
     fs.rmSync(hold, { force: true });
+    fs.rmSync(hold.replace(/\.hold$/, '.unheld'), { force: true });
     fed(id, 'waiting');
   }
 }

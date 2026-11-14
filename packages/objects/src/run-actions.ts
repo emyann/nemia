@@ -11,6 +11,7 @@
  * words.
  */
 import { Schema } from 'effect';
+import { Actor } from './token.ts';
 import { ChatSpeaker } from './nemia.ts';
 import { RunDrift } from './run.ts';
 import { Paused } from './server-api.ts';
@@ -206,6 +207,7 @@ export const RunApproved = Schema.Struct({
   at: Schema.String,
   message: Schema.NullOr(Schema.String),
   file: Schema.String,
+  actor: Schema.optionalKey(Actor),
   loop: Schema.optionalKey(Schema.Boolean),
   next: Schema.optionalKey(Schema.Literals(['step', 'waiting', 'nothing'])),
   caps: Schema.optionalKey(
@@ -215,8 +217,9 @@ export const RunApproved = Schema.Struct({
 export type RunApproved = typeof RunApproved.Type;
 
 /**
- * Words said to a step's running session, as `nemia say` says them, and who wrote them (`from`): none is the caller the request is —
- * the person with no session's token, a session by its own.
+ * Words said to a step's running session, as `nemia say` says them, and `from`, retired: who wrote them is the caller the request's
+ * token says — the person under any token of theirs, an agent by a standing token minted for it or by its session's. A `from` naming an
+ * agent is refused (422), naming `nemia token add <name> --agent <agent>`; one naming the person is read no further.
  */
 export const RunSay = Schema.Struct({ text: Schema.String, from: Schema.optionalKey(ChatSpeaker) }).annotate({
   identifier: 'RunSay',
@@ -279,6 +282,7 @@ export const RunHoldWritten = Schema.Struct({
   until: Strings,
   why: Schema.optionalKey(Schema.String),
   by: Schema.optionalKey(Schema.String),
+  actor: Schema.optionalKey(Actor),
 }).annotate({ identifier: 'RunHoldWritten' });
 export type RunHoldWritten = typeof RunHoldWritten.Type;
 
@@ -303,7 +307,9 @@ export const RunCancelPlan = Schema.Union([
 export type RunCancelPlan = typeof RunCancelPlan.Type;
 
 /** What a cancel answers: the run and the plan it followed (`nemia cancel`). */
-export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan }).annotate({ identifier: 'RunCancelled' });
+export const RunCancelled = Schema.Struct({ id: Schema.String, plan: RunCancelPlan, actor: Schema.optionalKey(Actor) }).annotate({
+  identifier: 'RunCancelled',
+});
 export type RunCancelled = typeof RunCancelled.Type;
 
 /** A condition routed by hand, as `nemia route` routes one: the route, one of the condition's `routes:`. */

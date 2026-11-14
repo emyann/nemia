@@ -38,6 +38,7 @@ import { leaseRelease } from '../release/index.ts';
 import { runningRelease } from '../release/version.verb.ts';
 import { retain } from '../retention/retention.verb.ts';
 import { raiseStoreFloor } from '../release/archive.store.ts';
+import { credentialKept } from '../token/token.store.ts';
 import { releaseCheck } from '../release/check.verb.ts';
 import { upgradeCarries, type Running } from '../release/index.ts';
 import { adoptBundled, atPin, harnessesHeld, pinnedHarnesses, releaseTrees, type Adopted } from '../release/carry.store.ts';
@@ -307,8 +308,9 @@ export const limitRefusal = (config: Settings, scope: (parent?: string) => strin
  * it removes the installed releases no one needs (`retain`), pinning the one this process runs: by then each session it adopted has
  * recorded what it runs on. On a ninth, once the first pass has answered, an archive install asks for the newest release every six hours
  * (`releaseCheck`), unless `NEMIA_RELEASE_CHECK=off`. As it takes the store it raises the store's floor to the oldest release that reads
- * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it. Before the engine holds
- * anything it puts the store's tools folder first on its own PATH, its place's tools after it and their variables set
+ * what this one writes, never lowering it (`raiseStoreFloor`), so `nemia upgrade` refuses to go back past it, and puts the person's
+ * credential in place (`credentialKept`), so the person's `nemia` on this machine presents a token with nothing typed. Before the
+ * engine holds anything it puts the store's tools folder first on its own PATH, its place's tools after it and their variables set
  * (`toolsOnPath`), and adopts each harness a release carries that the tools folder lacks (`adoptedAtStart`); once the engine
  * holds, it files the install of each harness an upgrade carries that is not at its pin (`carriedFiled`); on a tenth it reads the
  * machine's needs every `NEEDS_EVERY` (`needs`), into the memory the process gives (`NeedsMemory`) or one of its own, its place's needs
@@ -334,6 +336,7 @@ export const up = (
       ({ held }) => Effect.sync(() => releaseStore(home, held)),
     );
     yield* Effect.try({ try: () => raiseStoreFloor(home), catch: (err) => err });
+    yield* Effect.try({ try: () => credentialKept(home), catch: (err) => err });
     const declared = (yield* PlaceService).declared;
     yield* Effect.try({ try: () => toolsOnPath(home, process.env, declared), catch: (err) => err });
     yield* adoptedAtStart(home, runningRelease());

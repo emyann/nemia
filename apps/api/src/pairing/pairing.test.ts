@@ -1,12 +1,13 @@
 /**
  * The pairing routes on a store marked exposed (`WF_EXPOSED=1`): a client with no token asks for a pairing and claims it, the person lists
  * and approves it, and the token the claim answers is one the api then takes; a first-visit link sets the board's HttpOnly cookie once.
- * The person's side refuses no token (401) and a session's (403). Statuses, phases and cookie attributes are asserted, never a sentence.
+ * The person's side refuses no token (401) and a session's (403 `person-only`). Statuses, phases and cookie attributes are asserted,
+ * never a sentence.
  *
  * On the stand-ins: the runtime's test engine, a session's task filed on it and left working (its token live), and the test place; the
  * tokens minted through the package's `TokenDoor` under the harness's store.
  */
-import { root } from '../../test/harness.ts';
+import { NO_TOKEN, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
@@ -43,14 +44,17 @@ const sessionRunning = () => {
   standIn().settle(TASK, 'working');
 };
 
-/** A request of `method` to `url` on the exposed app, as a client sends one: JSON, presenting `bearer` where given. */
+/**
+ * A request of `method` to `url` on the exposed app, as a client sends one: JSON, presenting `bearer` where given, and no token where
+ * not.
+ */
 const send = (method: 'GET' | 'POST', url: string, body?: unknown, bearer?: string) =>
   exposed().request(url, {
     method,
     headers: {
       'content-type': 'application/json',
       'sec-fetch-site': 'same-origin',
-      ...(bearer === undefined ? {} : { authorization: `Bearer ${bearer}` }),
+      ...(bearer === undefined ? NO_TOKEN : { authorization: `Bearer ${bearer}` }),
     },
     ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
   });
@@ -85,7 +89,9 @@ test('a full pairing: asked, waiting, approved by the person, claimed once, and 
   const approve = (bearer?: string) => send('POST', `/api/pairings/${pairing.code.toLowerCase()}/approve`, {}, bearer);
   assert.equal((await approve()).status, 401, 'no token: refused at the gate');
   sessionRunning();
-  assert.equal((await approve(sessionToken)).status, 403, "a session's token approves no pairing");
+  const bySession = await approve(sessionToken);
+  assert.equal(bySession.status, 403, "a session's token approves no pairing");
+  assert.equal(((await bySession.json()) as { reason?: string }).reason, 'person-only');
   const approved = await approve(personToken);
   assert.equal(approved.status, 200, await approved.clone().text());
   assert.equal(((await approved.json()) as Pairing).phase, 'claimable');

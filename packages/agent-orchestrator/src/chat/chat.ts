@@ -8,7 +8,7 @@
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`say.verb.ts`).
  */
-import type { FramedFor, SpeakerNameRefusal, SpeakerRefusal, WithSpeaker, WithoutSpeaker } from '../../contracts/speaker.contract.ts';
+import type { FramedFor, FromRefusal, SpeakerNameRefusal, SpeakerRefusal } from '../../contracts/speaker.contract.ts';
 import type { FramedForStep, StepSpeaker } from '../../contracts/step-speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { AGENT_OPENS, AGENT_WRITES } from '../say/say.ts';
@@ -19,7 +19,7 @@ import type { CallState, ChatFrom, SaidAfter } from 'objects';
 
 /**
  * Who a message is from (`ChatFrom`, objects' `CHAT_FROM`): the task's agent (`agent`), the person, the keeper, whose words are a quiet
- * marker, or another agent that wrote to the task in its chat under a name the person allowed (`peer`, the message carrying its `name`);
+ * marker, or another agent that wrote to the task in its chat with a token of its own (`peer`, the message carrying its `name`);
  * and where a tool call stands (`CallState`, objects' `CALL_STATES`): done, at work, failed, not begun, or waiting on the person.
  */
 export type { CallState, ChatFrom };
@@ -167,11 +167,8 @@ export type ChatSources = {
 /** Who wrote words to a task's chat: the person, or an agent, by the name it speaks under. An entry with none is the person's. */
 export type Speaker = { kind: 'person' } | { kind: 'agent'; name: string };
 
-/** Where words to the chat came from: the board, a person's browser on it, or anywhere else (a shell, a script, another agent's host). */
-export type Via = 'board' | 'elsewhere';
-
-/** Why words from a speaker are not taken: `Invalid`, what is given is wrong; `Conflict`, the person has not allowed that name. */
-export type SpeakerRefused = { kind: 'Invalid' | 'Conflict'; message: string };
+/** Why words from a speaker are not taken: `Invalid`, what is given is wrong. */
+export type SpeakerRefused = { kind: 'Invalid'; message: string };
 
 /** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
 export const PERSON_FRAME = 'The person writes from the board: ';
@@ -210,28 +207,31 @@ export const speakerNameRefusal: SpeakerNameRefusal = (name) => {
 };
 
 /**
- * Why words from `speaker`, come `via`, are not taken, given the names the person `allowed`; null where they are. The person's words
- * are taken from the board alone: anything else must say which agent wrote them (`Invalid`). An agent's are taken from anywhere under a
- * name the person allowed, refused `Invalid` under a name no agent speaks under and `Conflict` under one not allowed. Pure.
+ * Why words from `speaker` are not taken, or null where they are. The person's are taken whatever token of theirs carried them, the
+ * board's cookie, a shell's or a script's; an agent's, whose token says who it is, under a name an agent speaks under, refused `Invalid`
+ * under one no agent does. Pure.
  */
-export const speakerRefusal: SpeakerRefusal = (speaker, via, allowed) => {
-  if (speaker.kind === 'person')
-    return via === 'board'
-      ? null
-      : {
-          kind: 'Invalid',
-          message:
-            'Words from anywhere but the board must say which agent wrote them: send `from: { kind: "agent", name: "<your name>" }`, a name the person allowed with `nemia chat allow <name>`.',
-        };
+export const speakerRefusal: SpeakerRefusal = (speaker) => {
+  if (speaker.kind === 'person') return null;
   const bad = speakerNameRefusal(speaker.name);
-  if (bad !== undefined) return { kind: 'Invalid', message: bad };
-  if (!allowed.includes(speaker.name))
-    return {
-      kind: 'Conflict',
-      message: `The person has not allowed \`${speaker.name}\` to speak in this chat: they allow it with \`nemia chat allow ${speaker.name}\`.`,
-    };
-  return null;
+  return bad === undefined ? null : { kind: 'Invalid', message: bad };
 };
+
+/** How an agent is given a token of its own to speak with, as a refusal of a retired `from` or `--as` names it. */
+export const AGENT_TOKEN_FORM = 'nemia token add <name> --agent <agent>';
+
+/**
+ * Why words that say who they are from (`from`, the retired `--as`) are refused, or null where they are not: words that name an agent
+ * are refused `Invalid`, since an agent speaks with a token of its own (`AGENT_TOKEN_FORM`), and who speaks is the caller its token says;
+ * words that name the person, or no one, are refused for nothing, the field read no further. Pure.
+ */
+export const fromRefusal: FromRefusal = (from) =>
+  from?.kind === 'agent'
+    ? {
+        kind: 'Invalid',
+        message: `Words no longer say which agent they are from (\`${from.name}\`): an agent speaks with a token of its own, which the person mints with \`${AGENT_TOKEN_FORM}\`, and its words are its own by that token. Send no \`from\` (no \`--as\`).`,
+      }
+    : null;
 
 /**
  * The words `text` from `speaker` are said to the task in, so it knows who wrote them: the person's as they always were
@@ -241,37 +241,17 @@ export const framedFor: FramedFor = (speaker, text) =>
   speaker.kind === 'person' ? PERSON_FRAME + text : AGENT_OPENS + speaker.name + AGENT_WRITES + text;
 
 /**
- * Who words to a step's session are from (`nemia say`, the api's `say`, `src/say/say.verb.ts`), or why they are refused, off the
- * `caller` the request is, who the words say they are from (`from`) and the names the person `allowed` in her chat (`nemia chat allow`, the
- * same list). A session that presents its token speaks as its own agent, whatever the person allowed, and is refused `Invalid` where it
- * names anyone else. With no token, words that name no one, or the person, are the person's, from the board or a shell as every say was
- * before; an agent is judged by her chat's own rule (`speakerRefusal`, as if from anywhere but the board): `Invalid` under a name no agent
- * speaks under, `Conflict` under one the person has not allowed. Pure.
+ * Who words to a step's session (`nemia say`, the api's `say`, `src/say/say.verb.ts`), or to her chat (`chatSay`), are from, off the
+ * `caller` the request's token says: an agent — a session by its run's token, or an agent by a standing token the person minted for it —
+ * speaks as its own agent, under the name its token proves; the person, under any token of theirs, as the person. Pure.
  */
-export const stepSpeaker: StepSpeaker = (caller, from, allowed) => {
-  if (caller.kind === 'agent') {
-    if (from === undefined || (from.kind === 'agent' && from.name === caller.agent)) return { kind: 'agent', name: caller.agent };
-    return {
-      kind: 'Invalid',
-      message: `This session's token says it is \`${caller.agent}\`, and its words say they are from ${from.kind === 'person' ? 'the person' : `\`${from.name}\``}: a session speaks as itself alone, so send no \`from\` (no \`--as\`).`,
-    };
-  }
-  if (from === undefined || from.kind === 'person') return { kind: 'person' };
-  const refused = speakerRefusal(from, 'elsewhere', allowed);
-  return refused ?? { kind: 'agent', name: from.name };
-};
+export const stepSpeaker: StepSpeaker = (caller) => (caller.kind === 'agent' ? { kind: 'agent', name: caller.agent } : { kind: 'person' });
 
 /**
  * The words `text` from `speaker` are handed to a step's session in: the person's as they always were, in no frame; an agent's in the
  * frame her chat says them in (`framedFor`), never as the person's. Pure.
  */
 export const framedForStep: FramedForStep = (speaker, text) => (speaker.kind === 'person' ? text : framedFor(speaker, text));
-
-/** The person's `allowed` names with `name` allowed, listed once. Pure. */
-export const withSpeaker: WithSpeaker = (allowed, name) => (allowed.includes(name) ? [...allowed] : [...allowed, name]);
-
-/** The person's `allowed` names with `name` taken back. Pure. */
-export const withoutSpeaker: WithoutSpeaker = (allowed, name) => allowed.filter((n) => n !== name);
 
 /** The longest text the person may send at once. */
 export const CHAT_TEXT_MAX = 8000;

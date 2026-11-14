@@ -31,7 +31,7 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
       assert.equal(lit('/workflows/repo/dev/review'), 'Workflows');
       assert.equal(lit('/stats'), 'Stats');
       assert.equal(lit('/chat'), 'Nemia', 'her chat is a page of its own, and the rail lights her on it');
-      for (const path of ['/settings', '/setup', '/capabilities']) assert.equal(lit(path), 'Settings', path);
+      for (const path of ['/settings', '/setup', '/capabilities', '/tokens']) assert.equal(lit(path), 'Settings', path);
       for (const path of [
         '/nowhere',
         '/chatx',
@@ -49,10 +49,10 @@ test("DESTINATIONS, destinationOf, SETTINGS_TABS and tabsOf: the rail's destinat
   await t.test(
     "a tab's page has the tabs of Settings, in their order, each its own page's address, and any other page has none, a path that only begins with a tab's name included",
     () => {
-      for (const path of ['/settings', '/setup', '/capabilities']) {
+      for (const path of ['/settings', '/setup', '/capabilities', '/tokens']) {
         assert.deepEqual(
           tabsOf(path)?.map((tab) => tab.label),
-          ['Settings', 'Capabilities', 'Setup'],
+          ['Settings', 'Capabilities', 'Setup', 'Tokens'],
           path,
         );
         assert.ok(

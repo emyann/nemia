@@ -114,6 +114,8 @@ const agentOf = (agent: string, factoryName: string, runId?: string): Caller => 
     factory: factoryName,
     run: runId ?? null,
     step: runId === undefined ? null : 'design',
+    token: null,
+    narrowed: null,
   };
   return answered;
 };

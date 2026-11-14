@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { KeyRound } from 'lucide-react';
+import { BOARD_LINK_WORDS, commandLine } from 'objects';
 import { CutField, CutFrame, CutPress, ScanLines } from '@/components/look';
 import type { TokenAsk, TokenAsked } from '@/lib/api/read';
 import { signIn } from '@/lib/api/session';
@@ -9,22 +10,26 @@ import { PairBrowser } from './PairBrowser';
 
 /** Why the token is asked for, by the refusal that asked it. */
 const WHY: Record<TokenAsk, string> = {
-  'token-required':
-    'This Nemia is reached from beyond its machine, so it asks every browser for a token of yours before it shows anything.',
+  'token-required': 'This Nemia asks every browser for a token of yours before it shows anything, on its own machine as from beyond it.',
   'unknown-token':
-    'The token this browser sent is no token this Nemia keeps: it was removed since, or is of another Nemia, and this browser no longer sends it. Paste one it keeps.',
+    'The token this browser sent is no token this Nemia keeps: it was retired since, or is of another Nemia, and this browser no longer sends it.',
 };
+
+/** The command, typed on the machine the store is on, that prints a first-visit link signing a browser in with no token to copy. */
+const BOARD_LINK = commandLine(BOARD_LINK_WORDS, {});
 
 /** Reloads the page, where every read is made again with the cookie the api set or cleared. */
 const reload = () => window.location.reload();
 
 /**
- * The page the board shows in place of every other once the api asks this browser for a token (`useTokenAsked`): why it asks, the api's
- * own words, which say where a token of the person's is minted, a field the person pastes one into, and a press that sends it to the
- * api, which keeps it as this browser's cookie (`signIn`); then the page loads again, and the board is read with it. A token the api
- * refuses is said, in its words, and the page stays. Where the cookie's token is the one refused, the api's refusal cleared the cookie
- * already, so the browser sends none until one is pasted. Under the form, the other way in: this browser paired by a code the person
- * approves (`PairBrowser`), no token pasted; over it, a first-visit link this page was opened on and the api refused (`LinkRefusal`).
+ * The page the board shows in place of every other once the api asks this browser for a token (`useTokenAsked`) — which every store
+ * does, loopback included, of a browser that sends none: why it asks, the way in (`BOARD_LINK_WORDS`, typed on the store's machine,
+ * whose link signs the browser in), the api's own words, which say where a token of the person's is minted, a field the person pastes
+ * one into, and a press that sends it to the api, which keeps it as this browser's cookie (`signIn`); then the page loads again, and
+ * the board is read with it. A token the api refuses is said, in its words, and the page stays. Where the cookie's token is the one
+ * refused, the api's refusal cleared the cookie already, so the browser sends none until one is pasted. Under the form, the other way
+ * in: this browser paired by a code the person approves (`PairBrowser`), no token pasted; over it, a first-visit link this page was
+ * opened on and the api refused (`LinkRefusal`).
  */
 export function TokenPage({ asked }: { asked: TokenAsked }) {
   const ask = asked.reason;
@@ -50,6 +55,10 @@ export function TokenPage({ asked }: { asked: TokenAsked }) {
           </h1>
           <LinkRefusal />
           <p className="text-body-medium text-muted-foreground">{WHY[ask]}</p>
+          <p data-token-way className="text-body-medium text-muted-foreground">
+            To sign this browser in, type <code className="font-mono text-on-surface">{BOARD_LINK}</code> on the machine the store is on and
+            open the link it prints; or paste a token of yours here.
+          </p>
           {asked.message && (
             <p data-token-said className="font-mono text-body-small break-words text-muted-foreground">
               {asked.message}

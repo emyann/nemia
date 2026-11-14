@@ -3,7 +3,7 @@
  * and the file the ask is written to.
  */
 import { Effect, Schema } from 'effect';
-import { RunRetry, RETRY_WORDS } from 'objects';
+import { Actor, RunRetry, RETRY_WORDS } from 'objects';
 import { givenAnswers, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { messageRefusal, type RetryHow } from './index.ts';
 import { retryRun } from './retry.verb.ts';
@@ -46,13 +46,15 @@ function stepRefusal(args: Args): string | null {
 /**
  * What `nemia retry` takes: the run and the step (none for a run's only loop, with `round`), and the ask as the api is sent it
  * (`objects`' `RunRetry`) — its way, a fresh session's model, the words, a raise of its cap, a person's `answers` by title and label, or
- * `round` — with `answer`, the `--answer`s typed at the command line by number and letter.
+ * `round` — with `answer`, the `--answer`s typed at the command line by number and letter; and who asks (`actor`, objects' `Actor`), which
+ * the api hands of its caller and the ask keeps — none from the command line.
  */
 export const RetryInput = Schema.Struct({
   runId: Schema.String,
   step: Schema.optionalKey(Schema.String),
   ...RunRetry.fields,
   answer: Schema.optionalKey(Schema.Array(Schema.String)),
+  actor: Schema.optionalKey(Actor),
 });
 export type RetryInput = typeof RetryInput.Type;
 
@@ -103,14 +105,14 @@ export const RETRY: Served<
   input: RetryInput,
   handler: Effect.fnUntraced(function* (input: RetryInput) {
     const home = yield* StoreRoot;
-    const { answers, ...flags } = input;
+    const { answers, actor, ...flags } = input;
     yield* checked(retryRefusal(flags) ?? askRefusal(input));
     const { runId, step } = input;
     const { hint } = renamedValues('retry', input);
     const hinted = hint === undefined ? {} : { hint };
     if (input.round === true) {
       yield* checked(roundBudgetRefusal(runId, input.budget));
-      const { ask, file } = yield* roundRun(runId, step, input.budget);
+      const { ask, file } = yield* roundRun(runId, step, input.budget, actor);
       return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}), ...hinted };
     }
     const at = step ?? '';
@@ -118,11 +120,11 @@ export const RETRY: Served<
     const typed = input.answer ?? [];
     const message =
       answers !== undefined
-        ? { message: yield* givenAnswers(runId, at, answers, { note: how.message, home }) }
+        ? { message: yield* givenAnswers(runId, at, answers, { note: how.message, home, actor }) }
         : typed.length
-          ? { message: yield* typedAnswers(runId, at, typed, { note: how.message }) }
+          ? { message: yield* typedAnswers(runId, at, typed, { note: how.message, actor }) }
           : {};
-    const { ask, file, stopFirst } = yield* retryRun(runId, at, { ...how, ...message }, { stopBlocked: true }).pipe(
+    const { ask, file, stopFirst } = yield* retryRun(runId, at, { ...how, ...message }, { stopBlocked: true, actor }).pipe(
       Effect.provideService(StoreRoot, home),
     );
     return { try: ask.try, file, stopFirst, ...hinted };

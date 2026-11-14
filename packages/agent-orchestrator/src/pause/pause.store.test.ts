@@ -93,6 +93,24 @@ test('the pause on disk: put, read back, refused, lifted, read when it does not 
     resumePause(ROOT);
     refusedAs(() => cutPause(ROOT), 'Missing', 'nemia pause');
   });
+  await t.test(
+    'a pause put by a caller keeps its `by` and, beside it, who put it, through a cut; one that names no actor reads with none',
+    () => {
+      const actor = { kind: 'agent', agent: 'operator', token: 'ops' } as const;
+      const put = putPause(ROOT, { by: 'ann', actor }, new Date('2026-10-04T12:00:00.000Z'));
+      assert.deepEqual(put, { at: '2026-10-04T12:00:00.000Z', by: 'ann', actor });
+      assert.deepEqual(readPause(ROOT), put);
+      assert.deepEqual(cutPause(ROOT), { ...put, timeoutMs: 0 }, 'a cut keeps who put it');
+      resumePause(ROOT);
+      fs.writeFileSync(pauseFile(ROOT), `${JSON.stringify({ at: '2026-10-03T08:00:00.000Z', by: 'ann', actor: { kind: 'robot' } })}\n`);
+      assert.deepEqual(
+        readPause(ROOT),
+        { at: '2026-10-03T08:00:00.000Z', by: 'ann' },
+        'an actor that does not read is none, the pause stands',
+      );
+      resumePause(ROOT);
+    },
+  );
 });
 
 test("the engine's ceiling is the store's sessions per pool, and none at all where the setting is refused", () => {

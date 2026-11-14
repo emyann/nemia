@@ -25,6 +25,7 @@ import {
   type FeedLine,
   type FeedMemo,
   type FeedPause,
+  type FeedResumed,
   type FeedLevels,
   type FeedConflicts,
   type FeedReadiness,
@@ -159,6 +160,7 @@ export const emitFeed = Effect.fn('emitFeed')(function* (
     memo?: FeedMemo;
     unjudged?: ReadonlySet<string>;
     pause?: FeedPause;
+    resumed?: FeedResumed;
     levels?: FeedLevels;
     conflicts?: FeedConflicts;
     readiness?: FeedReadiness;

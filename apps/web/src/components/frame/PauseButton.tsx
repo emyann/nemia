@@ -9,7 +9,9 @@ import { pauseNowQuery, pauseQuery, putPause, resumePause } from '@/lib/api/paus
 import { interruptSentence, PAUSE_PARKS, type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
+import type { Actor as ActorRead } from 'objects';
 import { POPOVER } from '../../lib/classes';
+import { Actor } from '../actor/Actor';
 
 /** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
@@ -131,15 +133,18 @@ function NowForm({
 /**
  * The pause in the popover: its whole sentence, each task still finishing, each session parked and each landing held, then what may be
  * done — Pause… while all factories run (`onAsk('pause')`), Stop now… while they run or are Pausing (`onAsk('now')`), Resume while a
- * pause stands (`onResume`).
+ * pause stands (`onResume`). Under its sentence, who put the pause (`Actor`), where its file says.
  */
 function PauseFacts({
   words,
+  actor,
   onAsk,
   onResume,
   isPending,
 }: {
   words: PauseWords;
+  /** Who put the pause, where its file says. */
+  actor: ActorRead | undefined;
   onAsk: (asking: Asking) => void;
   onResume: () => void;
   isPending: boolean;
@@ -149,6 +154,7 @@ function PauseFacts({
       <p data-pause-line className="text-body-small text-muted-foreground">
         {words.line}
       </p>
+      {words.state !== 'running' && <Actor actor={actor} />}
       <Lines lines={words.finishing} data="data-pause-finishing" />
       <Lines lines={words.parked} data="data-pause-parked" />
       <Lines lines={words.staged} data="data-pause-staged" className="text-yours" />
@@ -252,7 +258,15 @@ export function PauseButton() {
               isPending={act.isPending}
             />
           )}
-          {asking === null && <PauseFacts words={words} onAsk={setAsking} onResume={() => act.mutate(null)} isPending={act.isPending} />}
+          {asking === null && (
+            <PauseFacts
+              words={words}
+              actor={read.data?.pause?.actor}
+              onAsk={setAsking}
+              onResume={() => act.mutate(null)}
+              isPending={act.isPending}
+            />
+          )}
           {refused && (
             <p role="alert" data-pause-refused className="font-mono text-body-small break-words whitespace-pre-wrap text-destructive">
               {refused.message}

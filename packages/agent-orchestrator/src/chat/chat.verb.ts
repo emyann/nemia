@@ -39,7 +39,6 @@ import {
   readAsksClosed,
   readDelivered,
   readOutbox,
-  readSpeakers,
   readReadMark,
   readStops,
   writeReadMark,
@@ -55,7 +54,9 @@ import {
   projectChat,
   readChatCursor,
   sourcesAt,
+  fromRefusal,
   speakerRefusal,
+  stepSpeaker,
   withEvents,
   type ChatEvent,
   type ChatSession,
@@ -67,8 +68,8 @@ import {
   type ReadMark,
   type SourceStop,
   type Speaker,
-  type Via,
 } from './chat.ts';
+import type { ProposalCaller } from '../caller/index.ts';
 
 /** Which chat: the long-lived task it is with (none while none is filed), and the folder its files are kept in. */
 export type ChatPlace = { readonly task: string | undefined; readonly dir: string };
@@ -397,25 +398,23 @@ export const followChat = Effect.fn('followChat')(function* (
 const entryId = (): string => `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
 
 /**
- * The `text` `speaker` wrote, come `via` the board or from elsewhere, put in the outbox of the chat at `place`, which the keeper says to
- * the task once it is up (`sayOutbox`), in the words that say who wrote it (`framedFor`): the entry, carrying `from` where an agent wrote
- * it. Refused (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`, and as `speakerRefusal` refuses the speaker over the
- * names the person allowed (`readSpeakers`): `Invalid` for the person from anywhere but the board or an agent under a name no agent
- * speaks under, `Conflict` for an agent under a name the person has not allowed.
+ * The `text` the `caller` wrote put in the outbox of the chat at `place`, which the keeper says to the task once it is up (`sayOutbox`),
+ * in the words that say who wrote it (`framedFor`): the entry, carrying `from` where an agent wrote it. Who wrote it is the caller its
+ * token says (`stepSpeaker`): the person under any token of theirs, the board's cookie included, as the person; an agent, by its session
+ * or a standing token minted for it, under its agent's name. Refused (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`,
+ * for words that say they are from an agent (`from`, retired: `fromRefusal`), and for an agent under a name no agent speaks under
+ * (`speakerRefusal`).
  */
-export const chatSay = Effect.fn('chatSay')(function* (place: ChatPlace, text: string, speaker: Speaker, via: Via) {
+export const chatSay = Effect.fn('chatSay')(function* (place: ChatPlace, text: string, caller: ProposalCaller, from?: Speaker) {
   if (typeof text !== 'string' || text.trim() === '')
     return yield* Effect.fail(new Invalid({ message: 'The message is empty: write something to send.' }));
   if (text.length > CHAT_TEXT_MAX)
     return yield* Effect.fail(
       new Invalid({ message: `The message is ${text.length} characters: send at most ${CHAT_TEXT_MAX}, in parts if it is longer.` }),
     );
-  const allowed = speaker.kind === 'agent' ? yield* tried(() => readSpeakers(place.dir)) : [];
-  const refused = speakerRefusal(speaker, via, allowed);
-  if (refused !== null)
-    return yield* Effect.fail(
-      refused.kind === 'Conflict' ? new Conflict({ message: refused.message }) : new Invalid({ message: refused.message }),
-    );
+  const speaker = stepSpeaker(caller);
+  const refused = fromRefusal(from) ?? speakerRefusal(speaker);
+  if (refused !== null) return yield* Effect.fail(new Invalid({ message: refused.message }));
   const at = new Date().toISOString();
   const entry: OutboxEntry = speaker.kind === 'agent' ? { id: entryId(), at, text, from: speaker } : { id: entryId(), at, text };
   yield* tried(() => appendOutbox(place.dir, entry));

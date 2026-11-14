@@ -25,6 +25,7 @@ import {
 import { parseWorkflow } from '../workflow.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { names, namesFor } from '../../test/assessed.ts';
+import { actorWords, type Actor } from 'objects';
 
 const cut: Question = {
   title: 'How is the card cut?',
@@ -313,12 +314,12 @@ test('answerText and approvedAnswerText', async (t) => {
         '',
         'Note: Thanks.',
         '',
-        'Answered by: person, on the board',
+        'Answered by: the person, on the board',
       ].join('\n'),
     );
     assert.equal(
       answerText([cut], [{ question: cut.title, chose: [], own: 'Neither.' }]),
-      'Answers to your questions:\n\n1. How is the card cut?\n   In my own words: Neither.\n\nAnswered by: person, on the board',
+      'Answers to your questions:\n\n1. How is the card cut?\n   In my own words: Neither.\n\nAnswered by: the person, on the board',
     );
   });
   await t.test('approvedAnswerText says whose questions they answer, each in the order asked, the note, and who answered', () => {
@@ -345,18 +346,40 @@ test('answerText and approvedAnswerText', async (t) => {
         '',
         'Note: Go.',
         '',
-        'Answered by: person, on the board',
+        'Answered by: the person, on the board',
       ].join('\n'),
     );
     assert.ok(!approvedAnswerText('design', [cut], [{ question: cut.title, chose: ['a'] }]).includes('Answers to your questions'));
   });
   await t.test('each says where the person answered: at the terminal when it says so, on the board by default', () => {
     const answers = [{ question: cut.title, chose: ['a'] }];
-    assert.ok(answerText([cut], answers, undefined, 'at the terminal').endsWith('\n\nAnswered by: person, at the terminal'));
     assert.ok(
-      approvedAnswerText('design', [cut], answers, 'n', 'at the terminal').endsWith('Note: n\n\nAnswered by: person, at the terminal'),
+      answerText([cut], answers, undefined, 'the person, at the terminal').endsWith('\n\nAnswered by: the person, at the terminal'),
     );
-    assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: person, on the board'));
-    assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: person, on the board'));
+    assert.ok(
+      approvedAnswerText('design', [cut], answers, 'n', 'the person, at the terminal').endsWith(
+        'Note: n\n\nAnswered by: the person, at the terminal',
+      ),
+    );
+    assert.ok(answerText([cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
+    assert.ok(approvedAnswerText('design', [cut], answers).endsWith('\n\nAnswered by: the person, on the board'));
+  });
+  await t.test("each says who answered in the actor's words, where they are handed", () => {
+    const answers = [{ question: cut.title, chose: ['a'] }];
+    const actors: Array<[Actor, readonly string[]]> = [
+      [{ kind: 'person', token: 'laptop' }, ['laptop']],
+      [{ kind: 'agent', agent: 'operator', token: 'ops' }, ['operator', 'ops']],
+      [{ kind: 'agent', agent: 'review', run: 'r-1', step: 'review' }, ['review', 'r-1/review']],
+    ];
+    for (const [actor, named] of actors) {
+      for (const text of [
+        answerText([cut], answers, undefined, actorWords(actor)),
+        approvedAnswerText('design', [cut], answers, 'n', actorWords(actor)),
+      ]) {
+        const last = text.split('\n\n').at(-1) ?? '';
+        assert.equal(last, `Answered by: ${actorWords(actor)}`, `the last block is who answered, ${JSON.stringify(actor)}`);
+        for (const name of named) assert.ok(last.includes(name), `${last} names ${name}`);
+      }
+    }
   });
 });

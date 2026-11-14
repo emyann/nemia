@@ -76,9 +76,10 @@ const loopbackAddress = (host: string): boolean => host === LOOPBACK || host ===
 /**
  * Where the api listens, read off `NEMIA_BIND` (`value`) and whether the store is marked exposed (`WF_EXPOSED=1`): the loopback where it
  * asks for none, the address it names where that is the loopback, and any other address — a private network's, or every interface
- * (`0.0.0.0`, `::`) — only on a store marked exposed, where every route of its data needs a token (`needOf`, caller/caller.ts). Anyone
- * who reaches an address beyond this machine on a store not marked exposed could act as the person, so it is refused; a value that is no
- * address is refused rather than read as the default, which would listen somewhere the operator did not ask for.
+ * (`0.0.0.0`, `::`) — only on a store marked exposed: every route of its data needs a token on any store (`needOf`, caller/caller.ts),
+ * but a store the person has not marked exposed is one they have not said may be reached from beyond this machine, so it is refused
+ * there; a value that is no address is refused rather than read as the default, which would listen somewhere the operator did not ask
+ * for.
  */
 export const bindOf: BindOf = (value, exposed) => {
   const host = asked(value);
@@ -93,7 +94,7 @@ const BIND_WORDS: Readonly<Record<BindRefusal, (value: string) => string>> = {
   'not-an-address': (value) =>
     `NEMIA_BIND=${value} is not an IP address. Give an address of this machine — 127.0.0.1, a private network's like 100.64.0.1, or 0.0.0.0 for every interface — or unset NEMIA_BIND for ${LOOPBACK}.`,
   unexposed: (value) =>
-    `NEMIA_BIND=${value} listens beyond this machine on a store not marked exposed, where a request with no token is the person. Mark the store exposed (WF_EXPOSED=1, in the service's environment) and mint yourself a token (nemia token add <name>), or unset NEMIA_BIND for ${LOOPBACK}.`,
+    `NEMIA_BIND=${value} listens beyond this machine on a store not marked exposed, which you have not said may be reached from another machine. Mark the store exposed (WF_EXPOSED=1, in the service's environment) and mint yourself a token (nemia token add <name>), or unset NEMIA_BIND for ${LOOPBACK}.`,
 };
 
 /** The host the api listens on (`bindOf`), or its refusal thrown (exit 2) in words that name the variable to set. */

@@ -16,6 +16,7 @@
  */
 import { Effect } from 'effect';
 import {
+  actorOf,
   APPROVE,
   CANCEL,
   CONCLUDED,
@@ -228,7 +229,7 @@ const pruned = (at: At, { preview, ...payload }: RunPrune) =>
 /** Another try or round of the step `at.step` asked for (`nemia retry`): the file the ask is written to, and what it asked. */
 const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
   acted(at, async (s) => {
-    const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload }));
+    const asked = await s.inRequest(RETRY.handler({ runId: at.name, step: at.step, ...payload, actor: actorOf(s.caller) }));
     return {
       ...given('try', asked.try),
       file: asked.file,
@@ -240,12 +241,12 @@ const retried = (at: At & { readonly step: string }, payload: RunRetry) =>
     };
   });
 
-/** The step `at.step` approved at its gate (`nemia approve`): the approval written. */
+/** The step `at.step` approved at its gate (`nemia approve`): the approval written, with who gave it (the caller's actor). */
 const approved = (at: At & { readonly step: string }, payload: RunApprove) =>
   acted(at, async (s) => {
-    const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload }));
-    const { step, try: tried, at: when, message, file, loop, next, caps } = done;
-    return { step, try: tried, at: when, message, file, loop, next, caps };
+    const done = await s.inRequest(APPROVE.handler({ runId: at.name, step: at.step, ...payload, actor: actorOf(s.caller) }));
+    const { step, try: tried, at: when, message, file, actor, loop, next, caps } = done;
+    return { step, try: tried, at: when, message, file, ...(actor ? { actor } : {}), loop, next, caps };
   });
 
 /**
@@ -277,12 +278,14 @@ export const runsHandlers = readsBounded(Api, 'runs', (handlers) =>
       acted({ namespace, name }, (s) => s.inRequest(LABEL_RUN.handler({ runId: name, ...payload }))),
     )
     .handle('hold', ({ params: { namespace, name }, payload }) =>
-      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false }))),
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, ...payload, off: false, actor: actorOf(s.caller) }))),
     )
     .handle('unhold', ({ params: { namespace, name } }) =>
-      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true }))),
+      acted({ namespace, name }, (s) => s.inRequest(HOLD.handler({ runId: name, off: true, actor: actorOf(s.caller) }))),
     )
-    .handle('cancel', ({ params: { namespace, name } }) => acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name }))))
+    .handle('cancel', ({ params: { namespace, name } }) =>
+      acted({ namespace, name }, (s) => s.inRequest(CANCEL.handler({ runId: name, actor: actorOf(s.caller) }))),
+    )
     .handle('retry', ({ params, payload }) => retried(params, payload))
     .handle('approve', ({ params, payload }) => approved(params, payload))
     .handle('route', ({ params, payload: { route } }) =>

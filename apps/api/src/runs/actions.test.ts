@@ -5,7 +5,7 @@
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds.
  */
-import { root } from '../../test/harness.ts';
+import { root, SEATED } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -133,11 +133,14 @@ const asked = (run: string): string[] => {
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
 
-/** A file the run wrote, its words but when. */
+/** A file the run wrote, its words but when and who wrote it (`actorIn`). */
 const written = (file: string): unknown => {
-  const { at: _when, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+  const { at: _when, actor: _who, ...rest } = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   return rest;
 };
+
+/** Who a file the run wrote says wrote it: the caller over the api, none for a verb run in-process. */
+const actorIn = (file: string): unknown => (JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>).actor;
 
 /** A removal on the board, as its run page sends it. */
 const remove = (id: string) => app.request(`/api/namespaces/default/runs/${id}`, { method: 'DELETE', headers: BOARD, body: '{}' });
@@ -188,12 +191,13 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       const res = await post('/api/namespaces/default/runs/r-api-gate/steps/plan/approve', { message: 'Go.' });
       assert.equal(res.status, 202);
       const answered = (await res.json()) as { try: number; at: string; message: string; file: string; loop: boolean; next: string };
-      assert.deepEqual(Object.keys(answered).sort(), ['at', 'caps', 'file', 'loop', 'message', 'next', 'step', 'try']);
+      assert.deepEqual(Object.keys(answered).sort(), ['actor', 'at', 'caps', 'file', 'loop', 'message', 'next', 'step', 'try']);
       assert.equal(answered.try, typed.try);
       assert.deepEqual([answered.loop, answered.next], [typed.loop, typed.next], 'what `nemia approve` prints of what is filed next');
       assert.equal(answered.file, approvalFile(root, 'r-api-gate', 'plan', 1));
       assert.equal(typed.file, approvalFile(root, 'r-cli-gate', 'plan', 1));
       assert.deepEqual(written(answered.file), written(String(typed.file)));
+      assert.deepEqual([actorIn(answered.file), actorIn(String(typed.file))], [SEATED, undefined], 'the api records its caller');
       assert.deepEqual(asked('r-api-gate'), asked('r-cli-gate'));
     },
   );
@@ -211,6 +215,7 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       assert.deepEqual([answered.step, answered.round], [typed.step, typed.round]);
       assert.equal(answered.file, String(typed.file).replace('r-cli-loop', 'r-api-loop'));
       assert.deepEqual(written(answered.file), written(String(typed.file)));
+      assert.deepEqual([actorIn(answered.file), actorIn(String(typed.file))], [SEATED, undefined], 'the api records its caller');
       assert.deepEqual(asked('r-api-loop'), asked('r-cli-loop'));
     },
   );
@@ -227,6 +232,7 @@ test('an action on its endpoint answers what its `nemia` entry answers: the same
       assert.deepEqual([answered.step, answered.try, answered.message], [typed.step, typed.try, typed.message]);
       assert.equal(answered.file, String(typed.file).replace('r-cli-enough', 'r-api-enough'));
       assert.deepEqual(written(answered.file), written(String(typed.file)));
+      assert.deepEqual([actorIn(answered.file), actorIn(String(typed.file))], [SEATED, undefined], 'the api records its caller');
       assert.deepEqual(asked('r-api-enough'), asked('r-cli-enough'));
     },
   );

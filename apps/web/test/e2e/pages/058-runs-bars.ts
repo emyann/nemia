@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { Browser, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectNone, facesLoaded, idle, Refused } from '../checks.ts';
+import { seated } from '../served.ts';
 import { launch, type Bars, type PageSpec } from '../visit.ts';
 import { OUT, photographing } from '../world.ts';
 
@@ -90,6 +91,7 @@ async function sameIn(browser: Browser, from: Page, width: number, height: numbe
     deviceScaleFactor: scale,
     reducedMotion: 'reduce',
   });
+  await seated(context, from.url());
   const page = await context.newPage();
   await page.goto(from.url(), { waitUntil: 'load' });
   await facesLoaded(page);

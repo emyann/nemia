@@ -972,7 +972,7 @@ test('a blocked step asks questions in two fields, and is answered by their numb
         { question: when.title, chose: ['now'] },
       ],
       undefined,
-      'at the terminal',
+      'the person, at the terminal',
     );
     assert.equal(ask.message, expected);
   });

@@ -161,9 +161,18 @@ const root = path.join(scratch('nemia-propose-'), 'store');
 fs.mkdirSync(root, { recursive: true });
 fs.writeFileSync(path.join(root, 'daemon.json'), JSON.stringify({ url: `http://127.0.0.1:${(stub.address() as AddressInfo).port}` }));
 
+/** A config folder of no context: `ambient()` drops `XDG_CONFIG_HOME`, which leaves the person's own, whose `local-token` would be sent. */
+const NO_CONFIG = scratch('nemia-propose-config-');
+
 /** `nemia argv` on the stand-in, with `token` as `WF_SESSION_TOKEN` where given, else none in its environment; `stdin` its input. */
 function nemia(argv: readonly string[], { token, stdin }: { token?: string; stdin?: string } = {}): Promise<Said> {
-  const env = { ...ambient(), WF_ROOT: root, NEMIA_DAEMON_START: 'off', ...(token !== undefined ? { WF_SESSION_TOKEN: token } : {}) };
+  const env = {
+    ...ambient(),
+    WF_ROOT: root,
+    XDG_CONFIG_HOME: NO_CONFIG,
+    NEMIA_DAEMON_START: 'off',
+    ...(token !== undefined ? { WF_SESSION_TOKEN: token } : {}),
+  };
   const run = spawn(process.execPath, [CLI, ...argv], { env, stdio: ['pipe', 'pipe', 'pipe'] });
   let out = '';
   let err = '';
@@ -188,11 +197,14 @@ const HIRES_FILE = [
   'apiVersion: nemia/v1\nkind: Hire\nmetadata:\n  name: tidy.fresh\nspec:\n  workflow: tidy\n  step: fresh\n  agent: shipper\n',
 ].join('---\n');
 
-test('`sessionHeaders`: Bearer WF_SESSION_TOKEN where it holds one, else the remote context’s token, else none', () => {
-  const here = { XDG_CONFIG_HOME: scratch('nemia-headers-config-') };
+test('`sessionHeaders`: Bearer WF_SESSION_TOKEN where it holds one, else the remote context’s token, else the store’s credential here, else none', () => {
+  const here = { XDG_CONFIG_HOME: scratch('nemia-headers-config-'), WF_ROOT: scratch('nemia-headers-store-') };
   assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
   assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: '' }), {});
   assert.deepEqual(sessionHeaders(here), {});
+  fs.writeFileSync(path.join(here.WF_ROOT, 'credential'), 'kept-here\n', { mode: 0o600 });
+  assert.deepEqual(sessionHeaders(here), { authorization: 'Bearer kept-here' });
+  assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
   configWritten({ contexts: [{ name: 'vps', server: 'http://vps:7777', token: 'person' }], current: 'vps' }, here);
   assert.deepEqual(sessionHeaders(here), { authorization: 'Bearer person' });
   assert.deepEqual(sessionHeaders({ ...here, WF_SESSION_TOKEN: 'tok' }), { authorization: 'Bearer tok' });
@@ -252,7 +264,7 @@ test('propose --objects: the objects given on the line, as JSON, are proposed as
   });
 });
 
-test('with WF_SESSION_TOKEN unset or empty, no request carries an Authorization header: the caller is the person', async () => {
+test('with WF_SESSION_TOKEN unset or empty and no credential in the store, no request carries an Authorization header', async () => {
   for (const token of [undefined, '']) {
     const { said, requests } = await sent(() =>
       nemia(['propose', '-f', '-', '-n', 'f1'], { ...(token !== undefined ? { token } : {}), stdin: HIRES_FILE }),

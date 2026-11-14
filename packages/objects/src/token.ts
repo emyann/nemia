@@ -114,7 +114,7 @@ export class TokensGroup extends HttpApiGroup.make('tokens').add(
     error: [BadRequest, Invalid, Conflict, Forbidden, Failed],
   }),
   HttpApiEndpoint.delete('retire', '/api/tokens/:name', {
-    params: { name: Schema.String },
+    params: { name: Schema.String.annotate({ description: 'The name of the token to retire.' }) },
     success: Token,
     error: [Missing, Forbidden, Failed],
   }),

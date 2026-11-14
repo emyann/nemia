@@ -38,6 +38,9 @@ export class Forbidden extends TaggedError('Forbidden')<{ readonly message: stri
 /** Every refusal the orchestrator throws, by its kind. */
 export type Refusal = Missing | Conflict | Invalid | Forbidden;
 
-/** Whether `err` is one of the orchestrator's refusals, by its class: a plain `Error` carrying `exitCode` 2 is not. */
+/**
+ * Whether `err` is one of the orchestrator's refusals, by its class: a plain `Error` carrying `exitCode` 2 is not.
+ * @param err What was thrown or failed with.
+ */
 export const isRefusal = (err: unknown): err is Refusal =>
   err instanceof Missing || err instanceof Conflict || err instanceof Invalid || err instanceof Forbidden;

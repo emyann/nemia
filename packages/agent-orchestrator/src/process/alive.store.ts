@@ -1,6 +1,9 @@
 /** Whether a process is there, asked of the process table. A bottom store: it imports no store file. */
 
-/** Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there. */
+/**
+ * Whether `pid` is a live process on this host: a signal 0 delivered, or refused for want of permission, which still means it is there.
+ * @param pid The process id asked of.
+ */
 export function alive(pid: number): boolean {
   try {
     process.kill(pid, 0);

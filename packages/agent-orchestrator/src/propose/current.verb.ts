@@ -50,6 +50,9 @@ const NONE: Current = { version: null };
 /**
  * The folder of a factory's tree that holds `what`: its workflows, or the agents or skills beside them. Refused, `Invalid`, for a factory
  * made from no template, which has no tree a proposal writes: its definitions are its repositories' and the person's library's.
+ * @param home The store's root folder.
+ * @param factory The factory's name.
+ * @param what Which folder of the tree: its workflows, its agents or its skills.
  */
 export const treeDir = (home: string, factory: string, what: 'workflows' | 'agents' | 'skills'): string => {
   const filed = filedAtOnce(home, factory);
@@ -160,6 +163,10 @@ const factoryNow = (place: ProposalPlace, factory: string) =>
 /**
  * The object of `kind` named `name` in the factory `factory`, now: its version and spec, or nothing there. Refused as the read refuses: a
  * factory with no tree for a Workflow, an Agent or a Skill (`Invalid`), one not rendered yet (`Conflict`).
+ * @param place Where the proposal is read: the store's root.
+ * @param factory The factory's name.
+ * @param kind The kind of the object.
+ * @param name The object's name; for a Factory, the factory's own.
  */
 export const currentOf = (
   place: ProposalPlace,

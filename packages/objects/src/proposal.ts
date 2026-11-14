@@ -8,7 +8,7 @@
  * Beside it, the body a proposal is made with (`ProposalCreate`). Plain Schemas of JSON, as every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, describedOne, listOf } from './meta.ts';
 import { ACCESS_CHANGES, APPLY_AT, APPROVED_BY, CHANGE_VERBS, PROPOSABLE_KINDS, PROPOSAL_PHASES } from './words.ts';
 
 /**
@@ -17,23 +17,31 @@ import { ACCESS_CHANGES, APPLY_AT, APPROVED_BY, CHANGE_VERBS, PROPOSABLE_KINDS, 
  * given, `update` where one is).
  */
 export const ProposedObject = Schema.Struct({
-  apiVersion: Schema.optionalKey(Schema.Literal(API_VERSION)),
-  kind: Schema.Literals(PROPOSABLE_KINDS),
+  apiVersion: Schema.optionalKey(Schema.Literal(API_VERSION).annotate({ description: 'The version the object is under, nemia/v1.' })),
+  kind: Schema.Literals(PROPOSABLE_KINDS).annotate({ description: 'The kind of the object.' }),
   metadata: Schema.Struct({
-    name: Schema.String,
-    namespace: Schema.optionalKey(Schema.String),
-    resourceVersion: Schema.optionalKey(Schema.String),
-  }),
-  spec: Schema.optionalKey(Schema.Unknown),
-  verb: Schema.optionalKey(Schema.Literals(CHANGE_VERBS)),
+    name: Schema.String.annotate({ description: "The object's name." }),
+    namespace: Schema.optionalKey(Schema.String.annotate({ description: "The object's namespace." })),
+    resourceVersion: Schema.optionalKey(
+      Schema.String.annotate({ description: 'The version the object was read at; absent for one the proposal makes.' }),
+    ),
+  }).annotate({ description: 'Which object it is, and the version it was read at.' }),
+  spec: Schema.optionalKey(
+    describedOne(Schema.Unknown, "The object's spec as its kind's spec says it; absent where the object is removed."),
+  ),
+  verb: Schema.optionalKey(
+    Schema.Literals(CHANGE_VERBS).annotate({
+      description: 'What the proposal does to the object; absent: create where no resourceVersion is given, update where one is.',
+    }),
+  ),
 });
 export type ProposedObject = typeof ProposedObject.Type;
 
 /** What a proposal asks: its objects, when it applies (absent: at approval), and why, in the proposer's words. */
 export const ProposalSpec = Schema.Struct({
-  objects: Schema.Array(ProposedObject),
-  applyAt: Schema.optionalKey(Schema.Literals(APPLY_AT)),
-  why: Schema.optionalKey(Schema.String),
+  objects: Schema.Array(ProposedObject).annotate({ description: 'The objects the proposal applies, each as apply takes it.' }),
+  applyAt: Schema.optionalKey(Schema.Literals(APPLY_AT).annotate({ description: 'When the proposal applies; absent: at approval.' })),
+  why: Schema.optionalKey(Schema.String.annotate({ description: "Why it is proposed, in the proposer's words." })),
 }).annotate({
   description:
     "What the proposal asks: the objects it applies, each as apply takes it, when it applies (at approval where absent), and why, in the proposer's words.",
@@ -42,27 +50,29 @@ export type ProposalSpec = typeof ProposalSpec.Type;
 
 /** One change a proposal makes, as the machinery reads it: the resource (`workflows`, `agents`, …), the name, the verb, its access. */
 export const ProposalChange = Schema.Struct({
-  resource: Schema.String,
-  name: Schema.String,
-  verb: Schema.Literals(CHANGE_VERBS),
-  access: Schema.Literals(ACCESS_CHANGES),
+  resource: Schema.String.annotate({ description: 'The resource it changes: `workflows`, `agents`, and so on.' }),
+  name: Schema.String.annotate({ description: 'The name of the object it changes.' }),
+  verb: Schema.Literals(CHANGE_VERBS).annotate({ description: 'What it does to the object.' }),
+  access: Schema.Literals(ACCESS_CHANGES).annotate({ description: 'What the change does to access.' }),
 });
 export type ProposalChange = typeof ProposalChange.Type;
 
 /** Who proposed: the agent of the session that called, and its run and step where it was a run's (all absent: the person). */
 export const ProposedBy = Schema.Struct({
-  agent: Schema.optionalKey(Schema.String),
-  run: Schema.optionalKey(Schema.String),
-  step: Schema.optionalKey(Schema.String),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent of the session that called; absent for the person.' })),
+  run: Schema.optionalKey(
+    Schema.String.annotate({ description: "The id of the run the session was a step of; absent where it was no run's." }),
+  ),
+  step: Schema.optionalKey(Schema.String.annotate({ description: "The name of the step the session was; absent where it was no run's." })),
 });
 export type ProposedBy = typeof ProposedBy.Type;
 
 /** Who approved: the person, or an agent under the rule named. */
 export const ApprovedByOf = Schema.Struct({
-  by: Schema.Literals(APPROVED_BY),
-  agent: Schema.optionalKey(Schema.String),
-  rule: Schema.optionalKey(Schema.String),
-  at: Schema.String,
+  by: Schema.Literals(APPROVED_BY).annotate({ description: 'Who approved it: the person, or an agent under a rule.' }),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent that approved it, where one did.' })),
+  rule: Schema.optionalKey(Schema.String.annotate({ description: 'The id of the rule the agent approved it under.' })),
+  at: Schema.String.annotate({ description: 'When it was approved, as an ISO 8601 time.' }),
 });
 export type ApprovedByOf = typeof ApprovedByOf.Type;
 
@@ -72,15 +82,20 @@ export type ApprovedByOf = typeof ApprovedByOf.Type;
  * wrote before a write failed (`written`), and a sentence saying why it stands where it does.
  */
 export const ProposalStatus = Schema.Struct({
-  phase: Schema.Literals(PROPOSAL_PHASES),
-  proposedBy: ProposedBy,
-  approvedBy: Schema.optionalKey(ApprovedByOf),
-  changes: Schema.Array(ProposalChange),
-  widens: Schema.Boolean,
-  before: Schema.optionalKey(Schema.Array(ProposedObject)),
-  revisions: Schema.optionalKey(Schema.Array(Schema.String)),
-  written: Schema.optionalKey(Schema.Array(Schema.String)),
-  message: Schema.optionalKey(Schema.String),
+  phase: Schema.Literals(PROPOSAL_PHASES).annotate({ description: 'Where the proposal stands in its life.' }),
+  proposedBy: ProposedBy.annotate({ description: 'Who proposed it.' }),
+  approvedBy: Schema.optionalKey(ApprovedByOf.annotate({ description: 'Who approved it, and when; absent until it is approved.' })),
+  changes: Schema.Array(ProposalChange).annotate({ description: 'Each change it makes, with what it does to access.' }),
+  widens: Schema.Boolean.annotate({ description: 'Whether the whole proposal widens access.' }),
+  before: Schema.optionalKey(
+    Schema.Array(ProposedObject).annotate({
+      description:
+        'The objects as they stood before it applied, which undo proposes back; absent until it applies, and an object it made is absent from it.',
+    }),
+  ),
+  revisions: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The revisions it made.' })),
+  written: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The objects it wrote before a write failed.' })),
+  message: Schema.optionalKey(Schema.String.annotate({ description: 'A sentence saying why the proposal stands where it does.' })),
 }).annotate({
   description:
     "The machinery's account of the proposal: its phase, who proposed and approved it, its changes and whether it widens access, the objects as they stood before it applied, the revisions it made, and why it stands where it does.",

@@ -9,7 +9,7 @@
  * every object of this package is.
  */
 import { Schema } from 'effect';
-import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
+import { API_VERSION, ObjectMeta, describedNumber, listOf } from './meta.ts';
 import { startExtras } from './run-actions.ts';
 
 /**
@@ -78,17 +78,22 @@ export type CardSpec = typeof CardSpec.Type;
 
 /** The tick's last start of a queued card that did not happen: when, on which repository, why, and whether it was a refusal. */
 export const CardLastStart = Schema.Struct({
-  at: Schema.String,
-  repo: Schema.String,
-  why: Schema.String,
-  refused: Schema.Boolean,
+  at: Schema.String.annotate({ description: 'When the tick tried to start the card, as an ISO 8601 time.' }),
+  repo: Schema.String.annotate({ description: 'The repository the start was on.' }),
+  why: Schema.String.annotate({ description: 'Why the start did not happen.' }),
+  refused: Schema.Boolean.annotate({ description: 'Whether the start was a refusal, rather than a miss.' }),
 });
 export type CardLastStart = typeof CardLastStart.Type;
 
 /** A label key a card was filed without, since the runs of its `from:` disagree on it: each run with its value. */
 export const CardLabelLeftOut = Schema.Struct({
-  key: Schema.String,
-  values: Schema.Array(Schema.Struct({ run: Schema.String, value: Schema.String })),
+  key: Schema.String.annotate({ description: 'The label key the card was filed without.' }),
+  values: Schema.Array(
+    Schema.Struct({
+      run: Schema.String.annotate({ description: 'The id of a run of its `from:`.' }),
+      value: Schema.String.annotate({ description: "That run's value of the label." }),
+    }),
+  ).annotate({ description: 'Each run of its `from:` with its value of the label.' }),
 });
 export type CardLabelLeftOut = typeof CardLabelLeftOut.Type;
 
@@ -97,31 +102,47 @@ export type CardLabelLeftOut = typeof CardLabelLeftOut.Type;
  * line of its body (`title`, absent where it has none), and why the entry does not read as a card (`error`, absent on a card).
  */
 export const CardStatus = Schema.Struct({
-  state: Schema.Literals(CARD_STATES),
-  runs: Schema.Array(Schema.String),
-  lastStart: Schema.optionalKey(CardLastStart),
-  title: Schema.optionalKey(Schema.String),
-  error: Schema.optionalKey(Schema.String),
-  /** Whether the card is still in play: not started, or its run not ended. `nemia inbox` and the board list these by default. */
-  inPlay: Schema.Boolean,
-  /** A queued card's place in the order the tick starts cards in, from 1, among every card queued and not started, every factory's. */
-  place: Schema.optionalKey(Schema.Number),
-  /**
-   * The entry's file in the inbox: `<name>.md` for a card, and for a stray entry that is no card (`idea.txt`, a folder `sub/`) its own
-   * file, which is its name, its `error` saying why it is no card.
-   */
-  file: Schema.optionalKey(Schema.String),
-  /** The card's file as written, frontmatter and body: on a read of one card alone, never on a list's items. */
-  source: Schema.optionalKey(Schema.String),
-  /** The label keys the card was filed without, as the runs of its `from:` disagree on them: on the answer of a filing alone. */
-  labelsLeftOut: Schema.optionalKey(Schema.Array(CardLabelLeftOut)),
-  /** How many cards are queued and not started, every factory's, the card among them: on the answer of a queue alone. */
-  queueLength: Schema.optionalKey(Schema.Number),
-  /**
-   * The repository a queued card starts on, the one its factory's wiring names for its workflow, else its factory's only one: on the
-   * answer of a queue alone, where it has one.
-   */
-  factoryRepo: Schema.optionalKey(Schema.String),
+  state: Schema.Literals(CARD_STATES).annotate({
+    description: "Where the card is in its life: its own word until it starts, and its run's phase from then on.",
+  }),
+  runs: Schema.Array(Schema.String).annotate({ description: 'The ids of the runs the card was started as.' }),
+  lastStart: Schema.optionalKey(CardLastStart.annotate({ description: "The tick's last start of the card that did not happen." })),
+  title: Schema.optionalKey(Schema.String.annotate({ description: "The first line of the card's body; absent where it has none." })),
+  error: Schema.optionalKey(Schema.String.annotate({ description: 'Why the entry does not read as a card; absent on a card.' })),
+  inPlay: Schema.Boolean.annotate({
+    description: 'Whether the card is still in play: not started, or its run not ended. `nemia inbox` and the board list these by default.',
+  }),
+  place: Schema.optionalKey(
+    describedNumber(
+      "A queued card's place in the order the tick starts cards in, from 1, among every card queued and not started, every factory's.",
+    ),
+  ),
+  file: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The entry's file in the inbox: `<name>.md` for a card, and for a stray entry that is no card its own file, which is its name, its `error` saying why it is no card.",
+    }),
+  ),
+  source: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The card's file as written, frontmatter and body: on a read of one card alone, never on a list's items.",
+    }),
+  ),
+  labelsLeftOut: Schema.optionalKey(
+    Schema.Array(CardLabelLeftOut).annotate({
+      description:
+        'The label keys the card was filed without, as the runs of its `from:` disagree on them: on the answer of a filing alone.',
+    }),
+  ),
+  queueLength: Schema.optionalKey(
+    describedNumber("How many cards are queued and not started, every factory's, the card among them: on the answer of a queue alone."),
+  ),
+  factoryRepo: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The repository a queued card starts on, the one its factory's wiring names for its workflow, else its factory's only one: on the answer of a queue alone, where it has one.",
+    }),
+  ),
 }).annotate({
   description:
     'What Nemia read of the card: its state, the runs it was started as, the last start that did not happen, its title, its place in the queue, and why it does not read as a card.',
@@ -153,12 +174,16 @@ export type CardList = typeof CardList.Type;
  * (`nemia factory attach <factory> <workflow> --repo <name>`).
  */
 export const CardFile = Schema.Struct({
-  body: Schema.String,
-  workflow: Schema.optionalKey(Schema.String),
-  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
-  repo: Schema.optionalKey(Schema.String),
-  factory: Schema.optionalKey(Schema.String),
-  label: Schema.optionalKey(Schema.Array(Schema.String)),
+  body: Schema.String.annotate({ description: "The card's idea, in markdown: its first line is its title." }),
+  workflow: Schema.optionalKey(Schema.String.annotate({ description: 'The workflow that runs the card, by name.' })),
+  from: Schema.optionalKey(
+    Schema.Literals(['repo', 'yours']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
+  ),
+  repo: Schema.optionalKey(Schema.String.annotate({ description: "Retired and refused: the factory places the card's run." })),
+  factory: Schema.optionalKey(Schema.String.annotate({ description: 'The factory the card is filed in.' })),
+  label: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({ description: 'The labels the card is filed with, each as `key=value`.' }),
+  ),
 });
 export type CardFile = typeof CardFile.Type;
 
@@ -170,13 +195,25 @@ export type CardFile = typeof CardFile.Type;
  * no worktree, inputs).
  */
 export const CardStart = Schema.Struct({
-  workflow: Schema.optionalKey(Schema.String),
-  from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
-  after: Schema.optionalKey(Schema.Array(Schema.String)),
-  context: Schema.optionalKey(Schema.Array(Schema.String)),
-  brief: Schema.optionalKey(Schema.String),
-  label: Schema.optionalKey(Schema.Array(Schema.String)),
-  cards: Schema.optionalKey(Schema.Array(Schema.String)),
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({ description: "The workflow its run is started on, by name; the card's own `workflow:` when it names none." }),
+  ),
+  from: Schema.optionalKey(
+    Schema.Literals(['repo', 'yours']).annotate({ description: 'Retired, read and ignored: the factory finds the workflow.' }),
+  ),
+  after: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The runs its first steps wait on to land, by id.' })),
+  context: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: 'The runs whose conclusions it is handed as context, by id; it does not wait on them.',
+    }),
+  ),
+  brief: Schema.optionalKey(Schema.String.annotate({ description: "The brief given in place of the card's body." })),
+  label: Schema.optionalKey(
+    Schema.Array(Schema.String).annotate({
+      description: 'The labels the run is started with, each as `key=value` or `key-` to take one off.',
+    }),
+  ),
+  cards: Schema.optionalKey(Schema.Array(Schema.String).annotate({ description: 'The inbox cards it is handed, by name.' })),
   ...startExtras,
 });
 export type CardStart = typeof CardStart.Type;
@@ -188,10 +225,16 @@ export type CardStart = typeof CardStart.Type;
  */
 export const CardWrite = Schema.Struct({
   metadata: Schema.Struct({
-    resourceVersion: Schema.optionalKey(Schema.String),
-    labels: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  }),
-  spec: CardSpec,
+    resourceVersion: Schema.optionalKey(
+      Schema.String.annotate({ description: 'The version the card was read at; the write is refused where the card has changed since.' }),
+    ),
+    labels: Schema.optionalKey(
+      Schema.Record(Schema.String, Schema.String).annotate({
+        description: "The card's labels as they are to be; absent leaves them, `{}` takes them all off.",
+      }),
+    ),
+  }).annotate({ description: "The card's labels, and the version it was read at." }),
+  spec: CardSpec.annotate({ description: 'The spec of the card as it is to be, `queued` as the card has it.' }),
 });
 export type CardWrite = typeof CardWrite.Type;
 
@@ -204,7 +247,9 @@ export const CardEdit = Schema.Struct({
   source: Schema.String.annotate({
     description: "The card's file as it is to be, frontmatter and body, as status.source serves it and nemia inbox add reads a file.",
   }),
-  resourceVersion: Schema.optionalKey(Schema.String),
+  resourceVersion: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The version the card was read at; the write is refused where the card has changed since.' }),
+  ),
 });
 export type CardEdit = typeof CardEdit.Type;
 
@@ -214,6 +259,10 @@ export type CardEdit = typeof CardEdit.Type;
  * sent with no body, or a body the api does not read, queues as it did before the key.
  */
 export const CardQueue = Schema.Struct({
-  workflow: Schema.optionalKey(Schema.String),
+  workflow: Schema.optionalKey(
+    Schema.String.annotate({
+      description: "The workflow the card starts on, by name, written over the card's own; absent, the card's own.",
+    }),
+  ),
 });
 export type CardQueue = typeof CardQueue.Type;

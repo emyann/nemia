@@ -361,7 +361,7 @@ export type PauseTimeoutAnswer = typeof PauseTimeoutAnswer.Type;
  */
 export const PauseTimeoutWrite = Schema.Struct({
   timeout: Schema.String.annotate({
-    description: 'The new timeout (nemia pause-timeout <d>): digits and s, m or h, from 1s to 23h, as 10m.',
+    description: 'The new timeout (`nemia pause-timeout <d>`): digits and s, m or h, from 1s to 23h, as 10m.',
   }),
 }).annotate({ identifier: 'PauseTimeoutWrite' });
 export type PauseTimeoutWrite = typeof PauseTimeoutWrite.Type;

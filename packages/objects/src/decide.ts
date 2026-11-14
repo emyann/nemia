@@ -69,7 +69,7 @@ export const DiffFile = Schema.Struct({
   /** Whether a narrowed decision (`decisionNarrowed`, `?diffs=`) left its `lines` out, to be asked for by its path. */
   linesLeftOut: Schema.optionalKey(
     Schema.Boolean.annotate({
-      description: 'Whether the read left its lines out, to be asked for by its path (?diffs=<path>); absent where it did not.',
+      description: 'Whether the read left its lines out, to be asked for by its path (`?diffs=<path>`); absent where it did not.',
     }),
   ),
 }).annotate({ identifier: 'DiffFile' });

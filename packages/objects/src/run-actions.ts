@@ -62,7 +62,7 @@ export type RunInput = typeof RunInput.Type;
 export const startExtras = {
   models: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.String).annotate({
-      description: "Each step's model for this run alone, step to model, as --model <step>=<model> gives it.",
+      description: "Each step's model for this run alone, step to model, as `--model <step>=<model>` gives it.",
     }),
   ),
   gates: Schema.optionalKey(
@@ -74,7 +74,7 @@ export const startExtras = {
     Schema.Boolean.annotate({ description: 'Whether the run works with no worktree of its own (--no-worktree).' }),
   ),
   inputs: Schema.optionalKey(
-    Schema.Array(RunInput).annotate({ description: 'The files handed to its steps (--input <file>), each by its name.' }),
+    Schema.Array(RunInput).annotate({ description: 'The files handed to its steps (`--input <file>`), each by its name.' }),
   ),
 };
 
@@ -103,7 +103,7 @@ export const RunStart = Schema.Struct({
   label: Schema.optionalKey(Schema.Array(NotBlank).annotate({ description: 'The labels it is started with, each key=value.' })),
   card: Schema.optionalKey(
     Schema.Never.annotate({
-      description: 'Refused: an inbox card is started at its own path, POST /api/namespaces/<namespace>/cards/<name>/start.',
+      description: 'Refused: an inbox card is started at its own path, `POST /api/namespaces/<namespace>/cards/<name>/start`.',
       message: 'a card is started at its own path, POST /api/namespaces/:namespace/cards/:name/start, with the workflow and the brief',
     }),
   ),

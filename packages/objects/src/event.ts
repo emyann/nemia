@@ -35,7 +35,7 @@ export const Event = Schema.Struct({
   metadata: ObjectMeta,
   involved: EventInvolved.annotate({
     description:
-      "What the line is about: its kind (Run, Step, Daemon, Store, Factory) and name, a run's id, <run>/<step>, a daemon's pid or store.",
+      "What the line is about: its kind (Run, Step, Daemon, Store, Factory) and name, a run's id, `<run>/<step>`, a daemon's pid, or store.",
   }),
   reason: Schema.Literals(EVENT_REASONS).annotate({
     description: 'What happened, as a code a machine selects on; Unknown for a reason this version does not know.',
@@ -53,7 +53,7 @@ export const Event = Schema.Struct({
   on: Schema.optionalKey(
     Schema.Literals(WAIT_ON).annotate({
       description:
-        'What a Waiting line waits on: run (the runs its hold names) or hold (a hold only a person lifts). Absent on any other line.',
+        "What a Waiting line waits on: run (other runs), limit (the limit on runs in flight), base (the base branch, while another run lands there), pause (the store's pause) or hold (a hold only a person lifts). Absent on any other line.",
     }),
   ),
   via: Schema.optionalKey(

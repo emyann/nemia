@@ -46,7 +46,7 @@ export const FactoryLevel = Schema.Struct({
  * factory first, and the command a person runs once to trust her folder (`trust`, null where it is trusted).
  */
 export const NemiaLevel = Schema.Struct({
-  level: LevelWord.annotate({ description: "The store's level (nemia level <level>): manual, semi-auto or auto." }),
+  level: LevelWord.annotate({ description: "The store's level (`nemia level <level>`): manual, semi-auto or auto." }),
   since: Schema.NullOr(Schema.String).annotate({ description: 'When the store took its level; null where its level was never set.' }),
   task: Schema.NullOr(Schema.String).annotate({ description: "Her task's id; null where none was ever filed." }),
   phase: Schema.NullOr(Schema.Literals(ENGINE_PHASES)).annotate({
@@ -88,7 +88,7 @@ export const NemiaMemory = Schema.Struct({
   dir: Schema.String.annotate({ description: 'The folder her facts are kept in.' }),
   facts: Schema.Array(Schema.String).annotate({ description: 'The name of each fact she keeps.' }),
   fact: Schema.NullOr(Schema.Struct({ name: Schema.String, text: Schema.String })).annotate({
-    description: 'The fact asked (nemia memory <fact>), by name with its words; null where none was asked.',
+    description: 'The fact asked (`nemia memory <fact>`), by name with its words; null where none was asked.',
   }),
 });
 
@@ -251,7 +251,7 @@ export const PolicyReach = Schema.Struct({
     guidance: Schema.Array(Schema.String),
   }).annotate({
     description:
-      'The whole proposal to propose them by: what the agent proposed already with the suggestions added, for PUT /api/policy/<name>/proposal.',
+      'The whole proposal to propose them by: what the agent proposed already with the suggestions added, for `PUT /api/policy/<name>/proposal`.',
   }),
   unloaded: Schema.Array(Schema.Struct({ workflow: Schema.String, message: Schema.String })).annotate({
     description: 'Each workflow attached to the factory that does not load, with why.',

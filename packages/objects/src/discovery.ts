@@ -17,7 +17,7 @@ export type { ApiRoute, KindPlural, Resource, RouteMethod } from '../contracts/d
 export const APIResource = Schema.Struct({
   name: Schema.String.annotate({ description: 'The resource: a kind under its plural (runs), or a sub-resource of one (runs/hold).' }),
   singularName: Schema.String.annotate({ description: "The kind's singular, in lower case (run)." }),
-  namespaced: Schema.Boolean.annotate({ description: 'Whether a namespace holds it (/api/namespaces/<namespace>/<plural>).' }),
+  namespaced: Schema.Boolean.annotate({ description: 'Whether a namespace holds it (`/api/namespaces/<namespace>/<plural>`).' }),
   kind: Schema.Literals(KINDS).annotate({ description: 'The kind of object it serves.' }),
   verbs: Schema.Array(Schema.Literals(RESOURCE_VERBS)).annotate({
     description: "What can be done to it, in Kubernetes' words (get, list, create…).",

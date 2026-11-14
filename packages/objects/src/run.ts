@@ -106,7 +106,7 @@ export const RunSpecStep = Schema.Struct({
   }),
   rounds: NullNumber.annotate({ description: 'On a looping step, how many rounds it may run (rounds:); null on any other.' }),
   harness: NullString.annotate({
-    description: 'What runs its session (harness:), or a2a:<name> for a remote A2A agent; null where unset.',
+    description: 'What runs its session (harness:), or `a2a:<name>` for a remote A2A agent; null where unset.',
   }),
   model: NullString.annotate({
     description: "The model the harness runs its session on (model:); null where unset, the harness's own default.",
@@ -626,7 +626,7 @@ export const RunStatus = Schema.Struct({
   }),
   on: Schema.NullOr(Schema.Literals(WAIT_ON)).annotate({
     description:
-      'What the run waits on, set exactly when its reason is Waiting: run (the runs its hold names), hold (a hold only a person lifts). Null otherwise.',
+      "What the run waits on, set exactly when its reason is Waiting: run (other runs), limit (the limit on runs in flight), base (the base branch, while another run lands there), pause (the store's pause) or hold (a hold only a person lifts). Null otherwise.",
   }),
   via: Schema.NullOr(Schema.Literals(ANSWER_VIA)).annotate({
     description:

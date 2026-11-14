@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page, Route } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { openFold, photograph, themeOf } from '../board.ts';
 import { expectInside, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -22,12 +22,12 @@ const unread = async (route: Route) => {
   await route.fulfill({ response, json: { ...body, status: { ...body.status, steps } } });
 };
 
-/** The run's page, its object answered with `FAKE.unverified` unread; its section once loaded. */
+/** The run's page, its object answered with `FAKE.unverified` unread; that step's Detail, opened once loaded. */
 async function onRun(page: Page): Promise<Locator> {
   await page.route(isDetail, unread);
   await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
   await idle(page);
-  return page.locator(`#step-${FAKE.unverified}`);
+  return openFold(page.locator(`#step-${FAKE.unverified}`), 'detail');
 }
 
 export default {
@@ -46,7 +46,8 @@ export default {
       await expectVisible(row, `${FAKE.unverified}'s facts say why its session is unread`);
       const said = await row.textContent();
       if (said !== WHY) throw new Refused(`the unread row says the runtime's words whole — it says ${said}`);
-      const beside = await page.locator(`#step-${FAKE.refused} [data-fact="unread"]`).count();
+      const besideDetail = await openFold(page.locator(`#step-${FAKE.refused}`), 'detail');
+      const beside = await besideDetail.locator('[data-fact="unread"]').count();
       if (beside) throw new Refused(`${FAKE.refused}, read beside it, draws no unread row — it draws ${beside}`);
       await page.setViewportSize({ width: 390, height: 844 });
       await row.scrollIntoViewIfNeeded();

@@ -409,7 +409,7 @@ async function visit(page: Page): Promise<void> {
       if ('removed' in answer || 'why' in answer)
         throw new Refused(`the start answers the run and the card, a card started being kept — it answered ${JSON.stringify(answer)}`);
       await starting.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
-      await expectVisible(starting.locator('h1', { hasText: id }), `the start opens the run's page (${id})`);
+      await expectVisible(starting.locator('header[data-run-header]', { hasText: id }), `the start opens the run's page (${id})`);
       await expectVisible(
         starting.locator(`[data-from="${planned.name}"]`, { hasText: new RegExp(`^from inbox card ${planned.name}$`) }),
         `and the run's page says, under the brief, the card it came from, as wf decide does (from inbox card ${planned.name})`,

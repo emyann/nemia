@@ -1,24 +1,5 @@
 {
-  "CardStarted": 11,
-  "RunApprove": 3,
-  "RunApproved": 9,
-  "RunAsked": 7,
-  "RunCancelled": 2,
-  "RunHeld": 3,
-  "RunHold": 3,
-  "RunHoldWritten": 4,
-  "RunInput": 3,
-  "RunPrune": 3,
-  "RunPruned": 7,
-  "RunRefresh": 2,
-  "RunRefreshed": 8,
-  "RunRemoved": 13,
-  "RunRetry": 5,
-  "RunRoute": 1,
-  "RunRouted": 5,
-  "RunSaid": 9,
-  "RunSay": 2,
-  "RunStart": 12,
-  "RunStarted": 11,
-  "RunStartedFacts": 24
+  "CardStarted": 1,
+  "RunStart": 1,
+  "RunStarted": 1
 }

@@ -99,7 +99,10 @@ function formerForm(doc: ReturnType<typeof parsed>, block: string): boolean {
   );
 }
 
-/** Whether a block (a file's lines between its two `---`) is in the former line form: refused at load, written as YAML by the rewrite. */
+/**
+ * Whether a block (a file's lines between its two `---`) is in the former line form: refused at load, written as YAML by the rewrite.
+ * @param block The frontmatter's lines between its two `---`.
+ */
 export const inFormerForm = (block: string): boolean => formerForm(parsed(block), block);
 
 /**
@@ -124,6 +127,8 @@ function formerRefusal(name: string, block: string): string {
  * YAML 1.2. Refused, as `WorkflowError`, naming the file's line and the fix: a block in the former line form (`formerForm`), named with
  * the line to write as YAML (`formerRefusal`); a block YAML refuses, one that is not a map of keys (a line of prose), a key that is not a
  * word of text, and a line that is a YAML document's marker (`---`, `...`), which would end the block.
+ * @param name The file's name, as a refusal names it.
+ * @param block The frontmatter's lines between its two `---`.
  */
 export function readFrontmatter(name: string, block: string): Frontmatter {
   const counter = new LineCounter();
@@ -163,6 +168,7 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
  * A block as YAML's own values, a number a number and a list a list, where `readFrontmatter` reads every scalar as its text: for a
  * reader that serves a file's keys as the objects type them (`currentOf`, a Workflow's spec as its files write it). Throws YAML's own
  * error on a block YAML refuses, as the loader's `readFrontmatter` refuses it with the fix.
+ * @param block The frontmatter's lines between its two `---`.
  */
 export function frontmatterValues(block: string): unknown {
   const doc = parseDocument(block);
@@ -175,6 +181,7 @@ export function frontmatterValues(block: string): unknown {
  * The block for `values`, YAML's own values written as YAML writes them, no line folded, every line ending in a line break, with no `---`
  * around it: the writer beside `frontmatterValues`, for a block whose keys hold maps and lists of maps (a workflow README's `needs:`),
  * which `renderFrontmatter`'s pairs do not.
+ * @param values The keys and their values, in the order they are written.
  */
 export function frontmatterOfValues(values: Readonly<Record<string, unknown>>): string {
   return stringify(values, { lineWidth: 0 });
@@ -183,6 +190,7 @@ export function frontmatterOfValues(values: Readonly<Record<string, unknown>>): 
 /**
  * A block read as `readFrontmatter` reads it, or null where it refuses it: for a reader that never refuses, as a file's one key is read
  * for a listing (`frontmatterKey`), or a file that is a card only when its block reads as one (`cardToStart`).
+ * @param block The frontmatter's lines between its two `---`.
  */
 export function frontmatterOrNull(block: string): Frontmatter | null {
   try {
@@ -196,6 +204,9 @@ export function frontmatterOrNull(block: string): Frontmatter | null {
  * An entry's value as the one string its key's reader reads: text as it is, and a list on a key that holds one (`list`) as the comma
  * string the former form wrote, `tools: [Read, Grep]` as `Read, Grep`. Refused, naming the line: a list on a key that holds one value, a
  * list item that is not text or holds a comma (the comma form cannot carry it), and a map.
+ * @param name The file's name, as a refusal names it.
+ * @param entry The entry read: its key, its value and its line.
+ * @param list Whether the entry's key holds a list.
  */
 export function flatValue(name: string, entry: FrontmatterEntry, list: boolean): string {
   const { key, value, line } = entry;
@@ -280,6 +291,7 @@ function writtenPair(key: string, value: FrontmatterValue): string {
  * The block for `pairs`, in their order: each `key: value` written as `writtenPair` writes it, every line ending in a line break, with no
  * `---` around it. What every writer of a step, an agent, a skill or a card writes through, so a file written and read back
  * (`readFrontmatter`) gives the values it was written with. A comment line a writer keeps goes before or after it, as it is.
+ * @param pairs The keys and their values, in the order they are written.
  */
 export function renderFrontmatter(pairs: readonly FrontmatterPair[]): string {
   return pairs.map(([key, value]) => writtenPair(key, value)).join('');
@@ -289,6 +301,10 @@ export function renderFrontmatter(pairs: readonly FrontmatterPair[]): string {
  * `block` with `key` set to `value`, or taken out where `value` is undefined, each other key, its comment and its form as written: what a
  * switch writes into a file whose other keys no render keeps (`withPreload`). A key set twice is set or taken out each time. A block
  * `readFrontmatter` refuses, the former form among them, is refused so. Returns the block's lines, as `renderFrontmatter` does.
+ * @param name The file's name, as a refusal names it.
+ * @param block The frontmatter's lines between its two `---`.
+ * @param key The key to set or take out.
+ * @param value The value to set it to, or undefined to take it out.
  */
 export function withKey(name: string, block: string, key: string, value: FrontmatterValue | undefined): string {
   readFrontmatter(name, block);
@@ -369,6 +385,8 @@ const FRONTMATTER_AT = /^(﻿?---[ \t]*(\r?\n))([\s\S]*?\r?\n)?(---[ \t]*(?:\r?\
  * line breaks, its body — as it was. A file with no frontmatter, or one already in YAML, is returned as it is. Refused, naming the line,
  * where the result would not read as the former reader read it, and where the block is in neither form (`readFrontmatter`). Pure: the
  * walk over folders is `nemia frontmatter rewrite`'s.
+ * @param name The file's name, as a refusal names it.
+ * @param text The file's whole text.
  */
 export function rewriteFormer(name: string, text: string): { text: string; changed: boolean } {
   const m = FRONTMATTER_AT.exec(text);
@@ -387,6 +405,7 @@ export function rewriteFormer(name: string, text: string): { text: string; chang
  * The lines of a block in YAML where a plain value goes on past ` #`, which YAML reads as a comment and the former reader read as part
  * of the value, each by its line in the file. What `nemia frontmatter rewrite` lists rather than guesses: whether the tail was meant
  * is the author's to say. None for a block in the former form, whose rewrite keeps the tail in the value, nor one that does not read.
+ * @param block The frontmatter's lines between its two `---`.
  */
 export function commentTails(block: string): number[] {
   const read = frontmatterOrNull(block);

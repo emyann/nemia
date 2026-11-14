@@ -11,6 +11,14 @@ import type { HoldsOpen } from '../../../contracts/holds-open.contract.ts';
  * a check that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run ended for good, called
  * off or pruned, whose steps nobody will answer (`endedForGood`) — but not of a held one: a hold lifts, and the word it waits for then
  * reaches the session that signed. A try of a closed step is filed as its own task, `-try<n>`.
+ * @param step The step whose task is held open.
+ * @param run The run the step is of.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf A step's closeout, by its name, or undefined where it has none.
+ * @param askedCloseout How a task's closeout was asked for, by the task's id.
+ * @param steps The workflow's steps.
+ * @param spendOf What a try of a step has cost, by its task's id.
+ * @param verdictOf A step's check verdict, by its name, or undefined where it has none; none for any step when not given.
  */
 export const holdsOpen: HoldsOpen = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
   if (endedForGood(run)) return false;

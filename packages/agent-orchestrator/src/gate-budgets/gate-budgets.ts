@@ -41,6 +41,11 @@ export type GateBudgets = { from: GateBudgetsFrom; steps: GateBudget[]; said: st
  * the caps of the approval of the try it is on where it set some, else what its closeout `said` proposes. The run's line counts each step
  * at the most it may cost — the larger of its cap here (or its cap in force, for a step not here) and what its tries have cost — and names
  * the steps with no cap, which bound nothing.
+ * @param run The run the gate is on.
+ * @param step The step whose gate is read.
+ * @param steps The workflow's steps.
+ * @param said The step's closeout, an error where it did not read, or undefined where it has none.
+ * @param spendOf What each try of a step has cost, read from its task.
  */
 export function gateBudgets(
   run: Run,
@@ -104,7 +109,13 @@ const boundWords = ({ most, uncapped }: RunBound): string =>
 const lineWords = (run: Run, most: number, line: number): string =>
   `at most ${dollars(most)} under these caps passes the cost line of ${dollars(line)} factory ${run.factory ?? 'default'} sets for ${basename(run.workflowDir)}`;
 
-/** The budgets at every gate of `run` that has some (`gateBudgets`), by its step: what `nemia decide` carries beside its gate lines. */
+/**
+ * The budgets at every gate of `run` that has some (`gateBudgets`), by its step: what `nemia decide` carries beside its gate lines.
+ * @param run The run whose gates are read.
+ * @param steps The workflow's steps.
+ * @param said A step's closeout, by its name, or undefined where it has none.
+ * @param spendOf What each try of a step has cost, read from its task.
+ */
 export const gatesBudgets = (
   run: Run,
   steps: readonly StepSpec[],

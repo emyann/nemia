@@ -98,6 +98,7 @@ export const FACTORY_SETTING_RM: Served<{ file: string; removed: string }, Setti
 /**
  * The harness settings of `factory` a run in it freezes, or why it cannot start (`harnessSettingsRefusal`, a key a person wrote by hand
  * that a factory may not set); none in the default factory, and for a factory that names none.
+ * @param factory The factory the run starts in, or undefined for the default factory.
  */
 export const settingsAt = (factory: Factory | undefined): Effect.Effect<HarnessSettings | undefined, Invalid> => {
   const settings = factory?.harnessSettings;

@@ -19,13 +19,22 @@ import { routeAsk } from '../route/index.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
-/** The follower of a condition already filed or sent its card, which settles its route; undefined while none is. */
+/**
+ * The follower of a condition already filed or sent its card, which settles its route; undefined while none is.
+ * @param condition The condition's step name.
+ * @param run The run the condition is of.
+ * @param steps The workflow's steps.
+ */
 export const settledBy = (condition: string, run: Run, steps: readonly StepSpec[]): string | undefined =>
   steps.find((s) => s.after.includes(condition) && Boolean(run.steps[s.name]?.taskId || run.steps[s.name]?.sent))?.name;
 
 /**
  * Why `route` cannot be given to `step` of `run`, in words that name the fix — or undefined, when it may: a step that is no condition, a
  * route not in its `routes:`, and a condition one of whose followers is filed or sent, whose route is taken. Pure.
+ * @param run The run the condition is of.
+ * @param steps The workflow's steps.
+ * @param step The step named as the condition.
+ * @param route The route given.
  */
 export function routeRefused(
   run: Run,

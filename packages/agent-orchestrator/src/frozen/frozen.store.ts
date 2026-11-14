@@ -20,16 +20,25 @@ import { CARRIED_FOLDER } from '../step/step.ts';
 /**
  * The run's own copies of its workflow folder, `runs/<id>/workflow`, and with `hex` the one copy under that digest (`Run.workflowFiles`):
  * what a check and a session are told as `WF_WORKFLOW_FILES`. Beside the run's record, and removed with it (`nemia rm`).
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
 export const workflowFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => workflowFilesRoot(runsDir(home), run.id, hex);
 
 /**
  * The run's own copies of the carried folder, `runs/<id>/carried`, and with `hex` the one copy under that digest (`Run.carriedFiles`):
  * what a check and a session are told as `WF_CARRIED_FILES`. Beside the run's record, and removed with it (`nemia rm`).
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param hex The digest of one copy, or undefined for the folder of every copy.
  */
 export const carriedFilesDir = (home: string, run: Pick<Run, 'id'>, hex?: string): string => carriedFilesRoot(runsDir(home), run.id, hex);
 
-/** The carried folder of the workflow at `workflowDir`: `carried/` beside it, the files the workflows of its folder share. */
+/**
+ * The carried folder of the workflow at `workflowDir`: `carried/` beside it, the files the workflows of its folder share.
+ * @param workflowDir The workflow's folder.
+ */
 export const carriedDirOf = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), CARRIED_FOLDER);
 
 /** A file of a workflow folder: its path from the folder with `/` between parts, its permission bits, its bytes. */
@@ -39,6 +48,7 @@ export type WorkflowFile = { path: string; mode: number; bytes: Uint8Array };
  * Every file of the workflow folder `dir`, at any depth, sorted by path in code-unit order. Refused (`Invalid`), naming the entry and the
  * fix: a symbolic link, which would hand the run what it points at as it is when read rather than as it was at the start, and anything
  * that is neither a file nor a folder.
+ * @param dir The workflow folder to read.
  */
 export function workflowFilesOf(dir: string): WorkflowFile[] {
   const files: WorkflowFile[] = [];
@@ -64,6 +74,7 @@ export function workflowFilesOf(dir: string): WorkflowFile[] {
 /**
  * The hex of the digest of `files`' content: each file's path, its permission bits but the write ones, its size and its bytes, in order.
  * No bound on a path's length, as an archive's has: a folder any run can be started on has a digest.
+ * @param files The folder's files, sorted by path (`workflowFilesOf`).
  */
 export function workflowFilesDigest(files: readonly WorkflowFile[]): string {
   const hash = createHash('sha256');
@@ -79,6 +90,9 @@ export function workflowFilesDigest(files: readonly WorkflowFile[]): string {
  * and refused as `workflowFilesOf` reads and refuses them; a copy of that content already there is kept as it is and not written again.
  * Written into a sibling folder and renamed into place, each file with its write bits cleared; the sibling is removed where a write fails,
  * and the error thrown.
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param dir The workflow folder to copy.
  */
 export const freezeWorkflowFiles = (home: string, run: Pick<Run, 'id'>, dir: string): string =>
   freezeInto(home, workflowFilesOf(dir), run, 'workflow');
@@ -86,6 +100,9 @@ export const freezeWorkflowFiles = (home: string, run: Pick<Run, 'id'>, dir: str
 /**
  * Copies the carried folder beside the workflow at `workflowDir` (`carriedDirOf`) into the run's own `carried/<hex>/`
  * (`carriedFilesDir`), as `freezeWorkflowFiles` copies the workflow's, and answers the hex; undefined where no such folder is there.
+ * @param home The store's home folder.
+ * @param run The run, by its id.
+ * @param workflowDir The workflow's folder, beside which the carried folder lies.
  */
 export function freezeCarriedFiles(home: string, run: Pick<Run, 'id'>, workflowDir: string): string | undefined {
   const files = carriedFilesOf(workflowDir);
@@ -95,6 +112,7 @@ export function freezeCarriedFiles(home: string, run: Pick<Run, 'id'>, workflowD
 /**
  * Every file of the carried folder beside the workflow at `workflowDir`, read and refused as `workflowFilesOf` reads and refuses them;
  * undefined where no such folder is there.
+ * @param workflowDir The workflow's folder, beside which the carried folder lies.
  */
 export const carriedFilesOf = (workflowDir: string): WorkflowFile[] | undefined => {
   const dir = carriedDirOf(workflowDir);

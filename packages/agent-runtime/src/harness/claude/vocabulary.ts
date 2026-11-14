@@ -132,7 +132,7 @@ const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermi
 /**
  * The models on which Claude Code drops `auto`: the session is filed in `auto` and runs in `default` from its first turn. Each matches
  * the name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.316, the Agent SDK's, by
- * the `permissionMode` of the session's `init` line, and again on 2.1.322 and 2.1.323 by `test/live-sdk.boundary.test.ts`, which
+ * the `permissionMode` of the session's `init` line, and again on 2.1.322, 2.1.323 and 2.1.325 by `test/live-sdk.boundary.test.ts`, which
  * measures each listed model and each alias at every bump: `haiku`, `sonnet`, `opus` and `fable` keep `auto` and are not listed. On
  * 2.1.322, ten runs a model: both listed ran in `default` all ten times, and `haiku` and `sonnet` in `auto` all ten, so no model's
  * answer varies — but in one run of ten each listed model's `init` line said `auto`, and a `status` line after it `default`: the mode

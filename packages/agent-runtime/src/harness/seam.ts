@@ -25,6 +25,10 @@ import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { causeWords, RunnerError } from './error.ts';
 import type { Telemetry } from './telemetry.ts';
 import type { OriginOf } from '../../contracts/origin.contract.ts';
+import type { TranscriptOriginKind } from './origin-kinds.ts';
+import { ORIGIN_KINDS } from './origin-kinds.ts';
+
+export type { TranscriptOriginKind } from './origin-kinds.ts';
 
 export { RunnerError } from './error.ts';
 
@@ -124,25 +128,6 @@ export type TranscriptEvent = {
    */
   origin?: { kind: TranscriptOriginKind };
 };
-
-/**
- * The words a harness has for where a transcript event came from, the Agent SDK's (`SDKMessageOrigin['kind']`), held equal to them in
- * Claude's reader.
- */
-const ORIGIN_KINDS = [
-  'human',
-  'channel',
-  'peer',
-  'task-notification',
-  'coordinator',
-  'unclassified',
-  'observer',
-  'auto-continuation',
-  'observer-activity',
-] as const;
-
-/** Where a transcript event came from: a word of `ORIGIN_KINDS`, or `unknown` for one the harness wrote that is none of them. */
-export type TranscriptOriginKind = (typeof ORIGIN_KINDS)[number] | 'unknown';
 
 /** A harness's written origin as its word: itself where `ORIGIN_KINDS` names it, `unknown` otherwise (`contracts/origin.contract.ts`). */
 export const originOf: OriginOf = (written) => ORIGIN_KINDS.find((kind) => kind === written) ?? 'unknown';

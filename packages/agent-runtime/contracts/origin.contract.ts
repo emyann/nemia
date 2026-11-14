@@ -4,7 +4,7 @@
  * `unknown`, never as a person's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { TranscriptOriginKind } from '../src/harness/seam.ts';
+import type { TranscriptOriginKind } from '../src/harness/origin-kinds.ts';
 
 /** The words the Agent SDK has for a message's origin. */
 const named = (written: string): boolean =>

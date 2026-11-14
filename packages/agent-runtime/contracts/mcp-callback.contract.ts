@@ -8,7 +8,24 @@
  * send the browser to (`http://localhost:<callbackPort>/callback`). The words of each refusal are the caller's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { CallbackRefusal, PastedCallback, Redirect } from '../src/harness/mcp-callback.ts';
+
+/** A pasted address as the runtime reads it: its origin and path, and the OAuth parameters of its query, null where absent. */
+export type PastedCallback = {
+  readonly origin: string;
+  readonly pathname: string;
+  readonly code: string | null;
+  readonly state: string | null;
+  readonly error: string | null;
+};
+
+/** The redirect a sign-in asked for: its origin and path. */
+export type Redirect = { readonly origin: string; readonly pathname: string };
+
+/**
+ * Why a pasted address is refused: it is no address (`unreadable`); it is not the redirect the sign-in asked for (`elsewhere`); the
+ * provider said no (`denied`, its `error`); it carries no code (`no-code`), or no state (`no-state`).
+ */
+export type CallbackRefusal = 'unreadable' | 'elsewhere' | 'denied' | 'no-code' | 'no-state';
 
 /** Whether an OAuth parameter was given, and given something. */
 const given = (value: string | null): boolean => value !== null && value !== '';

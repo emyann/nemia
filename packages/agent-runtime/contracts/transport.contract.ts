@@ -4,7 +4,7 @@
  * as itself, and any other word, one the SDK adds later included, as `unknown`.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { McpTransport } from '../src/harness/mcp.ts';
+import type { McpTransport } from '../src/harness/mcp-transports.ts';
 
 /** The words the Agent SDK has for the transport of a server a `.mcp.json` declares. */
 const named = (written: string): boolean => written === 'stdio' || written === 'http' || written === 'sse';

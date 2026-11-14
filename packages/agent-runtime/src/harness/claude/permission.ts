@@ -12,47 +12,14 @@ import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAnswered, PermissionAskOf } from '../../../contracts/permission.contract.ts';
 import type { AskOption, SessionAsk } from '../../core/index.ts';
 import type { PermissionFacts } from '../seam.ts';
+import { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_DENIED, commandOf } from './permission-words.ts';
+import type { PermissionOffer, PermissionAsk, PermissionHeld, PermissionAnswer } from '../../../contracts/permission.contract.ts';
 
-/** What a call that would ask a person is told where no answer reached it: its holder was let go, or its turn was ended. */
-export const ASK_CUT =
-  'The question went to the person and this call did not wait for their answer: the session was paused or its turn was ended while it ' +
-  'waited. Their answer is said to you as words once they give it, naming the question. Carry on without it.';
+export type { PermissionOffer, PermissionAsk, PermissionHeld, PermissionAnswer } from '../../../contracts/permission.contract.ts';
 
-/** The choice that runs the call this once. */
-export const PERMISSION_ONCE = 'Allow once';
-/** The choice that runs the call and saves the rules the SDK suggested, so a call like it is not asked again. */
-export const PERMISSION_ALWAYS = 'Always allow';
-/** The choice that refuses the call. */
-export const PERMISSION_DENY = 'Deny';
-
-/** What a call the person denied with no words of their own is told. */
-export const PERMISSION_DENIED =
-  'The person denied this call where it was shown to them. Do not run it again unasked: say in your answer what you were denied, and ask them if you need it.';
+export { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_DENIED, commandOf } from './permission-words.ts';
 
 export type { PermissionFacts };
-
-/** What the SDK hands `canUseTool` about a prompt, as the ask reads it: its words, its two hints, and the rules it suggests saving. */
-export type PermissionOffer = {
-  title?: string;
-  displayName?: string;
-  description?: string;
-  decisionReason?: string;
-  blockedPath?: string;
-  defaultToNo?: boolean;
-  suppressAlwaysAllowRule?: boolean;
-  suggestions?: PermissionUpdate[];
-};
-
-/** A permission held for a person, as the session's asks carry it: one question, its choices the three answers. */
-export type PermissionAsk = Extract<SessionAsk, { kind: 'permission' }>;
-
-/** What the held call keeps while it waits: the call's input, whether always was offered, and the SDK's suggestions. */
-export type PermissionHeld = { input: Record<string, unknown>; always: boolean; suggestions: PermissionUpdate[] };
-
-/** What the held call returns to the SDK: the two members of the SDK's permission result, as this flow gives them. */
-export type PermissionAnswer =
-  | { behavior: 'allow'; updatedInput: Record<string, unknown>; updatedPermissions?: PermissionUpdate[] }
-  | { behavior: 'deny'; message: string };
 
 /** Whether `s` is a word with something in it. */
 const said = (s: string | undefined): s is string => s !== undefined && s !== '';
@@ -76,12 +43,6 @@ const alwaysOption = (suggestions: PermissionUpdate[]): AskOption => ({
   label: PERMISSION_ALWAYS,
   description: `Run this call, and save what Claude Code suggests: ${suggestions.map(updateOf).join('; ')}.`,
 });
-
-/** The command a shell call was typed with, as its input holds it: nothing for another tool, or for an input with no command string. */
-export const commandOf = (tool: string, input: Record<string, unknown>): string | undefined => {
-  const command = input['command'];
-  return tool === 'Bash' && typeof command === 'string' ? command : undefined;
-};
 
 export const permissionAskOf: PermissionAskOf = (id, at, tool, input, offer) => {
   const suggestions = offer.suggestions ?? [];

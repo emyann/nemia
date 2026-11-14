@@ -4,10 +4,11 @@
  * (`taskIdRefusal`, whose words the door passes as `idRefusal`), and its attempts number from 1 with no gap (`Task`, `model.ts`).
  */
 import type { AppendRefusal } from '../../../contracts/journal.contract.ts';
+import type { AppendRefusalReason } from './append-refusals.ts';
+import { APPEND_REFUSALS } from './append-refusals.ts';
 
-/** Why the door refuses an append, a closed set: the words of `JournalError.reason`. */
-export const APPEND_REFUSALS = ['malformed-id', 'filed-twice', 'not-filed', 'attempt-out-of-order'] as const;
-export type AppendRefusalReason = (typeof APPEND_REFUSALS)[number];
+export type { AppendRefusalReason } from './append-refusals.ts';
+export { APPEND_REFUSALS } from './append-refusals.ts';
 
 export const appendRefusal: AppendRefusal = (idRefusal, event, held) => {
   if (event.kind === 'filed') {

@@ -10,15 +10,11 @@ import path from 'node:path';
 import type { McpServer, RemoteMcpServer } from './seam.ts';
 import type { HarnessArgs } from './args.ts';
 import type { TransportOf } from '../../contracts/transport.contract.ts';
+import type { McpTransport } from './mcp-transports.ts';
+import { MCP_TRANSPORTS } from './mcp-transports.ts';
 
-/**
- * The transports Claude Code loads a server of a `.mcp.json` over, the Agent SDK's words (`McpServerConfigForProcessTransport`, its
- * in-process `sdk` aside), held equal to them in `claude/session-options.ts`.
- */
-export const MCP_TRANSPORTS = ['stdio', 'http', 'sse'] as const;
-
-/** An MCP server's transport: a word of `MCP_TRANSPORTS`. */
-export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+export type { McpTransport } from './mcp-transports.ts';
+export { MCP_TRANSPORTS } from './mcp-transports.ts';
 
 /**
  * A server's written `type` as its transport: itself where `MCP_TRANSPORTS` names it, `unknown` otherwise

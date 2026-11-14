@@ -14,6 +14,9 @@ import { labelsRefusalOf } from '../labels.ts';
 import { unknownTask } from '../text.ts';
 import type { RequestStop } from '../../../contracts/stop.contract.ts';
 import { TaskId } from '../model.ts';
+import { StopRefused, stopRefusalOf } from './stop-refusal.ts';
+
+export { StopRefused, stopRefusalOf } from './stop-refusal.ts';
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
@@ -299,24 +302,6 @@ export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
   }
   return admitted;
 });
-
-/** A stop the runtime would not journal, and why, in words that say what to do instead. Nothing was written. */
-export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused', {
-  message: Schema.String,
-}) {}
-
-/**
- * Why `requestStop` would not journal a stop, or `undefined`: a task it has no record of, and one its guard (`stoppable`, by
- * `verbTakes`) refuses — one that has settled, and one asked to stop already, whose next pass stops what runs and settles it.
- * Off the record alone, so it costs no registry call.
- */
-export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return unknownTask(taskId);
-  if (verbTakes('requestStop', state)) return undefined;
-  if (state.settled)
-    return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
-  return `\`${taskId}\` has been asked to stop already: the next pass stops what runs and settles it. \`ae ls\` says when it has.`;
-};
 
 /**
  * A person's word that a task stop: journalled as `stop-requested`, whatever it is doing; the next pass stops its session

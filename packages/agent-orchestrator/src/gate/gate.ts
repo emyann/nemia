@@ -135,7 +135,7 @@ export const approvalRefusal: ApprovalRefusal = (
   }
   const n = tryOf(run, name);
   const given = approvalOf(run, name);
-  const { sendsBack } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
+  const { sendsBack } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf, undefined);
   if (given) return approvedRefusal(steps, step, run, given, sendsBack);
   const pending = asks.find((a) => a.step === name && a.try === n + 1);
   if (pending && !heard(pending, sendsBack)) {

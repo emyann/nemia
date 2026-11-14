@@ -7,7 +7,10 @@ import { CLI, type CommandWords, type Flag, type Positional, type Spec } from '.
 /** The place a writer is named on (`<from>`), required: `yours`, the one it writes, or `factory`, a templated factory's tree. */
 export const FROM: Positional = { key: 'from', takes: 'required', kind: 'name' };
 
-/** `--factory`, the factory made from a template whose tree a writer named on `factory` writes into: taken on both sides, once. */
+/**
+ * `--factory`, the factory made from a template whose tree a writer named on `factory` writes into: taken on both sides, once.
+ * @param command The writer's command name, as the flag's refusals say it.
+ */
 export const factoryFlag = (command: string): Flag => ({
   flag: '--factory',
   kind: 'text',
@@ -16,7 +19,11 @@ export const factoryFlag = (command: string): Flag => ({
   twice: `${CLI} ${command} takes --factory once: one tree is written.`,
 });
 
-/** `--version`, the version `what` was read at, which a refusal of a write without it names: taken on both sides, once. */
+/**
+ * `--version`, the version `what` was read at, which a refusal of a write without it names: taken on both sides, once.
+ * @param command The writer's command name, as the flag's refusals say it.
+ * @param what What the version is of, as its refusal says it.
+ */
 export const versionFlag = (command: string, what: string): Flag => ({
   flag: '--version',
   kind: 'text',
@@ -25,7 +32,13 @@ export const versionFlag = (command: string, what: string): Flag => ({
   twice: `${CLI} ${command} takes --version once: one write is checked against one version.`,
 });
 
-/** A text flag the command line alone takes, under `key`, once: a path its runner reads, never sent to the api. */
+/**
+ * A text flag the command line alone takes, under `key`, once: a path its runner reads, never sent to the api.
+ * @param command The writer's command name, as the flag's refusals say it.
+ * @param key The flag's key, and its spelling after --.
+ * @param takes What the path names, as the refusal of a value left out says it.
+ * @param why Why the api never takes it, said beside the flag.
+ */
 export const cliPath = (command: string, key: string, takes: string, why: string): Flag => ({
   flag: `--${key}`,
   kind: 'text',
@@ -35,7 +48,13 @@ export const cliPath = (command: string, key: string, takes: string, why: string
   only: { side: 'cli', why },
 });
 
-/** The spec of a writer named `command`, used as `usage` says: its positionals and flags; any other argument refused in its words. */
+/**
+ * The spec of a writer named `command`, used as `usage` says: its positionals and flags; any other argument refused in its words.
+ * @param command The writer's command name, as a refusal says it.
+ * @param usage The writer's usage after its name, which ends a refusal.
+ * @param positionals The positionals the writer takes, in order.
+ * @param flags The flags the writer takes.
+ */
 export const writerSpec = (command: string, usage: string, positionals: readonly Positional[], flags: readonly Flag[]): Spec => ({
   positionals,
   flags,

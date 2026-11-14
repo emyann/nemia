@@ -229,6 +229,11 @@ export const feedEvents = (
  *
  * The stream `query` and `lastEventId` ask for, or the refusal that answers before it opens: `beats.feed` the reader's beat, and
  * `context` the app's services the relay reads (the hub, the store's root).
+ * @param query The request's query: the cursor to start from or after, the cursor to stop at, and the label selectors.
+ * @param lastEventId The Last-Event-ID an EventSource sends as it reconnects, or undefined on a first connect.
+ * @param beats The beats the app reads on; the feed's is the reader's.
+ * @param context The app's services the relay reads: the hub and the store's root.
+ * @param home The store's root folder, whose feed is read.
  */
 export const feedOpened = (
   query: { readonly from?: string; readonly after?: string; readonly until?: string; readonly selector?: string | readonly string[] },

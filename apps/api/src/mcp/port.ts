@@ -90,6 +90,10 @@ const jsonOf = (text: string): unknown => {
  * The request a call of `tool` with `args` makes of the api, from the request `from` that carried it: the path's names filled in and
  * encoded, the query's keys as its query (each value of a list once), every other key as its JSON body on any method but a GET (`{}`
  * where there is none, `content-type: application/json` always, so the write guard takes it), and the caller's `Authorization`.
+ * @param tool The tool called: its endpoint's path, method and keys.
+ * @param args The call's arguments, by key.
+ * @param from The request to the port that carried the call, whose address and Authorization are taken.
+ * @param signal What aborts the request, where one is given.
  */
 export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>>, from: Request, signal?: AbortSignal): Request {
   const filled = tool.path.replace(/:([A-Za-z]+)/g, (_, key: string) => encodeURIComponent(asText(args[key])));
@@ -112,6 +116,8 @@ export function requestOf(tool: PortTool, args: Readonly<Record<string, unknown>
  * The arguments a call of `tool` with `args` is sent with: each default its link sends (`defaults`) for a key the call leaves out, and a
  * page of `PORT_PAGE` where its endpoint takes `limit` and the call gives none, nor a `last` of a read from a cursor, which takes one
  * of the two alone.
+ * @param tool The tool called: its link's defaults and its endpoint's keys.
+ * @param args The call's arguments, by key.
  */
 export function argsSent(tool: PortTool, args: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   const absent = (key: string) => args[key] === undefined || args[key] === null;
@@ -203,6 +209,11 @@ async function answerOf(
  * page (`argsSent`), and held under `ANSWER_BOUND` (`answerFit`): a page past it asked again shorter — a list's `limit` halved, a read
  * from a cursor's `last` or `limit` (`countKeyOf`) — any other answer past it refused with how to narrow it (`pastTheBound`, the read's
  * own keys in `READS`), its body left out. A path name not given is refused before any request, naming it.
+ * @param tool The tool called.
+ * @param args The call's arguments, by key.
+ * @param from The request to the port that carried the call.
+ * @param app The app whose fetch answers the call.
+ * @param signal What aborts the call, where one is given.
  */
 export async function called(
   tool: PortTool,
@@ -273,6 +284,10 @@ function servesFeed(server: Server, views: FeedViews): void {
  * cacheable by its caller alone for `PORT_LIST_TTL_MS` in the modern era, and answers a call through `app` (`called`), presenting the
  * caller's own request. Its capabilities and handlers are all here: an extension the port declares, and the handler that serves it,
  * go beside these.
+ * @param tools The port's tools, listed in this order.
+ * @param appOf What gives the app a call is answered by.
+ * @param progressEveryMs How often a call that asks for progress is told it, in milliseconds.
+ * @param feed The era the request speaks and the feed's views, where the feed is offered as resources; none where it is not.
  */
 export function portServer(
   tools: readonly PortTool[],
@@ -398,6 +413,9 @@ function releasedWith(response: Response, releases: readonly (() => void)[], sig
  * other refused -32602 naming the templates and nothing held; each view held for its stream (`views`, the caller's token judged by the
  * list), then the request handed to the SDK, whose listen router acknowledges it and writes each `notifications/resources/updated`; its
  * views let go as its stream ends, is cancelled or its request aborts. Any other request is the SDK's, its body read once.
+ * @param request The request of the port.
+ * @param handler The SDK's handler of the port.
+ * @param views The feed's views, which hold each URI subscribed to.
  */
 export async function listened(request: Request, handler: McpHttpHandler, views: FeedViews): Promise<Response> {
   if (request.method !== 'POST') return handler.fetch(request);
@@ -424,6 +442,7 @@ export async function listened(request: Request, handler: McpHttpHandler, views:
  * is answered as JSON, or as a stream where its call is told progress; a legacy one (`initialize`, then each request on its own)
  * by the SDK's stateless leg, which streams; a GET or a DELETE is a 405, as the port keeps no stream or session of its own. The tools
  * are generated once, as the handler is made, in the command table's order.
+ * @param appOf What gives the app the port is mounted on.
  */
 export function mcpPort(appOf: () => Fetching, { progressEveryMs = PROGRESS_EVERY_MS }: PortOptions = {}) {
   const tools = portTools(TABLE, CLI_VERBS, Api);

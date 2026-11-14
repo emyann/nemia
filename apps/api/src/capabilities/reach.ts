@@ -28,6 +28,8 @@ import type { PlaceService } from 'agent-orchestrator';
  * Why what asks is denied without a prompt on a Claude Code step: `dontAsk`, which denies it in any session; or it runs as a job, which has
  * no one to ask — every step on a harness whose rules say a job of it was measured denying what asks in its mode (`jobDeniesAsksIn`).
  * Null on another harness, and in a mode not measured.
+ * @param harness The step's harness, by its name.
+ * @param spec The step's spec, read for its permission mode.
  */
 export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode'>): 'dontAsk' | 'a job' | null => {
   if (spec.permissionMode === 'dontAsk') return 'dontAsk';
@@ -141,7 +143,11 @@ export type CapabilitiesWithSteps = Capabilities & {
   steps: StepReach[];
 };
 
-/** What each step of each workflow that reads gets. A folder the loader refuses has no step to give anything to. */
+/**
+ * What each step of each workflow that reads gets. A folder the loader refuses has no step to give anything to.
+ * @param capabilities What the repository offers and its rules deny, ask and allow.
+ * @param workflows The workflows listed, each with its steps or why it does not read.
+ */
 export function reachOf(
   capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'asked' | 'allowed'>,
   workflows: readonly WorkflowListing[],
@@ -379,6 +385,7 @@ const statedByFactory = async (servers: readonly McpServer[], e: Engine['Service
  * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`, its servers asked through `asker`
  * with `env`), and what each step of each workflow listed from it and from `home` gets. A workflows directory that cannot be listed is a
  * warning, and no step is shown; the rest is served.
+ * @param repo The checkout's folder, whose offer and workflows are read.
  */
 export async function capabilitiesWithSteps(
   repo: string,

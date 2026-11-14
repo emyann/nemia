@@ -499,6 +499,11 @@ const pathOf = (runId: string, step: string, tried: string | undefined) =>
  * A page of the step's conversation read once from `after` (`readTranscript`), as `asked` cuts it within `bounds` (`TRANSCRIPT_PAGE`,
  * unless a test shortens them), nothing for a step not filed yet. A cursor whose count is no whole number from 0, a `limit` or a `last`
  * that is no whole number from 1, both asked, or a kind that is none are `Invalid` (422), refused before anything is read.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param after The cursor to read from, or undefined for the start.
+ * @param asked How the page is cut: its limit or last, and the kinds kept.
+ * @param bounds The most a page holds; TRANSCRIPT_PAGE by default.
  */
 export const transcriptAt = (runId: string, step: string, after: string | undefined, asked: TranscriptAsked, bounds = TRANSCRIPT_PAGE) =>
   answered(async (s): Promise<StepTranscript> => {

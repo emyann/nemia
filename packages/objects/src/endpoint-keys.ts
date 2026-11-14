@@ -59,13 +59,19 @@ function keysOf(schema: Schema.Top | undefined): string[] {
   return [...new Set(members.flatMap((m) => (isRecord(m.properties) ? Object.keys(m.properties) : [])))];
 }
 
-/** Whether `schema`, or the one it carries headers on, is a stream of server-sent events. */
+/**
+ * Whether `schema`, or the one it carries headers on, is a stream of server-sent events.
+ * @param schema An endpoint's success schema.
+ */
 export const streamsOf = (schema: Schema.Top): boolean => {
   const inner: object = HttpApiSchema.isWithHeaders(schema) ? schema.schema : schema;
   return '_tag' in inner && inner._tag === 'StreamSse';
 };
 
-/** Where `endpoint` takes a call's input, and whether it answers a stream. */
+/**
+ * Where `endpoint` takes a call's input, and whether it answers a stream.
+ * @param endpoint The endpoint, as the Api declares it.
+ */
 export function keysOfEndpoint(endpoint: EndpointShape): EndpointKeys {
   return {
     method: endpoint.method,
@@ -77,14 +83,22 @@ export function keysOfEndpoint(endpoint: EndpointShape): EndpointKeys {
   };
 }
 
-/** The endpoint `<group>.<endpoint>` of `api`, or none where it declares no such endpoint. */
+/**
+ * The endpoint `<group>.<endpoint>` of `api`, or none where it declares no such endpoint.
+ * @param api The Api whose groups are searched.
+ * @param name The endpoint's group and name, joined by a dot.
+ */
 export function endpointOf(api: ApiShape, name: string): EndpointShape | undefined {
   const dot = name.indexOf('.');
   const group = Object.values(api.groups).find((g) => g.identifier === name.slice(0, dot));
   return group === undefined ? undefined : Object.values(group.endpoints).find((e) => e.identifier === name.slice(dot + 1));
 }
 
-/** Where the endpoint `<group>.<endpoint>` of `api` takes a call's input; thrown where `api` declares none of that name. */
+/**
+ * Where the endpoint `<group>.<endpoint>` of `api` takes a call's input; thrown where `api` declares none of that name.
+ * @param api The Api whose groups are searched.
+ * @param name The endpoint's group and name, joined by a dot.
+ */
 export function endpointKeysOf(api: ApiShape, name: string): EndpointKeys {
   const endpoint = endpointOf(api, name);
   if (endpoint === undefined) throw new Error(`${name} is no endpoint of the Api: name one it declares, as <group>.<endpoint>`);

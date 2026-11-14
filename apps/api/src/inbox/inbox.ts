@@ -26,6 +26,8 @@ export type Filing = { text: string; workflow?: string; repo?: string; factory?:
  * before the package is asked. The package refuses, `Invalid`, before anything is written (`addToInbox`): a `repo`, retired, naming the
  * attach; a workflow that is no name; and in a factory, a workflow it does not attach, naming the attach. `from` is retired, read and
  * ignored.
+ * @param body The card's body, as the endpoint decodes it.
+ * @param home The store's root folder, whose factories are read.
  */
 export function filingOf(body: CardFile, home: string): Filing {
   if (body.factory !== undefined) readFactoryAtOnce(home, body.factory, 'Nothing was filed.');

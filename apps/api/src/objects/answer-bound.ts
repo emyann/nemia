@@ -98,6 +98,8 @@ const keysWalked = (walk: Walk, value: object): boolean => {
  * symbol left out, such a value in an array written `null`, a value's `toJSON` respected — counted without building the string, and
  * stopped as soon as it is past `most`: the exact length where it is at most `most`, and a length past `most` (where the walk stopped,
  * the rest unread) where it is not. 0 for a value `JSON.stringify` writes nothing of. Pure.
+ * @param value The value whose JSON is measured.
+ * @param most The length, in characters, past which the walk stops.
  */
 export const jsonLengthPast = (value: unknown, most: number): number => {
   if (unwritten(value)) return 0;
@@ -132,6 +134,8 @@ export class AnswerPastBound extends Error {
  * encodes it: past it, a defect of `AnswerPastBound`, answered 422. A read of bytes or a stream (`READS`' `bytes`, `stream`), and a
  * response the handler built itself, are answered as they are. Every GET handler of the `Api` is given through it by its group
  * (`readsBounded`), which `test/bounded.test.ts` holds.
+ * @param endpoint The GET endpoint, by its group and name.
+ * @param handler The endpoint's handler.
  */
 export const readHandled =
   <Args extends ReadonlyArray<unknown>, A, E, R>(
@@ -173,6 +177,9 @@ const partsOf = (value: unknown): Readonly<Record<string, unknown>> =>
  * that is an agent presenting one (`tokenFloor`, the package's), the command its endpoint serves read off the table (`floorEntryOf`): a
  * request past the floor answered 403, `Forbidden` with the floor's reason and words that name what the person does instead
  * (`floorWords`), and the handler never run. The person's tokens and a session's are never judged here: the handler runs as it is.
+ * @param group The endpoint's group.
+ * @param name The endpoint's name in its group.
+ * @param handler The endpoint's handler.
  */
 export const floorHandled =
   <Args extends ReadonlyArray<unknown>, A, E, R>(
@@ -224,6 +231,9 @@ const boundedHandlers = <H>(group: string, handlers: H): H => {
  * `HttpApiBuilder.group`, every endpoint's handler of the group judged first by the floor of an agent's standing token (`floorHandled`)
  * and every GET endpoint's given through `readHandled`, so no read the group serves answers past the app's bound: what every group of the
  * `Api` is built with (serve.ts' groups; `test/bounded.test.ts` names any read that answers past it).
+ * @param api The Api the group is of.
+ * @param group The group's name.
+ * @param build What gives the group's handlers.
  */
 export const readsBounded: typeof HttpApiBuilder.group = (api, group, build) =>
   HttpApiBuilder.group(api, group, (handlers) => build(boundedHandlers(group, handlers)));

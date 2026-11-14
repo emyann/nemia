@@ -52,6 +52,8 @@ const UNLINKED: Readonly<Record<string, Resolved>> = { 'nemia.chatSend': 'act' }
  * The command entry the endpoint `endpoint` (`<group>.<endpoint>`) serves, as the floor judges a request of it by `method`: the strictest
  * for an agent of the entries that link it; where none does, one named for the endpoint, of its class in `UNLINKED`, else a read for a
  * GET and out of reach otherwise.
+ * @param endpoint The endpoint, its group and name joined by a dot.
+ * @param method The request's HTTP method: a GET no entry links is a read.
  */
 export function floorEntryOf(endpoint: string, method: string): AdmissionEntry {
   const linked = LINKED.get(endpoint) ?? [];
@@ -71,6 +73,11 @@ const raiseWords = (factory: string | undefined, least: string): string =>
  * The words of the floor's refusal of `route` (`<METHOD> <path>`), served as `entry`, under the agent's standing token `caller`, for
  * `reason`: what reached past the floor, and what the person types or clicks instead. `factory` is the factory the request names, where
  * it names one.
+ * @param route The request's method and path.
+ * @param entry The command entry the endpoint serves (floorEntryOf).
+ * @param caller The agent whose standing token the request carries.
+ * @param reason Why the floor refused it.
+ * @param factory The factory the request names, or undefined where it names none.
  */
 export function floorWords(
   route: string,

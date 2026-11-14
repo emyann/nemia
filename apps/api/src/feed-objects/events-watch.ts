@@ -22,7 +22,12 @@ const namespaceOf = (url: string): string | undefined => {
   }
 };
 
-/** The Events a watch of `/api/events` or `/api/namespaces/<ns>/events` follows, from byte `from` of the feed. */
+/**
+ * The Events a watch of `/api/events` or `/api/namespaces/<ns>/events` follows, from byte `from` of the feed.
+ * @param c The request's context, read for its namespace and label selectors.
+ * @param from The byte of the feed to follow from.
+ * @param beat How often the feed is read, or undefined for the default.
+ */
 export const eventsFollowed: Follow = (c, from, beat: Duration.Input | undefined) => {
   const kept = eventKept({
     namespace: namespaceOf(c.req.url),

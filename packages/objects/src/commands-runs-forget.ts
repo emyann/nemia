@@ -11,6 +11,7 @@ const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unme
 /**
  * Refused of `nemia rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag
  * deletes, and alone would delete nothing, silently — then a switch with no run to forget.
+ * @param args The command line's arguments, by key.
  */
 export function rmRefusal(args: Args): string | null {
   if (args.forceUnmerged === true && args.deleteBranches !== true)

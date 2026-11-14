@@ -36,7 +36,11 @@ const figureOf = (svg: string): string => {
 /** The `diagram=<name>` a fence's meta names, or undefined for a fence drawn on its page. */
 const NAMED = /(?:^|\s)diagram=([a-z][\w-]*)(?=\s|$)/;
 
-/** The Mermaid block between `diagram:<name>:begin` and `diagram:<name>:end` in a markdown text, or undefined where it holds none. */
+/**
+ * The Mermaid block between `diagram:<name>:begin` and `diagram:<name>:end` in a markdown text, or undefined where it holds none.
+ * @param markdown The text of a markdown doc to look in.
+ * @param name The diagram's name, as its markers spell it.
+ */
 export const diagramIn = (markdown: string, name: string): string | undefined => {
   const lines = markdown.split('\n');
   const begin = lines.findIndex((l) => l.startsWith(`<!-- diagram:${name}:begin`));
@@ -58,6 +62,8 @@ const packageDocs = (root: string): string[] =>
 /**
  * The diagram named `name`, read from between its markers in the package docs under `root`. Throws, naming the fix, when no doc holds
  * it or more than one does.
+ * @param root The repository's root folder, whose package docs are searched and from which a doc's path is said.
+ * @param name The diagram's name, as its markers spell it.
  */
 export const diagramFrom = (root: string, name: string): string => {
   const found = packageDocs(root).flatMap((file) => {
@@ -85,7 +91,10 @@ const readAs = (lines: string[]): string =>
     ? renderMermaidSVG(lines.join('\n'))
     : JSON.stringify(parseMermaid(lines.join('\n')), (_key, value: unknown) => (value instanceof Map ? [...value] : value));
 
-/** The lines of a diagram, after its header, that the renderer reads as nothing: taken away, each leaves what it draws the same. */
+/**
+ * The lines of a diagram, after its header, that the renderer reads as nothing: taken away, each leaves what it draws the same.
+ * @param source The diagram's Mermaid text, its header on its first line.
+ */
 export const unreadLines = (source: string): string[] => {
   const lines = source
     .split('\n')

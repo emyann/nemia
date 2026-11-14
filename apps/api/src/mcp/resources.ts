@@ -42,7 +42,10 @@ const nameOf = (path: string): string =>
     .filter((part) => part !== '' && part !== 'api' && !part.startsWith(':'))
     .join('-');
 
-/** Whether `endpoint` lists the feed's events: a GET whose success is an `EventList`. */
+/**
+ * Whether `endpoint` lists the feed's events: a GET whose success is an `EventList`.
+ * @param endpoint The endpoint, its method and the kinds it answers.
+ */
 export const listsEvents = (endpoint: Endpoint): boolean => endpoint.method === 'GET' && endpoint.kinds.includes('EventList');
 
 /** The templates of the feed's resources, one per Event list of the `Api`, in `ENDPOINTS`' order (the fewest names first). */
@@ -64,6 +67,7 @@ const named = (): string => FEED_TEMPLATES.map((t) => t.uriTemplate).join(' or '
 /**
  * The view `uri` names: a URI of the `nemia` scheme with no host, whose path is one an Event list serves and whose query holds the
  * selector alone (each `labelSelector` kept, in order); else why it names none, naming the templates that do.
+ * @param uri The URI a subscription or a read names.
  */
 export const viewOf = (uri: string): ViewOrNot => {
   const none = (why: string): ViewOrNot => ({ kind: 'none', message: `${uri} ${why}: give a URI of ${named()}` });
@@ -80,7 +84,11 @@ export const viewOf = (uri: string): ViewOrNot => {
   return { kind: 'view', view: { uri, path: url.pathname, selectors: url.searchParams.getAll(SELECTOR_KEY) } };
 };
 
-/** The path and query a view is read at with `extra` (a page's `limit`, a watch's `resourceVersion`), its selectors after them. */
+/**
+ * The path and query a view is read at with `extra` (a page's `limit`, a watch's `resourceVersion`), its selectors after them.
+ * @param view The view: its path and its selectors.
+ * @param extra The keys read with it, each with its value.
+ */
 export const pathOf = (view: FeedView, extra: Readonly<Record<string, string>>): string => {
   const query = new URLSearchParams(extra);
   for (const selector of view.selectors) query.append(SELECTOR_KEY, selector);
@@ -90,6 +98,9 @@ export const pathOf = (view: FeedView, extra: Readonly<Record<string, string>>):
 /**
  * The text a read of a view answers: an `EventList` of `events` (the newest last) at `resourceVersion` where one is known, within
  * `bound` characters (`ANSWER_BOUND`): past it, the oldest events left out, one by one, so it stays a whole `EventList`.
+ * @param events The events to answer, the newest last.
+ * @param resourceVersion The version they are at, or undefined where none is known.
+ * @param bound The most the text is, in characters; ANSWER_BOUND by default.
  */
 export const readAnswer = (events: readonly Event[], resourceVersion: string | undefined, bound = ANSWER_BOUND): string => {
   const metadata = resourceVersion === undefined ? {} : { resourceVersion };

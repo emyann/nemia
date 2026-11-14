@@ -234,6 +234,8 @@ function placeQueryOf(c: RequestContext<ApiEnv>): PlaceQuery {
  * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves. The files the runtime read for it are
  * counted into `POLL_READS`, whether it answered or threw. It runs under the request's server span, so a program it runs on the app's
  * runtime (`inRequest`) is that span's child, and one run apart (`runPlaced`) is made so by `trace`.
+ * @param c The request's context, carrying the app's runtime and the request's span.
+ * @param handle The handler's body, given the request's services.
  */
 export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(

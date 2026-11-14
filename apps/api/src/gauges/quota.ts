@@ -112,7 +112,10 @@ const ORDER = Object.keys(LABELS);
 
 const SEE = 'get_usage is experimental: see README.md, The quota on the board';
 
-/** `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days. */
+/**
+ * `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days.
+ * @param ms How long, in milliseconds; a negative one is none.
+ */
 export function ageWord(ms: number): string {
   const sec = Math.ceil(Math.max(0, ms) / 1000);
   if (sec < 60) return `${sec} s`;
@@ -181,6 +184,8 @@ const heardRead = (heard: HeardQuota | null, now: number): Read | null => {
 /**
  * What the engine's answer says to the board, judged at `now` for the windows' resets: the plan's windows (`fresh`), or why there are none,
  * with what to do. Pure. A plan none of whose limits is a window the board shows is `unknown`.
+ * @param asked The engine's answer, or why it gave none.
+ * @param now The wall time, in milliseconds since the epoch, the windows' resets are judged at.
  */
 export function readOf(asked: Asked, now: number): Read {
   const none = { subscription: null, windows: [] };
@@ -252,6 +257,8 @@ export type Held = { asked: Asked; at: number; keptMs?: number };
 /**
  * How long the `streak`th `unanswered` outcome in a row is kept: `firstMs`, doubled for each one before it in the row, never past
  * `QUOTA_BACKOFF_CEILING_MS` — nor under `firstMs`, should it be set higher than the ceiling.
+ * @param streak How many unanswered outcomes in a row, this one counted.
+ * @param firstMs How long the first is kept, in milliseconds; QUOTA_BACKOFF_MS by default.
  */
 export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): number {
   return Math.min(firstMs * 2 ** Math.max(0, streak - 1), Math.max(firstMs, QUOTA_BACKOFF_CEILING_MS));
@@ -260,6 +267,10 @@ export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): n
 /**
  * The quota, judged at `now` from the ask held — null while none is, and one is being asked — and the last answer that had windows, shown
  * while younger than `QUOTA_LAST_MS`. Pure: a quota asker (`makeQuota`) holds both and hands them here.
+ * @param held The ask held, or null while one is being asked.
+ * @param last The last answer that had windows, or null where none had.
+ * @param now The wall time, in milliseconds since the epoch, the quota is judged at.
+ * @param keepMs How long an answer is kept, in milliseconds, where the ask held does not say; QUOTA_KEEP_MS by default.
  */
 export function quotaOf(held: Held | null, last: Held | null, now: number, keepMs: number = QUOTA_KEEP_MS): Quota {
   const lastRead = last && now - last.at <= QUOTA_LAST_MS ? readOf(last.asked, now) : null;
@@ -432,6 +443,7 @@ export const QUOTA_DAEMON_WAIT_MS = 30_000;
  * A board's quota as the runtime words an answer: a `fresh` one's windows, as the board shows them, keys the board does not know left out;
  * any other state an answer with no windows, which the daemon records nothing of — and so is a token's windows its sessions heard
  * (`heard`), a reading of a turn gone by and no ask's answer, which the daemon records nothing of either, as before. Pure.
+ * @param q The board's quota, as quotaOf judges it.
  */
 export function harnessQuotaOf(q: Quota): HarnessQuota {
   if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` };
@@ -444,6 +456,9 @@ export function harnessQuotaOf(q: Quota): HarnessQuota {
  * The daemon's ask of `harness`'s quota, through `read`, the asker the boards read (`QuotaAsker`), so a board and the daemon reading the
  * same harness share one keep, one backoff and one ask in flight: `ask` reaches the engine only when the asker would for a board, and
  * its read waits `QUOTA_DAEMON_WAIT_MS`.
+ * @param read The asker the boards read.
+ * @param harness The harness whose quota is asked, by its name.
+ * @param ask The engine's ask of the quota, made only when the asker would make it for a board.
  */
 export const daemonQuota =
   (read: ReadQuota, harness: string, ask: () => Promise<HarnessQuota>) =>

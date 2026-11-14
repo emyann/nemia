@@ -46,7 +46,10 @@ export class Answered extends Data.TaggedError('Answered')<{
   readonly said: string | undefined;
 }> {}
 
-/** Whether `failed` is a call that gave up at its bound. */
+/**
+ * Whether `failed` is a call that gave up at its bound.
+ * @param failed What a call failed with, of any type.
+ */
 export const timedOut = (failed: unknown): boolean =>
   HttpClientError.isHttpClientError(failed) && failed.reason._tag === 'TransportError' && Cause.isTimeoutError(failed.reason.cause);
 
@@ -80,6 +83,7 @@ const decodedFailure = (failed: unknown): Effect.Effect<never, unknown> => {
 /**
  * The typed client of the `Api` at `options.baseUrl`, as every consumer of the api makes it; it asks for the `HttpClient` it sends with
  * (`FetchHttpClient.layer`, or a page's own `Fetch`).
+ * @param options Where the api is (baseUrl), the token sent as a bearer where one is given, and headers sent on every request.
  */
 export const apiClient = (options: ApiClientOptions) =>
   Effect.flatMap(HttpClient.HttpClient, (sent) => {

@@ -104,6 +104,7 @@ const RELEASE = leaseRelease(RUNNING);
 /**
  * What `GET /api/health` answers: that the api is up, and the release it runs (`release`), the tag of an install's `release.json`, which
  * the client holds its own against; none for a checkout, or where the app was given no release.
+ * @param running The install the app runs, or undefined where it was given none.
  */
 export const healthOf = (running: Running | undefined): Health =>
   running?.kind === 'install' ? { ok: true, release: running.tag } : { ok: true };

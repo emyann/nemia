@@ -30,7 +30,10 @@ export const BookmarkObject = Schema.Struct({
   metadata: Schema.Struct({ resourceVersion: Schema.String }),
 });
 
-/** One event of a watch whose objects are `item`: what happened to an object, or a BOOKMARK. */
+/**
+ * One event of a watch whose objects are `item`: what happened to an object, or a BOOKMARK.
+ * @param item The schema of the objects the watch is of.
+ */
 export const watchEventOf = <Item extends Schema.Constraint>(item: Item) =>
   Schema.Union([
     Schema.Struct({ type: Schema.Literals(['ADDED', 'MODIFIED', 'DELETED']), object: item }),

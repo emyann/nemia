@@ -11,6 +11,11 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
   `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
   flag off.
+- **The one surface at a glance needs no daemon and no token**: `npm run api:page` serves the reference page alone on this machine's
+  loopback (`src/openapi/browse.ts`, port 8790, `PORT` moves it), each operation a command links named `nemia <command>` with its MCP
+  tool, who answers for it when an agent calls it, and its help; `npm run api` prints the same table in a terminal — command, tool,
+  endpoint, what it takes and answers — and `npm run api -- <group>` one group (`src/openapi/overview.ts`). Both read the command
+  table (`COMMAND_WORDS`) and the document, never a store; `node apps/api/src/openapi/print.ts` prints the whole document.
 - **The OpenAPI document has a page to browse it beside it**: `GET /openapi` (`src/openapi/reference.ts`) is Scalar's reference, drawn
   in the browser from the document at `OPENAPI_PATH`, never a copy, so a route the document gains shows there with nothing to change.
   The page reaches no host but the api: its script is the installed `@scalar/api-reference` bundle, read by `app.ts` and served at `/openapi/scalar.js`

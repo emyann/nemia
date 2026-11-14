@@ -6,13 +6,13 @@
  * Each under `/api/runs/:runId/steps/:step/`, found among the runs the store lists, in any namespace. Served by the api's step handlers
  * (`apps/api/src/steps/steps.ts`).
  */
-import { Schema } from 'effect';
+import { Schema, SchemaTransformation } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Gone, Invalid, Missing, ReadFailed, Unjudged } from './api-errors.ts';
 import { StepLog } from './run.ts';
 import { StepTries, StepTry, TryCloseout } from './run-tries.ts';
 import { StepTold } from './run-told.ts';
-import { describedNumber } from './meta.ts';
+import { describedNumber, describedOne } from './meta.ts';
 import { LIFECYCLE_STATES, SAID_AFTER, TRANSCRIPT_ORIGINS, TRANSCRIPT_ROLES } from './words.ts';
 
 const List = <S extends Schema.Top>(item: S) => Schema.mutable(Schema.Array(item));
@@ -24,14 +24,35 @@ const State = Schema.Literals(LIFECYCLE_STATES);
  * `input` is absent where the harness recorded the call without one.
  */
 export const TranscriptEvent = Schema.Struct({
-  id: Schema.String,
-  at: Schema.String,
-  role: Schema.Literals(TRANSCRIPT_ROLES),
-  kind: Schema.Literals(SAID_AFTER),
-  text: Schema.optionalKey(Schema.String),
-  tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
-  result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),
-  origin: Schema.optionalKey(Schema.Struct({ kind: Schema.Literals(TRANSCRIPT_ORIGINS) })),
+  id: Schema.String.annotate({ description: "The event's id, which a tool_result shares with its call; unique with its kind." }),
+  at: Schema.String.annotate({ description: "When it was said, the time on the harness's own record." }),
+  role: Schema.Literals(TRANSCRIPT_ROLES).annotate({ description: "Who said it: assistant, user (a tool's result is user) or system." }),
+  kind: Schema.Literals(SAID_AFTER).annotate({ description: 'What kind of event it is: text, thinking, tool_use, tool_result or system.' }),
+  text: Schema.optionalKey(Schema.String.annotate({ description: 'The words of the event; absent for one with none.' })),
+  tool: Schema.optionalKey(
+    Schema.Struct({
+      name: Schema.String.annotate({ description: 'The tool called.' }),
+      input: Schema.optionalKey(
+        describedOne(
+          Schema.Unknown,
+          'What the tool was called with, as the harness recorded it; absent where it recorded the call without one.',
+        ),
+      ),
+    }).annotate({ description: 'The tool call, of a tool_use event.' }),
+  ),
+  result: Schema.optionalKey(
+    Schema.Struct({
+      text: Schema.String.annotate({ description: "The tool's result, in words." }),
+      isError: Schema.Boolean.annotate({ description: 'Whether the tool failed.' }),
+    }).annotate({ description: "The tool's result, of a tool_result event." }),
+  ),
+  origin: Schema.optionalKey(
+    Schema.Struct({
+      kind: Schema.Literals(TRANSCRIPT_ORIGINS).annotate({
+        description: "Where a user event's words came from, as the harness said it; unknown for a word the runtime has not named.",
+      }),
+    }).annotate({ description: "Where a user event's words came from." }),
+  ),
 });
 export type TranscriptEvent = typeof TranscriptEvent.Type;
 
@@ -62,16 +83,20 @@ export const StepTranscript = Schema.Struct({
 export type StepTranscript = typeof StepTranscript.Type;
 
 /** One state of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */
-export const LifecycleTransition = Schema.Struct({ state: State, event: Schema.String, at: Schema.String });
+export const LifecycleTransition = Schema.Struct({
+  state: State.annotate({ description: 'The lifecycle state its journal says.' }),
+  event: Schema.String.annotate({ description: 'The kind of the journal entry that put it on the state.' }),
+  at: Schema.String.annotate({ description: 'When the entry was written.' }),
+});
 export type LifecycleTransition = typeof LifecycleTransition.Type;
 
 /** One edge of the lifecycle: the state it leaves, on what event, under which guard, the state it reaches, and what it does. */
 export const LifecycleEdge = Schema.Struct({
-  from: State,
-  event: Schema.String,
-  guard: Schema.optionalKey(Schema.String),
-  to: State,
-  action: Schema.String,
+  from: State.annotate({ description: 'The state the edge leaves.' }),
+  event: Schema.String.annotate({ description: 'The event it is taken on.' }),
+  guard: Schema.optionalKey(Schema.String.annotate({ description: 'The guard it is taken under; absent for none.' })),
+  to: State.annotate({ description: 'The state it reaches.' }),
+  action: Schema.String.annotate({ description: 'What it does.' }),
 });
 export type LifecycleEdge = typeof LifecycleEdge.Type;
 
@@ -80,22 +105,22 @@ export type LifecycleEdge = typeof LifecycleEdge.Type;
  * state the next pass reads, and the guard its refusal asks.
  */
 export const LifecycleVerb = Schema.Struct({
-  verb: Schema.String,
-  entry: Schema.String,
-  by: Schema.Literal('person'),
-  from: List(State),
-  to: State,
-  guard: Schema.String,
+  verb: Schema.String.annotate({ description: 'The verb, as a person writes it.' }),
+  entry: Schema.String.annotate({ description: 'The entry it journals.' }),
+  by: Schema.Literal('person').annotate({ description: 'Who writes it: a person.' }),
+  from: List(State).annotate({ description: 'The states it is taken from.' }),
+  to: State.annotate({ description: 'The state the next pass reads.' }),
+  guard: Schema.String.annotate({ description: 'The guard its refusal asks.' }),
 });
 export type LifecycleVerb = typeof LifecycleVerb.Type;
 
 /** The lifecycle as data a page draws (`lifecycleGraph`, the runtime's): its first state, every state, the final ones, edges and verbs. */
 export const LifecycleGraph = Schema.Struct({
-  initial: State,
-  states: List(State),
-  final: List(State),
-  edges: List(LifecycleEdge),
-  verbs: List(LifecycleVerb),
+  initial: State.annotate({ description: 'The first state of a task.' }),
+  states: List(State).annotate({ description: 'Every state of the lifecycle.' }),
+  final: List(State).annotate({ description: 'The states that end a task.' }),
+  edges: List(LifecycleEdge).annotate({ description: 'Its edges, each from a state on an event to another.' }),
+  verbs: List(LifecycleVerb).annotate({ description: 'The verbs a person writes to a task from outside the lifecycle.' }),
 });
 export type LifecycleGraph = typeof LifecycleGraph.Type;
 
@@ -128,7 +153,17 @@ export const StepFile = HttpApiSchema.WithHeaders(Schema.Uint8Array.pipe(HttpApi
 
 /** One event of a step's stream, named `event`, its data the JSON of `data`, and the cursor to resume from as its `id` where it has one. */
 const sse = <E extends string, D extends Schema.Top>(event: E, data: D) =>
-  Schema.Struct({ id: Schema.optionalKey(Schema.String), event: Schema.Literal(event), data: Schema.fromJsonString(data) });
+  Schema.Struct({
+    id: Schema.optionalKey(
+      Schema.String.annotate({
+        description: 'The cursor to resume from, which an EventSource sends back as Last-Event-ID; absent where the event has none.',
+      }),
+    ),
+    event: Schema.Literal(event).annotate({ description: "The event's name." }),
+    data: Schema.String.annotate({ description: "The event's data, as JSON." }).pipe(
+      Schema.decodeTo(data, SchemaTransformation.fromJsonString()),
+    ),
+  });
 
 /**
  * What a step's stream sends, by name: whether its harness pushes the session (`following`); each whole event of its conversation
@@ -149,13 +184,16 @@ export const StepStreamEvent = Schema.Union([
 export type StepStreamEvent = typeof StepStreamEvent.Type;
 
 /** A run's step, named in the path. */
-const stepParams = { runId: Schema.String, step: Schema.String };
+const stepParams = {
+  runId: Schema.String.annotate({ description: "The run's id, found among the runs the store lists in any namespace." }),
+  step: Schema.String.annotate({ description: "The step's name." }),
+};
 
 /** A step's try, by its number as the path says it. */
-const tryParams = { ...stepParams, try: Schema.String };
+const tryParams = { ...stepParams, try: Schema.String.annotate({ description: "The try's number, from 1." }) };
 
 /** A file of a step's, by its name, never by a path. */
-const fileParams = { ...stepParams, file: Schema.String };
+const fileParams = { ...stepParams, file: Schema.String.annotate({ description: "The file's name, never a path." }) };
 
 /**
  * The query of a read of a step's tries, a try or its closeout, each closeout read narrowly (`closeoutNarrowed`): `fields`, the fields of
@@ -165,9 +203,14 @@ const fileParams = { ...stepParams, file: Schema.String };
  * where more is left.
  */
 const closeoutQuery = {
-  fields: Schema.optionalKey(Schema.String),
-  bodyFrom: Schema.optionalKey(Schema.String),
-  bodyLimit: Schema.optionalKey(Schema.String),
+  fields: Schema.optionalKey(
+    Schema.String.annotate({
+      description:
+        "The fields of the closeout's output to answer, comma-separated, * for every one, an empty one naming none; not given, the fields whose JSON is short.",
+    }),
+  ),
+  bodyFrom: Schema.optionalKey(Schema.String.annotate({ description: 'The character the closeout body starts at; 0 where not given.' })),
+  bodyLimit: Schema.optionalKey(Schema.String.annotate({ description: 'How many characters of the closeout body to answer.' })),
 };
 
 /**
@@ -176,10 +219,14 @@ const closeoutQuery = {
  * cursor answered still counts every event, so a read without `kinds` from it misses none.
  */
 const transcriptQuery = {
-  after: Schema.optionalKey(Schema.String),
-  limit: Schema.optionalKey(Schema.String),
-  last: Schema.optionalKey(Schema.String),
-  kinds: Schema.optionalKey(Schema.String),
+  after: Schema.optionalKey(Schema.String.annotate({ description: 'The cursor to read on from.' })),
+  limit: Schema.optionalKey(
+    Schema.String.annotate({ description: 'How many of the first events after the cursor to answer; never with last.' }),
+  ),
+  last: Schema.optionalKey(Schema.String.annotate({ description: 'How many of the last events to answer; never with limit.' })),
+  kinds: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The kinds of event to answer, comma-separated; every one where not given.' }),
+  ),
 };
 
 /** What a sub-resource of the run object refuses with: none by that name, a try the package refuses, a run not judged. */
@@ -220,8 +267,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('log', '/api/runs/:runId/steps/:step/log', {
     params: stepParams,
-    /** `tail`, how many of its last lines to answer (`LOG_TAIL`). */
-    query: { tail: Schema.optionalKey(Schema.String) },
+    query: { tail: Schema.optionalKey(Schema.String.annotate({ description: 'How many of its last lines to answer.' })) },
     success: StepLog,
     error: [Missing, Invalid, ReadFailed],
   }),
@@ -237,7 +283,7 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('path', '/api/runs/:runId/steps/:step/path', {
     params: stepParams,
-    query: { try: Schema.optionalKey(Schema.String) },
+    query: { try: Schema.optionalKey(Schema.String.annotate({ description: "The try's number, from 1; the latest where not given." })) },
     success: StepPath,
     error: engineReadErrors,
   }),
@@ -249,8 +295,12 @@ export class StepsGroup extends HttpApiGroup.make('steps').add(
   }),
   HttpApiEndpoint.get('transcriptStream', '/api/runs/:runId/steps/:step/transcript/stream', {
     params: stepParams,
-    query: { after: Schema.optionalKey(Schema.String) },
-    headers: { 'last-event-id': Schema.optionalKey(Schema.String) },
+    query: { after: Schema.optionalKey(Schema.String.annotate({ description: 'The cursor to stream on from.' })) },
+    headers: {
+      'last-event-id': Schema.optionalKey(
+        Schema.String.annotate({ description: 'The id of the last event received, which an EventSource sends back when it reconnects.' }),
+      ),
+    },
     success: HttpApiSchema.WithHeaders(HttpApiSchema.StreamSse({ events: StepStreamEvent }), {
       /** Never kept by a proxy between: each event is said once. */
       'cache-control': Schema.Literal('no-cache'),

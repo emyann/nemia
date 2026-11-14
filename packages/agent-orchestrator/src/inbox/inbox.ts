@@ -127,6 +127,8 @@ function refuse(why: string): never {
  * a key set twice or to nothing, a `queued:` that is not an
  * ISO time or is on a card with no `workflow:` — nothing would say what starts it — a `gate:` that names more than one step or is a step's
  * `true`, a `factory:` that is not a factory's name (`factoryNameRefusal`), an empty body, and a frontmatter that never closes.
+ * @param file The card's file name in the inbox, with its `.md`: its name, and what a refusal names.
+ * @param text The file's text, frontmatter and body.
  */
 export function parseInboxCard(file: string, text: string): InboxCard {
   const { block, body } = splitFrontmatter(file, text);
@@ -195,6 +197,8 @@ function fromRuns(file: string, from: string): string[] {
 /**
  * One inbox card as `parseInboxCard` reads it, or why it does not read (`why`, the refusal's words, which name the file and the fix): what
  * the inbox's listing shows a card it cannot read with. A failure that is no refusal is no reason a card gives, and is thrown.
+ * @param file The card's file name in the inbox, with its `.md`.
+ * @param text The file's text.
  */
 export function cardOrWhy(file: string, text: string): { card: InboxCard } | { why: string } {
   try {
@@ -205,7 +209,10 @@ export function cardOrWhy(file: string, text: string): { card: InboxCard } | { w
   }
 }
 
-/** A card's `from:` line's value, written as `parseInboxCard` reads it back. */
+/**
+ * A card's `from:` line's value, written as `parseInboxCard` reads it back.
+ * @param runs The runs the card was started as, none where it names none.
+ */
 export const fromLine = (runs: readonly string[] | undefined): string | undefined => (runs?.length ? runs.join(', ') : undefined);
 
 /** Refuses a card's `factory:` that is not a factory's name (`factoryNameRefusal`), naming the file and the fix. */
@@ -218,6 +225,9 @@ function refuseFactoryKey(file: string, factory: string): void {
  * Why the card in `file` cannot start: neither it nor its start names a factory, and a card is started only in the factory named for it —
  * never one inferred from a folder, which can be two factories'. Names the line to write, with the store's factories (`names`), the
  * start's own words for naming one (`fix`, `--factory <name>` say) when it has any, and how a new card names one as it is filed.
+ * @param file The card's file, as the refusal names it.
+ * @param names The names of the store's factories, offered to choose from; none where none is filed.
+ * @param fix The start's own words for naming a factory, `--factory <name>` say; absent where the start has none.
  */
 export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string): string {
   const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: nemia factory add <name> --repo <root>';
@@ -276,6 +286,7 @@ function flatKeys(file: string, block: string, filing: boolean): Partial<Record<
 /**
  * The workflow a card names by its `workflow:`, or none: its value where it is a workflow's name (`workflowNameRefusal`), and nothing for
  * an old card's path, which names no workflow its factory offers.
+ * @param workflow The card's `workflow:` value, null or undefined where it has none.
  */
 export const cardWorkflowName = (workflow: string | null | undefined): string | undefined =>
   workflow == null || workflowNameRefusal(workflow) !== undefined ? undefined : workflow;
@@ -284,6 +295,9 @@ export const cardWorkflowName = (workflow: string | null | undefined): string | 
  * Why `workflow`, given as a card's `workflow:` by `where` (`--workflow`, `spec.workflow`, a file's line), cannot be one, or undefined: a
  * card names its workflow by its name, the folder its factory offers, never a path (`workflowNameRefusal`); then what was not done.
  * Silent for an empty one, which the card's reader refuses as a key with no value.
+ * @param where What gave the workflow, said first: `--workflow`, `spec.workflow`, a file's line.
+ * @param workflow The workflow as given.
+ * @param notDone What was not done, said last.
  */
 export function cardWorkflowRefusal(where: string, workflow: string, notDone: string): string | undefined {
   const refused = workflow.trim() === '' ? undefined : workflowNameRefusal(workflow);
@@ -295,6 +309,7 @@ export function cardWorkflowRefusal(where: string, workflow: string, notDone: st
 /**
  * Why `name` cannot name a card, or undefined when it can: empty; a slash, `.` or `..`, which would reach outside the inbox; or a leading
  * dot, a hidden file `nemia inbox` never lists. Whether a card of that name is there is the folder's to say (`noCardLine`).
+ * @param name The name as typed.
  */
 export function inboxNameRefusal(name: string): string | undefined {
   if (!name.trim())
@@ -310,6 +325,8 @@ export function inboxNameRefusal(name: string): string | undefined {
 /**
  * That the inbox has no card `name`, and which it has — the cards `nemia inbox` lists, by name — with the name without its `.md` when that
  * is one of them.
+ * @param name The name as typed.
+ * @param cards The names of the cards the inbox has.
  */
 export function noCardLine(name: string, cards: readonly string[]): string {
   const bare =
@@ -394,6 +411,7 @@ export type CardRun = Pick<Run, 'id' | 'from'> & { phase: RunPhase };
  * A listed entry's state, from what the listing read of it: the phase of its run when a record names it, whatever the card carries — the
  * first of its runs still in play where several do, else the last's; else `refused` when it is queued and its try as it stands was
  * refused; else `queued` when it is queued; else `filed` — an entry that does not read as a card among them, its `error` saying why. Pure.
+ * @param l The entry: its queue and last try, and the phases of the runs that name it, in the order they were started.
  */
 export const cardState = (l: Pick<InboxListing, 'queued' | 'tried'> & { phases: readonly RunPhase[] }): CardState =>
   l.phases.find((phase) => CARD_IN_PLAY[phase]) ?? l.phases.at(-1) ?? (l.queued ? (l.tried?.refused ? 'refused' : 'queued') : 'filed');
@@ -410,7 +428,10 @@ export const CARD_IN_PLAY: Readonly<Record<CardState, boolean>> = {
   ...RUN_PHASE_IN_PLAY,
 };
 
-/** Whether `l` is a card still in play (`CARD_IN_PLAY`). Pure. */
+/**
+ * Whether `l` is a card still in play (`CARD_IN_PLAY`). Pure.
+ * @param l The listed entry, its state worked out.
+ */
 export const cardInPlay = (l: Pick<InboxListing, 'state'>): boolean => CARD_IN_PLAY[l.state];
 
 /** An entry as the inbox lists it before its runs' phases are read: everything but its `state` (`cardsListed`). */
@@ -423,6 +444,10 @@ export type CardListing = Omit<InboxListing, 'state'>;
  * queued card says when, and its place in the order; and, when the tick's last try of its start is of the card as it stands (`tries`, by
  * name), that try. An entry that does not read is not queued. Each card says the repository its factory works on for its workflow
  * (`factoryRepo`), from the store's `factories` that read, by name: with none handed, none.
+ * @param files The inbox folder's entries, each with its text.
+ * @param runs The store's runs, each with the cards it was started from (`from`).
+ * @param tries The tick's last try of each queued card's start, by card name; none where none is handed.
+ * @param factories The store's factories that read, by name; none where none is handed.
  */
 export function cardsListed(
   files: readonly PlanFile[],
@@ -498,6 +523,10 @@ export function cardsListed(
 /**
  * The inbox as `nemia inbox` and the board list it: `cardsListed`, each entry with its `state` (`cardState`), off the phases of the
  * runs that name it, which `runs` carries as read now. Pure.
+ * @param files The inbox folder's entries, each with its text.
+ * @param runs The store's runs, each with the cards it was started from and its phase as read now.
+ * @param tries The tick's last try of each queued card's start, by card name; none where none is handed.
+ * @param factories The store's factories that read, by name; none where none is handed.
  */
 export function inboxListing(
   files: readonly PlanFile[],
@@ -516,6 +545,7 @@ export function inboxListing(
  * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a run was started from left out
  * (`startedAs`), since it is never started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was
  * refused keeps its place, and the tick passes over it (`nextQueued`).
+ * @param listing The inbox's entries.
  */
 export const queueOrder = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs'>>(listing: readonly L[]): L[] =>
   listing
@@ -530,6 +560,8 @@ export type WiredFactory = Pick<Factory, 'repos' | 'workflowRepos'>;
  * The repository a card's factory works on for the card's workflow (`workflowRepo`): the one its wiring names, else its only one. Null
  * for a card of the default factory, one whose factory is not among `factories` (the store's that read, by name) or names it none, and
  * one that names no workflow by its name. The card's own `repo:` is never read. Pure.
+ * @param l The card: its workflow and the factory it names, null for the default one.
+ * @param factories The store's factories that read, by name.
  */
 export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, factories: ReadonlyMap<string, WiredFactory>): string | null {
   const factory = l.factory === null ? undefined : factories.get(l.factory);
@@ -544,6 +576,9 @@ export function factoryRepoOf(l: Pick<InboxListing, 'workflow' | 'factory'>, fac
  * wiring names for its workflow (`factoryRepoOf`), else `''`, none — the start refuses it by name, and the try is remembered on `''`, so a
  * wiring that names one later is a new try; for a card of the default factory, the daemon's (`fromDaemon`), the only start that turns
  * on where the daemon runs. The card's own `repo:` is never read.
+ * @param l The card: its workflow and the factory it names, null for the default one.
+ * @param daemonRepo The repository the daemon runs in.
+ * @param factories The store's factories that read, by name.
  */
 export function queueRepo(
   l: Pick<InboxListing, 'workflow' | 'factory'>,
@@ -558,6 +593,9 @@ export function queueRepo(
  * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused
  * as it stands — its text the same, and tried on the repository it would be tried on now (`queueRepo`, with the store's `factories` by
  * name). A card whose start failed for any other reason keeps its place, and is tried again. Pure.
+ * @param listing The inbox's entries.
+ * @param repo The repository the daemon runs in.
+ * @param factories The store's factories that read, by name; none where none is handed.
  */
 export const nextQueued = <L extends Pick<CardListing, 'name' | 'queued' | 'startedAs' | 'tried' | 'workflow' | 'factory'>>(
   listing: readonly L[],
@@ -582,6 +620,7 @@ export type QueueStarted =
  *
  * One writer, so a person reads the same sentence wherever the card was started: `nemia start` prints it under the run, and a tick's
  * queue line carries it (`queueLine`). `InboxStarted.ignoredRepo` in inbox.verb.ts is what both are given.
+ * @param repo The card's own `repo:` value.
  */
 export const ignoredRepoLine = (repo: string): string =>
   `the card's repo: ${repo} is retired and was not read — its factory places the run (nemia factory attach <factory> <workflow> --repo <name>); delete the line`;
@@ -591,6 +630,7 @@ export const ignoredRepoLine = (repo: string): string =>
  * then. A card whose retired `repo:` was not read says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon
  * that says it — `nemia up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
  * terminal.
+ * @param q The pass's start of the card: started, refused or failed.
  */
 export function queueLine(q: QueueStarted): string {
   if ('refused' in q) {
@@ -610,6 +650,8 @@ export function queueLine(q: QueueStarted): string {
  * What `nemia inbox` says of a queued card's last try (`inboxLines`): when, on which repository — the one its factory works on for its
  * workflow said as such, none where it names none — and why; refused, how to have it tried again, and running `nemia up` elsewhere only
  * when the daemon's repository was the one; failed otherwise, that the tick tries it again. Empty for a card not tried.
+ * @param l The inbox's entry, with the tick's last try of its start, if any.
+ * @param unfactoredStarts Whether a card that names no factory starts on a repository (`WF_DEFAULT_FACTORY_STARTS=1`).
  */
 export function triedClause(l: InboxListing, unfactoredStarts: boolean): string {
   const t = l.tried;
@@ -631,6 +673,10 @@ export function triedClause(l: InboxListing, unfactoredStarts: boolean): string 
  * and its try names no repository to run one in, unless `unfactoredStarts` (`WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch) starts it.
  * A try on the repository the card's factory works on (`factoryRepo`) says so, and names no daemon's repository to run one in: only a try
  * on the daemon's own (`queueRepo`) does (`triedClause`). An old card's `repo:` is listed as retired.
+ * @param listing The inbox's entries, each with its state.
+ * @param unfactoredStarts Whether a card that names no factory starts on a repository (`WF_DEFAULT_FACTORY_STARTS=1`); false where not
+ * given.
+ * @param show Which labels each line shows, every one or the keys asked as columns; none where not given.
  */
 export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false, show: LabelsShown = {}): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
@@ -647,6 +693,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
 
 /**
  * A started card's state as `nemia inbox` says it beside its run: its run's phase, and `waiting on you` for a run that waits on a person.
+ * @param state The card's state.
  */
 export const phaseSaid = (state: CardState): string => (state === 'waiting' ? 'waiting on you' : state);
 
@@ -660,6 +707,7 @@ const labelSegments = (map: Labels, show: LabelsShown): string =>
 /**
  * The map a selector reads of an inbox entry: its person labels, then its `workflow:` where it sets one, and its `factory:` —
  * `default` where it names none, the factory it starts in — as a run's whole map (`metadataLabels`) carries its own. Pure.
+ * @param l The entry: its person labels, its workflow and its factory, null for the default one.
  */
 export const cardLabels = (l: Pick<InboxListing, 'labels' | 'workflow' | 'factory'>): Labels => ({
   ...l.labels,
@@ -699,6 +747,9 @@ function splitOrProse(from: string, text: string): { block: string | null; body:
  * workflow's name (`cardWorkflowRefusal`), a `repo:` in the text, retired (`retiredRepoRefusal`), and a `queued:` in the text: a card is
  * queued once it is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with
  * a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
+ * @param from Where the idea came from, as a refusal names it: the file given, or the note.
+ * @param text The idea as given: a note, or a file's text.
+ * @param givenKeys The `workflow`, `factory` and labels given beside the idea, written over the text's own.
  */
 export function ideaCard(
   from: string,
@@ -749,6 +800,7 @@ export function ideaCard(
 /**
  * Why a card is given no repository — `repo:` is retired: a card names its factory and its workflow, and the factory's wiring places its
  * run — with the attach that names a workflow's repository; then what was not done.
+ * @param notDone What was not done, said last.
  */
 export const retiredRepoRefusal = (notDone: string): string =>
   `a card names its factory and its workflow, never a repository: the factory places its run, on the repository its wiring names for the workflow. Leave the repository out, and name it on the factory: nemia factory attach <factory> <workflow> --repo <name>. ${notDone}`;
@@ -780,6 +832,9 @@ function cardWritten(keys: Partial<Record<FlatKey, string | undefined>> & { labe
  * `gate:` and `factory:` kept: what `nemia inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped,
  * as `nemia inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
  * `ideaCard` keeps it. Pure; the text it gives reads back as a card (`parseInboxCard`), or is refused as one would be.
+ * @param card The card as read.
+ * @param at The time the card is queued at, an ISO time; null to take its `queued:` off.
+ * @param workflow The workflow to write over the card's own; absent to keep the card's.
  */
 export function queuedText(card: InboxCard, at: string | null, workflow?: string): string {
   return cardText(card, { workflow: workflow ?? card.workflow, queued: at ?? undefined });
@@ -788,18 +843,24 @@ export function queuedText(card: InboxCard, at: string | null, workflow?: string
 /**
  * A card's text with `from:` set to `runs` — or taken off, for none — every other key kept: what `nemia inbox from` writes. Written again
  * as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
+ * @param card The card as read.
+ * @param runs The runs to write; none takes the line off.
  */
 export const fromText = (card: InboxCard, runs: readonly string[]): string => cardText(card, { from: fromLine(runs) });
 
 /**
  * A card's text with `labels:` set to `labels`, in key order — or taken off, for none — every other key kept: what `nemia label inbox`
  * writes. Written again as `queuedText` writes it; pure, and the text reads back as a card (`parseInboxCard`).
+ * @param card The card as read.
+ * @param labels The labels to write; none takes the line off.
  */
 export const labelledText = (card: InboxCard, labels: Labels): string => cardText(card, { labels });
 
 /**
  * A card's text, its keys written over by `over` and the frontmatter written again in the keys' order, its comments dropped; a body that
  * opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Read back before it is given.
+ * @param card The card as read.
+ * @param over The keys to write over the card's own; an undefined key is taken off.
  */
 export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels }): string {
   const keys: Partial<Record<FlatKey, string | undefined>> & { labels?: Labels } = {
@@ -822,6 +883,11 @@ export function cardText(card: InboxCard, over: Partial<Record<FlatKey, string |
  * Why `nemia inbox queue` will not queue this card, in words that name the fix — or undefined, when it may. Pure. Refused: a card a run's
  * record names (`startedAs`), which is not started again (`startedRefusal`); a card already queued, with its place, and how to take it
  * back; and a card with no `workflow:` and none given — nothing would say what starts it, and `--workflow <w>` writes both.
+ * @param card The card to queue.
+ * @param where The card's file, which a refusal of a card started already names for filing the idea again (`startedRefusal`).
+ * @param startedAs The runs a record says the card was started as.
+ * @param place The card's place in the queue's order, from 1, null where it has none.
+ * @param workflow The workflow given to queue it with, absent where none was.
  */
 export function queueRefusal(
   card: InboxCard,
@@ -848,6 +914,8 @@ export function queueRefusal(
  * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
  * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`
  * would start a run asked to do its own path, and leave the card where it was.
+ * @param at The path given.
+ * @param dir The inbox's folder.
  */
 export function inboxNameOf(at: string, dir: string): string | null {
   const rel = path.relative(dir, at);
@@ -860,6 +928,10 @@ export function inboxNameOf(at: string, dir: string): string | null {
  * workflow its factory offers — and none was given; with the workflows `offered.by` offers (its factory, or for a card of the default
  * factory the repository's `workflows/`) to name one of, and how. `where` is what `nemia start` is given for the card: its name, as the
  * start takes it on this machine and on another's.
+ * @param card The card, by its file, which the refusal names.
+ * @param where What `nemia start` is given for the card: its name.
+ * @param offered Who offers workflows, its factory or the repository's `workflows/`, and the names of those it offers.
+ * @param oldPath The old card's `workflow:` that is a path; absent where the card names no workflow at all.
  */
 export function noWorkflowRefusal(
   card: Pick<InboxCard, 'file'>,
@@ -883,6 +955,9 @@ export function noWorkflowRefusal(
 /**
  * Why a card is not started again: a run's record names it (`from`), so it was started — a card is started once, and stays in the inbox
  * as its trace. Started again, the idea would run twice.
+ * @param card The card, by its file, which the refusal names.
+ * @param where What `nemia inbox add` is told to file the idea again from: the card's file.
+ * @param runs The runs a record says the card was started as.
  */
 export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
   return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and a card is started once. To run the idea again, file it again under a name of its own: nemia inbox add ${where}.`;

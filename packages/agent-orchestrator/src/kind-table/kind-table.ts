@@ -100,7 +100,10 @@ const agentCells = (agent: Agent): readonly string[] => [
   copiedCell(agent),
 ];
 
-/** `list` as a table: `AGENT_COLUMNS`, and a row per agent of the page. */
+/**
+ * `list` as a table: `AGENT_COLUMNS`, and a row per agent of the page.
+ * @param list The page of agents, as the list answers it.
+ */
 export const agentTable = (list: AgentList): Table => tableOf(list, AGENT_COLUMNS, agentCells);
 
 /** The columns of a skill's row, in the order its cells are. */
@@ -127,7 +130,10 @@ const skillCells = (skill: Skill): readonly string[] => [
   (skill.spec.tags ?? []).join(', '),
 ];
 
-/** `list` as a table: `SKILL_COLUMNS`, and a row per skill of the page. */
+/**
+ * `list` as a table: `SKILL_COLUMNS`, and a row per skill of the page.
+ * @param list The page of skills, as the list answers it.
+ */
 export const skillTable = (list: SkillList): Table => tableOf(list, SKILL_COLUMNS, skillCells);
 
 /** The columns of a factory's row, in the order its cells are. */
@@ -188,7 +194,10 @@ const factoryCells = (factory: Factory): readonly string[] => [
   factory.spec.volumes.map((v) => `${v.name ? `${v.name}=` : ''}${v.path}${v.readOnly ? ' (read-only)' : ''}`).join(', '),
 ];
 
-/** `list` as a table: `FACTORY_COLUMNS`, and a row per factory of the page. */
+/**
+ * `list` as a table: `FACTORY_COLUMNS`, and a row per factory of the page.
+ * @param list The page of factories, as the list answers it.
+ */
 export const factoryTable = (list: FactoryList): Table => tableOf(list, FACTORY_COLUMNS, factoryCells);
 
 /** The columns of an MCP server's row, in the order its cells are. */
@@ -215,5 +224,8 @@ const mcpServerCells = (server: McpServer): readonly string[] => [
     .join(', '),
 ];
 
-/** `list` as a table: `MCP_SERVER_COLUMNS`, and a row per server of the page. */
+/**
+ * `list` as a table: `MCP_SERVER_COLUMNS`, and a row per server of the page.
+ * @param list The page of MCP servers, as the list answers it.
+ */
 export const mcpServerTable = (list: McpServerList): Table => tableOf(list, MCP_SERVER_COLUMNS, mcpServerCells);

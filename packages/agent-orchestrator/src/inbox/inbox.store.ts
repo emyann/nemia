@@ -278,6 +278,8 @@ export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string)
  * the card's name `given` says, with or without its `.md`, where the inbox has that card and no file of that name stands where it is
  * typed; else null, for a path outside it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not
  * there at its path is still a card's path, refused by name at start; a name no card has is text.
+ * @param home The store's root, whose inbox is read.
+ * @param given What was typed: a path, a card's name with or without its `.md`, or any other text.
  */
 export const inboxNameAt = (home: string, given: string): string | null => {
   const at = cardNameAt(home, given);

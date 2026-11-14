@@ -35,7 +35,10 @@ export const LABEL_NAME = /^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$/;
 
 const LISTS = `the closed keys are ${CLOSED_LABEL_KEYS.join(', ')} and the reserved ones ${RESERVED_LABEL_KEYS.join(', ')}`;
 
-/** Why `key` cannot be a person's label key, or undefined where it can. Pure. */
+/**
+ * Why `key` cannot be a person's label key, or undefined where it can. Pure.
+ * @param key The key as given.
+ */
 export function labelKeyRefusal(key: string): string | undefined {
   if (key.includes('/'))
     return `${JSON.stringify(key)} has a prefix, and a label takes none for now: drop what is before the /, as in ${key.slice(key.lastIndexOf('/') + 1) || 'team'}=…`;
@@ -49,7 +52,11 @@ export function labelKeyRefusal(key: string): string | undefined {
   return undefined;
 }
 
-/** Why `value` cannot be the value of the label `key`, or undefined where it can: empty, or a name segment of 63 at most. Pure. */
+/**
+ * Why `value` cannot be the value of the label `key`, or undefined where it can: empty, or a name segment of 63 at most. Pure.
+ * @param key The label's key, which the refusal names.
+ * @param value The value as given; empty takes the key's value away.
+ */
 export function labelValueRefusal(key: string, value: string): string | undefined {
   if (value === '') return undefined;
   if (value.length > LABEL_CAP) return `the value of ${key} is ${value.length} characters long: keep it to ${LABEL_CAP} at most`;
@@ -58,10 +65,17 @@ export function labelValueRefusal(key: string, value: string): string | undefine
   return undefined;
 }
 
-/** Why `key=value` cannot be a person's label, or undefined. Pure. */
+/**
+ * Why `key=value` cannot be a person's label, or undefined. Pure.
+ * @param key The label's key.
+ * @param value The label's value.
+ */
 export const labelRefusal = (key: string, value: string): string | undefined => labelKeyRefusal(key) ?? labelValueRefusal(key, value);
 
-/** Why `labels` cannot be a person's map, in the words of its first wrong pair, or undefined. Pure. */
+/**
+ * Why `labels` cannot be a person's map, in the words of its first wrong pair, or undefined. Pure.
+ * @param labels The map as given.
+ */
 export function labelsRefusal(labels: Labels): string | undefined {
   for (const [key, value] of Object.entries(labels)) {
     const refusal = labelRefusal(key, value);
@@ -76,6 +90,7 @@ const EDIT_FORM = 'label edits are key=value to set a key and key- to remove one
 /**
  * The edits `texts` spell, or the refusal of the first that is wrong: a word that is neither `key=value` nor `key-`, a key or a value
  * a label cannot hold, and one key edited twice in one list, which says nothing of which edit wins. Pure.
+ * @param texts The edits as typed, each `key=value` or `key-`.
  */
 export function parseLabelEdits(texts: readonly string[]): { readonly edits: readonly LabelChange[] } | { readonly refused: string } {
   const edits: LabelChange[] = [];
@@ -100,6 +115,9 @@ export function parseLabelEdits(texts: readonly string[]): { readonly edits: rea
  * `current` after `edits`, as `kubectl label` applies them: each `key=value` sets its key, each `key-` removes it (no change where it
  * is absent), and every key no edit names keeps its value. Without `overwrite`, an edit that would change a key's value is refused,
  * naming the key, its value and `--overwrite`; with it, or where the value is the same, it is taken. Pure.
+ * @param current The labels the object has.
+ * @param edits The edits to apply, in order.
+ * @param overwrite Whether an edit may change a key's value (`--overwrite`).
  */
 export const labelEdits: LabelEdits = (current, edits, overwrite) => {
   const clash = edits.find((e) => e.op === 'set' && Object.hasOwn(current, e.key) && current[e.key] !== e.value);
@@ -131,6 +149,8 @@ export type Inherited = { readonly labels: Labels; readonly leftOut: readonly Le
  * The labels a run or a card is created with, copied once: every key the runs it names (`parents`) agree on, then the card's own
  * labels over them, then the start's typed edits over those — `key=value` sets, `key-` drops an inherited one. A key two runs give
  * different values that neither the card nor the start sets is left out, and named in `leftOut`. Pure.
+ * @param input The labels of the runs the card or run names (`parents`), the card's own, and the start's typed edits, the last two absent
+ * where none.
  */
 export function inheritedLabels(input: {
   readonly parents: readonly ParentLabels[];
@@ -162,7 +182,10 @@ export function inheritedLabels(input: {
   return { labels: out, leftOut };
 }
 
-/** `labels` as a printer shows them: `a=b,c=d` in key order, or `<none>` for none, as kubectl's LABELS column. Pure. */
+/**
+ * `labels` as a printer shows them: `a=b,c=d` in key order, or `<none>` for none, as kubectl's LABELS column. Pure.
+ * @param labels The map to show.
+ */
 export const labelsText = (labels: Labels): string => {
   const keys = Object.keys(labels).sort();
   return keys.length === 0 ? '<none>' : keys.map((key) => `${key}=${labels[key] ?? ''}`).join(',');
@@ -173,6 +196,7 @@ export const labelsText = (labels: Labels): string => {
  * — `default` for a run in the default factory, as the feed and the telemetry say it, so `-l factory=default` selects the same runs on
  * every surface — and the person's keys, which never take a closed key (`labelKeyRefusal`). The caller names the factory: there is no
  * default here to forget. Pure.
+ * @param of The run's workflow and factory, `default` for the default one, and the person's labels, if any.
  */
 export const metadataLabels = (of: { readonly workflow: string; readonly factory: string; readonly labels?: Labels }): Labels => ({
   ...of.labels,
@@ -183,6 +207,7 @@ export const metadataLabels = (of: { readonly workflow: string; readonly factory
 /**
  * The run's whole map, as a selector reads it and a list's row carries it: the person's keys, `workflow`, and `factory` (`default` for the
  * default one).
+ * @param run The run's record: its workflow's folder, its factory, undefined for the default one, and its person labels.
  */
 export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>): Labels =>
   metadataLabels({ workflow: path.basename(run.workflowDir), factory: run.factory ?? DEFAULT_NAMESPACE, labels: run.labels });
@@ -190,6 +215,8 @@ export const runLabelMap = (run: Pick<Run, 'workflowDir' | 'factory' | 'labels'>
 /**
  * The runs of `runs` whose whole map `selectors` takes (`selectsLabels`), in their order: every one where none is given. The lists select
  * off the composed record before they judge a run (`runsSummarized`, `runsListed`), and the stats before they sum a run's facts.
+ * @param runs The runs to select from.
+ * @param selectors The selectors given; none selects every run.
  */
 export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'labels'>>(
   runs: readonly R[],
@@ -200,6 +227,8 @@ export const selectedRuns = <R extends Pick<Run, 'workflowDir' | 'factory' | 'la
  * What a printer appends to a line of `map`'s, as `nemia ls` its runs' head lines and `nemia inbox` its cards': with `--show-labels`,
  * `  labels: <the map>` (`labelsText`); then, for each `-L <key>` in the order given, `  <key>: <its value>`, `<none>` where the map has
  * none. Nothing with neither, so the line is as it was. Pure.
+ * @param map The labels of the line's run or card.
+ * @param shown Whether `--show-labels` was given (`all`), and the keys of each `-L`, in the order given.
  */
 export const labelSegments = (map: Labels, shown: { readonly all: boolean; readonly columns: readonly string[] }): string =>
   `${shown.all ? `  labels: ${labelsText(map)}` : ''}${shown.columns.map((key) => `  ${key}: ${map[key] ?? '<none>'}`).join('')}`;

@@ -6,21 +6,12 @@
  * `retention.verb.ts` sweeps.
  */
 import type { ReleaseRetention } from '../../contracts/retention.contract.ts';
+import type { Installed, InUse, Retention } from '../../contracts/retention.contract.ts';
+
+export type { Installed, InUse, Retention } from '../../contracts/retention.contract.ts';
 
 /** How many of the newest releases are kept whatever runs on them. */
 export const RELEASES_KEPT = 2;
-
-/** A release installed under `releases/`: its folder's name and when it was built, as its `release.json` says. */
-export type Installed = { readonly tag: string; readonly builtAt: string };
-
-/**
- * What is in use as a sweep reads it: the tag the pointer names (null with no pointer), the tags a running Nemia process or a session in
- * flight runs on, and how many local sessions in flight recorded no release.
- */
-export type InUse = { readonly current: string | null; readonly pinned: readonly string[]; readonly unrecorded: number };
-
-/** What a sweep removes, or why it removes nothing: no pointer, or a local session in flight whose release is not recorded. */
-export type Retention = { readonly remove: readonly string[]; readonly held: 'no pointer' | 'unrecorded' | null };
 
 /** The installed releases newest first: by `builtAt` descending, then by tag descending, so two built at once still order. */
 export const newestFirst = (installed: readonly Installed[]): Installed[] =>

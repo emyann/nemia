@@ -8,16 +8,8 @@
  */
 export const READS_ITS_CODE: readonly string[] = [
   'packages/agent-orchestrator/contracts/gate.contract.ts',
-  'packages/agent-orchestrator/contracts/hold.contract.ts',
-  'packages/agent-orchestrator/contracts/leftovers.contract.ts',
   'packages/agent-orchestrator/contracts/reach.contract.ts',
-  'packages/agent-orchestrator/contracts/retention.contract.ts',
-  'packages/agent-orchestrator/contracts/session-caller.contract.ts',
   'packages/agent-orchestrator/contracts/standing.contract.ts',
-  'packages/agent-orchestrator/contracts/step-machine.contract.ts',
-  'packages/agent-orchestrator/contracts/unit-running.contract.ts',
-  'packages/agent-orchestrator/contracts/watch-changes.contract.ts',
-  'packages/agent-orchestrator/contracts/workflow-graph.contract.ts',
   'packages/agent-runtime/contracts/decide.contract.ts',
   'packages/agent-runtime/contracts/lifecycle.contract.ts',
   'packages/agent-runtime/contracts/observe.contract.ts',

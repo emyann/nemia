@@ -6,7 +6,18 @@
  * under a session would crash it.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Installed, InUse, Retention } from '../src/retention/retention.ts';
+
+/** A release installed under `releases/`: its folder's name and when it was built, as its `release.json` says. */
+export type Installed = { readonly tag: string; readonly builtAt: string };
+
+/**
+ * What is in use as a sweep reads it: the tag the pointer names (null with no pointer), the tags a running Nemia process or a session in
+ * flight runs on, and how many local sessions in flight recorded no release.
+ */
+export type InUse = { readonly current: string | null; readonly pinned: readonly string[]; readonly unrecorded: number };
+
+/** What a sweep removes, or why it removes nothing: no pointer, or a local session in flight whose release is not recorded. */
+export type Retention = { readonly remove: readonly string[]; readonly held: 'no pointer' | 'unrecorded' | null };
 
 /** Whether `tag` is kept by what is in use: the pointer names it, or a process or a session runs on it. */
 const inUseBy = (inUse: InUse, tag: string): boolean => tag === inUse.current || inUse.pinned.includes(tag);

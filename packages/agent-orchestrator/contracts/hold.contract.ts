@@ -9,7 +9,14 @@
  * `nemia ls`'s line and the decision cannot say different things of one hold.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Wait } from '../src/wait/wait.ts';
+
+/**
+ * A run this one waits on, as `nemia ls` and `nemia decide` name it: its id and, when it may never land without a person, why — the store
+ * has no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `landed` only on a hold
+ * whose every run has landed, in the moment before the tick lifts it (`holdsOf`). `unread`, why where its branches stand was not read,
+ * which the next pass asks again.
+ */
+export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; landed?: true; unread?: string };
 
 /**
  * What of a run a hold is judged from, read before anything is written (`hold`, wait/wait.verb.ts). `cancelled`, `pruned`: the run was

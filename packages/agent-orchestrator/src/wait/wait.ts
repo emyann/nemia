@@ -6,6 +6,9 @@ import path from 'node:path';
 import { prunedWords, type Hold, type Run } from '../record/record.ts';
 import type { HoldNeedsYou, HoldStop, HoldStopOf } from '../../contracts/hold.contract.ts';
 import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
+import type { Wait } from '../../contracts/hold.contract.ts';
+
+export type { Wait } from '../../contracts/hold.contract.ts';
 
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
@@ -51,14 +54,6 @@ export const runReady = (run: Run, landed: (runId: string) => boolean): boolean 
  * why where its branches stand was not read, when it was not (`unread`): it then has not landed, and is asked again on the next pass.
  */
 export type ParentRun = { record?: Run; landed: boolean; gone?: string[]; unread?: string };
-
-/**
- * A run this one waits on, as `nemia ls` and `nemia decide` name it: its id and, when it may never land without a person, why — the store
- * has no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `landed` only on a hold
- * whose every run has landed, in the moment before the tick lifts it (`holdsOf`). `unread`, why where its branches stand was not read,
- * which the next pass asks again.
- */
-export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; landed?: true; unread?: string };
 
 /** Each run this one waits on that has not landed (`waitingOn`), and why it may never. Pure. */
 export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {

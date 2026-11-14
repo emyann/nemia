@@ -5,7 +5,16 @@
  * whose process lives stays; a log goes once it is older than `LOGS_KEPT_DAYS`, so a person can read why an upgrade failed until then.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import { LAST_DATE_MS, LOGS_KEPT_MS, type BuildLog, type Leftovers, type PidEntry } from '../src/retention/leftovers.ts';
+import { LAST_DATE_MS, LOGS_KEPT_MS } from '../src/retention/kept.ts';
+
+/** A pid-named entry under `releases/`: its name, and whether the process its name ends on is alive. */
+export type PidEntry = { readonly name: string; readonly live: boolean };
+
+/** A build log under `releases/.logs/`: its name, and when it was last written, in whole milliseconds since the epoch. */
+export type BuildLog = { readonly name: string; readonly modifiedMs: number };
+
+/** What a sweep removes of the leftovers: the entries under `releases/` and the logs under `releases/.logs/`, by name. */
+export type Leftovers = { readonly entries: readonly string[]; readonly logs: readonly string[] };
 
 const leftoversSpec = spec<(entries: readonly PidEntry[], logs: readonly BuildLog[], nowMs: number) => Leftovers>({
   /**

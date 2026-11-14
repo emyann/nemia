@@ -8,12 +8,9 @@
  */
 import type { StepStatus } from '../record/record.ts';
 import type { StepMove } from '../../contracts/step-machine.contract.ts';
+import type { StepTransition } from '../../contracts/step-machine.contract.ts';
 
-/**
- * What a pair of a step's words is: no move (`stays`), a move the machine draws, named by the event that makes it (`edge`), or
- * one it does not draw (`refused`), which the replay fails on.
- */
-export type StepTransition = { kind: 'stays' } | { kind: 'edge'; event: string } | { kind: 'refused' };
+export type { StepTransition } from '../../contracts/step-machine.contract.ts';
 
 /** One move of a step's word, from a state to another, on the fact that makes it. */
 export type StepEdge = { from: StepStatus; to: StepStatus; event: string };

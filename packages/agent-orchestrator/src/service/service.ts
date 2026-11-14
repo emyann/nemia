@@ -11,6 +11,9 @@
 import { DAEMON_FILE, holderWords, lastPassWords, type DaemonStanding } from '../daemon/daemon.ts';
 import { pauseWords, type Pause } from '../pause/pause.ts';
 import type { UnitRunningOf } from '../../contracts/unit-running.contract.ts';
+import type { UnitState, UnitRunning } from '../../contracts/unit-running.contract.ts';
+
+export type { UnitState, UnitRunning } from '../../contracts/unit-running.contract.ts';
 
 /** What the machine is, as the store reads it: its platform, whether it is WSL, and whether systemd runs as its init. */
 export type Machine = { readonly platform: string; readonly wsl: boolean; readonly systemd: boolean };
@@ -295,12 +298,6 @@ export function plistRead(text: string): UnitRead {
   return { node, entry, cwd, env };
 }
 
-/**
- * What the system says of the service: whether it is active (systemd's active, inactive, failed or activating; launchd's running or not),
- * whether it starts at login (`enabled`), and its main process — none when it does not run.
- */
-export type UnitState = { readonly active: string; readonly enabled: string; readonly pid: number | null };
-
 /** `systemctl --user show -p ActiveState,UnitFileState,MainPID` read: `MainPID=0` is no process. */
 export function systemdState(text: string): UnitState {
   const value = (key: string) => new RegExp(`^${key}=(.*)$`, 'm').exec(text)?.[1]?.trim() ?? '';
@@ -315,12 +312,6 @@ export function launchdState(text: string | null): UnitState {
   const pid = Number(/^\s*pid = (\d+)$/m.exec(text)?.[1]);
   return { active: state, enabled: 'loaded', pid: pid > 0 ? pid : null };
 }
-
-/**
- * What the unit runs: the daemon a take-over stopped (`old`), another process (`other`), no process (`none`), or the system could not
- * say (`unknown`).
- */
-export type UnitRunning = 'old' | 'other' | 'none' | 'unknown';
 
 /**
  * What the unit runs, by the system's own word on it (`state`, null where it could not be asked), against `old`, the pid of the daemon

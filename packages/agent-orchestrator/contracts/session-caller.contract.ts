@@ -11,8 +11,13 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 import type { CallerKind, TokenRefusal } from 'objects';
-import type { TokenNeed } from '../src/token/token.ts';
 import type { FloorNarrowing } from './token-floor.contract.ts';
+
+/**
+ * What a request's route needs of a token: `none`, a request with none being the person (an in-process program; no route the api answers);
+ * `token`, any live one (every route the api answers); `standing`, one the person minted, held by the person or an agent (the MCP port).
+ */
+export type TokenNeed = 'none' | 'token' | 'standing';
 
 /**
  * What the store keeps of a session token it minted, found by the token's digest: the session's agent, its factory (null for a session

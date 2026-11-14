@@ -7,7 +7,19 @@
  * initial state Kubernetes calls synthetic "Added" events. Which object each key names, and the BOOKMARK between reads, are the door's.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { Versioned, WatchChange } from '../src/list-watch/list-watch.ts';
+import type { WatchEventType } from 'objects';
+
+/** What a watch says of one object, as `objects` names them (`WATCH_EVENT_TYPES` but `BOOKMARK`). */
+export type WatchChangeType = Exclude<WatchEventType, 'BOOKMARK'>;
+
+/**
+ * An object of a list, by its key, unique in the list, and its version: the object as its list's route compares it, its JSON as served
+ * unless the route leaves out parts measured to the read (a run's, `runWatchVersion`).
+ */
+export type Versioned = { readonly key: string; readonly version: string };
+
+/** What a watch sends of one object: what happened to it, and its key. */
+export type WatchChange = { readonly type: WatchChangeType; readonly key: string };
 
 /** Whether no key is in `objects` twice, as a list names each object once. */
 const distinct = (objects: readonly Versioned[]): boolean => objects.every((o, i) => !objects.slice(0, i).some((p) => p.key === o.key));

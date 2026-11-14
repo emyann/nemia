@@ -9,7 +9,18 @@
  * the unit runs a process, and the command that starts it where it runs none.
  */
 import { type Implementation, spec } from '@emyann/tsverify';
-import type { UnitRunning, UnitState } from '../src/service/service.ts';
+
+/**
+ * What the system says of the service: whether it is active (systemd's active, inactive, failed or activating; launchd's running or not),
+ * whether it starts at login (`enabled`), and its main process — none when it does not run.
+ */
+export type UnitState = { readonly active: string; readonly enabled: string; readonly pid: number | null };
+
+/**
+ * What the unit runs: the daemon a take-over stopped (`old`), another process (`other`), no process (`none`), or the system could not
+ * say (`unknown`).
+ */
+export type UnitRunning = 'old' | 'other' | 'none' | 'unknown';
 
 /**
  * `state` is the system's word on the unit (`systemdState`, `launchdState`), or null where the system's program could not be asked

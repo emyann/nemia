@@ -36,6 +36,8 @@ export type Collision = Collisions['colliding'][number];
  * The decision about a run, keyed by its state's stamp (`stamp`): read again when the run moves, never polled, kept while the next one
  * is read. Every diff asked whole (`?diffs=*`), the api answering none whole unless asked: the gate shows the check-affecting ones in
  * full.
+ * @param id The run's id.
+ * @param stamp The stamp of the run's state: a new one reads the decision again.
  */
 export const decisionQuery = (id: string, stamp: string) =>
   queryOptions({

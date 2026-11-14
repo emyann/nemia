@@ -15,7 +15,10 @@ export type PolicyList = typeof PolicyListAnswer.Type;
 /** A rule at a gate with its words. */
 export type PolicyRule = PolicyList['builtin'];
 
-/** `agent`'s rules for Auto: polled slowly, since the agent proposes from its session. */
+/**
+ * `agent`'s rules for Auto: polled slowly, since the agent proposes from its session.
+ * @param agent The agent's name.
+ */
 export const policyQuery = (agent: string) =>
   queryOptions({
     queryKey: ['policy', agent],
@@ -27,6 +30,9 @@ export const policyQuery = (agent: string) =>
  * Confirms the rule `id` that `agent` proposed, or the default again, as `words`, the words the person read: from then on, at Auto, its
  * answer is given unasked where it holds. Resolves with the rules after the write; rejects with the api's refusal: a rule not proposed,
  * one that reads otherwise since, or one in force already.
+ * @param agent The agent's name.
+ * @param id The rule's id.
+ * @param words The rule's words, as the person read them.
  */
 export const confirmRule = (agent: string, id: string, words: string): Promise<PolicyList> =>
   call(
@@ -34,7 +40,11 @@ export const confirmRule = (agent: string, id: string, words: string): Promise<P
     write(PolicyListAnswer, 'The rule may be in force, or read otherwise: read the rules again before confirming it again.'),
   );
 
-/** Drops the rule `id` of `agent`'s from force, the default among them. Rejects with the api's refusal: a rule not in force. */
+/**
+ * Drops the rule `id` of `agent`'s from force, the default among them. Rejects with the api's refusal: a rule not in force.
+ * @param agent The agent's name.
+ * @param id The rule's id.
+ */
 export const dropRule = (agent: string, id: string): Promise<PolicyList> =>
   call(
     (c) => c.nemia.dropRule({ params: { name: agent, id } }),

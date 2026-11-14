@@ -62,6 +62,9 @@ export const chatStreamPath = '/api/nemia/chat/stream';
 /**
  * One read of her chat: the last events, oldest first, with the cursor a stream resumes from and where she is. The page older is asked
  * for with the `before` the last read answered; the rest of the chat comes down the stream, as a step's conversation does.
+ * @param page Which page: `before`, the cursor the last read answered, asks for the page older, none for the last events; `limit`,
+ *   how many events at most, the api's own count where none.
+ * @param signal Aborts the read; none for a read that runs to its end.
  */
 export const readChat = (page: { before?: string; limit?: number } = {}, signal?: AbortSignal): Promise<ChatHistory> =>
   call(
@@ -76,21 +79,31 @@ export const readChat = (page: { before?: string; limit?: number } = {}, signal?
     signal,
   );
 
-/** The person's words, put in her outbox: she reads them at her next turn. */
+/**
+ * The person's words, put in her outbox: she reads them at her next turn.
+ * @param text The person's words.
+ */
 export const sendChat = (text: string): Promise<ChatSent> =>
   call(
     (c) => c.nemia.chatSend({ payload: { text } }),
     write(ChatSentAnswer, 'The message may be in her outbox already: read her chat again before sending it a second time.'),
   );
 
-/** An ask of hers answered, each question by its picks. */
+/**
+ * An ask of hers answered, each question by its picks.
+ * @param id The ask's id.
+ * @param picks The person's pick for each of its questions.
+ */
 export const answerChat = (id: string, picks: readonly AskPick[]): Promise<ChatAnswer> =>
   call(
     (c) => c.nemia.chatAnswer({ payload: { id, picks } }),
     write(ChatAnswerAnswer, 'The answer may be filed already: read her chat again, which draws it, before answering a second time.'),
   );
 
-/** The person's read mark moved to `through`. */
+/**
+ * The person's read mark moved to `through`.
+ * @param through The id of the last event the person saw.
+ */
 export const markChatRead = (through: string): Promise<ChatReadMark> =>
   call(
     (c) => c.nemia.chatRead({ payload: { through } }),

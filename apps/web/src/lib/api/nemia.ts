@@ -37,7 +37,10 @@ export const nemiaMemoryQuery = queryOptions({
   refetchInterval: () => pace(30_000),
 });
 
-/** One fact's words, read when a person opens it, never polled: a fact she no longer keeps is said at once (`retryUnlessGone`). */
+/**
+ * One fact's words, read when a person opens it, never polled: a fact she no longer keeps is said at once (`retryUnlessGone`).
+ * @param name The fact's name.
+ */
 export const nemiaFactQuery = (name: string) =>
   queryOptions({
     queryKey: ['nemia', 'memory', name],
@@ -55,6 +58,7 @@ export type LevelAsk = typeof NemiaLevelSet.Type;
  * Sets a level, as the package's level command does: some factory put above Manual files her a session at the keeper's next beat, none
  * left above it stops it, and her folder not trusted holds her session until it is (`trust`). Resolves with where she is after the
  * write; rejects with the api's refusal in full, such as a raise that raises nothing.
+ * @param ask The level to write: the store's, a factory's default, a raise of a factory for a stretch, or its raise ended.
  */
 export const putLevel = (ask: LevelAsk): Promise<NemiaLevel> =>
   call(

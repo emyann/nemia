@@ -4,12 +4,19 @@
 const selectorQuery = (selector: string | undefined): string =>
   selector === undefined || selector.trim() === '' ? '' : `selector=${encodeURIComponent(selector.trim())}`;
 
-/** `path` with `selector`'s query keys added after its own. */
+/**
+ * `path` with `selector`'s query keys added after its own.
+ * @param path The path a read is sent to, its own query included.
+ * @param selector A label selector; undefined or blank for none.
+ */
 export const withSelector = (path: string, selector: string | undefined): string => {
   const query = selectorQuery(selector);
   return query === '' ? path : `${path}${path.includes('?') ? '&' : '?'}${query}`;
 };
 
-/** A query key's tail for `selector`: an object, which no run's id nor a card's name can be. */
+/**
+ * A query key's tail for `selector`: an object, which no run's id nor a card's name can be.
+ * @param selector A label selector; undefined or blank for none.
+ */
 export const selectorKey = (selector: string | undefined): Array<{ selector: string }> =>
   selector === undefined || selector.trim() === '' ? [] : [{ selector: selector.trim() }];

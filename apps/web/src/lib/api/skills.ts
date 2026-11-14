@@ -84,7 +84,10 @@ export class SkillRefusal extends Error {
 /** How a skill's write is refused: a `SkillRefusal` in the api's words, with its status. */
 const refused: Refuse = (words, status) => new SkillRefusal(words, status);
 
-/** Copy the builtin skill `name` into your library, a write of its own: an agent of yours can then be given it. */
+/**
+ * Copy the builtin skill `name` into your library, a write of its own: an agent of yours can then be given it.
+ * @param name The skill's name, its folder's.
+ */
 export const copySkill = async (name: string): Promise<SkillAdded> => ({
   skill: skillRowOf(await served.copy(DEFAULT_NAMESPACE, name, refused)),
 });
@@ -153,6 +156,9 @@ const skillDetailOf = (skill: Skill): SkillDetail => ({
 /**
  * One skill, read from disk now, in `place`'s factory on its repository (none: the default namespace): its page's read. Under
  * `skillsQuery`'s key, so a write that reads the list again reads it again too.
+ * @param from The origin it is read from (`yours`, `repo`, `factory`, `builtin`); a word no origin has reads with none.
+ * @param name The skill's name, its folder's.
+ * @param place The factory and repository it is read in; empty for the default namespace on no repository.
  */
 export const skillQuery = (from: string, name: string, place: PagePlace = {}) =>
   queryOptions({
@@ -169,16 +175,27 @@ const specOfDraft = ({ name: _, ...spec }: SkillDraft) => spec;
 /**
  * A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader
  * refuses.
+ * @param draft The skill to write: its name, its card's lines and its instructions.
  */
 export const createSkill = async (draft: SkillDraft): Promise<SkillSaved> =>
   skillDetailOf(await served.create(DEFAULT_NAMESPACE, { metadata: { name: draft.name }, spec: specOfDraft(draft) }, refused));
 
-/** A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since. */
+/**
+ * A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since.
+ * @param name The skill's name, its folder's.
+ * @param version The version it was read at (`SkillDetail.version`).
+ * @param draft What it now holds, whole.
+ */
 export const saveSkill = async (name: string, version: string, draft: SkillDraft): Promise<SkillSaved> =>
   skillDetailOf(
     await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, spec: specOfDraft(draft) }, refused),
   );
 
-/** A skill of yours loaded every turn, or named for a session to load: its `preload:` line alone, at the version it was read at. */
+/**
+ * A skill of yours loaded every turn, or named for a session to load: its `preload:` line alone, at the version it was read at.
+ * @param name The skill's name, its folder's.
+ * @param version The version it was read at (`SkillDetail.version`).
+ * @param preload Whether it is loaded every turn; false names it for a session to load.
+ */
 export const switchPreload = async (name: string, version: string, preload: boolean): Promise<SkillSaved> =>
   skillDetailOf(await served.replace(DEFAULT_NAMESPACE, name, { metadata: { resourceVersion: version }, preload }, refused));

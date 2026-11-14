@@ -47,6 +47,8 @@ export const pauseNowQuery = queryOptions({
  * stops when its current tool call ends, cut once the store's timeout passes. With `now`, a pause at once, as the package's `pauseNow`:
  * what runs is asked to stop too, each step tried again on the resume, and a pause that stands is kept as it was. Rejects with the api's
  * refusal in full — the package's words for a store already paused — or its own about the request.
+ * @param why Why the store is paused, as the person said it; none or empty for no words.
+ * @param now Whether to pause at once, asking what runs to stop; false or none for a pause at the next tool call's end.
  */
 export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
   call(

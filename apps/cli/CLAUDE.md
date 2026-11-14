@@ -2,14 +2,14 @@
 
 `nemia` and `wf` as a person types them. Every store verb is a moved command: its words are `objects`' (`COMMAND_WORDS`, the names
 `MOVED_COMMANDS`), and it is parsed, helped, run and printed here through the api under every context. Its reads (`READ_VERBS` in
-`src/route.ts`: `doctor` and `daemon`) and its own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, over every kind the api serves,
+`src/verbs.ts`: `doctor` and `daemon`) and its own verbs (`CLIENT_VERBS`: `get`, `apply`, `explain`, over every kind the api serves,
 `propose` and `proposals`, `decide`, `channel` and `server`) ask the api serving the store over HTTP. A verb about this machine (`MACHINE_VERBS`) and a help
 of one run on the orchestrator's own CLI, spawned with the same words (`src/local.ts`), whatever the context. Nothing is forwarded: a
 word typed under a remote context that the client does not answer and this machine does not own is refused, exit 2, naming `nemia
 --help` and `NEMIA_CONTEXT=local`. `--local` is refused, exit 2 (`routeOf`'s `refused`), naming the command typed without it: `local` is
 this machine's daemon, reached through its api. It sits beside the board, above the api: the order is
 `web, cli → api → orchestrator → runtime` (`docs/architecture.md`, *The layers*). Which way a command goes is `routeOf`
-(`src/route.ts`), a pure decision proved by its contract, each verb list spelled once there and read by the code (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
+(`src/route.ts`), a pure decision proved by its contract, each verb list spelled once (`src/verbs.ts`, `objects`) and read by the code and the contract (`npm run contracts` proves it, `apps/cli/src` being one of the roots `tools/contracts/legs.ts` names).
 
 - **It imports the objects by their entry, the api's types, and no other package of ours.** Its source and its bins import no
   `agent-orchestrator`, no `agent-runtime`, no harness SDK and no path into `packages/`; `objects` by its entry alone, never
@@ -69,7 +69,7 @@ this machine's daemon, reached through its api. It sits beside the board, above 
   that does not decode by its `Api` Schema is refused in `answerOf`, exit 2, naming the verb, both releases as known (`servedWith` hands
   the daemon's on) and `nemia version` (`undecoded`, `src/objects.ts`), never a JavaScript error.
 - **No file of `src` imports a value of `contracts/`**: a contract loads the verifier, which an archive does not carry. The verb lists
-  live in `src/route.ts` and the contract imports them (`tools/guards/test/no-contract-values.test.ts`).
+  live in `src/verbs.ts` and `objects`, and the contract and `src/route.ts` import them (`tools/guards/test/no-contract-values.test.ts`).
 - **One store fact, in `src/where.ts`**: the store's root (`WF_ROOT`, else `~/.agent-workflows`) and the `url` its lease holds
   (`daemon.json`), read only under this machine's context. No other file of `src` spells a store path or reads a file of the store: what it shows comes from the api.
 - **One process, in `src/local.ts`**: the orchestrator's CLI entries, `agent-orchestrator/bin` and `/bin/wf`, resolved and spawned with

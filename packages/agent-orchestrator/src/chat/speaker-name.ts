@@ -5,6 +5,7 @@ import { RESERVED_SPEAKERS, SPEAKER_NAME_MAX, wellSpelt } from './speaker-words.
 /**
  * Why `name` is no name an agent speaks under, or undefined where it is one: 1 to `SPEAKER_NAME_MAX` characters, spelt as `wellSpelt`
  * says, and none of `RESERVED_SPEAKERS`. Pure.
+ * @param name The name asked to speak under.
  */
 export const speakerNameRefusal: SpeakerNameRefusal = (name) => {
   if (name.length === 0) return 'The name is empty: name the agent that speaks, such as `operator`.';

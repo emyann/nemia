@@ -89,7 +89,10 @@ export const sayOutbox = Effect.fn('sayOutbox')(function* (taskId: string, dir: 
   return done;
 });
 
-/** Whether the chat kept in `dir` has an entry no mark names yet: what the keeper owes it. */
+/**
+ * Whether the chat kept in `dir` has an entry no mark names yet: what the keeper owes it.
+ * @param dir The folder the chat is kept in.
+ */
 export const outboxOwed = (dir: string): boolean => {
   const marked = new Set(readDelivered(dir).map((m) => m.id));
   return readOutbox(dir).some((entry) => !marked.has(entry.id));
@@ -244,10 +247,15 @@ const carry = (e: Engine, taskId: string, owes: AnswerOwed, ask: Ask, answer: As
  * of hers is asking again. The two are one rule: a mark is owed wherever an ask's marks and the world disagree — no call waiting and
  * no `cut` mark, or a call waiting and a `cut` mark that stands. `undefined` live asks are a harness that cannot say, and nothing is
  * owed on them. What makes the keeper's beat run the record even where nothing new waits on the person; `recordAsks` does the marking.
+ * @param dir The folder the chat is kept in.
+ * @param live The asks the session holds open now, or undefined where its harness cannot say.
  */
 export const closesOwed = (dir: string, live: TaskView['asks']): boolean => live !== undefined && closesFor(dir, live).length > 0;
 
-/** Whether the chat kept in `dir` holds an answer no mark names yet: what the keeper owes her. */
+/**
+ * Whether the chat kept in `dir` holds an answer no mark names yet: what the keeper owes her.
+ * @param dir The folder the chat is kept in.
+ */
 export const answersOwed = (dir: string): boolean => {
   const done = new Set(readAnswersDone(dir).map((mark) => mark.id));
   return readAnswers(dir).some((answer) => !done.has(answer.id));

@@ -173,6 +173,7 @@ export type ChatSources = {
  * Why words from `speaker` are not taken, or null where they are. The person's are taken whatever token of theirs carried them, the
  * board's cookie, a shell's or a script's; an agent's, whose token says who it is, under a name an agent speaks under, refused `Invalid`
  * under one no agent does. Pure.
+ * @param speaker Who the words are from: the person, or an agent under the name its token proves.
  */
 export const speakerRefusal: SpeakerRefusal = (speaker) => {
   if (speaker.kind === 'person') return null;
@@ -187,6 +188,7 @@ export const AGENT_TOKEN_FORM = 'nemia token add <name> --agent <agent>';
  * Why words that say who they are from (`from`, the retired `--as`) are refused, or null where they are not: words that name an agent
  * are refused `Invalid`, since an agent speaks with a token of its own (`AGENT_TOKEN_FORM`), and who speaks is the caller its token says;
  * words that name the person, or no one, are refused for nothing, the field read no further. Pure.
+ * @param from Who the words say they are from: an agent by its name, the person, or undefined where they say no one.
  */
 export const fromRefusal: FromRefusal = (from) =>
   from?.kind === 'agent'
@@ -200,12 +202,15 @@ export const fromRefusal: FromRefusal = (from) =>
  * Who words to a step's session (`nemia say`, the api's `say`, `src/say/say.verb.ts`), or to her chat (`chatSay`), are from, off the
  * `caller` the request's token says: an agent — a session by its run's token, or an agent by a standing token the person minted for it —
  * speaks as its own agent, under the name its token proves; the person, under any token of theirs, as the person. Pure.
+ * @param caller Who calls, as the request's token says: the person, or an agent by its name.
  */
 export const stepSpeaker: StepSpeaker = (caller) => (caller.kind === 'agent' ? { kind: 'agent', name: caller.agent } : { kind: 'person' });
 
 /**
  * The words `text` from `speaker` are handed to a step's session in: the person's as they always were, in no frame; an agent's in the
  * frame her chat says them in (`framedFor`), never as the person's. Pure.
+ * @param speaker Who the words are from: the person, or an agent by its name.
+ * @param text The words as they were sent.
  */
 export const framedForStep: FramedForStep = (speaker, text) => (speaker.kind === 'person' ? text : framedFor(speaker, text));
 
@@ -332,6 +337,7 @@ const stopEvent = (stop: SourceStop): ChatEvent => ({
  * began after the first, then each outbox entry no said carries yet, undelivered: the person's, or a peer's where an agent wrote it. A
  * tool call with no result is `pending`, but the session's last, which is `running`, or `waits` where the phase says the task needs the
  * person. Pure.
+ * @param sources Everything the chat is projected from: the sessions, the saids, the files of the chat, and the task's phase.
  */
 export function projectChat(sources: ChatSources): ChatEvent[] {
   const claims = claimsOf(sources);
@@ -385,6 +391,7 @@ const optionOf = (o: { label: string; description: string }): AskOption => {
  * choice's recommendation read out of its label (`RECOMMENDED`), since that is where the question tool's own words put it, and its
  * kind, a permission carrying its call's facts. A raw ask that says no kind is a question, as every ask was before a permission was
  * one. Pure.
+ * @param raw The ask as the runtime says it: its call's id, when, its kind and permission facts where it gives them, and its questions.
  */
 export const askOf = (raw: {
   id: string;
@@ -414,11 +421,16 @@ export const askOf = (raw: {
  * An ask as one key: a question's by each question's own words, in order, so two asks of the same words key the same and a question
  * asked again after a restart is the one ask; a permission's by its own call's id, since leave given to one call is no leave for the
  * next of the same words, and two such calls are two asks. Pure.
+ * @param ask The ask: its id, its kind and its questions.
  */
 export const askKey = (ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string =>
   ask.kind === 'permission' ? `permission:${ask.id}` : JSON.stringify(ask.questions.map((q) => q.question));
 
-/** The id of the ask among `asks` asking the same questions as `ask` under another id, where there is one. Pure. */
+/**
+ * The id of the ask among `asks` asking the same questions as `ask` under another id, where there is one. Pure.
+ * @param asks The asks the chat holds.
+ * @param ask The ask whose questions are matched: its id, its kind and its questions.
+ */
 export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | 'questions'>): string | undefined => {
   const key = askKey(ask);
   return asks.find((one) => one.id !== ask.id && askKey(one) === key)?.id;
@@ -428,6 +440,9 @@ export const sameWords = (asks: readonly Ask[], ask: Pick<Ask, 'id' | 'kind' | '
  * The answer already recorded for an ask of the same questions as `ask` under another id, the latest where there are several: what a
  * question she asks again — a restart cut her session between the ask and the answer, so she asks it afresh under a new call — is
  * answered from, rather than put to the person a second time. `undefined` where no earlier ask of those words was answered. Pure.
+ * @param asks The asks the chat holds.
+ * @param answers The answers the person gave, oldest first.
+ * @param ask The ask asked again: its id, its kind and its questions.
  */
 export const answeredBefore = (
   asks: readonly Ask[],
@@ -446,6 +461,7 @@ export type AskDrawn = 'actions' | 'form' | 'many';
  * Which drawing an ask takes: `many`, a tab per question and a Submit, for more than one question; `actions`, her proposal's buttons,
  * for one question whose every choice explains nothing — a description she deliberately left empty; `form`, the radio fieldset, for
  * every other one question. Pure.
+ * @param ask The ask, by its questions.
  */
 export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
   if (ask.questions.length !== 1) return 'many';
@@ -457,7 +473,12 @@ export const drawnAsk = (ask: Pick<Ask, 'questions'>): AskDrawn => {
 const kindOfAsk = (ask: Pick<Ask, 'kind' | 'questions'>): ChatAskKind =>
   ask.kind === 'permission' ? 'permission' : drawnAsk(ask) === 'actions' ? 'proposal' : 'question';
 
-/** An ask as the chat draws it, with the person's answer where they have given one, and a permission's call facts. Pure. */
+/**
+ * An ask as the chat draws it, with the person's answer where they have given one, and a permission's call facts. Pure.
+ * @param ask The ask.
+ * @param answer The person's answer to it, or undefined where they gave none.
+ * @param cutAt When its call stopped waiting on the person (`cutOf`), or undefined where it is waiting.
+ */
 export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string): ChatEvent => {
   const drawn: AskEvent = {
     id: `q:${ask.id}`,
@@ -476,6 +497,7 @@ export const askEvent = (ask: Ask, answer: AskAnswer | undefined, cutAt?: string
 /**
  * When each ask's call stopped waiting on the person, by the ask's id, off the keeper's marks: the latest mark of an ask is the one
  * that holds, so an ask marked `cut` and then `again` is waiting once more and is in no entry of this. Pure.
+ * @param closed The keeper's marks of what became of each ask's call, in the order it made them.
  */
 export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
   const cut = new Map<string, string>();
@@ -491,6 +513,7 @@ export const cutOf = (closed: readonly AskClose[]): Map<string, string> => {
  * an ask, which a later `cut` takes away. Her restarted session asks a cut question afresh under a call id of its own, and the chat
  * keeps the one ask under the first call's: this is what says where the person's answer to it goes, and whose taking of it to read.
  * Pure.
+ * @param closed The keeper's marks of what became of each ask's call, in the order it made them.
  */
 export const callsOf = (closed: readonly AskClose[]): Map<string, string> => {
   const calls = new Map<string, string>();
@@ -509,6 +532,8 @@ export type AskPick = { question: string; labels?: readonly string[]; words?: st
  * joined with `", "`, and words of their own carried as the answer's value rather than any word of ours. Refused (`Invalid`) for a
  * question of the ask left out, a label that is no choice of it, words that are blank, and several labels for a question that takes
  * one. Pure.
+ * @param ask The ask, by its questions.
+ * @param picks What the person chose for each question.
  */
 export function answerFor(ask: Pick<Ask, 'questions'>, picks: readonly AskPick[]): Record<string, string> {
   const answers: Record<string, string> = {};
@@ -546,12 +571,16 @@ export type AnswerOwed = 'return' | 'words' | 'mark';
  * What an answer is owed, off the two facts the runtime reports of its ask: `taken`, its held call took an answer already, so the
  * answer reached her and nothing is owed but the mark; `open`, its call is still waiting, so the answer goes back through it; neither,
  * so no call of it is waiting any more — a turn ended, a holder let go — and the answer is said to her as words. Pure.
+ * @param open Whether the ask's held call is still waiting.
+ * @param taken Whether the held call took an answer already.
  */
 export const askDue = (open: boolean, taken: boolean): AnswerOwed => (taken ? 'mark' : open ? 'return' : 'words');
 
 /**
  * The words an answer whose call was cut is said to her in, naming each question and what the person answered: she was asking, the
  * call did not wait for the answer, and this is it.
+ * @param ask The ask, by its questions.
+ * @param answers The person's answer to each question, by the question's own words.
  */
 export const askWords = (ask: Pick<Ask, 'questions'>, answers: Record<string, string>): string =>
   [
@@ -567,6 +596,7 @@ const asked = (e: ChatEvent): e is Extract<ChatEvent, { kind: ChatAskKind }> =>
  * How many asks of hers wait on the person: what joins the count her face shows. An ask whose call was cut with nothing answered
  * (`cutAt`) waits on nobody — nothing of hers is held open for it, and she has been told as much — so it is not counted, or a
  * session let go between a question and its answer would leave the count wrong for as long as the chat lasts. Pure.
+ * @param events The chat's events.
  */
 export const asksWaiting = (events: readonly ChatEvent[]): number =>
   events.filter((e) => asked(e) && e.chose === undefined && e.cutAt === undefined).length;
@@ -581,6 +611,9 @@ export const PAGE_DEFAULT = 50;
 /**
  * The `limit` events before the event `before`, or the last `limit` where none is named. Refused (`Invalid`) for a limit that is no
  * whole number from 1 to `PAGE_MAX`, and for an id the chat does not hold. Pure.
+ * @param events The chat's events, oldest first.
+ * @param before The id of the event the page ends before, or undefined for the last page.
+ * @param limit How many events the page holds at most: `PAGE_DEFAULT` where none is given.
  */
 export function chatPage(events: readonly ChatEvent[], before: string | undefined, limit: number = PAGE_DEFAULT): ChatPage {
   if (!Number.isInteger(limit) || limit < 1 || limit > PAGE_MAX)
@@ -607,7 +640,10 @@ export type ChatCursor = {
   closed: number;
 };
 
-/** The cursor of everything `sources` holds. Pure. */
+/**
+ * The cursor of everything `sources` holds. Pure.
+ * @param sources Everything the chat is projected from.
+ */
 export const cursorOf = (sources: ChatSources): ChatCursor => ({
   attempts: sources.sessions.length,
   events: sources.sessions.at(-1)?.events.length ?? 0,
@@ -620,7 +656,10 @@ export const cursorOf = (sources: ChatSources): ChatCursor => ({
   closed: sources.closed.length,
 });
 
-/** A cursor as a stream's event id: its counts, dot-separated. Pure. */
+/**
+ * A cursor as a stream's event id: its counts, dot-separated. Pure.
+ * @param c The cursor.
+ */
 export const chatCursor = (c: ChatCursor): string =>
   [c.attempts, c.events, c.said, c.outbox, c.delivered, c.stops, c.asks, c.answers, c.closed].join('.');
 
@@ -638,6 +677,7 @@ const NOT_A_CURSOR = (text: string) =>
  * The cursor `text` names. A cursor of fewer counts than today's, which a tab open across the deploy that added one still carries,
  * reads as one that had seen none of what it does not count. Refused (`Invalid`) where it is not `COUNTS_LEAST` to `COUNTS` whole
  * counts. Pure.
+ * @param text The cursor as a client sent it back.
  */
 export function readChatCursor(text: string): ChatCursor {
   const parts = text.split('.');
@@ -650,6 +690,9 @@ export function readChatCursor(text: string): ChatCursor {
 /**
  * What `sources` held when the cursor `c` was read: its first sessions, the last of them cut at its count, and the first of each
  * file. Refused (`Invalid`) for a cursor that counts more than the sources hold, which no read of them gave. Pure.
+ * @param sources Everything the chat is projected from now.
+ * @param c The cursor read off `text` (`readChatCursor`).
+ * @param text The cursor as a client sent it, named in the refusal.
  */
 export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): ChatSources {
   const last = sources.sessions[c.attempts - 1];
@@ -683,6 +726,10 @@ export function sourcesAt(sources: ChatSources, c: ChatCursor, text: string): Ch
  * kind and id: a call's result carries the call's id),
  * and its transcript cursor moved to `cursor`: a read of what a session wrote since, or a follow's moment of it, folded in. Unchanged
  * where it holds no session of that attempt. Pure.
+ * @param sources Everything the chat is projected from.
+ * @param attempt The attempt of the session the events are added to.
+ * @param events The transcript events read since.
+ * @param cursor Where the session's transcript was read through, kept on the session.
  */
 export function withEvents(sources: ChatSources, attempt: number, events: readonly SourceEvent[], cursor: string): ChatSources {
   const at = sources.sessions.findIndex((s) => s.attempt === attempt);
@@ -696,7 +743,11 @@ export function withEvents(sources: ChatSources, attempt: number, events: readon
   return { ...sources, sessions };
 }
 
-/** The events of `now` a reader of `then` has not seen as they are: new ones, and those whose state or delivery changed. Pure. */
+/**
+ * The events of `now` a reader of `then` has not seen as they are: new ones, and those whose state or delivery changed. Pure.
+ * @param then The events the reader has.
+ * @param now The events the chat holds now.
+ */
 export function changedSince(then: readonly ChatEvent[], now: readonly ChatEvent[]): ChatEvent[] {
   const seen = new Map(then.map((e) => [e.id, JSON.stringify(e)]));
   return now.filter((e) => seen.get(e.id) !== JSON.stringify(e));
@@ -739,7 +790,10 @@ const ANSWERING: Record<EnginePhase, boolean> = {
   stopped: false,
 };
 
-/** Whether a runtime phase is a session that is live: one that hears what is said to it (`UP`). */
+/**
+ * Whether a runtime phase is a session that is live: one that hears what is said to it (`UP`).
+ * @param phase The task's phase in the runtime's words.
+ */
 export const upOf = (phase: EnginePhase): boolean => UP[phase];
 
 /** Whether a runtime phase is a turn in progress (`ANSWERING`). */
@@ -764,6 +818,10 @@ const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): num
  * Where the task is, off its phase (none where no task is filed), the runs that wait on the person (`waiting`), its chat and the
  * person's read mark: `waitsOnYou` the runs waiting and the asks of its own the person has not answered (`asksWaiting`), unread the
  * agent's messages the mark leaves unread (`unreadOf`). Pure.
+ * @param phase The task's phase in the runtime's words, or undefined where no task is filed.
+ * @param waiting How many runs wait on the person.
+ * @param events The chat's events.
+ * @param mark The person's read mark, or undefined where they never set one.
  */
 export function presenceOf(
   phase: EnginePhase | undefined,

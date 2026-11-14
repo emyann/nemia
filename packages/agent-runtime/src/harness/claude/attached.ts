@@ -383,6 +383,15 @@ const adoptIn =
   };
 
 /**
+ * Drops `placeholder`, which stood for an orphan while it was taken up, where the taking up ended with no session started in its place
+ * — the run stopped, never named its session, spent its cap, or was refused — so the next look reads the run's file as it was written,
+ * and holds no entry with no session behind it.
+ */
+const leftUnheld = (live: Map<string, Live>, placeholder: Live): void => {
+  if (live.get(placeholder.run.name) === placeholder) live.delete(placeholder.run.name);
+};
+
+/**
  * The interrupt file of `run`, which the holder runs as `at`, read on a look: dropped where its turn has ended, else its turn ended
  * through the SDK (`interruptTurn`) and the file dropped once that was sent. A send that failed is `record`ed, and asked again on the
  * next look, the file left.
@@ -442,17 +451,19 @@ export const attachedSessions = (
   const looked = (run: AttachedRun): AttachedRun => {
     const at = live.get(run.name);
     if (!holding) return run;
-    if (at && stopped(run) && isOpen(at.run.state)) at.abort.abort();
+    if (at?.abort && stopped(run) && isOpen(at.run.state)) at.abort.abort();
     interruptAsked(root, at, run, recorded(context, `${run.name}'s turn was not interrupted as asked; the next look asks again`));
     if (at) paused(at);
     if (at?.input) hear(root, at);
     if (!at && orphaned(run)) {
       const placeholder = { run, letGo: true } as Live;
       live.set(run.name, placeholder);
-      void adopt(run).catch((cause: unknown) => {
-        live.delete(run.name);
-        recorded(context, `${run.name} was not taken up; the next look takes it up again`)(cause);
-      });
+      void adopt(run)
+        .then(() => leftUnheld(live, placeholder))
+        .catch((cause: unknown) => {
+          live.delete(run.name);
+          recorded(context, `${run.name} was not taken up; the next look takes it up again`)(cause);
+        });
       return { ...run, state: 'working' };
     }
     return run;

@@ -592,6 +592,23 @@ test('the next holder takes up a session left behind: what it tells the session,
     assert.deepEqual(seen.closeout, { payload: { done: 1 } });
   });
 
+  await t.test('a parked session a stop was asked of is canceled as it is taken up, and every later look reads it canceled', async (rt) => {
+    const { root, request } = place({ output: { done: 1 } });
+    writeRun(root, {
+      name: NAME,
+      state: 'parked',
+      owner: process.pid,
+      startedAt: new Date().toISOString(),
+      sessionId: 'the-stopped-session',
+      request: { ...request, brief: undefined },
+    });
+    fs.writeFileSync(filesOf(root, NAME).stop, String(process.pid));
+    const h = await holder(root);
+    rt.after(h.close);
+    await until(rt, async () => (await sighted(h))?.state === 'canceled', 'the session canceled, never resumed', { everyMs: 50 });
+    for (const look of ['second', 'third']) assert.equal((await sighted(h))?.state, 'canceled', `the ${look} look after it`);
+  });
+
   await t.test("a session cut at its holder's bound is resumed told which call did not finish", async (rt) => {
     const { root, dir, request } = place({ output: { done: 1 } });
     writeRun(root, {

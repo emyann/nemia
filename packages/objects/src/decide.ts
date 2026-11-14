@@ -228,6 +228,8 @@ export type RunDecision = typeof RunDecision.Type;
  * naming every one; `?diffs=`, comma-separated, an empty one naming none), every other with its lines left out (`linesLeftOut`), its path
  * and its counts kept; not given, none is whole, a decision reading as its summary. Anything but a decidable run is answered as it is.
  * Pure.
+ * @param decision The run's decision, as it was worked out.
+ * @param diffs The paths whose diffs are answered whole, * naming every one; undefined where the read names none.
  */
 export const decisionNarrowed = (decision: RunDecision, diffs: readonly string[] | undefined): RunDecision =>
   'sensitive' in decision

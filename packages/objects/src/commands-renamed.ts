@@ -48,6 +48,7 @@ export const RETIRED_COMMANDS: ReadonlyMap<string, string> = new Map([
 /**
  * The refusal of a command line, its words after the program, that opens with a retired command (`RETIRED_COMMANDS`, the longest that
  * matches): the words that say what to type instead, or undefined where it opens with none.
+ * @param words A command line's words after the program.
  */
 export function retiredIn(words: readonly string[]): string | undefined {
   for (const size of [2, 1]) {
@@ -82,6 +83,7 @@ function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: s
  * longest that matches, then again on what it became, each former name once, so `auto drop` is put to `policy …` and then to `policy rm`),
  * the flag that says an absorbed verb added before its other flags, and each former flag of the command put to its new spelling
  * (`RENAMED_FLAGS`); with the hint naming what was typed and what to type now, or `words` as given and no hint.
+ * @param words A command line's words after the program, as typed.
  */
 export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
   let named = [...words];

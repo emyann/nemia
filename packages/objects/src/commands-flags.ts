@@ -7,13 +7,19 @@ import type { Args, Flag, Spec } from './command.ts';
 /** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
 export type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
 
-/** Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms. */
+/**
+ * Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms.
+ * @param said Each text flag of the command and what it takes.
+ * @param shape The command's forms, which end each refusal.
+ */
 export const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
   Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
 
 /**
  * The refusal of `flag`'s value left out, in `refusals`, which holds one for each text flag of its command (`takesOf`): a flag it holds
  * none for is thrown, naming it.
+ * @param refusals The command's refusals of a value left out, by flag (takesOf).
+ * @param flag The flag whose refusal is asked, as spelled on the command line.
  */
 export const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
   const takes = refusals[flag];
@@ -21,7 +27,11 @@ export const takesFor = (refusals: Readonly<Record<string, string>>, flag: strin
   return takes;
 };
 
-/** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
+/**
+ * `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space.
+ * @param args The command line's arguments, by key.
+ * @param key Which of the two flags' values to read.
+ */
 export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
   const value = args[key];
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : undefined;
@@ -30,6 +40,8 @@ export const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
 /**
  * Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out (its refusal in `takes`), blank, or longer than
  * its cap.
+ * @param args The command line's arguments, by key.
+ * @param refusals The command's refusals of a value left out, by flag (takesOf).
  */
 export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
   const value = args[key];
@@ -41,7 +53,14 @@ export function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusal
   return null;
 }
 
-/** `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words. */
+/**
+ * `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words.
+ * @param said Each text flag of the command, its key, and what it takes.
+ * @param command The command line's name, as a refusal of a flag given twice says it (nemia hold).
+ * @param puts What the command puts, as a refusal of a flag given twice says it (a hold).
+ * @param refusals The command's refusals of a value left out, by flag (takesOf).
+ * @param shape The command's forms, which end the refusal of a flag given twice.
+ */
 export const saidFlags = (
   said: readonly Said[],
   command: string,
@@ -60,6 +79,8 @@ export const saidFlags = (
 /**
  * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
  * flag's own `takes`, or null.
+ * @param spec The command's flags, each text one with what it takes.
+ * @param args The command line's arguments, by key.
  */
 export function leftOut(spec: Spec, args: Args): string | null {
   for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined)) {
@@ -79,7 +100,10 @@ export const SELECTOR_FLAG_FORM =
   '-l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", -l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; ' +
   'commas between clauses, which all must hold, and -l again for another selector, of which one must';
 
-/** `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes. */
+/**
+ * `-l <selector>`, given again for another, of the command `command`: the runs whose labels one of them takes.
+ * @param command The command line's name, as the flag's refusal says it.
+ */
 export const selectorFlag = (command: string): Flag => ({
   flag: '-l',
   kind: 'text',
@@ -91,6 +115,7 @@ export const selectorFlag = (command: string): Flag => ({
 /**
  * `-l <selector>`, `--show-labels` and `-L <key>` of the command `command`: the runs whose labels a selector takes, each given again for
  * another; each line with its whole map; and that label's value beside each line, given again for another.
+ * @param command The command line's name, as each flag's refusal says it.
  */
 export const labelFlags = (command: string): Flag[] => [
   selectorFlag(command),

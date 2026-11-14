@@ -81,6 +81,7 @@ const costOf = (piece: Readiness['pieces'][number]): ReadinessCost => piece.cost
 /**
  * Whether a run waits on the read: a missing piece costs `run`. Only then is the server not ready to run, and the board's banner
  * raised; a missing piece of another cost is advised, listed on Setup and by `nemia doctor` with its fix.
+ * @param read The server's readiness, as read.
  */
 export const runsWait = (read: Readiness): boolean => missingOf(read).some((piece) => costOf(piece) === 'run');
 
@@ -94,6 +95,7 @@ const phraseOf = (cost: ReadinessCost, n: number, firstRun: boolean): string => 
 /**
  * What the read's missing pieces cost, said after `missing:`, each cost of `READINESS_COSTS` a phrase of its own as its pieces declare
  * it, "before a factory's first run" only where the read says no run was ever started (`ran: false`); none where no piece is missing.
+ * @param read The server's readiness, as read.
  */
 export function missingSaid(read: Readiness): string | undefined {
   const missing = missingOf(read);
@@ -107,6 +109,7 @@ export function missingSaid(read: Readiness): string | undefined {
 /**
  * The read's last line, as `nemia doctor` says it: `not ready` while a run waits on a missing piece (`runsWait`), else `ready`,
  * with the pieces advised counted; what the missing pieces cost after either (`missingSaid`).
+ * @param read The server's readiness, as read.
  */
 export function readinessSaid(read: Readiness): string {
   const said = missingSaid(read);

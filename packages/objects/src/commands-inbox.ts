@@ -108,7 +108,10 @@ export const INBOX_QUEUE_WORDS = {
   },
 } as const satisfies CommandWords;
 
-/** The runs `args` names, as `nemia inbox from` takes them: none for `--off`. */
+/**
+ * The runs `args` names, as `nemia inbox from` takes them: none for `--off`.
+ * @param args The command line's arguments, by key: its runs under runs.
+ */
 export const runsNamed = (args: Args): readonly string[] => (Array.isArray(args.runs) ? args.runs.map(String) : []);
 
 /** `nemia inbox from`'s spec: the card's name, then the runs it is handed as context, or `--off`. */
@@ -194,7 +197,10 @@ export const INBOX_RM_WORDS = {
   },
 } as const satisfies CommandWords;
 
-/** The edits under `labels`, in the order given. */
+/**
+ * The edits under `labels`, in the order given.
+ * @param args The command line's arguments, by key: its edits under labels.
+ */
 export const labelEdits = (args: Args): readonly string[] => (Array.isArray(args.labels) ? args.labels.map(String) : []);
 
 /** A label command's spec: the run or card, then its edits, and `--overwrite`. */
@@ -209,7 +215,11 @@ const labelSpec = (command: string, what: string, key: string, lists: string): S
   missing: `${command} takes the ${what} first, as ${lists} lists it, then its edits: ${command} <${key}> team=core [--overwrite].`,
 });
 
-/** The refusal of a label command given no edit, or null where it was given one. */
+/**
+ * The refusal of a label command given no edit, or null where it was given one.
+ * @param command The label command's line, as its refusal names it (nemia label run).
+ * @param key What the edits come after on the command line, as its refusal says it (run, card).
+ */
 export const noEdits =
   (command: string, key: string) =>
   (args: Args): string | null =>

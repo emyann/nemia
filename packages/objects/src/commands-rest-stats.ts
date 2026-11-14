@@ -55,6 +55,7 @@ const isDay = (text: string): boolean =>
 /**
  * What `nemia stats` refuses of its flags before anything is read, or null: a value empty or starting `--`, in what the flag takes; a key
  * to go by that is not one of `STATS_BY`; a day that is not a real `YYYY-MM-DD`; a `--from` after the `--to`.
+ * @param args The command line's arguments, by key.
  */
 export function statsRefusal(args: Args): string | null {
   const left = STATS_KEYS.find((key) => {

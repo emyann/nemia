@@ -16,7 +16,10 @@ const UNIT_MS = { s: 1_000, m: 60_000, h: 3_600_000 } as const;
 /** The shortest timeout a pause takes, and the longest: one second, and 23 hours. */
 const TIMEOUT_BOUNDS = { least: 1_000, most: 23 * 3_600_000 } as const;
 
-/** Why `text` is no timeout, naming the form, or undefined for one that reads: digits and one unit, from 1s to 23h. */
+/**
+ * Why `text` is no timeout, naming the form, or undefined for one that reads: digits and one unit, from 1s to 23h.
+ * @param text The timeout as typed, blanks around it allowed.
+ */
 export const timeoutRefusal = (text: string): string | undefined => {
   const m = /^(\d+)([smh])$/.exec(text.trim());
   const unit = m?.[2];
@@ -55,7 +58,10 @@ const pauseTimeoutRefusal = (timeout: unknown, now: boolean): string | null => {
   return wrong === undefined ? null : `--timeout: ${wrong}: ${PAUSE_SHAPE}, as nemia pause --timeout 10m.`;
 };
 
-/** Why `nemia pause`'s arguments are refused before anything is read, or null: `--why` and `--by` (`saidRefusal`), then `--timeout`. */
+/**
+ * Why `nemia pause`'s arguments are refused before anything is read, or null: `--why` and `--by` (`saidRefusal`), then `--timeout`.
+ * @param args The command line's arguments, by key.
+ */
 export const pauseRefusal = (args: Args): string | null =>
   PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? pauseTimeoutRefusal(args.timeout, args.now === true);
 
@@ -109,7 +115,10 @@ export const PAUSE_WORDS = {
 /** `nemia pause-timeout`'s form, as each of its refusals ends on it. */
 const TIMEOUT_SHAPE = 'nemia pause-timeout [<d>]';
 
-/** Why the timeout `nemia pause-timeout` was given is refused, ending on the form it takes; null where none, or one in its form. */
+/**
+ * Why the timeout `nemia pause-timeout` was given is refused, ending on the form it takes; null where none, or one in its form.
+ * @param args The command line's arguments, by key: the timeout under timeout, which may be absent.
+ */
 export const pauseTimeoutCheck = (args: Args): string | null => {
   const text = args.timeout;
   const wrong = typeof text === 'string' ? timeoutRefusal(text) : undefined;

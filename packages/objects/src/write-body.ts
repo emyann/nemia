@@ -9,6 +9,7 @@ import { HttpClientRequest } from 'effect/http';
 /**
  * `request`, where it is a write with no body, with `{}` as its body, sent as `content-type: application/json`; a read, and a write with
  * a body of its own, as it is.
+ * @param request The request about to be sent.
  */
 export const jsonBodied = (request: HttpClientRequest.HttpClientRequest): HttpClientRequest.HttpClientRequest =>
   request.method === 'GET' || request.method === 'HEAD' || request.body._tag !== 'Empty'

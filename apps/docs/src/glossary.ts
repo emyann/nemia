@@ -51,7 +51,10 @@ const filesOf = (root: string, dirs: string[]): string[] => {
   return out;
 };
 
-/** Every glossary table of the repository at `root`: each `glossary.json` under `packages/` and `apps/`, parsed, by its path. */
+/**
+ * Every glossary table of the repository at `root`: each `glossary.json` under `packages/` and `apps/`, parsed, by its path.
+ * @param root The repository's root folder, under whose packages/ and apps/ the tables are found and from which their paths are said.
+ */
 export const tablesIn = (root: string): Table[] =>
   filesOf(root, ['packages', 'apps'])
     .filter((f) => path.posix.basename(f) === 'glossary.json')
@@ -65,7 +68,10 @@ export const tablesIn = (root: string): Table[] =>
       }
     });
 
-/** The ids a ```glossary fence lists, one a line, in its order. */
+/**
+ * The ids a ```glossary fence lists, one a line, in its order.
+ * @param fence The text inside the glossary fence of the page, one context's id a line.
+ */
 export const idsOf = (fence: string): string[] =>
   fence
     .split('\n')
@@ -75,6 +81,8 @@ export const idsOf = (fence: string): string[] =>
 /**
  * A table the fence omits, an id of the fence no table has, and an id two tables give, of which the page would draw the first alone:
  * each a fault naming the fix.
+ * @param tables Every glossary table of the repository, as tablesIn reads them.
+ * @param order The ids the fence lists, in its order (idsOf).
  */
 export const fenceFaults = (tables: Table[], order: string[]): Fault[] => [
   ...tables
@@ -135,7 +143,11 @@ const itemOf = (term: Term): ListItem => {
   return { type: 'listItem', spread: false, children: [{ type: 'paragraph', children }] };
 };
 
-/** The page's sections, one per context in `order`: its title as a heading, what it is about, and a list of its terms. */
+/**
+ * The page's sections, one per context in `order`: its title as a heading, what it is about, and a list of its terms.
+ * @param tables Every glossary table of the repository, as tablesIn reads them.
+ * @param order The ids the fence lists, in its order: a context no table has draws no section.
+ */
 export const glossarySections = (tables: Table[], order: string[]): RootContent[] =>
   order.flatMap((id) => {
     const table = tables.find((t) => t.context === id);
@@ -176,7 +188,11 @@ const exportsOf = (file: string, text: string): string[] => {
   });
 };
 
-/** Each term's type that no source file of its table's workspace exports, a fault naming the table, the type and the fix. */
+/**
+ * Each term's type that no source file of its table's workspace exports, a fault naming the table, the type and the fix.
+ * @param root The repository's root folder, from which each table's workspace is read.
+ * @param tables Every glossary table of the repository, whose terms' types are looked for.
+ */
 export const typeFaults = (root: string, tables: Table[]): Fault[] => {
   const exports = new Map<string, Set<string>>();
   const exportedBy = (workspace: string): Set<string> => {

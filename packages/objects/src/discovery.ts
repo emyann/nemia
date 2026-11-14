@@ -42,6 +42,8 @@ const isParam = (segment: string): boolean => segment.startsWith(':');
  * The route `method` and `path` (the `Api`'s, with `:param` segments) read as: its plural, the first word after `/api/` or after
  * `/api/namespaces/:namespace/`; whether a name follows it; and the words after it, its names left out, joined by `/`. Null where the
  * method is none discovery reads, the path is not under `/api/`, or a segment is empty or the plural is a name.
+ * @param method The route's HTTP method.
+ * @param path The route's path, as the Api spells it.
  */
 export const routeOf = (method: string, path: string): ApiRoute | null => {
   const routeMethod = ROUTE_METHODS.find((m) => m === method);
@@ -98,6 +100,8 @@ const subResourceAt = (routes: readonly ApiRoute[], kinds: readonly KindPlural[]
 /**
  * What discovery lists of `routes` for `kinds`: each kind under its plural, in their order, then each sub-resource a kind's routes serve,
  * at its first route; a route whose plural no kind has is listed by none.
+ * @param routes Every route of the Api, as routeOf reads them, in order.
+ * @param kinds The kinds the api serves, each with its plural, in the order listed.
  */
 export const resourcesOf: ResourcesOf = (routes, kinds) =>
   [

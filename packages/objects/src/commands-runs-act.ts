@@ -52,6 +52,7 @@ const HOLD_TAKES: Readonly<Record<string, string>> = { '--until': UNTIL_TAKES, .
 /**
  * Refused of `nemia hold`'s arguments before any run is read: a run to wait on empty or starting `-`, what `saidRefusal` refuses of `--why`
  * and `--by`; then together: `--until` and `--off` both, and `--why` or `--by` with `--off`. A run named twice is the verb's to refuse.
+ * @param args The command line's arguments, by key.
  */
 export function holdRefusal(args: Args): string | null {
   const until = listOf(args, 'until');
@@ -197,6 +198,7 @@ const WAIT_TAKES: Readonly<Record<string, string>> = { '-l': WAIT_LABELS.takes ?
 /**
  * Refused of `nemia wait`'s arguments before the feed is read: a cursor that is no whole number. A label query the grammar refuses, and a
  * `--for` out of its form or past its bound, are the handler's to refuse, which holds the grammar and the bound.
+ * @param args The command line's arguments, by key: the cursor under from.
  */
 export const waitRefusal = (args: Args): string | null => {
   const from = args.from;

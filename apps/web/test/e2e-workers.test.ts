@@ -1,12 +1,23 @@
 /**
  * How the e2e splits its pages between workers (e2e/workers.ts): every page handed out once, in the pages' order, to whichever worker
- * asks, and none once a worker failed; how many workers a machine takes, each bound proven by a machine where it alone binds; and the
- * refusal of two workers that share a store, an api port or an app, made to refuse; and the failure a run fails on, the earliest page's.
- * No browser, so `npm test` runs it.
+ * asks, and none once the run stopped; when a failed worker's seat starts another; how many workers a machine takes, each bound proven
+ * by a machine where it alone binds; and the refusal of two workers that share a store, an api port or an app, made to refuse; and the
+ * failure a run fails on, the earliest page's. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { apart, failedInOrder, fewerThanAsked, PER_WORKER_BYTES, queueOf, workersFor, type PageQueue, type Seat } from './e2e/workers.ts';
+import {
+  apart,
+  FAILURES_NAMED,
+  failedInOrder,
+  fewerThanAsked,
+  PER_WORKER_BYTES,
+  queueOf,
+  startsAgain,
+  workersFor,
+  type PageQueue,
+  type Seat,
+} from './e2e/workers.ts';
 
 const SEVEN = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
@@ -35,12 +46,20 @@ test("the pages are handed in the order given, which is the pages' order, not th
   assert.deepEqual([queue.next(), queue.next(), queue.next()], ['z', 'y', 'x']);
 });
 
-test('REFUSED: a page asked for after a worker failed, while pages remain', () => {
+test('REFUSED: a page asked for after the run stopped its queue, while pages remain, and none is left to hand out', () => {
   const queue = queueOf(SEVEN);
   assert.equal(queue.next(), 'a');
+  assert.equal(queue.left(), 6);
   queue.stop();
-  assert.equal(queue.next(), null, 'no worker starts another page once one failed');
-  assert.equal(queue.next(), null);
+  assert.equal(queue.next(), null, 'no worker starts another page once the run names no more failures');
+  assert.equal(queue.left(), 0);
+});
+
+test('a seat whose worker failed on a page starts another for the pages left; not one handed no page, past the failures a run names, or with none left', () => {
+  assert.equal(startsAgain({ handed: 3, failed: 1, left: 4 }), true);
+  assert.equal(startsAgain({ handed: 0, failed: 1, left: 4 }), false, 'it failed before any page: its seat would fail the same way');
+  assert.equal(startsAgain({ handed: 1, failed: FAILURES_NAMED, left: 4 }), false);
+  assert.equal(startsAgain({ handed: 1, failed: 1, left: 0 }), false);
 });
 
 /** A machine where no bound but the one a test names binds. */

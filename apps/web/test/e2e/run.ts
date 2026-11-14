@@ -6,7 +6,7 @@
  *  0. Reads its plan from its command line (`planOf`, pages.ts), refusing a flag or a page it does not know before anything else.
  *  1. With `--look`, or with no `--pages`, `--shard` or `--look` (the whole e2e), runs the look's browser tests first, two files at a
  *     time (`lookTests`, look.ts), and stops there when it visits no page (`--look` alone). `--pages` and a shard run none of them.
- *  2. Builds the web app, once.
+ *  2. Builds the web app, once, unless `dist/` is already the build of the sources as they stand (`current`, built.ts): never in CI.
  *  3. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): half the machine's cores, or as many as
  *     `--workers` asks, capped by as many as its free memory holds and by the pages (`workersFor`); `--workers` can lower the count,
  *     never raise it past free memory, and a run given fewer than it asked says so on one line before it starts them.
@@ -25,7 +25,9 @@
  *     go, for the shards of one run to be summed against that bound together afterwards (`pages-bound.ts`).
  *
  * Exits non-zero when a worker fails, saying each failure, and last the first by the pages' order, naming the page, the theme and the
- * assertion, with a screenshot of what the page looked like. On a signal, every worker is stopped and every store removed. The assertions
+ * assertion, with a screenshot of what the page looked like. A worker stops at its first failing page; its seat then starts another on
+ * a fresh store for the pages left, so one run names every failing page of its batch, up to `FAILURES_NAMED` (`startsAgain`,
+ * workers.ts), and says their names together before it ends. On a signal, every worker is stopped and every store removed. The assertions
  * are made to refuse in checks.test.ts, the visiting and the exit (visit.ts) in visit.test.ts, and a full-page picture of a tall page with
  * its frame where the window was in photograph.test.ts, all of which `--look` runs, and a whole `npm run e2e` first.
  */
@@ -33,13 +35,25 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { current, inputsOf, stamp } from './built.ts';
 import { lookTests } from './look.ts';
 import { loadPages, planOf } from './pages.ts';
 import { overBound, pagesLine, pastTool, rankLines, type PageTiming, type ShardPages } from './timing.ts';
 import { exitOn } from './visit.ts';
-import { apart, failedInOrder, fewerThanAsked, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
+import {
+  apart,
+  FAILURES_NAMED,
+  failedInOrder,
+  fewerThanAsked,
+  pageNamed,
+  queueOf,
+  startsAgain,
+  workersFor,
+  type PageQueue,
+  type Seat,
+} from './workers.ts';
 import type { WorkerResult } from './worker.ts';
-import { fromNodeModules, OUT, plain, WEB } from './world.ts';
+import { fromNodeModules, OUT, plain, REPO, WEB } from './world.ts';
 
 /** How many of the slowest pages a run says at its end. */
 const RANKED = 10;
@@ -87,12 +101,15 @@ function relay(from: NodeJS.ReadableStream, to: NodeJS.WritableStream, prefix: s
   });
 }
 
+/** A worker's result, and how many pages it was handed. */
+type Ran = { result: WorkerResult; handed: number };
+
 /**
  * Worker `i` started on `store` with `args`, handed its pages from `queue` one at a time as it asks; resolves with what it wrote to its
- * result, or a failure saying how it ended without one. A worker that fails stops the queue: no worker starts another page.
+ * result file `result`, or a failure saying how it ended without one, and with how many pages it was handed.
  */
-async function runWorker(i: number, store: string, args: readonly string[], dir: string, queue: PageQueue<string>): Promise<WorkerResult> {
-  const result = path.join(dir, `worker-${i}.json`);
+async function runWorker(i: number, store: string, args: readonly string[], result: string, queue: PageQueue<string>): Promise<Ran> {
+  let handed = 0;
   const worker = path.join(import.meta.dirname, 'worker.ts');
   const child = spawn(process.execPath, [worker, '--worker', String(i), '--store', store, '--result', result, ...args], {
     cwd: WEB,
@@ -100,32 +117,68 @@ async function runWorker(i: number, store: string, args: readonly string[], dir:
   });
   children.push(child);
   child.on('message', () => {
-    if (child.connected) child.send({ page: queue.next() });
+    if (!child.connected) return;
+    const page = queue.next();
+    if (page !== null) handed++;
+    child.send({ page });
   });
   const kept: string[] = [];
-  const ended = new Promise<string>((resolve) =>
-    child.on('exit', (code, signal) => {
-      if (code !== 0) queue.stop();
-      resolve(signal ?? `code ${code}`);
-    }),
-  );
+  const ended = new Promise<string>((resolve) => child.on('exit', (code, signal) => resolve(signal ?? `code ${code}`)));
   await Promise.all([relay(child.stdout!, process.stdout, `[w${i}] `, kept), relay(child.stderr!, process.stderr, `[w${i}] `, kept)]);
   const how = await ended;
-  if (fs.existsSync(result)) return JSON.parse(fs.readFileSync(result, 'utf8')) as WorkerResult;
+  if (fs.existsSync(result)) return { result: JSON.parse(fs.readFileSync(result, 'utf8')) as WorkerResult, handed };
   return {
-    worker: i,
-    store,
-    setupMs: 0,
-    ms: 0,
-    timings: [],
-    shots: [],
-    failure: `worker ${i} ended (${how}) without saying what it did. What it said last:\n    ${kept.join('\n    ')}`,
-    tails: '',
+    handed,
+    result: {
+      worker: i,
+      store,
+      setupMs: 0,
+      ms: 0,
+      timings: [],
+      shots: [],
+      failure: `worker ${i} ended (${how}) without saying what it did. What it said last:\n    ${kept.join('\n    ')}`,
+      tails: '',
+    },
   };
 }
 
-/** The web app, built into `dist/`, once, for every worker's `vite preview` to serve. */
+/** How many workers of this run have failed, over every seat. */
+let failed = 0;
+/** How many pages the queue still held when the run stopped it. */
+let unvisited = 0;
+
+/**
+ * Seat `seat`'s workers, one after another, and what each did: the first on the seat's store, and after one that failed another on a
+ * fresh store for the pages left, while the run still names failures (`startsAgain`); once it does not, the queue is stopped and no
+ * worker starts another page.
+ */
+async function runSeat(seat: Seat, args: readonly string[], dir: string, queue: PageQueue<string>): Promise<WorkerResult[]> {
+  const did: WorkerResult[] = [];
+  for (let store = seat.store; ; store = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-'))) {
+    stores.push(store);
+    const { result, handed } = await runWorker(seat.worker, store, args, path.join(dir, `worker-${seat.worker}-${did.length}.json`), queue);
+    did.push(result);
+    if (!result.failure) return did;
+    failed++;
+    if (!startsAgain({ handed, failed, left: queue.left() })) {
+      unvisited = Math.max(unvisited, queue.left());
+      queue.stop();
+      return did;
+    }
+    console.log(`e2e: worker ${seat.worker} starts again on a fresh store for the ${queue.left()} pages left`);
+  }
+}
+
+/**
+ * The web app, built into `dist/`, once, for every worker's `vite preview` to serve; not built again where `dist/` is already the build
+ * of the sources as they stand (`current`).
+ */
 function build(): void {
+  const inputs = inputsOf(WEB, REPO);
+  if (current(WEB, inputs)) {
+    console.log('e2e: the web app in dist/ is the build of these sources, so it is not built again (rm -rf apps/web/dist to build it)');
+    return;
+  }
   console.log('e2e: building the web app');
   try {
     execFileSync(process.execPath, [fromNodeModules(path.join('vite', 'bin', 'vite.js')), 'build'], { cwd: WEB, stdio: 'pipe' });
@@ -133,6 +186,7 @@ function build(): void {
     const { stdout, stderr } = err as { stdout?: Buffer; stderr?: Buffer };
     throw new Error(plain(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`), { cause: err });
   }
+  stamp(WEB, inputsOf(WEB, REPO));
 }
 
 /**
@@ -182,13 +236,21 @@ async function main(): Promise<void> {
   apart(seats);
   console.log(`e2e: ${plan.visit.length} pages over ${n} worker${n > 1 ? 's' : ''} (${Math.round(os.freemem() / 2 ** 20)} MB free)`);
   const flags = [...(plan.themes.length > 1 ? ['--photos'] : []), ...(plan.measured ? ['--contrast'] : [])];
-  results = await Promise.all(seats.map((seat) => runWorker(seat.worker, seat.store, flags, dir, queue)));
-  apart(results);
+  const bySeat = await Promise.all(seats.map((seat) => runSeat(seat, flags, dir, queue)));
+  results = bySeat.flat();
+  apart(bySeat.map((did) => did.at(-1)!));
   const order = plan.visit.map((p) => p.name);
   const failures = failedInOrder(results, order);
-  for (const failed of failures.slice(1).reverse())
-    console.error(`\ne2e: worker ${failed.worker} FAILED — ${failed.failure}${failed.tails}`);
+  for (const other of failures.slice(1).reverse()) console.error(`\ne2e: worker ${other.worker} FAILED — ${other.failure}${other.tails}`);
   first = failures[0];
+  if (failures.length > 1) {
+    const names = failures.map((f) => pageNamed(f.failure!) ?? 'a worker, naming no page');
+    const line =
+      `\ne2e: ${failures.length} failures: ${names.join(', ')}` +
+      (unvisited > 0 ? `; ${unvisited} pages were handed to no worker, a run naming ${FAILURES_NAMED} failures at most` : '');
+    console.error(line);
+    console.log(line);
+  }
   if (first) throw new Error(first.failure!);
   const shots = results.flatMap((r) => r.shots);
   const timings: PageTiming[] = results.flatMap((r) => r.timings);

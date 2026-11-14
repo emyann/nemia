@@ -12,19 +12,21 @@ const Strings = List(Schema.String);
 
 /** A file a branch changed (`Change`, branches.ts). A binary file has null counts, never 0. */
 const Change = Schema.Struct({
-  path: Schema.String,
-  from: Schema.optionalKey(Schema.String),
-  added: Schema.NullOr(Schema.Finite),
-  removed: Schema.NullOr(Schema.Finite),
+  path: Schema.String.annotate({ description: 'The file, by its path in the repository.' }),
+  from: Schema.optionalKey(Schema.String.annotate({ description: 'Where a renamed file came from; absent for one not renamed.' })),
+  added: Schema.NullOr(Schema.Finite).annotate({ description: 'The lines it added; null for a binary file, which has no line counts.' }),
+  removed: Schema.NullOr(Schema.Finite).annotate({
+    description: 'The lines it removed; null for a binary file, which has no line counts.',
+  }),
 });
 
 /** A workspace package, a top-level directory, or `(root)`, and what a branch changed in it (`Group`, branches.ts). */
 const Group = Schema.Struct({
-  name: Schema.String,
-  files: Schema.Finite,
-  added: Schema.Finite,
-  removed: Schema.Finite,
-  binary: Schema.Finite,
+  name: Schema.String.annotate({ description: 'The workspace package, top-level directory or (root) it is.' }),
+  files: Schema.Finite.annotate({ description: 'How many files the branch changed in it.' }),
+  added: Schema.Finite.annotate({ description: 'The lines the branch added in it.' }),
+  removed: Schema.Finite.annotate({ description: 'The lines the branch removed in it.' }),
+  binary: Schema.Finite.annotate({ description: 'How many of its changed files are binary.' }),
 });
 
 /**
@@ -32,18 +34,23 @@ const Group = Schema.Struct({
  * `workspaces` globs with `**`, absent where nobody read them.
  */
 const Radius = Schema.Struct({
-  changes: List(Change),
-  groups: List(Group),
-  agentFacing: Strings,
-  checkAffecting: Strings,
-  lessons: List(Change),
-  deepWorkspaces: Schema.optionalKey(Strings),
+  changes: List(Change).annotate({ description: 'Each file the branch changed, with its line counts.' }),
+  groups: List(Group).annotate({ description: 'The parts of the repository the branch touched, with what it changed in each.' }),
+  agentFacing: Strings.annotate({ description: 'The changed files an agent reads.' }),
+  checkAffecting: Strings.annotate({ description: 'The changed files that decide a check.' }),
+  lessons: List(Change).annotate({ description: 'The changes to a file where the next agent reads, for the lesson line.' }),
+  deepWorkspaces: Schema.optionalKey(
+    Strings.annotate({ description: "The base's workspaces globs that have **, as written; absent where nobody read them." }),
+  ),
 });
 
 /** What a branch touched, or the sentence saying what it changed is not known. */
 export const DecisionTouched = Schema.Struct({
   branch: Schema.String.annotate({ description: 'The branch read.' }),
-  radius: Schema.Union([Radius, Schema.Struct({ error: Schema.String })]).annotate({
+  radius: Schema.Union([
+    Radius,
+    Schema.Struct({ error: Schema.String.annotate({ description: 'The sentence saying what the branch changed is not known.' }) }),
+  ]).annotate({
     description:
       'What the branch touched: its files and their counts, its groups, what an agent reads and what decides a check; or the sentence saying it is not known.',
   }),
@@ -112,42 +119,79 @@ export type DecideCommand = typeof DecideCommand.Type;
 
 /** Whether a branch ahead merges onto the base, as git's `merge-tree` answers it — clean, conflicted, or not known — without its words. */
 const mergeWords = [
-  Schema.Struct({ clean: Schema.Literal(true) }),
-  Schema.Struct({ clean: Schema.Literal(false), conflicts: Strings }),
-  Schema.Struct({ error: Schema.String }),
+  Schema.Struct({ clean: Schema.Literal(true).annotate({ description: 'The branch merges cleanly.' }) }),
+  Schema.Struct({
+    clean: Schema.Literal(false).annotate({ description: 'The branch does not merge cleanly.' }),
+    conflicts: Strings.annotate({ description: 'The files that conflict.' }),
+  }),
+  Schema.Struct({ error: Schema.String.annotate({ description: 'The sentence saying whether it merges is not known.' }) }),
 ] as const;
+
+const mergeClean = Schema.Literal(true).annotate({ description: 'The branch merges cleanly.' });
+const mergeConflicted = Schema.Literal(false).annotate({ description: 'The branch does not merge cleanly.' });
+const mergeConflicts = Strings.annotate({ description: 'The files that conflict.' });
+const mergeError = Schema.String.annotate({ description: 'The sentence saying whether it merges is not known.' });
+const mergeSaid = Schema.String.annotate({ description: 'Whether it merges, in words.' });
 
 /** Whether a branch ahead of the base still merges onto it, and that in words (`StandingMerge`, merges.ts). */
 export const StandingMerge = Schema.Union([
-  Schema.Struct({ clean: Schema.Literal(true), said: Schema.String }),
-  Schema.Struct({ clean: Schema.Literal(false), conflicts: Strings, said: Schema.String }),
-  Schema.Struct({ error: Schema.String, said: Schema.String }),
-]).annotate({ identifier: 'StandingMerge' });
+  Schema.Struct({ clean: mergeClean, said: mergeSaid }),
+  Schema.Struct({ clean: mergeConflicted, conflicts: mergeConflicts, said: mergeSaid }),
+  Schema.Struct({ error: mergeError, said: mergeSaid }),
+]).annotate({
+  identifier: 'StandingMerge',
+  description: 'Whether a branch ahead of the base still merges onto it: clean, with its conflicts, or not known, and that in words.',
+});
 export type StandingMerge = typeof StandingMerge.Type;
 
 /** The keys every standing has, whichever way its branch stands. */
-const standingFields = { said: Schema.String, stat: Schema.NullOr(Schema.String), merge: Schema.NullOr(StandingMerge) };
+const standingFields = {
+  said: Schema.String.annotate({ description: "The fact of where the branch stands, in the package's words." }),
+  stat: Schema.NullOr(Schema.String).annotate({ description: 'How much it changed, as 3 files: +14 −1; null for nothing past the base.' }),
+  merge: Schema.NullOr(StandingMerge).annotate({ description: 'Whether it still merges onto the base; null unless it is ahead.' }),
+};
+const standingBranch = Schema.String.annotate({ description: 'The result branch.' });
 
 /**
  * Where one result branch stands against the base as git says it now — on it, ahead by N commits, gone, or unread — with the fact in the
  * package's words, how much it changed (`3 files: +14 −1`, null for nothing past the base) and whether it still merges (null unless ahead).
  */
 export const Standing = Schema.Union([
-  Schema.Struct({ branch: Schema.String, where: Schema.Literal('on'), ...standingFields }),
-  Schema.Struct({ branch: Schema.String, where: Schema.Literal('ahead'), commits: Schema.Finite, ...standingFields }),
-  Schema.Struct({ branch: Schema.String, where: Schema.Literal('gone'), ...standingFields }),
-  Schema.Struct({ branch: Schema.String, where: Schema.Literal('unread'), why: Schema.String, ...standingFields }),
+  Schema.Struct({
+    branch: standingBranch,
+    where: Schema.Literal('on').annotate({ description: 'The branch is on the base.' }),
+    ...standingFields,
+  }),
+  Schema.Struct({
+    branch: standingBranch,
+    where: Schema.Literal('ahead').annotate({ description: 'The branch is ahead of the base.' }),
+    commits: Schema.Finite.annotate({ description: 'How many commits it is ahead by.' }),
+    ...standingFields,
+  }),
+  Schema.Struct({
+    branch: standingBranch,
+    where: Schema.Literal('gone').annotate({ description: 'The branch is gone.' }),
+    ...standingFields,
+  }),
+  Schema.Struct({
+    branch: standingBranch,
+    where: Schema.Literal('unread').annotate({ description: 'Git did not say where the branch stands.' }),
+    why: Schema.String.annotate({ description: 'Why it was not read.' }),
+    ...standingFields,
+  }),
 ]).annotate({ identifier: 'Standing' });
 export type Standing = typeof Standing.Type;
 
 /** A branch of this run (`ours`) that does not merge cleanly onto another run's (`branch`, of `run`), and that in words. */
 const Collision = Schema.Struct({
-  run: Schema.String,
-  branch: Schema.String,
-  ours: Schema.String,
-  merge: Schema.Union(mergeWords),
-  said: Schema.String,
+  run: Schema.String.annotate({ description: 'The other run, by id.' }),
+  branch: Schema.String.annotate({ description: "The other run's branch that this run's does not merge onto cleanly." }),
+  ours: Schema.String.annotate({ description: "This run's branch that does not merge onto it cleanly." }),
+  merge: Schema.Union(mergeWords).annotate({ description: 'Whether they merge: clean, with its conflicts, or not known.' }),
+  said: Schema.String.annotate({ description: 'The collision in words.' }),
 });
+
+const collisionBranch = Schema.String.annotate({ description: 'The branch ahead of the base.' });
 
 /**
  * At an ending's decision: whether each branch ahead merges onto the base (`onto`), the other runs in flight on it, each branch of theirs
@@ -158,9 +202,9 @@ export const Collisions = Schema.Struct({
   onto: Schema.String.annotate({ description: 'The base branch the run lands onto.' }),
   base: List(
     Schema.Union([
-      Schema.Struct({ branch: Schema.String, clean: Schema.Literal(true), said: Schema.String }),
-      Schema.Struct({ branch: Schema.String, clean: Schema.Literal(false), conflicts: Strings, said: Schema.String }),
-      Schema.Struct({ branch: Schema.String, error: Schema.String, said: Schema.String }),
+      Schema.Struct({ branch: collisionBranch, clean: mergeClean, said: mergeSaid }),
+      Schema.Struct({ branch: collisionBranch, clean: mergeConflicted, conflicts: mergeConflicts, said: mergeSaid }),
+      Schema.Struct({ branch: collisionBranch, error: mergeError, said: mergeSaid }),
     ]),
   ).annotate({
     description: 'Whether each branch ahead merges onto the base: clean, with its conflicts, or not known, and that in words.',
@@ -169,7 +213,14 @@ export const Collisions = Schema.Struct({
   colliding: List(Collision).annotate({
     description: 'Each branch of another run that a branch of this run does not merge onto cleanly, and that in words.',
   }),
-  semantic: Schema.NullOr(Schema.Struct({ step: Schema.String, check: Schema.String, sha: Schema.String, said: Schema.String })).annotate({
+  semantic: Schema.NullOr(
+    Schema.Struct({
+      step: Schema.String.annotate({ description: 'The step whose check refused the merged tree.' }),
+      check: Schema.String.annotate({ description: 'The landing check that refused it.' }),
+      sha: Schema.String.annotate({ description: 'The commit of the merged tree it refused.' }),
+      said: Schema.String.annotate({ description: 'What it said, in words.' }),
+    }),
+  ).annotate({
     description:
       'The landing check that refused the merged tree though it merges: its step, the check, the commit and the words; null where none did.',
   }),
@@ -261,7 +312,12 @@ export const Decidable = Schema.Struct({
   overBudget: Schema.NullOr(Schema.String).annotate({ description: 'The line saying the run is over its budget; null where it is not.' }),
   commands: List(DecideCommand).annotate({ description: 'The commands nemia decide offers for the run.' }),
   baseHeldBy: Schema.optionalKey(BaseHold),
-  awaiting: Schema.NullOr(Schema.Struct({ branches: Strings, direct: Schema.Boolean })).annotate({
+  awaiting: Schema.NullOr(
+    Schema.Struct({
+      branches: Strings.annotate({ description: 'The result branches it awaits.' }),
+      direct: Schema.Boolean.annotate({ description: 'Whether it worked on its base branch itself.' }),
+    }),
+  ).annotate({
     description:
       'What the finished run awaits: its branches, and direct for one that worked on its base branch itself; null for a run still running with a step waiting on a person.',
   }),
@@ -285,8 +341,13 @@ export type Decidable = typeof Decidable.Type;
 export const RunDecision = Schema.Union([
   Schema.Struct({ waiting: RunWaiting, holding: Schema.optionalKey(RunHolding) }),
   Schema.Struct({ holding: RunHolding }),
-  Schema.Struct({ running: Schema.Literal(true), held: Schema.optionalKey(RunSlot) }),
-  Schema.Struct({ nothing: Schema.String }),
+  Schema.Struct({
+    running: Schema.Literal(true).annotate({ description: 'The run runs, and nobody is waited on.' }),
+    held: Schema.optionalKey(RunSlot),
+  }),
+  Schema.Struct({
+    nothing: Schema.String.annotate({ description: "The sentence saying there is nothing to decide, in the package's words." }),
+  }),
   Decidable,
 ]).annotate({ identifier: 'RunDecision' });
 export type RunDecision = typeof RunDecision.Type;

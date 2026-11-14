@@ -53,6 +53,7 @@ import type { Verdict } from '../src/check/check.ts';
 import type { StepSpec } from '../src/workflow.ts';
 import { retryOffers } from '../src/retry/retry.ts';
 import { retriesNamed } from '../src/retry/index.ts';
+import { needsRefusedOf } from '../src/decide/decide.verb.ts';
 import { aRead, listing, names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
@@ -2095,27 +2096,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     );
     assert.equal(offer?.command, 'nemia retry r-1 implement --recheck');
     const needs = () => ({ ...said('blocked'), needs: 'Re-run the check: nemia retry r-1 implement --recheck' });
-    const refusedOn = (tip: string) => (name: string) => {
-      const [named] = retriesNamed(needs().needs, 'r-1');
-      if (!named) return undefined;
-      return (
-        retryRefusal(
-          CHECKED,
-          blockedAfter(),
-          name,
-          named.how,
-          phases(settled),
-          needs,
-          () => true,
-          undefined,
-          [],
-          () => false,
-          undefined,
-          undefined,
-          at(tip),
-        ) ?? undefined
-      );
-    };
+    const refusedOn = (tip: string) => needsRefusedOf(CHECKED, blockedAfter(), read(tip, needs));
     const moved = answerLines(
       CHECKED,
       blockedAfter(),

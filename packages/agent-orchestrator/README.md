@@ -1843,7 +1843,7 @@ retries: 1
   `failed (check)`). Nothing committed since is read off the world, never the session's word: the commit the branch was at when the
   run filed that check (`CheckTask.tip`) against where it is now, once the run has handed the blocked session off
   (`blockedRecheck`, `contracts/blocked-recheck.contract.ts`). `wf decide` offers it first there, and says beside a blocked step's
-  answer the refusal of any `wf retry` its `needs` names (`retriesNamed`). Each refusal
+  answer the refusal of any `nemia retry` its `needs` names (`retriesNamed`). Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
 - **A session its harness blocked is tried again the same way.** A session can stop on the harness's own

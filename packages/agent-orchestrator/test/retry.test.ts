@@ -41,7 +41,8 @@ import {
   runWith,
 } from '../src/runner.ts';
 import { stepsNow as stepsOf } from './steps-now.ts';
-import { askFile, asksDir, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { askFile, asksDir, listRuns, markCancelled, readAnswers, runRecord } from '../src/record/record.store.ts';
+import { passStanding } from '../src/standing/standing.verb.ts';
 import { filesStoreAt } from '../src/record/files.store.ts';
 import { isRepositoryRun, LINE_NAME, shownNote, shownStatus } from '../src/run.ts';
 import type { Listing, RunsListed } from '../src/list/list.ts';
@@ -443,6 +444,8 @@ const startedRun = async (workflowDir: string, labels?: readonly string[]): Prom
 };
 
 /** One pass of the tick over the run `id`, on the stage's engine, the run read through the store as the daemon reads it: labels and all. */
+/** The daemon's sweep of where the store's repositories stand, written to `standing.json`, which `nemia decide` reads (`passStanding`). */
+const standingPass = () => stage.runWith(stage.board().e, passStanding(listRuns(ROOT)));
 const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(filesStore.runs.read(id)));
 
 /** The attempt of `id` ended in `phase` with what `end` says — its closeout, exit code, reason, cost, denials, what it printed. */
@@ -1149,6 +1152,45 @@ test('`nemia retry --message` takes the next argument as the answer whatever it 
     ['beside --model', ['--message=keep --flag=on', '--model', 'opus'], { mode: 'fresh', model: 'opus', message: 'keep --flag=on' }],
   ];
   for (const [name, flags, how] of rows) await t.test(name, async (sub) => assert.deepEqual(await asked(sub, ...flags), how));
+});
+
+test('a step blocked after its check failed, nothing committed since: `nemia decide` offers --recheck, and says a needs-named one refused once its branch moved', async (t) => {
+  const s = story(t);
+  const b = stage.board();
+  let run: RepositoryRun;
+  const try2 = () => `${run.id}-implement-try2`;
+  await s.test('its check refuses, retries: continues it, and the session signs off blocked asking for the check again', async () => {
+    run = await throughCheck(['check: npm test', 'retries: 1'], 'failed', { exitCode: 1 });
+    assert.deepEqual((await tick(run.id)).tried, ['implement']);
+    ended(try2(), 'succeeded', {
+      closeout: {
+        outcome: 'blocked',
+        summary: 'sound',
+        artifacts: [],
+        needs: `Re-run the check: nemia retry ${run.id} implement --recheck`,
+      },
+    });
+    await tick(run.id);
+    assert.equal(runRecord(ROOT, run.id).steps.implement?.handedOff, try2(), 'handed off');
+  });
+  await s.test('nemia decide offers --recheck first, and says no refusal beside the answer', async () => {
+    await standingPass();
+    const decided = await stage.runWith(b.e, decideRun(run.id));
+    assert.ok(decided.offers[0]?.includes(`nemia retry ${run.id} implement --recheck`), decided.offers[0]);
+    names(decided.answering.implement, `nemia retry ${run.id} implement --message`);
+    assert.doesNotMatch(decided.answering.implement ?? '', /refused/);
+  });
+  await s.test('its branch moves: the answer carries the refusal of the recheck its needs names, and nemia retry refuses it', async () => {
+    const moved = stage.place().world.branch(run.repo, run.branch, { 'moved.txt': 'by hand' });
+    await standingPass();
+    const decided = await stage.runWith(b.e, decideRun(run.id));
+    names(decided.answering.implement, 'refused', moved, `nemia retry ${run.id} implement --message`);
+    assert.ok(!decided.offers.join('\n').includes('--recheck'), decided.offers.join('\n'));
+    await assert.rejects(
+      stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'recheck' })),
+      refusedAs('Conflict', moved, `nemia retry ${run.id} implement --message`),
+    );
+  });
 });
 
 test('a blocked step answered with `nemia retry --message`', async (t) => {

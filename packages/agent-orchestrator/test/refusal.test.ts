@@ -147,6 +147,11 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * `agent-orchestrator/run` is two more since `list/list.ts` and `tick/assess.ts` read a run's needs through the needs folder's face rather
  * than `needs/needs.ts` itself: `needs/index.ts`, the face, and `needs/harness.ts` behind it, whose mark of a harness's removal and
  * install command the face exports beside the needs' judgements. Both pure, importing nothing but types, and neither touching a disk.
+ *
+ * `agent-orchestrator/run` is two more since a blocked step's failed check may run again: `retry/blocked-recheck.ts`, its judgement and
+ * its read off the record, which `retry/retry.ts` and `retry/retry-refusal.ts` read, and `retry/named.ts`, the `nemia retry` commands a
+ * blocked step's `needs` names, which the retry folder's face exports. Both pure, importing nothing but `record/record.ts`, already
+ * loaded, and types, and neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
   'agent-orchestrator/run': { all: 208, effect: 15 },

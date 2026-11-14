@@ -276,21 +276,10 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 }
 
 /**
- * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
- * due, what is left to decide and the decision itself, the runs it waits on and is held until, the checkout's holder, every try's view —
- * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
- * tick's last reading): the standings, the collisions at an ending and the cap's parents are read through it, and git is asked nothing.
- *
- * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
- * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
- * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for whether a run nothing of which
- * is filed is held (`slotsOf`). Fails with a refusal a read threw.
- */
-/**
  * The refusal of the first `nemia retry` a step's `needs` names that the store would refuse (`retriesNamed`, judged by `retryRefusal` on
  * the reading `nemia decide` holds), said beside its answer (`answerLines`), or undefined.
  */
-const needsRefusedOf =
+export const needsRefusedOf =
   (steps: readonly StepSpec[], run: Run, read: AssessRead) =>
   (name: string): string | undefined => {
     const { phaseOf, signedOff, asked, verdictOf, asks, spendOf, checkKillOf, tipOf } = read;
@@ -316,6 +305,17 @@ const needsRefusedOf =
     return undefined;
   };
 
+/**
+ * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
+ * due, what is left to decide and the decision itself, the runs it waits on and is held until, the checkout's holder, every try's view —
+ * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
+ * tick's last reading): the standings, the collisions at an ending and the cap's parents are read through it, and git is asked nothing.
+ *
+ * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
+ * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same. The
+ * cap on runs in flight, whose `WF_MAX_RUNS` before any pass is the program's `StoreConfig`'s, is read for whether a run nothing of which
+ * is filed is held (`slotsOf`). Fails with a refusal a read threw.
+ */
 export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const { run, views, judged, git } = at;
   const config = yield* StoreConfig;

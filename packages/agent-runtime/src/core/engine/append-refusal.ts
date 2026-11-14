@@ -4,8 +4,6 @@
  * (`taskIdRefusal`, whose words the door passes as `idRefusal`), and its attempts number from 1 with no gap (`Task`, `model.ts`).
  */
 import type { AppendRefusal } from '../../../contracts/journal.contract.ts';
-import type { AppendRefusalReason } from './append-refusals.ts';
-import { APPEND_REFUSALS } from './append-refusals.ts';
 
 export type { AppendRefusalReason } from './append-refusals.ts';
 export { APPEND_REFUSALS } from './append-refusals.ts';

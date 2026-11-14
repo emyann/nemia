@@ -6,7 +6,7 @@
  * `retention.verb.ts` sweeps.
  */
 import type { ReleaseRetention } from '../../contracts/retention.contract.ts';
-import type { Installed, InUse, Retention } from '../../contracts/retention.contract.ts';
+import type { Installed, Retention } from '../../contracts/retention.contract.ts';
 
 export type { Installed, InUse, Retention } from '../../contracts/retention.contract.ts';
 

@@ -33,4 +33,3 @@ const speakerNameRefusalSpec = spec<(name: string) => string | undefined>({
 
 /** `speakerNameRefusal`'s type, which `src/chat/speaker-name.ts` takes: why `name` is no name an agent speaks under, or undefined. */
 export type SpeakerNameRefusal = Implementation<typeof speakerNameRefusalSpec>;
-

@@ -8,7 +8,6 @@ import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/inde
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
 import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';
-import type { WorkflowThere, VersionRefused } from '../../contracts/workflow-version.contract.ts';
 
 export type { WorkflowThere, VersionRefused } from '../../contracts/workflow-version.contract.ts';
 

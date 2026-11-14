@@ -25,4 +25,3 @@ const ruleReachesSpec = spec<(rule: PolicyRule, site: GateSite) => boolean>({
 });
 
 export type RuleReaches = Implementation<typeof ruleReachesSpec>;
-

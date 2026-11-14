@@ -37,4 +37,3 @@ export type GateSite = { workflow: string; step: string; approvedFirst: boolean;
 
 /** Why a condition can never hold at a gate: the step is approved before it runs, or it has no check to pass. */
 export type NeverWhy = 'approved-before-it-runs' | 'no-check';
-

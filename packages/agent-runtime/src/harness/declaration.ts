@@ -12,7 +12,7 @@ import type { ClaudeRules } from './claude/rules.ts';
 import { CLAUDE_DECLARATION, CLAUDE_SIGN_IN } from './claude/vocabulary.ts';
 import { CODEX_DECLARATION } from './codex/vocabulary.ts';
 import { COMMAND_DECLARATION } from './command/vocabulary.ts';
-import type { Capability, HarnessDeclared, VerbHarness } from '../../contracts/capability.contract.ts';
+import type { Capability } from '../../contracts/capability.contract.ts';
 
 export type { Capability, HarnessDeclared, VerbHarness } from '../../contracts/capability.contract.ts';
 

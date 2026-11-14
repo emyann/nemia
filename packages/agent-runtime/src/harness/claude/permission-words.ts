@@ -1,4 +1,7 @@
-/** The words a permission ask is shown in and answered by, and the command a shell call was typed with: read by `permission.ts` and its contract (`contracts/permission.contract.ts`). */
+/**
+ * The words a permission ask is shown in and answered by, and the command a shell call was typed with: read by `permission.ts` and its
+ * contract (`contracts/permission.contract.ts`).
+ */
 
 /** What a call that would ask a person is told where no answer reached it: its holder was let go, or its turn was ended. */
 export const ASK_CUT =
@@ -23,4 +26,3 @@ export const commandOf = (tool: string, input: Record<string, unknown>): string 
   const command = input['command'];
   return tool === 'Bash' && typeof command === 'string' ? command : undefined;
 };
-

@@ -1,50 +1,43 @@
-/**
- * The whole engine, as data and one pure function.
- *
- * Two states, one join key:
- *
- *   DESIRED   what I asked for            -> the journal, append-only JSONL      (ours)
- *   OBSERVED  what the machine is doing   -> run files, an A2A Task's state      (the harness's)
- *   join key  a NAME we choose before spawning and pass as `--name`
- *
- * The name is the whole trick, and it is Kubernetes' label selector: because we decide it rather
- * than learning it, a session we started is findable after a crash that lost every other trace of
- * it. The harness's own session id is a handle we look up when we need one — never a key.
- *
- * `decide()` compares the two states and names ONE step. It touches no database, spawns no
- * process and reads no clock it was not handed — so the interesting half of this engine is a pure
- * function with an exhaustive test, and the I/O half has no decisions in it.
- *
- * Why there are no leases here: for a harness that keeps its own registry, the session is owned by
- * the harness and outlives us, so "is it still running" is a question we ASK. For one that does
- * not, `harness/detached/detached.ts` keeps the registry and a heartbeat, and answers the same question with
- * the same word. Either way the answer arrives as a `SessionState` — A2A's word for a task's state — and nothing in this
- * file can tell which kind of harness produced it.
- */
-
-import type { HarnessArgs } from '../harness/args.ts';
-import type { FormerReason } from './event-schema.ts';
-import type { PermissionFacts, TranscriptMark } from '../harness/seam.ts';
-import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
+import type { PermissionFacts } from '../harness/seam.ts';
+import { transition, VERBS, type LifecycleEvent, type Move, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { backoffOf, endedWhen, restartWords } from './restart.ts';
 import { deadlineOf, heldNow, holdFacts } from './deadline.ts';
 import { turnOf } from './turn.ts';
-import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
+import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type SessionState } from './session.ts';
 import { foldInto } from './attempt-fold.ts';
 import type { AdmissionWait } from './admission.ts';
 import type { Decide } from '../../contracts/decide.contract.ts';
 import type { LifecycleOf } from '../../contracts/lifecycle.contract.ts';
 import type { Observe } from '../../contracts/observe.contract.ts';
-import type { TaskResources, Sighting, SessionAsk, SessionAskKind, AskQuestion, AskOption, Parked, Bridge, Denial, Usage, EndReason, Event, Said, Input, Attempt, State, Action, Now } from './state.ts';
+import type { Sighting, Parked, Denial, Event, Attempt, State, Action, Now } from './state.ts';
 import { nameFor } from './name.ts';
-import { waitsForInput, awaitsAdmission, admissionOf } from './waiting.ts';
+import { waitsForInput, awaitsAdmission } from './waiting.ts';
 
 export { waitsForInput, awaitsAdmission, admissionOf } from './waiting.ts';
 
 export { nameFor } from './name.ts';
 
-export type { TaskResources, Sighting, SessionAsk, SessionAskKind, AskQuestion, AskOption, Parked, Bridge, Denial, Usage, EndReason, Event, Said, Input, Attempt, State, Action, Now } from './state.ts';
+export type {
+  TaskResources,
+  Sighting,
+  SessionAsk,
+  SessionAskKind,
+  AskQuestion,
+  AskOption,
+  Parked,
+  Bridge,
+  Denial,
+  Usage,
+  EndReason,
+  Event,
+  Said,
+  Input,
+  Attempt,
+  State,
+  Action,
+  Now,
+} from './state.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);

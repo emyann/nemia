@@ -31,7 +31,6 @@ export type Chosen =
   | { readonly kind: 'remote'; readonly name: string; readonly server: string; readonly token: string }
   | { readonly kind: 'refused'; readonly name: string };
 
-
 /** The name a command asks for: `NEMIA_CONTEXT` where it is set and not empty, else the file's own. */
 const named = (config: ClientConfig, asked: string | undefined): string | undefined =>
   asked !== undefined && asked !== '' ? asked : config.current;

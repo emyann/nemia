@@ -4,7 +4,7 @@
  * `callbackRefusal` is proved by `contracts/mcp-callback.contract.ts`.
  */
 import type { CallbackRefusalOf } from '../../contracts/mcp-callback.contract.ts';
-import type { PastedCallback, Redirect, CallbackRefusal } from '../../contracts/mcp-callback.contract.ts';
+import type { PastedCallback, Redirect } from '../../contracts/mcp-callback.contract.ts';
 
 export type { PastedCallback, Redirect, CallbackRefusal } from '../../contracts/mcp-callback.contract.ts';
 

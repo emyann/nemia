@@ -10,7 +10,6 @@ import path from 'node:path';
 import type { McpServer, RemoteMcpServer } from './seam.ts';
 import type { HarnessArgs } from './args.ts';
 import type { TransportOf } from '../../contracts/transport.contract.ts';
-import type { McpTransport } from './mcp-transports.ts';
 import { MCP_TRANSPORTS } from './mcp-transports.ts';
 
 export type { McpTransport } from './mcp-transports.ts';

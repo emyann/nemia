@@ -15,4 +15,3 @@ export const speakerNameRefusal: SpeakerNameRefusal = (name) => {
     return `\`${name}\` is no name an agent speaks under: use lowercase letters, digits, \`.\`, \`_\`, \`-\` and \`/\`, opening with a letter or a digit.`;
   return undefined;
 };
-

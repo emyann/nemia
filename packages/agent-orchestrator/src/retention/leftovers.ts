@@ -6,8 +6,8 @@
  * `retention.verb.ts` sweeps.
  */
 import type { UpgradeLeftovers } from '../../contracts/leftovers.contract.ts';
-import type { PidEntry, BuildLog, Leftovers } from '../../contracts/leftovers.contract.ts';
-import { LOGS_KEPT_DAYS, LOGS_KEPT_MS, LAST_DATE_MS } from './kept.ts';
+import type { Leftovers } from '../../contracts/leftovers.contract.ts';
+import { LOGS_KEPT_DAYS, LOGS_KEPT_MS } from './kept.ts';
 
 export { LOGS_KEPT_DAYS, LOGS_KEPT_MS, LAST_DATE_MS } from './kept.ts';
 

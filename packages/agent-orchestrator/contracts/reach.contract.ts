@@ -3,8 +3,10 @@
  * declares it, never off a run, so it says whether a rule could ever approve that gate, not whether it does now. A condition admission
  * reads on the gated step itself (`factsOf`, src/auto/facts.ts) never holds at some gates: an ending approved before it is filed
  * (`approvedFirst`) has no closeout and no verdict when it is approved, so the agent cannot recommend it and no check has passed; a step
- * with no `check:` never has a check that passed (`verdict === 0`). `neverHolds` says which and why (its spec `never-holds.contract.ts`'s), `ruleReaches`
- * whether a rule could approve a gate (`rule-reaches.contract.ts`'s), `suggestedFor` the rule that reaches a gate asking all that can hold there, and `unmetNow` what keeps a rule from a gate
+ * with no `check:` never has a check that passed (`verdict === 0`). `neverHolds` says which and why (its spec `never-holds.contract.ts`'s),
+ * `ruleReaches`
+ * whether a rule could approve a gate (`rule-reaches.contract.ts`'s), `suggestedFor` the rule that reaches a gate asking all that can hold
+ * there, and `unmetNow` what keeps a rule from a gate
  * in a run's facts at the call. The words a person reads, and the read that gathers a factory's gates, are the code's, held by tests.
  */
 import { type Implementation, spec } from '@emyann/tsverify';

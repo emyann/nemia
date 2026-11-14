@@ -10,10 +10,9 @@
  */
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAnswered, PermissionAskOf } from '../../../contracts/permission.contract.ts';
-import type { AskOption, SessionAsk } from '../../core/index.ts';
+import type { AskOption } from '../../core/index.ts';
 import type { PermissionFacts } from '../seam.ts';
 import { ASK_CUT, PERMISSION_ONCE, PERMISSION_ALWAYS, PERMISSION_DENY, PERMISSION_DENIED, commandOf } from './permission-words.ts';
-import type { PermissionOffer, PermissionAsk, PermissionHeld, PermissionAnswer } from '../../../contracts/permission.contract.ts';
 
 export type { PermissionOffer, PermissionAsk, PermissionHeld, PermissionAnswer } from '../../../contracts/permission.contract.ts';
 

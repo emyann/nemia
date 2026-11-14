@@ -9,7 +9,7 @@
 import type { Adopted, AdoptRefusal } from '../../contracts/adopt.contract.ts';
 import { settingsNamed } from '../harness-settings/harness-settings.ts';
 import { DEFAULT_REVISIONS, factoryVolumes, volumeMark, type Factory, type Hires, type RevisionsPolicy } from '../factory/factory.ts';
-import type { Wiring, Adoption, AdoptRefused } from '../../contracts/adopt.contract.ts';
+import type { Adoption } from '../../contracts/adopt.contract.ts';
 import type { AdoptedCard } from './adopt-refusals.ts';
 import { templatedAdoptRefusal, strandedCardRefusal, strandedScheduleRefusal, leftoverRefusal } from './adopt-refusals.ts';
 

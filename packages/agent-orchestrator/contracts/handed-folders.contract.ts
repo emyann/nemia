@@ -28,6 +28,8 @@ const handedFoldersSpec = spec<(found: readonly HandedRunFolders[]) => string[]>
   },
 });
 
-/** The type of each folder the pass found of the runs a run is handed, by its absolute path (`handedFolders`, src/handed-folders/handed-folders.ts). */
+/**
+ * The type of each folder the pass found of the runs a run is handed, by its absolute path (`handedFolders`,
+ * src/handed-folders/handed-folders.ts).
+ */
 export type HandedFolders = Implementation<typeof handedFoldersSpec>;
-

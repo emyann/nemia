@@ -11,7 +11,7 @@
 import { DAEMON_FILE, holderWords, lastPassWords, type DaemonStanding } from '../daemon/daemon.ts';
 import { pauseWords, type Pause } from '../pause/pause.ts';
 import type { UnitRunningOf } from '../../contracts/unit-running.contract.ts';
-import type { UnitState, UnitRunning } from '../../contracts/unit-running.contract.ts';
+import type { UnitState } from '../../contracts/unit-running.contract.ts';
 
 export type { UnitState, UnitRunning } from '../../contracts/unit-running.contract.ts';
 

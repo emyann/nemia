@@ -6,6 +6,4 @@
  * It only shrinks: a change that moves a contract's types into the contract, or a value both need into a file of its own, takes the
  * contract off here in the same commit. A contract is never added.
  */
-export const READS_ITS_CODE: readonly string[] = [
-  'packages/agent-orchestrator/contracts/standing.contract.ts',
-];
+export const READS_ITS_CODE: readonly string[] = ['packages/agent-orchestrator/contracts/standing.contract.ts'];

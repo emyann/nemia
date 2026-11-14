@@ -1,5 +1,5 @@
 import { BIND_PUBLIC_VARIABLE, bindExposure, everyOf, kindOfBind, MAX_EVERY_MS } from 'agent-orchestrator';
-import type { Bind, BindOf, BindRefusal } from '../contracts/bind.contract.ts';
+import type { BindOf, BindRefusal } from '../contracts/bind.contract.ts';
 import { asked, isAddress, LOOPBACK } from './address/address.ts';
 
 export type { Bind, BindRefusal } from '../contracts/bind.contract.ts';

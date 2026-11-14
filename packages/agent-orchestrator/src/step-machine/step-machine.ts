@@ -8,7 +8,6 @@
  */
 import type { StepStatus } from '../record/record.ts';
 import type { StepMove } from '../../contracts/step-machine.contract.ts';
-import type { StepTransition } from '../../contracts/step-machine.contract.ts';
 
 export type { StepTransition } from '../../contracts/step-machine.contract.ts';
 

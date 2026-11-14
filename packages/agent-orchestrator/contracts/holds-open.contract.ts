@@ -70,4 +70,3 @@ const holdsOpenSpec = spec<
 
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type HoldsOpen = Implementation<typeof holdsOpenSpec>;
-

@@ -5,4 +5,3 @@ export const WAIT_DEFAULT_MS = 240_000;
 
 /** The longest bound a wait takes: four minutes and a half, under every caller's five. */
 export const WAIT_MAX_MS = 270_000;
-

@@ -1,4 +1,7 @@
-/** The runtime's state of a task and what the machine sees of it, as data: read by `domain.ts` (`decide`, `lifecycleOf`, `observe`) and by their contracts. */
+/**
+ * The runtime's state of a task and what the machine sees of it, as data: read by `domain.ts` (`decide`, `lifecycleOf`, `observe`) and by
+ * their contracts.
+ */
 import type { HarnessArgs } from '../harness/args.ts';
 import type { PermissionFacts, TranscriptMark } from '../harness/seam.ts';
 import type { AdmissionWait } from './admission.ts';
@@ -737,4 +740,3 @@ export type Now = {
    */
   drained?: boolean;
 };
-

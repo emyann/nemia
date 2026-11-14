@@ -5,4 +5,3 @@
  * the judgement over the folder as one value (`assume`, pure) rather than over the join.
  */
 export const joinedFolder = (host: string, rest: string): string => host + '/' + rest;
-

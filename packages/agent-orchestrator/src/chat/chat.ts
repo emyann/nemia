@@ -8,7 +8,7 @@
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
  * (`say.verb.ts`).
  */
-import type { FromRefusal, Speaker, SpeakerRefusal, SpeakerRefused } from '../../contracts/speaker.contract.ts';
+import type { FromRefusal, Speaker, SpeakerRefusal } from '../../contracts/speaker.contract.ts';
 import type { FramedForStep, StepSpeaker } from '../../contracts/step-speaker.contract.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { blockedWord, type EnginePhase } from '../views/views-words.ts';

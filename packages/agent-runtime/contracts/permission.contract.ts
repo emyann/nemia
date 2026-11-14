@@ -12,7 +12,14 @@
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionAsk } from '../src/core/index.ts';
-import { ASK_CUT, commandOf, PERMISSION_ALWAYS, PERMISSION_DENIED, PERMISSION_DENY, PERMISSION_ONCE } from '../src/harness/claude/permission-words.ts';
+import {
+  ASK_CUT,
+  commandOf,
+  PERMISSION_ALWAYS,
+  PERMISSION_DENIED,
+  PERMISSION_DENY,
+  PERMISSION_ONCE,
+} from '../src/harness/claude/permission-words.ts';
 
 /** What the SDK hands `canUseTool` about a prompt, as the ask reads it: its words, its two hints, and the rules it suggests saving. */
 export type PermissionOffer = {

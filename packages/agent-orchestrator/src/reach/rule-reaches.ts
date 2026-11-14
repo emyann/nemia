@@ -7,4 +7,3 @@ export const ruleReaches: RuleReaches = (rule, site) =>
   rule.answer === 'approve' &&
   (rule.steps === undefined || rule.steps.includes(site.step)) &&
   rule.when.every((c) => neverHolds(site, c) === null);
-

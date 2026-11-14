@@ -18,4 +18,3 @@ export const holdsOpen: HoldsOpen = (step, run, phaseOf, closeoutOf, askedCloseo
   if (own === 'blocked') return true;
   return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
 };
-

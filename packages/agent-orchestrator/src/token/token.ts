@@ -8,7 +8,6 @@
  * of liveness are `caller.verb.ts`'s, afresh on each request.
  */
 import type { CallerOfToken } from '../../contracts/session-caller.contract.ts';
-import type { TokenNeed } from '../../contracts/session-caller.contract.ts';
 
 export type { TokenNeed } from '../../contracts/session-caller.contract.ts';
 

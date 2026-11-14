@@ -21,7 +21,7 @@ import { fieldsOf, itemsOf, sameSchema } from '../shape/shape.ts';
 import type { StepSpec } from '../step/step.ts';
 import { downstreamOf } from '../workspace/workspace.ts';
 import { tryOf, type Run } from '../record/record.ts';
-import type { StepBudget, CapInput } from '../../contracts/budget.contract.ts';
+import type { StepBudget } from '../../contracts/budget.contract.ts';
 
 export type { StepBudget, CapInput } from '../../contracts/budget.contract.ts';
 

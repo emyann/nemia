@@ -11,4 +11,3 @@ export const handedFolders: HandedFolders = (found) => {
   for (const f of found) if (f.inputs !== undefined) folders.push(f.inputs);
   return folders;
 };
-

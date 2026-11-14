@@ -1,4 +1,7 @@
-/** A run's steps as a graph, its `input` edges included (`inputGraphOf`): read by `summary/graph.ts` and by `contracts/workflow-graph.contract.ts`, which proves the graph `graph.ts` builds on it. */
+/**
+ * A run's steps as a graph, its `input` edges included (`inputGraphOf`): read by `summary/graph.ts` and by
+ * `contracts/workflow-graph.contract.ts`, which proves the graph `graph.ts` builds on it.
+ */
 import { nodeKind, type NodeKind } from '../route/index.ts';
 import { DEFAULT_ROUNDS, type StepSpec } from '../step/step.ts';
 import type { EdgeKind } from 'objects';
@@ -82,4 +85,3 @@ export function inputGraphOf(steps: readonly GraphStep[]): ObjectGraph {
   const nodes = nodesOf(steps);
   return nodes ? { roots, edges, nodes } : { roots, edges };
 }
-

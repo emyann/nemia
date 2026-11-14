@@ -20,4 +20,3 @@ export const stopRefusalOf = (taskId: string, state: State | undefined): string 
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
   return `\`${taskId}\` has been asked to stop already: the next pass stops what runs and settles it. \`ae ls\` says when it has.`;
 };
-

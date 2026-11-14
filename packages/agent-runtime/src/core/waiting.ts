@@ -1,4 +1,7 @@
-/** Whether a task waits: on a person's answer (`waitsForInput`), or on the layer above's word to start its turn (`awaitsAdmission`). Read by `domain.ts` and its contracts. */
+/**
+ * Whether a task waits: on a person's answer (`waitsForInput`), or on the layer above's word to start its turn (`awaitsAdmission`). Read by
+ * `domain.ts` and its contracts.
+ */
 import type { State } from './state.ts';
 import { turnOf } from './turn.ts';
 
@@ -37,4 +40,3 @@ export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
   if (turn.attempts.length > 0) return undefined;
   return state.admitted === turn.n ? 'admitted' : 'queued';
 }
-

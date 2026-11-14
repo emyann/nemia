@@ -21,9 +21,8 @@ import {
   workflowNameRefusal,
   repoNameRefusal,
   reposNamed,
-  type Schedule,
 } from '../factory.ts';
-import type { WiringChange, WiringRefused } from '../../../contracts/wiring.contract.ts';
+import type { WiringRefused } from '../../../contracts/wiring.contract.ts';
 import { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';
 
 export { withName, hiresInto, withHire, withEntry, withoutEntry } from './dictionaries.ts';

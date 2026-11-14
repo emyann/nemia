@@ -1,4 +1,7 @@
-/** The words a speaker is named and framed by: read by `chat.ts`, `speaker-name.ts`, `framed.ts` and their contracts (`contracts/speaker.contract.ts`, `contracts/speaker-name.contract.ts`). */
+/**
+ * The words a speaker is named and framed by: read by `chat.ts`, `speaker-name.ts`, `framed.ts` and their contracts
+ * (`contracts/speaker.contract.ts`, `contracts/speaker-name.contract.ts`).
+ */
 
 /** The words the person's own are said to the task in, before the words themselves, as the keeper has always said them. */
 export const PERSON_FRAME = 'The person writes from the board: ';
@@ -21,4 +24,3 @@ export const wellSpelt = (name: string): boolean => {
   for (let i = 1; i < name.length; i++) if (!NAME_TAKES.includes(name.charAt(i))) return false;
   return true;
 };
-

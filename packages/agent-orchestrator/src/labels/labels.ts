@@ -13,7 +13,7 @@ import path from 'node:path';
 import { DEFAULT_NAMESPACE } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import { LABEL_KEYS, RESERVED_KEYS, selectsLabels, type Selectors } from '../watch/selector.ts';
-import type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
+import type { Labels, LabelChange } from '../../contracts/labels.contract.ts';
 
 export type { Labels, LabelChange, Edited } from '../../contracts/labels.contract.ts';
 

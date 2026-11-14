@@ -5,7 +5,8 @@
  * (`MACHINE_VERBS`), a help of one, and, under this machine's context, a word no list holds, which that CLI refuses in its own words; and
  * refused, a word typed while the context names a remote daemon that the client does not answer and that is no verb of this machine:
  * nothing is forwarded, so no such word reaches this machine's store.
- * Each list is spelled once, in `verbs.ts` or `objects`, and read by the contract and the code: no file of `src` imports a value of a contract, which ships the
+ * Each list is spelled once, in `verbs.ts` or `objects`, and read by the contract and the code: no file of `src` imports a value of a
+ * contract, which ships the
  * verifier (`tools/guards/test/no-contract-values.test.ts`).
  */
 import { MACHINE_VERBS, MOVED_COMMANDS, type MovedCommand } from 'objects';

@@ -1,4 +1,6 @@
-/** Where a transcript event came from, a list and its word, read by the seam (`seam.ts`) and its contract (`contracts/origin.contract.ts`). */
+/**
+ * Where a transcript event came from, a list and its word, read by the seam (`seam.ts`) and its contract (`contracts/origin.contract.ts`).
+ */
 
 /**
  * The words a harness has for where a transcript event came from, the Agent SDK's (`SDKMessageOrigin['kind']`), held equal to them in

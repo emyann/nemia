@@ -2,7 +2,6 @@
  * The pure part of `nemia wait`: how long a wait waits (`waitBound`), and the `--for` it is given read as milliseconds (`waitForOf`).
  */
 import type { WaitBoundOf } from '../../contracts/wait-bound.contract.ts';
-import type { WaitBound } from '../../contracts/wait-bound.contract.ts';
 import { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';
 
 export { WAIT_DEFAULT_MS, WAIT_MAX_MS } from './wait-limits.ts';

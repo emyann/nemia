@@ -47,7 +47,8 @@ export type WriteRefusal = 'host' | 'site' | 'media';
 /**
  * Whether a header names this machine's loopback (`localhost`, `127.0.0.1` or `[::1]`, on any port, in any case), and whether one says a
  * JSON body (`application/json`, its parameters and case left out): patterns and case folds, which the verifier does not read (a regular
- * expression, `toLowerCase`), so each is the code's (`src/address/address.ts`, `src/media/media.ts`), declared pure and nothing more, and the laws read the same two the
+ * expression, `toLowerCase`), so each is the code's (`src/address/address.ts`, `src/media/media.ts`), declared pure and nothing more, and
+ * the laws read the same two the
  * code calls. Which spellings each takes is held by its tests (`src/guard.test.ts`).
  */
 export const loopbackName = assume(loopback, { pure: true });

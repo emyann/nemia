@@ -1,7 +1,8 @@
 /**
  * Who speaks to a long-lived session in its chat (agent-orchestrator, src/chat/chat.ts): the person, or an agent named as itself
  * (`Speaker`), which is the caller the request's token says (`stepSpeaker`, step-speaker.contract.ts). A name an agent may speak under
- * (`speakerNameRefusal`, speaker-name.contract.ts); whether words from a speaker are taken (`speakerRefusal`); whether a request that still says who its words are
+ * (`speakerNameRefusal`, speaker-name.contract.ts); whether words from a speaker are taken (`speakerRefusal`); whether a request that still
+ * says who its words are
  * from, a field retired for the caller's own token, is refused (`fromRefusal`); and the words the keeper says them to the session in
  * (`framedFor`).
  *
@@ -11,7 +12,7 @@
  * The types the laws read are this contract's, which `src/chat/chat.ts` hands on; the constants are `src/chat/speaker-words.ts`'s; and the
  * `speakerNameRefusal` that `speakerRefusal`'s laws read is `src/chat/speaker-name.ts`'s, proved by `speaker-name.contract.ts`.
  */
-import { assume, type Implementation, spec } from '@emyann/tsverify';
+import { type Implementation, spec } from '@emyann/tsverify';
 import { speakerNameRefusal } from '../src/chat/speaker-name.ts';
 import { PERSON_FRAME } from '../src/chat/speaker-words.ts';
 

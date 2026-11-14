@@ -4,9 +4,7 @@
  * Which object a key names, the order of the events and the BOOKMARK between reads are the door's. Pure.
  */
 import type { WatchChanges } from '../../contracts/watch-changes.contract.ts';
-import type { WatchEventType } from 'objects';
-import type { Versioned, WatchChange } from '../../contracts/watch-changes.contract.ts';
-import type { WatchChangeType } from '../../contracts/watch-changes.contract.ts';
+import type { WatchChange } from '../../contracts/watch-changes.contract.ts';
 
 export type { WatchChangeType } from '../../contracts/watch-changes.contract.ts';
 

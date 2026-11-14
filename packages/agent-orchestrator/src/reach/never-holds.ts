@@ -10,4 +10,3 @@ export const neverHolds: NeverHolds = (site, condition) => {
   if (!site.hasCheck && condition === 'checked') return 'no-check';
   return null;
 };
-

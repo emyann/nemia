@@ -3,7 +3,7 @@
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
 import type { StepSpec } from '../step/step.ts';
-import { andList, endedForGood, tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
+import { andList, tryOf, type Approval, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
 import {
   approvalOf,
@@ -22,7 +22,6 @@ import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { ApprovalRefusal } from '../../contracts/gate.contract.ts';
 import type { TakeBackStopOf } from '../../contracts/take-back.contract.ts';
-import { holdsOpen } from '../holds-open/holds-open.ts';
 
 export { holdsOpen } from '../holds-open/holds-open.ts';
 

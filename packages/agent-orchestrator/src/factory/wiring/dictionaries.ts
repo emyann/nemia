@@ -21,4 +21,3 @@ export const withoutEntry = <V>(dict: Readonly<Record<string, V>>, key: string):
   const { [key]: _gone, ...rest } = dict;
   return rest;
 };
-

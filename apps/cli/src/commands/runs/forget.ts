@@ -39,7 +39,10 @@ function leftLine(id: string, did: string, err: unknown, tally: Tally): void {
   if (!(err instanceof Refused)) tally.failed = true;
 }
 
-/** `nemia rm <runId>... [--delete-branches [--force-unmerged]]`: each run forgotten whole, its line each; none named, the help. */
+/**
+ * `nemia rm <runId>... [--delete-branches [--force-unmerged]]`: each run forgotten whole, its line each; none named, the help.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function rm(args: Args): Promise<number> {
   const ids = idsOf(args);
   if (!ids.length) {
@@ -176,6 +179,7 @@ async function removed(ready: readonly Ready[], payload: object, tally: Tally): 
 /**
  * `nemia prune [<runId>...] [--unmerged] [--artifacts] [--yes]`: the space runs that are over hold, listed with its size, and freed on
  * `--yes` or a person's y; with none named, every run that is over.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function prune(args: Args): Promise<number> {
   const ids = idsOf(args);

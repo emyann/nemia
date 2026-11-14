@@ -18,6 +18,8 @@ type RepoQuery = { readonly repo?: string };
  * under this machine's context the folder the command is typed in, which the api places on the repository of a filed factory that holds
  * it (`repoQueryOf`), and where no factory's does (`Invalid`) asked again with no repository, which the api answers with yours and the
  * builtins alone. Under a remote context no repository is sent.
+ * @param args The words typed after the command's name, whose `repo` is the repository typed, if any.
+ * @param ask The request to make, given the `repo` query to send, or none.
  */
 export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
   const typed = textArg(args, 'repo');
@@ -31,7 +33,11 @@ export const onRepo = <A, E, R>(args: Args, ask: (repo: RepoQuery) => Effect.Eff
   );
 };
 
-/** The words `file` holds, or stdin's for `-`, for `nemia <command>`; refused, exit 2, naming the file, where it cannot be read. */
+/**
+ * The words `file` holds, or stdin's for `-`, for `nemia <command>`; refused, exit 2, naming the file, where it cannot be read.
+ * @param file The path of the file to read, or `-` for stdin.
+ * @param command The command's name, said in a refusal.
+ */
 export function wordsRead(file: string, command: string): string {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');

@@ -21,7 +21,10 @@ import { amountArg, listArg, namespaceOfRun, said, switchArg, textArg } from '..
 import { runOf } from './act.ts';
 import { answersOf } from './answers.ts';
 
-/** Dollars as the store prints them: two places, or three figures under a cent. */
+/**
+ * Dollars as the store prints them: two places, or three figures under a cent.
+ * @param usd The amount, in dollars.
+ */
 export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A cap in dollars as a person wrote it: whole where it is whole. */
@@ -49,7 +52,11 @@ async function stepOf(command: string, args: Args, namespace: string, typed: str
 /** The way a retry was asked, as its line says it: `--model m`, else `--continue`, `--fresh` or `--recheck`. */
 const modeWord = (mode: string, model: string | undefined): string => (model !== undefined ? `--model ${model}` : `--${mode}`);
 
-/** What `nemia retry` printed of the ask it wrote: the round asked for, or the try, how, with what, and when it is filed. */
+/**
+ * What `nemia retry` printed of the ask it wrote: the round asked for, or the try, how, with what, and when it is filed.
+ * @param typed What was typed: the run and step, whether a round was asked, the mode and model, the budget in dollars, the message, and
+ * whether answers were given.
+ */
 export const retryLines = (
   { try: tryNo, file, stopFirst, step: looping, round: n, budget }: RunAsked,
   typed: {
@@ -76,7 +83,10 @@ export const retryLines = (
   return [`${typed.runId}  asked: try ${tryNo ?? ''} of ${typed.step} (${how})${words} — ${then}`, `   ${file}`];
 };
 
-/** `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer]... [--message] [--budget]`. */
+/**
+ * `nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer]... [--message] [--budget]`.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function retry(args: Args): Promise<number> {
   const command = RETRY_WORDS.name;
   const runId = runOf(args);
@@ -116,6 +126,9 @@ export async function retry(args: Args): Promise<number> {
 /**
  * The budgets `--budget <step>=<amount>` gives, each the step's name and dollars above zero (`dollarsOf`); refused, exit 2, showing the
  * line to type. Which steps they may name is the approval's.
+ * @param typed Each `--budget` as typed, `<step>=<amount>`.
+ * @param runId The run's id, said in the refusal's line to type.
+ * @param step The step at its gate, said in the refusal's line to type.
  */
 export function budgetsOf(typed: readonly string[], runId: string, step: string): { step: string; usd: number }[] {
   return typed.map((value) => {
@@ -141,6 +154,9 @@ const thenWords = ({ step, next }: RunApproved): string =>
 /**
  * What `nemia approve` printed: an approval taken back (`--off`), the loop accepted as it stands, or the try approved, with what, each cap
  * it set, and the file.
+ * @param approved What the api answers of the approval.
+ * @param runId The run's id.
+ * @param answered Whether answers were given with the approval.
  */
 export const approveLines = (approved: RunApproved, runId: string, answered: boolean): string[] => {
   const { step, try: tryNo, message, file, loop, caps, takenBack } = approved;
@@ -163,6 +179,7 @@ export const approveLines = (approved: RunApproved, runId: string, answered: boo
 /**
  * `nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]`, or `nemia approve
  * <runId> <step> --off`, an approval taken back.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function approve(args: Args): Promise<number> {
   const command = APPROVE_WORDS.name;
@@ -189,7 +206,11 @@ const fenced = (text: string, info: string): string[] => {
   return [`${fence}${info}`, text, fence];
 };
 
-/** What `nemia say` printed: the words kept for a first try, or said to which try and journalled where; then the words, fenced. */
+/**
+ * What `nemia say` printed: the words kept for a first try, or said to which try and journalled where; then the words, fenced.
+ * @param runId The run's id.
+ * @param step The step the words were said to.
+ */
 export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSaid, runId: string, step: string): string[] => [
   kept
     ? `${runId}  kept for ${step}'s first try, at ${at} — not delivered: no session of ${step} runs yet, and its first try's brief carries the words`
@@ -202,6 +223,7 @@ export const sayLines = ({ at, attempt, text, try: tryNo, taskId, kept }: RunSai
 /**
  * `nemia say <runId> <step> <words...>`: the words to the step's running session, from the caller the token says. `--as`, retired, never
  * reaches here: its words' check refuses it (`SAY_WORDS`).
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
  */
 export async function say(args: Args): Promise<number> {
   const command = SAY_WORDS.name;

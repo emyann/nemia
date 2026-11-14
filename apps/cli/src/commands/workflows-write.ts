@@ -21,7 +21,10 @@ const merged = (files: readonly WorkflowFile[], over: readonly WorkflowFile[]): 
   return [...byPath.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 };
 
-/** `nemia workflows write`'s runner, on the words parsed against its words. */
+/**
+ * `nemia workflows write`'s runner, on the words parsed against its words.
+ * @param args The words typed after the command's name, parsed against its words (`parseArgv`).
+ */
 export async function workflowsWrite(args: Args): Promise<number> {
   const place = placeOf(args, COMMAND, USAGE);
   const name = textArg(args, 'name') ?? '';

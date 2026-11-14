@@ -6,7 +6,9 @@
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
 import { deadlineOf } from '../src/core/deadline.ts';
-import { type Attempt, awaitsAdmission, nameFor, type Now, type Sighting, type State, waitsForInput } from '../src/core/domain.ts';
+import { nameFor } from '../src/core/name.ts';
+import type { Attempt, Now, Sighting, State } from '../src/core/state.ts';
+import { awaitsAdmission, waitsForInput } from '../src/core/waiting.ts';
 import type { LifecycleEvent } from '../src/core/lifecycle.ts';
 import { backoffOf, RESTART_BACKOFF } from '../src/core/restart.ts';
 

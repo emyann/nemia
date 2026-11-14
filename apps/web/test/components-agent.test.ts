@@ -673,8 +673,9 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
       { from: 'yours' as const, workflow: 'mine', step: 'plan' },
     ],
     fills: [
-      { from: 'repo' as const, workflow: 'dev', step: 'implement', hired: false },
+      { from: 'factory' as const, workflow: 'dev', step: 'implement', hired: false },
       { from: 'factory' as const, workflow: 'build', step: 'review', hired: true },
+      { from: 'factory' as const, workflow: 'build', step: 'review', hired: false },
     ],
   };
   const html = renderToStaticMarkup(
@@ -683,6 +684,14 @@ test("a link to a repository's agent, or to a node of a repository's workflow, k
   );
   assert.match(html, /href="\/workflows\/repo\/dev\/implement\?factory=treed"/, "a repository's node, in the page's factory");
   assert.match(html, /href="\/workflows\/yours\/mine\/plan"/, 'a node of yours, with none');
-  assert.match(html, /href="\/workflows\/factory\/build\/review\?factory=treed"/, "a step the factory's hire fills, in its factory");
-  assert.equal(html.match(/data-node="dev\/implement"/g)?.length, 1, 'a step both named and filled, once');
+  assert.equal(
+    html.match(/href="\/workflows\/factory\/build\/review\?factory=treed"/g)?.length,
+    1,
+    'a step the factory fills, in its factory, once',
+  );
+  assert.equal(
+    html.match(/data-node="dev\/implement"/g)?.length,
+    1,
+    'a step both named and filled, once, whichever origin each reads it from',
+  );
 });

@@ -60,11 +60,14 @@ function NodeLink({ user }: { user: AgentUser | AgentFill }) {
   );
 }
 
-/** Each node that names an agent, then each step it fills in the factory read that none of those is, hired there or named elsewhere. */
+/**
+ * Each node that names an agent, then each step it fills in the factory read that none of those is, hired there or named elsewhere: a step
+ * by its workflow and its name, since a factory's tree is read as a repository's where a node names it.
+ */
 const nodesOf = ({ usedBy, fills }: Pick<AgentListing, 'usedBy' | 'fills'>): Array<AgentUser | AgentFill> => {
-  const keyOf = (node: AgentUser | AgentFill) => `${node.from}/${node.workflow}/${node.step}`;
-  const named = new Set(usedBy.map(keyOf));
-  const filled = fills.filter((fill, i) => !named.has(keyOf(fill)) && fills.findIndex((other) => keyOf(other) === keyOf(fill)) === i);
+  const keyOf = (node: AgentUser | AgentFill) => `${node.workflow}/${node.step}`;
+  const drawn = new Set(usedBy.map(keyOf));
+  const filled = fills.filter((fill, i) => !drawn.has(keyOf(fill)) && fills.findIndex((other) => keyOf(other) === keyOf(fill)) === i);
   return [...usedBy, ...filled];
 };
 

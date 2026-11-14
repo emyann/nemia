@@ -187,6 +187,11 @@ export default {
         `the tree's own ${TREE_AGENT.name} opens on its page in ${TREED} and says a factory's own agent changes the factory's way`,
       );
       await expectCount(agentPage.getByRole('button', { name: /^(Save|Remove…?)$/ }), 0, 'and offers no Save and no Remove');
+      await expectCount(
+        agentPage.locator(`[data-used-by] a[data-node="${OWN.name}/${OWN.step}"]`),
+        1,
+        `and it names the step of its tree it fills in ${TREED}, once`,
+      );
       await expectVisible(
         agentPage.locator(`[data-given-skill="${TREE_SKILL.name}"] [data-skill-from="factory"]`),
         `its ${TREE_SKILL.name} is found in its tree, as a start in ${TREED} finds it, and said to be the factory's`,

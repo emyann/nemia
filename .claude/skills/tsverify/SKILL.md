@@ -50,6 +50,9 @@ export const shipping: Shipping = (total) => (total >= 50 ? 0 : 5)
 
 - **The spec's module exports the function's type**, `Implementation<typeof shippingSpec>`, under the function's name: the
   code takes it and imports nothing of tsverify, and the verifier finds the code through that import.
+- **The spec's module imports nothing from the code that implements it.** Declare the types its signature needs in the spec's
+  module and let the code take them from it; a value both need (an error class, a service) goes in a module of its own that
+  both import. A spec that imports its implementation's types cannot be written, or type-checked, before the code exists.
 - **A law reads one run**: `({ input: [a, , c], output }) => boolean`, the arguments as a tuple (a hole for one it does not
   read). A law of async code or an Effect program reads its outcome as `output` and the calls it made as `calls`.
 - **Give each law its sentence**, `{ description, condition }`: the report prints the description on the law's line, so

@@ -10,11 +10,15 @@ import type { Frozen } from './frozen.ts';
 /**
  * Whether a run has something to decide, as its page and the list read it: `assess` says it finished, or a step waits
  * on a person — and nobody called it off. The api has the last word (`isDecidable`); this only says when to ask.
+ * @param run The run: its status, when it was called off (null where it was not) and the steps that wait on you.
  */
 export const decidableRun = (run: Frozen<Pick<RunView, 'status' | 'cancelledAt' | 'waitingOnYou'>>): boolean =>
   run.cancelledAt === null && run.status !== 'cancelled' && (run.status !== 'running' || run.waitingOnYou.length > 0);
 
-/** Whether the api's answer is a decision to show, rather than `running` or `nothing`. */
+/**
+ * Whether the api's answer is a decision to show, rather than `running` or `nothing`.
+ * @param decision The api's answer for the run, or undefined while none has come.
+ */
 export const isDecidable = (decision: RunDecision | undefined): decision is Decidable => Boolean(decision && 'touched' in decision);
 
 /**
@@ -27,6 +31,7 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * `starting`, `between-attempts`, a session its harness blocked and `pending` flip between polls while nothing the decision says has moved,
  * and each flip would ask the api — an observation per task, and `git diff` — again. A step that signs off, a check that
  * settles, a try filed (a new task) all move it.
+ * @param run The run: its status, when it was called off, who it waits on, its hold where it has one, and its steps.
  */
 export const decisionStamp = (
   run: Frozen<
@@ -55,6 +60,7 @@ export const decisionStamp = (
  * several branches counts the change with the most lines among them — the parent's plus a follower's own on top of it. Two siblings that
  * each changed one file apart count the larger alone: the card is a line for triage, and the CLI's `decide`, which prints each branch on
  * its own, is where the whole of it is. A binary file adds no lines.
+ * @param touched What each branch the decision reads touched, or the error that its radius could not be read.
  */
 export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
@@ -80,6 +86,8 @@ export function touchedSummary(touched: readonly Touched[]): string {
 /**
  * A group's +/− bar, as a percentage of the track each part fills: the group with the most lines changed on the branch
  * fills it, and the others in proportion. A group of binary files only has no lines, and no bar.
+ * @param group The group's added and removed lines.
+ * @param most The most lines any group on the branch changed (`mostLines`); zero or less gives no bar.
  */
 export function barOf(group: Pick<Group, 'added' | 'removed'>, most: number): { added: number; removed: number } {
   if (most <= 0) return { added: 0, removed: 0 };
@@ -87,7 +95,10 @@ export function barOf(group: Pick<Group, 'added' | 'removed'>, most: number): { 
   return { added: pct(group.added), removed: pct(group.removed) };
 }
 
-/** The most lines any of these groups changed: what `barOf` measures a bar against. */
+/**
+ * The most lines any of these groups changed: what `barOf` measures a bar against.
+ * @param groups The groups of a branch's radius.
+ */
 export const mostLines = (groups: readonly Group[]): number => Math.max(0, ...groups.map((g) => g.added + g.removed));
 
 export type DiffLine = 'meta' | 'hunk' | 'added' | 'removed' | 'context';
@@ -96,6 +107,7 @@ export type DiffLine = 'meta' | 'hunk' | 'added' | 'removed' | 'context';
  * What a line of a unified diff is, for its colour: a file's header lines (`+++`, `---`, and every line no other kind claims, such as
  * `diff --git`, `index`, `new file mode`, `rename from`, `similarity index`, `Binary files … differ`), a hunk's header, an added line, a
  * removed one, or context.
+ * @param line One line of the diff, without its line break.
  */
 export function diffLine(line: string): DiffLine {
   if (line.startsWith('@@')) return 'hunk';
@@ -106,7 +118,11 @@ export function diffLine(line: string): DiffLine {
   return 'meta';
 }
 
-/** A file's lines in the diff, off the branch's radius — both ends of a rename — when git counted it. */
+/**
+ * A file's lines in the diff, off the branch's radius — both ends of a rename — when git counted it.
+ * @param touched What the branch touched, or undefined where it is not known; a radius that could not be read gives undefined.
+ * @param file The file's path as the diff names it, or `from → to` for a rename.
+ */
 export function changeOf(touched: Touched | undefined, file: string): { added: number | null; removed: number | null } | undefined {
   if (!touched || 'error' in touched.radius) return undefined;
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));

@@ -58,8 +58,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
   `e2e/built.ts`: the board's files but its tests, `objects`' and the lockfile, by size and time of change; never in CI); `rm -rf dist`
   makes it build. A worker stops at its first failing page, and its seat starts another on a fresh store for the pages left
   (`startsAgain`, `e2e/workers.ts`), so one run names every failing page of its batch, five at most, and their names together at its end:
-  read them all before running again. A change to a part most pages draw is pushed for CI's shards to name the pages it breaks, never
-  walked page by page here.
+  read them all before running again. After a change to a part most pages draw, run the pages that draw it most and sign off: the
+  round's `ci` shards visit every page in five minutes and name the ones it broke, where walking them all here takes an hour.
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.

@@ -51,7 +51,7 @@ holds what every change needs.
   measure with `npx tsrs --noEmit`, the compiler `ci` judges with.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
-- `npm run rules` — the repository-wide rule tests, side by side in about fifteen seconds (`tools/guards/rules.ts`: the guards but their
+- `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
   boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of what a
   session changed never run them, so a step's session runs it before it signs off, and anyone before a push.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch

@@ -12,7 +12,10 @@ import { Invalid } from '../refusal/refusal.ts';
 import { DEFAULT_TIMEOUT_MS, timeoutOf, timeoutRefusal } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
-/** The store's timeout file. */
+/**
+ * The store's timeout file.
+ * @param home The store's root.
+ */
 export const timeoutFile = (home: string): string => path.join(home, 'pause-timeout.json');
 
 const isTimeoutFile = Schema.is(Schema.Struct({ timeout: Schema.String, at: Schema.optional(Schema.String) }));
@@ -23,6 +26,7 @@ export type TimeoutAt = { ms: number; set: boolean; at?: string };
 /**
  * The timeout in force on the store at `home`: the file's, or ten minutes where there is none. A file that does not read, or holds no
  * timeout, is refused `Invalid`, naming the file and the verb that writes it again.
+ * @param home The store's root.
  */
 export function timeoutAt(home: string): TimeoutAt {
   const file = timeoutFile(home);
@@ -46,7 +50,12 @@ export function timeoutAt(home: string): TimeoutAt {
   return { ms, set: true, ...(read.at ? { at: read.at } : {}) };
 }
 
-/** The timeout `text` written as the store's, stamped `now`; refused `Invalid` where `timeoutRefusal` refuses it. */
+/**
+ * The timeout `text` written as the store's, stamped `now`; refused `Invalid` where `timeoutRefusal` refuses it.
+ * @param home The store's root.
+ * @param text The timeout as a person typed it, a duration such as `10m`.
+ * @param now When it is set, the file's stamp; the present where none is given.
+ */
 export function putTimeout(home: string, text: string, now: Date = new Date()): TimeoutAt {
   const ms = timeoutOf(text);
   if (ms === undefined) throw new Invalid({ message: `${timeoutRefusal(text)}: type nemia pause-timeout <d>, as nemia pause-timeout 10m` });

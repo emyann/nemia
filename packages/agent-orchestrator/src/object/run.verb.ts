@@ -73,7 +73,10 @@ export type RunReads = {
 /** The object of a run, or why it is not judged, in the words the list says it with, and each step's word off its record. */
 export type RunObjectAnswer = RunObject | { unjudged: string; steps: readonly UnjudgedStep[] };
 
-/** The short of a try (`TryShort`): its number, round and codes, how it signed off and its check's verdict. */
+/**
+ * The short of a try (`TryShort`): its number, round and codes, how it signed off and its check's verdict.
+ * @param t The try, as the step's tries read it.
+ */
 export const tryShort = (t: StepTry): TryShort => ({
   try: t.try,
   round: t.round,
@@ -418,7 +421,12 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 /** The parts read on every request are exactly the inputs `RUN_INPUTS` says a request watches: one added there fails the typecheck here. */
 export const diskPartsHeld: Same<keyof RunDiskParts, InputsWatchedBy<'request'>> = true;
 
-/** The disk parts of `run` (`RunDiskParts`), off the store's root `home` and its workflow `folder` as it loads now (`workflowsOf`). */
+/**
+ * The disk parts of `run` (`RunDiskParts`), off the store's root `home` and its workflow `folder` as it loads now (`workflowsOf`).
+ * @param run The run's record.
+ * @param home The store's root.
+ * @param folder The run's workflow folder as it loads now: its steps, or the warning of why it does not load.
+ */
 export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']): RunDiskParts => ({
   onDisk: onDiskOf(run, home),
   warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
@@ -429,6 +437,8 @@ export const diskPartsOf = (run: Run, home: string, folder: RunReading['folder']
  * The object before its disk parts (`runObjectCore`) with them laid over (`RunDiskParts`): a new object, the one handed in left as it
  * was, since a kept one is shared. Its `resourceVersion` is the core's digested with the parts laid (`runVersion`), so it moves when
  * either does; laid twice, the version is digested twice, so it is laid on the core alone.
+ * @param object The run's object before its disk parts, left as it is.
+ * @param parts The disk parts laid over it.
  */
 export const withDiskParts = (object: RunObject, parts: RunDiskParts): RunObject => {
   const laid = object.status.steps.map((step) => ({ step, files: parts.files(step.name) }));

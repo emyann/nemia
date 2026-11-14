@@ -49,7 +49,11 @@ export const STOP_GRACE_MS = 2000;
 /** How often a stopped group is asked whether it has ended. */
 export const STOP_POLL_MS = 20;
 
-/** Signal the process group `pgid` leads; false when it has no process left, or cannot be signalled. */
+/**
+ * Signal the process group `pgid` leads; false when it has no process left, or cannot be signalled.
+ * @param pgid The id of the process group, its leader's pid.
+ * @param signal The signal sent, or 0 to ask only whether the group has a process left.
+ */
 export function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
   try {
     process.kill(-pgid, signal);
@@ -77,6 +81,8 @@ function emptied(pgid: number, graceMs: number): boolean {
  * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
  * there after `graceMs` (`STOP_GRACE_MS` by default), SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill.
  * Never throws.
+ * @param pgid The id of the process group, its leader's pid.
+ * @param graceMs How long the group is given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
 export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS): boolean {
   if (!signalGroup(pgid, 'SIGTERM') || emptied(pgid, graceMs)) return false;
@@ -101,6 +107,10 @@ function lastLines(stderr: string): string {
 /**
  * Why a verb stopped at its deadline of `deadlineMs` gave no answer: that it was stopped, whether a process it started outlived SIGTERM
  * for `graceMs` and was `killed`, and the last lines the process running then wrote on `stderr`.
+ * @param deadlineMs The verb's deadline, in ms.
+ * @param killed Whether a process it started outlived SIGTERM and was killed.
+ * @param stderr What the process running then wrote on stderr.
+ * @param graceMs How long the group was given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
 export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string, graceMs: number = STOP_GRACE_MS): string {
   const words = lastLines(stderr);
@@ -110,11 +120,19 @@ export function stoppedWords(deadlineMs: number, killed: boolean, stderr: string
   return `it gave no answer within ${deadlineMs / 1000} s, its deadline, and was stopped${kill}${words ? `: ${words}` : ''}`;
 }
 
-/** Why `verb` gave no answer when the place threw answering it: the verb, and the last lines of what was thrown, on one line. */
+/**
+ * Why `verb` gave no answer when the place threw answering it: the verb, and the last lines of what was thrown, on one line.
+ * @param verb The place's verb that threw.
+ * @param threw What was thrown, an error or any value.
+ */
 export const threwWords = (verb: PlaceVerb, threw: unknown): string =>
   `${verb} threw before it answered: ${lastLines(threw instanceof Error ? threw.message : String(threw))}`;
 
-/** `verb` unread, with why and now. */
+/**
+ * `verb` unread, with why and now.
+ * @param verb The place's verb that gave no answer.
+ * @param said Why it gave none, in words.
+ */
 export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unread } => ({
   unread: { verb, said, at: new Date().toISOString() },
 });
@@ -154,6 +172,9 @@ export type RunPlaceRead = { readonly place: Place; readonly say: PlaceDeclared[
  * What `place` reads the repository run left (`inventory`): its worktrees inside `under` and the run's branches, as its place names them,
  * merged or not into its base branch, with the place's `say` — or the outcome that is no answer: refused, or not heard. Never an empty
  * inventory in its place.
+ * @param run The repository run: its id, its repository and its base branch.
+ * @param place The run's place, asked its inventory.
+ * @param under The folder the run's worktrees are read inside.
  */
 export function readRunPlace(
   run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
@@ -167,6 +188,9 @@ export function readRunPlace(
 /**
  * `readRunPlace`'s answer, asked off the loop (`ask`): for a caller the daemon's pass must not wait on, as its sweep of finished runs
  * and `nemia prune` are.
+ * @param run The repository run: its id, its repository and its base branch.
+ * @param place The run's place, asked its inventory.
+ * @param under The folder the run's worktrees are read inside.
  */
 export const askRunPlace = (
   run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
@@ -181,6 +205,9 @@ export const askRunPlace = (
  * A repository run's place, opened at `nemia start` on `root`: `place` asked its `open` verb, told whether the run cuts worktrees
  * (`isolate`). Refuses (`Invalid`) an `open` that refuses, in its own words. An `open` that is not heard is no refusal: it throws a plain
  * `Error`, with why, so a queued card is tried again.
+ * @param place The run's place, asked its `open` verb.
+ * @param root The repository the run is started on.
+ * @param isolate Whether the run cuts worktrees.
  */
 export function openPlace(place: Place, root: string, isolate: boolean): Opened {
   const outcome = place.askNow('open', { root, isolate });
@@ -193,6 +220,9 @@ export function openPlace(place: Place, root: string, isolate: boolean): Opened 
  * Whether each `{ onto, branch }` of `trials` merges in `repo`, as `place` answers its `trial` verb: each base's commit
  * now, and each trial in the order asked. Asks nothing for no trial. A refusal, an unread outcome, or an answer with another count of
  * trials than asked is never a verdict: every trial is then `{ unknown }` in words that say why, and every base's commit null.
+ * @param repo The repository the trials are asked in.
+ * @param trials Each branch and the base it is tried onto, in the order asked.
+ * @param place The place asked its `trial` verb.
  */
 export function trialMerges(repo: string, trials: readonly { readonly onto: string; readonly branch: string }[], place: Place): Trials {
   if (!trials.length) return { at: {}, trials: [] };
@@ -220,6 +250,8 @@ const emptiedLater = (pgid: number, graceMs: number): Effect.Effect<boolean> =>
 /**
  * A child that has not ended stopped, with what it started: the group it leads sent SIGTERM, then SIGKILL when a process of it outlives
  * `graceMs` (`STOP_GRACE_MS` by default), and its pipes closed. Answers whether it had to kill.
+ * @param child The child process stopped, the leader of its group.
+ * @param graceMs How long the group is given to end on SIGTERM, in ms; `STOP_GRACE_MS` where none is given.
  */
 export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number = STOP_GRACE_MS): Effect.Effect<boolean> =>
   Effect.gen(function* () {

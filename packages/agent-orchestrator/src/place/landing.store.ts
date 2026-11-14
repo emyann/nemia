@@ -32,12 +32,17 @@ export type StatusMemo = {
   readonly place: Place;
 };
 
-/** A new `StatusMemo` for one pass, with no answer yet, reading a run's heads through `heads` and asking `place`. */
+/**
+ * A new `StatusMemo` for one pass, with no answer yet, reading a run's heads through `heads` and asking `place`.
+ * @param heads Every branch of a run's repository and its commit, or undefined where they were not read.
+ * @param place The place asked.
+ */
 export const statusMemo = (heads: StatusMemo['heads'], place: Place): StatusMemo => ({ reads: new Map(), heads, place });
 
 /**
  * Whether a merge is staged in `run`'s checkout, as a `stat` of the file the place named at `open` (`stagedFile`) says, with no process.
  * Undefined for a run whose record names no such file, started before its place named one: `status` says it there.
+ * @param run The run's record, the staged file it names read.
  */
 export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | undefined {
   return run.stagedFile === undefined ? undefined : fs.existsSync(run.stagedFile);
@@ -46,6 +51,9 @@ export function stagedHere(run: Pick<RepositoryRun, 'stagedFile'>): boolean | un
 /**
  * `run`'s checkout as its place's `status` answers it, with the run's result tips off the heads `memo` reads (`resultTips`), asked once per
  * checkout and run within one pass, of the place `memo` names. A refusal and an unread answer are `{ unread }`, in words.
+ * @param run The run, a repository run's record.
+ * @param steps The run's steps, its result branches and landing read off them.
+ * @param memo The pass's memo of what the place said, and the place it asks.
  */
 export function checkoutStatus(run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): CheckoutRead {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
@@ -70,6 +78,9 @@ const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, st
 /**
  * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
  * from there and starts no process: for a caller the daemon's pass must not wait on.
+ * @param run The run, a repository run's record.
+ * @param steps The run's steps, its result branches and landing read off them.
+ * @param memo The pass's memo of what the place said, and the place it asks.
  */
 export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[], memo: StatusMemo): Effect.Effect<CheckoutRead> => {
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
@@ -89,6 +100,9 @@ export const askCheckoutStatus = (run: RepositoryRun, steps: readonly StepSpec[]
  * file the place named at `open` (`stagedHere`), with no process; for a record that names none, the place's `status`, asked only while a
  * landing among `steps` is filed and not landed, and true where it gives no answer — a merge nobody can read is held, never let go.
  * False for a folder run and for a run with no such ending.
+ * @param run The run's record.
+ * @param steps The run's steps, its result branches and landing read off them.
+ * @param memo The pass's memo of what the place said, and the place it asks.
  */
 export function mergeStaged(run: Run, steps: readonly StepSpec[], memo: StatusMemo): boolean {
   if (!isRepositoryRun(run)) return false;
@@ -112,6 +126,9 @@ export type LandedThrough =
  * Commit the merge staged in `run`'s checkout with `message`, or abort it, through the place `memo` names (`land`); the pass's reads of
  * `status` in `memo` are cleared, since the checkout has changed. The place's refusal in its words (`refused`: a hook, a path still
  * unmerged), or why it was not heard (`unread`).
+ * @param run The run, a repository run's record.
+ * @param act What is done with the merge: a commit with its message, or an abort.
+ * @param memo The pass's memo of what the place said, and the place it asks.
  */
 export function landThrough(
   run: RepositoryRun,
@@ -125,7 +142,11 @@ export function landThrough(
   return { unread: `the place's land was not heard: ${outcome.unread.said}` };
 }
 
-/** What a landing session of `run` is denied (`denyWhileLanding`, as `place` declares it): none for a folder run, which lands nothing. */
+/**
+ * What a landing session of `run` is denied (`denyWhileLanding`, as `place` declares it): none for a folder run, which lands nothing.
+ * @param run The run's record.
+ * @param place The run's place, whose declared denies are read.
+ */
 export function landingDenies(run: Run, place: Place): readonly string[] {
   return isRepositoryRun(run) ? place.declared.denyWhileLanding : [];
 }
@@ -134,6 +155,11 @@ export function landingDenies(run: Run, place: Place): readonly string[] {
  * What `step`, an ending of `run` that lands on its check, is told and denied by `place` (`landingContract`): its `say.stage` with
  * `{repo}` and `{branches}` filled from the run's checkout and its result branches with a tip, recorded or among `heads` (`resultTips`),
  * and its denies. Undefined for any other step.
+ * @param run The run's record.
+ * @param steps The run's steps, its result branches read off them.
+ * @param step The step told.
+ * @param place The run's place, whose declared words and denies are read.
+ * @param heads Every branch of the repository and its commit, or undefined where they were not read: the recorded tips alone then.
  */
 export function landingWords(
   run: Run,
@@ -148,7 +174,11 @@ export function landingWords(
   return { stage: declared.say.stage.replaceAll('{repo}', run.repo).replaceAll('{branches}', branches), denied: declared.denyWhileLanding };
 }
 
-/** The commands `place` gives the briefs of `run`'s steps (its `say`): none for a folder run. */
+/**
+ * The commands `place` gives the briefs of `run`'s steps (its `say`): none for a folder run.
+ * @param run The run's record.
+ * @param place The run's place, whose declared commands are read.
+ */
 export function placeSay(run: Run, place: Place): PlaceSay | undefined {
   return isRepositoryRun(run) ? place.declared.say : undefined;
 }

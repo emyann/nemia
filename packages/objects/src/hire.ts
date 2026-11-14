@@ -14,30 +14,36 @@ import { FILL_ORIGINS, SETTING_ORIGINS } from './words.ts';
 
 /** The step, by its workflow and its name, and the agent the factory hires into it (absent where it hires none). */
 export const HireSpec = Schema.Struct({
-  workflow: Schema.String,
-  step: Schema.String,
-  agent: Schema.optionalKey(Schema.String),
+  workflow: Schema.String.annotate({ description: "The step's workflow." }),
+  step: Schema.String.annotate({ description: "The step's name." }),
+  agent: Schema.optionalKey(
+    Schema.String.annotate({ description: 'The agent the factory hires into the step; absent where it hires none.' }),
+  ),
 }).annotate({ description: 'The step, by its workflow and name, and the agent the factory hires into it, absent where it hires none.' });
 export type HireSpec = typeof HireSpec.Type;
 
 /** A setting a session gets: its value (absent where the harness's own default holds) and where it came from. */
 export const HireSetting = Schema.Struct({
-  value: Schema.optionalKey(Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Array(Schema.String)])),
-  from: Schema.Literals(SETTING_ORIGINS),
+  value: Schema.optionalKey(
+    Schema.Union([Schema.String, Schema.Number, Schema.Boolean, Schema.Array(Schema.String)]).annotate({
+      description: "The setting's value; absent where the harness's own default holds.",
+    }),
+  ),
+  from: Schema.Literals(SETTING_ORIGINS).annotate({ description: 'Where the setting came from.' }),
 });
 export type HireSetting = typeof HireSetting.Type;
 
 /** Each setting a session on the step gets, by its name, each with where it came from. */
 export const HireSettings = Schema.Struct({
-  model: HireSetting,
-  effort: HireSetting,
-  context: HireSetting,
-  harness: HireSetting,
-  permissionMode: HireSetting,
-  allowedTools: HireSetting,
-  disallowedTools: HireSetting,
-  skills: HireSetting,
-  mcp: HireSetting,
+  model: HireSetting.annotate({ description: 'The model a session on the step runs on.' }),
+  effort: HireSetting.annotate({ description: 'How hard the harness thinks.' }),
+  context: HireSetting.annotate({ description: "The session's context window, in tokens." }),
+  harness: HireSetting.annotate({ description: 'What runs the session.' }),
+  permissionMode: HireSetting.annotate({ description: "Claude Code's permission mode." }),
+  allowedTools: HireSetting.annotate({ description: 'What the session may do without being asked.' }),
+  disallowedTools: HireSetting.annotate({ description: 'What the session may not have.' }),
+  skills: HireSetting.annotate({ description: 'The skills the session is given.' }),
+  mcp: HireSetting.annotate({ description: 'The MCP servers the session loads.' }),
 });
 export type HireSettings = typeof HireSettings.Type;
 
@@ -46,11 +52,13 @@ export type HireSettings = typeof HireSettings.Type;
  * a session there is given (absent where it names none), and why the hire does not read (`error`, absent where it does).
  */
 export const HireStatus = Schema.Struct({
-  filled: Schema.Literals(FILL_ORIGINS),
-  agent: Schema.optionalKey(Schema.String),
-  settings: HireSettings,
-  harnessSettings: Schema.optionalKey(HarnessSettings),
-  error: Schema.optionalKey(Schema.String),
+  filled: Schema.Literals(FILL_ORIGINS).annotate({ description: 'Who fills the step.' }),
+  agent: Schema.optionalKey(Schema.String.annotate({ description: 'The agent that fills the step; absent where none does.' })),
+  settings: HireSettings.annotate({ description: 'Each setting a session on the step gets, with where it came from.' }),
+  harnessSettings: Schema.optionalKey(
+    HarnessSettings.annotate({ description: "The factory's harness settings a session there is given; absent where it names none." }),
+  ),
+  error: Schema.optionalKey(Schema.String.annotate({ description: 'Why the hire does not read; absent where it does.' })),
 }).annotate({
   description:
     'Who fills the step and the agent that does, each setting a session there gets with where it came from, and why the hire does not read.',
@@ -75,5 +83,5 @@ export const HireList = listOf('Hire', Hire);
 export type HireList = typeof HireList.Type;
 
 /** An agent hired into the step (`PUT …/hires/<workflow>.<step>`). */
-export const HireWrite = Schema.Struct({ agent: Schema.String });
+export const HireWrite = Schema.Struct({ agent: Schema.String.annotate({ description: 'The agent to hire into the step.' }) });
 export type HireWrite = typeof HireWrite.Type;

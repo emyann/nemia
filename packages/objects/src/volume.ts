@@ -7,7 +7,10 @@ import { Schema } from 'effect';
 import { API_VERSION, ObjectMeta, listOf } from './meta.ts';
 
 /** The folder, by its absolute path, and whether steps only read it (`:ro`) or write it too (`:rw`). */
-export const VolumeSpec = Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }).annotate({
+export const VolumeSpec = Schema.Struct({
+  path: Schema.String.annotate({ description: "The folder's absolute path on the machine." }),
+  readOnly: Schema.Boolean.annotate({ description: 'Whether steps only read the folder (:ro) rather than write it too (:rw).' }),
+}).annotate({
   description: 'The folder, by its absolute path, and whether steps only read it.',
 });
 export type VolumeSpec = typeof VolumeSpec.Type;
@@ -17,9 +20,9 @@ export type VolumeSpec = typeof VolumeSpec.Type;
  * ended whose record mounts it (`runs`).
  */
 export const VolumeStatus = Schema.Struct({
-  present: Schema.Boolean,
-  refused: Schema.optionalKey(Schema.String),
-  runs: Schema.Array(Schema.String),
+  present: Schema.Boolean.annotate({ description: 'Whether the folder is there now.' }),
+  refused: Schema.optionalKey(Schema.String.annotate({ description: "Why a run's start would refuse it; absent where none would." })),
+  runs: Schema.Array(Schema.String).annotate({ description: 'The ids of the runs not ended whose record mounts it.' }),
 }).annotate({ description: 'Whether the folder is there now, why a run would refuse it, and the runs not ended that mount it.' });
 export type VolumeStatus = typeof VolumeStatus.Type;
 

@@ -1,6 +1,7 @@
 /**
  * A gate, from a person's side (agent-orchestrator, src/gate/gate.ts): why `nemia approve` will not approve a step
- * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word (`holdsOpen`). The task turns on where
+ * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word (`holdsOpen`, src/holds-open/holds-open.ts,
+ * its spec `holds-open.contract.ts`'s). The task turns on where
  * the step stands (`standing`, status.ts), which reads some forty functions of the run's record and closeouts: the gate
  * takes what its spec proves of it (`standing.contract.ts`), and nothing of its body. The approval turns on the word the run
  * reads for the step (`runWords`), its standing with the routing laid over it, so a node the run says waits at its gate is
@@ -8,7 +9,6 @@
  * steps an ending waits on (`notHandedOn`) only shape what a refusal says: declared pure, and nothing more.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
-import { holdsOpen } from '../src/gate/gate.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import type { CloseoutAsked, Run, TaskPhase } from '../src/record/record.ts';
@@ -17,6 +17,7 @@ import type { StepSpec } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
 import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
 import { runWords } from '../src/route/routed/routed-words.ts';
+import { holdsOpen } from '../src/holds-open/holds-open.ts';
 import { approved, gated, tryNow } from './laws.ts';
 
 export const sendBack = assume(retryable, { pure: true });
@@ -213,62 +214,3 @@ const approvalRefusalSpec = spec<
 
 /** The function's type, which the code takes: it then imports nothing of tsverify. */
 export type ApprovalRefusal = Implementation<typeof approvalRefusalSpec>;
-
-const holdsOpenSpec = spec<
-  (
-    step: StepSpec,
-    run: Run,
-    phaseOf: (taskId: string) => TaskPhase,
-    closeoutOf: (step: string) => Closeout | undefined,
-    askedCloseout: (taskId: string) => CloseoutAsked,
-    steps: readonly StepSpec[],
-    spendOf: SpendOf,
-    verdictOf?: (step: string) => Verdict | undefined,
-  ) => boolean
->({
-  ensures: {
-    notOnACancelledRun: {
-      description: 'No step of a cancelled run is held open',
-      condition: ({ input: [, run], output }) => !run.cancelledAt || !output,
-    },
-    notOnAPrunedRun: {
-      description: 'No step of a pruned run is held open',
-      condition: ({ input: [, run], output }) => !run.pruned || !output,
-    },
-    whileItSignedBlocked: {
-      description: 'A step that signed off blocked is held open',
-      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
-        !!run.cancelledAt || !!run.pruned || standing(step, run, p, c, a, steps, s, v).own !== 'blocked' || output,
-    },
-    whileAGateChecks: {
-      description: 'A gated step is held open while its check runs',
-      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
-        !!run.cancelledAt || !!run.pruned || !gated(step, run) || standing(step, run, p, c, a, steps, s, v).own !== 'checking' || output,
-    },
-    whileAGateWaits: {
-      description: 'A gated step is held open while it awaits approval',
-      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
-        !!run.cancelledAt ||
-        !!run.pruned ||
-        !gated(step, run) ||
-        standing(step, run, p, c, a, steps, s, v).status !== 'awaiting approval' ||
-        output,
-    },
-    anUngatedStepOnlyBlocked: {
-      description: 'An ungated step is held open only when it signed off blocked',
-      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
-        !output || gated(step, run) || standing(step, run, p, c, a, steps, s, v).own === 'blocked',
-    },
-    aGateHoldsOnlyWhileAPersonIsAsked: {
-      description:
-        'A gated step is held open only while it signed off blocked, its check runs, or it awaits approval: anything else closes it',
-      condition: ({ input: [step, run, p, c, a, steps, s, v], output }) => {
-        if (!output || !gated(step, run)) return true;
-        const stands = standing(step, run, p, c, a, steps, s, v);
-        return stands.own === 'blocked' || stands.own === 'checking' || stands.status === 'awaiting approval';
-      },
-    },
-  },
-});
-/** The function's type, which the code takes: it then imports nothing of tsverify. */
-export type HoldsOpen = Implementation<typeof holdsOpenSpec>;

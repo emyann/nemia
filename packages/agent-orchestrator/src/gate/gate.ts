@@ -20,24 +20,11 @@ import {
 import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
-import type { ApprovalRefusal, HoldsOpen } from '../../contracts/gate.contract.ts';
+import type { ApprovalRefusal } from '../../contracts/gate.contract.ts';
 import type { TakeBackStopOf } from '../../contracts/take-back.contract.ts';
+import { holdsOpen } from '../holds-open/holds-open.ts';
 
-/**
- * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on
- * this pass. Pure. Open while a person's word is what moves the step, so that word reaches the session that signed as its next turn
- * (`e.answer`) rather than a new task: the step signed off `blocked`, or it is gated and the try it is on is not approved — checking, or at
- * its gate. Anything else closes it (`e.close`), which settles it as it signed: an ungated step that signed off, a gated one once approved,
- * a check that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run ended for good, called
- * off or pruned, whose steps nobody will answer (`endedForGood`) — but not of a held one: a hold lifts, and the word it waits for then
- * reaches the session that signed. A try of a closed step is filed as its own task, `-try<n>`.
- */
-export const holdsOpen: HoldsOpen = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
-  if (endedForGood(run)) return false;
-  const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
-  if (own === 'blocked') return true;
-  return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
-};
+export { holdsOpen } from '../holds-open/holds-open.ts';
 
 /**
  * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.

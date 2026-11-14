@@ -20,6 +20,8 @@ export type JournalKept = { taskId: string; journal: number; bodies: number; har
  * The bytes `file` takes on the disk, as the file system counts them (`lstat().blocks * 512`): a folder's with everything
  * under it, a link's own and never its target's. `undefined` for a path that is not there; `seen`, given, takes each path
  * counted, and one already there counts nothing.
+ * @param file The path to measure.
+ * @param seen The paths counted so far, added to as each is counted, or undefined to count every path.
  */
 export const diskBytesOf = (file: string, seen?: Set<string>): number | undefined => {
   const stat = fs.lstatSync(file, { throwIfNoEntry: false });

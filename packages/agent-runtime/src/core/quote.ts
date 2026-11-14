@@ -10,12 +10,19 @@ export const VALUE_QUOTE = 60;
 /** How much of an address, a list of addresses, a status text or another party's error words a sentence quotes. */
 export const WORDS_QUOTE = 200;
 
-/** `text` cut to its first `max` characters, `VALUE_QUOTE` by default, and marked `…` where it was cut; whole when it fits. */
+/**
+ * `text` cut to its first `max` characters, `VALUE_QUOTE` by default, and marked `…` where it was cut; whole when it fits.
+ * @param text The text to quote.
+ * @param max The most characters of it to keep.
+ */
 export const quote = (text: string, max = VALUE_QUOTE): string => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 /**
  * The first `max` of `items` (3 by default), each whole, joined by `separator`, then how many more there are: `, and 1,997 more`.
  * A list of `max` or fewer comes back joined whole.
+ * @param items The items to list.
+ * @param separator What the items are joined by.
+ * @param max The most items to name.
  */
 export const firstOf = (items: readonly string[], separator: string, max = 3): string =>
   items.length > max
@@ -26,6 +33,10 @@ export const firstOf = (items: readonly string[], separator: string, max = 3): s
  * The end of `text`, kept within `max` characters under a first line `said` that says it was cut, whenever anything of it was:
  * `text` longer than `max`, or `cut`, something cut before it was handed over. Whole, with no such line, when nothing was cut.
  * `quote` keeps a value's start, for a sentence; `endOf` keeps a log's end, where the latest is. `said` is shorter than `max`.
+ * @param text The text whose end is kept.
+ * @param max The most characters to answer, the line `said` included.
+ * @param said The first line that says the text was cut.
+ * @param cut Whether something was cut before the text was handed over.
  */
 export const endOf: EndOf = (text, max, said, cut) => {
   if (!cut && text.length <= max) return text;

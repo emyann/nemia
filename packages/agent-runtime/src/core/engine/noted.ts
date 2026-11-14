@@ -18,6 +18,10 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
  * What a task's sighting says of an attempt in flight, for the record: a long-lived one's process (`sightingFacts`), what it
  * has consumed so far (`countedFacts`), what the harness has denied any (`deniedFacts`), and the code and harness version it
  * runs on (`imageFacts`).
+ * @param state The task's fold.
+ * @param observed The pass's sightings, by session name.
+ * @param at The moment each entry is stamped, an ISO time.
+ * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
 export const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
   const sighting = lastSighting(state, observed);

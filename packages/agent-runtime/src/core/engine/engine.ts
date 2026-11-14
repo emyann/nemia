@@ -101,7 +101,10 @@ export const LIVE: ReadonlySet<SessionState> = new Set(['submitted', 'working', 
 /** A move the lifecycle refused in a pass: which task, and the state and event it had no edge for (`Refusal`). */
 export type RefusedMove = { taskId: string } & Refusal;
 
-/** A refused move as a person reads it, in a log or `ae tick`'s output: what did not move, and why nothing will until something changes. */
+/**
+ * A refused move as a person reads it, in a log or `ae tick`'s output: what did not move, and why nothing will until something changes.
+ * @param m The refused move: its task, and the state and event the lifecycle had no edge for.
+ */
 export const refusedText = (m: RefusedMove): string =>
   `${m.taskId}  stalled: its lifecycle has no edge from ${m.state} on ${m.event}, so nothing is done; it is asked again each pass`;
 
@@ -582,6 +585,7 @@ export class TickRefused extends Schema.TaggedError<TickRefused>()('TickRefused'
 /**
  * Why a pass refuses what it was handed, or `undefined` when it was handed nothing: it takes nothing, and an untyped caller
  * passing a ceiling, `tick(3)`, would otherwise have it dropped without a word.
+ * @param args Every argument the pass was called with.
  */
 export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
   args.length === 0
@@ -1000,6 +1004,10 @@ const bridgeOfTask = (asked: boolean, settled: boolean, seen: Bridge | undefined
  * judged — `decide` never saw it. So is its `bridge`, which only a task its runner says asked for one carries (`bridgeAsked`,
  * `bridgeOfTask`), and why the
  * look left its session unread (`unreadWhy`, the look's words by the last attempt's name), only for a session not seen.
+ * @param state The task's fold.
+ * @param observed What the look saw of the sessions, by name.
+ * @param unreadWhy The look's words for each session name it could not read, or undefined where it left none unread.
+ * @param bridgeAsked The runner's answer to whether a task asked for a bridge, or undefined for a runner that gives none.
  */
 export function viewOfState(
   state: State,

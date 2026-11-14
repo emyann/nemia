@@ -12,6 +12,8 @@ export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused'
  * Why `requestStop` would not journal a stop, or `undefined`: a task it has no record of, and one its guard (`stoppable`, by
  * `verbTakes`) refuses — one that has settled, and one asked to stop already, whose next pass stops what runs and settles it.
  * Off the record alone, so it costs no registry call.
+ * @param taskId The task's id, named in the words of a refusal.
+ * @param state The task's fold, or undefined where the runtime has no record of it.
  */
 export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
   if (!state) return unknownTask(taskId);

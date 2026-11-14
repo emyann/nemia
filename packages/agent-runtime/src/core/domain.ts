@@ -44,10 +44,16 @@ const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 're
 
 export type { PermissionFacts };
 
-/** A denial as a person reads it, and as a permission rule is written: `Bash(pytest)`, `Skill(look)`, `WebFetch`. */
+/**
+ * A denial as a person reads it, and as a permission rule is written: `Bash(pytest)`, `Skill(look)`, `WebFetch`.
+ * @param d The denial: the tool refused, and what it was asked to do where that was recorded.
+ */
 export const denialText = (d: Denial): string => (d.what ? `${d.tool}(${d.what})` : d.tool);
 
-/** The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`. */
+/**
+ * The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`.
+ * @param name The session's name, as its harness lists it.
+ */
 export const nameParts = (name: string): { taskId: string; n: number } | undefined => {
   const [, taskId, n] = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name) ?? [];
   if (taskId === undefined || n === undefined) return undefined;
@@ -123,7 +129,11 @@ function waitInto(s: State, wait: AdmissionWait | undefined): void {
   else s.waits = wait;
 }
 
-/** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
+/**
+ * Observed state, folded. A `State` is never stored — it is always re-derived from the journal.
+ * @param taskId The task's id.
+ * @param events The task's journal, in the order it was written.
+ */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
     taskId,
@@ -203,7 +213,11 @@ const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.sto
  */
 export const VERB_GUARDS: Record<VerbGuard, (state: State) => boolean> = { stoppable, awaitsWord };
 
-/** Whether a person's verb is taken in this state: the guard `VERBS` names for it, asked of the state. */
+/**
+ * Whether a person's verb is taken in this state: the guard `VERBS` names for it, asked of the state.
+ * @param verb The person's verb.
+ * @param state The task's fold.
+ */
 export const verbTakes = (verb: VerbName, state: State): boolean => {
   const guard = VERBS.find((v) => v.verb === verb)?.guard;
   return guard !== undefined && VERB_GUARDS[guard](state);
@@ -222,6 +236,7 @@ export { backoffOf, cutWords, PARKED_WORDS, RESTART_BACKOFF, RESTART_WORDS } fro
  * A settled task: nothing is observed of it and nothing is decided, on any pass. `decide`'s first question, ahead of the
  * lifecycle — a settled task's state is final and takes no event, so asking would refuse every settled task in the store
  * on every pass — and the one a pass may ask to skip a settled task before it reads anything else of it.
+ * @param state The task's fold.
  */
 export const settledQuiet = (state: State): boolean => state.settled !== null;
 
@@ -234,6 +249,10 @@ export const settledQuiet = (state: State): boolean => state.settled !== null;
  * what the pass saw of it (`observe`); and the lifecycle's edge for that event in that state (`transition`, in
  * `lifecycle.ts`), which names the next state and the one action. An event with no edge is refused, and the refusal is
  * the answer: nothing is done, and the pass reports it. `move` is the lifecycle's; a test hands another to plant a refusal.
+ * @param state The task's fold.
+ * @param observed The pass's sightings, by session name.
+ * @param now The moment of the pass, and what it knows beside: the grace window, the names it could not read, a drain.
+ * @param move The lifecycle's edge for an event in a state (`transition`).
  */
 export const decide: Decide = (state, observed, now, move = transition) => {
   if (settledQuiet(state)) return { do: 'nothing', why: `settled: ${state.settled}` };
@@ -258,6 +277,7 @@ export const decide: Decide = (state, observed, now, move = transition) => {
  * 4. Held open and closed by a person: `ending`.
  * 5. Held open and waiting on a person's answer (`waitsForInput`): `input-required`.
  * 6. Its current turn has an attempt, all ended: `ending`; else `submitted`.
+ * @param state The task's fold.
  */
 export const lifecycleOf: LifecycleOf = (state) => {
   if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
@@ -328,6 +348,9 @@ export const lifecycleOf: LifecycleOf = (state) => {
  *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  * Exported only for the tests that import it.
+ * @param state The task's fold.
+ * @param observed The pass's sightings, by session name.
+ * @param now The moment of the pass, and what it knows beside: the grace window, the names it could not read, a drain.
  */
 export const observe: Observe = (state, observed, now) => {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };
@@ -396,6 +419,8 @@ function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined
  * (`held`), it computes nothing (`busy`), and its turn has ended — waiting on nobody it names (`input-required` with no
  * `waitingFor`, Claude Code's idle `blocked`), `completed`, or at work and quiet. Never for a job, whose turn's end is its end,
  * and never for a session that waits on a person for something it names, or to sign in.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the session, or undefined where it saw nothing.
  */
 export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
   if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
@@ -407,6 +432,8 @@ export const idleOf = (state: State, sighting: Sighting | undefined): boolean =>
  * Whether a long-lived task's harness is respawning its session as `sighting` shows it: listed live, with no process
  * (`held: false`) — Claude Code's row for a session whose process died, which it restarts on the same conversation. Never for
  * a job, for a task asked to stop, or for a harness that cannot say whether it holds a process.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the session, or undefined where it saw nothing.
  */
 export const respawning = (state: State, sighting: Sighting | undefined): boolean =>
   state.restartPolicy === 'Always' && !state.stopRequested && sighting?.held === false && isLive(sighting.state);
@@ -437,6 +464,10 @@ function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now)
  * The answer to a spawn its harness refused — nothing started — as the lifecycle gives it: the attempt's `unstartable` end,
  * in the harness's words, or the refusal when the lifecycle has no edge for it. Asked by the engine, the one place that
  * learns of it, so that every move of a task is an edge.
+ * @param state The task's fold.
+ * @param attempt The number of the attempt whose spawn was refused.
+ * @param error The harness's words for the refusal.
+ * @param move The lifecycle's edge for an event in a state (`transition`).
  */
 export function spawnRefused(state: State, attempt: number, error: string, move: Move = transition): Action {
   const from = lifecycleOf(state);
@@ -446,7 +477,11 @@ export function spawnRefused(state: State, attempt: number, error: string, move:
     : moved.action;
 }
 
-/** Is this task waiting on a person? The one thing a fleet operator must be told about. A long-lived task's idle session is not. */
+/**
+ * Is this task waiting on a person? The one thing a fleet operator must be told about. A long-lived task's idle session is not.
+ * @param state The task's fold.
+ * @param observed The pass's sightings, by session name.
+ */
 export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>): boolean {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
@@ -482,6 +517,10 @@ const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono
  * again after one, or held in a process it had not been seen in. Nothing for a settled task, an ended attempt or a session the
  * pass did not see. Each is stamped `at`; a gap, a hold and a release also `mono`, the same moment on the monotonic clock when the
  * engine read one, since `decide` measures from them.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
+ * @param at The moment each entry is stamped, an ISO time.
+ * @param mono The monotonic reading of that moment, or undefined where none was read.
  */
 export function sightingFacts(state: State, sighting: Sighting | undefined, at: string, mono?: Monotonic): Event[] {
   const last = state.attempts.at(-1);

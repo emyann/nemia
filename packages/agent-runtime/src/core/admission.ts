@@ -36,6 +36,8 @@ export type { RunsUnder, Sizing } from '../../contracts/runs-under.contract.ts';
  * holder needs (what is promised), and what is available now less the floor and what the holders with no process yet need (what the
  * kernel does not see yet). Below nothing where the machine is already past either.
  * Exported only for the tests that import it.
+ * @param m The machine's memory as the pass read it, and the floor kept off it.
+ * @param holders The tasks holding a slot, each with its need and whether its process is there.
  */
 export const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => {
   let promised = 0;
@@ -52,6 +54,7 @@ export const roomOf = (m: MachineMemory, holders: readonly Holder[]): number => 
  * more than the room the machine has left waits for memory, told its need and the room; any other is admitted, its need taken off
  * the room and its slot counted. A waiter that needs nothing always fits, and with no reading of the machine only the ceiling
  * decides. Proved by `contracts/admission.contract.ts`.
+ * @param one The waiter: its pool and need, the ceiling, its pool's count of slots taken, and the room left (null with no reading).
  */
 export const admitOne: AdmitOne = (one) => {
   if (one.inPool >= one.ceiling) return { for: 'slot', pool: one.pool, ceiling: one.ceiling };
@@ -66,6 +69,7 @@ export const admitOne: AdmitOne = (one) => {
  * Which waiters a pass admits, in turn, and why each other waits: `admitOne` taken at each waiter, handed its pool's count and the
  * room the waiters before it left. A waiter that waits never stops the ones after it, as a scheduler goes on to the next Pod: a smaller
  * one behind it may fit. The laws of the whole pass, which sum over its waiters, are held by `test/admission.test.ts`.
+ * @param pass The ceiling, the machine's memory (null where it was not read), the holders of a slot and the waiters in turn.
  */
 export const admitting = (pass: AdmissionPass): Admitted => {
   let room = pass.machine === null ? null : roomOf(pass.machine, pass.holders);
@@ -151,13 +155,17 @@ const needOf = (view: AdmissionView, rule: AdmissionRule): number =>
 /**
  * What a task needs of the machine's memory, in bytes, as admission counts it: its request (`resources.requests.memory`), else its
  * limit, which stands for its request as Kubernetes gives a container that names a limit and no request, else nothing.
+ * @param resources What the task runs under, or undefined where it runs under none.
  */
 export const needBytesOf = (resources: TaskResources | undefined): number => {
   const quantity = resources?.requests?.memory ?? resources?.limits?.memory;
   return (quantity === undefined ? undefined : memoryBytesOf(quantity)) ?? 0;
 };
 
-/** The pool a harness counts against when the engine names none for it: its own name, and `default` for a task with no harness. */
+/**
+ * The pool a harness counts against when the engine names none for it: its own name, and `default` for a task with no harness.
+ * @param harness The task's harness, or undefined where it names none.
+ */
 export const ownPool = (harness: string | undefined): string => harness ?? 'default';
 
 /**
@@ -186,6 +194,7 @@ const HOLDS_SLOT: Record<TaskPhase, boolean> = {
 /**
  * Whether a task holds a slot of its pool: by its phase (`HOLDS_SLOT`), or admitted and not yet started, which the next pass starts.
  * Exported only for the tests that import it.
+ * @param view The task's phase and its admission mark.
  */
 export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boolean =>
   view.admission === 'admitted' || HOLDS_SLOT[view.phase];
@@ -213,6 +222,8 @@ const byTurn = (a: AdmissionView, b: AdmissionView): number => {
  * (`working`, `quiescent`), and the waiting tasks in turn (`byTurn`), handed to
  * `admitting` with the machine as `rule.machine` reads it once. Nothing running is stopped for a waiting task; no ceiling admits
  * nothing, and nor does a rule `unschedulable` says true of as the pass asks it, each saying no wait.
+ * @param views Every task's view off the pass's one observation.
+ * @param rule What the engine admits under: the ceiling, the pools, the machine's memory and the defaults.
  */
 export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): Admitted {
   const { ceiling, poolOf } = rule;

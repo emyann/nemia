@@ -11,6 +11,9 @@ import { denialText, type Event, type Sighting, type State } from '../domain.ts'
  * Nothing for a settled task, an ended attempt, a session the pass did not see or that is no longer working, whose end carries
  * the denials, a sighting that names none, or one whose denials do not begin with the attempt's: another reading than the one
  * written, which the end sets right.
+ * @param state The task's fold.
+ * @param sighting What the pass saw of the attempt's session, or undefined where it saw nothing.
+ * @param at The moment each entry is stamped, an ISO time.
  */
 export function deniedFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
   const last = state.attempts.at(-1);

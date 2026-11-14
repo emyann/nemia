@@ -517,6 +517,8 @@ const noBodies = (ref: unknown) =>
 /**
  * What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one.
  * Exported only for the tests that import it.
+ * @param taskId The id of the task appended to.
+ * @param event The event appended.
  */
 export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
   task: taskId,

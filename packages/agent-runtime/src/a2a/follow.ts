@@ -25,7 +25,10 @@ const PARTIAL = 'partial';
  */
 export const STATE_GONE_KEY = 'ae/follower-gone';
 
-/** The signal of a follower that went away, where the call carries one; none on the in-process road, which has no socket. */
+/**
+ * The signal of a follower that went away, where the call carries one; none on the in-process road, which has no socket.
+ * @param context The call's context, whose state may hold the signal under `STATE_GONE_KEY`.
+ */
 export const goneOf = (context: ServerCallContext): AbortSignal | undefined => {
   const gone = context.state.get(STATE_GONE_KEY);
   return gone instanceof AbortSignal ? gone : undefined;
@@ -89,7 +92,10 @@ const responseOf = (taskId: string, m: Followed): StreamResponse => {
   return artifactUpdate(taskId, m.key, PARTIAL, { $case: 'text', value: m.text }, m.append, m.last);
 };
 
-/** What a `SubscribeToTask` answer says, as the moment a driver gives; none for an answer that is not one (a message). */
+/**
+ * What a `SubscribeToTask` answer says, as the moment a driver gives; none for an answer that is not one (a message).
+ * @param r One answer of `SubscribeToTask`.
+ */
 export const followedOf = (r: StreamResponse): Followed[] => {
   const p = r.payload;
   const state = (s: SessionState | undefined): Followed[] => (s ? [{ kind: 'state', state: s }] : []);
@@ -114,6 +120,10 @@ export const followedOf = (r: StreamResponse): Followed[] => {
  * `gone`, where the call carries one, ends the follow as the follower goes away: the stream is interrupted, so a session that says
  * nothing lets go at once. Asking this generator to return cannot do it — a `return` waits behind the `next` already pending, and a
  * silent follow never settles one — so the driver's work would run on for the session's life with nobody reading it.
+ * @param harness The name of the harness, said in a failure.
+ * @param ops The harness's driver, whose `follow` is read.
+ * @param params The request, whose `id` is the session's.
+ * @param gone The signal of a follower that went away, or undefined where the call carries none.
  */
 export async function* subscription(
   harness: string,
@@ -147,6 +157,7 @@ export async function* subscription(
  * `follow` through the seam: the session under `name` followed by `SubscribeToTask`, each answer read back as the moment it carries.
  * A refusal in A2A's words (`UnsupportedOperationError`) fails it as a `RunnerError` that is `refused`; any other failure as one that
  * is not.
+ * @param subscribe The client's `SubscribeToTask`, called with the session's name as the Task's id.
  */
 export const followThrough =
   (subscribe: (params: SubscribeToTaskRequest) => AsyncGenerator<StreamResponse, void, undefined>) =>

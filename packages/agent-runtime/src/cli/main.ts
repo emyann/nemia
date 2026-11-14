@@ -242,6 +242,8 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  *
  * The harness's arguments go under `config`, as a task carries them; a brief writes them as keys like any other.
  * Exported only for the tests that import it.
+ * @param text The brief: its frontmatter, then its words.
+ * @param fallbackCwd Where the session works when the frontmatter names no `cwd`: where `ae` runs.
  */
 export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const { meta, brief } = briefParts(text);
@@ -426,6 +428,7 @@ const tickOnce = async (engine: EngineShape): Promise<void> => {
 /**
  * What `ae sweep` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument.
  * Exported only for the tests that import it.
+ * @param rest The arguments after `sweep`.
  */
 export const sweepAsked = (rest: readonly string[]): { yes: boolean } => {
   const other = rest.filter((a) => a !== '--yes');
@@ -441,6 +444,8 @@ const bodies = (n: number) => `${n} bod${n === 1 ? 'y' : 'ies'}`;
 /**
  * The line `ae sweep` prints for `report`: what it removed, when `yes`, else what it would remove; and what it keeps.
  * Exported only for the tests that import it.
+ * @param report What `Engine.sweep` answered.
+ * @param yes Whether `--yes` was given, so the bodies were removed.
  */
 export const sweepLine = (report: SweepReport, yes: boolean): string =>
   yes
@@ -457,6 +462,7 @@ const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promis
  * What `ae forget` is asked, off the arguments after it: the task ids, and `yes`, given `--yes`. Refuses, with exit code 2, no id or
  * a flag.
  * Exported only for the tests that import it.
+ * @param rest The arguments after `forget`.
  */
 export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: boolean } => {
   const taskIds = rest.filter((a) => a !== '--yes');
@@ -475,6 +481,7 @@ export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: 
  * The lines `ae forget` prints for `report`: per task what went, or without `yes` what would, what each harness leaves, and the next
  * command.
  * Exported only for the tests that import it.
+ * @param report What `Engine.forget` answered.
  */
 export const forgetLines = (report: ForgetReport): string[] => {
   const lines: string[] = [];
@@ -571,6 +578,7 @@ const keepingVerb = (verb: string | undefined) =>
  * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led
  * by `ae` (`refusalWords`) — for options the engine refuses; any other failure to build it is rejected as it is.
  * Exported only for the tests that import it.
+ * @param options The engine's options, its store's `root` among them.
  */
 export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
   ManagedRuntime.make(EngineService.layer(options))
@@ -632,6 +640,7 @@ function engineless(argv: string[]): boolean {
  *   "at-least-once, in order" true when a push and a tick land together, all behind one method: a CLI that re-implemented
  *   its easy half would be the worst consumer of its own API.
  * - `admission` is the hook's, served with no engine (`engineless`).
+ * @param argv The command line's arguments after `ae`: the verb, then its own.
  */
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;

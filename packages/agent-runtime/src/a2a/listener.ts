@@ -206,6 +206,8 @@ const closed = (server: http.Server, sockets: Set<Socket>): Promise<void> =>
  * The port of a holder, for the scope it is taken in: one `ops` per harness served, each behind its own reading surface over a
  * `HarnessHandler` of the same journal (`events`), a fresh token written under `root`, and the address they are reached at.
  * As the scope closes the server stops, every socket is destroyed and the token is forgotten.
+ * @param served The store folder the token is written under (`root`), the driver of each harness served by its name (`ops`), and what reads
+ * the events journaled for a task by its id (`events`).
  */
 export const servedOf = (served: {
   root: string;

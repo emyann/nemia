@@ -103,6 +103,8 @@ export type RuntimeExtensionParams = { methods: SessionMethod[]; say: boolean };
  * A harness's card: what it is called, that it answers a message once and is polled after, and the runtime's extension —
  * which of its methods this harness answers, and whether its running sessions take words. A verb the driver lacks is
  * left off the card, so a client offers it to nobody.
+ * @param harness The name of the harness, the card's name.
+ * @param ops The harness's driver: the verbs it has are the ones the card offers.
  */
 export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
   name: harness,

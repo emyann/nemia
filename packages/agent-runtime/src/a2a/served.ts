@@ -72,6 +72,9 @@ const refuse = (method: Exclude<keyof A2ARequestHandler, Served>) =>
 /**
  * The card a holder serves for `harness` at `url`: the in-process card (`cardOf`) with one JSONRPC interface at `url`, a
  * `bearer` scheme and the one requirement that names it, and the runtime's extension declaring no method and no `say`.
+ * @param harness The name of the harness, the card's name.
+ * @param ops The harness's driver, whose verbs the in-process card reads.
+ * @param url The address the port serves the harness at.
  */
 export const servedCardOf = (harness: string, ops: RunnerOps, url: string): AgentCard => {
   const card = cardOf(harness, ops);
@@ -92,7 +95,10 @@ export const servedCardOf = (harness: string, ops: RunnerOps, url: string): Agen
   };
 };
 
-/** A card as the JSON it is served and configured as (`cardOfJson` reads it back). */
+/**
+ * A card as the JSON it is served and configured as (`cardOfJson` reads it back).
+ * @param card The card in the SDK's objects.
+ */
 export const cardJsonOf = (card: AgentCard): Record<string, unknown> => AgentCard.toJSON(card) as Record<string, unknown>;
 
 /**

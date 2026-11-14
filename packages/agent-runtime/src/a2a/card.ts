@@ -136,6 +136,7 @@ const wrongOf = (json: unknown, error: Schema.SchemaError): string => {
 /**
  * A card as JSON, read into the SDK's objects once it decodes, or the first thing wrong with it (`wrong`, a clause that
  * begins `its` or `it`). A scheme in the SDK's form is kept as it was given; the rest is the SDK's parse of the decoded card.
+ * @param json The card as JSON, as served at the agent's URL or configured in a harness, unchecked.
  */
 export const cardOfJson = (json: unknown): { card: AgentCard } | { wrong: string } => {
   const decoded = decodeCard(json);
@@ -175,6 +176,8 @@ const cardRefusal = (harness: string, card: unknown): string | undefined => {
  * Why a remote agent's configuration cannot be taken, or `undefined`. Asked by `Engine.layer`, so an address that could
  * never be reached — or one that carries a secret in it, which the configuration is no place for — or a card that does not
  * decode is refused before any task is filed on it.
+ * @param harness The name of the remote harness, said in the refusal.
+ * @param agent The harness's configuration as given: one of `url` or `card`.
  */
 export const remoteConfigRefusal = (harness: string, agent: Record<string, unknown>): string | undefined => {
   const keys = Object.keys(agent);

@@ -50,6 +50,7 @@ const cardUrlOf = (address: string): URL => {
  * An address as its words show it: origin and path, never the query, which can carry a key (as the api's `remoteOf` shows one). The
  * path is quoted: a request's address is an interface the agent's card served, whose path can be any length.
  * Exported only for the tests that import it.
+ * @param u The address: a string, a URL, or a request whose `url` is read.
  */
 export const shownUrl = (u: string | URL | Request): string => {
   const url = new URL(u instanceof Request ? u.url : u);
@@ -114,7 +115,15 @@ const headerOf = (
   }
 };
 
-/** What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met. */
+/**
+ * What the card's requirements ask of each request: the first requirement the secrets meet whole, else why none is met.
+ * @param card The agent's card, whose security requirements and schemes are read.
+ * @param agentUrl The address the agent is reached at, handed to `credentials` and `missing`.
+ * @param harness The name of the harness, handed to `credentials` and `missing`.
+ * @param credentials What answers a secret for a scheme, or undefined where none is given: then no scheme that needs one is met.
+ * @param missing The words a refusal gives for a scheme with no secret, or undefined for the default, which says to give `Engine.layer` a
+ * `credentials`.
+ */
 export const authOf = (
   card: AgentCard,
   agentUrl: string,
@@ -291,6 +300,11 @@ export type Connection = {
  * secret, so a redirect to it is followed, and what it names is held to the address's origin. The headers are asked of
  * `credentials` on every request, so a secret that changes is sent as it is at the time. The SDK is handed the card already
  * read, with only the interface chosen.
+ * @param harness The name of the harness, handed to `credentials`.
+ * @param agent The agent, by its address (`url`) or by its card (`card`).
+ * @param credentials What answers a secret for a scheme the card declares, or undefined where none is given.
+ * @param requestMs How long a request may take, in milliseconds.
+ * @param sendMs How long a send may take, in milliseconds.
  */
 export const connectionOf = (
   harness: string,

@@ -7,8 +7,9 @@
  *  1. With `--look`, or with no `--pages`, `--shard` or `--look` (the whole e2e), runs the look's browser tests first, two files at a
  *     time (`lookTests`, look.ts), and stops there when it visits no page (`--look` alone). `--pages` and a shard run none of them.
  *  2. Builds the web app, once.
- *  3. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): as many workers as `--workers` asks, else
- *     as many as the machine has room for (`workersFor`) — half its cores, as many as its free memory holds, no more than the pages.
+ *  3. Hands the pages it visits to workers, one at a time as each asks (`queueOf`, workers.ts): half the machine's cores, or as many as
+ *     `--workers` asks, capped by as many as its free memory holds and by the pages (`workersFor`); `--workers` can lower the count,
+ *     never raise it past free memory, and a run given fewer than it asked says so on one line before it starts them.
  *  4. Makes an empty store for each, refusing two that are one (`apart`), and starts each worker (worker.ts), which seeds its store,
  *     serves it with an api and `vite preview` of its own, and visits the pages it is handed in its own Chromium, in the dark theme: no
  *     console error, no failed request, the page in the theme asked for, and the elements the page must have. With `--pages`, only the
@@ -36,7 +37,7 @@ import { lookTests } from './look.ts';
 import { loadPages, planOf } from './pages.ts';
 import { overBound, pagesLine, pastTool, rankLines, type PageTiming, type ShardPages } from './timing.ts';
 import { exitOn } from './visit.ts';
-import { apart, failedInOrder, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
+import { apart, failedInOrder, fewerThanAsked, queueOf, workersFor, type PageQueue, type Seat } from './workers.ts';
 import type { WorkerResult } from './worker.ts';
 import { fromNodeModules, OUT, plain, WEB } from './world.ts';
 
@@ -166,7 +167,10 @@ async function main(): Promise<void> {
     return;
   }
   build();
-  const n = workersFor({ cores: os.availableParallelism(), freeBytes: os.freemem(), pages: plan.visit.length, asked: plan.workers });
+  const freeBytes = os.freemem();
+  const n = workersFor({ cores: os.availableParallelism(), freeBytes, pages: plan.visit.length, asked: plan.workers });
+  const fewer = fewerThanAsked({ asked: plan.workers, workers: n, freeBytes, pages: plan.visit.length });
+  if (fewer) console.log(fewer);
   const queue = queueOf(plan.visit.map((p) => p.name));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-e2e-run-'));
   stores.push(dir);

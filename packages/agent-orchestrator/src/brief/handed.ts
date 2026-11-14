@@ -64,6 +64,8 @@ function concludedLines(parent: Extract<ParentCloseout, { steps: readonly Parent
  *
  * `remote` for a step on a remote A2A agent (`remoteBrief`), which has no workspace here: told the work stays on this machine, and that the
  * account below is all it is given of it, never that the change is on disk beside it.
+ * @param parent The run waited on: its record's terminal steps and how each signed off, or why that cannot be given.
+ * @param remote Whether the step is on a remote A2A agent; false where absent.
  */
 export function fromRunSection(parent: ParentCloseout, remote = false): string {
   const head = ['', headingOf('From run <id>', parent.run), ''];
@@ -104,6 +106,8 @@ function landedLabel(parent: ParentCloseout, remote: boolean): string {
  * it, opened in other words — handed, not waited on — and labelled by whether it had landed when this run's steps were filed
  * (`landedLabel`): one still in flight is "not landed, not judged", its change not in this workspace. A source whose record cannot be
  * read says so and why. `remote` for a step on a remote A2A agent, told its work stays on this machine.
+ * @param parent The run handed as context, and whether it had landed.
+ * @param remote Whether the step is on a remote A2A agent; false where absent.
  */
 export function contextSection(parent: ParentCloseout, remote = false): string {
   const head = ['', headingOf('From run <id>', parent.run), ''];
@@ -121,7 +125,11 @@ export function contextSection(parent: ParentCloseout, remote = false): string {
   return [...head, ...opening, ...concludedLines(parent)].join('\n');
 }
 
-/** A section of a run handed to a root in the words its `how` says: `fromRunSection` for a run waited on, `contextSection` for one read. */
+/**
+ * A section of a run handed to a root in the words its `how` says: `fromRunSection` for a run waited on, `contextSection` for one read.
+ * @param parent The run handed, with how: waited on, or read.
+ * @param remote Whether the step is on a remote A2A agent; false where absent.
+ */
 export const handedSection = (parent: ParentCloseout, remote = false): string =>
   parent.how === 'read' ? contextSection(parent, remote) : fromRunSection(parent, remote);
 
@@ -216,6 +224,9 @@ const endsPart = (parts: readonly HandedPart[], lines: readonly string[], next: 
  * froze: a card's own `## From <word>` stays in what was asked for. Inside a person's section a heading the run does not write is the
  * person's text; after any other it opens a part of the run's, as a section the run wrote under a heading this table has not learned.
  * `self` is the step told: its own check's verdict is a check part given by it.
+ * @param task The step's task.
+ * @param steps The names of the steps the run froze; none where absent.
+ * @param self The step told; absent where none is.
  */
 export function handedParts(task: string, steps: readonly string[] = [], self?: string): HandedPart[] {
   const named = new Set(steps);

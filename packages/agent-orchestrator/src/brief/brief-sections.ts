@@ -90,7 +90,11 @@ export const TASK_HEADINGS = {
 /** A heading of `TASK_HEADINGS`, as the table writes it. */
 export type TaskHeading = keyof typeof TASK_HEADINGS;
 
-/** The line that opens a section under `heading`, each `<…>` of it filled in order by `fills`: `headingOf('Try <n>', 2)` is `## Try 2`. */
+/**
+ * The line that opens a section under `heading`, each `<…>` of it filled in order by `fills`: `headingOf('Try <n>', 2)` is `## Try 2`.
+ * @param heading The heading, as `TASK_HEADINGS` writes it.
+ * @param fills What fills each `<…>` of it, in order.
+ */
 export function headingOf(heading: TaskHeading, ...fills: readonly (string | number)[]): string {
   let at = 0;
   return `## ${heading.replace(/<[a-z]+>/g, (hole) => String(fills[at++] ?? hole))}`;
@@ -102,6 +106,11 @@ export function headingOf(heading: TaskHeading, ...fills: readonly (string | num
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
  * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`). The
  * section is given as continuing (`resumed: true`), since `retrySection` has said the session is new.
+ * @param step The loop's target.
+ * @param run The run.
+ * @param steps The run's steps.
+ * @param retry The try, and what became of the one before it.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not.
  */
 export function retriedInRound(
   step: StepSpec,
@@ -309,6 +318,9 @@ const CHECK_AGAIN =
  * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a
  * new session is told as any try is. A try sent back from an ending that stopped on the base branch is told why in the
  * ending's terms, then what it said (`endingSection`).
+ * @param step The step tried again.
+ * @param r The try, and what became of the one before it.
+ * @param inFolder Whether the step is of a folder run, told of its folder rather than a branch; false where absent.
  */
 export function retrySection(step: StepSpec, r: RetryBriefing, inFolder = false): string {
   const pastBudget =
@@ -382,6 +394,7 @@ function saidSection(said: readonly Said[] | undefined): string[] {
  * (`fenced`) — a person's, or an agent's in the frame that names it (`saidBy`), which the lines then say apart, as `## Said to your
  * session` says them. Carried once: the step's first try is given them, and a later try that starts a new session is not. Nothing when
  * nothing was said.
+ * @param said What was said to the step before it was filed, in order; undefined where nothing was.
  */
 export function saidBeforeSection(said: readonly SaidBefore[] | undefined): string[] {
   if (!said?.length) return [];
@@ -429,6 +442,11 @@ export type RoundBriefing = {
  * The answers are on the brief because they are what the run needs of the step: a disagreement said in `replies` travels to the next
  * round's reviewer as data, where it can be weighed; one said nowhere is a finding raised again, round after round, until a person is
  * handed the argument cold.
+ * @param step The loop's target.
+ * @param r The round, and what the looping step asked.
+ * @param steps The run's steps.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not.
+ * @param inFolder Whether the step is of a folder run; false where absent.
  */
 export function roundSection(
   step: StepSpec,
@@ -492,6 +510,10 @@ export function roundSection(
  * `## Round <n> of <N>`, on a looping step's brief, every round: what its `again` does and which round this is — and from the second, what
  * the loop's target answered to the last round's findings (`## Replies from <target>`), as data. Mechanism, like the closeout contract: an
  * author who writes `loop:` does not explain the loop in prose, and cannot explain it wrong.
+ * @param step The looping step.
+ * @param run The run.
+ * @param steps The run's steps.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not.
  */
 export function loopSection(
   step: StepSpec,
@@ -573,6 +595,11 @@ function repliesSection(step: StepSpec, closeoutOf: (step: string) => Closeout |
  * without `again`, which is the loop's routing word and not a finding. A step not yet signed off is said
  * to be so: only a brief shown before the step is filed reads that, since nothing that reads a step is
  * filed until it has given every field it declares.
+ * @param from The step whose declared output is handed.
+ * @param steps The run's steps.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not.
+ * @param read Why it is handed, said under its label, and the fields left out; where absent, because this step reads it, with none
+ *   left out.
  */
 export function fromSection(
   from: string,
@@ -607,6 +634,9 @@ export function fromSection(
  * It travels as a parent run's closeout does, one level down: a person read what the gated step handed on and said it may go on, and their
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
  * step is on (`approvalOf`): the one that let this step be filed.
+ * @param step The step told.
+ * @param run The run.
+ * @param steps The run's steps.
  */
 export function approvedSection(step: StepSpec, run: Run, steps: readonly StepSpec[]): string {
   const before = upstreamOf(steps, step.name);
@@ -661,6 +691,10 @@ const answerGiven = (run: Run, a: RetryAsk): boolean => {
  * It travels as an approval does (`approvedSection`): an answer to a step's `needs` is a person's decision on the work — a part cut out,
  * a behaviour chosen — and the steps after it judge the work by it, or ask again for what the person already said. Read off the ask
  * files, waiting and consumed (`answers`), since the run's record keeps no message.
+ * @param step The step told.
+ * @param run The run.
+ * @param steps The run's steps.
+ * @param answers Every answer a person gave with `nemia retry --message` on the run, waiting or consumed.
  */
 export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSpec[], answers: readonly RetryAsk[]): string {
   const before = upstreamOf(steps, step.name);
@@ -688,6 +722,10 @@ export function answeredSection(step: StepSpec, run: Run, steps: readonly StepSp
  * It is on the brief because this step is the only one that can carry it anywhere. A loop ended by a person is a decision about scope: the
  * change is good enough, and what the reviewer found is somebody's later work. An ending step that merges without knowing that writes a
  * merge nobody can read the reason of, and the findings are lost with the run.
+ * @param step The step told.
+ * @param run The run.
+ * @param steps The run's steps.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not.
  */
 export function acceptedSection(
   step: StepSpec,
@@ -741,6 +779,14 @@ function approveCommand(run: Run, step: StepSpec, said: Closeout | undefined): s
  * `nemia approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until
  * the hold lifts (`heldRefusal`).
  *
+ * @param steps The run's steps.
+ * @param run The run.
+ * @param phaseOf The phase of a task, by its id.
+ * @param closeoutOf How a step signed off, by its name; undefined where it has not, and for every step where absent.
+ * @param askedCloseout What a task's record says of its closeout, by its id: never asked, asked, or asked and ended without it;
+ *   never asked, for every task, where absent.
+ * @param verdictOf A step's check verdict, by its name; undefined where it has none, and for every step where absent.
+ * @param spendOf What a step has spent; undefined for every step where absent.
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`).
  * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet: the same.
  * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is due again.
@@ -804,6 +850,8 @@ function approvedLine(step: StepSpec, run: Run, given: Approval): string {
  * What `nemia decide` prints under a looping step whose loop a person ended as it stands (`nemia approve`): when, and the words they gave,
  * which are the whole reason its findings are still open. Nothing for a loop nobody accepted, nor for an acceptance a later try has spent.
  * Pure.
+ * @param steps The run's steps.
+ * @param run The run.
  */
 export function acceptedLines(steps: readonly StepSpec[], run: Run): Record<string, string> {
   const lines: Record<string, string> = {};

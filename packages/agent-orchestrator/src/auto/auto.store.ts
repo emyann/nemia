@@ -69,7 +69,10 @@ export type Confirmed = { since: string; rules: PolicyRule[] };
 /** What an agent proposed, as read. */
 export type Proposed = { at: string; rules: PolicyRule[]; guidance: string[]; digest: string | null };
 
-/** The folder of `<store>/auto/`, under the store `home`. */
+/**
+ * The folder of `<store>/auto/`, under the store `home`.
+ * @param home The store's root.
+ */
 export const policyDir = (home: string): string => path.join(home, POLICY_FOLDER);
 
 /** `agent`'s name, refused (`Invalid`) where it is no agent's. */
@@ -79,13 +82,24 @@ function named(agent: string): string {
   return agent;
 }
 
-/** The file the person's confirmed list for `agent` is kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's. */
+/**
+ * The file the person's confirmed list for `agent` is kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's.
+ * @param home The store's root.
+ * @param agent The agent's name.
+ */
 export const confirmedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.json`);
 
-/** The file `agent`'s proposals are kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's. */
+/**
+ * The file `agent`'s proposals are kept in, in the store `home`. Refused (`Invalid`): a name that is no agent's.
+ * @param home The store's root.
+ * @param agent The agent's name.
+ */
 export const proposedFile = (home: string, agent: string): string => path.join(policyDir(home), `${named(agent)}.proposed.json`);
 
-/** The digest of the words of a custom instruction, or null for none: what a proposal is stale against once the words change. */
+/**
+ * The digest of the words of a custom instruction, or null for none: what a proposal is stale against once the words change.
+ * @param words The custom instruction's words; undefined where there are none.
+ */
 export const digestOf = (words: string | undefined): string | null =>
   words === undefined ? null : createHash('sha256').update(words).digest('hex').slice(0, 16);
 
@@ -143,6 +157,8 @@ function jsonWritten(file: string, value: unknown): void {
 /**
  * The person's confirmed list for `agent` in the store `home`, or undefined where they confirmed none. Refused (`Invalid`), naming the
  * file and its first wrong field, where it does not read: admission then allows nothing by it.
+ * @param home The store's root.
+ * @param agent The agent's name.
  */
 export function readConfirmed(home: string, agent: string): Confirmed | undefined {
   const file = confirmedFile(home, agent);
@@ -154,7 +170,11 @@ export function readConfirmed(home: string, agent: string): Confirmed | undefine
   return { since: read.success.since, rules: read.success.rules.map(ruleOf) };
 }
 
-/** What `agent` proposed in the store `home`, or undefined where it proposed nothing. Refused (`Invalid`) where the file does not read. */
+/**
+ * What `agent` proposed in the store `home`, or undefined where it proposed nothing. Refused (`Invalid`) where the file does not read.
+ * @param home The store's root.
+ * @param agent The agent's name.
+ */
 export function readProposed(home: string, agent: string): Proposed | undefined {
   const fix = `propose again with nemia policy propose ${agent} --file <path>`;
   const file = proposedFile(home, agent);
@@ -166,7 +186,12 @@ export function readProposed(home: string, agent: string): Proposed | undefined 
   return { at, rules: rules.map(ruleOf), guidance: [...guidance], digest };
 }
 
-/** Writes what `agent` proposes in the store `home`, whole, over what it proposed before: `nemia policy propose`'s, alone. */
+/**
+ * Writes what `agent` proposes in the store `home`, whole, over what it proposed before: `nemia policy propose`'s, alone.
+ * @param home The store's root.
+ * @param agent The agent's name.
+ * @param proposed What it proposes: its rules and its guidance.
+ */
 export function writeProposed(home: string, agent: string, proposed: Proposed): void {
   jsonWritten(proposedFile(home, agent), proposed);
 }
@@ -176,6 +201,11 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
  * that is built in (`default`), added to the person's list, which a first confirm seeds with the builtin rule. The list written. Refused,
  * writing nothing: a rule it did not propose (`Missing`), one whose words are no longer `words`, proposed again since (`Conflict`), and one
  * in force already (`Conflict`).
+ * @param home The store's root.
+ * @param agent The agent's name.
+ * @param id The rule's id: one it proposed, or `default`.
+ * @param words The rule's words as the person read them.
+ * @param now When it is confirmed, the list's `since`.
  */
 export function confirmRule(home: string, agent: string, id: string, words: string, now: Date): Confirmed {
   const rule = id === DEFAULT_ID ? DEFAULT_POLICY : readProposed(home, agent)?.rules.find((r) => r.id === id);
@@ -200,6 +230,10 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
 /**
  * Drops the rule `id` from the person's list for `agent` in the store `home` at `now`, the builtin rule among them while they confirmed
  * none. The list written. Refused, writing nothing: a rule not in force (`Missing`).
+ * @param home The store's root.
+ * @param agent The agent's name.
+ * @param id The rule's id.
+ * @param now When it is dropped, the list's `since`.
  */
 export function dropRule(home: string, agent: string, id: string, now: Date): Confirmed {
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_POLICY];

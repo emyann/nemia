@@ -239,6 +239,9 @@ export const WorkflowSpec = Schema.Struct({
   readme: Schema.optionalKey(Text),
   steps: Schema.Array(WorkflowStep),
   files: Schema.optionalKey(Schema.Array(WorkflowFile)),
+}).annotate({
+  description:
+    "The workflow as its files say it: its description, the machine needs its README declares, its README, its steps in order, and the folder's other text files.",
 });
 export type WorkflowSpec = typeof WorkflowSpec.Type;
 
@@ -290,13 +293,16 @@ export const WorkflowStatus = Schema.Struct({
   unfilled: Text,
   /** The files a removal took (`DELETE …/workflows/<name>`), by their path in the folder, on that answer alone. */
   removed: Schema.optionalKey(Strings),
+}).annotate({
+  description:
+    'What Nemia reads of the workflow: where it was found, its folder, its graph, each step resolved, why it does not load or cannot start in the factory, and its revision.',
 });
 export type WorkflowStatus = typeof WorkflowStatus.Type;
 
 /** A workflow, as an object. */
 export const Workflow = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Workflow'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Workflow').annotate({ description: 'What the object is: a Workflow, a folder of markdown, one file a step.' }),
   metadata: ObjectMeta,
   spec: WorkflowSpec,
   status: WorkflowStatus,
@@ -354,12 +360,20 @@ export type KeyField = typeof KeyField.Type;
  * each agent of yours gives a step it is attached to (`agents`), and how a step names a remote A2A agent with the keys it may not set.
  */
 export const KeyForm = Schema.Struct({
-  keys: Schema.Array(KeyField),
-  defaultHarness: Schema.String,
-  roleKeys: Schema.Array(Schema.Literals(STEP_KEYS)),
-  policyKeys: Schema.Array(Schema.Literals(STEP_KEYS)),
-  agents: Schema.Record(Schema.String, StepKeys),
-  remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.Array(Schema.Literals(STEP_KEYS)) }),
+  keys: Schema.Array(KeyField).annotate({
+    description: "Every key a step may set, in the package's order: what it means, how it is set and the words it may take.",
+  }),
+  defaultHarness: Schema.String.annotate({ description: 'The harness a step runs on where it names none.' }),
+  roleKeys: Schema.Array(Schema.Literals(STEP_KEYS)).annotate({ description: 'The keys an agent may set.' }),
+  policyKeys: Schema.Array(Schema.Literals(STEP_KEYS)).annotate({
+    description: "The keys a step's file sets as its policy over its agent.",
+  }),
+  agents: Schema.Record(Schema.String, StepKeys).annotate({
+    description: 'The role values each agent of yours gives a step it is attached to, by its name.',
+  }),
+  remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.Array(Schema.Literals(STEP_KEYS)) }).annotate({
+    description: 'How a step names a remote A2A agent: the prefix of its agent line, and the keys such a step may not set.',
+  }),
 }).annotate({ identifier: 'KeyForm' });
 export type KeyForm = typeof KeyForm.Type;
 
@@ -375,25 +389,41 @@ export type KeyRow = typeof KeyRow.Type;
  * can be hired into it and which, where each skill of its layers is found, and its newest runs.
  */
 export const WorkflowStepPage = Schema.Struct({
-  workflow: Schema.String,
-  from: Schema.Literals(['repo', 'yours']),
-  dir: Schema.String,
-  step: Schema.String,
-  body: Schema.String,
-  source: Schema.String,
-  keys: Schema.Array(KeyRow),
-  agentSkills: Schema.NullOr(Schema.Array(CardSkill)),
-  factory: Text,
-  layers: StepLayers,
-  hired: Text,
-  hiredIn: Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String })),
+  workflow: Schema.String.annotate({ description: 'The workflow the step is of.' }),
+  from: Schema.Literals(['repo', 'yours']).annotate({
+    description: "Where the workflow is read from: the factory's repository, or yours.",
+  }),
+  dir: Schema.String.annotate({ description: "The workflow's folder." }),
+  step: Schema.String.annotate({ description: "The step's name." }),
+  body: Schema.String.annotate({ description: "The step's body: what its agent is told to do." }),
+  source: Schema.String.annotate({ description: "The step's file as written." }),
+  keys: Schema.Array(KeyRow).annotate({
+    description: 'Every key a step may set, with its value as the loader read it (null where unset) and what it means.',
+  }),
+  agentSkills: Schema.NullOr(Schema.Array(CardSkill)).annotate({
+    description: "What the step's agent says it can do, as card entries; null where it has none.",
+  }),
+  factory: Text.annotate({ description: "The factory the page was read in, the namespace's; null for default." }),
+  layers: StepLayers.annotate({
+    description: "What a run of the step would be told now, by layer: its agent's, yours, the factory's, and the step's policy.",
+  }),
+  hired: Text.annotate({ description: 'The agent the factory hires into the step; null where it hires none.' }),
+  hiredIn: Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String })).annotate({
+    description: 'The factories that hire an agent into the step, each with the agent; empty where none does.',
+  }),
   hiring: Schema.Struct({
     refused: Text,
     agents: Schema.Array(Schema.Struct({ name: Schema.String, description: Text })),
+  }).annotate({
+    description:
+      'Whether an agent can be hired into the step: why not (null where it can), and the agents that can, each with its description.',
   }),
   skillsFrom: Schema.Array(
     Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])), foundIn: Text }),
-  ),
+  ).annotate({
+    description:
+      "Where each skill of the step's layers is found: yours, the repository's or a builtin, and the folder; null where none is found.",
+  }),
   recentRuns: Schema.Array(
     Schema.Struct({
       id: Schema.String,
@@ -402,6 +432,8 @@ export const WorkflowStepPage = Schema.Struct({
       factory: Text,
       filed: Schema.Boolean,
     }),
-  ),
+  ).annotate({
+    description: "The step's newest runs: each run's id, brief, when it was made, its factory and whether its task was filed.",
+  }),
 }).annotate({ identifier: 'WorkflowStepPage' });
 export type WorkflowStepPage = typeof WorkflowStepPage.Type;

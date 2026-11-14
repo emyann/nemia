@@ -32,6 +32,8 @@ export const TemplateSpec = Schema.Struct({
   parameters: Schema.Record(Schema.String, TemplateParameter),
   hires: Schema.Record(Schema.String, Schema.String),
   revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
+}).annotate({
+  description: "The template's manifest as written: its version, description, instruction, rules, parameters, hires and revisions policy.",
 });
 export type TemplateSpec = typeof TemplateSpec.Type;
 
@@ -46,13 +48,16 @@ export const TemplateStatus = Schema.Struct({
   agents: Schema.Array(Schema.String),
   skills: Schema.Array(Schema.String),
   problems: Schema.optionalKey(Schema.Array(Schema.String)),
+}).annotate({
+  description:
+    'What Nemia read of the template: where it is read from, its digest, its workflows, agents and skills, and each problem that stops it being read or applied.',
 });
 export type TemplateStatus = typeof TemplateStatus.Type;
 
 /** A template, as an object. */
 export const Template = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Template'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Template').annotate({ description: 'What the object is: a Template, a factory packaged to be applied.' }),
   metadata: ObjectMeta,
   spec: TemplateSpec,
   status: TemplateStatus,

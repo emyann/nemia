@@ -434,6 +434,40 @@ test('REFUSED: a ci that is red, one still running, and a head no ci judged at a
   assert.equal(asked(a.calls, 'pr', 'merge').length, 0);
 });
 
+test('merge reads the latest run of its check, as the wait does: a red run a later green one replaced is no verdict, and a green one a later red replaced is none either', () => {
+  const rollup = (...runs: Array<{ conclusion: string; startedAt: string }>) =>
+    JSON.stringify({ statusCheckRollup: runs.map((run) => ({ name: 'ci', workflowName: 'ci', status: 'COMPLETED', ...run })) });
+  const rerun = world();
+  rerun.gh.answers([
+    ...mergeable(rerun).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup(
+        { conclusion: 'FAILURE', startedAt: '2026-11-14T10:00:00Z' },
+        { conclusion: 'SUCCESS', startedAt: '2026-11-14T10:20:00Z' },
+      ),
+    },
+  ]);
+  const landed = land(rerun, 'merge', args());
+  assert.equal(landed.code, 0, landed.err);
+  assert.equal(asked(landed.calls, 'pr', 'merge').length, 1, 'the head the wait passed is merged');
+
+  const broken = world();
+  broken.gh.answers([
+    ...mergeable(broken).filter((rule) => rule.when !== 'pr view'),
+    {
+      when: 'pr view',
+      out: rollup(
+        { conclusion: 'SUCCESS', startedAt: '2026-11-14T10:00:00Z' },
+        { conclusion: 'FAILURE', startedAt: '2026-11-14T10:20:00Z' },
+      ),
+    },
+  ]);
+  const refused = land(broken, 'merge', args());
+  assert.equal(refused.code, 1, refused.out);
+  assert.equal(asked(refused.calls, 'pr', 'merge').length, 0, 'nothing is merged');
+});
+
 test('merge reads the CI context --check names and no other: a green `ci` is no verdict for `--check gate`, a green `gate` is', () => {
   const ciAlone = world();
   ciAlone.gh.answers(mergeable(ciAlone));

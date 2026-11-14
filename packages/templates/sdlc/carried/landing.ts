@@ -272,12 +272,13 @@ function sole(found: readonly Pr[], id: string, state: string, open: string): Pr
 }
 
 /**
- * The CI context `check` of `number`'s head — the one the base branch's protection requires, named by `--check` — read as it is now;
- * refuses a head nothing judged, or one it did not pass.
+ * The CI context `check` of `number`'s head — the one the base branch's protection requires, named by `--check` — read as it is now, by
+ * the latest run of each check (`latest`), as the round's wait reads it (`pull-request.ts`): a run re-run or run again on another event
+ * of the head leaves its earlier one in the rollup, and that one is no verdict. Refuses a head nothing judged, or one it did not pass.
  */
 function green(pr: Pr, check: string): void {
   const text = gh('pr', 'view', String(pr.number), '--json', 'statusCheckRollup');
-  const entries = parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${pr.number}`, text).statusCheckRollup ?? [];
+  const entries = latest(parsed<{ statusCheckRollup?: Entry[] }>(`the checks of #${pr.number}`, text).statusCheckRollup ?? []);
   const ours = entries.filter((entry) => (entry.name ?? entry.context ?? '') === check);
   if (ours.length === 0)
     throw new Refusal(
@@ -638,7 +639,7 @@ function greenAtHead(pr: Pr, check: string, id: string, began: number): string {
   const l: Landing = { number: pr.number, url: pr.url, oid: head, onto: pr.headRefName, check };
   for (;;) {
     const { entries, unread } = readAt(head);
-    const ours = named(entries, check);
+    const ours = named(latest(entries), check);
     const seen = unread === undefined && !(ours.length && superseded(ours)) ? seenOf(ours) : 'pending';
     if (seen === 'passed') return `\`${check}\` passed at ${head.slice(0, 12)}, the head the landing refreshed #${pr.number} to`;
     if (seen === 'failed')

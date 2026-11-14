@@ -55,6 +55,17 @@ import { heldLater } from '../round/round.ts';
 import { answersOr } from '../question/index.ts';
 import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.ts';
 import type { RaiseBy } from 'objects';
+import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
+
+/**
+ * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory`, read by `checkKills` in
+ * src/views/views.verb.ts): undefined where it killed nothing of it. A machine's kill is no verdict on the work, so `retries:` runs the
+ * check again rather than continue the session (`retriesDue`).
+ */
+export type CheckKillOf = (step: string) => OutOfMemoryKill | undefined;
+
+/** Whether the machine, not the check's own limit, ran out of memory and killed a process of a step's current check. */
+const machineKilled = (checkKillOf: CheckKillOf, step: string): boolean => checkKillOf(step)?.by === 'machine';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.
@@ -384,7 +395,10 @@ export const pauseAsksVoid = (
  * the session, and the session can work again before a tick stops it, told something by a peer with no `nemia up` running. Left for its
  * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
  * the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written; `runsOn`
- * marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
+ * marks a session the harness no longer calls blocked. Otherwise a check the machine's OOM killer ended a process of, under its own limit
+ * (`checkKillOf`), while `retries:` has tries left and `--recheck` is a way to try the step: the check run again, and nothing else
+ * (`mode: 'recheck'`, recorded `retried`), whatever it exited with and whatever its `checkFailurePolicy:` says of the code, since a kill
+ * of the machine's is no verdict on the work. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
  * the step re-filed, its session continued. Past them, or for a check that did not finish, nothing is due — the step waits on the person.
  * Nor for a refusal whose exit code the step's `checkFailurePolicy:` says is a person's (`FailStep`, `personsRefusal`): no try is spent
  * on it, and the step waits on the person, offered `--recheck` (`retryOffers`).
@@ -421,6 +435,7 @@ export const pauseAsksVoid = (
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due,
  *   to stop it first.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
+ * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a machine's kill is rechecked.
  */
 export function retriesDue(
   steps: readonly StepSpec[],
@@ -432,6 +447,7 @@ export function retriesDue(
   asks: readonly RetryAsk[] = [],
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
+  checkKillOf: CheckKillOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
@@ -474,6 +490,14 @@ export function retriesDue(
         ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
+    } else if (
+      status === 'failed (check)' &&
+      record.check &&
+      modes.includes('recheck') &&
+      machineKilled(checkKillOf, step.name) &&
+      retriesSpent(record) < (step.retries ?? 0)
+    ) {
+      due.push({ step: step.name, try: next, mode: 'recheck', by: 'retries' });
     } else if (
       status === 'failed (check)' &&
       record.check &&
@@ -527,6 +551,7 @@ export function tryNote(step: StepSpec, record: StepRecord | undefined, steps: r
  */
 function howOf(step: StepSpec, last: EarlierTry): string {
   if (last.cause === 'retries') return `by retries: ${step.retries ?? 0}`;
+  if (last.retried) return `rechecked by retries: ${step.retries ?? 0}, the machine having run out of memory`;
   if (last.cause === 'signoff') return 'asked to sign off by the run';
   if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.cause === 'recheck') return 'rechecked on your word';
@@ -617,6 +642,8 @@ const abortedWords = (
  *   one that did not finish the recheck.
  * @param landingDenied What the run's place denies a landing session (`landingDenies`), read for a denied ending alone: a call it denies
  *   is said to be the step's own fence at work, and offered no rule.
+ * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a check the machine killed is offered
+ *   `--recheck` first, since it is no verdict on the work.
  */
 export function retryOffers(
   steps: readonly StepSpec[],
@@ -628,6 +655,7 @@ export function retryOffers(
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   landingDenied: () => readonly string[] = () => [],
+  checkKillOf: CheckKillOf = () => undefined,
 ): Offer[] {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   const lines: Offer[] = [];
@@ -661,7 +689,8 @@ export function retryOffers(
       );
       continue;
     }
-    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, () =>
+    const machine = machineOffered(step.name, status, modes, checkKillOf);
+    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, () =>
       personsOffered(step, status, modes, verdictOf),
     );
     if (recheck) {
@@ -699,6 +728,10 @@ function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Ver
   return checkFailureAction(step.checkFailurePolicy, verdict) === 'FailStep' ? verdict : undefined;
 }
 
+/** Whether a `failed (check)` step's check the machine killed is offered `--recheck` first, where `--recheck` is a way to try it. Pure. */
+const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf): boolean =>
+  status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step);
+
 /** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
 const personsOffered = (
   step: Pick<StepSpec, 'name' | 'checkFailurePolicy'>,
@@ -709,7 +742,8 @@ const personsOffered = (
   status === 'failed (check)' && modes.includes('recheck') ? personsRefusal(step, verdictOf(step.name)) : undefined;
 
 /**
- * The offer that leads with `--recheck` (`retryOffers`), or undefined: a check that did not finish, past a budget or not; or a refusal
+ * The offer that leads with `--recheck` (`retryOffers`), or undefined: a check the machine's OOM killer ended a process of (`machine`),
+ * past a budget or not, its session continued beside it; a check that did not finish, past a budget or not; or a refusal
  * its step's policy names a person's (`persons`, read only within the budget), its session continued beside it.
  */
 function recheckFirst(
@@ -717,8 +751,15 @@ function recheckFirst(
   unfinished: boolean,
   raise: Raise | undefined,
   spent: string,
+  machine: boolean,
   persons: () => number | undefined,
 ): [string, string, string] | undefined {
+  if (machine)
+    return [
+      `${command} --recheck`,
+      'the machine ran out of memory and killed a process of its check, under its own limit: no verdict on the work. Run the check again, and nothing else, once the machine has room',
+      `  (or continue its session, told what happened: ${command}${spent})`,
+    ];
   if (unfinished)
     return [
       `${command} --recheck`,

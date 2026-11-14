@@ -69,7 +69,10 @@ async function follows(page: Page, rows: readonly BellRow[]): Promise<void> {
   const url = new URL(page.url());
   if (url.hash !== `#${bellHash(row)}` || url.searchParams.has('bar'))
     throw new Refused(`the row opens /runs/${row.run}#${bellHash(row)}, the bar closed — it opens ${url.pathname}${url.search}${url.hash}`);
-  await expectOnScreen(page.locator(`section[id="${bellHash(row)}"] h2`).first(), "the gate's section is in view");
+  await expectOnScreen(
+    page.locator(`article[id="${bellHash(row)}"] [data-step-head]`).first(),
+    "the gate's part is in view, its head first",
+  );
   await page.goBack();
   await page.waitForURL((back) => back.pathname === '/runs' && back.searchParams.get('bar') === 'waiting', { timeout: WAIT_MS });
   await expectVisible(waitingBar(page), 'Back returns to the bar');

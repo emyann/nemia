@@ -87,7 +87,12 @@ const RunFileSchema = Schema.StructWithRest(
      * `Sighting.memory`. Best-effort: a scope that emptied with Claude Code killed in it reads nothing more. Absent with no limit.
      */
     memory: Schema.optional(
-      Schema.Struct({ limitBytes: Schema.Finite, peakBytes: Schema.optional(Schema.Finite), oomKills: Schema.Finite }),
+      Schema.Struct({
+        limitBytes: Schema.Finite,
+        peakBytes: Schema.optional(Schema.Finite),
+        oomKills: Schema.Finite,
+        oom: Schema.optional(Schema.Finite),
+      }),
     ),
     /**
      * The scope the session's Claude Code runs in, its folder under the cgroup mount, read off Claude Code on the first message it sent

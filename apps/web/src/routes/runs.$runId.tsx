@@ -1,43 +1,15 @@
-import type { ReactNode } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import { Values } from '../components/run/Artifacts';
-import { Artifacts, bytesWord, ClosedNeeds, Statement } from '../components/step/Closeout';
-import { Decide } from '../components/gate/Decide';
-import { Markdown } from '../components/markdown/Markdown';
-import { NeedsBanner, ToDecideBanner } from '../components/gate/Needs';
-import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, unreadRows, when } from '../components/step/Facts';
-import { StepPageLink } from '../components/step/StepParts';
-import { StepBody, StepPolicy, Told } from '../components/step/Told';
-import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/gate/Gate';
-import { RunCanvas } from '../components/run/RunCanvas';
 import { RunGone } from '../components/run/RunGone';
-import { StatusChip, StepNote } from '../components/step/StatusChip';
-import { Timeline } from '../components/run/Timeline';
-import { StartedFrom } from '../components/run/TryTag';
-import { RemoveRun } from '../components/run/RemoveRun';
-import { LiftHold } from '../components/run/LiftHold';
-import { RunWait } from '../components/run/RunWait';
-import { HoldRun } from '../components/run/HoldRun';
-import { PruneRun } from '../components/run/PruneRun';
+import { AsksOfYou } from '../components/run/AsksOfYou';
+import { RunHeader } from '../components/run/RunHeader';
+import { RunCanvas } from '../components/run/RunCanvas';
+import { RunResult } from '../components/run/RunResult';
+import { Ledger } from '../components/run/Ledger';
+import { Receipts } from '../components/run/Receipts';
 import { KindsBehind } from '../components/run/KindsBehind';
-import { Labels } from '../components/field/Labels';
-import { runsMoved } from '../lib/runWrites';
-import { factoriesQuery } from '../lib/api/factories.ts';
-import { labelRun } from '../lib/api/labels.ts';
 import { readGone } from '../lib/api/gone.ts';
-import { loadRun, useRunView, type RunDetail, type StepView } from '../lib/runView';
-import { namespaceOf } from '../lib/factories';
-import { untrustedFor, type UntrustedPlace } from '../lib/factories';
-import { askedIn, decideDrawn, gateOffered, stepAnchor } from '../lib/asks';
+import { loadRun, useRunView, type RunDetail } from '../lib/runView';
 import { barValue } from '../lib/bar';
-import { spentTitle } from '../lib/cost';
-import { durationWords } from '../lib/duration';
-import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
-import { useNow } from '../lib/useNow';
-import { ink } from '../lib/meaning';
-import { ENDED } from '../lib/words';
-import { Actor } from '../components/actor/Actor';
 
 /**
  * `step`, the old address of one step of the run and the one a message names a step by (`broughtOf`, `lib/stepLink.ts`), opens that
@@ -96,387 +68,40 @@ function RunRead({ runId }: { runId: string }) {
 }
 
 /**
- * The run's labels, a person's edited in place: an edit reads the run's object again (`exact`, as a hold does) and every list it is on
- * (`runsMoved`), so the chip shows with no reload.
- */
-function RunLabels({ run }: { run: RunDetail }) {
-  const queryClient = useQueryClient();
-  const edit = (edits: readonly string[]) =>
-    labelRun(namespaceOf(run.labels.factory), run.id, edits).then(() => runsMoved(queryClient, run.id));
-  return <Labels labels={run.labels} edit={edit} />;
-}
-
-/**
- * One run, top to bottom: what is left to decide about its result, above who else it waits on, as the CLI's `ls` prints the two; the runs
- * it waits on and a person's hold; its warning; its id (`RunHeading`), with what it has cost, every step's tries, once a cost
- * was measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it,
- * what it was started from, and, once it is over, what it holds on disk to give back as the CLI's `prune` does; then Decide, between the
- * banners and the canvas, for a run with something to decide and never while it runs: an answer to give, or a try a person has asked for,
- * since a session the harness blocked is continued from the banner and Decide draws it only once its try is asked; the graph, the whole
- * width of the page, a step pressed on it inspected in the frame's bar; the brief, with the inbox card it was started from under it, as the
- * CLI's `decide` puts it under the run's line; its facts; its timeline; and each step's section.
- *
- * Its facts: a folder run has no repository, base or branch, and names where its work is instead, the one thing a person needs to find what
- * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
- * once the CLI's `prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
+ * One run, top to bottom, in the order a person reads it: what it asks of them, each ask pointing to its step (`AsksOfYou`); its header
+ * — its title, where it stands, its id, its labels, three tiles and its menu (`RunHeader`) — with its warning and the kinds it is behind
+ * on under it; the graph, the whole width of the page, whose edges carry the packets that passed between steps, a step pressed on it
+ * inspected in the frame's bar; the ask beside the result (`RunResult`); every step in one part (`Ledger`); and its receipts, folded
+ * (`Receipts`). The machine's detail is one fold down, never gone.
  */
 function Run({ run }: { run: RunDetail }) {
-  const runCancelled = run.cancelledAt !== null;
   return (
     <article className="space-y-6">
       <BackToRuns />
 
-      <ToDecideBanner run={run} />
+      <AsksOfYou run={run} />
 
-      <NeedsBanner run={run} />
+      <RunHeader run={run} />
 
-      <RunWaits run={run} />
-
-      {run.warning && <p className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">{run.warning}</p>}
+      {run.warning && (
+        <p data-run-warning className="rounded border border-outline px-3 py-2 text-body-medium text-muted-foreground">
+          {run.warning}
+        </p>
+      )}
 
       <KindsBehind run={run} />
-
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <RunHeading run={run} />
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <RunTook run={run} />
-          {run.cost && (
-            <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-body-medium">
-              <span className="text-muted-foreground">cost </span>
-              <span className="font-mono">{run.cost.said}</span>
-            </p>
-          )}
-          {run.read && (
-            <p
-              data-run-read
-              className="text-body-medium"
-              title="What every try of every step read: from the cache, written to it, and the largest context one response carried."
-            >
-              <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
-            </p>
-          )}
-          {run.tokens && (
-            <p data-run-tokens className="text-body-medium">
-              <span className="font-mono">{run.tokens.said}</span> <span className="text-muted-foreground">({run.tokens.split})</span>
-            </p>
-          )}
-          <StartedFrom run={run} />
-          {run.try && <RemoveRun id={run.id} />}
-          <HoldRun run={run} />
-          <PruneRun run={run} />
-        </div>
-        <RunLabels run={run} />
-      </header>
-
-      {decideDrawn(run) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph">
         <RunCanvas run={run} />
       </section>
 
-      <section className="space-y-4">
-        <Markdown>{run.brief}</Markdown>
-        {run.fromNote && (
-          <p data-from={run.from?.inbox} className="text-body-medium text-muted-foreground">
-            {run.fromNote}
-          </p>
-        )}
-        <Facts
-          rows={[
-            ...(run.place === 'folder'
-              ? ([['work', pathRow(run.work)]] satisfies Array<[string, ReactNode]>)
-              : ([
-                  ['repo', code(run.repo)],
-                  ['base', code(run.baseRef)],
-                  ['branch', code(run.branch)],
-                ] satisfies Array<[string, ReactNode]>)),
-            ['created', when(run.createdAt)],
-            ['started', startedRow(run)],
-            [ENDED.cancelled.word, cancelledRow(run)],
-            ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
-            ['workflow', code(run.workflowDir)],
-          ]}
-        />
-      </section>
+      <RunResult run={run} />
 
-      <Timeline run={run} />
+      <Ledger run={run} />
 
-      {run.steps.map((step) => (
-        <StepSection key={step.name} run={run} step={step} runCancelled={runCancelled} />
-      ))}
+      <Receipts run={run} />
     </article>
   );
-}
-
-/**
- * When the CLI's `prune` removed a run's worktrees, how many and what they held, and what it kept — in the CLI `prune`'s words. And when
- * `--artifacts` removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the
- * files went later than the worktrees, each at its own time.
- */
-function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
-  const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
-  const count = `${worktrees.length} worktree${worktrees.length === 1 ? '' : 's'}`;
-  const title = [
-    ...worktrees.map((w) => `${w.path}  ${bytesWord(w.bytes)}`),
-    ...(artifacts ? [`its files  ${bytesWord(artifacts.bytes)}`] : []),
-  ].join('\n');
-  if (!artifacts) {
-    return (
-      <span data-pruned title={title}>
-        {when(at)} — removed {count}, {bytesWord(bytes)} freed; its branches, record and files are kept
-      </span>
-    );
-  }
-  const files = `its files, ${bytesWord(artifacts.bytes)} freed; its branches and record are kept`;
-  return (
-    <span data-pruned data-files-pruned title={title}>
-      {!worktrees.length ? (
-        <>
-          {when(artifacts.at)} — removed {files}
-        </>
-      ) : artifacts.at === at ? (
-        <>
-          {when(at)} — removed {count}, {bytesWord(bytes)} freed, and {files}
-        </>
-      ) : (
-        <>
-          {when(at)} — removed {count}, {bytesWord(bytes)} freed; {when(artifacts.at)} — removed {files}
-        </>
-      )}
-    </span>
-  );
-}
-
-/**
- * What the harness denied a step's try, every call as a permission rule names it: `Skill(look), Bash(pytest)`; and under it, where
- * the run works on a place a harness does not trust (`cause`), that this is the likely cause, in the api's words, with the line that
- * trusts it.
- */
-const deniedRow = (calls: readonly string[], cause: UntrustedPlace | undefined): ReactNode => (
-  <span className="flex min-w-0 flex-col gap-1">
-    <span data-denied className={`font-mono text-body-small ${ink.yours}`}>
-      {calls.join(', ')}
-    </span>
-    {cause && (
-      <span data-denied-cause={cause.factory} className="text-body-small text-muted-foreground">
-        Likely cause: <span className="font-mono break-all">{cause.place.place}</span> is not trusted for {cause.place.harness}, which
-        withholds {cause.place.withheld}.{' '}
-        {cause.place.never ?? (
-          <>
-            Trust it: <code className="font-mono whitespace-nowrap text-foreground">{cause.trust}</code>
-          </>
-        )}
-      </span>
-    )}
-  </span>
-);
-
-/**
- * The place the run `run` works on that a harness does not trust, read off the factories' answer only where a step of it was denied a
- * call (`asked`): nothing while that is read, and nothing where every place is trusted.
- */
-function useDeniedCause(run: RunDetail, asked: boolean): UntrustedPlace | undefined {
-  const { data } = useQuery({ ...factoriesQuery, enabled: asked });
-  return asked && data ? untrustedFor(data, { repo: run.repo }) : undefined;
-}
-
-/**
- * One step's section: its state, its spec, its check, what it is told, its facts, its files, then its gate or what it handed on.
- *
- * What it is told is said once: where its run froze its layers, by layer in the fold (`Told`) alone, its agent's instructions, the
- * person's custom instructions, its policy and its task; where it froze none, its body (`StepBody`) above the fold of its brief whole.
- *
- * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
- * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
- * rule names it, which is what its work may be short of, with its likely cause where the run's place is not trusted; why the runtime
- * could not read its session alone, where it could not, in its
- * words — neither working nor gone, which its status does not say; what its current try consumed, in the CLI `decide`'s words,
- * `not measured` where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt
- * cache marked; and what every try has cost together, and of its cap where it has one, red once past it.
- *
- * A folder step's files: what it left in its folder, which is the whole of what it made — the files its closeout named and the ones it
- * forgot to, each with its size, a text file readable in a tab, and what the api serves by no name, a directory or a link, by its path — so
- * *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read says so instead, where an empty
- * list would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
- *
- * At its gate — waiting on you as the CLI's `ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`)
- * — the step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a
- * person approves, beside Approve and Send back. An ending step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing
- * on, and shows instead the work it would act on (`ActsOn`), the branch's standing and counts and each work step's closeout with its
- * files, since approving is what runs it. An ending that has already run — filed, aborted, retried — is at its gate for its own closeout,
- * as any gated step is. A send-back names the steps the package names (`sendBackTo`): the step itself once it has run, or the steps it
- * waits on. Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
- * what its own approval filed and the terms it acts on.
- */
-function StepSection({ run, step, runCancelled }: { run: RunDetail; step: StepView; runCancelled: boolean }) {
-  const { spec, closeout, gate } = step;
-  const cause = useDeniedCause(run, Boolean(step.denied));
-  const atGate = gateOffered(step, runCancelled);
-  const ends = endsTheRun(step);
-  const acts = atGate && ends && step.taskId === null;
-  const handedOn = closeout && (
-    <div className="min-w-0 space-y-2 rounded border border-outline-variant p-3 text-body-medium">
-      <Statement closeout={closeout} />
-      {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
-      {closeout.artifacts.length > 0 && (
-        <div aria-label="Artifacts" className="text-body-small text-muted-foreground">
-          Artifacts:
-          <Artifacts artifacts={closeout.artifacts} />
-        </div>
-      )}
-      <Values values={closeout.values} />
-    </div>
-  );
-
-  return (
-    <section id={stepAnchor(step.name)} className="scroll-mt-4 space-y-4 border-t border-outline-variant pt-6">
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-semibold">{step.name}</h2>
-          <StatusChip codes={step} runCancelled={runCancelled} runHeld={run.holding != null} />
-        </div>
-        <StepNote note={step.note} />
-      </div>
-
-      {spec && <Facts rows={specRows(spec, step.filed)} />}
-
-      {step.check && <Check check={step.check} />}
-
-      <StepBody body={step.body} layers={step.layers} />
-
-      <Told told={step.told} layers={step.layers} parts={step.taskParts} filed={step.taskId !== null} />
-      <StepPageLink page={run.workflowPage} step={step.name} />
-
-      <Facts
-        rows={[
-          run.place === 'folder' ? ['folder', pathRow(step.workspace)] : ['branch', code(step.branch)],
-          ['task', step.taskId ? code(step.taskId) : 'not filed'],
-          ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
-          ...(step.denied ? ([['denied', deniedRow(step.denied.calls, cause)]] satisfies Array<[string, ReactNode]>) : []),
-          ...unreadRows(step.sessionUnread),
-          ['used', step.used?.used],
-          ['cost', step.used?.cost],
-          ...readRows(step.used),
-          ...spentRows(step),
-        ]}
-      />
-
-      {run.place === 'folder' && step.taskId !== null && (
-        <div aria-label="Files" data-files className="text-body-small text-muted-foreground">
-          {step.filesError === null ? (
-            <>
-              Files in its folder:
-              <Artifacts artifacts={step.files} size none="the folder is empty" />
-            </>
-          ) : (
-            <span data-files-error>{step.filesError}</span>
-          )}
-        </div>
-      )}
-
-      {atGate ? <AtGate run={run} step={step} acts={acts} /> : handedOn}
-
-      {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} budgets={gate.budgets} />}
-    </section>
-  );
-}
-
-/**
- * A step at its gate, under its section: its policy drawn open, then the gate. An ending's (`acts`) beside the work it would act on,
- * sending back the steps it waits on; any other beside what the step handed on, with the questions it asks (`askedIn`) and the budgets
- * it proposes for the steps after it (`gate.budgets`), sending back the step.
- */
-function AtGate({ run, step, acts }: { run: RunDetail; step: StepView; acts: boolean }) {
-  const back = acts
-    ? run.graph.edges.filter((e) => (e.kind === 'after' || e.kind === 'route') && e.to === step.name).map((e) => e.from)
-    : [step.name];
-  return (
-    <>
-      <StepPolicy layers={step.layers} />
-      {acts ? (
-        <div className="grid items-start gap-4 @3xl/page:grid-cols-2">
-          <ActsOn run={run} step={step} />
-          <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} onto={run.branch} />
-        </div>
-      ) : (
-        <Gate
-          runId={run.id}
-          step={step.name}
-          approveLine={step.commands.approve}
-          back={back}
-          closeout={step.closeout}
-          questions={askedIn(step.closeout)}
-          budgets={step.gate?.budgets}
-        />
-      )}
-    </>
-  );
-}
-
-/**
- * What the run took, or how long it has been at work, as its card's clock says it (`runClock`), the start, the end and the wall time on
- * hover; it moves every second while a task of it runs (`clockCounts`). Nothing before the run started, which the `started` row says.
- */
-function RunTook({ run }: { run: RunDetail }) {
-  const finished = !inFlight(run);
-  const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
-  if (run.startedAt === null) return null;
-  const clock = runClock(run, now, finished);
-  return (
-    <p data-run-took className="text-body-medium">
-      <time dateTime={clock.at} title={clock.title} className="font-mono">
-        {clock.words}
-      </time>
-    </p>
-  );
-}
-
-/** When the run was called off, and who called it off where its record says (`Actor`); nothing for a run never called off. */
-function cancelledRow(run: RunDetail): ReactNode {
-  if (!run.cancelledAt) return undefined;
-  return (
-    <span className="inline-flex flex-wrap items-center gap-x-2">
-      {when(run.cancelledAt)}
-      <Actor actor={run.cancelledBy} />
-    </span>
-  );
-}
-
-/**
- * When the run started — its first step filed — and, where it waited before that, for how long: the wait the Factory's card does not count
- * as time at work (`runClock`). Not yet while nothing of it is filed, and never for a run called off first.
- */
-function startedRow(run: RunDetail): ReactNode {
-  if (run.startedAt === null) return run.cancelledAt ? 'never: called off first' : 'not yet';
-  const waited = waitedMs(run)!;
-  return (
-    <span data-started>
-      {when(run.startedAt)}
-      {waited >= 1000 && `, after waiting ${durationWords(waited, 'second')}`}
-    </span>
-  );
-}
-
-/**
- * What the run waits on other runs for: a start `--after` runs, and a person's hold, which carries its Lift. While a hold stands no step
- * offers an answer — the package refuses each — so it is the one thing on the page asked of anyone.
- */
-function RunWaits({ run }: { run: RunDetail }) {
-  return (
-    <>
-      {run.waiting && <RunWait label="Waiting on runs" wait={run.waiting} />}
-      {run.holding && (
-        <RunWait label="Held" wait={run.holding} actor={run.holding.actor}>
-          <LiftHold id={run.id} />
-        </RunWait>
-      )}
-    </>
-  );
-}
-
-/** A run's id, its page's heading. */
-function RunHeading({ run }: { run: RunDetail }) {
-  return <h1 className="font-mono text-body-medium text-muted-foreground">{run.id}</h1>;
 }
 
 function BackToRuns() {

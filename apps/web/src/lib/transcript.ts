@@ -31,7 +31,7 @@ export const sessionToRead = (
   step.attempts.count > 0 || step.tries.some((t) => t.taskId === step.taskId && t.attempts.count > 0) ? step.taskId : null;
 
 /** The tool a Claude Code session gives its closeout with. Codex gives its closeout as its last words, which are said. */
-export const CLOSEOUT_TOOL = 'StructuredOutput';
+const CLOSEOUT_TOOL = 'StructuredOutput';
 
 /** A tool call and, once the transcript has it, its result: paired by the call's id, which its result carries. */
 export type ToolCall = {

@@ -6,6 +6,7 @@
  * asks for it with `"x-shape": "questions"`, which the loader expands (`expandShapes`) before it checks the schema is strict, so the
  * harness is handed standard JSON Schema only.
  */
+import type { FieldShape } from 'objects';
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import { isObject, type StepSpec } from '../step/step.ts';
 import { BUDGETS_SCHEMA, budgetRefusals } from '../budget/budget.ts';
@@ -86,19 +87,34 @@ const FORMER_QUESTIONS_SCHEMAS = [
   },
 ];
 
-/** The shapes a marker may name, each with its schema. */
-const SHAPES: Record<string, object> = { questions: QUESTIONS_SCHEMA, budgets: BUDGETS_SCHEMA };
+/** A field that names a place or a commit: a string, or null where the step has none. Its shape tells the board how to draw it. */
+const NULLABLE_STRING = { type: ['string', 'null'] };
+
+/** The shapes a marker may name (objects' `FIELD_SHAPES`), each with its schema. */
+const SHAPES: Record<FieldShape, object> = {
+  questions: QUESTIONS_SCHEMA,
+  budgets: BUDGETS_SCHEMA,
+  link: NULLABLE_STRING,
+  commit: NULLABLE_STRING,
+};
+
+/** Whether `shape` is one a marker may name. */
+const isShape = (shape: unknown): shape is FieldShape => typeof shape === 'string' && Object.hasOwn(SHAPES, shape);
 
 /** Whether `value` holds the marker anywhere, at any depth. */
 const marked = (value: unknown): boolean =>
   Array.isArray(value) ? value.some(marked) : isObject(value) && (Object.hasOwn(value, SHAPE_KEY) || Object.values(value).some(marked));
 
 /**
- * An output schema's `properties` with each marked field expanded to the schema of its shape, its `description` kept; or why they cannot
- * be. Refuses a shape it does not know, a marker beside any schema key but `description`, and a marker anywhere but on a field itself.
+ * An output schema's `properties` with each marked field expanded to the schema of its shape, its `description` kept, and the shape each
+ * marked field was (`shapes`, none for an unmarked one); or why they cannot be. Refuses a shape it does not know, a marker beside any
+ * schema key but `description`, and a marker anywhere but on a field itself.
  */
-export function expandShapes(properties: Record<string, unknown>): { properties: Record<string, unknown> } | { error: string } {
+export function expandShapes(
+  properties: Record<string, unknown>,
+): { properties: Record<string, unknown>; shapes: Record<string, FieldShape> } | { error: string } {
   const expanded: Record<string, unknown> = {};
+  const shapes: Record<string, FieldShape> = {};
   for (const [name, field] of Object.entries(properties)) {
     if (!isObject(field) || !Object.hasOwn(field, SHAPE_KEY)) {
       if (marked(field))
@@ -107,7 +123,7 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
       continue;
     }
     const shape = field[SHAPE_KEY];
-    if (typeof shape !== 'string' || !Object.hasOwn(SHAPES, shape)) {
+    if (!isShape(shape)) {
       const known = Object.keys(SHAPES).map((k) => `\`${k}\``);
       return {
         error: `\`${name}\` asks for the shape ${JSON.stringify(shape)}, which is none of the shapes there are: ${known.join(', ')}`,
@@ -120,8 +136,9 @@ export function expandShapes(properties: Record<string, unknown>): { properties:
       };
     }
     expanded[name] = { ...SHAPES[shape], ...(typeof field.description === 'string' ? { description: field.description } : {}) };
+    shapes[name] = shape;
   }
-  return { properties: expanded };
+  return { properties: expanded, shapes };
 }
 
 /**

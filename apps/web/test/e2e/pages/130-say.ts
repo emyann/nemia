@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, isRunAction } from '../board.ts';
 import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { attachedFiles, DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -98,7 +98,11 @@ export default {
       );
       await expectCount(talk.getByText(SAYING.words, { exact: true }), 1, 'the words are drawn once');
       if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
-      await expectVisible(top.locator('[data-note]', { hasText: 'said to 1×' }), "the step's note says it was said to, in wf ls's words");
+      const detail = await openFold(partOf(page, SAYING.step), 'detail');
+      await expectVisible(
+        detail.locator('[data-note]', { hasText: 'said to 1×' }),
+        "the step's note, in its part's detail, says it was said to, in wf ls's words",
+      );
 
       await settled(page);
       await photograph(page, path.join(OUT, `say-said-${await themeOf(page)}.png`), { fullPage: true });

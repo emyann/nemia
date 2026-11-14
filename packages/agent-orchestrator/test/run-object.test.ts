@@ -22,7 +22,7 @@ import { EngineService as RunsEngine, engineOf } from '../src/runtime-client.ts'
 import { SHOW, TRIES, TRY, CLOSEOUT, TOLD } from '../src/object/commands.verb.ts';
 import { advanceRun, startRun, runWith as runEngine, RunObject, runObject } from '../src/runner.ts';
 import { tryShort } from '../src/object/run.verb.ts';
-import { runRecord } from '../src/record/record.store.ts';
+import { artifactsDir, runRecord } from '../src/record/record.store.ts';
 import { Missing } from '../src/refusal/refusal.ts';
 import { StoreRoot } from '../src/config/root.store.ts';
 import type { StepTry } from '../src/resource/tries.verb.ts';
@@ -51,6 +51,15 @@ beforeEach(() => {
 });
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
+
+/** The step's status on the run's object `id`. */
+const statusOf = async (id: string, step: string) => {
+  const answer = await object(id);
+  assert.ok(!('unjudged' in answer), `${id} is judged`);
+  const status = answer.status.steps.find((s) => s.name === step);
+  assert.ok(status, `${id} has ${step}`);
+  return status;
+};
 
 /** A workflow folder of the steps named, each after those `after` gives it. */
 const folder = (steps: Record<string, string | null>): string => {
@@ -200,4 +209,54 @@ test("nemia show's handler answers the object, nemia/v1's Run; with raw, the rec
   const raw = await handled<object>(SHOW, { runId: id, raw: true } as never);
   assert.equal((raw as { id?: string }).id, id);
   assert.ok('steps' in raw);
+});
+
+test("a git run's step lists every file of its artifacts folder, named or not, under its artifacts route; one unread says why", async () => {
+  const id = await started({ work: null, after: 'work' });
+  const dir = artifactsDir(ROOT, { id }, 'work');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'notes.md'), 'named');
+  fs.writeFileSync(path.join(dir, 'shot.png'), 'unnamed');
+  fs.writeFileSync(path.join(dir, 'closeout.json'), '{}');
+  engine().settle(`${id}-work`, 'succeeded', { closeout: { ...SIGNED, artifacts: [path.join(dir, 'notes.md')] } });
+  await advanced(id);
+  const listed = (await statusOf(id, 'work')).artifactsFolder;
+  assert.equal(listed?.error, null);
+  assert.deepEqual(
+    listed?.files.map((f) => ('url' in f ? f.url : f.path)),
+    ['notes.md', 'shot.png'].map((name) => `/api/runs/${id}/steps/work/artifacts/${name}`),
+    "both files, the run's own closeout.json left out",
+  );
+  assert.deepEqual((await statusOf(id, 'after')).artifactsFolder?.files ?? [], [], 'a step not filed yet lists none');
+  fs.chmodSync(dir, 0o100);
+  try {
+    const unread = (await statusOf(id, 'work')).artifactsFolder;
+    assert.deepEqual(unread?.files, [], 'a folder that cannot be listed lists nothing');
+    assert.equal(typeof unread?.error, 'string', 'and says why');
+  } finally {
+    fs.chmodSync(dir, 0o755);
+  }
+});
+
+test("a run's spec says each step's declared fields in order, with their shapes, and the closeout serves the shapes", async () => {
+  const dir = scratch('wf-run-object-shaped-');
+  fs.writeFileSync(path.join(dir, 'work.md'), '---\nplace: git\noutput: work.schema.json\n---\nwork it\n');
+  const properties = { pr: { 'x-shape': 'link' }, notes: { type: 'string' }, head: { 'x-shape': 'commit' } };
+  const schema = { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+  fs.writeFileSync(path.join(dir, 'work.schema.json'), JSON.stringify(schema));
+  const repo = scratch('wf-run-object-repo-');
+  stand().world.repository(repo, {});
+  const { id } = await runPlaced(startRun({ brief: 'shape me', repo, workflowDir: dir }));
+  await advanced(id);
+  const answer = await object(id);
+  assert.ok(!('unjudged' in answer));
+  assert.deepEqual(answer.spec.steps.find((s) => s.name === 'work')?.fields, [
+    { name: 'pr', shape: 'link' },
+    { name: 'notes', shape: null },
+    { name: 'head', shape: 'commit' },
+  ]);
+  engine().settle(`${id}-work`, 'succeeded', { closeout: { ...SIGNED, pr: 'https://x.test/pr/1', notes: 'n', head: null } });
+  await advanced(id);
+  const closeout = await handled<{ closeout: { shapes?: object } | null }>(CLOSEOUT, { runId: id, step: 'work' });
+  assert.deepEqual(closeout.closeout?.shapes, { pr: 'link', head: 'commit' });
 });

@@ -17,7 +17,8 @@ import {
   readsUnbounded,
   SHORT_FIELD,
   type RunDecision,
-  type StepCloseout,
+  StepCloseout,
+  StepTold,
 } from 'objects';
 
 /** `Api`'s groups with `group` beside them, as `readsUnbounded` reads an Api. */
@@ -69,6 +70,31 @@ test('a closeout read with no fields keeps its short output fields and names the
   assert.deepEqual(every.outputLeftOut, []);
   assert.deepEqual(every.raw, { whole: true });
   assert.deepEqual(Object.keys(closeoutNarrowed(closeoutOf(10), ['long']).output), ['long']);
+});
+
+test('a narrowed closeout keeps the shapes of exactly the fields it keeps; one with no shapes reads with none', () => {
+  const shaped: StepCloseout = { ...closeoutOf(10), shapes: { short: 'link', long: 'commit' } };
+  assert.deepEqual(closeoutNarrowed(shaped, undefined).shapes, { short: 'link' });
+  assert.deepEqual(closeoutNarrowed(shaped, ['*']).shapes, { short: 'link', long: 'commit' });
+  assert.equal('shapes' in closeoutNarrowed(closeoutOf(10), ['*']), false);
+});
+
+test('an answer from before the run page’s keys decodes: no shapes, fields or artifacts folder, and a text task part with no source', () => {
+  const decoded = Schema.decodeUnknownSync(StepTold)({
+    body: null,
+    told: null,
+    layers: null,
+    taskParts: [{ kind: 'text', text: 'do it' }],
+  });
+  assert.deepEqual(decoded.taskParts, [{ kind: 'text', text: 'do it' }]);
+  assert.equal(Schema.decodeUnknownSync(StepCloseout)(closeoutOf(1)).shapes, undefined);
+  const told = Schema.decodeUnknownSync(StepTold)({
+    body: null,
+    told: null,
+    layers: null,
+    taskParts: [{ kind: 'text', text: 'x', source: 'step', step: 'design' }],
+  });
+  assert.deepEqual(told.taskParts?.[0], { kind: 'text', text: 'x', source: 'step', step: 'design' });
 });
 
 test('a closeout’s body is read by page: the default page, then on from bodyNext to its end, never past the most', () => {

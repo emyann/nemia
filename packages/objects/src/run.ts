@@ -18,6 +18,7 @@ import { ChatSpeaker } from './nemia.ts';
 import {
   ANSWER_VIA,
   ARTIFACT_KINDS,
+  FIELD_SHAPES,
   ATTEMPT_ENDS,
   CHECK_RESULTS,
   ENGINE_OUTCOMES,
@@ -93,6 +94,11 @@ export const RunSpecStep = Schema.Struct({
   tools: Schema.NullOr(Strings),
   deadlineSeconds: NullNumber,
   agent: Schema.optionalKey(Schema.String),
+  /**
+   * The fields of its declared output, in its schema's order, each with the shape its `x-shape` marked (`FIELD_SHAPES`, null where none);
+   * absent for a step that declares none, or frozen before the run kept them.
+   */
+  fields: Schema.optionalKey(List(Schema.Struct({ name: Schema.String, shape: Schema.NullOr(Schema.Literals(FIELD_SHAPES)) }))),
 }).annotate({ identifier: 'RunSpecStep' });
 export type RunSpecStep = typeof RunSpecStep.Type;
 
@@ -397,6 +403,11 @@ export const RunStepStatus = Schema.Struct({
   budget: Schema.NullOr(StepBudget),
   /** How many questions its closeout asks, on a step waiting on a person whose closeout asks some (`Listing`'s `asks`); left out else. */
   asks: Schema.optionalKey(Schema.Finite),
+  /**
+   * Every file of the step's artifacts folder, named by a closeout or not (`folderFiles`, files.store.ts, linked under `…/artifacts/`),
+   * with why the folder did not read (null where it did); absent on a step not filed yet, or from an older api.
+   */
+  artifactsFolder: Schema.optionalKey(Schema.Struct({ files: List(StepArtifact), error: NullString })),
 }).annotate({ identifier: 'RunStepStatus' });
 export type RunStepStatus = typeof RunStepStatus.Type;
 
@@ -611,6 +622,8 @@ export const StepCloseout = Schema.Struct({
   missing: Strings,
   replies: Schema.NullOr(List(Schema.Struct({ finding: Schema.String, answer: Schema.String, why: Schema.String }))),
   schema: Fields,
+  /** The shape (`FIELD_SHAPES`) of each field of `schema` its step's output marked by `x-shape`; absent where it marked none. */
+  shapes: Schema.optionalKey(Schema.Record(Schema.String, Schema.Literals(FIELD_SHAPES))),
   questions: List(Asked),
   raw: Schema.Unknown,
   /**
@@ -674,6 +687,7 @@ export const closeoutNarrowed = (
     ...(whole !== null && to < whole.length ? { bodyNext: to } : {}),
     output: kept(closeout.output),
     schema: kept(closeout.schema),
+    ...(closeout.shapes === undefined ? {} : { shapes: kept(closeout.shapes) }),
     raw: fields?.includes('*') === true ? rawPaged(closeout.raw, from, to) : null,
     outputLeftOut: Object.keys(closeout.output).filter((name) => !keeps(name)),
   };

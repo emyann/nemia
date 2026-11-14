@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { frontmatterOfValues, frontmatterValues } from '../frontmatter/frontmatter.ts';
-import { Need } from 'objects';
+import { FIELD_SHAPES, Need } from 'objects';
 import { firstPiece } from '../piece/piece.ts';
 import {
   AGENTS_FOLDER,
@@ -466,6 +466,7 @@ const frozenStepFields = {
         owners: Schema.optionalKey(
           Schema.Record(Schema.String, Schema.Struct({ by: Schema.Literals(['agent', 'step']), name: Schema.String, file: Schema.String })),
         ),
+        shapes: Schema.optionalKey(Schema.Record(Schema.String, Schema.Literals(FIELD_SHAPES))),
       }),
       Rest,
     ),

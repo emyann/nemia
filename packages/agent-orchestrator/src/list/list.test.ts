@@ -79,6 +79,11 @@ test('a step killed at its memory limit says so in its note, and one with no kil
     assert.ok(note.includes('check out of memory'));
     assert.ok(note.includes('WF_MEMORY_LIMIT'));
   });
+  await t.test('its check killed by the machine, under its own limit: the note says the machine, naming no WF_MEMORY_LIMIT', () => {
+    const note = implement(listed((id) => (id === 'c1' ? { ...KILLED, oom: 0 } : undefined))).note ?? '';
+    assert.ok(note.includes('check out of memory') && note.includes('machine'));
+    assert.ok(!note.includes('WF_MEMORY_LIMIT'));
+  });
   await t.test('no record, or a record with no kill: the listing is the one built without memoryOf', () => {
     assert.deepEqual(
       listed(() => undefined),

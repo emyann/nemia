@@ -6,7 +6,7 @@
  */
 import path from 'node:path';
 import { memoryQuantityRefusal } from 'agent-runtime/vocabulary';
-import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type StepSpec } from '../step/step.ts';
+import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, shapesKept, type StepOutput, type StepSpec } from '../step/step.ts';
 import {
   declarationOf,
   DEFAULT_HARNESS,
@@ -433,7 +433,7 @@ export function outputOf(
   const shaped = expandShapes(schema.properties);
   if ('error' in shaped) {
     refuse(
-      `${named} ${shaped.error}. A field of questions is written \`"<field>": { "${SHAPE_KEY}": "questions", "description": "<what they are>" }\`, and the run expands it to the questions' schema.`,
+      `${named} ${shaped.error}. A field of a shape is written \`"<field>": { "${SHAPE_KEY}": "questions", "description": "<what it is>" }\`, with \`budgets\`, \`link\` or \`commit\` in place of \`questions\` for another shape, and the run expands it to that shape's schema.`,
     );
   }
   schema.properties = shaped.properties;
@@ -448,7 +448,7 @@ export function outputOf(
       `${named} is not strict at ${loose.at || 'the top'}: ${loose.why}. Codex refuses a structured output whose objects do not list every property in \`required\` and set \`"additionalProperties": false\`. A field that may be absent is required and nullable instead — \`"type": ["string", "null"]\`.`,
     );
   }
-  return { file, schema: schema as OutputSchema };
+  return { file, schema: schema as OutputSchema, ...shapesKept(shaped.shapes) };
 }
 
 /** Whether harness `harness` is one the runtime declares, taking none of the flags that carry a plugin and a prompt (`claudeFlags`). */

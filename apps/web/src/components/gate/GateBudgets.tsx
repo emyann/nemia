@@ -6,6 +6,7 @@
 import type { StepView } from '../../lib/runView';
 import type { Frozen } from '../../lib/frozen';
 import { budgetWord } from '../../lib/money';
+import { focusRing } from '../ui/ds/utils';
 
 /** The budgets a gated step proposed for the steps after it, or the caps its approval set, as the api says each. */
 export type GateBudgets = NonNullable<NonNullable<StepView['gate']>['budgets']>;
@@ -172,5 +173,4 @@ function BudgetRow({
   );
 }
 
-const AMOUNT =
-  'w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant focus:outline-none';
+const AMOUNT = `w-24 rounded border border-outline bg-background px-2 py-1 font-mono text-body-medium focus:border-on-surface-variant ${focusRing()}`;

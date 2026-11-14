@@ -19,6 +19,7 @@ import {
 import type { RunDetail } from '../../lib/runView';
 import { forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../../lib/canvas';
 import { layout, stepsOf, type Point } from '../../lib/layout';
+import { packetsOfView } from '../../lib/stepPart';
 import { useContent } from '../../lib/useContent';
 import { stepState } from '../../lib/status';
 import { useCanvasPress } from '../../lib/useCanvasPress';
@@ -68,7 +69,8 @@ const button =
 
 /**
  * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
- * `graph` has them, never worked out here from a step's spec.
+ * `graph` has them, never worked out here from a step's spec — each edge along which a step handed its declared output carrying that
+ * packet as a chip (`packetsOfView`), which moves the page to the giver's part.
  *
  * Laid out from the `after` edges the first time the run is seen in this browser; after that, wherever a
  * person dragged the nodes, kept per run until "Reset layout" lays it out again. The layering reads the steps' names and the graph's
@@ -195,7 +197,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
     });
   }, [placed, run, selected]);
 
-  const edges = useMemo(() => stepEdges(run), [run]);
+  const edges = useMemo(() => stepEdges(run, packetsOfView(run)), [run]);
 
   const moved = useRef(false);
   const onNodesChange = useCallback((changes: NodeChange<StepFlowNode>[]) => {

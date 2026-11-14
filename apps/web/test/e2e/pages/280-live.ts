@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, sidebar, themeOf, railPlace, runPath } from '../board.ts';
+import { fed, openFold, partOf, photograph, sidebar, themeOf, railPlace, runPath } from '../board.ts';
 import { expectCount, expectVisible, FEED_STREAM, feedAnswered, idle, Refused, settled } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -55,8 +55,9 @@ export default {
 
     const gate = page.locator(`section[aria-label="The gate of ${gated}"]`);
     const approve = gate.getByRole('button', { name: 'Approve', exact: true });
-    const approval = page.locator(`article > section#step-${gated} section[aria-label="The approval of ${gated}"]`);
+    const approval = partOf(page, gated).locator(`[data-part-detail] section[aria-label="The approval of ${gated}"]`);
     await expectVisible(approve, `${gated} waits at its gate`);
+    await openFold(partOf(page, gated), 'detail');
 
     const approvePath = `${await runPath(page, id)}/steps/${gated}/approve`;
     try {

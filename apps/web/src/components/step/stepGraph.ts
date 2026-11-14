@@ -1,16 +1,18 @@
 import { MarkerType } from '@xyflow/react';
 import type { RunDetail, StepView } from '../../lib/runView';
-import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../../lib/canvas';
+import { edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState, type Packet } from '../../lib/canvas';
 import { contextEdges, runEdges } from '../../lib/factory';
 import { nodeKinds, routedOf, routesOf, takenRoutes } from '../../lib/routing';
 import { statePaint, stepState, type StepState } from '../../lib/status';
 import type { StateFlowEdge } from './StateEdge';
 import type { StepNodeData } from './StepNode';
+import { stepPartOf } from '../../lib/stepPart';
 
 /**
  * What a step's node shows, on its run's page and on the Factory alike: read off the run as the api gives it, whose
  * `waitingOnYou` decides the human gate beside the step's own word; for a condition or a workflow node, its graph node, and what its
- * sentence says of its route or its card (`routedOf`).
+ * sentence says of its route or its card (`routedOf`); and what its part says it gave, of the try it shows, whose first item the node draws
+ * (`stepPartOf`, the one model of every size of a step).
  */
 export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   step: run.steps[index],
@@ -22,6 +24,7 @@ export const stepData = (run: RunDetail, index: number): StepNodeData => ({
   routes: routesOf(run.graph, run.steps[index].name),
   routed: routedOf(run.steps[index].message),
   taken: takenRoutes(run.steps).get(run.steps[index].name) ?? null,
+  gave: stepPartOf(run, run.steps[index].name, new Date()).gave,
 });
 
 /** The minimap in the chips' colours, so a glance at it says what the nodes say: each state's fill is its meaning's (`statePaint`). */
@@ -57,9 +60,10 @@ export type StepGraphFacts = Pick<RunDetail, 'cancelledAt' | 'holding' | 'graph'
  * A graph's edges as a run's page draws them, on the Factory and a workflow's page alike: the api's `graph`, never a step's spec —
  * an edge per `after`, and for a loop, the edge back from its looping step to the step a round runs again, under both
  * nodes and labelled with the round once past the first; a route's edge labelled with its route, thin and faint where it was not
- * taken. Each says what `edgesOf` reads off the steps at its ends.
+ * taken. Each says what `edgesOf` reads off the steps at its ends; an edge along which a step handed its declared output carries that
+ * packet of `packets` (a run's page passes its own, `packetsOfView`), which `StateEdge` draws as a chip.
  */
-export function stepEdges(facts: StepGraphFacts): StateFlowEdge[] {
+export function stepEdges(facts: StepGraphFacts, packets: readonly Packet[] = []): StateFlowEdge[] {
   const runCancelled = facts.cancelledAt !== null;
   const runHeld = facts.holding != null;
   const steps = facts.steps.map((s) => ({
@@ -68,8 +72,9 @@ export function stepEdges(facts: StepGraphFacts): StateFlowEdge[] {
     note: s.note,
     roundDue: s.roundDue,
   }));
-  return edgesOf(facts.graph, steps, takenRoutes(facts.steps)).map((e) => {
-    const edge = drawn(e.id, e.source, e.target, e.state, e.kind === 'loop', e.untaken);
+  return edgesOf(facts.graph, steps, takenRoutes(facts.steps), packets).map((e) => {
+    const plain = drawn(e.id, e.source, e.target, e.state, e.kind === 'loop', e.untaken);
+    const edge = e.packet && plain.data ? { ...plain, data: { ...plain.data, packet: e.packet } } : plain;
     const labelled = e.label ? { ...edge, label: e.label } : edge;
     return e.kind === 'loop' ? { ...labelled, sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET } : labelled;
   });

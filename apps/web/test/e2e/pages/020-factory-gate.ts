@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { fed, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
+import { fed, openFold, partOf, photograph, stepBar, themeOf, isRunAction } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING, FAKE } from '../seed.ts';
@@ -131,11 +131,12 @@ export default {
       }),
       `with ${FAKE.branch}, and in which file`,
     );
+    const detail = await openFold(partOf(inspector, ending), 'detail');
     await expectVisible(
-      inspector.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }),
-      `${ending} is not filed, and its inspector says so`,
+      detail.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }),
+      `${ending} is not filed, and its inspector's detail says so`,
     );
-    await expectCount(inspector.locator('dt', { hasText: /^sessions$/ }), 0, 'rather than a table of dashes');
+    await expectCount(detail.locator('dt', { hasText: /^sessions$/ }), 0, 'rather than a table of dashes');
     await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), { fullPage: true });

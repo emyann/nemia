@@ -1,13 +1,13 @@
 /**
- * The frame's side sheet for one step of a run: the step's tabs (`StepTabs`), read from the run's record, which a read again keeps
- * current.
+ * The frame's side sheet for one step of a run: the step's part whole and its conversation's tail under it (`StepInspector`), read
+ * from the run's record, which a read again keeps current.
  */
 import { readGone } from '@/lib/api/gone';
 import { useRunRead, type RunDetail } from '@/lib/runView';
 import { titleOf } from '@/lib/factory';
 import { BarPanel } from '../frame/BarPanel';
 import { RunGone } from '../run/RunGone';
-import { StepTabs } from './StepInspector';
+import { StepInspector } from './StepInspector';
 
 /**
  * The bar for the step `step` of the run `run`, titled by the step and described by its run's title. While the run is read it says so; a
@@ -35,7 +35,7 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
       </p>
     );
   }
-  return <StepTabs run={run} step={step} className="h-full" />;
+  return <StepInspector run={run} step={step} className="h-full" />;
 }
 
 /** A bar's body for the run `id` not read yet: that it is read, or, with `error`, why the read failed. */

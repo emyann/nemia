@@ -13,25 +13,19 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { coded } from './run-fixtures.ts';
 import './tsx.ts';
 import {
   at,
   atGate,
-  closeoutSaying,
   commandsOf,
   cut,
   endingRun,
-  LOGIN,
   needing,
   offersMarkup,
   planCloseout,
   proposalIn,
-  ranOnce,
   routedWith,
   textsOf,
-  threeTries,
-  toShip,
   unescaped,
   UNMEASURED,
   WAIT,
@@ -47,13 +41,12 @@ const { OFFERS } = await import('../src/lib/words.ts');
 const { instantWhole } = await import('../src/lib/instant.ts');
 type RunDetail = import('../src/lib/runView.ts').RunDetail;
 type Decidable = import('../src/lib/api/decision.ts').Decidable;
-const { TryCloseouts } = await import('../src/components/step/Closeout.tsx');
+const { FieldWidgetView } = await import('../src/components/field/widgets/FieldWidgetView.tsx');
 const facts = await import('../src/components/step/Facts.tsx');
 type StepCloseout = import('../src/lib/api/tries.ts').StepCloseout;
 const { RecommendButton } = await import('../src/components/gate/Questions.tsx');
 type Question = import('../src/lib/api/tries.ts').Question;
 const Answering = await import('../src/components/gate/Decide.tsx');
-const { NeedsBanner, ToDecideBanner } = await import('../src/components/gate/Needs.tsx');
 const { container, hairline, ringed } = await import('../src/lib/meaning.ts');
 const { decisionStamp } = await import('../src/lib/decide.ts');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
@@ -447,9 +440,9 @@ test('a question that takes several marks each label it recommends as a list, an
   const many: Question = { ...where, recommended: ['retry', 'gate'] };
   const html = renderToStaticMarkup(createElement(RecommendButton, { questions: [many], draft: {}, onDraft: () => {} }));
   assert.match(html, /data-recommend-all/);
-  const said = closeoutSaying('A design.', { output: { open: [many] }, questions: [{ field: 'open', questions: [many] }] });
-  const tries = [{ ...threeTries[2], attempts: ranOnce, closeout: said }];
-  const read = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: '-' }));
+  const read = renderToStaticMarkup(
+    createElement(FieldWidgetView, { name: 'open', widget: 'questions', value: [many], given: true, questions: [many] }),
+  );
   assert.equal([...read.matchAll(/data-recommended="true"/g)].length, 2);
 });
 
@@ -545,91 +538,26 @@ test('a loop out of rounds is approved as it stands from the Answer section, wit
   assert.doesNotMatch(commands, /<form|<textarea/);
 });
 
-/** The banner, rendered inside the query client its Continue asks with. */
-const bannerMarkup = (run: RunDetail) =>
-  renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
-
-test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
-  const base = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
-  const asks = {
-    ...base.steps[0],
-    name: 'implement',
-    taskId: 't-2',
-    ...coded('succeeded · BLOCKED'),
-    needs: 'Which database?',
-    waitingFor: null,
-    lastLine: null,
-  };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
-  const html = bannerMarkup(run);
-
-  assert.match(html, /^<section aria-label="Waiting on you"/);
-  const texts = textsOf(html);
-  assert.ok(textContentOf(html).includes('implement asks: Which database?'), html);
-  assert.ok(
-    texts.includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`),
-    `after the step's name, which is a tag of its own\n${html}`,
-  );
-  const items = new Map([...html.matchAll(/<li data-need="(\w+)" data-step="(\w+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2], m[3]]));
-  assert.doesNotMatch(items.get('implement')!, /<form|<button|<textarea/, 'a question is answered from the Decide section, not the banner');
-  const review = items.get('review')!;
-  assert.match(
-    review,
-    /^<p [^>]*>[\s\S]*?<\/p><p data-advice="true" class="break-words text-body-small">answer it in Claude Code: claude agents, session ae\/t-1\/1<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/,
-    'under the wait, where a person answers it, which this board does not; then a form that asks the tick for another try, and nothing else',
-  );
-  assert.deepEqual(
-    [...review.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]),
-    [['submit', false, 'Continue']],
-    'one button, enabled with nothing written: the box is optional',
-  );
-  assert.match(review, /<label for="[^"]+" class="sr-only">What to tell review, if anything<\/label>/);
-  assert.match(review, /<textarea [^>]*placeholder="Anything to tell it \(optional\): the next try is told it\."/);
-  assert.ok(textsOf(review).includes('nemia retry r-1 review'), `the step's retry line, as the api answers it\n${review}`);
-  assert.doesNotMatch(
-    html,
-    /data-copy|data-unblock|ae stop|cannot continue/,
-    'no commands to copy, and no sentence that the board cannot continue it',
-  );
-
-  const note = 'try 2 asked (--continue) — stopping its blocked session, then the tick files it';
-  const held = { ...base.steps[0], note, asked: { try: 2, mode: 'continue' as const, model: null, message: null, stopFirst: true } };
-  const asked = bannerMarkup({ ...run, steps: [asks, held] });
-  assert.ok(
-    asked.includes(`<p data-note="true" class="font-mono text-body-small">${note}</p></li>`),
-    `asked: what the tick does with it, in \`wf ls\`'s words\n${asked}`,
-  );
-  assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/, 'and nothing to press');
-  assert.doesNotMatch(
-    /<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0],
-    /data-advice/,
-    'no advice to answer the prompt in that session: the next tick stops it, so the line would send a person to a session about to go',
-  );
-  assert.ok(
-    textsOf(asked).includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`),
-    `the wait is still said, in the need's own line\n${asked}`,
-  );
-
-  const mute = bannerMarkup({ ...run, steps: [asks, { ...base.steps[0], waitingFor: null }] });
-  assert.ok(
-    textsOf(mute).includes(`is blocked by the harness: ${LOGIN}`),
-    `a harness that says nothing about what for: the need alone\n${mute}`,
-  );
-  assert.doesNotMatch(mute, /data-advice/, 'with no empty line under it');
-});
-
 /** What a piece of markup reads as, its tags gone: `textContent`, as the e2e's `hasText` reads it. */
 const textContentOf = (html: string): string => unescaped(html.replace(/<[^>]+>/g, ''));
 
-test("an agent's question is drawn as its markdown after `asks:`, in the banner and in the inspector; the banner's hover keeps it plain", async () => {
+test("Continue asks the tick for another try of a session the harness blocked: a box for anything to tell it, optional, and the step's retry line", () => {
+  const html = withClient(createElement(Answering.Continue, { runId: 'r-1', step: 'review', line: 'nemia retry r-1 review' }));
+  assert.match(html, /^<div data-continue="true"[^>]*><form aria-label="Continue review"/);
+  assert.deepEqual(
+    [...html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2])]),
+    [['submit', false]],
+    'one button, enabled with nothing written: the box is optional',
+  );
+  assert.match(html, /<label for="[^"]+" class="sr-only">/);
+  assert.match(html, /<textarea /);
+  assert.ok(textsOf(html).includes('nemia retry r-1 review'), `the step's retry line, as the api answers it\n${html}`);
+  assert.doesNotMatch(html, /data-copy|ae stop/, 'no commands to copy');
+});
+
+test("an agent's question is drawn as its markdown after `asks:` in the inspector", async () => {
   const needs = 'Which **database**?\n\n- one\n- two';
   const run = needing('succeeded · BLOCKED', { needs }, { waitingOnYou: ['review'] });
-  const item = /<li data-need="asks"[^]*?<\/li>/.exec(bannerMarkup(run))![0];
-  assert.match(item, /<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>\?<\/p>\s*<ul/);
-  assert.match(item, /class="[^"]*max-h-40 overflow-y-auto[^"]*"/, 'a long question scrolls in a box of its own');
-  assert.match(item, new RegExp(`title="asks: Which \\*\\*database\\*\\*\\?\\n\\n- one`));
-  assert.ok(textContentOf(item).startsWith('review asks: Which database?'), item);
-
   const { Asked } = await import('../src/components/gate/GateBrief.tsx');
   const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
   assert.match(
@@ -664,54 +592,6 @@ test("a result nobody decided is asked in the inspector, with the way to the run
 
   const called = { ...needing('succeeded', {}, { waitingOnYou: [], cancelledAt: at }), toDecide };
   assert.equal(await routedWith(createElement(Asked, { run: called, step: called.steps[0] })), '');
-});
-
-test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
-  assert.equal(bannerMarkup(needing('running (working)', {}, { waitingOnYou: [] })), '', 'nothing needed: no banner');
-  const held = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
-  assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
-  assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
-});
-
-test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
-  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
-  const both = bannerMarkup({ ...run, steps: [run.steps[0], theme] });
-  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
-  assert.equal(
-    textsOf(line).join(''),
-    `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —nemia decide r-1`,
-  );
-  assert.match(
-    line,
-    /<strong><a href="#step-review" data-approve="review" class="underline underline-offset-2">approve review<\/a>, theme<\/strong>/,
-  );
-  assert.doesNotMatch(
-    both,
-    /<li |<form|<button/,
-    "the need is the banner's line: no question to list under it, and nothing to press in the banner",
-  );
-});
-
-test("in the frame's bar, the banners name a step by a button that opens the step's bar, where a hash would point nowhere", () => {
-  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
-  const onStep = () => {};
-  const needs = renderToStaticMarkup(
-    createElement(
-      QueryClientProvider,
-      { client: new QueryClient() },
-      createElement(NeedsBanner, { run: { ...run, steps: [run.steps[0], theme] }, onStep }),
-    ),
-  );
-  assert.doesNotMatch(needs, /href="#step-/);
-  assert.match(
-    needs,
-    /<strong><button type="button" data-approve="review" class="underline underline-offset-2">approve review<\/button>, theme<\/strong>/,
-  );
-  const decide = withClient(createElement(ToDecideBanner, { run: endingRun(), onStep }));
-  assert.doesNotMatch(decide, /href="#step-/);
-  assert.match(decide, /<button type="button" data-approve="ship" class="underline underline-offset-2">/);
 });
 
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
@@ -804,59 +684,9 @@ const decidedAs = (standings: unknown[]) => ({
   commands: [],
 });
 
-/**
- * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
- */
-function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
-  const client = new QueryClient();
-  client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
-  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
-}
-
-test("the to-decide banner says what `wf ls` says after `→ to decide:`, and links an ending step's gate to its section — and nothing where there is nothing to decide", () => {
-  const run = endingRun();
-  const html = withClient(createElement(ToDecideBanner, { run }));
-  assert.match(html, /^<section aria-label="To decide" data-to-decide="approve"/);
-  assert.deepEqual(textsOf(html), ['To decide:', toShip.said]);
-  assert.match(html, /<a href="#step-ship" data-approve="ship" class="underline underline-offset-2">/);
-
-  const branch = {
-    kind: 'result' as const,
-    branches: ['wf/r-1/implement'],
-    said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1',
-    command: 'wf decide r-1',
-  };
-  const ahead = withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: branch } }));
-  assert.match(ahead, /data-to-decide="result"/);
-  assert.deepEqual(textsOf(ahead), ['To decide:', branch.said], 'a branch nobody merged: the words, and the command in them');
-  assert.doesNotMatch(ahead, /<a /, 'it names no step to link to');
-
-  assert.equal(withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: null } })), '', 'nothing to decide: no banner');
-  assert.equal(
-    withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: undefined as unknown as null } })),
-    '',
-    'and none from an api that carries none',
-  );
-});
-
-test("the ending step's own gate is not asked for twice: the to-decide banner says it, and the banner below has nothing left to say", () => {
-  const run = endingRun();
-  assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
-  const theme = { ...run.steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), closeout: null, approve: null, gate: null };
-  const both = bannerMarkup({
-    ...run,
-    steps: [...run.steps, theme],
-    waitingOnYou: ['ship', 'theme'],
-    waitingOnYouWords: ['approve ship', 'theme'],
-  });
-  assert.match(both, /^<section aria-label="Waiting on you"/, 'another step waiting on you is still said, beside the decision');
-  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
-  assert.equal(
-    textsOf(line).join(''),
-    'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —nemia decide r-1',
-    'and only it',
-  );
-});
+/** What an ending's gate would act on, drawn in a router (each work step a link to its part) with the run's decision already read. */
+const actsOn = (run: RunDetail, decision: unknown): Promise<string> =>
+  routedWith(createElement(Gates.ActsOn, { run, step: run.steps[1] }), [[['runs', run.id, 'decision', decisionStamp(run)], decision]]);
 
 test('the step that ends the run in the checkout is known by its `workspace`, and its gate says where it holds — not that it holds once the step has signed off', async () => {
   const [implement, ship] = endingRun().steps;
@@ -883,7 +713,7 @@ test('the step that ends the run in the checkout is known by its `workspace`, an
   );
 });
 
-test("what an ending step would act on, beside its gate: the branch's standing and counts, and each work step's closeout with its files", () => {
+test("what an ending step would act on, beside its gate: the branch's standing and counts, and a link to each work step's part with its summary", async () => {
   const run = endingRun();
   const standing = {
     branch: 'wf/r-1/implement',
@@ -892,26 +722,31 @@ test("what an ending step would act on, beside its gate: the branch's standing a
     said: 'wf/r-1/implement is ahead of main by 3 commits',
     stat: '4 files: +456 −2',
   };
-  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const html = await actsOn(run, decidedAs([standing]));
   assert.match(html, /^<section aria-label="What ship would act on"/);
   assert.match(html, /data-standing="ahead"/);
   const texts = textsOf(html);
   assert.ok(texts.includes(standing.said), html);
   assert.ok(texts.includes(standing.stat), 'how much it changed, as `wf decide` prints it');
-  assert.ok(texts.includes('implement'), `the work it waits on, off the graph\n${html}`);
-  assert.match(html, /<h4[^>]*>What changed<\/h4>/, 'its closeout rendered as the markdown it is');
-  assert.ok(texts.includes('the cap on runs in flight'), html);
-  assert.match(html, /aria-label="Artifacts of implement"/, 'and the files it named');
-  assert.ok(texts.includes('RESPONSE.md'), html);
+  assert.match(
+    html,
+    /<li data-acts-on="implement"[^>]*><a [^>]*href="\/runs\/r-1#step-implement"[^>]*>What implement gave<\/a>/,
+    `the work it waits on, off the graph, a link to its part on the run's page\n${html}`,
+  );
+  assert.doesNotMatch(
+    html,
+    /<h4[^>]*>What changed|Artifacts of implement|data-artifact/,
+    'what it gave is its part, drawn once, not here again',
+  );
 
-  const none = withDecision(run, decidedAs([]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const none = await actsOn(run, decidedAs([]));
   assert.ok(
     textsOf(none).includes('No result branch of its own: the work is on the base branch.'),
     `a run with no result branch of its own: said, not left blank\n${none}`,
   );
 });
 
-test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", () => {
+test("a result branch whose place was not heard reads unread beside an ending's gate, in the package's words — never on the base, nor ahead", async () => {
   const run = endingRun();
   const why = 'the place was not heard: timed out';
   const standing = {
@@ -921,7 +756,7 @@ test("a result branch whose place was not heard reads unread beside an ending's 
     said: `wf/r-1/implement: where it stands is not read (${why})`,
     stat: null,
   };
-  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1] }));
+  const html = await actsOn(run, decidedAs([standing]));
   assert.match(html, /data-standing="unread"/);
   assert.ok(textsOf(html).includes(standing.said), html);
   assert.doesNotMatch(html, /data-standing="(on|ahead|gone)"|data-stat/, 'no standing of its own, and no counts');
@@ -1180,17 +1015,10 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
   );
 });
 
-test("the run page's gate draws what is being approved beside Approve and Send back; the inspector's, whose Output tab has it, does not", () => {
-  const html = withClient(
-    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
-  );
-  const handed = html.indexOf('aria-label="What plan handed on"');
-  assert.ok(handed >= 0, html);
-  assert.ok(handed < html.indexOf('aria-label="Approve plan"'), 'what it handed on comes before the answer: read, then decided');
-  assert.match(html, /data-field="approach"/);
-  assert.match(html, /@3xl\/page:grid-cols-2/, 'beside the answer where the page is wide');
-  const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', framed: false }));
-  assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|@3xl\/page:grid-cols-2/);
+test("a gate draws no closeout of its own: what it approves is its step's part, above it", () => {
+  const html = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
+  assert.ok(html.indexOf('aria-label="Approve plan"') >= 0, html);
+  assert.doesNotMatch(html, /What plan handed on|data-handed-on|data-field=|lg:grid-cols-2/);
 });
 
 /** A design's closeout at its gate, asking two questions as data in its `open` field. */
@@ -1201,21 +1029,19 @@ const askingCloseout: StepCloseout = {
   questions: [{ field: 'open', questions: [cut, where] }],
 };
 
-test('a gate whose step asks questions draws them in the answer column, after what it handed on, with the recommended answers offered — and Approve and Send back wait until each is answered', () => {
+test('a gate whose step asks questions draws them before its answer, with the recommended answers offered — and Approve and Send back wait until each is answered', () => {
   const html = withClient(
     createElement(Gate, {
       runId: 'r-1',
       step: 'design',
       approveLine: 'nemia approve r-1 design',
-      closeout: askingCloseout,
       questions: [cut, where],
     }),
   );
-  const handed = html.indexOf('aria-label="What design handed on"');
   const asked = html.indexOf('aria-label="What design asks"');
   const approve = html.indexOf('aria-label="Approve design"');
-  assert.ok(handed >= 0 && handed < asked && asked < approve, html);
-  assert.doesNotMatch(html.slice(handed, asked), /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
+  assert.ok(asked >= 0 && asked < approve, html);
+  assert.doesNotMatch(html, /data-questions=/, 'the questions are drawn once, as fields, not read-only beside');
   assert.match(html, /<fieldset data-question="How is the card cut\?"/);
   assert.match(html, /<fieldset data-question="Where do the answers go\?"/);
   assert.match(html, /<button type="button" data-recommend-all[^>]*>Choose the recommended answers<\/button>/);
@@ -1228,9 +1054,7 @@ test('a gate whose step asks questions draws them in the answer column, after wh
     /placeholder="A note beside the answers \(optional\): every step after the gate is handed it with the answers, under “Approved”\."/,
   );
   assert.match(html, /<button type="submit" disabled=""[^>]*>Send back<\/button>/, 'nothing to send back yet: no words, no answers');
-  const plain = withClient(
-    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
-  );
+  const plain = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.doesNotMatch(plain, /data-gate-questions|Not answered|data-recommend-all/);
   assert.match(plain, /<button type="submit"[^>]*>Approve<\/button>/);
   assert.doesNotMatch(plain, /<button type="submit" disabled=""[^>]*>Approve<\/button>/);
@@ -1283,21 +1107,6 @@ test('a raise of a step that signed off blocked asking questions as data draws t
     html,
     /<button type="submit" disabled="" title="Not answered: How is the card cut\? · Where do the answers go\?"[^>]*>Raise the budget and answer<\/button>/,
   );
-});
-
-test("REFUSED: a banner that says a person is waited on is drawn in an amount's colour or a failure's — Waiting on you and To decide both read yours", () => {
-  const waiting = bannerMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
-  const decide = withClient(createElement(ToDecideBanner, { run: endingRun() }));
-  for (const [label, html] of [
-    ['Waiting on you', waiting],
-    ['To decide', decide],
-  ]) {
-    const m = new RegExp(`<section aria-label="${label}"[^>]*class="([^"]*)"`).exec(html);
-    assert.ok(m, `${label} is drawn`);
-    assert.equal(drawnYours(m[1]), true, `${label}: ${m[1]}`);
-  }
-  assert.equal(drawnYours(`rounded ${container.money}`), false, 'the amber of an amount is no wait');
-  assert.equal(drawnYours(`rounded ${container.yours} ${container.failure}`), false);
 });
 
 test('a proposal the api says is not there (404) is said so, and one it could not read otherwise is a reading notice', async () => {

@@ -2,7 +2,7 @@
  * What should happen to a run now (`assess`), decided from the engine's view of each task and nothing else: what the tick files, and
  * whether the run is finished and what stopped it (`stoppedOnWord`). Pure; the tick acts on it, and the verbs and the screens ask it.
  */
-import { retriesDue, type Retry, type RetryAsk } from '../retry/index.ts';
+import { retriesDue, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
 import type { RetryBriefing } from '../brief/index.ts';
 import {
   waitsOnCheckout,
@@ -120,6 +120,8 @@ export type AssessRead = {
   readonly asked: (taskId: string) => CloseoutAsked;
   /** What each step's current check exited with (`exitVerdicts`), read only for a check that did not pass. */
   readonly verdictOf: (step: string) => Verdict | undefined;
+  /** What the OOM killer did to each step's current check (`checkKills`): a check the machine killed is run again by `retries:`. */
+  readonly checkKillOf: CheckKillOf;
   /** Whether a task's session is blocked by its harness (`harnessBlocked`): what makes a person's try of it due, to stop it first. */
   readonly sessionBlocked: (taskId: string) => boolean;
   /** What each task's sessions cost (`spendReader`): what holds a step over its `budget:`. */
@@ -170,6 +172,7 @@ export function assess(read: AssessRead): Assessment {
     signedOff: closeoutOf,
     asked: askedCloseout,
     verdictOf,
+    checkKillOf,
     sessionBlocked,
     spendOf,
     standings,
@@ -192,7 +195,7 @@ export function assess(read: AssessRead): Assessment {
   if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' };
 
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
-  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf);
+  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');

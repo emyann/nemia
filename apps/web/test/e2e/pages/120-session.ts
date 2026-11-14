@@ -1,16 +1,17 @@
-import { sidebar } from '../board.ts';
+import { partOf, sidebar } from '../board.ts';
 import { expectCount, expectInside, expectNone, expectTexts, expectVisible, Refused } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * A settled step's session, read once, drawn by the one conversation family: its chip and a link back to the run at the top, then the
-   * band that says nothing more arrives here, and the talk down to the window's foot — the brief folded to a line that opens, the calls
-   * and the thoughts among them folded into one turn, the session's words from their markdown in the agent's bubble, a line the harness
-   * wrote on its own as a quiet marker, and the closeout. The session has ended, so no composer is drawn at all: the band carries why,
-   * and where to go instead. Read back, the talk says so and a pill offers the way to the latest, with no count: nothing of a step's
-   * session is counted unread. It is photographed from its start, scrolled up as a reader scrolls to it.
+   * A settled step's session, read once, drawn by the one conversation family: its name and a link back to the run at the top, its part
+   * whole under it (its chip in the part's head), then the band that says nothing more arrives here, and the talk, the part and the talk
+   * scrolling together down to the window's foot — the brief folded to a line that opens, the calls and the thoughts among them folded into
+   * one turn, the session's words from their markdown in the agent's bubble, a line the harness wrote on its own as a quiet marker, and the
+   * closeout's one line, which points up to what the step said in its part. The session has ended, so no composer is drawn at all: the band
+   * carries why, and where to go instead. Read back, the talk says so and a pill offers the way to the latest, with no count: nothing of a
+   * step's session is counted unread. It is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
@@ -18,7 +19,8 @@ export default {
     await sidebar(page);
     const top = page.locator('header[aria-label="The step"]');
     await expectVisible(top.getByRole('heading', { level: 1, name: SESSION.step, exact: true }), 'the page is headed by the step');
-    await expectVisible(top.locator('[data-state="blocked"]', { hasText: 'waits on you' }), "the step's chip, at the top");
+    const part = partOf(page, SESSION.step);
+    await expectVisible(part.locator('[data-step-tag]', { hasText: /^waits on you$/i }), "the step's chip, in its part under the top");
     await expectVisible(top.locator(`a[href="/runs/${FAKE.id}"]`, { hasText: FAKE.title }), 'a link back to the run, by what it asked');
     await expectCount(top.locator('[data-following]'), 0, 'a settled task is read once, not followed');
 
@@ -35,10 +37,11 @@ export default {
       'with why, and where to go instead',
     );
     await expectCount(page.locator('[data-session-composer]'), 0, 'and no composer at all: the fact is said once, in one voice');
-    const [box, foot] = [await talk.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
+    const scope = page.locator(`[data-step-scope="${SESSION.step}"]`);
+    const [box, foot] = [await scope.boundingBox(), { y: page.viewportSize()?.height ?? 0 }];
     if (!box || Math.abs(box.y + box.height - foot.y) > 24) {
       throw new Refused(
-        `the talk takes the page's height down to the window's foot — it ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${foot.y} px`,
+        `the part and the talk take the page's height down to the window's foot — they end at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${foot.y} px`,
       );
     }
 
@@ -83,15 +86,31 @@ export default {
     await expectVisible(talk.locator('[data-session-marker="system"]', { hasText: SESSION.system }), 'a line the harness wrote, quietly');
 
     const closeout = talk.locator('[data-session-closeout]');
-    await expectVisible(closeout.locator('[data-session-outcome="blocked"]'), 'the closeout, named, with its outcome');
-    await expectVisible(closeout.getByText(SESSION.closeout.needs), 'and what it needs');
+    await expectVisible(closeout.locator('[data-session-outcome="blocked"]'), 'the closeout, named, with its outcome, on one line');
+    await expectCount(closeout.getByText(SESSION.closeout.needs), 0, 'what it said is not drawn again in the talk');
+    await expectVisible(
+      part.locator('[data-part-said]').getByText(SESSION.closeout.needs),
+      'it is in the part above, what it needs said once',
+    );
+    await closeout.locator('[data-session-to-said]').click();
+    await expectNone(async () => {
+      const said = await part.locator('[data-part-said]').boundingBox();
+      const view = await scope.boundingBox();
+      return said && view && said.y >= view.y - 1 && said.y < view.y + view.height
+        ? null
+        : `it stands at ${said?.y}, the scroll at ${view?.y}`;
+    }, "the closeout's line scrolls up to what the step said");
     await expectCount(
       page.getByRole('link', { name: /Claude Code web/ }),
       0,
       'no link to Claude Code web: nothing the engine reads carries a URL for a session',
     );
     await expectCount(talk.locator('[data-session-message="told"]'), 0, 'nobody said anything to it: no turn of yours');
-    await expectCount(page.locator('main input, main textarea:not([disabled])'), 0, 'nothing else to type into');
+    await expectCount(
+      page.locator('main input:not([data-part-asks] *), main textarea:not([disabled]):not([data-part-asks] *)'),
+      0,
+      "nothing else to type into but the answer in what the step's part asks of you",
+    );
 
     const scrolled = () => talk.evaluate((element) => element.scrollTop);
     const toStart = async (why: string) => {

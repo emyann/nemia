@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PATH_POLL_MS } from '../../../src/lib/lifecyclePath.ts';
-import { openDebug, photograph, sidebar, themeOf } from '../board.ts';
+import { LEDGER, openDebug, partOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, settled } from '../checks.ts';
 import { SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -18,14 +18,14 @@ export default {
    * finishes (`follows`).
    */
   name: 'debug-polled',
-  route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
+  route: `/runs/${SAYING.run}`,
   follows: true,
   expect: async (page) => {
     await sidebar(page);
     const taskId = `${SAYING.run}-${SAYING.step}`;
     const journal = path.join(store!, 'engine', 'tasks', `${taskId}.jsonl`);
     const seeded = fs.readFileSync(journal, 'utf8');
-    const { panel, lifecycle } = await openDebug(page, taskId);
+    const { panel, lifecycle } = await openDebug(partOf(page.locator(LEDGER), SAYING.step), taskId);
     await expectVisible(lifecycle.locator('[data-state="working"][data-lit]'), 'draft’s session is at work: working lit');
     try {
       fs.appendFileSync(journal, `${JSON.stringify({ kind: 'stop-requested', at: new Date().toISOString() })}\n`);

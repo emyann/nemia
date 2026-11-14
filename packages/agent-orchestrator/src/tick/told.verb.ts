@@ -30,7 +30,16 @@ import { lackLines } from '../artifacts/artifacts.ts';
 import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
 import { budgetOf, ownStatus, type SpendOf } from '../status/status.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, saidIn, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import {
+  checkKills,
+  closeoutAsked,
+  closeoutReader,
+  exitVerdicts,
+  harnessBlocked,
+  saidIn,
+  spendReader,
+  taskPhasesRead,
+} from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { RunId } from '../record/record.model.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
@@ -407,6 +416,7 @@ export const readersOf = (views: ReadonlyMap<string, TaskView>, run: Run, steps:
   signedOff: closeoutReader(views, run, steps),
   asked: closeoutAsked(views),
   verdictOf: exitVerdicts(views, run),
+  checkKillOf: checkKills(views, run),
   sessionBlocked: harnessBlocked(views),
   spendOf: spendReader(views),
 });

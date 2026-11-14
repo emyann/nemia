@@ -5,10 +5,10 @@
  */
 import { type TaskPhase } from '../record/record.ts';
 import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
-import type { AttemptMemory, KilledAtLimit } from '../../contracts/out-of-memory.contract.ts';
+import type { AttemptMemory, OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
 import type { AttemptEnd, EnginePhase } from 'objects';
 
-export type { AttemptMemory, AttemptReason, EngineOutcome, KilledAtLimit };
+export type { AttemptMemory, AttemptReason, EngineOutcome, OutOfMemoryKill };
 
 /**
  * How an attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (`AttemptReason`), or the orchestrator's
@@ -166,9 +166,9 @@ export const currentTurn = <A extends { turn?: number }>(state: { attempts: read
   state.attempts.filter((a) => (a.turn ?? 0) === (state.inputs?.length ?? 0));
 
 /**
- * The memory record of the last attempt of a task's current turn (`currentTurn`) in which the kernel killed a process at its limit
- * (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a former journal, or a task under no limit. Read
- * off the view on every pass, never off a transition.
+ * The memory record of the last attempt of a task's current turn (`currentTurn`) in which the kernel's OOM killer ended a process, at
+ * its limit or because the machine ran out (`oomKills` of 1 or more); undefined where none was, or the attempts carry no record — a
+ * former journal, or a task under no limit. Read off the view on every pass, never off a transition.
  */
 export const killedMemoryOf = (v: WordView | undefined): AttemptMemory | undefined =>
   v

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, openFold, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, settled } from '../checks.ts';
 import { ENDING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -26,12 +26,13 @@ export default {
       check: { taskId: `${id}-${ending}-check` },
       landed: { aborted: 'its check refused the merge (exit 1)', refusedOn: head },
     };
-    const merges = page.locator('section[aria-label="Decide"] section[aria-label="Trial merges"]');
+    const merges = page.locator('[data-asks] [data-fold="decide"] section[aria-label="Decide"] section[aria-label="Trial merges"]');
     try {
       fs.writeFileSync(recordFile, JSON.stringify(record, null, 2));
       fed(id, ending, 'aborted');
       await page.reload({ waitUntil: 'load' });
       await idle(page);
+      await openFold(page.locator('[data-asks]'), 'decide');
       await expectVisible(
         merges.locator('[data-fact="semantic"][data-state="bad"]', {
           hasText: `merges cleanly onto main, and ${ending}'s landing check refused the merged tree at ${head.slice(0, 7)}: a conflict of meaning, not of text`,
@@ -41,7 +42,7 @@ export default {
       await expectCount(
         merges.locator(`[data-fact="semantic"] a[data-fact-link="${ending}"][href="/runs/${id}#step-${ending}"]`),
         1,
-        `to ${ending}'s section`,
+        `to ${ending}'s part`,
       );
       await settled(page);
       await photograph(merges, path.join(OUT, `semantic-merges-${await themeOf(page)}.png`));

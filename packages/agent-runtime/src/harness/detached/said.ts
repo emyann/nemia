@@ -82,6 +82,8 @@ const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_E
 /**
  * What `file` keeps of a capture known by `key` — or nothing, when it is not there, not whole, not decoded, or of another key.
  * Exported only for the tests that import it.
+ * @param file The file a capture's reading is kept in (`.said`).
+ * @param key The capture's size and modification time now, which the kept reading must have been read at.
  */
 export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
   let parsed: unknown;
@@ -94,7 +96,12 @@ export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined 
   return parsed.read as HarnessOutput;
 };
 
-/** Keeps `read` in `file`, known by `key`: written beside it under this process's name, then renamed over it. A failure is none. */
+/**
+ * Keeps `read` in `file`, known by `key`: written beside it under this process's name, then renamed over it. A failure is none.
+ * @param file The file a capture's reading is kept in (`.said`).
+ * @param key The capture's size and modification time the reading was read at.
+ * @param read What the spec's reader read of the capture.
+ */
 export const keepSaid = (file: string, key: SaidKey, read: HarnessOutput): void => {
   try {
     replaceFile(file, JSON.stringify({ version: SAID_VERSION, ...key, read }));
@@ -114,6 +121,10 @@ const saidOf = (reader: NonNullable<HarnessSpec['readOutput']>, text: string): S
  * What `keep` keeps of a capture's `text`, which `reader` reads as `read` (read here when not given): `{ kept, read }`, all of it
  * for a capture already kept, and what both read; or why it is left whole (`why`): the reader refuses the whole text, `keep`
  * throws, or the reader reads the kept text otherwise.
+ * @param reader The spec's reader of a capture (`readOutput`).
+ * @param keep What the spec keeps of an ended capture (`keepOutput`).
+ * @param text The capture's whole text.
+ * @param read What the reader read of `text`, or undefined to read it here.
  */
 export const keptText = (
   reader: NonNullable<HarnessSpec['readOutput']>,
@@ -137,6 +148,9 @@ export const keptText = (
  * Writes `kept` over the capture `file`, known by `key`, and answers its key now; or answers nothing and leaves it whole, when the
  * file has changed since `key` or the write fails. Written beside it under this process's name, given the file's own access and
  * modification times, then renamed over it, so a reader finds the whole capture or the kept one, never a part.
+ * @param file The capture, the run's `.log`.
+ * @param key The capture's size and modification time when `kept` was worked out from it.
+ * @param kept The text to write over it.
  */
 export const replaceCapture = (file: string, key: SaidKey, kept: string): SaidKey | undefined => {
   try {
@@ -165,7 +179,10 @@ const keepCapture = (
   return 'kept' in told && told.kept !== capture.text ? replaceCapture(file, capture.key, told.kept) : undefined;
 };
 
-/** A capture `file`'s key and text, or nothing when it cannot be read. */
+/**
+ * A capture `file`'s key and text, or nothing when it cannot be read.
+ * @param file The capture, the run's `.log`.
+ */
 export const captureAt = (file: string): { key: SaidKey; text: string } | undefined => {
   try {
     const { size, mtimeMs } = fs.statSync(file);
@@ -178,7 +195,11 @@ export const captureAt = (file: string): { key: SaidKey; text: string } | undefi
 /** Where a run's capture is (`log`), what was read of it is kept (`kept`), and, for a spec that keeps it, its whole stdout (`stdout`). */
 type SaidFiles = { log: string; kept: string; stdout?: string };
 
-/** The files of the run whose files begin `base`: `.log`, `.said`, and `.stdout` for a spec that keeps its `streams` whole. */
+/**
+ * The files of the run whose files begin `base`: `.log`, `.said`, and `.stdout` for a spec that keeps its `streams` whole.
+ * @param base The path of the run's files less their end.
+ * @param streams Whether the spec keeps its streams whole, which adds `.stdout`; undefined for none.
+ */
 export const saidFilesAt = (base: string, streams?: true): SaidFiles => ({
   log: `${base}.log`,
   kept: `${base}.said`,
@@ -194,6 +215,9 @@ type SaidWhen = { over: boolean; ended?: boolean; keep?: (output: string) => str
 /**
  * When `run`'s capture is read (`SaidWhen`): `over`, as the runner's look reads the run now (its lease gone with its worker included);
  * ended once its worker wrote its end.
+ * @param run The run's file, whose state says whether its worker wrote its end.
+ * @param over Whether the runner's look reads the run as over now.
+ * @param keep What the spec keeps of an ended capture (`keepOutput`), or undefined for a spec that keeps every capture whole.
  */
 export const saidWhen = (run: RunFile, over: boolean, keep?: (output: string) => string): SaidWhen => ({
   over,
@@ -237,6 +261,10 @@ const saidAt = (
  * that has its key. A refusal is kept in `memo` alone: it leaves that run unread, or failed once ended, and is read again by the
  * next process.
  *
+ * @param reader The spec's reader of a capture (`readOutput`).
+ * @param memo What this process has read of each run's capture, by the run's name.
+ * @param name The run's name.
+ * @param files The run's capture, the file its reading is kept in, and its stdout where the spec keeps streams.
  * @param when whether the run is over, so its capture no longer grows: only then is what was read kept on disk; and whether its
  *   worker wrote its end, so its capture is rewritten to what `keep` keeps of it (`SaidWhen`).
  */

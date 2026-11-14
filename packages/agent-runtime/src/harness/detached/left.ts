@@ -14,6 +14,9 @@ import type { Instant } from '../../core/clock.ts';
 /**
  * The signal sent to what a run left (`left.contract.ts`): nothing where nothing is left; SIGTERM at the first ask and within the
  * grace since it; SIGKILL past it, an age that cannot be read (`NaN`) included.
+ * @param left Whether the run's process group or its scope still holds a process.
+ * @param askedAgoMs How long ago the first stop was asked, in milliseconds; undefined at the first ask.
+ * @param graceMs The run's stop grace, in milliseconds.
  */
 export const leftSignal: LeftSignalOf = (left, askedAgoMs, graceMs) =>
   !left ? 'none' : askedAgoMs === undefined || askedAgoMs <= graceMs ? 'SIGTERM' : 'SIGKILL';
@@ -22,6 +25,7 @@ export const leftSignal: LeftSignalOf = (left, askedAgoMs, graceMs) =>
  * The process group `harness` led that still holds a process, to signal; `undefined` where none is recorded, its group is empty or
  * another user's, or its leader's pid is another process's now: alive, and started at another time than the recorded one. A leader
  * gone leaves its group's number to its members, never to a new process, so a group whose leader died is still the run's.
+ * @param harness The harness's process group as the run file recorded it: its leader's pid and start; undefined where none is recorded.
  */
 export const groupLeft = (harness: { pid: number; start?: string } | undefined): number | undefined => {
   if (harness === undefined || !Number.isInteger(harness.pid) || harness.pid <= 1) return undefined;
@@ -55,6 +59,8 @@ const askedIn = (file: string): Instant | undefined => {
 /**
  * The first time a stop was asked of the run whose stop file is `file`, and whether that is `now`: the instant kept there, else `now`,
  * written there. The worker reads the file by its existence alone, so what it holds is the runner's.
+ * @param file The run's stop file (`.stop`).
+ * @param now The instant of this ask.
  */
 export const firstAsked = (file: string, now: Instant): { at: Instant; first: boolean } => {
   const kept = askedIn(file);

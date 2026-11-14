@@ -18,6 +18,7 @@ const TELEMETRY_VARIABLE = /^(OTEL_.*|TRACEPARENT|TRACESTATE|CLAUDE_CODE_ENABLE_
 /**
  * `env` without the variables of a process's telemetry (`TELEMETRY_VARIABLE`): what a child is spawned with, so that it exports only
  * what its runner hands it, and a command run for a task exports nothing as the process that runs the engine.
+ * @param env The environment a child would be spawned with.
  */
 export const withoutTelemetry = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
   Object.fromEntries(Object.entries(env).filter(([name]) => !TELEMETRY_VARIABLE.test(name)));
@@ -25,6 +26,7 @@ export const withoutTelemetry = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
 /**
  * Why `telemetry` is no collector to export to, or `undefined`: anything but an object whose `endpoint` is an absolute http(s) URL, and
  * one whose `toolDetails` is there and not `true`.
+ * @param telemetry The task's `telemetry` as filed, of any shape; undefined where it is left out, which is no refusal.
  */
 export const telemetryRefusalOf = (telemetry: unknown): string | undefined => {
   if (telemetry === undefined) return undefined;
@@ -44,11 +46,16 @@ const SPAN_ID = /^(?!0+$)[0-9a-f]{16}$/;
 /**
  * The W3C `traceparent` of `span`, `00-<trace id>-<span id>-<flags>`, sampled `01` or not `00`; `undefined` for a span whose ids are
  * not trace context's, which a session could not join.
+ * @param span The span's trace id and span id, in hex, and whether it is sampled.
  */
 export const traceparentOf = (span: { traceId: string; spanId: string; sampled: boolean }): string | undefined =>
   TRACE_ID.test(span.traceId) && SPAN_ID.test(span.spanId) ? `00-${span.traceId}-${span.spanId}-${span.sampled ? '01' : '00'}` : undefined;
 
-/** `ops`, with every spawn told where to export (`SpawnRequest.telemetry`): what an engine given `telemetry` runs each harness through. */
+/**
+ * `ops`, with every spawn told where to export (`SpawnRequest.telemetry`): what an engine given `telemetry` runs each harness through.
+ * @param ops The runner of a harness.
+ * @param telemetry The collector every spawn is told to export to.
+ */
 export const telemetered = (ops: RunnerOps, telemetry: Telemetry): RunnerOps => ({
   ...ops,
   spawn: (r) => ops.spawn({ ...r, telemetry }),

@@ -30,6 +30,8 @@ const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.fi
  *
  * The rules are what the file says, not what a session necessarily gets: a harness that has not been trusted with the directory drops
  * them (`folderTrust`, whose `grants` says so), and a caller that must know asks that too.
+ * @param harness The harness's name.
+ * @param dir The folder the session is started in, whose project configuration is read.
  */
 export function projectAllows(harness: string, dir: string): readonly string[] | undefined {
   if (!readsProject(harness)) return undefined;

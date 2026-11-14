@@ -58,6 +58,10 @@ export type WorkerSeen = 'running' | 'gone' | 'unknown';
 /**
  * The word a run file's state is read as (`lease.contract.ts`): the worker's own word, except a `working` one whose beat is past the
  * lease while its worker is not seen running, which is `failed`. An age that cannot be read (`NaN`) is past it.
+ * @param state The state the worker wrote in its run file.
+ * @param beatAgeMs How long ago its last beat was, in milliseconds; `NaN` where it cannot be read.
+ * @param leaseMs How long a beat holds the lease, in milliseconds.
+ * @param worker Whether the worker is seen running (`workerSeen`).
  */
 export const leaseWord: LeaseWord = (state, beatAgeMs, leaseMs, worker) =>
   state !== 'working' || beatAgeMs <= leaseMs || worker === 'running' ? state : 'failed';
@@ -68,6 +72,9 @@ type Beaten = { state: string; heartbeatAt: string; beat?: Monotonic };
 /**
  * The run's word as of `now` (`leaseWord`), its worker looked for (`worker`) only where its beat is stale, since that costs a read of
  * `/proc`: given as a thunk, it is asked at most once.
+ * @param run The run file's state and its last beat, on both clocks.
+ * @param now The instant the run is read as of.
+ * @param worker Whether the worker is seen running, or a thunk that looks, asked only where the beat is stale.
  */
 export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): string => {
   const age = elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now);
@@ -75,11 +82,19 @@ export const leased = (run: Beaten, now: Instant, worker: WorkerSeen | (() => Wo
   return leaseWord(run.state, age, STALE_MS, fresh ? 'unknown' : typeof worker === 'function' ? worker() : worker);
 };
 
-/** A word of a run file as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
+/**
+ * A word of a run file as a sighting says it. A word no worker writes is `failed`, as a lease gone is.
+ * @param word The state a run file says.
+ */
 export const stateOfWord = (word: string): SessionState =>
   Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
 
-/** A run file's state as a sighting says it, as of `now`, its worker as `worker` found it (`leased`). */
+/**
+ * A run file's state as a sighting says it, as of `now`, its worker as `worker` found it (`leased`).
+ * @param run The run file's state and its last beat, on both clocks.
+ * @param now The instant the run is read as of.
+ * @param worker Whether the worker is seen running, or a thunk that looks, asked only where the beat is stale.
+ */
 export const detachedStateOf = (run: Beaten, now: Instant, worker: WorkerSeen | (() => WorkerSeen)): SessionState =>
   stateOfWord(leased(run, now, worker));
 
@@ -215,6 +230,7 @@ const isRunFile = Schema.is(RunFileSchema);
 /**
  * The run file in `text`, or why it is none: the first field a worker would have written otherwise. JSON that does not parse
  * is none too — a worker rewriting it is caught mid-write, and the next read finds it whole.
+ * @param text The run file's text, as read from disk.
  */
 export const runFileIn = (text: string): RunFile | string => {
   let parsed: unknown;
@@ -236,6 +252,7 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 /**
  * The run file the spawn writes before its worker starts: `plan`, working, with no pid yet, its first beat on both clocks, and the
  * code it is spawned from (`image`).
+ * @param plan What the spawn plans for the run, written onto the run file for the worker to read.
  */
 export const firstRunFile = (plan: object): string => {
   const now = instantNow();

@@ -98,6 +98,7 @@ const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | und
  * (`wrong`, a sentence that names the line, the event, its first wrong field and the fix, and quotes at most 60 characters of
  * what it found there).
  * Exported only for the tests that import it.
+ * @param output What the harness printed on stdout, whole lines of JSON.
  */
 export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wrong: string } => {
   const events: CodexEvent[] = [];
@@ -124,6 +125,8 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
  * What `codex exec --json` says of the text it is writing, in `output`'s whole lines after `before` lines: nothing, as Codex prints
  * each message whole, in its `item.completed`, and its rollout gives it. Or why it is refused (`wrong`, as `codexEventsOf` words it,
  * the line numbered in the whole output), when a line of a type the runtime reads does not decode.
+ * @param output The whole lines of stdout read this time.
+ * @param before How many lines of stdout came before `output`, so that a refusal numbers its line in the whole output.
  */
 export const codexPartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
   const read = codexEventsOf('\n'.repeat(before) + output);
@@ -170,6 +173,7 @@ const turnOf = ({ usage }: typeof TurnCompletedSchema.Type): Turn => ({
  *
  * Throws an `Error` whose message is `codexEventsOf`'s `wrong` when the stream does not decode: its output is refused, never
  * read as saying nothing.
+ * @param output What the harness printed on stdout, as JSON lines, over the whole session.
  */
 export const codexOutput = (output: string): HarnessOutput => {
   const read = codexEventsOf(output);

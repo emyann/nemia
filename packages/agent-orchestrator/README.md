@@ -2791,7 +2791,8 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   approval, and it may wait after it: for the checkout another run's ending holds, or for the pass that files it. Its approval names
   the tries of the work it approved, each step it waits on (`work` in its file), and is in force only while those tries stand. So until
   the ending is filed, `wf retry <run> review --message "<objection>"` (the steps `sendBackTo` names) is taken: the try it files is
-  past what the approval approved, which spends it. The tick moves it into `done/`, beside any spent there before, never over one, and
+  past what the approval approved, which spends it: the record's read composes no such approval onto the run (`workStands`), and the
+  tick moves it into `done/`, beside any spent there before, never over one, and
   once the work signs off again the ending waits at its gate for a new approval. A restart reads the same, since the record's tries are
   what spend it. `wf ls`, `wf decide` and a second `wf approve` offer that send-back beside what the ending waits for; a held or pruned
   run offers none. An approval an older nemia wrote names no work, and counts as current. Once the ending is filed, the send-back is

@@ -35,7 +35,6 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import type { WorkStands } from '../../contracts/approval-work.contract.ts';
 import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
 
 /**
@@ -49,17 +48,19 @@ export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): st
   steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
- * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it, and
- * an ending's, given for work that has had a try since (`Approval.work`), by that try: a send-back of the work. Pure.
+ * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it; an
+ * ending's, given for work that has had a try since, is spent by that try, and the record's read leaves it out (`workStands`). Pure.
  */
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
-  run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step) && workStands(run, a));
+  run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
 /**
  * Whether each step an approval's `work` names is still on the try it was on when the approval was given (as `tryOf` counts it); an
  * approval with none stands. Each step's record is found among the record's own entries, never read at a name the approval's file gave.
+ * One that does not stand is spent: the record's read composes no such approval onto the run (`runRecord`, the Run door's memory), and
+ * the pass moves its file into `done/` (`spentApprovals`).
  */
-export const workStands: WorkStands = (run, a) => {
+export const workStands = (run: Pick<Run, 'steps'>, a: Approval): boolean => {
   const records = Object.entries(run.steps);
   return Object.entries(a.work ?? {}).every(([step, n]) => {
     const record = records.find(([name]) => name === step)?.[1];

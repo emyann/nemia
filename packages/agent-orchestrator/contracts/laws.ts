@@ -1,12 +1,11 @@
 /**
  * What the gate's and `standing`'s specs both say in their laws: whether a step is gated, the try it is on, and whether a
- * person approved that try for the work as it stands, each written once, in the record's words.
+ * person approved that try, each written once, in the record's words.
  */
 import type { Run } from '../src/record/record.ts';
 import type { StepSpec } from '../src/step/step.ts';
 import { reposNamed, type Factory } from '../src/factory/factory.ts';
 import { hiresInto, type WiringChange } from '../src/factory/wiring/wiring.ts';
-import { workStands } from '../src/status/status.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: StepSpec, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
@@ -15,12 +14,9 @@ export const tryNow = (run: Run, name: string): number => {
   const tries = run.steps[name]?.tries;
   return tries === undefined ? 1 : tries.length + 1;
 };
-/**
- * Whether a person approved the try a step is on, for the work as it stands: an ending's approval names the tries of the work it approved,
- * and a send-back of that work spends it (`workStands`, read by its spec).
- */
+/** Whether a person approved the try a step is on. */
 export const approved = (run: Run, name: string): boolean =>
-  (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name) && workStands(run, x));
+  (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
 
 /**
  * Whether a factory takes a change of its wiring, its names aside, as `wiringRefusal` judges it: a hire or a schedule only into a workflow

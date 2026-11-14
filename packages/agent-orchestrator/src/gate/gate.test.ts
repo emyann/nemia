@@ -237,17 +237,6 @@ test('gateLines at an ending approved and not filed: the send-back of the work b
       phases({ t1: 'succeeded', t2: 'running' }),
       { ship: 'approved 23:10Z' },
     ],
-    [
-      'the work tried since: the approval is spent, and the gate asks again',
-      atShip({
-        approvals: [given],
-        steps: { implement: { taskId: 't3', tries: [{ taskId: 't1', cause: 'continue' }] }, ship: { taskId: null } },
-      }),
-      phases({ t1: 'succeeded', t3: 'succeeded' }),
-      {
-        ship: 'awaiting approval:  nemia approve r-1 ship [--message "<words>"]  — or send it back:  nemia retry r-1 implement --message "<objection>"',
-      },
-    ],
   ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
     await t.test(row, () => assert.deepEqual(gateLines(ENDING, r, p, signedDone, asked), expected));
   }

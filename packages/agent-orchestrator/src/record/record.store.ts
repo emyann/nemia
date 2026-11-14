@@ -22,7 +22,7 @@ import {
   type Run,
   type Unheld,
 } from './record.ts';
-import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
+import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
 import { personRoutes, unrouted, withRoutes } from '../route/index.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { RETRY_MODES, spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
@@ -381,6 +381,7 @@ const readRecord = (home: string, id: string): Run => {
       routes: personRoutes(asksDir(home, id), names, heldIn),
     };
   });
+  const standing = approvals.filter((a) => workStands(run, a));
   return {
     ...withRoutes(run, routes),
     ...(cancelled?.at ? { cancelledAt: cancelled.at } : {}),
@@ -388,7 +389,7 @@ const readRecord = (home: string, id: string): Run => {
     ...(pruned ? { pruned } : {}),
     ...heldOf(home, id),
     ...(saidBefore ? { saidBefore } : {}),
-    ...(approvals.length ? { approvals } : {}),
+    ...(standing.length ? { approvals: standing } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   };
 };
@@ -822,7 +823,9 @@ export function consumeAsks(
     doneWith(home, run.id, [
       ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(home, run.id, a.step, a.try)),
       ...spentRoundAsks(run, rounds).map((a) => roundAskFile(home, run.id, a.step, a.round)),
-      ...spentApprovals(run).map((a) => approvalFile(home, run.id, a.step, a.try)),
+      ...spentApprovals({ ...run, approvals: readApprovalsNow(home, run.id).approvals }).map((a) =>
+        approvalFile(home, run.id, a.step, a.try),
+      ),
       ...spentAcceptances(run).map((a) => acceptFile(home, run.id, a.step, a.try)),
     ]),
   );

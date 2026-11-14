@@ -21,6 +21,7 @@ import { heldRefusal, prunedRefusal } from '../forget/prune/prune.ts';
 import { routeLine, runWords } from '../route/routed/index.ts';
 import { firstPiece } from '../piece/piece.ts';
 import type { ApprovalRefusal, HoldsOpen } from '../../contracts/gate.contract.ts';
+import type { TakeBackStopOf } from '../../contracts/take-back.contract.ts';
 
 /**
  * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on
@@ -56,8 +57,16 @@ function approvedRefusal(steps: readonly StepSpec[], step: StepSpec, run: Run, g
   if (sendsBack)
     return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: nemia retry ${run.id} ${name} --message "<objection>".`;
   if (approvedFirst(step, run) && !run.steps[name]?.taskId) return unfiledRefusal(step, run, approved, given);
+  return handedOnWords(steps, name, run, approved, 'so there is nothing to approve, nor to send back');
+}
+
+/**
+ * The words of an approved step that has handed on: `approved`, what it said of the approval, then what waits on it — filed, or nothing
+ * — then `so`, what that leaves a person, and where the run stands. Pure.
+ */
+function handedOnWords(steps: readonly StepSpec[], name: string, run: Run, approved: string, so: string): string {
   const after = steps.some((s) => s.after.includes(name));
-  return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: nemia ls ${run.id}.`;
+  return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, ${so}. See where the run stands: nemia ls ${run.id}.`;
 }
 
 /**
@@ -241,4 +250,37 @@ export function approveFormOf(
   if (step === undefined || !step.loop) return 'gate';
   if (!hasGate(step, run)) return 'loop';
   return atGate() ? 'gate' : 'loop';
+}
+
+/**
+ * What of a step refuses `nemia approve <run> <step> --off` (`takeBackJudged`, which words it), or null: a step the run does not have,
+ * then one not approved, then one approved whose session or check has a task — what it approved has run. Pure.
+ */
+export const takeBackStop: TakeBackStopOf = ({ known, approved, filed }) =>
+  !known ? 'unknown' : !approved ? 'unapproved' : filed ? 'handed-on' : null;
+
+/**
+ * Whether `nemia approve <run> <name> --off` may take back the approval of step `name`: the approval it takes back, where the step stands
+ * approved (`approvalOf`) — whether the approval names the work it approved or an older nemia wrote it with none — and nothing of it has
+ * been filed, neither its session nor its check (an ending waiting on the checkout, held, or not yet ticked); else why not, in words that
+ * name the fix (`refused`). The stop is `takeBackStop`'s; the words of a step that has handed on are a second approval's
+ * (`handedOnWords`). Pure.
+ */
+export function takeBackJudged(steps: readonly StepSpec[], run: Run, name: string): { approval: Approval } | { refused: string } {
+  const step = steps.find((s) => s.name === name);
+  const record = run.steps[name];
+  const given = approvalOf(run, name);
+  const stop = takeBackStop({
+    known: step !== undefined && record !== undefined,
+    approved: given !== undefined,
+    filed: Boolean(record?.taskId || record?.check),
+  });
+  if (stop === 'unknown') return { refused: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` };
+  if (stop === 'unapproved' || !given)
+    return {
+      refused: `try ${tryOf(run, name)} of ${name} is not approved, so there is nothing to take back. To approve it once it waits at its gate: nemia approve ${run.id} ${name}. See where it stands: nemia ls ${run.id}.`,
+    };
+  if (stop === null) return { approval: given };
+  const approved = `try ${given.try} of ${name} was approved at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
+  return { refused: handedOnWords(steps, name, run, approved, 'and its approval cannot be taken back') };
 }

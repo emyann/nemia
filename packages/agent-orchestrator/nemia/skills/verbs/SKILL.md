@@ -696,7 +696,7 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
                                on the port: retry
-  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]
+  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"] | <runId> <step> --off
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
@@ -718,5 +718,8 @@ Each answers what waits on the person. Bring the matter first, with the `bring-w
                                Your approval makes the budgets the step proposed the caps of the
                                steps after the gate, and auto never approves unasked a cap above
                                a step's own budget
+                               --off: take back the approval of a step that stands approved while
+                               nothing it approved has been filed — an ending waiting on the base
+                               branch, held, or not yet ticked. The step waits at its gate again
                                on the port: approve
 ```

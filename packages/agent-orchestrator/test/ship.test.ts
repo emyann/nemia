@@ -31,6 +31,7 @@ import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
 import type { World } from '../place/memory/world.ts';
 import type { Stage } from './story.ts';
 import {
+  APPROVE,
   acceptRun,
   advanceRun,
   approveRun,
@@ -1917,20 +1918,81 @@ test('an ending approved by an older nemia and waiting on the checkout: its appr
     assert.ok(!(await shipOf(first)).note?.includes('nemia retry'), 'nemia ls offers no send-back');
     await assert.rejects(
       stage.runWith(e(), retryRun(first, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' })),
-      refusedAs('Conflict', 'approve-ship-1', 'done/', `nemia retry ${first} implement --message "<objection>"`),
+      refusedAs('Conflict', `nemia approve ${first} ship --off`, `nemia retry ${first} implement --message "<objection>"`),
     );
-    await assert.rejects(stage.runWith(e(), approveRun(first, 'ship')), refusedNaming('approve-ship-1', 'done/'));
+    await assert.rejects(stage.runWith(e(), approveRun(first, 'ship')), refusedNaming(`nemia approve ${first} ship --off`));
   });
 
   await s.test('taken back as the refusal says, the gate holds again and the send-back is taken', async () => {
-    fs.mkdirSync(path.join(asksDir, 'done'), { recursive: true });
-    fs.renameSync(path.join(asksDir, 'approve-ship-1'), path.join(asksDir, 'done', 'approve-ship-1'));
+    await stage.main(['approve', first, 'ship', '--off'], e());
+    assert.ok(fs.existsSync(path.join(asksDir, 'done', 'approve-ship-1')), 'the approval is set aside, not deleted');
     assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
     const { ask } = await stage.runWith(
       e(),
       retryRun(first, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' }),
     );
     assert.deepEqual([ask.step, ask.try], ['implement', 2]);
+  });
+});
+
+test('an ending approved and waiting on the checkout: a person takes the approval back, and it waits at its gate again; once its land is filed, taking it back is refused', async (t) => {
+  const s = story(t);
+  const PERSON = { kind: 'person' } as const;
+  let first = '';
+  let second = '';
+  const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
+  const doneOf = (id: string, name: string) =>
+    JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', name), 'utf8')) as {
+      step?: string;
+      at: string;
+      work?: Record<string, number>;
+      takenBack?: { at: string; actor?: { kind: string } };
+    };
+
+  await s.test('taken back, by whom and when: the approval moves to done/ and the ending waits at its gate', async () => {
+    const two = await at.twoApproved();
+    [first, second] = [two.first.id, two.second.id];
+    assert.deepEqual([(await at.pass(first)).filed, (await at.pass(second)).filed], [[], ['ship']]);
+    assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${second}'s ship has it)`);
+    const given = JSON.parse(fs.readFileSync(path.join(asksDir(first), 'approve-ship-1'), 'utf8')) as { at: string };
+    const off = await stage.runWith(e(), APPROVE.handler({ runId: first, step: 'ship', off: true, actor: PERSON }));
+    assert.deepEqual([off.step, off.try, off.at, off.takenBack?.actor], ['ship', 1, given.at, PERSON]);
+    assert.ok(!fs.existsSync(path.join(asksDir(first), 'approve-ship-1')), 'the approval is no longer in force');
+    const kept = doneOf(first, 'approve-ship-1');
+    assert.deepEqual(
+      [kept.at, kept.work, kept.takenBack?.at, kept.takenBack?.actor],
+      [given.at, { implement: 1 }, off.takenBack?.at, PERSON],
+    );
+    assert.equal(off.file, path.join(asksDir(first), 'done', 'approve-ship-1'));
+    assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
+    assert.deepEqual((await at.pass(first)).filed, [], 'nothing of ship is filed on the approval taken back');
+    assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
+  });
+
+  await s.test('REFUSED: a gate not approved has nothing to take back, and --off takes no words', async () => {
+    await assert.rejects(stage.main(['approve', first, 'ship', '--off'], e()), refusedAs('Conflict', `nemia approve ${first} ship`));
+    await assert.rejects(stage.main(['approve', first, 'ship', '--off', '--message', 'no'], e()), refusedAs('Invalid', '--off'));
+  });
+
+  await s.test(
+    'an approval an older nemia wrote, naming no work, is taken back the same on a held run, kept beside the first in done/',
+    async () => {
+      const { file } = await stage.runWith(e(), approveRun(first, 'ship'));
+      fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+      assert.equal(await statusOf(first, 'ship'), `waiting on the checkout (${second}'s ship has it)`);
+      const hold = rooted.holds.put(first, [], { why: 'send it back' })!;
+      await stage.main(['approve', first, 'ship', '--off'], e());
+      assert.ok(rooted.holds.lift(first, hold.at), 'the hold stood through the take-back');
+      assert.equal(await statusOf(first, 'ship'), 'awaiting approval');
+      const kept = doneOf(first, 'approve-ship-1.2');
+      assert.deepEqual([kept.at, kept.work, typeof kept.takenBack?.at], ['2026-09-17T07:00:00.000Z', undefined, 'string']);
+    },
+  );
+
+  await s.test('REFUSED once its land is filed: what it approved has run, and the approval stays', async () => {
+    assert.equal(runRecord(ROOT, second).steps.ship.taskId, `${second}-ship`);
+    await assert.rejects(stage.main(['approve', second, 'ship', '--off'], e()), refusedAs('Conflict', `nemia ls ${second}`));
+    assert.ok(fs.existsSync(path.join(asksDir(second), 'approve-ship-1')), 'the approval is not moved');
   });
 });
 

@@ -14,7 +14,7 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, workStands, type RoundAsk } from '../status/status.ts';
-import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, Unheld } from '../record/record.ts';
+import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run, SaidBefore, TakenBack, Unheld } from '../record/record.ts';
 import type { Labels } from '../labels/labels.ts';
 import type { Actor } from 'objects';
 import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
@@ -40,8 +40,8 @@ const recordOf = (run: Run): Run => {
   return structuredClone(kept) as Run;
 };
 
-/** One ask held, by its key's name (`<of>-<step>-<n>`), and whether the tick consumed it. */
-type Held = { person: PersonRequest; done: boolean };
+/** One ask held, by its key's name (`<of>-<step>-<n>`), whether it was set aside, and, of an approval, that a person took it back. */
+type Held = { person: PersonRequest; done: boolean; takenBack?: TakenBack };
 
 /** What a stand-in holds: each run's record, and a person's files beside it, by run id; and each run's stamp, a count of its changes. */
 type State = {
@@ -260,6 +260,15 @@ function asksGroup(st: State): RunsLayer['asks'] {
       return { written: true, where };
     },
     where: (id, key) => runsAt(`${id}.asks`, nameOf(key)),
+    takeBack: (id, step, n, takenBack) => {
+      const name = nameOf({ of: 'gate', step, n });
+      const before = asksOf(st, id).get(name);
+      if (!before || before.done) return null;
+      before.done = true;
+      before.takenBack = structuredClone(takenBack);
+      touch(st, id);
+      return runsAt(`${id}.asks`, 'done', name);
+    },
   };
 }
 

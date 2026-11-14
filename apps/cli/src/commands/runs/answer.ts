@@ -138,9 +138,17 @@ const thenWords = ({ step, next }: RunApproved): string =>
       ? 'the next tick files what waits on it'
       : 'nothing waits on it: its run can be decided';
 
-/** What `nemia approve` printed: the loop accepted as it stands, or the try approved, with what, each cap it set, and the file. */
+/**
+ * What `nemia approve` printed: an approval taken back (`--off`), the loop accepted as it stands, or the try approved, with what, each cap
+ * it set, and the file.
+ */
 export const approveLines = (approved: RunApproved, runId: string, answered: boolean): string[] => {
-  const { step, try: tryNo, message, file, loop, caps } = approved;
+  const { step, try: tryNo, message, file, loop, caps, takenBack } = approved;
+  if (takenBack)
+    return [
+      `${runId}  taken back: the approval of try ${tryNo} of ${step}, given at ${approved.at} — ${step} waits at its gate again: nemia approve ${runId} ${step}`,
+      `   ${file}`,
+    ];
   if (loop) return [`${runId}  accepted: try ${tryNo} of ${step} as it stands, its findings open — ${thenWords(approved)}`, `   ${file}`];
   const words = answered ? ', with your answers' : message !== null ? ', with your words' : '';
   return [
@@ -152,7 +160,10 @@ export const approveLines = (approved: RunApproved, runId: string, answered: boo
   ];
 };
 
-/** `nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]`. */
+/**
+ * `nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--budget <step>=<amount>]... [--message "<words>"]`, or `nemia approve
+ * <runId> <step> --off`, an approval taken back.
+ */
 export async function approve(args: Args): Promise<number> {
   const command = APPROVE_WORDS.name;
   const runId = runOf(args);
@@ -162,6 +173,7 @@ export async function approve(args: Args): Promise<number> {
   const typedBudgets = listArg(args, 'budget');
   const message = textArg(args, 'message');
   const payload = {
+    ...(switchArg(args, 'off') ? { off: true } : {}),
     ...(message !== undefined ? { message } : {}),
     ...(typedBudgets.length ? { budgets: budgetsOf(typedBudgets, runId, step) } : {}),
     ...(await answersOf(command, runId, step, typedAnswers)),

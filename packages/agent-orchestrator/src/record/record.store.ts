@@ -18,6 +18,7 @@ import {
   type Acceptance,
   type Approval,
   type Hold,
+  type TakenBack,
   type Pruned,
   type Run,
   type Unheld,
@@ -847,6 +848,32 @@ export function doneWith(home: string, id: string, spent: readonly string[]): vo
       fs.unlinkSync(file);
     } catch {}
   }
+}
+
+/**
+ * Set aside the approval of try `n` of `step` of run `id`, taken back by a person (`nemia approve <run> <step> --off`): what its file
+ * said, with `takenBack` beside it, written exclusively into `done/` at the first name there no file holds (`keptName`), then its file
+ * removed — never deleted unkept, never written over. Answers where it was set aside; null where no approval is at its name, or where it
+ * went between the read and the removal (a pass set it aside as spent), whose copy is then removed again.
+ */
+export function takeBackApproval(home: string, id: string, step: string, n: number, takenBack: TakenBack): string | null {
+  return within('act', () => {
+    const file = approvalFile(home, id, step, n);
+    const held = heldIn(file);
+    if ('unreadable' in held || typeof approvalIn(file, step, n) === 'string') return null;
+    const said = held.read !== null && typeof held.read === 'object' ? held.read : {};
+    const done = keptName(path.join(asksDir(home, id), 'done', path.basename(file)));
+    fs.mkdirSync(path.dirname(done), { recursive: true });
+    fs.writeFileSync(done, `${JSON.stringify({ ...said, takenBack }, null, 2)}\n`, { flag: 'wx' });
+    try {
+      fs.unlinkSync(file);
+    } catch (err) {
+      fs.rmSync(done, { force: true });
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw err;
+    }
+    return done;
+  });
 }
 
 /**

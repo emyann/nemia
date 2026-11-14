@@ -1,10 +1,14 @@
 /**
- * What the served objects say of their own fields: each property of each schema the api's document holds (`OpenApi.fromApi(Api)`, the
- * document a client, the reference page and the MCP port's tools read) carries a `description`, set on its Schema
- * (`.annotate({ description })`), since a comment above a Schema reaches none of them. The properties still said nowhere are counted
- * per schema in `described.baseline.json`, which only shrinks: a schema with more than its count is refused, one the baseline does
- * not name owes none, and a count above today's is refused too, so a change that describes a field lowers its count in the same
- * commit. Today's counts, as the baseline's text: `node test/described.test.ts --print`.
+ * What the served objects say of their own fields: each field the api's document holds (`OpenApi.fromApi(Api)`, the document a client,
+ * the reference page and the MCP port's tools read) carries a `description`, set on its Schema (`.annotate({ description })`), since a
+ * comment above a Schema reaches none of them. A field is a property of a schema, at any depth: a component's, an inline request
+ * body's or answer's, one nested under another property, under an array's `items` or `prefixItems`, a record's
+ * `additionalProperties` or a branch of an `anyOf`, `oneOf` or `allOf`; and an operation's path or query parameter. A field that is
+ * another schema whole (a bare `$ref`) is said by that schema's description, and counted under that schema's name. The fields still
+ * said nowhere are counted per component, by its name, and per operation, by its `operationId`, in `described.baseline.json`, which
+ * only shrinks: a key with more than its count is refused, one the baseline does not name owes none, and a count above today's is
+ * refused too, so a change that describes a field lowers its count in the same commit. Today's counts, as the baseline's text: `node
+ * test/described.test.ts --print`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,54 +19,121 @@ import { Api } from 'objects';
 
 const BASELINE = 'packages/objects/test/described.baseline.json';
 
-/** A property of a schema, as far as this reads it: its own description, or the schema it is, whole, by reference. */
-type Property = { readonly description?: string; readonly $ref?: string };
+/** A schema of the document, as far as this reads it: what it says of itself, the schema it is by reference, and what it holds. */
+type Node = {
+  readonly description?: string;
+  readonly $ref?: string;
+  readonly properties?: Readonly<Record<string, Node | boolean>>;
+  readonly items?: Node | boolean;
+  readonly prefixItems?: readonly (Node | boolean)[];
+  readonly additionalProperties?: Node | boolean;
+  readonly anyOf?: readonly (Node | boolean)[];
+  readonly oneOf?: readonly (Node | boolean)[];
+  readonly allOf?: readonly (Node | boolean)[];
+};
 
-/** A schema of the document, as far as this reads it: what it says of itself, and its properties. */
-type Component = { readonly description?: string; readonly properties?: Readonly<Record<string, Property | boolean>> };
+/** A parameter of an operation, as far as this reads it: its own description, and its schema, which may carry one instead. */
+type Parameter = { readonly description?: string; readonly schema?: Node };
+
+/** A media type's content, as far as this reads it: its schema, never effect's `x-effect-stream` beside it. */
+type Content = Readonly<Record<string, { readonly schema?: Node }>>;
+
+/** An operation of the document, as far as this reads it. */
+type Operation = {
+  readonly operationId?: string;
+  readonly parameters?: readonly Parameter[];
+  readonly requestBody?: { readonly content?: Content };
+  readonly responses?: Readonly<Record<string, { readonly content?: Content }>>;
+};
+
+/** The document, as far as this reads it: its operations by path and method, and its components. */
+export type Document = {
+  readonly paths?: Readonly<Record<string, Readonly<Record<string, Operation>>>>;
+  readonly components?: { readonly schemas?: Readonly<Record<string, Node>> };
+};
 
 /**
- * Whether a property says what it is: by its own description, or, where it is another schema whole (a bare `$ref`, on which the
- * document keeps no word of its own), by that schema's.
+ * Whether a field says what it is: by its own description, or, where it is another schema whole (a bare `$ref`, on which the document
+ * keeps no word of its own), by that schema's.
  */
-const described = (property: Property | boolean, schemas: Readonly<Record<string, Component>>): boolean => {
-  if (typeof property !== 'object') return false;
-  if (property.description?.trim()) return true;
-  const referred = property.$ref === undefined ? undefined : schemas[property.$ref.split('/').at(-1) ?? ''];
+const described = (field: Node | boolean | undefined, schemas: Readonly<Record<string, Node>>): boolean => {
+  if (typeof field !== 'object') return false;
+  if (field.description?.trim()) return true;
+  const referred = field.$ref === undefined ? undefined : schemas[field.$ref.split('/').at(-1) ?? ''];
   return Boolean(referred?.description?.trim());
 };
 
-/** How many properties of each schema among `schemas` carry no description: a schema with none owed is left out. */
-export const undescribed = (schemas: Readonly<Record<string, Component>>): Record<string, number> =>
-  Object.fromEntries(
-    Object.entries(schemas)
-      .map(([name, schema]) => {
-        const owed = Object.values(schema.properties ?? {}).filter((p) => !described(p, schemas)).length;
-        return [name, owed] as const;
-      })
+/** The schemas a node holds that are no field of their own: an array's items, a record's values, a union's or an intersection's branches. */
+const held = (node: Node): (Node | boolean | undefined)[] => [
+  node.items,
+  ...(node.prefixItems ?? []),
+  node.additionalProperties,
+  ...(node.anyOf ?? []),
+  ...(node.oneOf ?? []),
+  ...(node.allOf ?? []),
+];
+
+/** How many fields under `node`, at any depth, say nothing: a `$ref` is counted under its component, never walked into here. */
+const owedUnder = (node: Node | boolean | undefined, schemas: Readonly<Record<string, Node>>): number => {
+  if (typeof node !== 'object' || node.$ref !== undefined) return 0;
+  const fields = Object.values(node.properties ?? {});
+  return (
+    fields.filter((field) => !described(field, schemas)).length +
+    [...fields, ...held(node)].reduce((sum: number, inner) => sum + owedUnder(inner, schemas), 0)
+  );
+};
+
+/** How many fields of an operation say nothing: its parameters, and the fields of its inline request body and answers. */
+const owedBy = (operation: Operation, schemas: Readonly<Record<string, Node>>): number => {
+  const parameters = (operation.parameters ?? []).filter(
+    (parameter) => !parameter.description?.trim() && !described(parameter.schema, schemas),
+  ).length;
+  const contents = [operation.requestBody?.content, ...Object.values(operation.responses ?? {}).map((answer) => answer.content)];
+  const bodies = contents.flatMap((content) => Object.values(content ?? {}).map((media) => media.schema));
+  return parameters + bodies.reduce((sum: number, body) => sum + owedUnder(body, schemas), 0);
+};
+
+/**
+ * How many fields of `document` carry no description, per component by its name and per operation by its `operationId`: a key with
+ * none owed is left out.
+ * @param document The api's document, `OpenApi.fromApi(Api)`, or a planted one.
+ */
+export const undescribed = (document: Document): Record<string, number> => {
+  const schemas = document.components?.schemas ?? {};
+  const operations = Object.values(document.paths ?? {}).flatMap((methods) => Object.values(methods));
+  return Object.fromEntries(
+    [
+      ...Object.entries(schemas).map(([name, schema]) => [name, owedUnder(schema, schemas)] as const),
+      ...operations.map((operation) => [operation.operationId ?? '?', owedBy(operation, schemas)] as const),
+    ]
       .filter(([, owed]) => owed > 0)
       .sort(([a], [b]) => a.localeCompare(b)),
   );
+};
 
-/** What today's counts and `baseline` disagree on, each a sentence naming the fix. */
+/**
+ * What today's counts and `baseline` disagree on, each a sentence naming the fix.
+ * @param today The counts of the document as it is, from `undescribed`.
+ * @param baseline The counts `described.baseline.json` holds.
+ */
 export const breaks = (today: Readonly<Record<string, number>>, baseline: Readonly<Record<string, number>>): string[] => [
   ...Object.entries(today)
     .filter(([name, owed]) => owed > (baseline[name] ?? 0))
     .map(
       ([name, owed]) =>
-        `${name} has ${owed} propert${owed === 1 ? 'y' : 'ies'} with no description, and ${BASELINE} allows ${baseline[name] ?? 0}: ` +
+        `${name} has ${owed} field${owed === 1 ? '' : 's'} with no description, and ${BASELINE} allows ${baseline[name] ?? 0}: ` +
         'say what each is on its Schema, `.annotate({ description: "…" })`, as a client reads the schema alone; never raise the count',
     ),
   ...Object.entries(baseline)
-    .filter(([name, held]) => held > (today[name] ?? 0))
-    .map(([name, held]) => `${name} owes ${today[name] ?? 0} now, and ${BASELINE} holds ${held}: lower it there, which only shrinks`),
+    .filter(([name, kept]) => kept > (today[name] ?? 0))
+    .map(([name, kept]) => `${name} owes ${today[name] ?? 0} now, and ${BASELINE} holds ${kept}: lower it there, which only shrinks`),
 ];
 
-const today = (): Record<string, number> => undescribed(OpenApi.fromApi(Api).components?.schemas ?? {});
+const today = (): Record<string, number> => undescribed(OpenApi.fromApi(Api) as Document);
 
 if (process.argv.includes('--print')) process.stdout.write(`${JSON.stringify(today(), null, 2)}\n`);
 else {
-  test('every property of a served object is described, but those the baseline counts, which only shrinks', () => {
+  test('every field of the api is described, but those the baseline counts, which only shrinks', () => {
     const baseline = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'described.baseline.json'), 'utf8')) as Record<
       string,
       number
@@ -75,17 +146,116 @@ else {
       Parcel: { properties: { id: { description: 'Its id.' }, weight: {}, lost: { description: ' ' } } },
       Kept: { properties: {} },
     };
-    assert.deepEqual(undescribed(planted), { Parcel: 2 });
+    assert.deepEqual(undescribed({ components: { schemas: planted } }), { Parcel: 2 });
     const referred = {
       Parcel: { properties: { owner: { $ref: '#/components/schemas/Owner' }, carrier: { $ref: '#/components/schemas/Carrier' } } },
       Owner: { description: 'Who it belongs to.', properties: {} },
       Carrier: { properties: {} },
     };
-    assert.deepEqual(undescribed(referred), { Parcel: 1 }, 'a property that is another schema whole is said by that schema');
+    assert.deepEqual(undescribed({ components: { schemas: referred } }), { Parcel: 1 }, 'a property that is another schema whole');
     assert.equal(breaks({ Parcel: 2 }, {}).length, 1, 'a schema the baseline does not name');
     assert.equal(breaks({ Parcel: 2 }, { Parcel: 1 }).length, 1, 'more than its count');
     assert.equal(breaks({ Parcel: 2 }, { Parcel: 2 }).length, 0);
     assert.equal(breaks({ Parcel: 1 }, { Parcel: 2 }).length, 1, 'a count above what is owed');
     assert.equal(breaks({}, { Parcel: 2 }).length, 1, 'a count for a schema that owes none');
+    assert.equal(breaks({ 'parcels.send': 1 }, {}).length, 1, 'an operation the baseline does not name');
+  });
+
+  const schemas = {
+    Owner: { description: 'Who it belongs to.', properties: {} },
+    Carrier: { properties: { name: {} } },
+  };
+  const said = { description: 'Said.' };
+  const owner = { $ref: '#/components/schemas/Owner' };
+  const carrier = { $ref: '#/components/schemas/Carrier' };
+  const nested = (inner: Node): Node => ({ description: 'Holds.', properties: { inner } });
+  const operation = (op: Operation): Document => ({ paths: { '/parcels': { post: { operationId: 'parcels.send', ...op } } } });
+  const body = (schema: Node): Operation => ({ requestBody: { content: { 'application/json': { schema } } } });
+  const answer = (schema: Node): Operation => ({ responses: { '200': { content: { 'application/json': { schema } } } } });
+  const cases: readonly { readonly kind: string; readonly bare: Document; readonly said: readonly Document[] }[] = [
+    {
+      kind: 'a path parameter',
+      bare: operation({ parameters: [{ schema: { type: 'string' } as Node }] }),
+      said: [operation({ parameters: [{ description: 'Said.' }] }), operation({ parameters: [{ schema: said }] })],
+    },
+    {
+      kind: 'a query parameter',
+      bare: operation({ parameters: [{}] }),
+      said: [operation({ parameters: [{ schema: owner }] })],
+    },
+    {
+      kind: 'an inline request body',
+      bare: operation(body({ properties: { weight: {} } })),
+      said: [operation(body({ properties: { weight: said } })), operation(body({ properties: { owner } }))],
+    },
+    {
+      kind: 'an inline answer',
+      bare: operation(answer({ properties: { weight: {} } })),
+      said: [operation(answer({ properties: { weight: said } })), operation(answer({ properties: { owner } }))],
+    },
+    {
+      kind: 'a nested property',
+      bare: { components: { schemas: { Parcel: { properties: { box: nested({}) } } } } },
+      said: [
+        { components: { schemas: { Parcel: { properties: { box: nested(said) } } } } },
+        { components: { schemas: { Parcel: { properties: { box: nested(owner) } } } } },
+      ],
+    },
+    {
+      kind: "an array's items",
+      bare: operation(answer({ properties: { boxes: { description: 'Boxes.', items: { properties: { weight: {} } } } } })),
+      said: [operation(answer({ properties: { boxes: { description: 'Boxes.', items: { properties: { weight: said } } } } }))],
+    },
+    {
+      kind: 'a branch of a union',
+      bare: operation(body({ anyOf: [owner, { oneOf: [{ properties: { weight: {} } }] }] })),
+      said: [operation(body({ anyOf: [owner, { oneOf: [{ properties: { weight: said } }] }] }))],
+    },
+    {
+      kind: "a record's values",
+      bare: operation(body({ additionalProperties: { properties: { weight: {} } } })),
+      said: [operation(body({ additionalProperties: { properties: { weight: owner } } }))],
+    },
+  ];
+  for (const planted of cases)
+    test(`REFUSED: ${planted.kind} said nowhere is counted; one described or a bare $ref to a described schema is not`, () => {
+      const count = (document: Document): Record<string, number> =>
+        undescribed({ ...document, components: { schemas: { ...schemas, ...document.components?.schemas } } });
+      assert.equal(
+        Object.values(count(planted.bare)).reduce((a, b) => a + b, 0),
+        2,
+        'the planted field, beside the one Carrier owes',
+      );
+      for (const document of planted.said) assert.deepEqual(count(document), { Carrier: 1 });
+    });
+
+  test('REFUSED: a $ref to a schema said nowhere is counted, and walked into only under its own name', () => {
+    assert.deepEqual(undescribed({ ...operation(body({ properties: { carrier } })), components: { schemas } }), {
+      Carrier: 1,
+      'parcels.send': 1,
+    });
+  });
+
+  test("an array's element, a union's branch and effect's stream schema ask nothing of themselves", () => {
+    const streamed: Document = {
+      paths: {
+        '/feed': {
+          get: {
+            operationId: 'feed.read',
+            responses: {
+              '200': {
+                content: {
+                  'text/event-stream': {
+                    schema: { items: { type: 'string' } as Node },
+                    'x-effect-stream': { properties: { cause: {} } },
+                  } as never,
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    assert.deepEqual(undescribed(streamed), {});
   });
 }

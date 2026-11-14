@@ -195,6 +195,19 @@ test('...and a child that holds a pipe open for good does not keep the run worki
   assert.ok(performance.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
 });
 
+test('a stop that lands while the pipes of a harness that ended drain leaves the run completed: it cut nothing', WAITED, async (t) => {
+  const dir = root();
+  const ops = detachedOps(sh('(sleep 30) & echo done > out.txt; exit 0'), dir);
+  await Effect.runPromise(ops.spawn(req('ae/t23/1', dir)));
+  await until(t, () => fs.existsSync(path.join(dir, 'out.txt')), 'the harness wrote its work, its last act before it exits', {
+    everyMs: 20,
+  });
+  await new Promise((r) => setTimeout(r, 300));
+  await Effect.runPromise(ops.stop('ae/t23/1'));
+  const seen = await settle(t, ops, 'ae/t23/1', 'completed');
+  assert.equal(seen?.exitCode, 0, 'the exit its harness ended on');
+});
+
 test('a stop that lands the moment the worker has published its pid is heard, not taken for a kill', WAITED, async (t) => {
   const dir = root();
   const hook = path.join(dir, 'freeze-after-publish.mjs');

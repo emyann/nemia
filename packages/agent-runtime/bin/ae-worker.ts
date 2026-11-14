@@ -483,7 +483,8 @@ if (child.pid !== undefined) {
  * How long, after the harness exits, its output may still be arriving. `exit` can come before its
  * pipes have drained, and a spec reads the final answer from that output — so the end is written
  * only once both pipes have closed and the log is on disk. Bounded, because a child the harness left
- * behind can hold a pipe open for as long as it likes.
+ * behind can hold a pipe open for as long as it likes. Whether the run was stopped is read as the harness exits, never once the pipes
+ * have drained: a stop that lands while they drain cut nothing, and a harness that ended on its own keeps its end.
  */
 const DRAIN_MS = 2_000;
 const closed = (s: NodeJS.ReadableStream & { closed?: boolean }) =>
@@ -495,14 +496,15 @@ const closed = (s: NodeJS.ReadableStream & { closed?: boolean }) =>
 child.on('exit', (code) => {
   clearInterval(beat);
   clearInterval(inbox);
+  const stopped = stopping;
   const drained = Promise.all([closed(stdout), closed(stderr)]);
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
   void Promise.race([drained, bound]).then(() =>
     endFiles(() => {
       const said = plan.terminationMessagePath === undefined ? undefined : terminationMessageAt(plan.terminationMessagePath);
       write({
-        state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed',
-        exitCode: stopping ? -1 : (code ?? -1),
+        state: stopped ? 'stopped' : code === 0 ? 'done' : 'failed',
+        exitCode: stopped ? -1 : (code ?? -1),
         terminationMessage: said,
         ...memoryNow(),
       });

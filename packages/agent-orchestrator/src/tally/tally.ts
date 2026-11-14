@@ -76,6 +76,9 @@ function entryRefusal(entry: string, output: StepOutput): string | undefined {
  * `field.key=value`.
  * Undefined for no line. Refused, naming the step's file and the entry: a tally on a step with no `output:`, an entry the schema cannot
  * hold (`entryRefusal`), and an entry given twice.
+ * @param step The step's name, or its file's, named in a refusal.
+ * @param written The `tally:` line as written, or undefined where the step has none.
+ * @param output The step's `output:` schema, or undefined where it declares none.
  */
 export function tallyOf(step: string, written: string | undefined, output: StepOutput | undefined): string[] | undefined {
   if (written === undefined) return undefined;
@@ -101,6 +104,8 @@ export function tallyOf(step: string, written: string | undefined, output: StepO
 /**
  * A closeout's value of a tally: an array's item count, a finite number, the items whose flag is exactly `true`, or the items whose key is
  * exactly the value; null otherwise.
+ * @param tally The tally's entry: a field, `field.flag` or `field.key=value`.
+ * @param output The closeout's output, or undefined where it gave none.
  */
 export function tallyIn(tally: string, output: Record<string, unknown> | undefined): number | null {
   const [fieldKey, match] = tally.split('=');
@@ -128,6 +133,8 @@ type Tallied = { step: string; day: string; tallies: readonly TallyFact[] };
 /**
  * A row per step and tally the tries declare (`TallyRow`), in the order the tries first give them: its total over the tries, and a cell
  * on each of `days`, the sum null on a day no try of it was measured.
+ * @param tries The tries, each with its tallies.
+ * @param days The days of the rows' cells, in order.
  */
 export function tallyRowsOf(tries: readonly Tallied[], days: readonly string[]): TallyRow[] {
   const rows = new Map<string, { step: string; tally: string; of: Array<{ day: string; value: number | null }> }>();

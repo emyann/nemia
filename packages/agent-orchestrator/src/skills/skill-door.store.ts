@@ -87,6 +87,8 @@ const skillChecked = checked(Skill, (skill: { name: string }) => `skills/${skill
 /**
  * The skill `name` as the model holds it, from a whole draft: each value as `renderSkill` writes it — its description trimmed, its
  * instructions as given — so a draft one layer refuses the other refuses. Pure.
+ * @param name The skill's name.
+ * @param draft The whole draft, as the board's form gives it.
  */
 export const draftedSkill = (name: string, draft: SkillDraft) => ({
   name,
@@ -106,7 +108,10 @@ const refusalOf = (refused: VersionRefused): Refusal =>
       ? new Conflict({ message: refused.message })
       : new Invalid({ message: refused.message });
 
-/** The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts. */
+/**
+ * The door over `layer`: each method as `doorOf` makes it, each name and each write checked before the layer acts.
+ * @param layer The layer the door's methods act on, once each name and write is checked.
+ */
 export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
   const door = doorOf<SkillLayer, SkillName>(layer).skills;
   return {
@@ -137,7 +142,10 @@ export function skillDoorOver(layer: SkillLayer): SkillDoorShape {
   };
 }
 
-/** The files of the store `home`, as a layer of the door: today's skill folders, read and written by the skills' own functions. */
+/**
+ * The files of the store `home`, as a layer of the door: today's skill folders, read and written by the skills' own functions.
+ * @param home The store's root.
+ */
 export function skillFiles(home: string): SkillLayer {
   return {
     skills: {
@@ -165,5 +173,8 @@ export const SkillDoor = Context.Reference<SkillDoorShape>('agent-orchestrator/S
   defaultValue: () => rootedDoor((root) => skillDoorOver(skillFiles(root)), 'Skill door'),
 });
 
-/** The Skill door over the files of the store `root`, as a layer: for a program that names its root by the door. */
+/**
+ * The Skill door over the files of the store `root`, as a layer: for a program that names its root by the door.
+ * @param root The store's root.
+ */
 export const skillDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(SkillDoor)(skillDoorOver(skillFiles(root)));

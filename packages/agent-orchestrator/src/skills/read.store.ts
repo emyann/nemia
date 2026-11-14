@@ -36,6 +36,8 @@ const REPOSITORY_HOLDER = '.claude';
  * factory's tree is, then the repository's `.claude/`, then yours, the store's `workflows/`. The builtin skills hold no root: they are
  * found past every root (`skillsFor`). So the repository wins over the store, and a workflow of the store finds its own first. One
  * folder is listed once.
+ * @param workflowDir The workflow's folder, whose root is looked in first.
+ * @param places The repository and the store's root, each looked in where given.
  */
 export function lookupRoots(workflowDir: string, places: Places = {}): string[] {
   const rootOf: Readonly<Record<DefinitionOrigin, string | undefined>> = {
@@ -51,15 +53,23 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
  * The repository whose two places — its `workflows/` and its `.claude/` — the root `root` is one of, or none: what `lookedUp` reads, which
  * refuses a name one repository has in both rather than choose, since a person reading either folder would take the one before them for
  * the one that runs.
+ * @param root A folder looked in (`lookupRoots`).
  */
 export const repositoryOf = (root: string): string | undefined =>
   path.basename(root) === 'workflows' || path.basename(root) === REPOSITORY_HOLDER ? path.dirname(root) : undefined;
 
-/** The roots as the precedence reads them (`lookedUp`): which repository each is a place of, and whether it holds the name. */
+/**
+ * The roots as the precedence reads them (`lookedUp`): which repository each is a place of, and whether it holds the name.
+ * @param roots The folders looked in, in their order (`lookupRoots`).
+ * @param holds Whether the root at that index holds the name.
+ */
 export const lookupOf = (roots: readonly string[], holds: (root: number) => boolean): LookupRoot[] =>
   roots.map((root, at) => ({ repo: repositoryOf(root), has: holds(at) }));
 
-/** The names in the folder `dir`, unsorted; none for a folder that is not there or cannot be read. */
+/**
+ * The names in the folder `dir`, unsorted; none for a folder that is not there or cannot be read.
+ * @param dir The folder read.
+ */
 export function entriesOf(dir: string): string[] {
   try {
     return fs.readdirSync(dir);
@@ -77,10 +87,16 @@ export const PLACE_SKILLS = path.join(import.meta.dirname, '..', '..', 'place');
  */
 export const BUILTIN_SKILLS = path.join(import.meta.dirname, '..', '..', SKILLS_FOLDER);
 
-/** Whether the skill folder `dir` is a builtin place skill of the package (`PLACE_SKILLS`). */
+/**
+ * Whether the skill folder `dir` is a builtin place skill of the package (`PLACE_SKILLS`).
+ * @param dir A skill's folder.
+ */
 export const isBuiltinPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
 
-/** Whether the skill folder `dir` is one of Nemia's builtin skills (`BUILTIN_SKILLS`). */
+/**
+ * Whether the skill folder `dir` is one of Nemia's builtin skills (`BUILTIN_SKILLS`).
+ * @param dir A skill's folder.
+ */
 export const isBuiltinSkill = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(BUILTIN_SKILLS);
 
 /** Whether `dir` holds a skill: a `SKILL.md` that is a file. */
@@ -89,7 +105,11 @@ const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.m
 /** The names of the skills of the package's folder `dir`: each folder of it that holds a skill. */
 const packageSkills = (dir: string): string[] => entriesOf(dir).filter((name) => holdsSkill(path.join(dir, name)));
 
-/** Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached. */
+/**
+ * Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached.
+ * @param a A folder.
+ * @param b The folder it is compared with.
+ */
 export function oneFolder(a: string, b: string): boolean {
   try {
     return fs.realpathSync(a) === fs.realpathSync(b);
@@ -199,6 +219,8 @@ function folderSkill(written: string, given: Required<GivenSkill>, repo: string 
  * name from `all`, and a skill named with its folder (`givenSkillOf`) from that folder of the repository `places.repo` alone
  * (`folderSkill`), read when it is first asked and never by a walk: a bare name is never a nested folder's. The roots and the package's
  * two folders are named for the refusal of a name none has (`skillAt`).
+ * @param workflowDir The workflow's folder, whose root is looked in first.
+ * @param places The repository and the store's root, each looked in where given; a skill named with its folder is read from the repository.
  */
 export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound {
   const roots = lookupRoots(workflowDir, places);
@@ -307,6 +329,7 @@ function folderOf(walk: Walked, dir: string): { real: string } | { refused: stri
  * SKILL.md and every file beneath, a followed folder's included; an ignored folder of the checkout is inside. Any other
  * skill folder has every link refused. A refused link is named from the folder of skills (`x`, `x/SKILL.md`), with what to do, and what
  * it points at is never opened; the folder itself refused is the one entry, under the path ''. Throws where a folder cannot be read.
+ * @param dir The skill's folder.
  */
 export function skillFiles(dir: string): SkillFile[] {
   const walk: Walked = { name: path.basename(dir), checkout: checkoutOf(dir) };
@@ -318,6 +341,7 @@ export function skillFiles(dir: string): SkillFile[] {
 /**
  * The refusal of the skill folder `dir` for a link in it that is not followed (`skillFiles`), the first by path, or nothing for a skill
  * whose every file reads — and for a folder that cannot be read, which its reader says in its own words.
+ * @param dir The skill's folder.
  */
 export function skillLinkRefusal(dir: string): WorkflowError | undefined {
   let files: SkillFile[];
@@ -333,6 +357,8 @@ export function skillLinkRefusal(dir: string): WorkflowError | undefined {
 /**
  * The skill folder `dir` copied to the folder `to` as its files (`skillFiles`), each a regular file with its mode, a followed link as
  * what it points at: no link is written. Refused with the skill's link refusal before a byte is written.
+ * @param dir The skill's folder.
+ * @param to The folder it is copied to, made where it is not there.
  */
 export function copySkillFiles(dir: string, to: string): void {
   const files = skillFiles(dir).map((file) => {
@@ -379,6 +405,7 @@ function rulesFieldRefusal(error: Schema.SchemaError): string {
  * The rules a skill declares in its `rules.json` (`RULES_FILE`) beside its SKILL.md, in the file's order; `[]` with no file. Refused with a
  * `WorkflowError` naming the file, its first wrong field and the shape to write: a file that is not JSON, a field missing or empty — a rule
  * with no `breaks` among them — and two rules under one `id`.
+ * @param skillDir The skill's folder, which holds its SKILL.md.
  */
 export function readSkillRules(skillDir: string): SkillRule[] {
   const file = path.join(skillDir, RULES_FILE);
@@ -422,6 +449,7 @@ function rulesRefusal(skillDir: string): WorkflowError | undefined {
  * The version of the skill whose folder is `dir`: a digest of every file in it, as `agentVersion` counts the folder of each skill an agent
  * gives — so a write that moves this moves the version of every agent that gives the skill. Null for a folder with no SKILL.md. A write of
  * the skill carries it, and is refused when the skill's folder holds another (`writeSkill`).
+ * @param dir The skill's folder.
  */
 export function skillVersion(dir: string): string | null {
   if (!fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })) return null;
@@ -433,6 +461,7 @@ export function skillVersion(dir: string): string | null {
 
 /**
  * A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through.
+ * @param file The file's path.
  */
 export function readForVersion(file: string): string | { unreadable: string } | { link: string } {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
@@ -452,6 +481,7 @@ function textForVersion(file: string): string | { unreadable: string } {
  * Every file of a skill's folder (`skillFiles`), by its path in the skill, sorted, each as a version counts it: a followed link as the
  * content it points at, so the version moves when that does and equals that of the skill's copy (`copySkillFiles`); a refused link as
  * where it points (`readForVersion`), never opened.
+ * @param dir The skill's folder.
  */
 export function folderForVersion(dir: string): Array<[string, unknown]> {
   let files: SkillFile[];
@@ -472,6 +502,8 @@ export function folderForVersion(dir: string): Array<[string, unknown]> {
  * frontmatter the card cannot read. The card only describes — no run reads it — so nothing refuses a load or a run for it: it is refused
  * where a card is asked for (`nemia agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds
  * skills (`skillsFor`, with the places), or a card could name a skill the run would not be given.
+ * @param agent The agent: its name, its description and the skills its `skills:` gives.
+ * @param found Where a start finds skills (`skillsFor`).
  */
 export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>, found: SkillsFound): AgentSkill[] {
   if (!agent.skills?.length) return [ownSkill(agent)];
@@ -499,6 +531,7 @@ export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>
  * Whether a skill asks to be told whole, in Claude Code's own prompt after the agent's instructions, rather than named for the session to
  * load: its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (its own `preload` is inert on a plugin's skill), so
  * the run does it when it renders the agent (`writeAgentFiles`). False for a SKILL.md that cannot be read.
+ * @param skillDir The skill's folder, which holds its SKILL.md.
  */
 export function preloads(skillDir: string): boolean {
   try {

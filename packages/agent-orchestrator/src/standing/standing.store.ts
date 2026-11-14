@@ -26,7 +26,10 @@ export type StoodRead = { readonly repo: string; readonly base: string; readonly
 /** `standing.json` as the tick writes it: its version, when the pass read it, and each repository, place and base branch it read. */
 export type StandingFile = { readonly v: 1; readonly at: string; readonly places: readonly StoodRead[] };
 
-/** `$WF_ROOT/standing.json`, where the tick keeps what its last pass read of where the branches stand. */
+/**
+ * `$WF_ROOT/standing.json`, where the tick keeps what its last pass read of where the branches stand.
+ * @param home The store's root.
+ */
 export const standingFile = (home: string): string => path.join(home, 'standing.json');
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -52,6 +55,7 @@ const REWRITTEN =
  * What the last pass read of where the branches stand (`standingFile`), or undefined before any pass wrote it. Refused (`Invalid`), naming
  * the file and its first wrong field, where it does not decode as `StandingFileSchema`: a file half written is never one, since it is
  * written whole and renamed.
+ * @param home The store's root.
  */
 export function readStanding(home: string): StandingFile | undefined {
   let text: string;
@@ -76,6 +80,7 @@ export function readStanding(home: string): StandingFile | undefined {
 /**
  * When the tick's last pass read where the branches stand (`at`, `readStanding`'s), or that no pass has (`none`): what `nemia ls` words
  * how old what it shows of them is by (`standingLine`). Refused as `readStanding` refuses a file that does not read.
+ * @param home The store's root.
  */
 export const listedStanding = (home: string): { at: string } | { none: true } => {
   const file = readStanding(home);
@@ -85,6 +90,9 @@ export const listedStanding = (home: string): { at: string } | { none: true } =>
 /**
  * What a pass read of where the branches stand written down, through a hidden file renamed over the last, so a reader never reads half of
  * it. Throws node's error where the store cannot be written.
+ * @param home The store's root.
+ * @param at When the pass read them, an ISO time.
+ * @param places What the pass read of each repository, place and base.
  */
 export function writeStanding(home: string, at: string, places: readonly StoodRead[]): void {
   const file: StandingFile = { v: 1, at, places };

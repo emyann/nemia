@@ -10,7 +10,10 @@ import path from 'node:path';
 /** A file sent to hand a run's steps: its own name, and its text where its bytes are UTF-8, else its bytes in base64. */
 export type SentInput = { readonly name: string; readonly text?: string; readonly base64?: string };
 
-/** Why the first of `inputs` that cannot be handed to a run cannot, naming what to send; null where each can. Pure. */
+/**
+ * Why the first of `inputs` that cannot be handed to a run cannot, naming what to send; null where each can. Pure.
+ * @param inputs The inputs sent, each by its file's name with its text or its bytes in base64.
+ */
 export function sentInputRefusal(inputs: readonly SentInput[]): string | null {
   for (const { name, text, base64 } of inputs) {
     if (name !== path.basename(name) || name === '' || name === '.' || name === '..' || name.includes('\\'))
@@ -21,7 +24,10 @@ export function sentInputRefusal(inputs: readonly SentInput[]): string | null {
   return null;
 }
 
-/** `inputs` written into a folder of their own, each by its name: the folder, and the paths of the files written, in the order sent. */
+/**
+ * `inputs` written into a folder of their own, each by its name: the folder, and the paths of the files written, in the order sent.
+ * @param inputs The inputs sent, each by its file's name with its text or its bytes in base64.
+ */
 export function sentInputsWritten(inputs: readonly SentInput[]): { dir: string; files: string[] } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nemia-inputs-'));
   const files = inputs.map((input) => {
@@ -32,5 +38,8 @@ export function sentInputsWritten(inputs: readonly SentInput[]): { dir: string; 
   return { dir, files };
 }
 
-/** The folder `sentInputsWritten` wrote, removed. */
+/**
+ * The folder `sentInputsWritten` wrote, removed.
+ * @param dir The folder `sentInputsWritten` answered.
+ */
 export const sentInputsRemoved = (dir: string): void => fs.rmSync(dir, { recursive: true, force: true });

@@ -154,6 +154,7 @@ const hintsOf = Effect.fnUntraced(function* (run: Run) {
 
 /**
  * Why a card's start takes no `--repo`: a card names its factory and its workflow, and the factory's wiring places its run.
+ * @param card The card's name, as the start names it.
  */
 export const cardRepoRefusal = (card: string): string =>
   `nemia start ${card} does not take --repo: a card's run works on the repository its factory names for its workflow, never one its start names. Start it without --repo, and name the repository on the factory: nemia factory attach <factory> <workflow> --repo <name>. Nothing was started.`;

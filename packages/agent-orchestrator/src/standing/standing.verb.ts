@@ -67,6 +67,8 @@ const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 /**
  * What is kept of `asked` once `stood` is read of it: the commit judged and its `pastBase`, the commit null where none was judged or it is
  * no commit id. Nothing where nothing was read of it, or its `baseRef` is no commit id: a fact against a name that moves is no fact.
+ * @param asked The branch asked of, its tip and the base it is asked against.
+ * @param stood What was read of it, or undefined where nothing was.
  */
 export const knownOf = (asked: AskedBranch, stood: BranchStood | undefined): KnownStood | undefined => {
   if (!stood || !OBJECT_ID.test(asked.baseRef)) return undefined;
@@ -75,7 +77,11 @@ export const knownOf = (asked: AskedBranch, stood: BranchStood | undefined): Kno
   return { tip, pastBase: tip === null ? null : stood.pastBase };
 };
 
-/** `branches`, each told what `kept` last read of it (`known`), where that was read against the `baseRef` it is asked against now. */
+/**
+ * `branches`, each told what `kept` last read of it (`known`), where that was read against the `baseRef` it is asked against now.
+ * @param branches The branches asked of now.
+ * @param kept What was last read of each branch, by its name, or undefined where nothing is kept.
+ */
 export const toldOf = (branches: Iterable<AskedBranch>, kept: KeptStood | undefined): AskedBranch[] =>
   [...branches].map((b) => {
     const was = kept?.get(b.branch);
@@ -221,6 +227,7 @@ export const NOTHING_READ: PassStanding = { read: new Map() };
 /**
  * Every branch of a run's repository and its commit as `git` read them, what a `StatusMemo` reads a run's result tips off: none where
  * nothing of the repository was read.
+ * @param git The reader whose heads of a repository are taken.
  */
 export const headsOver =
   (git: BranchReader) =>
@@ -233,6 +240,7 @@ export const NO_SNAPSHOT = 'no pass has read where it stands yet: nemia up reads
 /**
  * `standing.json` as the tick's last pass wrote it (`file`), as a `PassStanding`, with no process: undefined, nothing read, and every
  * question unread in the words `NO_SNAPSHOT` says.
+ * @param file `standing.json` as read (`readStanding`), or undefined where no pass wrote it.
  */
 export const snapshotStanding = (file: StandingFile | undefined): PassStanding =>
   file ? { read: byKey(file.places), at: file.at, unasked: 'the last pass did not ask it' } : { read: new Map(), unasked: NO_SNAPSHOT };
@@ -268,7 +276,10 @@ export const standingLive = Effect.fn('standingLive')(function* (runs: readonly 
   return standingReader(yield* standingNow([...runs, ...related], asksOwnOr(runs.map((r) => r.id))));
 });
 
-/** What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of. */
+/**
+ * What a person's verb asks of: the result branches of each run of `ids`, called off or not, and of every run `asksOwn` asks of.
+ * @param ids The runs the verb names, by id.
+ */
 export const asksOwnOr = (ids: readonly string[]): ((run: RepositoryRun) => boolean) => {
   const asked = new Set(ids);
   return (run) => asked.has(run.id) || asksOwn(run);
@@ -283,6 +294,8 @@ export const standingLiveOf = Effect.fn('standingLiveOf')(function* (ids: readon
 /**
  * Every branch of `run`'s repository and its commit, asked of `place` now: for a pass that read none for it, or whose reading a hand-off
  * it committed has moved. Undefined for a folder run, and a reading the place gave none of.
+ * @param run The run whose repository is asked of.
+ * @param place The place asked, now.
  */
 export function headsNow(run: Run, place: Place): Readonly<Record<string, string>> | undefined {
   if (!isRepositoryRun(run)) return undefined;
@@ -294,7 +307,11 @@ export function headsNow(run: Run, place: Place): Readonly<Record<string, string
 /** What was read of the repository and base branch `run` is in, or undefined where none was. */
 const stoodOf = (standing: PassStanding, run: RepositoryRun): StoodRead | undefined => standing.read.get(keyOf(run.repo, run.branch));
 
-/** Every branch of `run`'s repository and its commit, as it was read; undefined where none was. */
+/**
+ * Every branch of `run`'s repository and its commit, as it was read; undefined where none was.
+ * @param standing What the pass read of where the branches stand.
+ * @param run The run whose repository's heads are taken.
+ */
 export const headsFor = (standing: PassStanding, run: RepositoryRun): Readonly<Record<string, string>> | undefined => {
   const stood = stoodOf(standing, run);
   return stood && 'answer' in stood ? stood.answer.tips : undefined;
@@ -311,6 +328,7 @@ const repoHeads = (standing: PassStanding, repo: string): Readonly<Record<string
  * repository, place and base were not read, a branch not asked of — and one on a reading that is unread are unread (`unread` says why):
  * not landed, never gone, ahead by none; a branch of a run whose folder does not load says that folder's words (`unloaded`). Whether git
  * has a branch is read off any answered reading of its repository.
+ * @param standing What the pass read of where the branches stand.
  */
 export function standingReader(standing: PassStanding): BranchReader {
   const unasked = standing.unasked ?? 'not asked on this read';

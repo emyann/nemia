@@ -103,6 +103,9 @@ function itemsOf(step: StepSpec, skills: ReadonlyMap<string, ReadonlyMap<string,
 /**
  * What one run froze (`RunFrozen`): `head`'s keys, day, time and folder, and the items of its frozen `steps`, a skill by the digest of its
  * rendered copy in `skills` (step → skill → digest). An agent that fills several steps is one item, and so is a skill several steps give.
+ * @param head The run's keys, day, time and folder.
+ * @param steps The run's frozen steps.
+ * @param skills The digest of each skill's rendered copy, by step, then by skill.
  */
 export const frozenOf = (
   head: Omit<RunFrozen, 'items'>,
@@ -152,6 +155,7 @@ function seriesMarks(runs: readonly RunFrozen[]): Mark[] {
  * factory being its own, and their workflow folder as recorded, never by its name, so two factories that hire different agents into a
  * step mark nothing; an item is marked where its digest is known and differs from the one the run before it in the series froze for the
  * same item, known too.
+ * @param runs What each run froze.
  */
 export function marksOf(runs: readonly RunFrozen[]): Mark[] {
   const series = new Map<string, RunFrozen[]>();

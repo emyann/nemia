@@ -16,9 +16,11 @@ import { CHANGE_VERBS } from './words.ts';
  * orchestrator refuses one it does not know when the delegation is written, so a grant never reads wider, or narrower, than it says.
  */
 export const DelegationRule = Schema.Struct({
-  resources: Schema.Array(Schema.String),
-  resourceNames: Schema.Array(Schema.String),
-  verbs: Schema.Array(Schema.Literals(CHANGE_VERBS)),
+  resources: Schema.Array(Schema.String).annotate({
+    description: 'The resources the grant covers, each named: workflows, agents and so on.',
+  }),
+  resourceNames: Schema.Array(Schema.String).annotate({ description: 'The names among the resources it covers; every name where empty.' }),
+  verbs: Schema.Array(Schema.Literals(CHANGE_VERBS)).annotate({ description: 'The verbs the agent may approve on them.' }),
 });
 export type DelegationRule = typeof DelegationRule.Type;
 

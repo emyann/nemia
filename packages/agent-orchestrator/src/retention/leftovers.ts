@@ -13,13 +13,21 @@ export { LOGS_KEPT_DAYS, LOGS_KEPT_MS, LAST_DATE_MS } from './kept.ts';
 
 export type { PidEntry, BuildLog, Leftovers } from '../../contracts/leftovers.contract.ts';
 
-/** The leftovers to remove: each entry whose process is gone, each log older than `LOGS_KEPT_MS` at `nowMs`. */
+/**
+ * The leftovers to remove: each entry whose process is gone, each log older than `LOGS_KEPT_MS` at `nowMs`.
+ * @param entries The entries under `releases/` an upgrade names by its pid, each with whether its process is live.
+ * @param logs The build logs, each with when it was last written, in ms.
+ * @param nowMs The time now, in ms since the epoch.
+ */
 export const leftovers: UpgradeLeftovers = (entries, logs, nowMs) => ({
   entries: entries.filter((e) => !e.live).map((e) => e.name),
   logs: logs.filter((l) => l.modifiedMs + LOGS_KEPT_MS < nowMs).map((l) => l.name),
 });
 
-/** What a sweep says of the leftovers it removed: each entry, its process gone, and each log, older than `LOGS_KEPT_DAYS`. */
+/**
+ * What a sweep says of the leftovers it removed: each entry, its process gone, and each log, older than `LOGS_KEPT_DAYS`.
+ * @param swept The entries and logs the sweep removed.
+ */
 export const leftoverLines = (swept: Leftovers): string[] => [
   ...swept.entries.map((name) => `removed releases/${name}: the upgrade that made it is gone`),
   ...swept.logs.map((name) => `removed the build log releases/.logs/${name}: older than ${LOGS_KEPT_DAYS} days`),

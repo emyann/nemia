@@ -5,6 +5,11 @@
  */
 import type { RunsInOf } from '../../contracts/runs-in.contract.ts';
 
+/**
+ * The permission mode a step's try runs in, read off what the runtime measured of its session.
+ * @param filed The mode the try was filed with, or undefined where none was filed.
+ * @param ranIn The mode the runtime measured on its last attempt, or undefined where it measured none.
+ */
 export const runsInOf: RunsInOf = (filed, ranIn) => {
   if (ranIn === undefined) return null;
   if (filed === undefined) return { mode: ranIn, by: 'default' };

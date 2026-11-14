@@ -105,6 +105,11 @@ function taskPartsOf(run: Run, name: string, workflows: readonly StepSpec[] | nu
  * What a step was told, whole (`briefOf`), by layer (`toldLayers`) and its task by part (`taskPartsOf`): the layers from the step `run`
  * froze, never from `workflows` where that is the folder as it is now; null on a record that froze none, or that froze no step `name`. The
  * parts are of the task layer, or of the brief whole where no layer was frozen; null where nothing was told.
+ * @param run The run's record, whose frozen workflow gives the layers.
+ * @param name The step's name.
+ * @param workflows The workflow's steps as the folder holds them now, or null where it cannot be read.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param placeService The place service, read where the brief is made again from the workflow's files.
  */
 export function toldOf(
   run: Run,
@@ -123,6 +128,9 @@ export function toldOf(
 /**
  * What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. The
  * harness's arguments are the adapter's, under `config` (agent-runtime's `HarnessArgs`), which the engine carries unread.
+ * @param record The step's record, or undefined where the run has none of it.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param home The store's folder, where a remote agent's record is read.
  */
 export function filedOf(record: StepRecord | undefined, views: Views, home: string): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;

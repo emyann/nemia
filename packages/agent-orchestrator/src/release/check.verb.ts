@@ -50,6 +50,7 @@ export const checkOnce = Effect.fn('checkOnce')(function* (
 /**
  * The release check as the daemon runs it: a check now, then one every `RELEASE_CHECK_EVERY` while there is one to make; a check that
  * could not read is a warning, tried again at the next. It ends where the check is off or the code is no archive install.
+ * @param running The code this daemon runs: its download base read where it is an archive install.
  */
 export const releaseCheck = (running: Running) =>
   checkOnce(running).pipe(

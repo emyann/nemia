@@ -11,7 +11,11 @@ import { evictedBy } from './rest.ts';
 /** A memo of runs by id, and `cursor`, where on the engine's feed it has read to: undefined until it first reads the feed. */
 export type FollowedMemo = { cursor?: number; runs: Map<string, unknown> };
 
-/** What the log says of a feed that did not read: why, and how many runs the memo held and clears. */
+/**
+ * What the log says of a feed that did not read: why, and how many runs the memo held and clears.
+ * @param held How many runs the memo held.
+ * @param err Why the feed did not read.
+ */
 export const feedUnread = (held: number, err: unknown): string =>
   `the engine's feed did not read (${err instanceof Error ? err.message : String(err)}): the memo's ${held} run(s) are cleared, and read afresh on the next call`;
 

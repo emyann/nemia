@@ -191,6 +191,14 @@ const attemptsOn = (state: TaskView['state'] | undefined, turn?: number): TaskVi
  * declared fields: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field. `schema` is
  * built with `fromEntries`, as `declaredOutput` builds its fields, so a field JSON names `__proto__` is a property of its own. The
  * current try's `missing` are of the fields it was filed with (`filedOwed`): one its step declares since a revision followed is not.
+ * @param home The store's folder, where the artifacts are read.
+ * @param run The run's record.
+ * @param name The step's name.
+ * @param step The step's spec, whose declared output is read.
+ * @param taskId The try's task, or null where it has none.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param steps The run's steps, which a closeout's refusals are judged against.
+ * @param turn The turn of its task the try was, the task's current one where absent.
  */
 export function closeoutIn(
   home: string,
@@ -237,7 +245,12 @@ function shapesServed(step: StepSpec, fields: readonly string[]): Pick<StepClose
   return Object.keys(shapes).length ? { shapes } : {};
 }
 
-/** A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched. */
+/**
+ * A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched.
+ * @param taskId The try's task, or null where it has none.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param turn The turn of its task the try was, the task's current one where absent.
+ */
 export function unreadableIn(taskId: string | null, views: Views, turn?: number): StepUnreadable | null {
   const said = taskId ? attemptsOn(views.get(taskId)?.state, turn).at(-1)?.closeout : undefined;
   if (said === undefined) return null;
@@ -257,6 +270,8 @@ function replyOf(item: unknown): StepReply {
  * The turn of its task the earlier try `at` of a step was, the tries `before` it being those the record keeps ahead of it: how many of them
  * share its task and were no recheck. A task held open and answered keeps each try a person answered under its one id, one turn each; a
  * recheck replaces only the check, on the same turn.
+ * @param before The tries the record keeps ahead of it.
+ * @param at The earlier try.
  */
 export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number =>
   before.filter((t) => t.taskId === at.taskId && t.cause !== 'recheck').length;
@@ -273,6 +288,15 @@ export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number
  * turn a person answered, which signed and ended `done` for it, the task's own word being the turn it is on now. What a person said to a
  * try, and how it was reached as `nemia ls` words it — `answered`, when a person answered it — are read off the step's record as it stood
  * on that try, the tries behind it: `answerOf` reads a step's current try.
+ * @param home The store's folder, where the artifacts are read.
+ * @param run The run's record.
+ * @param name The step's name.
+ * @param steps The run's steps.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param current What the step already has of its current try.
+ * @param answers What people said to the run's tries (the answers the Run door keeps).
+ * @param stderr What each refused check printed on stderr, by its task (`refusedStderr`).
+ * @param releases The store's real releases folder.
  */
 export function triesOf(
   home: string,
@@ -341,6 +365,10 @@ export function triesOf(
  * `failed · unsigned`, the orchestrator's word, the runtime not judging it, and never the harness's `done` that the runtime records. What
  * it
  * ran on is its recorded image placed under `releases`, the store's real releases folder, and its harness's version (`sessionRanOn`).
+ * @param taskId The try's task, or null where it has none.
+ * @param views The engine's views of the run's tasks, by task id.
+ * @param releases The store's real releases folder.
+ * @param turn The turn of its task the try was, the task's current one where absent.
  */
 export function attemptsIn(taskId: string | null, views: Views, releases: string, turn?: number): StepAttempts {
   const state = taskId ? views.get(taskId)?.state : undefined;
@@ -360,7 +388,11 @@ export function attemptsIn(taskId: string | null, views: Views, releases: string
   };
 }
 
-/** How the folder has moved away from the steps the run started with, or null if it has not. */
+/**
+ * How the folder has moved away from the steps the run started with, or null if it has not.
+ * @param run The run's record, its steps and the workflow it froze.
+ * @param workflows The workflow's steps as the folder holds them now.
+ */
 export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null {
   const inFolder = new Set(workflows.map((s) => s.name));
   const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
@@ -381,6 +413,12 @@ export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null
  * writes, a gate of its own where the step has none. Off the record as the Run door composes it, with each approval and acceptance its
  * files hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own. The approval says who gave it
  * (`actor`) where its file does.
+ * @param run The run's record.
+ * @param step The step's spec.
+ * @param reason The step's reason as it stands.
+ * @param steps The run's steps.
+ * @param closeoutOf The closeout of a step by its name, or undefined where it has none.
+ * @param spendOf What a task's sessions cost, by its id (`taskSpend`).
  */
 export function gateOf(
   run: Run,

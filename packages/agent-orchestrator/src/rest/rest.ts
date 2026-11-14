@@ -56,6 +56,7 @@ export type RestFacts = {
  * which is not an input the memo watches); every task it has is settled; nothing is due and nothing was done; it has no notes; and
  * nothing it was judged by is another run's — no hold on a run nobody cancelled (`holdKeepsOut`), no claim on the checkout read, no run
  * waited on, no slot. Pure.
+ * @param f What the pass read of the run.
  */
 export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
 
@@ -63,6 +64,7 @@ export const atRest = (f: RestFacts): boolean => restBlockers(f).length === 0;
  * Whether a person's hold keeps a run out of rest (`rest-hold.contract.ts`): the pass of a held run reads the runs the hold names to lift
  * it, which no input the memo watches says; a cancelled run's pass reads none of them (`liftHold` returns at once, `waitedOn` names no
  * run), so its hold keeps it out of nothing. Pure.
+ * @param run Whether the run is held, and whether it was cancelled.
  */
 export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
 
@@ -70,6 +72,7 @@ export const holdKeepsOut: HoldKeepsOut = (run) => run.held && !run.cancelled;
  * Each clause of `atRest` that keeps a run out of the memo, by the name of the fact it reads (`status`, `due.retry`, `checkoutAsked`, …):
  * none for a run at rest. What the tick's check of its memo names when a full pass finds a run not at rest, and what a count of a store's
  * runs by clause is made of. Pure.
+ * @param f What the pass read of the run.
  */
 export function restBlockers(f: RestFacts): string[] {
   const out: string[] = [];
@@ -94,6 +97,8 @@ export function restBlockers(f: RestFacts): string[] {
  * `checkTaskId`), so every id a run's task could have — a try, a check, one a pass filed and died before writing down — starts with it.
  * Each prefix of the task id that ends before a dash is looked up, so a run whose id is a prefix of another's (`a-b`, `a-b-c`) is evicted
  * by that one's tasks too: more work, never less. Pure.
+ * @param taskIds The task ids the feed names.
+ * @param ids The ids of the runs held.
  */
 export function evictedBy(taskIds: Iterable<string>, ids: ReadonlySet<string>): Set<string> {
   const out = new Set<string>();

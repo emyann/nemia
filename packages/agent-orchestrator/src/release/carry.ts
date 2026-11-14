@@ -6,7 +6,11 @@ import type { HarnessesHeld, UpgradeCarries } from '../../contracts/harness-need
 
 export type { HarnessesHeld };
 
-/** The harnesses `held` names, activated or bundled, that the new release pins (`pinned`), each once, in the order `pinned` gives. */
+/**
+ * The harnesses `held` names, activated or bundled, that the new release pins (`pinned`), each once, in the order `pinned` gives.
+ * @param held The harnesses the store holds, activated and bundled.
+ * @param pinned The names of the harnesses the new release pins, in their order.
+ */
 export const upgradeCarries: UpgradeCarries = (held, pinned) => [
   ...new Set(pinned.filter((harness) => held.activated.includes(harness) || held.bundled.includes(harness))),
 ];

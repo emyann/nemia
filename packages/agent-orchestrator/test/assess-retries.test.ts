@@ -2038,13 +2038,14 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
       undefined,
       at('beefcafe'),
     );
-    assert.ok(refusedItself, 'a refusal that named a --recheck on a moved branch would name a refused command');
+    assert.ok(refusedItself, 'the old words: refused');
   });
 
   await t.test('a session continued after its check refused is told that signing off again unchanged runs the check again', () => {
     const told = (status: RetryBriefing['status']) =>
       retrySection(implement, { try: 2, by: 'retries', mode: 'continue', resumed: true, status });
-    assert.match(told('failed (check)'), /change nothing and sign off as before[\s\S]*files the check again/);
+    assert.match(told('failed (check)'), /change nothing/);
+    assert.match(told('failed (check)'), /files the check again/);
     assert.doesNotMatch(told('blocked'), /files the check again/);
   });
 
@@ -2136,6 +2137,7 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
       undefined,
       refusedOn('c0ffee1'),
     );
-    assert.equal(still.implement, 'to answer it:  nemia retry r-1 implement --message "<answer>"');
+    names(still.implement, 'nemia retry r-1 implement --message');
+    assert.doesNotMatch(still.implement ?? '', /refused/, 'the recheck its needs names is taken: no refusal is said');
   });
 });

@@ -114,6 +114,8 @@ function parsed(args: readonly string[]): Asked {
 /**
  * A proposal as the person reads it: its name and phase, whether it widens access, its page on the board, and, while it waits, the line
  * that approves it.
+ * @param proposal The proposal as the api answers it.
+ * @param namespace The factory it was asked in, named where the proposal's metadata names none.
  */
 export const proposalLines = (proposal: Proposal, namespace: string): string => {
   const factory = proposal.metadata.namespace ?? namespace;
@@ -238,6 +240,11 @@ async function undoOf(proposal: Proposal, namespace: string): Promise<ProposedOb
   return objects;
 }
 
+/**
+ * `nemia propose`, on the words after `propose`: the objects of a file, of `--objects` or an undo of a proposal, made into a
+ * proposal and printed; answers the exit code, or throws its refusal.
+ * @param args The words typed after `propose`, as `--help` lists them.
+ */
 export async function propose(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(PROPOSE_HELP);
@@ -266,6 +273,9 @@ export async function propose(args: readonly string[]): Promise<number> {
 /**
  * The proposal `payload` asks, made in the factory `namespace` for the command `verb` names, and printed (`proposalLines`): the one call
  * a proposal is made by, `nemia propose`'s and a writer's on the `factory` place alike.
+ * @param verb The verb the person typed, named in a refusal.
+ * @param namespace The factory the proposal is made in.
+ * @param payload The proposal asked: its objects, and when it applies and why where they are said.
  */
 export async function proposalMade(verb: string, namespace: string, payload: ProposalCreate): Promise<number> {
   const made = await asked(verb, (c) => c.proposals.create({ params: { namespace }, payload }));
@@ -273,7 +283,10 @@ export async function proposalMade(verb: string, namespace: string, payload: Pro
   return 0;
 }
 
-/** `nemia proposals approve|decline <name>`: the proposal judged by the caller, as the api allows it. */
+/**
+ * `nemia proposals approve|decline <name>`: the proposal judged by the caller, as the api allows it.
+ * @param args The words typed after `proposals`: `approve` or `decline`, the proposal's name, and `-n <factory>`.
+ */
 export async function proposals(args: readonly string[]): Promise<number> {
   if (args.includes('--help') || args.includes('-h')) {
     process.stdout.write(PROPOSALS_HELP);

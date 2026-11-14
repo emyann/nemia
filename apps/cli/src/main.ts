@@ -112,6 +112,8 @@ async function spawnedHere(argv: readonly string[], entry: Entry, help: boolean,
  * retired word `readiness` (`RETIRED_VERB`), naming `nemia doctor` (`retiredVerb`), and for a command retired with none in its place
  * (`objects`' `retiredIn`: `chat speakers|allow|disallow`), naming what to type instead. A former name is run as the name it became
  * (`objects`' `renamedIn`), its hint said on stderr.
+ * @param typed The words typed after the bin's name.
+ * @param entry Which bin was typed, `nemia` or the `wf` alias, whose entry a spawn takes: `nemia` where it is left out.
  */
 export async function main(typed: readonly string[], entry: Entry = 'nemia'): Promise<number> {
   const renamed = renamedIn(carryUnlocal(typed));

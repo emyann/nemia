@@ -10,11 +10,17 @@ import { fileURLToPath } from 'node:url';
 /** Which entry to spawn: `nemia`'s, or the `wf` alias's, which prints its hint first. */
 export type Entry = 'nemia' | 'wf';
 
-/** The orchestrator's CLI entry, resolved through its package's `exports`. */
+/**
+ * The orchestrator's CLI entry, resolved through its package's `exports`.
+ * @param entry Which bin's entry: `nemia`'s or the `wf` alias's.
+ */
 export const entryOf = (entry: Entry): string =>
   fileURLToPath(import.meta.resolve(entry === 'wf' ? 'agent-orchestrator/bin/wf' : 'agent-orchestrator/bin'));
 
-/** Whether `--local` was typed among `argv`: refused by the route (`routeOf`), never passed on. */
+/**
+ * Whether `--local` was typed among `argv`: refused by the route (`routeOf`), never passed on.
+ * @param argv The words typed after the bin's name.
+ */
 export const unlocal = (argv: readonly string[]): boolean => argv.includes('--local');
 
 /** How the child's stdout is taken: shown as this process's own, or kept and answered. */
@@ -51,11 +57,22 @@ function run(
   });
 }
 
-/** Runs the orchestrator's CLI on `argv` with this process's stdio and `env`, and answers its exit code (`run`). */
+/**
+ * Runs the orchestrator's CLI on `argv` with this process's stdio and `env`, and answers its exit code (`run`).
+ * @param argv The words the orchestrator's CLI is given.
+ * @param entry Which bin's entry to spawn, `nemia`'s where it is left out.
+ * @param env The child's environment, this process's where it is left out.
+ */
 export const spawned = (argv: readonly string[], entry: Entry = 'nemia', env: NodeJS.ProcessEnv = process.env): Promise<number> =>
   run(argv, entry, env, 'inherit').then(({ code }) => code);
 
-/** Runs the orchestrator's CLI on `argv` as `spawned` does, the text `input` its stdin, and answers its exit code. */
+/**
+ * Runs the orchestrator's CLI on `argv` as `spawned` does, the text `input` its stdin, and answers its exit code.
+ * @param argv The words the orchestrator's CLI is given.
+ * @param input The text written to the child's stdin.
+ * @param entry Which bin's entry to spawn, `nemia`'s where it is left out.
+ * @param env The child's environment, this process's where it is left out.
+ */
 export const piped = (
   argv: readonly string[],
   input: string,
@@ -66,6 +83,8 @@ export const piped = (
 /**
  * Runs `nemia <argv>` in process as `spawned` does, its stdout kept and answered beside its exit code: what a command's answer is read
  * off.
+ * @param argv The words the orchestrator's CLI is given.
+ * @param env The child's environment, this process's where it is left out.
  */
 export const captured = (argv: readonly string[], env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string }> =>
   run(argv, 'nemia', env, 'pipe');

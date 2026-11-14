@@ -11,6 +11,7 @@ import { Refused } from '../refused.ts';
  * How the words of a list's command, parsed (`args`), ask its table to print: `-o wide` every column, `--show-labels` the labels, and
  * `-L <key>`, given again for another, a column of that label; and the label queries `-l` gave, given again for another, to send as the
  * list's `labelSelector`. A refusal of another output is the command's own `check`, run before.
+ * @param args The list's command's words, parsed.
  */
 export function tableAsked(args: Args): { selector: readonly string[]; asked: TableAsked } {
   return {
@@ -22,6 +23,8 @@ export function tableAsked(args: Args): { selector: readonly string[]; asked: Ta
 /**
  * A list asked for its `Table`, of the read `verb` names: the table, or a refusal where the api answered the list's objects instead, an
  * api older than this client.
+ * @param verb The verb the person typed, named in the refusal.
+ * @param listed What the api answered the list: its `Table`, or its objects.
  */
 export function tableOf<L extends object>(verb: string, listed: L | Table): Table {
   if ('columnDefinitions' in listed) return listed;

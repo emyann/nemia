@@ -53,6 +53,7 @@ entry and loaded with \`claude --dangerously-load-development-channels server:<n
 /**
  * Each Event as the session reads it: its message the body of the tag, each field an attribute under its own name, a nested one joined to
  * its parent by `_`, a field the Event does not carry no attribute, and its labels left out.
+ * @param event The Event as the api's watch sends it.
  */
 export const channelNotice: ChannelNoticeOf = (event) => {
   const meta: ChannelMeta = {
@@ -90,7 +91,10 @@ function took(asked: ChannelAsked, word: string, value: string | undefined): voi
   else asked.cursorFile = value;
 }
 
-/** The words read, `help` for `--help`; refused, exit 2, for any word the channel does not take. */
+/**
+ * The words read, `help` for `--help`; refused, exit 2, for any word the channel does not take.
+ * @param args The words typed after `channel`.
+ */
 export function channelAsked(args: readonly string[]): ChannelAsked | 'help' {
   if (args.includes('--help') || args.includes('-h')) return 'help';
   const asked: ChannelAsked = { selectors: [] };
@@ -107,7 +111,11 @@ const resumeMost = (env: NodeJS.ProcessEnv = process.env): number => {
   return set !== undefined && /^\d+$/.test(set) ? Number(set) : RESUME_MOST;
 };
 
-/** What the session is told the channel sends, and what each attribute of its tag means. */
+/**
+ * What the session is told the channel sends, and what each attribute of its tag means.
+ * @param selectors The label selectors typed with `-l`, none where every event is sent.
+ * @param namespace The namespace `-n` names, undefined where every namespace's events are sent.
+ */
 export function channelInstructions(selectors: readonly string[], namespace: string | undefined): string {
   const which = selectors.length === 0 ? 'every event' : `each event one of the selectors ${selectors.join(', ')} takes`;
   const where = namespace === undefined ? '' : ` of the namespace ${namespace}`;
@@ -260,6 +268,9 @@ const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;
  * set-based or negated one holds a parenthesis or a `!`); a channel of one namespace has `factory=<namespace>` joined to each (a
  * selector of its own besides), as `nemia watch` takes no namespace, but `default`'s, which also holds runs of no factory label, so its
  * read keeps every namespace's lines.
+ * @param asked What the channel was asked: its selectors and its namespace.
+ * @param from The resourceVersion the skipped events come after.
+ * @param context The name of the context the channel resolved.
  */
 export function skippedRead(asked: ChannelAsked, from: string, context: string): string {
   const namespace = asked.namespace === undefined || asked.namespace === 'default' ? undefined : `factory=${asked.namespace}`;
@@ -418,6 +429,7 @@ function savedCursor(asked: ChannelAsked): string | undefined {
 /**
  * `nemia channel <args>`: its help, a refusal of its words, or the channel served until the session closes it (0), a signal stops it (128
  * and its number), or the api refuses what it asks (2).
+ * @param args The words typed after `channel`: `-l`, `-n` and `--cursor-file` with their values, or `--help`.
  */
 export async function channel(args: readonly string[]): Promise<number> {
   const asked = channelAsked(args);

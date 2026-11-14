@@ -16,13 +16,17 @@ export const LEASE_FILE = 'daemon.json';
 /** The credential's name under the store: what the daemon writes at its start, as the orchestrator names it. */
 export const CREDENTIAL_FILE = 'credential';
 
-/** The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it. */
+/**
+ * The store's folder: `WF_ROOT`, else `~/.agent-workflows`, as the orchestrator reads it.
+ * @param env The environment read for `WF_ROOT`.
+ */
 export const storeRoot = (env: NodeJS.ProcessEnv = process.env): string =>
   env.WF_ROOT !== undefined && env.WF_ROOT !== '' ? env.WF_ROOT : path.join(os.homedir(), '.agent-workflows');
 
 /**
  * The url the store's lease names, or none: no lease, a lease a `nemia up` holds, or one not yet listening; and none where the context
  * in use is not this machine's, whose store is then never read.
+ * @param env The environment read for the context in use and `WF_ROOT`.
  */
 export function servedAt(env: NodeJS.ProcessEnv = process.env): string | undefined {
   if (chosenOf(env).kind !== 'local') return undefined;
@@ -44,6 +48,7 @@ export function servedAt(env: NodeJS.ProcessEnv = process.env): string | undefin
 /**
  * The person's credential the store keeps for this machine (`CREDENTIAL_FILE`), trimmed, or none: no file, an empty one, one this user
  * may not read, or a context in use that is not this machine's, whose store is then never read.
+ * @param env The environment read for the context in use and `WF_ROOT`.
  */
 export function storeCredential(env: NodeJS.ProcessEnv = process.env): string | undefined {
   if (chosenOf(env).kind !== 'local') return undefined;

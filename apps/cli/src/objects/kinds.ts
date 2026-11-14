@@ -266,7 +266,10 @@ export const KIND_CALLS: { readonly [K in Kind]: KindCalls } = {
 /** The version a write was read at, where the file says one: a write of a stale one is refused. */
 const versioned = (a: Applied) => (a.resourceVersion !== undefined ? { resourceVersion: a.resourceVersion } : {});
 
-/** `call` answering null where the api has no such object (`Missing`), for apply's read before its write. */
+/**
+ * `call` answering null where the api has no such object (`Missing`), for apply's read before its write.
+ * @param call What is asked of the typed client for the object.
+ */
 export const orNone =
   <A>(call: Call<A>): Call<A | null> =>
   (client) =>

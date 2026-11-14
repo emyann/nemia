@@ -34,7 +34,10 @@ const closeoutLines = (n: number, c: StepCloseout): string[] => [
   ...(c.refused.length ? ['', 'refused:', ...c.refused.map((r) => `  ${r}`)] : []),
 ];
 
-/** What the command prints of a try: its closeout, or that it has none yet, or why it does not read. */
+/**
+ * What the command prints of a try: its closeout, or that it has none yet, or why it does not read.
+ * @param step The step's name, said where the try has no closeout to print.
+ */
 export const closeoutPrinted = ({ try: n, closeout, unreadable }: TryCloseout, step: string): string[] =>
   closeout
     ? closeoutLines(n, closeout)
@@ -64,7 +67,10 @@ const whole = (client: ObjectsClient, runId: string, step: string, read: TryClos
     return { ...read, closeout };
   });
 
-/** Prints what the try of the step `args` names signed off with, its latest where no `--try` is given; answers 0. */
+/**
+ * Prints what the try of the step `args` names signed off with, its latest where no `--try` is given; answers 0.
+ * @param args The command's words as parsed against `CLOSEOUT_WORDS`: the run, the step and `--try`.
+ */
 export async function closeout(args: Args): Promise<number> {
   const runId = textArg(args, 'runId') ?? '';
   const step = textArg(args, 'step') ?? '';

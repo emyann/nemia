@@ -28,7 +28,10 @@ type FeedLine = typeof FeedLineSaid.Type;
 /** How the watch prints: as JSON (`--json`), else in words. */
 export type Watched = { json?: boolean };
 
-/** What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's. */
+/**
+ * What one line of the feed says, without its time: a run's, the store's, a factory's, or a daemon's.
+ * @param l The feed's line, decoded by `FeedLineSaid`.
+ */
 export const feedSaidWords = (l: FeedLine): string => {
   const store = l.store !== undefined ? l : undefined;
   const who = store?.by ? ` by ${store.by}` : '';
@@ -44,12 +47,18 @@ export const feedSaidWords = (l: FeedLine): string => {
   return `${head}  ${l.word}${who}${notes.map((n) => `  · ${n}`).join('')}`;
 };
 
-/** One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. */
+/**
+ * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`.
+ * @param l The feed's line, decoded by `FeedLineSaid`.
+ */
 export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
 
 /**
  * A line as the watch prints it, `data` its JSON and `cursor` the byte just after it: in words, or the line whole with its cursor as one
  * JSON object.
+ * @param data The line's JSON, as the stream sends it.
+ * @param cursor The feed's offset just after the line, in bytes.
+ * @param how How the watch prints: as JSON where `json` is set, else in words.
  */
 export const watchedLine = (data: string, cursor: number, how: Watched): string => {
   const line: unknown = JSON.parse(data);
@@ -58,7 +67,11 @@ export const watchedLine = (data: string, cursor: number, how: Watched): string 
     : feedLineWords(Schema.decodeUnknownSync(FeedLineSaid)(line));
 };
 
-/** The bookmark at `cursor`: under `--json` a line carrying the cursor alone; in words, nothing. */
+/**
+ * The bookmark at `cursor`: under `--json` a line carrying the cursor alone; in words, nothing.
+ * @param cursor The feed's offset read to, in bytes.
+ * @param how How the watch prints: as JSON where `json` is set, else in words.
+ */
 export const bookmarkLine = (cursor: number, how: Watched): string | undefined =>
   how.json === true ? JSON.stringify({ cursor }) : undefined;
 
@@ -90,7 +103,11 @@ const pauseDoes = ({ timeoutMs }: NonNullable<Paused['pause']>): string =>
       ? 'nothing new starts, and each working session stops when its current tool call ends, cut once the timeout passes'
       : 'nothing new starts, and each working session runs on to its end';
 
-/** The pause as it stands, in one line, or null when none stands. */
+/**
+ * The pause as it stands, in one line, or null when none stands.
+ * @param paused What the api says of the store's pause: the pause, if one stands, and each task it finishes and holds.
+ * @param now The moment the time left of a timed pause is counted from: now where it is left out.
+ */
 export const pausedWords = (paused: Paused, now: Date = new Date()): string | null => {
   const { pause, finishing } = paused;
   if (!pause) return null;
@@ -107,7 +124,14 @@ export const pausedWords = (paused: Paused, now: Date = new Date()): string | nu
 /** Whether the api the watch follows answers, when it was read, and the sentence beside it. */
 export type Liveness = { state: 'up' | 'down'; at: string; text: string };
 
-/** The watch's liveness at `now`: `down` with why the stream dropped and what starts the api, `up` once it opens again at `cursor`. */
+/**
+ * The watch's liveness at `now`: `down` with why the stream dropped and what starts the api, `up` once it opens again at `cursor`.
+ * @param state Whether the api answers, `up`, or not, `down`.
+ * @param base The api's url the watch follows.
+ * @param cursor The feed's offset the watch reads on from, in bytes.
+ * @param now The moment it was read, in ms since the epoch.
+ * @param why Why the stream dropped, said beside a `down`; empty where it is left out.
+ */
 export const livenessOf = (state: Liveness['state'], base: string, cursor: number, now: number, why = ''): Liveness => ({
   state,
   at: new Date(now).toISOString(),
@@ -117,6 +141,10 @@ export const livenessOf = (state: Liveness['state'], base: string, cursor: numbe
       : `daemon: answering at ${base} — reading on from ${cursor}`,
 });
 
-/** A liveness line as the watch prints it: `12:00:00  daemon down  · <text>`, or one JSON object, which no cursor has. */
+/**
+ * A liveness line as the watch prints it: `12:00:00  daemon down  · <text>`, or one JSON object, which no cursor has.
+ * @param l The liveness to print.
+ * @param json Whether the watch prints as JSON (`--json`): false where it is left out.
+ */
 export const livenessWords = (l: Liveness, json = false): string =>
   json ? JSON.stringify({ liveness: l.state, at: l.at, note: l.text }) : `${l.at.slice(11, 19)}  daemon ${l.state}  · ${l.text}`;

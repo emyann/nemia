@@ -5,7 +5,7 @@
  * breaks one without touching it, and the tests of what a session changed never run it: of the round checks that failed over two days
  * in November 2026, half the real failures were one of these, each found by a whole `ci` run. Each group runs as its package's `test`
  * script loads it, one group after another and three files at a time, which keeps the whole near the 2 GB a suite is held to (2.3 GB
- * at its peak, in 23 s, measured 2026-11-13), and only what failed is said. The guards' boundary tests are left to `ci`: they hold the
+ * at its peak, in 23 s), and only what failed is said. The guards' boundary tests are left to `ci`: they hold the
  * workflows' own programs, which a change elsewhere does not move.
  *
  * Exits 1 when a rule refuses, after what it said. A file named here that is gone is refused: the list is held to the tree.

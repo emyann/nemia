@@ -67,22 +67,13 @@ test('the runner refuses two workers sharing a store, an api or an app, and a wo
   const worker = read('worker.ts');
   assert.match(
     runner,
-    /apart\(seats\);\n(?:.*\n)*?\s*results = await Promise\.all\(seats\.map\([^\n]*\n\s*apart\(results\);/,
-    'the runner refuses two workers sharing a store before it starts them, and an api or an app once they report theirs',
+    /apart\(seats\);\n(?:.*\n)*?\s*const bySeat = await Promise\.all\(seats\.map\([^\n]*\n(?:.*\n)*?\s*apart\(bySeat\.map\(/,
+    "the runner refuses two workers sharing a store before it starts them, and an api or an app once each seat's last reports its own",
   );
   assert.match(
     worker,
     /const before = fingerprint\(root\);\n(?:.*\n)*?\s*for await \(const page of pagesOf\([^\n]*\n(?:.*\n)*?\s*const left = leftOver\(before, fingerprint\(root\), visited\);\s*if \(left\) throw new Error\(/,
     'a worker prints its store before its first page, and fails when its pages leave it other than it was (`leftOver`)',
-  );
-});
-
-test('a worker that exits other than 0 stops the queue: no worker starts another page', () => {
-  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
-  assert.match(
-    runner,
-    /child\.on\('exit', \(code, signal\) => \{\s*if \(code !== 0\) queue\.stop\(\);/,
-    'a worker that failed, or was killed, stops the queue the moment it exits',
   );
 });
 

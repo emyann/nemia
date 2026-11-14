@@ -531,6 +531,36 @@ const ASK_WALKS: Record<string, Walk[]> = {
       },
       says: [1, 0],
     },
+    {
+      name: "an ending's approval is read while the work it names stands, and once a try of that work is filed it is read spent and consumed",
+      walk: ({ door }) => {
+        const run = made(door, 'w-work');
+        act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'review', try: 1, at, work: { implement: 1 } } }));
+        const approvalsOf = () => {
+          const read = act(door.runs.read(idOf(run.id)));
+          return 'refused' in read ? read : (read.approvals ?? []).map((a) => a.step);
+        };
+        const before = approvalsOf();
+        const sentBack = {
+          ...run,
+          steps: {
+            ...run.steps,
+            implement: {
+              ...run.steps.implement,
+              tries: [{ taskId: `${run.id}-implement`, cause: 'continue' as const }],
+              taskId: `${run.id}-implement-try2`,
+            },
+          },
+        };
+        act(door.runs.rewrite(sentBack));
+        const spent = approvalsOf();
+        const { asks, rounds } = done(door.asks.read(idOf(run.id)));
+        act(door.asks.consume(sentBack, asks, rounds));
+        act(door.asks.write(idOf(run.id), { kind: 'approve', of: 'gate', ask: { step: 'review', try: 1, at, work: { implement: 2 } } }));
+        return [before, spent, approvalsOf()];
+      },
+      says: [['review'], [], ['review']],
+    },
   ],
   'asks.answers': [
     {

@@ -348,8 +348,14 @@ const ZONE_LOCAL = 'America/New_York';
 /** The one workspace whose code reads local time, and so the one leg that runs its suite a second time. */
 const LOCAL_LEG = 'web';
 
-/** What the second zone's run step must be conditioned on, so it runs for that leg and no other. */
-const LOCAL_IF = `matrix.workspace == '${LOCAL_LEG}'`;
+/**
+ * What a leg's suite is conditioned on: every leg but the floor's on a pull request, whose suites main's push runs. The one condition a
+ * suite run may carry, written off the floor `engines.node` claims, so no other leg can be left out by it.
+ */
+const dueIf = (floor: string): string => `matrix.node != '${floor}' || github.event_name != 'pull_request'`;
+
+/** What the second zone's run step must be conditioned on, so it runs for that leg and no other, where the leg's suite is due. */
+const localIf = (floor: string): string => `matrix.workspace == '${LOCAL_LEG}' && (${dueIf(floor)})`;
 
 /** The environment variable the orchestrator's `test` script reads its shard out of. */
 const SHARD_ENV = 'WF_TEST_SHARD';
@@ -384,20 +390,23 @@ const suiteRuns = (workflow: Workflow): { zone: string | undefined; if?: string;
  * A run that does not pass `--force` is the invisible one: `turbo.json` hashes no environment, so it replays the run before it from the
  * cache and that timezone is never tested at all.
  */
-function zoneDrift(workflow: Workflow): string[] {
+function zoneDrift(workflow: Workflow, engine: string): string[] {
+  const floor = /^>=(\d+\.\d+\.\d+)$/.exec(engine)?.[1] ?? engine;
+  const DUE_LEG = dueIf(floor);
+  const LOCAL_IF = localIf(floor);
   const runs = suiteRuns(workflow);
   const sentences: string[] = [];
   const every = runs.filter((run) => run.zone === ZONE_EVERY);
   if (every.length === 0)
     sentences.push(
-      `the ${LEGS} job in ${FILE} does not run its suite under TZ=${ZONE_EVERY}: give it a run step of the suite with env TZ: ${ZONE_EVERY} and no if:, or a leg reports green having run no suite at all`,
+      `the ${LEGS} job in ${FILE} does not run its suite under TZ=${ZONE_EVERY}: give it a run step of the suite with env TZ: ${ZONE_EVERY} and if: ${DUE_LEG}, or a leg reports green having run no suite at all`,
     );
   sentences.push(
     ...every
-      .filter((run) => run.if !== undefined)
+      .filter((run) => run.if !== DUE_LEG)
       .map(
         (run) =>
-          `the ${LEGS} job's suite run under TZ=${ZONE_EVERY} in ${FILE} is conditioned on if: ${String(run.if)}: every leg runs its suite under ${ZONE_EVERY}, so take the condition off, or the legs it leaves out report green having run nothing`,
+          `the ${LEGS} job's suite run under TZ=${ZONE_EVERY} in ${FILE} is conditioned on ${run.if === undefined ? 'nothing' : `if: ${run.if}`}, not on if: ${DUE_LEG}: every leg runs its suite under ${ZONE_EVERY} but the floor's on a pull request, which main's push runs, so write that condition and no other, or the legs another leaves out report green having run nothing`,
       ),
   );
   const local = runs.filter((run) => run.zone === ZONE_LOCAL);
@@ -1113,7 +1122,7 @@ const drift = (
   ...guardsDrift(workflow),
   ...stallDrift(workflow),
   ...actionDrift(workflow),
-  ...zoneDrift(workflow),
+  ...zoneDrift(workflow, engine),
   ...filterDrift(workflow),
   ...verdictDrift(workflow),
   ...statusDrift(workflow, GATE, GATE, VERDICT),
@@ -1331,44 +1340,48 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
 
   const onezone = structuredClone(shipped);
   onezone.jobs[LEGS].steps = stepsOf(onezone).filter((step) => step.env?.TZ !== 'America/New_York');
-  assert.deepEqual(zoneDrift(onezone), [
-    "the test job in .github/workflows/ci.yml does not run its suite under TZ=America/New_York: give it a run step of the suite with env TZ: America/New_York and if: matrix.workspace == 'web', or a test of the web's local-time code passes CI and fails on a machine in another zone",
-  ]);
+  assert.equal(zoneDrift(onezone, engine).length, 1, "no second zone: the web's local-time code is tested in one zone alone");
 
+  const DUE_LEG = "matrix.node != '24.16.0' || github.event_name != 'pull_request'";
   const nozone = structuredClone(shipped);
   nozone.jobs[LEGS].steps = stepsOf(nozone).filter((step) => step.env?.TZ !== 'UTC');
-  assert.deepEqual(zoneDrift(nozone), [
-    'the test job in .github/workflows/ci.yml does not run its suite under TZ=UTC: give it a run step of the suite with env TZ: UTC and no if:, or a leg reports green having run no suite at all',
-  ]);
+  assert.equal(zoneDrift(nozone, engine).length, 1, 'no run under UTC: a leg reports green having run no suite at all');
+  assert.ok(zoneDrift(nozone, engine)[0].includes(`if: ${DUE_LEG}`), 'and the fix names the one condition the run takes');
 
   const everyleg = structuredClone(shipped);
-  delete runOf(everyleg, 'America/New_York').if;
-  assert.deepEqual(
-    zoneDrift(everyleg),
-    [
-      "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml is conditioned on nothing, not on if: matrix.workspace == 'web': web is the one workspace of this repository whose code reads local time, so write if: matrix.workspace == 'web' on that step, or the other legs run their suites twice for a zone they cannot read",
-    ],
-    'the second zone unconditioned is the cost this card took off: four legs paying a second pass for a zone no code of theirs reads',
+  runOf(everyleg, 'America/New_York').if = DUE_LEG;
+  assert.equal(
+    zoneDrift(everyleg, engine).length,
+    1,
+    'the second zone on every leg is the cost that card took off: four legs paying a second pass for a zone no code of theirs reads',
   );
 
   const otherleg = structuredClone(shipped);
-  runOf(otherleg, 'America/New_York').if = "matrix.workspace == 'api'";
-  assert.deepEqual(zoneDrift(otherleg), [
-    "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml is conditioned on if: matrix.workspace == 'api', not on if: matrix.workspace == 'web': web is the one workspace of this repository whose code reads local time, so write if: matrix.workspace == 'web' on that step, or the other legs run their suites twice for a zone they cannot read",
-  ]);
+  runOf(otherleg, 'America/New_York').if = `matrix.workspace == 'api' && (${DUE_LEG})`;
+  assert.equal(zoneDrift(otherleg, engine).length, 1, 'the second zone on a leg that is not the web');
 
   const conditioned = structuredClone(shipped);
   runOf(conditioned, 'UTC').if = "matrix.workspace == 'web'";
-  assert.deepEqual(zoneDrift(conditioned), [
-    "the test job's suite run under TZ=UTC in .github/workflows/ci.yml is conditioned on if: matrix.workspace == 'web': every leg runs its suite under UTC, so take the condition off, or the legs it leaves out report green having run nothing",
-  ]);
+  assert.equal(zoneDrift(conditioned, engine).length, 1, 'a condition that leaves legs out: they report green having run nothing');
+
+  const unconditioned = structuredClone(shipped);
+  delete runOf(unconditioned, 'UTC').if;
+  assert.equal(zoneDrift(unconditioned, engine).length, 1, "the floor's legs back on every pull request, a third of a push's runner time");
+
+  const everyevent = structuredClone(shipped);
+  runOf(everyevent, 'UTC').if = "matrix.node != '24.16.0'";
+  assert.equal(
+    zoneDrift(everyevent, engine).length,
+    1,
+    'the floor run by no event at all: engines.node would claim a version nothing tests',
+  );
 
   const third = structuredClone(shipped);
   const tokyo = structuredClone(runOf(third, 'UTC'));
   tokyo.name = 'test under TZ=Asia/Tokyo';
   tokyo.env = { ...tokyo.env, TZ: 'Asia/Tokyo' };
   stepsOf(third).push(tokyo);
-  assert.deepEqual(zoneDrift(third), [
+  assert.deepEqual(zoneDrift(third, engine), [
     'the test job in .github/workflows/ci.yml runs its suite under TZ=Asia/Tokyo, a zone this file knows nothing about: the legs run ' +
       'under UTC, and web alone a second pass under America/New_York — take the step off, or say in docs/plan-github-ci.md why a third ' +
       'zone is tested and hold it here',
@@ -1378,7 +1391,7 @@ test('REFUSED: a workspace with no leg, a leg with no workspace, a node floor ad
   const twice = unforced.jobs[LEGS]?.steps?.filter((step) => step.run?.includes('turbo run test') === true) ?? [];
   assert.equal(twice.length, 2, 'the leg runs its suite twice today');
   twice[1].run = twice[1].run?.replace(' --force', '');
-  assert.deepEqual(zoneDrift(unforced), [
+  assert.deepEqual(zoneDrift(unforced, engine), [
     "the test job's suite run under TZ=America/New_York in .github/workflows/ci.yml does not pass --force: turbo hashes no environment, so it replays the run before it from the cache and that timezone is never tested",
   ]);
 

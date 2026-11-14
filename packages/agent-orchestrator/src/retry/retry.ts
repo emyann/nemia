@@ -25,6 +25,7 @@ import { closeoutRefusals } from '../question/index.ts';
 import {
   aboveWord,
   approvalOf,
+  approvedUnfiled,
   capOf,
   endingStopped,
   hasGate,
@@ -167,7 +168,9 @@ function triedOn(
       (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && noneFiled) ||
       (satisfiesAfter(status) &&
         noneFiled &&
-        followers.some((f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))));
+        followers.some(
+          (f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf) || approvedUnfiled(f, run),
+        )));
   const rechecks = blockedRechecks(run.steps[step.name], tried, phaseOf, tipOf);
   const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack, rechecks);
   const raise =

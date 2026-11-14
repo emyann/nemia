@@ -638,12 +638,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/brief/brief-sections.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 18]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/brief/brief.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],
@@ -661,14 +655,14 @@
     {
       "files": ["packages/agent-orchestrator/src/gate/gate.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 32]
+        "complexity": ["error", { "max": 27 }],
+        "sonarjs/cognitive-complexity": ["error", 26]
       }
     },
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 124, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 122, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 29 }],
         "sonarjs/cognitive-complexity": ["error", 40]
       }

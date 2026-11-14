@@ -51,6 +51,9 @@ holds what every change needs.
   measure with `npx tsrs --noEmit`, the compiler `ci` judges with.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
+- `npm run rules` — the repository-wide rule tests, in under half a minute (`tools/guards/rules.ts`: the guards but their
+  boundary tests, and the structure tests each package keeps). A change breaks one without touching it, and the tests of what a
+  session changed never run them, so a step's session runs it before it signs off, and anyone before a push.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
   `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
@@ -217,7 +220,7 @@ What the `create-an-agent` skill (`packages/agent-orchestrator/skills/create-an-
   Nemia with this repository's words taken out, under its own semver recorded in `released.json`, and the tests that hold it
   (`packages/templates/CLAUDE.md`). The nemia factory runs on it; its overlays (pictures, this repository's fences, checks and
   skills) live in the factory's own tree, out of git. sdlc's `agents/`: Iris (product engineer), Seldon (software architect), Grace
-  (lead software engineer, who builds a wide card through subagents and fills implement in `build` and `quick`), Agora (code
+  (lead software engineer, who builds a card herself in one session and fills implement in `build` and `quick`), Agora (code
   reviewer), Otto (release engineer), Argus (janitor). And four workflows: `intake` (an idea to an intent), `build` (an intent to main,
   started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review whose
   pass files an ungated land, as `packages/templates/sdlc/workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox

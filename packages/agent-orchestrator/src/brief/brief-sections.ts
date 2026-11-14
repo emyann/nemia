@@ -9,6 +9,7 @@ import {
   andList,
   dataBlock,
   fenced,
+  type Approval,
   type CloseoutAsked,
   type Run,
   type SaidBefore,
@@ -26,6 +27,7 @@ import {
   owesReplies,
   roundOf,
   sendBackTo,
+  unfiledBack,
   standing,
   unheld,
   type Round,
@@ -766,7 +768,7 @@ export function gateLines(
     if (!hasGate(step, run) || waitingAgain.has(step.name)) continue;
     const given = approvalOf(run, step.name);
     if (given) {
-      lines[step.name] = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
+      lines[step.name] = approvedLine(step, run, given);
     } else if (standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval') {
       if (run.pruned) {
         lines[step.name] = neverApproved(run.pruned);
@@ -784,6 +786,18 @@ export function gateLines(
     }
   }
   return lines;
+}
+
+/**
+ * What `nemia decide` prints under a step a person approved: when, the words they gave, and — for an ending approved and not filed — the
+ * send-back of the work it would act on, which spends the approval (`unfiledBack`). Pure.
+ */
+function approvedLine(step: StepSpec, run: Run, given: Approval): string {
+  const back = unfiledBack(step, run)
+    .map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`)
+    .join(' or ');
+  const said = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;
+  return back ? `${said}  — not filed yet; or send the work back:  ${back}` : said;
 }
 
 /**

@@ -84,7 +84,16 @@ jobs:
           git config --global user.name 'nemia ci'
           git config --global user.email 'ci@nemia.invalid'
           git config --global init.defaultBranch main
+      # The floor's legs run on main alone. A pull request runs its suites on the line's latest, and the push to main that lands it
+      # runs them on both: over 400 ci runs (2026-11-12 to 11-14) the two versions disagreed twice, both times the latest failing where
+      # the floor passed, never the floor alone, while the floor's legs were a third of a push's runner time, and under load a run's
+      # wall time was its wait for a runner. A floor's leg on a pull request says so and runs nothing; main's ci, which the landing
+      # waits on, is where a failure of the floor alone is read.
+      - name: The floor's suite is main's to run
+        if: matrix.node == '24.16.0' && github.event_name == 'pull_request'
+        run: echo "node ${{ matrix.node }} is the floor engines.node claims. Its legs run on a push to main, not on a pull request - this leg ran no suite."
       - run: npm ci
+        if: matrix.node != '24.16.0' || github.event_name != 'pull_request'
         timeout-minutes: 10
       # Both runs pass --force: turbo.json hashes no environment (envMode loose passes it through without hashing it, WF_TEST_SHARD as
       # well as TZ), so without it the second run replays the first from the cache and the second timezone is never tested.
@@ -96,6 +105,7 @@ jobs:
       # 1/2 or 2/2 and the hole expands to --test-shard=<i>/2; on every other leg it is empty, the hole expands to nothing and that
       # package's suite runs whole.
       - name: test under TZ=UTC
+        if: matrix.node != '24.16.0' || github.event_name != 'pull_request'
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: UTC
@@ -106,7 +116,7 @@ jobs:
       # the eight that are not the web's came to 21 runner-minutes a push for a zone no code of theirs can read. A workspace that grows
       # a local-time read needs its second zone back here.
       - name: test under TZ=America/New_York
-        if: matrix.workspace == 'web'
+        if: matrix.workspace == 'web' && (matrix.node != '24.16.0' || github.event_name != 'pull_request')
         run: npx turbo run test --force --filter=${{ matrix.workspace }}
         env:
           TZ: America/New_York

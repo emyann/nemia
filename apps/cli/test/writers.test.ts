@@ -42,6 +42,18 @@ function nemia(argv: readonly string[], env: NodeJS.ProcessEnv): Promise<Said> {
   });
 }
 
+/**
+ * `each` of `items`, four at a time: a test that asks every command the same thing spawns the client once a command, and waited on one
+ * after another those spawns were the suite's longest test. Four keeps the file's children well inside what a suite is held to.
+ */
+async function fourAtATime<T>(items: readonly T[], each: (item: T) => Promise<void>): Promise<void> {
+  const left = [...items];
+  const worker = async (): Promise<void> => {
+    for (let item = left.shift(); item !== undefined; item = left.shift()) await each(item);
+  };
+  await Promise.all(Array.from({ length: 4 }, worker));
+}
+
 /** The version a write printed, `at version <v>`. */
 const versionIn = (said: string): string => /at version (\S+)$/m.exec(said)?.[1] ?? assert.fail(`no version in: ${said}`);
 
@@ -83,7 +95,7 @@ function laptop(prefix: string): NodeJS.ProcessEnv {
 
 test('`--help` prints its manual where it has one, else its usage and help, from `COMMAND_WORDS`, exit 0, asking nothing', async () => {
   const env = laptop('nemia-writers-help-');
-  for (const words of COMMAND_WORDS) {
+  await fourAtATime(COMMAND_WORDS, async (words) => {
     const said = await nemia([...words.name.split(' '), '--help'], env);
     assert.equal(said.code, 0, `${words.name} --help: ${said.err}`);
     if (words.manual !== undefined) assert.ok(said.out.includes(words.manual), `${words.name}: its manual`);
@@ -91,12 +103,13 @@ test('`--help` prints its manual where it has one, else its usage and help, from
       assert.ok(said.out.includes(`nemia ${words.name} ${words.usage}`.trimEnd()), said.out);
       for (const line of words.help) assert.ok(said.out.includes(line), `${words.name}: ${line}`);
     }
-  }
+  });
 });
 
 test('a command given too little, a required argument left out, prints its usage, exit 0, or, where its words say the refusal, is refused, exit 2, naming it', async () => {
   const env = laptop('nemia-writers-short-');
-  for (const words of COMMAND_WORDS.filter((w) => w.spec.positionals.some((p) => p.takes === 'required'))) {
+  const short = COMMAND_WORDS.filter((w) => w.spec.positionals.some((p) => p.takes === 'required'));
+  await fourAtATime(short, async (words) => {
     const said = await nemia(words.name.split(' '), env);
     if (words.spec.missing === undefined) {
       assert.equal(said.code, 0, `${words.name}: ${said.err}`);
@@ -106,7 +119,7 @@ test('a command given too little, a required argument left out, prints its usage
       assert.match(said.err, new RegExp(`nemia ${words.name.split(' ')[0]}`), `${words.name} names a command`);
       assert.equal(said.out, '', words.name);
     }
-  }
+  });
 });
 
 test('REFUSED, exit 2, before anything is asked: a flag no writer takes, `factory` without --factory, a folder that is a link or not there', async () => {

@@ -132,6 +132,7 @@ const HOLDS: Array<[RegExp, (file: string) => string]> = [
   [/\.schema\.json$/, () => '"properties"'],
   [/^skills\/([\w-]+)\/SKILL\.md$/, (file) => `name: ${file.split('/')[1]}\n`],
   [/^skills\/[\w-]+\/rules\.json$/, () => '"breaks"'],
+  [/^skills\/[\w-]+\/traps\.md$/, () => '# Traps of a test\n'],
   [/^workflows\/([\w-]+)\/README\.md$/, (file) => `# ${file.split('/')[1]}\n`],
   [/^workflows\/[\w-]+\/workflow\.yaml$/, () => 'kind: Workflow'],
   [/^carried\/ci-log\.ts$/, () => 'export function failures'],

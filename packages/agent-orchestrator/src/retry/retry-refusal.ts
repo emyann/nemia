@@ -27,6 +27,7 @@ import {
   raiseOf,
   raiseWords,
   sendBackTo,
+  takeBackWords,
   spentWord,
   waitsAtGate,
   type Raise,
@@ -271,7 +272,7 @@ function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
 
 /** Why a step with no way to be tried has none: an ending stopped on the base branch, an ending at its gate, or its status. */
 function nothingToTry(c: Judged): string {
-  return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? statusRefusal(c);
+  return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? unspentRefusal(c) ?? statusRefusal(c);
 }
 
 /** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or landed again. */
@@ -302,6 +303,17 @@ function endingGateRefusal(c: Judged): string | undefined {
     `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. ` +
     `Approve it: nemia approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`
   );
+}
+
+/**
+ * A send-back of work an ending approved and not filed waits on, where that approval names no work (`takeBackWords`): nothing would spend
+ * it, so it is taken back first.
+ */
+function unspentRefusal(c: Judged): string | undefined {
+  const { steps, run, name, status } = c;
+  if (!satisfiesAfter(status)) return undefined;
+  const ending = steps.find((s) => s.after.includes(name) && sendBackTo(s, run).includes(name) && takeBackWords(s, run));
+  return ending ? takeBackWords(ending, run) : undefined;
 }
 
 /** What a step's status says of a try, when it has none: not filed, running, checking, done, or a loop's round to go. */

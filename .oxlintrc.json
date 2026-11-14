@@ -709,8 +709,8 @@
     {
       "files": ["packages/agent-orchestrator/src/ending/ending.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 33]
+        "complexity": ["error", { "max": 28 }],
+        "sonarjs/cognitive-complexity": ["error", 30]
       }
     },
     {

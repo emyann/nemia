@@ -33,10 +33,10 @@ import {
 } from './nemia.ts';
 
 /** An agent's rules, by its name. */
-const policyParams = { name: Schema.String };
+const policyParams = { name: Schema.String.annotate({ description: "The agent's name." }) };
 
 /** One rule of an agent's, by the agent's name and the rule's id. */
-const ruleParams = { name: Schema.String, id: Schema.String };
+const ruleParams = { ...policyParams, id: Schema.String.annotate({ description: "The rule's id." }) };
 
 /** The answers named, so that the document holds each as a component. */
 const NemiaLevelObject = NemiaLevel.annotate({ identifier: 'NemiaLevel' });
@@ -82,7 +82,7 @@ export class NemiaGroup extends HttpApiGroup.make('nemia').add(
   }),
   HttpApiEndpoint.get('memory', '/api/nemia/memory', { success: NemiaMemoryObject, error: [Missing] }),
   HttpApiEndpoint.get('fact', '/api/nemia/memory/:fact', {
-    params: { fact: Schema.String },
+    params: { fact: Schema.String.annotate({ description: 'The name of the fact asked.' }) },
     success: NemiaMemoryObject,
     error: [Missing],
   }),

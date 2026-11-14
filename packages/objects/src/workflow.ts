@@ -372,7 +372,7 @@ export const KeyForm = Schema.Struct({
     description: 'The role values each agent of yours gives a step it is attached to, by its name.',
   }),
   remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.Array(Schema.Literals(STEP_KEYS)) }).annotate({
-    description: 'How a step names a remote A2A agent: the prefix of its agent line, and the keys such a step may not set.',
+    description: 'How a step names a remote A2A agent: the prefix its harness: line gives (a2a:), and the keys such a step may not set.',
   }),
 }).annotate({ identifier: 'KeyForm' });
 export type KeyForm = typeof KeyForm.Type;

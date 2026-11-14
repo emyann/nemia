@@ -77,7 +77,9 @@ its exit and the last lines of what it printed, on GitHub the failing jobs and t
 branch can answer exits 78 — every refusal of `change.ts`, and of `pull-request.ts` those `build`'s README names — which the implement
 step's `checkFailurePolicy:` names (`FailStep`, `onExitCodes: In [78]`): the run files no try on it, the step waits on the person,
 `failed (check)`, and `nemia decide` offers `nemia retry <run> implement --recheck` first. The implement step's note tells the try to
-change nothing on a failure it finds is not its change's, and to say so in `needs`. A step over its budget, a call denied under `denials: fail`, a check that did not finish and a blocked
+change nothing on a failure it finds is not its change's: a flake or the machine, signed off `done` again, which runs the check again
+within `retries:`; a failure the base has too, signed off `blocked` and said in `needs`, whose check a person can run again with
+`--recheck` where its branch has not moved since. A step over its budget, a call denied under `denials: fail`, a check that did not finish and a blocked
 sign-off spend no try and wait on a person at once, and so does a refusal after the second try.
 
 On GitHub, no typecheck, no lint and no test on this machine: nothing here runs Grace's tests for her before the review. Her session

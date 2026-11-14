@@ -1778,6 +1778,8 @@ retries: 1
   verdict on the work: the next tick runs the check again, and nothing else, as `--recheck` does, whatever it exited with and whatever
   `checkFailurePolicy:` says of the code. Its record keeps the try as a `recheck` marked `retried`, and it counts against `n` like any
   try of `retries:`. Past them, the step waits on you, offered `--recheck` first.
+  A session continued after its check refused that finds what failed is not its work's — a test that varies, the machine — changes
+  nothing and signs off as before: signing off again files the check again, within `n`, and its brief says so.
 - **`checkFailurePolicy:` — which refusals are a person's.** A step's check can say which of its exit codes mean a refusal only a
   person can answer — no tool signed in, a remote not there — read against Kubernetes' Job `podFailurePolicy`:
 
@@ -1835,7 +1837,13 @@ retries: 1
   check again on the work as it stands, and files no session. `--round` asks for a loop's next round instead
   ([*Going round again*](#going-round-again-loop-and-rounds)). A step may be tried again when it waits on you
   (its check did not pass, it ended unsigned, or it signed off blocked and its session has settled), or when
-  its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
+  its own session failed or was stopped. `--recheck` only applies where a check did not pass — and to a step whose session, continued
+  after its check failed, signed off blocked with nothing committed since: the check of the try before it runs again on the branch as
+  it is, as the same try, no session filed, and the blocked closeout stands on that check (`checking`, then `verified` or
+  `failed (check)`). Nothing committed since is read off the world, never the session's word: the commit the branch was at when the
+  run filed that check (`CheckTask.tip`) against where it is now, once the run has handed the blocked session off
+  (`blockedRecheck`, `contracts/blocked-recheck.contract.ts`). `wf decide` offers it first there, and says beside a blocked step's
+  answer the refusal of any `nemia retry` its `needs` names (`retriesNamed`). Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
 - **A session its harness blocked is tried again the same way.** A session can stop on the harness's own
@@ -2022,6 +2030,7 @@ stateDiagram-v2
   exhausted --> pending: a round on your word
   blocked --> running: tried again
   blocked --> over_budget: its session settled, over its budget
+  blocked --> checking: its failed check run again, nothing committed since
   unsigned --> running: tried again
   denied --> running: tried again
   failed_check --> running: tried again

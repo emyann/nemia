@@ -734,6 +734,15 @@
       }
     },
     {
+      "term": "Tip",
+      "meaning": "the commit a step's branch was at when the run filed its check, as the pass read it (`CheckTask.tip`), kept on the check and on the try it moves behind with. A step that signed off blocked after that check failed may have it run again (`nemia retry --recheck`) only while its branch is still at that commit (`blockedRecheck`).",
+      "type": "BlockedRecheck",
+      "see": {
+        "label": "Trying again",
+        "href": "/workflows/#trying-again"
+      }
+    },
+    {
       "term": "TryNumber",
       "meaning": "a try's number within its step, from 1.",
       "type": "TryNumber"

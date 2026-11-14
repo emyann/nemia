@@ -185,7 +185,7 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
         ['working', { mode: 'continue' }, /^working is still running/],
         ['working', { mode: 'fresh', message: 'Start again.' }, /^working is still running/],
         ['held', { mode: 'recheck' }, /^--recheck [^]* held is running, its session blocked/],
-        ['implement', { mode: 'recheck' }, /^--recheck [^]* implement is blocked: no check/],
+        ['implement', { mode: 'recheck' }, /^--recheck [^]* implement signed off blocked[^]*no check/],
       ];
       for (const [step, how, fact] of cases)
         assert.match(await refusedWith(await ask(step, how), 409, `${step} ${JSON.stringify(how)}`), fact);

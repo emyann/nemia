@@ -93,6 +93,7 @@ export const STEP_EDGES: readonly StepEdge[] = [
   { from: 'exhausted', to: 'pending', event: 'a round on your word' },
   { from: 'blocked', to: 'running', event: 'tried again' },
   { from: 'blocked', to: 'over budget', event: 'its session settled, over its budget' },
+  { from: 'blocked', to: 'checking', event: 'its failed check run again, nothing committed since' },
   { from: 'unsigned', to: 'running', event: 'tried again' },
   { from: 'denied', to: 'running', event: 'tried again' },
   { from: 'failed (check)', to: 'running', event: 'tried again' },

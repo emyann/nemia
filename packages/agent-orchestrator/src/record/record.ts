@@ -280,7 +280,7 @@ export type StepRecord = {
   sent?: { card: string; at: string };
   workspace?: string;
   branch?: string;
-  check?: { taskId: string };
+  check?: { taskId: string; tip?: string };
   tries?: readonly EarlierTry[];
   /**
    * The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is

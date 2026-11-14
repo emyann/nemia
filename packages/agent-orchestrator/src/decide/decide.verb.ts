@@ -15,13 +15,23 @@ import { type Run } from '../record/record.ts';
 import type { SaidTo } from '../say/say.ts';
 import { acceptanceOf, approvalOf, type BranchStanding, type Round, type SpendOf } from '../status/status.ts';
 import type { StepSpec } from '../step/step.ts';
+import type { AssessRead } from '../tick/assess.ts';
 import { hasStarted, type Wait } from '../wait/wait.ts';
 import { roundOffers } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
 import { choicesOf, costLine, runCostLines, runCostWords, type DecideCommand, type Decision } from './decide.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
-import { answerLines, answerOf, overBudgetLine, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
+import {
+  answerLines,
+  answerOf,
+  overBudgetLine,
+  retriesNamed,
+  retryOffers,
+  retryRefusal,
+  type Retry,
+  type RetryAsk,
+} from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
 import {
   checkReportsRead,
@@ -266,6 +276,36 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 }
 
 /**
+ * The refusal of the first `nemia retry` a step's `needs` names that the store would refuse (`retriesNamed`, judged by `retryRefusal` on
+ * the reading `nemia decide` holds), said beside its answer (`answerLines`), or undefined.
+ */
+export const needsRefusedOf =
+  (steps: readonly StepSpec[], run: Run, read: AssessRead) =>
+  (name: string): string | undefined => {
+    const { phaseOf, signedOff, asked, verdictOf, asks, spendOf, checkKillOf, tipOf } = read;
+    const needs = signedOff(name)?.needs;
+    for (const { step, how } of needs ? retriesNamed(needs, run.id) : []) {
+      const refused = retryRefusal(
+        steps,
+        run,
+        step,
+        how,
+        phaseOf,
+        signedOff,
+        asked,
+        verdictOf,
+        asks,
+        () => false,
+        spendOf,
+        checkKillOf,
+        tipOf,
+      );
+      if (refused) return `the nemia retry its needs names is refused: ${refused}`;
+    }
+    return undefined;
+  };
+
+/**
  * `nemia decide`'s answer (`Decided`) off a run's one reading (`StepsReading`): its judgement — each step's word, the tries and rounds
  * due, what is left to decide and the decision itself, the runs it waits on and is held until, the checkout's holder, every try's view —
  * so it says nothing of the run another reader of the same reading does not. Where the branches stand is the reading's (`at.git`, the
@@ -299,7 +339,19 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
   const offers = [
     ...roundOffers(steps, run, d, spendOf),
     ...mergeOffers(place, steps, run, d, rounds, phaseOf, reader, asked, spendOf, verdictOf),
-    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf, () => landingDenies(run, place), checkKillOf),
+    ...retryOffers(
+      steps,
+      run,
+      d,
+      phaseOf,
+      reader,
+      asked,
+      spendOf,
+      verdictOf,
+      () => landingDenies(run, place),
+      checkKillOf,
+      judged.read.tipOf,
+    ),
   ];
   const answer: Decided = {
     run,
@@ -317,7 +369,7 @@ export const decidedOf = Effect.fn('decidedOf')(function* (at: StepsReading) {
     runCost: runCostLines(run, spendOf),
     runCostSaid: runCostWords(run, spendOf),
     answers,
-    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
+    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf, needsRefusedOf(steps, run, judged.read)),
     gates: saidBy(
       gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds, checkKillOf),
       (name) => approvalOf(run, name)?.actor,

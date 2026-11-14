@@ -380,7 +380,12 @@ test("the store paused, then paused at once, then resumed: nothing new starts, e
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;
       const rechecked = runRecord(ROOT, runs.checking.id).steps.work;
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
-      assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, cause: 'recheck', paused: true });
+      assert.deepEqual(rechecked.tries?.at(-1), {
+        taskId: rechecked.taskId,
+        check: { taskId: checked, tip: world().tip(runs.checking.repo ?? '', rechecked.branch ?? runs.checking.branch ?? '') },
+        cause: 'recheck',
+        paused: true,
+      });
       assert.equal(runRecord(ROOT, runs.ended.id).steps.work?.tries, undefined, 'no other session is tried either');
       assert.deepEqual(scheduledDues(), [MONDAY], 'the fire held by the pause starts on the pass after the resume');
       const words = pausedWords(await stage.runWith(b.e, pausedRead())) ?? '';

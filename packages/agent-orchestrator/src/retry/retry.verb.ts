@@ -32,6 +32,7 @@ import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { headsNow } from '../standing/standing.verb.ts';
 
 /**
  * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
@@ -57,7 +58,9 @@ const askOf = (run: Run, stepName: string, how: RetryHow, actor: Actor | undefin
  * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on `--recheck`, a step
  * that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config its harness refuses
  * (`tryRefused`). An ask `nemia pause --now` wrote for that try refuses it even once void (`pauseAskVoid`): the tick alone sets it aside,
- * by its name, which a person's ask written there first would lose. Like a cancellation, the ask is the person's own file, and
+ * by its name, which a person's ask written there first would lose. Where a blocked step's branch stands is asked of its place now
+ * (`headsNow`), once and only where a refusal reads it: a `--recheck` of it is taken only on the commit its failed check judged. Like a
+ * cancellation, the ask is the person's own file, and
  * the verb never writes the run's json, which the tick owns. What the person said goes in the ask, `message`, and nowhere else: the tick
  * carries it into the try's brief. An ask written by someone else between the look and the write is refused as the look would have
  * refused it, and a file at the ask's name that no pass reads as one is named (`strayAsk`).
@@ -78,6 +81,9 @@ export const retryRun = Effect.fn('retry')(function* (
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
+  const place = yield* PlaceService;
+  let heads: { read: Readonly<Record<string, string>> | undefined } | undefined;
+  const tipOf = (branch: string): string | undefined => (heads ??= { read: headsNow(run, place) }).read?.[branch];
   const refusal = (asks: readonly RetryAsk[]) =>
     retryRefusal(
       steps,
@@ -92,6 +98,7 @@ export const retryRun = Effect.fn('retry')(function* (
       blocked,
       spendOf,
       checkKills(views, run),
+      tipOf,
     );
 
   const refused = refusal((yield* (yield* RunDoor).asks.read(RunId.read(id))).asks);
@@ -101,7 +108,7 @@ export const retryRun = Effect.fn('retry')(function* (
     const names = steps.map((s) => s.name).join(', ');
     return yield* Effect.fail(new Invalid({ message: `run ${id} has no step ${stepName}: retry one of its steps (${names})` }));
   }
-  const denied = landingDenies(run, yield* PlaceService);
+  const denied = landingDenies(run, place);
   const home = yield* StoreRoot;
   const { own } = yield* toldOf(run, step);
   const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home, own));

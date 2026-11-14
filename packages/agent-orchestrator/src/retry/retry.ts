@@ -56,6 +56,7 @@ import { answersOr } from '../question/index.ts';
 import type { MostSpent, RaiseVerdictOf } from '../../contracts/raise.contract.ts';
 import type { RaiseBy } from 'objects';
 import type { OutOfMemoryKill } from '../../contracts/out-of-memory.contract.ts';
+import { blockedRecheck, blockedRecheckRead, type TipOf } from './blocked-recheck.ts';
 
 /**
  * What the kernel's OOM killer did to each step's current check, and whose memory ran out (`outOfMemory`, read by `checkKills` in
@@ -72,7 +73,8 @@ const machineKilled = (checkKillOf: CheckKillOf, step: string): boolean => check
  *
  * Only a try that is over and let nothing that waits on it run: its check did not pass, it ended without its
  * closeout, it signed off blocked, or its session failed or was stopped. `recheck` only where a check did not
- * pass, since nothing else has a check to run again, and never on an ending that lands on its check
+ * pass, since nothing else has a check to run again — and on a step that signed off blocked after one, with nothing committed since
+ * (`blockedRecheck`, off where its branch is now, `tipOf`), and never on an ending that lands on its check
  * (`landsOnCheck`): the run aborted the merge its check judged, so a recheck would judge the checkout
  * without it. And on a step with a `check:` whose session was ended at its budget (`budget exhausted`) once it
  * settled, its check never run: the work may be done — a land session cut off after its merge — and the check
@@ -142,6 +144,7 @@ function triedOn(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  tipOf?: TipOf,
 ): { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
@@ -168,7 +171,8 @@ function triedOn(
         followers.some(
           (f) => waitsAtGate(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf) || approvedUnfiled(f, run),
         )));
-  const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack);
+  const rechecks = blockedRechecks(run.steps[step.name], tried, phaseOf, tipOf);
+  const modes = modesOf(step, run, tried, settled, harnessAsks || sendsBack, rechecks);
   const raise =
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
@@ -183,16 +187,26 @@ function triedOn(
 
 /**
  * The ways a try of a step standing `tried` on its own work may be taken (`retryable`): `recheck` beside a session where a check did not
- * pass, or never ran on a session cut off at its budget, but on an ending whose merge the run aborted; a session alone from any other end,
- * or where its harness asks or its gate sends it back (`other`).
+ * pass, or never ran on a session cut off at its budget, but on an ending whose merge the run aborted, and on a blocked step whose failed
+ * check may run again (`rechecks`, `blockedRecheck`); a session alone from any other end, or where its harness asks or its gate sends it
+ * back (`other`).
  */
-const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean): RetryMode[] => {
+const modesOf = (step: StepSpec, run: Run, tried: StepStatus, settled: boolean, other: boolean, rechecks: boolean): RetryMode[] => {
+  if (rechecks) return ['continue', 'fresh', 'recheck'];
   if (tried === 'budget exhausted')
     return settled && step.check && !landingAborted(step, run) ? ['continue', 'fresh', 'recheck'] : ['continue', 'fresh'];
   if (tried === 'failed (check)') return landsOnCheck(step, run) ? ['continue', 'fresh'] : ['continue', 'fresh', 'recheck'];
   const ended = tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || tried === 'denied';
   return ended || (tried === 'blocked' && settled) || other ? ['continue', 'fresh'] : [];
 };
+
+/** Whether a step standing `tried` is blocked and its failed check may run again (`blockedRecheck`). */
+const blockedRechecks = (
+  record: StepRecord | undefined,
+  tried: StepStatus,
+  phaseOf: (taskId: string) => TaskPhase,
+  tipOf: TipOf | undefined,
+) => tried === 'blocked' && blockedRecheck(blockedRecheckRead(record, true, phaseOf, tipOf)).recheck;
 
 /** Whether the run took back the merge an ending that lands on its check staged (`landingDue`): nothing is staged for a check to judge. */
 const landingAborted = (step: StepSpec, run: Run): boolean => {
@@ -436,6 +450,8 @@ export const pauseAsksVoid = (
  *   to stop it first.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
  * @param checkKillOf What the kernel's OOM killer did to each step's current check (`checkKills`): a machine's kill is rechecked.
+ * @param tipOf Where each branch of the run is now (`AssessRead.tipOf`): a person's recheck of a blocked step is due only where its branch
+ *   is still at the commit its failed check was filed on (`blockedRecheck`). `retries:` never rechecks a blocked step on its own.
  */
 export function retriesDue(
   steps: readonly StepSpec[],
@@ -448,6 +464,7 @@ export function retriesDue(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   checkKillOf: CheckKillOf = () => undefined,
+  tipOf: TipOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
@@ -463,6 +480,7 @@ export function retriesDue(
       harnessBlocked,
       spendOf,
       verdictOf,
+      tipOf,
     );
     if (!record?.taskId) continue;
     const phase = phaseOf(record.taskId);
@@ -656,13 +674,14 @@ export function retryOffers(
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   landingDenied: () => readonly string[] = () => [],
   checkKillOf: CheckKillOf = () => undefined,
+  tipOf: TipOf = () => undefined,
 ): Offer[] {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return [];
   const lines: Offer[] = [];
   for (const step of steps) {
     const offer = (bare: string, before: string, after = '') =>
       lines.push({ step: step.name, command: bare, said: `${step.name}: ${before}:  ${bare}${after}` });
-    const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
+    const tried = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf, tipOf);
     const { status, modes, sendsBack, back } = tried;
     const reads = { phaseOf, closeoutOf, askedCloseout, verdictOf };
     const { raise: judged, retry: raise } = raiseGrounds(step, run, steps, reads, spendOf, tried);
@@ -690,7 +709,7 @@ export function retryOffers(
       continue;
     }
     const machine = machineOffered(step.name, status, modes, checkKillOf);
-    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, () =>
+    const recheck = recheckFirst(command, d.unfinishedCheck.includes(step.name), raise, spent, machine, blockedOffered(status, modes), () =>
       personsOffered(step, status, modes, verdictOf),
     );
     if (recheck) {
@@ -732,6 +751,9 @@ function personsRefusal(step: Pick<StepSpec, 'checkFailurePolicy'>, verdict: Ver
 const machineOffered = (step: string, status: StepStatus, modes: readonly RetryMode[], checkKillOf: CheckKillOf): boolean =>
   status === 'failed (check)' && modes.includes('recheck') && machineKilled(checkKillOf, step);
 
+/** Whether a blocked step is offered `--recheck` first: its failed check may run again (`retryable`, `blockedRecheck`). */
+const blockedOffered = (status: StepStatus, modes: readonly RetryMode[]): boolean => status === 'blocked' && modes.includes('recheck');
+
 /** A `failed (check)` step's refusal its policy names a person's, where `--recheck` is a way to try it (`personsRefusal`). Pure. */
 const personsOffered = (
   step: Pick<StepSpec, 'name' | 'checkFailurePolicy'>,
@@ -742,8 +764,16 @@ const personsOffered = (
   status === 'failed (check)' && modes.includes('recheck') ? personsRefusal(step, verdictOf(step.name)) : undefined;
 
 /**
+ * What `nemia decide` says of a blocked step whose failed check may run again (`blockedRecheck`): the branch is where that check judged it,
+ * so its session changed nothing since.
+ */
+const BLOCKED_RECHECK =
+  'its session signed off blocked after its check failed, and changed nothing since: run the check again, and nothing else, if what failed was not the work';
+
+/**
  * The offer that leads with `--recheck` (`retryOffers`), or undefined: a check the machine's OOM killer ended a process of (`machine`),
- * past a budget or not, its session continued beside it; a check that did not finish, past a budget or not; or a refusal
+ * past a budget or not, its session continued beside it; a blocked step whose failed check may run again (`blocked`, `blockedRecheck`),
+ * its session answered beside it; a check that did not finish, past a budget or not; or a refusal
  * its step's policy names a person's (`persons`, read only within the budget), its session continued beside it.
  */
 function recheckFirst(
@@ -752,8 +782,10 @@ function recheckFirst(
   raise: Raise | undefined,
   spent: string,
   machine: boolean,
+  blocked: boolean,
   persons: () => number | undefined,
 ): [string, string, string] | undefined {
+  if (blocked) return [`${command} --recheck`, BLOCKED_RECHECK, `  (or answer its session: ${command} --message "<answer>"${spent})`];
   if (machine)
     return [
       `${command} --recheck`,
@@ -854,6 +886,8 @@ export function overBudgetLine(steps: readonly StepSpec[], run: Run, d: Decision
  * A closeout that asks questions is answered with an `--answer` for each (`answersOr`), one that asks none with `--message`.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
+ * @param needsRefused The refusal of a `nemia retry` a blocked step's `needs` names (`retriesNamed`, judged by `retryRefusal`), said
+ *   beside its answer, so a command the store refuses is not left standing as the way on.
  */
 export function answerLines(
   steps: readonly StepSpec[],
@@ -863,6 +897,7 @@ export function answerLines(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   spendOf: SpendOf = () => undefined,
+  needsRefused: (step: string) => string | undefined = () => undefined,
 ): Record<string, string> {
   if (d.kind !== 'awaiting' || !honoursAsks(run)) return {};
   const lines: Record<string, string> = {};
@@ -871,7 +906,10 @@ export function answerLines(
     const reads = { phaseOf, closeoutOf, askedCloseout, verdictOf: () => undefined };
     const { retry: raise } = raiseGrounds(step, run, steps, reads, spendOf, tried);
     const answer = answersOr(step, closeoutOf(step.name), '--message "<answer>"');
-    if (tried.status === 'blocked' && tried.modes.length) lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} ${answer}`;
+    const refused = tried.status === 'blocked' ? needsRefused(step.name) : undefined;
+    const said = refused ? `  (${refused})` : '';
+    if (tried.status === 'blocked' && tried.modes.length)
+      lines[step.name] = `to answer it:  nemia retry ${run.id} ${step.name} ${answer}${said}`;
     else if (raise && closeoutOf(step.name)?.outcome === 'blocked') {
       lines[step.name] =
         `to answer it, its cap raised above ${aboveWord(raise)}:  nemia retry ${run.id} ${step.name} --budget <amount> ${answer}`;

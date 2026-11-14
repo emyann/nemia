@@ -146,6 +146,13 @@ export type InformerRead<T> = {
   only(ids: Iterable<string>): void;
 };
 
+/**
+ * The branches of `run`'s steps whose try behind carries the commit its check was filed on (`CheckTask.tip`): where a blocked step may
+ * have that check run again turns on each one's tip (`blockedRecheck`), so a judgement is kept on them too.
+ */
+const recheckBranches = (run: Run): string[] =>
+  Object.values(run.steps).flatMap((r) => (r.branch && r.tries?.at(-1)?.check?.tip ? [r.branch] : []));
+
 /** The tips of `branches` and `run`'s base branch, as `heads` gives them for its repository; none for a folder run or no branch. */
 const tipsOf = (
   run: Run,
@@ -311,7 +318,8 @@ export const informedJudgements = Effect.fn('informedJudgements')(function* (
     read.answered(run, one.judgement);
     if (out.has(run.id)) continue;
     out.set(run.id, one);
-    read.keep(run, one.judgement, one.judgement.asked.branches, git.heads, yield* restingOf(e, one.judgement));
+    const branches = [...one.judgement.asked.branches, ...recheckBranches(run)];
+    read.keep(run, one.judgement, branches, git.heads, yield* restingOf(e, one.judgement));
   }
   yield* read.commit();
   return { runs: out, views: fresh.views, unreadable: fresh.unreadable } satisfies Judgements;

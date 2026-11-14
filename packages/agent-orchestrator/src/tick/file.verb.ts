@@ -495,7 +495,8 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so;
  * any other's worktree is brought to its lockfile first (`depsBefore`), and where that install failed the check runs no command and ends
  * with no verdict (`checkArgv`'s `unprovisioned`).
- * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
+ * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run, and records the commit the step's
+ * branch was at as the pass read it (`CheckTask.tip`), which a recheck of a blocked step compares against (`blockedRecheck`).
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const home = yield* StoreRoot;
@@ -534,7 +535,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     const { factory, workflow } = keysOf(run);
     noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
   }
-  run.steps[name] = { ...record, check: { taskId } };
+  const tip = record.branch ? f.heads?.()?.[record.branch] : undefined;
+  run.steps[name] = { ...record, check: { taskId, ...(tip ? { tip } : {}) } };
 });
 
 /**

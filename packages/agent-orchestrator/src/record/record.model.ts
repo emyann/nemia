@@ -39,8 +39,12 @@ export type TaskId = Id<'TaskId'>;
 const FactoryName = foreignId('FactoryName');
 const CardName = foreignId('CardName');
 
-/** A check of a step's work, a task of its own (`checkTaskId`, record.ts:397). */
-const CheckTask = Schema.Struct({ taskId: TaskId.OnRead });
+/**
+ * A check of a step's work, a task of its own (`checkTaskId`, record.ts:397), and `tip`: the commit the step's branch was at when the run
+ * filed it, as the pass read it (`fileCheck`) — what a recheck of a blocked step compares against (`blockedRecheck`). Absent on a record
+ * written before the field, on a folder run, and where the pass read no heads.
+ */
+const CheckTask = Schema.Struct({ taskId: TaskId.OnRead, tip: Schema.optional(Schema.String) });
 
 /** Words said to a step before it was filed (`SaidBefore`, record.ts): when, and the words as said. */
 const SaidBefore = Schema.Struct({ at: Schema.String, text: Schema.String });

@@ -2,7 +2,7 @@
  * What should happen to a run now (`assess`), decided from the engine's view of each task and nothing else: what the tick files, and
  * whether the run is finished and what stopped it (`stoppedOnWord`). Pure; the tick acts on it, and the verbs and the screens ask it.
  */
-import { retriesDue, type CheckKillOf, type Retry, type RetryAsk } from '../retry/index.ts';
+import { retriesDue, type CheckKillOf, type Retry, type RetryAsk, type TipOf } from '../retry/index.ts';
 import type { RetryBriefing } from '../brief/index.ts';
 import {
   waitsOnCheckout,
@@ -139,6 +139,11 @@ export type AssessRead = {
    * has filed nothing. Left out, none, as where the process keeps no reading.
    */
   readonly needs?: readonly NeedHeld[];
+  /**
+   * Where each branch of the run's repository is now, as the reader read it (the pass's heads, `nemia decide`'s and the list's `git`): what
+   * a person's `--recheck` of a blocked step is judged on (`blockedRecheck`). Left out, none was read, and no blocked step is rechecked.
+   */
+  readonly tipOf?: TipOf;
 };
 
 /**
@@ -195,7 +200,7 @@ export function assess(read: AssessRead): Assessment {
   if (run.cancelledAt) return { ...nothing, unreachable: [], status: 'cancelled' };
 
   const status = routedWords(steps, run, new Map([...stood].map(([name, st]) => [name, st.status])), closeoutOf);
-  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf);
+  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, sessionBlocked, spendOf, checkKillOf, read.tipOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');

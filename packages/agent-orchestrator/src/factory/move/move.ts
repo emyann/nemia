@@ -18,6 +18,9 @@ export const FOLDER_STAYS = ['proposals', 'delegations'] as const;
 /**
  * What the target is given of the repository `source`, as `nemia factory add --repo` would be given it: the value the person typed for
  * it, else the URL the source recorded as its origin; a folder with neither is refused, naming the flag that gives it one.
+ * @param source The repository's folder on the source's machine.
+ * @param origin The URL the source recorded as its origin, or undefined where it recorded none.
+ * @param typed The value the person typed for it, or undefined where they typed none.
  */
 export const repoOnTarget: RepoOnTargetOf = (source, origin, typed) => {
   if (typed !== undefined) return { kind: 'given', repo: typed };
@@ -35,6 +38,9 @@ export const repoOnTarget: RepoOnTargetOf = (source, origin, typed) => {
 /**
  * Where the target mounts `volume`: the path the person typed for it, else its path on the source, `refusal` being the target's judgement
  * of the path chosen (`volumeRefusal`); a judged path is refused, saying why and naming the flag that gives another.
+ * @param volume The volume on the source, by its name and its path.
+ * @param typed The path the person typed for it, or undefined where they typed none.
+ * @param refusal The target's judgement of the path chosen, or undefined where it refuses none.
  */
 export const volumeOnTarget: VolumeOnTargetOf = (volume, typed, refusal) => {
   if (refusal !== undefined)
@@ -48,6 +54,7 @@ export const volumeOnTarget: VolumeOnTargetOf = (volume, typed, refusal) => {
 /**
  * A volume as a move names it — in `--volume <key>=<path>`, a refusal and the import's answer: its name where it has one, else its path
  * on the source.
+ * @param volume The volume, by its name and its path on the source.
  */
 export const volumeKey = (volume: Pick<Volume, 'name' | 'path'>): string => volume.name ?? volume.path;
 
@@ -69,6 +76,8 @@ export type OnTarget = {
 /**
  * The folder names of `source`'s repositories that change on the target, the old to the new (`onTarget.repos`): what a workflow's
  * repository and a schedule's are named by.
+ * @param source The factory on the source, by its repositories.
+ * @param repos Each repository's folder on the target, by its path on the source.
  */
 export const renamedFolders = (source: Pick<Factory, 'repos'>, repos: Readonly<Record<string, string>>): Record<string, string> =>
   Object.fromEntries(
@@ -87,6 +96,8 @@ const renamedIn = (values: Readonly<Record<string, string>>, renamed: Readonly<R
  * from its own tree, its volumes at their decided paths with their names and marks kept, the workflows' repositories and the schedules'
  * renamed where a repository's folder name changed, its instruction kept in the store where the export carried its words, its template
  * read where the target kept it, and no generation, which the door counts again. Everything else as read.
+ * @param source The factory as the source's file holds it.
+ * @param onTarget What the target decided of it.
  */
 export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
   const { generation: _counted, tree: _tree, origins: _origins, ...kept } = source;
@@ -117,6 +128,7 @@ export function factoryOnTarget(source: Factory, onTarget: OnTarget): Factory {
  * The factory `factory` as its file holds it, as text: every key of its spec but its name, which is its file's, and, made from a template,
  * neither its tree, which is its store's, nor the wiring its tree holds (its workflows, hires, revisions policy and workflows'
  * repositories), which travels in its folder.
+ * @param factory The factory to write.
  */
 export function fileTextOf(factory: Factory): string {
   const { name: _name, tree: _tree, ...file } = factory;
@@ -149,6 +161,8 @@ function wiringRenamed(text: string, renamed: Readonly<Record<string, string>>):
  * The files of a factory's folder as the target places them: its tree's wiring with its workflows' repositories renamed where a
  * repository's folder name changed (`renamed`), and the instruction's words the export carried, where it did, as the file the store keeps
  * them in; every other file as it was.
+ * @param files The files of the factory's folder, as the export carried them.
+ * @param how The folder names that change, the old to the new (`renamed`), and the instruction's words the export carried, where it did.
  */
 export function folderOnTarget(
   files: readonly TreeFile[],
@@ -166,7 +180,10 @@ export function folderOnTarget(
     : [...placed, { path: DEFAULT_INSTRUCTION, mode: 0o644, bytes: new TextEncoder().encode(how.instruction) }];
 }
 
-/** The line a moved card's body ends with: where it came from, its name there and its factory's. */
+/**
+ * The line a moved card's body ends with: where it came from, its name there and its factory's.
+ * @param moved Where the card came from (the source's name), its name there and its factory's.
+ */
 export const movedLine = (moved: { readonly from: string; readonly name: string; readonly factory: string }): string =>
   `Moved from ${moved.from}: the card ${moved.name} of the factory ${moved.factory}.`;
 
@@ -175,6 +192,8 @@ export const movedLine = (moved: { readonly from: string; readonly name: string;
  * and `queued:` (nothing starts before the person trusts the factory there) taken off, every other key kept, and its body ending with the
  * line that says where it came from (`movedLine`). Read and written by the inbox's own readers (`parseInboxCard`, `cardText`); refused as
  * they refuse a card that does not read.
+ * @param text The card's text on the source.
+ * @param moved Its name on the source, its factory's, and where it came from (the source's name), said in its last line.
  */
 export function cardMoved(text: string, moved: { readonly name: string; readonly factory: string; readonly from: string }): string {
   const card = parseInboxCard(`${moved.name}.md`, text);

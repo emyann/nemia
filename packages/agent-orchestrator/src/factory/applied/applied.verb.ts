@@ -78,7 +78,10 @@ import { ProposalDoor } from '../../proposal/proposal.store.ts';
  */
 export type RenderedAt = { name: string; version: string; params: Params; entries: Entry[]; dropped: readonly string[] };
 
-/** The `--set` words that give `params`, each `<key>=<value>`. */
+/**
+ * The `--set` words that give `params`, each `<key>=<value>`.
+ * @param params The factory's parameters, by name.
+ */
 export const setsOf = (params: FactoryTemplate['params']): string[] =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
 
@@ -130,7 +133,10 @@ const condition = (type: FactoryConditionType, status: boolean, reason: FactoryC
 /** No upgrade is under way, so nothing waits to be merged. */
 const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgrade is under way, so no change waits to be merged.');
 
-/** `render` as an answer that cannot fail: what it rendered, or, for whatever stopped it, its words as the one problem. */
+/**
+ * `render` as an answer that cannot fail: what it rendered, or, for whatever stopped it, its words as the one problem.
+ * @param render The render to run, which may fail or die.
+ */
 export const renderedOrNot = <R>(
   render: Effect.Effect<RenderedAt | Unrendered, unknown, R>,
 ): Effect.Effect<RenderedAt | Unrendered, never, R> =>
@@ -172,7 +178,11 @@ function conditionOf(
   return read;
 }
 
-/** Whether two parameter sets give the same value to every name. */
+/**
+ * Whether two parameter sets give the same value to every name.
+ * @param a One parameter set, by name.
+ * @param b The other parameter set, by name.
+ */
 export const sameParams = (a: FactoryTemplate['params'], b: FactoryTemplate['params']): boolean =>
   Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key, value]) => b[key] === value);
 
@@ -245,6 +255,13 @@ export type UpgradeMerge = {
  * where an owner with conflicts has a resolution that applied (`taken`), merged again with that owner's files taken from the tree for
  * the render's (`takenFromTree`), so its conflicts are settled by what the proposal wrote. Each owner's files are its own, so the order
  * its proposals applied in changes nothing. Pure.
+ * @param factory The factory's name, which the owners of conflicts are keyed under.
+ * @param base The files of the base, the template as last applied.
+ * @param ours The files of the factory's tree.
+ * @param theirs The files of the template rendered now.
+ * @param switched Whether the upgrade switches to another template, so the base takes no part.
+ * @param proposals The name of the proposal that resolves each owner's conflicts, by the owner's key.
+ * @param phases Each proposal's phase now, by its name, `gone` where the store holds it no more.
  */
 export function upgradeMerge(
   factory: string,
@@ -272,13 +289,20 @@ export function upgradeMerge(
   return { merge, owners: conflictOwners(merge.conflicts, factory, ...sides), resolved };
 }
 
-/** `choices` without those for a conflict an owner's proposal resolves (`owners`): the draft it was composed from, never the merge. */
+/**
+ * `choices` without those for a conflict an owner's proposal resolves (`owners`): the draft it was composed from, never the merge.
+ * @param choices The person's choices, by a conflict's address.
+ * @param owners The key of the owner whose proposal resolves each conflict, by its address.
+ */
 export const choicesUnowned = (
   choices: Readonly<Record<string, Choice>>,
   owners: ReadonlyMap<string, string>,
 ): Readonly<Record<string, Choice>> => Object.fromEntries(Object.entries(choices).filter(([at]) => !owners.has(at)));
 
-/** The owner a key names as a person reads it: `the Agent reviewer`. */
+/**
+ * The owner a key names as a person reads it: `the Agent reviewer`.
+ * @param key The owner's key (`ownerKey`).
+ */
 export const ownerSaid = (key: string): string => {
   const owner = ownerOfKey(key);
   return `the ${owner.kind} ${owner.name}`;

@@ -17,7 +17,11 @@ import { tried } from '../../runtime-client.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
 
-/** The object of the schedule `s`, which the factory `listing`'s file holds. */
+/**
+ * The object of the schedule `s`, which the factory `listing`'s file holds.
+ * @param s The schedule as listed.
+ * @param listing The factory's file, which reads, that holds the schedule.
+ */
 export const scheduleOf = (s: ScheduleListed, listing: Exclude<FactoryListing, { error: string }>): Schedule => {
   const since = listing.schedules[s.workflow]?.since ?? '';
   const spec: Schedule['spec'] = {

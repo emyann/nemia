@@ -28,20 +28,36 @@ export type FactoryInstruction = {
   stored: boolean;
 };
 
-/** The folder the store keeps the factory `name`'s instruction in, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name. */
+/**
+ * The folder the store keeps the factory `name`'s instruction in, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export const instructionFolder = (home: string, name: string): string => instructionFolderAt(home, name);
 
-/** The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`). */
+/**
+ * The folder the store `home` keeps the factory `name`'s instruction in (`instructionFolder`). Refused: a bad name (`Invalid`).
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function instructionFolderAt(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   return path.join(home, 'factories', name);
 }
 
-/** The file the store keeps the factory `name`'s instruction in: `NEMIA.md` in its folder (`instructionFolder`). */
+/**
+ * The file the store keeps the factory `name`'s instruction in: `NEMIA.md` in its folder (`instructionFolder`).
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export const instructionFile = (home: string, name: string): string => path.join(instructionFolder(home, name), DEFAULT_INSTRUCTION);
 
-/** The file the store `home` keeps the factory `name`'s instruction in (`instructionFile`). */
+/**
+ * The file the store `home` keeps the factory `name`'s instruction in (`instructionFile`).
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export const instructionFileAt = (home: string, name: string): string => path.join(instructionFolderAt(home, name), DEFAULT_INSTRUCTION);
 
 /** Whether the folder `inner` is `outer` or inside it, both as `path.resolve` spells them: on a separator, never a prefix. */
@@ -88,6 +104,7 @@ function outsideFolder(at: Extract<InstructionPlace, { in: 'folder' }>): string 
 /**
  * The instruction kept at `at`, read afresh: its words, or null where there is no file — and why a file there does not read. In the
  * store, a link is not read; in a folder, a link is followed only while its target stays inside the folder. Nothing is written.
+ * @param at Where the instruction is kept: in the store, or in a folder of the factory's, with its file.
  */
 export function readInstructionAt(at: InstructionPlace): InstructionRead {
   if (at.in === 'folder') {
@@ -105,6 +122,9 @@ export function readInstructionAt(at: InstructionPlace): InstructionRead {
 /**
  * Whether the store keeps text for the factory `name`, read or not: a file, or anything else, at its place, `file` where it was made from
  * a template (its tree's).
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param file The file the store keeps the text at; the store's own file by default.
  */
 export const storeKeeps = (home: string, name: string, file = instructionFile(home, name)): boolean =>
   fs.lstatSync(file, { throwIfNoEntry: false }) !== undefined;
@@ -114,6 +134,11 @@ export const storeKeeps = (home: string, name: string, file = instructionFile(ho
  * `NEMIA.md` where it was made from a template, else `storeFile`, the store's), and the file. A link at the file or at its folder is
  * replaced, never written through. Refused, writing nothing: blank words (`Invalid`), and a tree not rendered yet (`Conflict`), which a
  * write would leave unseeded.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param words The instruction's words, trimmed before they are written.
+ * @param file The file to write; the store's own file by default.
+ * @param storeFile The store's own file for the factory, which `file` differs from where it is a tree's.
  */
 export function writeInstructionText(
   home: string,
@@ -139,14 +164,23 @@ export function writeInstructionText(
   return file;
 }
 
-/** The instruction the store keeps for the factory `name` removed, at `file` where it was made from a template: whether there was one. */
+/**
+ * The instruction the store keeps for the factory `name` removed, at `file` where it was made from a template: whether there was one.
+ * @param home The store's root.
+ * @param name The factory's name.
+ * @param file The file to remove; the store's own file by default.
+ */
 export function clearInstructionText(home: string, name: string, file = instructionFile(home, name)): boolean {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });
   return true;
 }
 
-/** The store's folder for the factory `name` removed whole, as `nemia factory rm` removes the factory: the folder, or null for none. */
+/**
+ * The store's folder for the factory `name` removed whole, as `nemia factory rm` removes the factory: the folder, or null for none.
+ * @param home The store's root.
+ * @param name The factory's name.
+ */
 export function removeInstructionFolder(home: string, name: string): string | null {
   const folder = instructionFolder(home, name);
   if (!fs.lstatSync(folder, { throwIfNoEntry: false })) return null;

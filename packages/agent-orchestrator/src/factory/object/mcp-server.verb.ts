@@ -23,7 +23,13 @@ const specOf = (server: FactoryServer, masked = true): McpServer['spec'] => ({
   ...(server.oauth === undefined ? {} : { oauth: { ...server.oauth } }),
 });
 
-/** The object of the server `s` of the factory `namespace`, filed at `filedAt`, its states unread for `unread` where they were. */
+/**
+ * The object of the server `s` of the factory `namespace`, filed at `filedAt`, its states unread for `unread` where they were.
+ * @param s The server as the factory lists it.
+ * @param namespace The factory's name.
+ * @param filedAt When the server was filed, its object's creation time.
+ * @param unread Why the servers' states were not read, or null where they were.
+ */
 export const mcpServerOf = (s: ServerListed, namespace: string, filedAt: string, unread: string | null): McpServer => {
   const spec = specOf(s);
   const error = s.error ?? unread ?? undefined;

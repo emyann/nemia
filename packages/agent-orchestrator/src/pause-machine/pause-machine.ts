@@ -29,18 +29,31 @@ export const PAUSE_EVENTS: Readonly<Record<PauseEvent, string>> = {
   lapse: 'the process that holds it ended',
 };
 
-/** The mode a pause that stands is in, by the timeout it gives a call in flight: none, 0, or another. */
+/**
+ * The mode a pause that stands is in, by the timeout it gives a call in flight: none, 0, or another.
+ * @param pause The pause as its file reads, of which the timeout alone is read.
+ */
 export const pausedModeOf = (pause: { timeoutMs?: number }): PausedMode =>
   pause.timeoutMs === undefined ? 'holding' : pause.timeoutMs === 0 ? 'cut' : 'draining';
 
-/** The mode a store is in by the pause read from its file (`pausedModeOf`); `none` where no pause stands. */
+/**
+ * The mode a store is in by the pause read from its file (`pausedModeOf`); `none` where no pause stands.
+ * @param pause The pause as its file reads, or null where the store has none.
+ */
 export const pauseModeOf = (pause: { timeoutMs?: number } | null): PauseMode => (pause === null ? 'none' : pausedModeOf(pause));
 
-/** The event a pause put with `timeoutMs` is: none, one, or 0. */
+/**
+ * The event a pause put with a timeout is: none, one, or 0.
+ * @param timeoutMs How long the pause gives a call in flight before it is cut, in milliseconds; undefined for a pause that cuts none.
+ */
 export const putEvent = (timeoutMs: number | undefined): PauseEvent =>
   timeoutMs === undefined ? 'put' : timeoutMs === 0 ? 'put-now' : 'put-timeout';
 
-/** What `event` does to a store in the mode `from` (contracts/pause-machine.contract.ts). */
+/**
+ * What an event does to a store in a mode (contracts/pause-machine.contract.ts).
+ * @param from The mode the store is in, read from its pause's file now.
+ * @param event What is asked of the pause: a put, a cut, a resume, or its holder's end.
+ */
 export const pauseMove: PauseMoved = (from: PauseMode, event: PauseEvent): PauseMove => {
   if (event === 'put' || event === 'put-timeout' || event === 'put-now') {
     if (from !== 'none') return { kind: 'refused', as: 'Conflict' };

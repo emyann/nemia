@@ -14,6 +14,13 @@ orchestrator, the api, the board and the client import it through its one entry,
 
 ## Traps
 
+- **A field says what it is on its Schema, never only in the comment above it**: `.annotate({ description: '…' })` on the field's
+  schema, inside `Schema.optionalKey(…)` for an optional one, since the document a client, the reference page and the MCP port's tools
+  read holds no comment. A field that is another schema whole (a bare `$ref` in the document) keeps no word of its own, so that
+  schema's own `description` says it. On a schema that takes a `.check(…)`, the description goes before the check: after it, the
+  document drops it. `test/described.test.ts` counts the properties still said nowhere, per schema, in `test/described.baseline.json`,
+  which only shrinks: describe a field and lower its count in the same commit (`node test/described.test.ts --print` prints today's).
+
 - **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same
   `apiVersion`: a reader of an older store, or an older client, reads the object still. A change that breaks a reader is a new
   version beside this one, never an edit of it.

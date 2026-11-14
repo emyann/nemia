@@ -111,6 +111,12 @@ holds what every change needs.
   the orchestrator's (a written state, marks that combine, a state worked out), objects' (fields served together), the guards' (a guard
   with a baseline). The runtime, the api, the board and the cli have none yet: the runtime's lifecycle (`core/lifecycle.ts`) is a table
   its contract trusts and does not prove, so it is no example of the proof.
+- **What a thing is for is said where its reader finds it.** An exported function's doc names each of its parameters, `@param <name>`
+  and what it is for, in the signature's order, and no tag for a name it has not (`tools/guards/test/params.test.ts`); `@returns` is
+  asked of nobody, the signature's type says it. A field of a served object says what it is on its Schema, `.annotate({ description
+  })`, since the document a client, the reference page and the MCP port's tools read holds no comment
+  (`packages/objects/test/described.test.ts`). Each has a baseline of what was written before, which only shrinks: a file you change
+  is left owing less. A comment inside a body is still refused (`comments/no-code-comments`).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.

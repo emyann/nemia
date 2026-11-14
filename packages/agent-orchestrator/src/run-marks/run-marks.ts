@@ -39,7 +39,10 @@ export const RUN_MARK_EVENTS: Readonly<Record<RunMarkEvent, string>> = {
   unprune: 'its prune taken back',
 };
 
-/** The marks a run carries, by which of its three files are there: called off, pruned, held. Every set of them is some mark. */
+/**
+ * The marks a run carries, by which of its three files are there: called off, pruned, held. Every set of them is some mark.
+ * @param run Which of the three marks the run carries, each a boolean.
+ */
 export const runMarkOf = (run: Parts): RunMark => {
   if (run.cancelled) {
     if (run.pruned) return run.held ? 'called-off-pruned-held' : 'called-off-pruned';
@@ -62,7 +65,11 @@ const holdOn = (at: Parts): RunMarkMove => {
   return at.held ? refused('held') : to({ ...at, held: true });
 };
 
-/** What `event` does to a run carrying the marks `from` (contracts/run-marks.contract.ts). */
+/**
+ * What an event does to a run carrying some marks (contracts/run-marks.contract.ts).
+ * @param from The marks the run carries, read from its files now.
+ * @param event What is asked of the run: a hold, a lift, a call-off, a prune, or a prune taken back.
+ */
 export const runMarkMove: RunMarkMoved = (from: RunMark, event: RunMarkEvent): RunMarkMove => {
   const at = PARTS[from];
   if (event === 'hold') return holdOn(at);

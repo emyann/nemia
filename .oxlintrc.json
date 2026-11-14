@@ -384,7 +384,7 @@
       "rules": { "typescript/no-non-null-assertion": "error" }
     },
     {
-      "files": ["apps/api/src/**"],
+      "files": ["apps/api/src/**", "apps/api/bin/**"],
       "excludeFiles": ["apps/api/src/**/*.test.ts"],
       "rules": { "typescript/no-non-null-assertion": "error" }
     },

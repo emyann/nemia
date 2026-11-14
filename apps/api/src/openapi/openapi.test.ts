@@ -87,7 +87,26 @@ test('the document is the one Effect writes of the Api, and holds, for each of K
     paths: Record<string, { get?: unknown; post?: unknown; put?: unknown }>;
     components: { schemas: Record<string, unknown> };
   };
-  assert.deepEqual(doc, JSON.parse(JSON.stringify(OpenApi.fromApi(Api))), 'the document is OpenApi.fromApi(Api), as JSON');
+  const unworded = (document: unknown): unknown => {
+    const copy = structuredClone(document) as { paths: Record<string, Record<string, { summary?: string; description?: string }>> };
+    for (const item of Object.values(copy.paths))
+      for (const op of Object.values(item)) {
+        delete op.summary;
+        delete op.description;
+      }
+    return copy;
+  };
+  assert.deepEqual(
+    unworded(doc),
+    unworded(JSON.parse(JSON.stringify(OpenApi.fromApi(Api)))),
+    'the document is OpenApi.fromApi(Api), as JSON, but for what each operation is said as',
+  );
+  const listed = (doc.paths['/api/runs']?.get ?? {}) as { summary?: string; description?: string };
+  assert.equal(listed.summary, 'nemia ls', "an operation a command links takes the command's line");
+  assert.ok(listed.description?.includes('`ls`'), 'and names its tool on the MCP port under it');
+  const direct = (doc.paths['/api/namespaces/{namespace}/runs']?.get ?? {}) as { summary?: string; description?: string };
+  assert.equal(direct.summary, 'runs.list', 'one no command links keeps its id');
+  assert.equal(direct.description, undefined);
   const GET_PATHS = {
     Run: '/api/runs/{name}',
     Card: '/api/namespaces/{namespace}/cards/{name}',
@@ -152,11 +171,15 @@ test("the card's labels are a POST whose body is a LabelEdit and whose answer a 
     { $ref: '#/components/schemas/Labelled' },
     'answers a Labelled',
   );
+  const { description: said, ...labels } = (doc.components.schemas['RunMetadata']?.properties?.['labels'] ?? {}) as {
+    description?: string;
+  };
   assert.deepEqual(
-    doc.components.schemas['RunMetadata']?.properties?.['labels'],
+    labels,
     { type: 'object', additionalProperties: { type: 'string' } },
     "a run's labels are a map of strings, the one index of extra keys the document allows",
   );
+  assert.ok(typeof said === 'string' && said.length > 0, 'and the field says what it is, for a client that reads the schema alone');
 });
 
 /** Each of the run's named actions in the document: its method on its path, the status it answers, and the component its body is. */

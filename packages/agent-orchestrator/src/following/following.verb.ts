@@ -171,6 +171,9 @@ const onward = (o: Onward, at: FollowedAttempt | undefined, cursor: number, read
  *
  * Refused (`Missing`) for a run the store has not and a step with no task filed; fails with the feed's refusal of its cursor; dies of what
  * the engine fails with but a refusal to stream.
+ * @param runId The run's id.
+ * @param step The step's name.
+ * @param after A cursor a read of the step's transcript gave, or undefined to follow from now.
  */
 export const followStep = (runId: string, step: string, after?: string): Stream.Stream<Moment, Refusal, EngineService> =>
   Stream.unwrap(
@@ -227,6 +230,8 @@ const taskNowOf = (e: Engine, taskId: string): Effect.Effect<StepNow> =>
  * again every `waitMs` (`TASK_WAIT_MS`). Any task: what it is for is its caller's.
  *
  * Dies of what the engine fails with but a refusal to stream, as `followStep` does.
+ * @param taskId The task's id.
+ * @param after A cursor a read of the task's transcript gave, or undefined to follow from now.
  */
 export const followTask = (
   taskId: string,

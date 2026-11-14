@@ -36,7 +36,11 @@ export type EngineForgetting = {
   marker?: string;
 };
 
-/** The share of `answer` that is the tasks `ids`: a refusal of the whole call is every run's. */
+/**
+ * The share of `answer` that is the tasks `ids`: a refusal of the whole call is every run's.
+ * @param answer What the engine answered of a call to forget tasks.
+ * @param ids The ids of the run's tasks.
+ */
 export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): EngineForgetting {
   const own = new Set(ids);
   const tasks = answer.tasks.filter((t) => own.has(t.taskId));
@@ -55,10 +59,16 @@ export function forgettingOf(answer: EngineAnswer, ids: readonly string[]): Engi
   };
 }
 
-/** Whether the engine has nothing left to forget of the run: no task waits, none was refused, and the call was not refused. */
+/**
+ * Whether the engine has nothing left to forget of the run: no task waits, none was refused, and the call was not refused.
+ * @param f What the engine did with the run's tasks.
+ */
 export const forgettingDone = (f: EngineForgetting): boolean => !f.waiting.length && !f.refused.length && f.refusal === undefined;
 
-/** Whether the engine refused to forget something of the run: a task by name, or the whole call. */
+/**
+ * Whether the engine refused to forget something of the run: a task by name, or the whole call.
+ * @param f What the engine did with the run's tasks.
+ */
 export const forgettingRefused = (f: EngineForgetting): boolean => f.refused.length > 0 || f.refusal !== undefined;
 
 /** `n` tasks, in words. */
@@ -105,6 +115,7 @@ const refusalWords = (f: EngineForgetting, marker: string, dry: boolean): string
  * What `nemia rm` says the engine did with the run `id`'s tasks, or, `dry`, what `nemia prune` says it would: the tasks forgotten with
  * their journals' size and feed lines, what their harness keeps, what waits and why, and what the engine refused with the marker it
  * leaves, which only a person removes. Empty when the engine keeps no task of the run.
+ * @param f What the engine did with the run's tasks, or would.
  */
 export function engineWords(f: EngineForgetting, { id, dry = false }: { id: string; dry?: boolean }): string {
   const marker = f.marker ?? `the marker of ${id}`;
@@ -112,6 +123,10 @@ export function engineWords(f: EngineForgetting, { id, dry = false }: { id: stri
   return [forgotWords(f, id, dry), left, waitWords(f, marker, dry), refusalWords(f, marker, dry)].filter(Boolean).join('; ');
 }
 
-/** What `nemia prune` says of the run `id` whose tasks it could not count, since reading it as `nemia rm` does failed with `why`. */
+/**
+ * What `nemia prune` says of the run `id` whose tasks it could not count, since reading it as `nemia rm` does failed with `why`.
+ * @param id The run's id.
+ * @param why Why the read failed, in words.
+ */
 export const uncountedWords = (id: string, why: string): string =>
   `${id}: what nemia rm would forget of the engine's tasks of it was not counted: ${why}`;

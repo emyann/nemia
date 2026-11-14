@@ -16,6 +16,7 @@ const STANDS_ORDER = ['yours', 'failed', 'working', 'toCome'] as const;
 /**
  * The box: the final steps the run will run, in its order, once every one is done and gave; else the first of `STANDS_ORDER` a step stands
  * as, linked to the first step that does (none where none does: to come with nothing to come).
+ * @param steps The run's steps as the box reads them (`resultStepsOf`), in the run's order.
  */
 export const resultOf: ResultOf = (steps) => {
   const owed = steps.filter((s) => s.final && s.stands !== 'skipped');
@@ -24,7 +25,10 @@ export const resultOf: ResultOf = (steps) => {
   return { kind: 'stands', why, step: steps.find((s) => s.stands === why)?.name ?? null };
 };
 
-/** Where a step stands for the box, by its state: done, skipped, waiting on a person, failed, at work, else to come. */
+/**
+ * Where a step stands for the box, by its state: done, skipped, waiting on a person, failed, at work, else to come.
+ * @param state The step's state, as the run's page draws it.
+ */
 export function standsOf(state: StepState): Stands {
   if (satisfiesAfter(state)) return 'done';
   if (state === 'skipped') return 'skipped';
@@ -50,6 +54,7 @@ const gaveOf = (step: StepView): boolean => {
  * The run's steps as the box reads them, in the run's order: each final where no `after` or route edge leaves it (a loop's edge back
  * leads to no step after it), where it stands (`standsOf`), and whether it gave: its shown try's closeout, or, for a node that is no
  * plain step — a workflow node, which files a card, or a condition, which takes a route — what it did, which no session signs off.
+ * @param view The run's detail: its graph, its steps, its calling off and its hold.
  */
 export function resultStepsOf(view: RunDetail): ResultStep[] {
   const before = new Set(view.graph.edges.filter((e) => e.kind !== 'loop').map((e) => e.from));
@@ -69,6 +74,7 @@ type RunEnd = 'calledOff' | 'ended';
  * How the run ended, where it has: called off (its status, or the moment it was), else ended once its status is one a run ends in
  * (succeeded or failed); null for a run still going. What none of its steps says once it stopped: a step a called-off run never ran
  * reads as still to come.
+ * @param view The run's detail: its status and when it was called off, null where it was not.
  */
 export function runEndOf(view: Pick<RunDetail, 'status' | 'cancelledAt'>): RunEnd | null {
   if (view.cancelledAt !== null || view.status === 'cancelled') return 'calledOff';

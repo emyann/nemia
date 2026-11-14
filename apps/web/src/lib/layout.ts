@@ -18,6 +18,8 @@ export type Point = { x: number; y: number };
  * A run's steps for the layering, off the graph the api gives: each step, in the run's order, with the steps its `after` and `route`
  * edges come from. A `loop` edge is left out: it points back, so laid out it would open a column right of the step it
  * returns to — or read as a cycle — for an edge that orders nothing.
+ * @param names The run's steps, by name, in the run's order.
+ * @param edges The graph's edges, each with where it comes from, where it goes and its kind.
  */
 export function stepsOf(names: readonly string[], edges: ReadonlyArray<{ from: string; to: string; kind: string }>): StepEdges[] {
   return names.map((name) => ({
@@ -35,6 +37,7 @@ export const ROW_HEIGHT = 150;
  * The columns, left first, each top to bottom. An `after` naming anything but one of the run's own steps draws nothing. Each step is
  * taken once, when the last step it waits on has been (Kahn's algorithm), so every edge is visited once and the layering ends whatever
  * `after` says. Throws, naming the steps it could not place, on a cycle: a step never taken is in or behind one.
+ * @param steps The run's steps, each with the steps it waits on.
  */
 export function layers(steps: readonly StepEdges[]): string[][] {
   const order = new Map<string, number>();
@@ -83,7 +86,10 @@ export function layers(steps: readonly StepEdges[]): string[][] {
   return columns;
 }
 
-/** Each step's top-left corner: the first column at x = 0, every column centred on y = 0. */
+/**
+ * Each step's top-left corner: the first column at x = 0, every column centred on y = 0.
+ * @param steps The run's steps, each with the steps it waits on.
+ */
 export function layout(steps: readonly StepEdges[]): Map<string, Point> {
   const at = new Map<string, Point>();
   layers(steps).forEach((column, c) =>
@@ -92,7 +98,10 @@ export function layout(steps: readonly StepEdges[]): Map<string, Point> {
   return at;
 }
 
-/** The room a layout takes: a column's width per column, and a row's height per row of its tallest column. */
+/**
+ * The room a layout takes: a column's width per column, and a row's height per row of its tallest column.
+ * @param at Each step's top-left corner, as `layout` gives it.
+ */
 export function extentOf(at: ReadonlyMap<string, Point>): { width: number; height: number } {
   if (!at.size) return { width: 0, height: 0 };
   const xs = [...at.values()].map((p) => p.x);

@@ -4,6 +4,7 @@ import type { StepAttempts } from './api/tries.ts';
 /**
  * The release and harness a session ran on: `v1.2.0 · <harness> <version>`, `checkout · <harness> <version>`, or `not recorded` where
  * its attempt recorded neither — one an older runtime ran, or one whose runner could not say. Nothing for a step with no attempt.
+ * @param latest The step's latest attempt: its release and its harness; null or undefined for a step with no attempt.
  */
 export function ranOnWords(latest: Pick<NonNullable<StepAttempts['latest']>, 'release' | 'harness'> | null | undefined): string | null {
   if (!latest) return null;

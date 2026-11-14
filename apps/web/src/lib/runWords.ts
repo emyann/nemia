@@ -77,6 +77,7 @@ const stateOn = (row: WaitingRow, step: CodedStep): StepState => stepState(step,
  * What `row` waits on a person for: a hold only a person lifts first; then the first of its steps, in the run's order, that the api
  * says waits on a person (`waitingOnYou`), by its kind (`kindOn`); then a run it waits on that never lands without a person. None for a
  * row that waits on nobody, and for one whose waiting step says a word the board has no kind for.
+ * @param row The run's row: its steps with their codes, its hold, the run it waits on and the steps that wait on you.
  */
 export function waitOf(row: WaitingRow): Wait | null {
   const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step))).length;
@@ -99,16 +100,25 @@ function wordsOf(kind: WaitKind): WaitWords {
   return words?.tag && words.sentence && words.open ? { tag: words.tag, sentence: words.sentence, open: words.open } : ANY_WAIT;
 }
 
-/** The sentence of a wait of `kind`. */
+/**
+ * The sentence of a wait of `kind`.
+ * @param wait The wait: its kind, the step that waits, and how many steps are done.
+ */
 export const sentenceOf = (wait: Wait): string => wordsOf(wait.kind).sentence(wait);
 
-/** The one sentence a waiting run says: its wait's (`waitOf`), or that it waits on you where the board has no kind for it. */
+/**
+ * The one sentence a waiting run says: its wait's (`waitOf`), or that it waits on you where the board has no kind for it.
+ * @param row The run's row: its steps with their codes, its hold, the run it waits on and the steps that wait on you.
+ */
 export function waitSentence(row: WaitingRow): string {
   const wait = waitOf(row);
   return wait ? sentenceOf(wait) : ANY_WAIT.sentence({ step: null, done: 0 });
 }
 
-/** The few words of a waiting run's tag: what is asked of the person (`approve land`). */
+/**
+ * The few words of a waiting run's tag: what is asked of the person (`approve land`).
+ * @param row The run's row: its steps with their codes, its hold, the run it waits on and the steps that wait on you.
+ */
 export function waitTag(row: WaitingRow): string {
   const wait = waitOf(row);
   return wait ? wordsOf(wait.kind).tag(wait) : ANY_WAIT.tag({ step: null, done: 0 });
@@ -136,6 +146,7 @@ function readAt(row: OpenedRow, gated: string | null): string | null {
  * The words of a waiting card's button, by the kind of its wait (`waitOf`): `Read the design` at a gate, `Read the question`,
  * `Read the check`, and `Open the run` for every other kind and for a wait the board has no kind for. The button opens the run's page
  * whatever it says.
+ * @param row The run's row, each step with its task, none for a step not filed yet.
  */
 export function openWord(row: OpenedRow): string {
   const wait = waitOf(row);
@@ -150,6 +161,7 @@ type Now = { word: string; note: string };
  * steps as the note (`implement (2 of 4)`); on a run a person holds whose step is not started, the hold's word, which is why it has not
  * (`held`, the step itself drawn as any step to come). None for a run whose every step is done. It says no duration: the row's Clock
  * column says how long the run has been at work, and a second time in the note beside it read as one word and said the same thing twice.
+ * @param row The run's row: its steps with their codes, its calling off and its hold.
  */
 export function nowOf(row: WaitingRow): Now | null {
   const held = row.holding != null;
@@ -164,6 +176,8 @@ export function nowOf(row: WaitingRow): Now | null {
 /**
  * How long a waiting run has waited on a person this time, at `asOf`, to the minute (`durationWords`): since `waitingSince`, never the
  * sum of its waits. Null for a run the answer dates no present wait of.
+ * @param run The run: since when it has waited on a person this time, null where the answer dates no present wait.
+ * @param asOf The instant the wait is measured to.
  */
 export const presentWait = (run: { waitingSince: string | null }, asOf: Date): string | null =>
   run.waitingSince === null ? null : durationWords(asOf.getTime() - Date.parse(run.waitingSince), 'minute');
@@ -176,13 +190,20 @@ export const JUST_NOW = 'just now';
  * (`3 minutes ago`, `2 hours ago`, `3 days ago`, `4 months ago`, `2 years ago`). date-fns's `formatDistanceStrict`, which rounds to the
  * nearest unit and writes no `about`, unlike `formatDistance`. A distance has no time zone: the whole instant on hover is where the
  * reader's zone shows (`instantWhole`). `UNREADABLE` where `at` or `now` does not parse.
+ * @param at The time that was.
+ * @param now The instant it is now.
  */
 export function agoWords(at: Date, now: Date): string {
   if (unreadable(at, now)) return UNREADABLE;
   return Math.abs(now.getTime() - at.getTime()) < 60_000 ? JUST_NOW : formatDistanceStrict(at, now, { addSuffix: true });
 }
 
-/** A run's steps as the rail draws them: each by its name and its state. */
+/**
+ * A run's steps as the rail draws them: each by its name and its state.
+ * @param steps The run's steps, each with its name and its codes.
+ * @param cancelled Whether the run was called off.
+ * @param held Whether a person holds the run.
+ */
 export const railStates = (
   steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
@@ -190,8 +211,13 @@ export const railStates = (
 ): Array<{ name: string; state: StepState; on: WaitOn | null }> =>
   steps.map((step) => ({ name: step.name, state: stepState(step, cancelled, held), on: step.on }));
 
-/** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
- * check verified told from one done on its own word. */
+/**
+ * What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
+ * check verified told from one done on its own word.
+ * @param steps The run's steps, each with its name and its codes.
+ * @param cancelled Whether the run was called off.
+ * @param held Whether a person holds the run.
+ */
 export const railSaid = (
   steps: ReadonlyArray<Pick<RunView['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>,
   cancelled: boolean,
@@ -201,13 +227,21 @@ export const railSaid = (
     .map((step) => `${step.name} ${stateWordsOf(step.state, step.on, held).rail}`)
     .join(', ');
 
-/** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
+/**
+ * A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`.
+ * @param name The step's name.
+ * @param state The step's state.
+ * @param on What thing the step waits on (`WaitOn`), or null where it waits on no thing.
+ * @param held Whether a person holds the run.
+ */
 export const barSaid = (name: string, state: StepState, on: WaitOn | null, held: boolean): string =>
   `${name}, ${stateWordsOf(state, on, held).rail}`;
 
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each
  * empty for a date that does not parse, which the writers that compose them say as `UNREADABLE` before they ask.
+ * @param at The date to say.
+ * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
 export function dateParts(at: Date, timeZone?: string): { year: string; month: string; day: string } {
   if (unreadable(at)) return { year: '', month: '', day: '' };
@@ -219,6 +253,9 @@ export function dateParts(at: Date, timeZone?: string): { year: string; month: s
  * When something of a run happened, as a person reads it where they are, to the minute, on a 12-hour clock: the time alone on the day
  * of `now` (`1:11 PM`), the day and the month before it on another (`11 Oct 1:11 PM`), and in another year the day alone, with its
  * year (`31 Dec 2025`). Its spaces are plain ones. `UNREADABLE` where `at` or `now` does not parse.
+ * @param at The time it happened.
+ * @param now The instant it is now, which sets how much of the date is said.
+ * @param timeZone The IANA time zone to say it in, or undefined for the person's own.
  */
 export function whenWords(at: Date, now: Date, timeZone?: string): string {
   if (unreadable(at, now)) return UNREADABLE;

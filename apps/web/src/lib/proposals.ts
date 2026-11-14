@@ -9,7 +9,10 @@ import type { ProposalBefore, ProposalOffers, ProposalOffersOf, ProposalOrderFac
 
 export type { ProposalOffers } from '../../contracts/proposal.contract.ts';
 
-/** Approve while it waits; Decline while it waits or stands approved and not yet applied (the verbs' own refusals, said before a click). */
+/**
+ * Approve while it waits; Decline while it waits or stands approved and not yet applied (the verbs' own refusals, said before a click).
+ * @param phase The proposal's phase.
+ */
 export const proposalOffers: ProposalOffersOf = (phase: ProposalPhase): ProposalOffers => ({
   approve: phase === 'waiting',
   decline: phase === 'waiting' || phase === 'approved',
@@ -28,7 +31,10 @@ const orderFactsOf = (proposal: Proposal): ProposalOrderFacts => {
   return { waiting: proposal.status.phase === 'waiting', at: Number.isFinite(at) && at >= 0 ? at : 0 };
 };
 
-/** `list` in the order the factory page lists it (`proposalBefore`), a new array; the api's order kept where nothing tells two apart. */
+/**
+ * `list` in the order the factory page lists it (`proposalBefore`), a new array; the api's order kept where nothing tells two apart.
+ * @param list The factory's proposals, in the api's order.
+ */
 export const proposalsInOrder = (list: readonly Proposal[]): Proposal[] =>
   [...list].sort((a, b) => proposalBefore(orderFactsOf(a), orderFactsOf(b)));
 
@@ -38,5 +44,6 @@ export const DELEGABLE: readonly string[] = PROPOSABLE_KINDS.map((kind) => RESOU
 /**
  * The hue a proposal's *Widens access* mark and its widening changes are drawn in: `yours` while it waits on the person, who judges it,
  * and grey once it is judged, since `yours` says only what waits on them.
+ * @param phase The proposal's phase.
  */
 export const widensHue = (phase: ProposalPhase): Hue => (phase === 'waiting' ? 'yours' : 'grey');

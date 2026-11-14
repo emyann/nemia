@@ -34,3 +34,6 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   glossary table, never a count (`test/glossary.test.ts`).
 - **`test/closed-state.test.ts` has no baseline**: no field at a door says a state or a kind as a `string`; a new one is typed as a
   closed union named in its glossary. Today's open fields, which should be none: `node tools/guards/test/closed-state.ts`.
+- **A guard to copy from**: `test/contract-first.test.ts` with `test/contract-first.baseline.ts`. Its judgement is a pure function over
+  paths and texts, so its refusal is proven on a planted fixture and never on the tree; what the tree still owes is named in a baseline
+  that only shrinks, and an entry for something clean now is refused too.

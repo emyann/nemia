@@ -16,6 +16,22 @@ this CLI serves that `KEPT` does not name (`heldBreaks`). A test reaches a store
 start, the `facts` the api answers the client to word (`factsOf`, `startedFacts`), of a removal its `forgot` (`test/forgetting.ts`); the
 lines a person reads are the client's, held by its tests.
 
+## Files to copy from
+
+Written to the shape `docs/architecture.md` states as rule 5, each held by tests that fail when it is bent. Start a new one from the one
+of its kind, never from an older file that looks alike:
+
+- **A state that is written** (one file or a few, moved by verbs and the pass): the store's pause.
+  `contracts/pause-machine.contract.ts` declares the words and the laws and reads nothing of `src`; `src/pause-machine/pause-machine.ts`
+  is the mode read afresh, the one move function, and what a mode means as tables; `src/pause/pause.store.ts` alone writes the file and
+  asks the function before each write; `src/pause/pause.store.test.ts` walks every mode and event against both, and refuses another
+  writer.
+- **A state written as several marks that combine**: a person's marks on a run. `contracts/run-marks.contract.ts`,
+  `src/run-marks/run-marks.ts` (a word for every set of the marks, so no set of files is unreadable), `src/record/marks.store.test.ts`.
+- **A state worked out on every pass and never written**: whether a run has ended. `contracts/run-ending.contract.ts` and
+  `src/run-ending/run-ending.ts`: one table over the closed type, which each reader asks in place of a list of its own. No move function
+  and no writer: there is nothing to write.
+
 ## Folders
 
 - **The source (`src`, `bin`, `place`) is under `noUncheckedIndexedAccess`, and lint refuses a `!`** there (`.oxlintrc.json`, held by

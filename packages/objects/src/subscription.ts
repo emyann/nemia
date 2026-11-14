@@ -20,6 +20,9 @@ export const SubscriptionSpec = Schema.Struct({
   selectors: Schema.Array(Schema.String),
   digestEvery: Schema.Number,
   scope: Schema.optionalKey(SubscriptionScope),
+}).annotate({
+  description:
+    'What was asked: the task told, the label queries it matches (any of them), the minutes between digests of routine lines, and the least level of a factory whose lines it is told.',
 });
 export type SubscriptionSpec = typeof SubscriptionSpec.Type;
 
@@ -34,13 +37,18 @@ export const SubscriptionStatus = Schema.Struct({
   pending: Schema.Number,
   since: Schema.optionalKey(Schema.String),
   error: Schema.optionalKey(Schema.String),
+}).annotate({
+  description:
+    'Where the deliverer is: the byte its news starts from, the byte before which every line is told or folded, the routine lines folded and not yet told and since when, and why its file did not read.',
 });
 export type SubscriptionStatus = typeof SubscriptionStatus.Type;
 
 /** A subscription, as an object. */
 export const Subscription = Schema.Struct({
-  apiVersion: Schema.Literal(API_VERSION),
-  kind: Schema.Literal('Subscription'),
+  apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
+  kind: Schema.Literal('Subscription').annotate({
+    description: "What the object is: a Subscription, a runtime task told of the feed's lines that match its label queries.",
+  }),
   metadata: ObjectMeta,
   spec: SubscriptionSpec,
   status: SubscriptionStatus,

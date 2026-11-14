@@ -528,9 +528,13 @@ export type FeedWaitEnd = (typeof FEED_WAIT_ENDS)[number];
  * `Event`, and the cursor after the last line it read, from which the next wait starts and loses no line.
  */
 export const FeedWait = Schema.Struct({
-  ended: Schema.Literals(FEED_WAIT_ENDS),
-  lines: Schema.Array(Event),
-  cursor: Schema.String,
+  ended: Schema.Literals(FEED_WAIT_ENDS).annotate({
+    description: 'Why the wait ended: matched, a line its label queries take was read; bound, its bound came with none.',
+  }),
+  lines: Schema.Array(Event).annotate({ description: 'The lines its label queries took, each an Event; empty at its bound.' }),
+  cursor: Schema.String.annotate({
+    description: 'The cursor after the last line it read, from which the next wait starts (?from=) and loses no line.',
+  }),
 }).annotate({ identifier: 'FeedWait' });
 export type FeedWait = typeof FeedWait.Type;
 

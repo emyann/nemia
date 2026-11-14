@@ -177,8 +177,8 @@ export const APPROVE_WORDS = {
     'steps after the gate, and auto never approves unasked a cap above',
     "a step's own budget",
     '--off: take back the approval of a step that stands approved while',
-    'nothing it approved has been filed — an ending waiting on the',
-    'checkout, held, or not yet ticked. The step waits at its gate again',
+    'nothing it approved has been filed — an ending waiting on the base',
+    'branch, held, or not yet ticked. The step waits at its gate again',
   ],
   spec: {
     positionals: [

@@ -33,12 +33,14 @@ export type Awaiting = NonNullable<Decidable['awaiting']>;
  * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run landed or called
  * off (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. A decision without `awaiting` is
  * read as null.
+ * @param decision The api's decision on the run.
  */
 export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidable(decision) ? (decision.awaiting ?? null) : null);
 
 /**
  * Whether the run's page offers a prune at all: a repository run (the package prunes repository runs alone), with nothing moving, and
  * with worktrees or files left on disk (`onDisk`). What it offers waits on the decision (`pruneOffer`).
+ * @param run The run's detail: its place, its status, whether anything moves, and what it has left on disk.
  */
 export function prunable(run: Prunable): boolean {
   const { worktrees, files } = run.onDisk;
@@ -49,6 +51,8 @@ export function prunable(run: Prunable): boolean {
  * What the run's page offers to prune, or null where it offers nothing (`prunable`). Only what is on disk is offered, and for a run nobody
  * decided (`awaiting`) the first two are shown refused and the third is the one to press. The api judges the prune again whatever this
  * says, and a refusal is shown in the package's words.
+ * @param run The run's detail: its place, its status, whether anything moves, and what it has left on disk.
+ * @param awaiting What the run waits on, where nobody decided it (`awaitingOf`); null for any other run.
  */
 export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer | null {
   if (!prunable(run)) return null;
@@ -110,12 +114,20 @@ function unmergedWarning(awaiting: Awaiting): string {
   return `Its work was never merged: once pruned, ${branches} ${awaiting.branches.length > 1 ? 'are' : 'is'} the only copy of it. ${after}`;
 }
 
-/** The choice selected first: the least a prune gives back that the api would take. */
+/**
+ * The choice selected first: the least a prune gives back that the api would take.
+ * @param offer What the run's page offers to prune.
+ */
 export function firstChoice(offer: PruneOffer): PruneChoice {
   return offer.choices.find((choice) => !choice.unavailable) ?? offer.choices[0];
 }
 
-/** The question the second press answers: the run and what it gives back, and for a run nobody merged, the warning again. */
+/**
+ * The question the second press answers: the run and what it gives back, and for a run nobody merged, the warning again.
+ * @param id The run's id.
+ * @param choice The choice the person selected.
+ * @param offer The offer it is among, whose warning is said again for a run nobody merged.
+ */
 export function pruneQuestion(id: string, choice: PruneChoice, offer: PruneOffer): string {
   const what = choice.label.charAt(0).toLowerCase() + choice.label.slice(1);
   return `Prune ${id}: ${what}? This cannot be undone.${choice.how.unmerged && offer.warning ? ` ${offer.warning}` : ''}`;

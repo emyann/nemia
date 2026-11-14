@@ -14,6 +14,7 @@ const BASE = 'http://board.invalid';
 /**
  * `href`, an address of this board (one leading slash), as the router's link takes it: its path as `to`, its query parsed by the
  * router's own `defaultParseSearch` as `search`, and its hash, where it has one. Pure.
+ * @param href The board's address, as a message writes it.
  */
 export function routeOfHref(href: string): RouteOfHref {
   const url = new URL(href, BASE);

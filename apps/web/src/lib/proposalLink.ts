@@ -20,6 +20,7 @@ const decoded = (part: string): string | undefined => {
 /**
  * The factory and the proposal a link of hers names, where it is a proposal's address on the board
  * (`/factories/<factory>/proposals/<name>`, both parts URI-decoded and neither empty); undefined for every other address. Pure.
+ * @param href The link's address, as a message names it.
  */
 export function proposalLinkOf(href: string): { factory: string; name: string } | undefined {
   const parts = PROPOSAL_LINK.exec(href);

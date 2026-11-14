@@ -332,9 +332,9 @@ const RUNS: Record<string, Walk[]> = {
       walk: ({ door }) => {
         for (const id of ['w-forget', 'w-forget-other']) {
           made(door, id);
+          act(door.holds.put(idOf(id), ['x'], {}));
           act(door.runs.cancel(idOf(id)));
           act(door.runs.prune(idOf(id), { at, worktrees: [] }));
-          act(door.holds.put(idOf(id), ['x'], {}));
           act(door.refresh.put(idOf(id)));
           act(door.labels.put(idOf(id), { team: 'core' }));
           act(door.asks.write(idOf(id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } }));

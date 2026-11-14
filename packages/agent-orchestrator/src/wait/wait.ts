@@ -5,6 +5,7 @@
 import path from 'node:path';
 import { prunedWords, type Hold, type Run } from '../record/record.ts';
 import type { HoldNeedsYou, HoldStop, HoldStopOf } from '../../contracts/hold.contract.ts';
+import { runMarkMove, runMarkOf } from '../run-marks/run-marks.ts';
 
 /**
  * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
@@ -93,10 +94,11 @@ export const holdNeedsYou: HoldNeedsYou = (holds) => holds.some(neverLands);
  * person lifts it, and a folder run may take one.
  */
 export const holdStop: HoldStopOf = (p): HoldStop | null => {
-  if (p.cancelled) return 'cancelled';
-  if (p.pruned) return 'pruned';
+  const move = runMarkMove(runMarkOf(p), 'hold');
+  const marked = move.kind === 'refused' ? move.as : null;
+  if (marked === 'cancelled' || marked === 'pruned') return marked;
   if (p.finished !== null) return p.finished;
-  if (p.held) return 'held';
+  if (marked === 'held') return marked;
   if (p.folder && p.until.length > 0) return 'folder';
   return null;
 };

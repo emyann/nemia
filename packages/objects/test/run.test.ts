@@ -160,3 +160,33 @@ test("words said to a step's session say who said them where an agent did; REFUS
   assert.equal(decoded.status.steps[0]?.said[0]?.words, 'Cut it.');
   assert.equal(Schema.decodeUnknownResult(Run)(withSaid({ ...said, from: { kind: 'agent' } }))._tag, 'Failure');
 });
+
+test('REFUSED: a step, a try and a run served with codes nothing makes together, as decoded and as encoded', () => {
+  const run = Schema.decodeUnknownSync(Run)(judged);
+  const step = run.status.steps[0];
+  const planted = <T>(change: (r: typeof run) => T): unknown => {
+    const copy = structuredClone(run);
+    change(copy);
+    return copy;
+  };
+  const cases: Array<[string, unknown]> = [
+    [
+      'a step done in the phase of one at work',
+      planted((r) => Object.assign(r.status.steps[0], { phase: 'running', reason: 'Succeeded' })),
+    ],
+    [
+      'a step that waits and says on nothing',
+      planted((r) => Object.assign(r.status.steps[0], { phase: 'pending', reason: 'Waiting', on: null })),
+    ],
+    ['a step that says what it waits on and is no wait', planted((r) => Object.assign(r.status.steps[0], { on: 'run' }))],
+    [
+      'a run that succeeded in the phase of one that waits',
+      planted((r) => Object.assign(r.status, { phase: 'waiting', reason: 'Succeeded' })),
+    ],
+  ];
+  assert.equal(step.on, null, 'the fixture step waits on nothing, so a planted `on` is the one change');
+  for (const [what, bad] of cases) {
+    assert.throws(() => Schema.decodeUnknownSync(Run)(bad), what);
+    assert.throws(() => Schema.encodeUnknownSync(Run)(bad), `${what}, encoded`);
+  }
+});

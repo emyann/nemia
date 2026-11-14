@@ -87,6 +87,18 @@ const read = (given: ReadinessFacts, ...needs: Need[]) =>
 
 const SIGN_IN = signInNeedOf(DEFAULT_HARNESS);
 
+/**
+ * Why a test of a harness nobody installed cannot be arranged on this machine, or false: the program of the second harness the runtime
+ * declares sits beside this process's Node, the folder every check's PATH ends with (`pathLedByTools`), so its install reads met
+ * whatever the test gives. A machine with that harness installed globally under its Node skips those tests, saying so; CI has none.
+ */
+const INSTALLED_BESIDE_NODE: string | false = (() => {
+  const program = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs)?.[1].needs?.program;
+  return program !== undefined && fs.existsSync(path.join(path.dirname(process.execPath), program))
+    ? `${program} is installed beside this machine's Node, which every check's PATH ends with: a harness nobody installed cannot be arranged here`
+    : false;
+})();
+
 test('the read says each area in order, each harness as two pieces, and a place need by its check', async () => {
   const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
   fs.writeFileSync(SIGNED_IN, '');
@@ -195,54 +207,58 @@ test("a need of a factory whose places are not trusted is unknown, its check nev
   assert.equal(fs.existsSync(path.join(repo, 'ran-here')), false, 'its check never ran in the repository');
 });
 
-test('a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named', async (t) => {
-  const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
-  assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
-  const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
-  const name = declaration.needs.program;
-  const program = path.join(toolsBinDir(ROOT), name);
-  const ambient = process.env.PATH;
-  process.env.PATH = (ambient ?? '')
-    .split(path.delimiter)
-    .filter((dir) => !fs.existsSync(path.join(dir, name)))
-    .join(path.delimiter);
-  t.after(() => {
-    process.env.PATH = ambient;
-  });
-  const states = (got: { pieces: readonly { harness?: { name: string }; state: string }[] }) =>
-    got.pieces.filter((p) => p.harness?.name === other).map((p) => p.state);
+test(
+  'a harness nobody activated and no workflow runs on is inactive, its install offered, and counts against nothing until it is installed or named',
+  { skip: INSTALLED_BESIDE_NODE },
+  async (t) => {
+    const [other, declaration] = Object.entries(HARNESS_DECLARATIONS).find(([name, d]) => name !== DEFAULT_HARNESS && d.needs) ?? [];
+    assert.ok(other !== undefined && declaration?.needs !== undefined, 'the runtime declares a second harness with needs');
+    const PATH = `${toolsBinDir(ROOT)}:/usr/bin:/bin`;
+    const name = declaration.needs.program;
+    const program = path.join(toolsBinDir(ROOT), name);
+    const ambient = process.env.PATH;
+    process.env.PATH = (ambient ?? '')
+      .split(path.delimiter)
+      .filter((dir) => !fs.existsSync(path.join(dir, name)))
+      .join(path.delimiter);
+    t.after(() => {
+      process.env.PATH = ambient;
+    });
+    const states = (got: { pieces: readonly { harness?: { name: string }; state: string }[] }) =>
+      got.pieces.filter((p) => p.harness?.name === other).map((p) => p.state);
 
-  const idle = await read(facts({ PATH }), identity('exit 0'));
-  assert.deepEqual(states(idle), ['inactive', 'inactive']);
-  const install = idle.pieces.find((p) => p.name === other);
-  assert.deepEqual(
-    install?.fixes.map((f) => [f.kind, f.startable, f.index]),
-    [[undefined, true, 0]],
-    'it offers its install, which activates it',
-  );
-  assert.equal(idle.pieces.find((p) => p.name === signInNeedOf(other))?.fixes.length, 0, 'and no sign-in before it is installed');
-  assert.equal(
-    idle.ready,
-    idle.pieces.every((p) => p.state !== 'missing'),
-    'an inactive piece is not missing, and ready reads only missing ones',
-  );
+    const idle = await read(facts({ PATH }), identity('exit 0'));
+    assert.deepEqual(states(idle), ['inactive', 'inactive']);
+    const install = idle.pieces.find((p) => p.name === other);
+    assert.deepEqual(
+      install?.fixes.map((f) => [f.kind, f.startable, f.index]),
+      [[undefined, true, 0]],
+      'it offers its install, which activates it',
+    );
+    assert.equal(idle.pieces.find((p) => p.name === signInNeedOf(other))?.fixes.length, 0, 'and no sign-in before it is installed');
+    assert.equal(
+      idle.ready,
+      idle.pieces.every((p) => p.state !== 'missing'),
+      'an inactive piece is not missing, and ready reads only missing ones',
+    );
 
-  fs.writeFileSync(program, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  try {
-    assert.deepEqual(states(await read(facts({ PATH }), identity('exit 0'))), ['met', 'met'], 'installed, a person activated it');
-  } finally {
-    fs.rmSync(program);
-  }
+    fs.writeFileSync(program, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    try {
+      assert.deepEqual(states(await read(facts({ PATH }), identity('exit 0'))), ['met', 'met'], 'installed, a person activated it');
+    } finally {
+      fs.rmSync(program);
+    }
 
-  const repo = fs.mkdtempSync(path.join(ROOT, 'named-'));
-  const dir = path.join(repo, 'workflows', 'dev');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: folder\nharness: ${other}\n---\nimplement it\n`);
-  createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
-  const named = await read(facts({ PATH }), identity('exit 0'));
-  assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
-  assert.equal(named.ready, false);
-});
+    const repo = fs.mkdtempSync(path.join(ROOT, 'named-'));
+    const dir = path.join(repo, 'workflows', 'dev');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: folder\nharness: ${other}\n---\nimplement it\n`);
+    createFactoryAt(ROOT, { name: 'named', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    const named = await read(facts({ PATH }), identity('exit 0'));
+    assert.deepEqual(states(named), ['missing', 'missing'], "a factory's workflow runs on it, so it counts");
+    assert.equal(named.ready, false);
+  },
+);
 
 /**
  * The second harness the runtime declares with needs, its program taken off this process's PATH for the test `t`, and a read of the store
@@ -272,48 +288,56 @@ const secondHarness = (t: { after: (fn: () => void) => void }) => {
   return { other, readAt };
 };
 
-test("a store agent hired into a factory's step names its harness to the read, as it holds a run on it", async (t) => {
-  const { other, readAt } = secondHarness(t);
-  const home = scratch('wf-readiness-hired-');
-  const agents = path.join(home, 'workflows', 'agents');
-  fs.mkdirSync(agents, { recursive: true });
-  fs.writeFileSync(path.join(agents, 'coder.md'), `---\nrole: Coder\ndescription: Writes the code.\nharness: ${other}\n---\nwrite it\n`);
-  const repo = fs.mkdtempSync(path.join(home, 'hired-'));
-  const dir = path.join(repo, 'workflows', 'dev');
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: folder\n---\nimplement it\n');
+test(
+  "a store agent hired into a factory's step names its harness to the read, as it holds a run on it",
+  { skip: INSTALLED_BESIDE_NODE },
+  async (t) => {
+    const { other, readAt } = secondHarness(t);
+    const home = scratch('wf-readiness-hired-');
+    const agents = path.join(home, 'workflows', 'agents');
+    fs.mkdirSync(agents, { recursive: true });
+    fs.writeFileSync(path.join(agents, 'coder.md'), `---\nrole: Coder\ndescription: Writes the code.\nharness: ${other}\n---\nwrite it\n`);
+    const repo = fs.mkdtempSync(path.join(home, 'hired-'));
+    const dir = path.join(repo, 'workflows', 'dev');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: folder\n---\nimplement it\n');
 
-  createFactoryAt(home, { name: 'unhired', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
-  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'the store agent alone, hired nowhere, runs no step');
+    createFactoryAt(home, { name: 'unhired', repos: [repo], workflows: ['dev'], hires: {}, schedules: {} });
+    assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'the store agent alone, hired nowhere, runs no step');
 
-  createFactoryAt(home, { name: 'hired', repos: [repo], workflows: ['dev'], hires: { 'dev/implement': 'coder' }, schedules: {} });
-  const hired = await readAt(home);
-  assert.deepEqual(hired.states, ['missing', 'missing'], "hired into the factory's step, the store agent's harness counts");
-  assert.equal(hired.ready, false);
-});
+    createFactoryAt(home, { name: 'hired', repos: [repo], workflows: ['dev'], hires: { 'dev/implement': 'coder' }, schedules: {} });
+    const hired = await readAt(home);
+    assert.deepEqual(hired.states, ['missing', 'missing'], "hired into the factory's step, the store agent's harness counts");
+    assert.equal(hired.ready, false);
+  },
+);
 
-test('a run of no factory that has filed nothing names the harness its frozen steps run on, and names it no more once a step is filed', async (t) => {
-  const { other, readAt } = secondHarness(t);
-  const home = scratch('wf-readiness-run-');
-  const runs = <A, E>(program: (door: RunDoorShape) => Effect.Effect<A, E>) =>
-    Effect.runPromise(Effect.provideService(Effect.flatMap(RunDoor, program), StoreRoot, home));
-  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'no factory and no run: nothing runs on it');
+test(
+  'a run of no factory that has filed nothing names the harness its frozen steps run on, and names it no more once a step is filed',
+  { skip: INSTALLED_BESIDE_NODE },
+  async (t) => {
+    const { other, readAt } = secondHarness(t);
+    const home = scratch('wf-readiness-run-');
+    const runs = <A, E>(program: (door: RunDoorShape) => Effect.Effect<A, E>) =>
+      Effect.runPromise(Effect.provideService(Effect.flatMap(RunDoor, program), StoreRoot, home));
+    assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'no factory and no run: nothing runs on it');
 
-  const run: Run = {
-    ...aRun('r-folder'),
-    workflowFiles: 'ab',
-    workflow: [{ name: 'implement', after: [], body: 'do it', harness: other }],
-    steps: { implement: { taskId: null } },
-  };
-  assert.equal(run.factory, undefined, 'the run is of no factory');
-  await runs((door) => door.runs.create(run));
-  const held = await readAt(home);
-  assert.deepEqual(held.states, ['missing', 'missing'], 'its frozen step runs on it, so the run would be held on it');
-  assert.equal(held.ready, false);
+    const run: Run = {
+      ...aRun('r-folder'),
+      workflowFiles: 'ab',
+      workflow: [{ name: 'implement', after: [], body: 'do it', harness: other }],
+      steps: { implement: { taskId: null } },
+    };
+    assert.equal(run.factory, undefined, 'the run is of no factory');
+    await runs((door) => door.runs.create(run));
+    const held = await readAt(home);
+    assert.deepEqual(held.states, ['missing', 'missing'], 'its frozen step runs on it, so the run would be held on it');
+    assert.equal(held.ready, false);
 
-  await runs((door) => door.runs.rewrite({ ...run, steps: { implement: { taskId: 'r-folder-implement' } } }));
-  assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'a run that has filed a step is held on no need');
-});
+    await runs((door) => door.runs.rewrite({ ...run, steps: { implement: { taskId: 'r-folder-implement' } } }));
+    assert.deepEqual((await readAt(home)).states, ['inactive', 'inactive'], 'a run that has filed a step is held on no need');
+  },
+);
 
 test('every piece declares what it costs while missing: linger and the bind keep the server up or open, a harness and a need a run waits on; and the read says whether a run was ever started', async () => {
   const home = scratch('wf-readiness-ran-');

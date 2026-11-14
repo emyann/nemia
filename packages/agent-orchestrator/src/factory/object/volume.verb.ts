@@ -9,7 +9,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { API_VERSION, type Volume, type VolumeList } from 'objects';
 import type { FactoryListing } from '../factory.ts';
-import type { RunPhase } from '../../phase/phase.ts';
+import { RUN_PHASE_IN_PLAY } from '../../phase/phase.ts';
 import { isDirectory as onDisk } from '../../record/record.store.ts';
 import { Missing, type Invalid } from '../../refusal/refusal.ts';
 import type { Engine } from '../../runtime-client.ts';
@@ -17,9 +17,6 @@ import { mountingRuns, type MountingRun, type SummaryHow } from '../../summary/s
 import { factoryVolumesNamed, volumeRefusal } from '../volume/volume.ts';
 import { factoryFiled } from './factory.verb.ts';
 import { objectsListed, versionOf, type ObjectQuery } from '../../object/listed.verb.ts';
-
-/** The phases of a run still in play: one that has not ended, and may yet run a step that mounts its volumes. */
-const IN_PLAY: readonly RunPhase[] = ['pending', 'running', 'waiting'];
 
 /** What a Volume's status is read against: the store's root, whether a path is a folder, and the runs whose records mount a volume. */
 export type VolumeWorld = {
@@ -37,7 +34,7 @@ export const volumesOf = (listing: Exclude<FactoryListing, { error: string }>, f
       present: world.isDirectory(path.resolve(v.path)),
       ...(refused === undefined ? {} : { refused }),
       runs: world.runs
-        .filter((r) => IN_PLAY.includes(r.phase) && r.volumes.some((m) => path.resolve(m.path) === path.resolve(v.path)))
+        .filter((r) => RUN_PHASE_IN_PLAY[r.phase] && r.volumes.some((m) => path.resolve(m.path) === path.resolve(v.path)))
         .map((r) => r.id)
         .sort(),
     };

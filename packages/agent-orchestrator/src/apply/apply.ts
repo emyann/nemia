@@ -4,6 +4,7 @@
  */
 import type { ProposalApply, ProposingRun } from '../../contracts/proposal-apply.contract.ts';
 import type { RunStatusWord } from 'objects';
+import { runOver } from '../run-ending/run-ending.ts';
 
 export const proposalApply: ProposalApply = (f) => {
   if (f.at === 'run-end' && f.run === 'going') return 'wait';
@@ -23,7 +24,8 @@ export type RunState = RunStatusWord | 'gone';
  */
 export const proposingRunOf = (run: string | undefined, state: RunState | undefined): ProposingRun => {
   if (run === undefined) return 'none';
-  if (state === 'succeeded') return 'succeeded';
-  if (state === 'cancelled' || state === 'gone') return 'ended';
-  return 'going';
+  if (state === undefined) return 'going';
+  if (state === 'gone') return 'ended';
+  if (!runOver(state)) return 'going';
+  return state === 'succeeded' ? 'succeeded' : 'ended';
 };

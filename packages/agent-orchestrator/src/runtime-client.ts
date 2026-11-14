@@ -14,7 +14,6 @@
  * the engine with `asked`, and lifts every other read with `tried` or `awaited`: a refusal is the program's failure, anything else a
  * defect it dies of.
  */
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, References, Scope } from 'effect';
@@ -42,7 +41,7 @@ import {
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { type Env, type Settings, settingsOf, wfRoot } from './config/config.store.ts';
 import { toolsBinDir } from './config/root.store.ts';
-import { pauseFile } from './pause/pause.store.ts';
+import { pauseStands } from './pause/pause.store.ts';
 import { servesOnStore } from './daemon/daemon.store.ts';
 import { reservedFor } from './service/index.ts';
 import { declarationOf, HARNESSES as STEP_HARNESSES, REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
@@ -355,7 +354,7 @@ export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
 
 /**
  * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), `unschedulable`, asked by the
- * runtime's pass before it admits, true while the store's pause's file is there (`pauseFile`), whatever it holds, as `readPause` reads a
+ * runtime's pass before it admits, true while the store's pause's file is there (`pauseStands`), whatever it holds, as `readPause` reads a
  * file that is there as a pause, and the floor of the machine's memory no session is admitted into (`reserved`, `floorOf`), which turns
  * the runtime's admission by memory on.
  *
@@ -366,7 +365,7 @@ export const storeAdmission = (
   config: Settings,
   totalBytes: () => number = os.totalmem,
 ): { maxConcurrent?: number; unschedulable: () => boolean; reserved?: { memory: string } } => ({
-  unschedulable: () => fs.existsSync(pauseFile(root)),
+  unschedulable: () => pauseStands(root),
   ...ceilingOf(config),
   ...floorOf(config, totalBytes),
 });

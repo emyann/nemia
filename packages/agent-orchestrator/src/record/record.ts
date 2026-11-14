@@ -14,6 +14,7 @@ import type { Labels } from '../labels/labels.ts';
 import type { Actor, PlaceKind, StepStatusWord } from 'objects';
 import type { EndedForGood, HonoursAsks } from '../../contracts/honours-asks.contract.ts';
 import type { FolderRun as FolderRunModel, RepositoryRun as RepositoryRunModel } from './record.model.ts';
+import { MARK_MEANS, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -200,14 +201,18 @@ export const stopsFollowers = (s: StepStatus): boolean =>
  * it lifts and the run files on after it: a read of what the run still needs once a hold lifts reads this. Pure, and proved by
  * `contracts/honours-asks.contract.ts`.
  */
-export const endedForGood: EndedForGood = (run) => Boolean(run.cancelledAt) || run.pruned !== undefined;
+export const endedForGood: EndedForGood = (run) => MARK_MEANS[marksOf(run)].endedForGood;
 
 /**
  * Whether a person's ask of the run is honoured, and anything may be asked of a person, on this pass: never of a run called off, pruned
  * or held (a hold until it lifts). A read of what the run does on this pass reads this. Pure, and proved by
  * `contracts/honours-asks.contract.ts`.
  */
-export const honoursAsks: HonoursAsks = (run) => !endedForGood(run) && run.hold === undefined;
+export const honoursAsks: HonoursAsks = (run) => MARK_MEANS[marksOf(run)].honoursAsks;
+
+/** The marks a run carries, as its record reads with them composed on it (`runMarkOf`): called off, pruned, held. */
+export const marksOf = (run: { cancelledAt?: string | null | undefined; pruned?: unknown; hold?: unknown }): RunMark =>
+  runMarkOf({ cancelled: Boolean(run.cancelledAt), pruned: run.pruned !== undefined, held: run.hold !== undefined });
 
 /** The first line of some prose that is not blank, trimmed; empty where there is none. Pure. */
 export const firstLine = (body: string): string =>

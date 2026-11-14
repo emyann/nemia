@@ -36,6 +36,7 @@ import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
+import { runMarkMove, runMarkOf, type RunMark } from '../run-marks/run-marks.ts';
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
@@ -249,6 +250,17 @@ export function readPruned(home: string, id: string): Pruned | undefined {
 }
 
 /**
+ * The marks the run carries now, read from which of its three files are there (`runMarkOf`): what each writer of one asks the machine
+ * with before it writes (`runMarkMove`, run-marks.ts), keeping its own guard against another hand beside it.
+ */
+export const marksAt = (home: string, id: string): RunMark =>
+  runMarkOf({
+    cancelled: fs.existsSync(cancelFile(home, id)),
+    pruned: fs.existsSync(pruneFile(home, id)),
+    held: fs.existsSync(holdFile(home, id)),
+  });
+
+/**
  * That a person holds the run until other runs land (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
  * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
  * landed (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
@@ -286,6 +298,7 @@ export const writeHold = (
   until: readonly string[],
   { why, by, actor }: Pick<Hold, 'why' | 'by' | 'actor'> = {},
 ): Hold | null => {
+  if (runMarkMove(marksAt(home, id), 'hold').kind !== 'edge') return null;
   fs.mkdirSync(runsDir(home), { recursive: true });
   const hold: Hold = {
     at: new Date().toISOString(),
@@ -325,6 +338,7 @@ function readUnheld(home: string, id: string): Unheld | undefined {
  * in those seconds put a hold the tick never read, and it stays. Given who lifts it (`actor`), that is written first (`unheldFile`).
  */
 export const removeHold = (home: string, id: string, at: string, actor?: Actor): boolean => {
+  if (runMarkMove(marksAt(home, id), 'lift').kind !== 'edge') return false;
   if (readHold(home, id)?.at !== at) return false;
   if (actor) writeWhole(unheldFile(home, id), JSON.stringify({ since: at, actor } satisfies Unheld, null, 2));
   try {
@@ -477,6 +491,7 @@ function readSaidBefore(home: string, id: string): Record<string, SaidBefore[]> 
 export const markCancelled = (home: string, id: string, actor?: Actor): string => {
   fs.mkdirSync(runsDir(home), { recursive: true });
   const at = new Date().toISOString();
+  if (runMarkMove(marksAt(home, id), 'cancel').kind !== 'edge') return readCancelled(home, id)?.at || at;
   try {
     fs.writeFileSync(cancelFile(home, id), actor ? JSON.stringify({ at, actor }) : at, { flag: 'wx' });
     return at;

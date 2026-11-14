@@ -9,6 +9,12 @@ applies: ["packages/*/contracts/**", "apps/*/contracts/**"]
 A contract proves a function by laws the verifier checks (`tsverify`, whose own skill says how to write and read one). This is what a
 contract asks of each step here, by what the step does. CI's `contracts` job runs every contract on each commit pushed.
 
+**A contract imports nothing from the file that implements it** (`tools/guards/test/contract-first.test.ts`): it is written first and
+typechecks before the code exists, so an implementer is handed the types with the laws. The types its signature needs are the
+contract's own, or `objects`'; a value both need — an error class, a service — lives in a file of its own that both import; and a type
+several files of `src` share, in a file that does not implement the contract, is imported by `import type`. A contract that reads its
+code is named in that guard's baseline, which only shrinks: move its types into it when you change it, and take it off.
+
 A contract is handed from step to step as a file, never as prose: design writes it, the run commits it under design's step, implement
 starts from that commit, and review reads implement's diff of it against that commit.
 
@@ -30,9 +36,10 @@ other write, `contracts/laws.ts` included: a helper the laws need is written ins
   says nothing the code does not already do, and one that comes back `vacuous` holds of no input: rewrite either before you hand it on.
 - **The function does not exist yet**: the verifier refuses a spec with no implementation, so write the spec, export its
   `Implementation<typeof …Spec>` type under the function's name. A word or a shape `objects` holds (`packages/objects/src/words.ts`
-  and its Schemas) is imported by `import type` from its entry, `objects`, never declared again; declare and export beside the spec only
-  a type the signature needs that neither `objects` nor the package's `src` holds (implement moves it into `src`, which changes no law). Typecheck it, `npx tsrs --noEmit -p <package>` (each
-  package that holds a `contracts/` has it in its tsconfig's `include`; a new one adds it), and say each law's verdict as `no code yet`.
+  and its Schemas) is imported by `import type` from its entry, `objects`, never declared again; every other type the signature needs
+  is declared and exported in the contract, where it stays: the code takes it from the contract and hands it on, and never moves it
+  into `src`. Typecheck it, `npx tsrs --noEmit -p <package>` (each package that holds a `contracts/` has it in its tsconfig's
+  `include`; a new one adds it), and say each law's verdict as `no code yet`.
 
 Your spec names the file and gives each law's name and verdict; it does not carry the laws in words. Name the file in your `artifacts`,
 and leave it uncommitted: the run commits it with the rest of your step as `design: hand off what was left uncommitted`, the commit

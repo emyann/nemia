@@ -8,6 +8,10 @@
  * Every pass reads it, as the Run door composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the
  * next. The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `nemia resume` lifts it.
  *
+ * This file alone writes the pause, and each write asks the machine first (`pauseMove`, pause-machine.ts): the mode the file stands in
+ * (`modeAt`), the event the caller brings, and the move or the refusal the machine answers. A write keeps its own guard against
+ * another hand — the exclusive create of a put, the text compared before a lapse lifts — since two callers can read one mode.
+ *
  * Beneath the controllers, beside `files.store.ts`, which imports it: it imports no store of runs.
  */
 import fs from 'node:fs';
@@ -18,6 +22,7 @@ import { Actor } from 'objects';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import type { Identity } from '../daemon/daemon.ts';
+import { pauseModeOf, pauseMove, putEvent, type PauseEvent, type PauseMode, type PauseMove } from '../pause-machine/pause-machine.ts';
 import { pauseLapsed, RESUME_LINE, type Pause, type PauseHolder } from './pause.ts';
 import { writeWhole } from '../whole-file/whole-file.store.ts';
 
@@ -29,6 +34,12 @@ const PAUSE_FILE = 'cordon';
 
 /** The pause's file: one for the whole store. */
 export const pauseFile = (home: string): string => path.join(home, PAUSE_FILE);
+
+/**
+ * Whether a pause stands on the store: its file is there, whatever it holds. What a reader that needs no word of the pause asks — the
+ * runtime's admission, a run's stamp — in place of the file's path.
+ */
+export const pauseStands = (home: string): boolean => fs.existsSync(pauseFile(home));
 
 /** A field of the file as it was written: one line of words, or absent. */
 const Said = Schema.optional(Schema.String);
@@ -100,6 +111,22 @@ export function readPauseFile(home: string): PauseFileRead | null {
 /** The store's pause, or null when none stands (`readPauseFile`, its holder left in the file). */
 export const readPause = (home: string): Pause | null => readPauseFile(home)?.pause ?? null;
 
+/** The mode the store's pause stands in, read from its file now (`pauseModeOf`). */
+export const modeAt = (home: string): PauseMode => pauseModeOf(readPause(home));
+
+/** What each refusal of the machine is thrown as, by what the caller was doing. */
+const REFUSED: Readonly<Record<'Conflict' | 'Missing', (message: string) => Conflict | Missing>> = {
+  Conflict: (message) => new Conflict({ message }),
+  Missing: (message) => new Missing({ message }),
+};
+
+/** The move the machine answers `event` on the store as it stands, a refusal thrown as its kind with `refusal`'s words. */
+function moved(home: string, event: PauseEvent, refusal: () => string): Exclude<PauseMove, { kind: 'refused' }> {
+  const move = pauseMove(modeAt(home), event);
+  if (move.kind === 'refused') throw REFUSED[move.as](refusal());
+  return move;
+}
+
 /** Who the machine says runs this process, or undefined where it cannot say. */
 function osUser(): string | undefined {
   try {
@@ -131,15 +158,17 @@ export function putPause(
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     ...(said.actor ? { actor: said.actor } : {}),
   };
+  const standing = (): string => {
+    const stands = readPause(home);
+    return `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`;
+  };
+  moved(home, putEvent(timeoutMs), standing);
   fs.mkdirSync(home, { recursive: true });
   try {
     fs.writeFileSync(pauseFile(home), `${JSON.stringify(heldBy ? { ...pause, heldBy } : pause)}\n`, { flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    const stands = readPause(home);
-    throw new Conflict({
-      message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and nemia pause --now stops what still finishes under it.`,
-    });
+    throw new Conflict({ message: standing() });
   }
   return pause;
 }
@@ -150,8 +179,11 @@ export function putPause(
  * pause stands on.
  */
 export function cutPause(home: string): Pause {
+  const nothing = 'the store is not paused: there is nothing to cut (nemia pause --now puts one).';
+  const move = moved(home, 'cut', () => nothing);
   const stands = readPauseFile(home);
-  if (stands === null) throw new Missing({ message: 'the store is not paused: there is nothing to cut (nemia pause --now puts one).' });
+  if (stands === null) throw new Missing({ message: nothing });
+  if (move.kind === 'stays') return stands.pause;
   const pause: Pause = { ...stands.pause, timeoutMs: 0 };
   const file = pauseFile(home);
   writeWhole(file, `${JSON.stringify(stands.heldBy ? { ...pause, heldBy: stands.heldBy } : pause)}\n`);
@@ -184,13 +216,15 @@ export function readResumed(home: string): { since: string; actor: Actor } | und
  * is written first, beside the pause's file (`resumedFile`), so the feed's lift of the pause names them.
  */
 export function resumePause(home: string, actor?: Actor): Pause {
+  const nothing = 'the store is not paused: there is nothing to resume (nemia pause puts one).';
+  moved(home, 'resume', () => nothing);
   const pause = readPause(home);
   if (pause !== null && actor) writeWhole(resumedFile(home), `${JSON.stringify({ since: pause.at, actor })}\n`);
   try {
     fs.unlinkSync(pauseFile(home));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new Missing({ message: 'the store is not paused: there is nothing to resume (nemia pause puts one).' });
+    throw new Missing({ message: nothing });
   }
   return pause ?? { at: '', by: '' };
 }
@@ -205,6 +239,7 @@ export function liftLapsedPause(home: string, identify: (holder: PauseHolder) =>
   const read = readPauseFile(home);
   if (read === null || read.heldBy === undefined) return null;
   if (!pauseLapsed(identify(read.heldBy))) return null;
+  if (pauseMove(pauseModeOf(read.pause), 'lapse').kind !== 'edge') return null;
   const file = pauseFile(home);
   try {
     if (fs.readFileSync(file, 'utf8') !== read.text) return null;

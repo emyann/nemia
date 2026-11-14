@@ -39,6 +39,7 @@ import {
   runNeedNames,
 } from './needs.verb.ts';
 import { readFixRecord, writeFixRecord, type FixRecord } from './fix.store.ts';
+import { runEnded } from '../run-ending/run-ending.ts';
 
 /** How long a fix may run: a device-code sign-in waits on a person for minutes, and a code lives about as long. */
 export const FIX_DEADLINE_SECONDS = 900;
@@ -299,9 +300,6 @@ const refusedStart = Effect.fnUntraced(function* (
     );
 });
 
-/** The statuses of a run that has not finished: what a fix that takes a need away waits on. */
-const UNFINISHED: ReadonlySet<string> = new Set(['running', 'waiting', 'awaiting approval']);
-
 /**
  * The unfinished runs of the store `home` whose needs (`runNeedNames`) name `need`, each with its needs: every run not cancelled whose
  * needs name it, judged by its one read (`readRun`, `assess`) as the listing judges it — a run whose read fails counts as unfinished, and
@@ -320,10 +318,10 @@ const unfinishedNeeding = Effect.fnUntraced(function* (
     const names = runNeedNames(home, needs, run, steps);
     if (!names.includes(need)) continue;
     const status = yield* readRun(e, run, { steps }).pipe(
-      Effect.map(({ read }) => assess(read).status as string),
-      Effect.orElseSucceed(() => 'running'),
+      Effect.map(({ read }) => assess(read).status),
+      Effect.orElseSucceed(() => 'running' as const),
     );
-    if (UNFINISHED.has(status)) out.push({ run: run.id, needs: names });
+    if (!runEnded(status)) out.push({ run: run.id, needs: names });
   }
   return out;
 });

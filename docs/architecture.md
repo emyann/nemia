@@ -736,6 +736,35 @@ read every file git lists outside their package; `turbo.json` makes the apps' `s
 so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
 cache key: run `npx turbo run test --force` after one.
 
+**5. A thing with a lifecycle has one machine, and one writer.** A thing whose state several verbs or passes move — a run, a hold, the
+store's pause, a card, a session at its harness — is written in one shape, so that its moves are in one place and nothing else makes
+one:
+
+- **Its state is one closed type, read afresh.** A pure function reads the state from the facts as they stand — a file, a journal's
+  fold — on every pass and by every verb, and nothing carries it between two reads. Every file present reads as some state: a
+  combination nobody should have written has a state of its own, never a branch that is missing.
+- **Its moves are one pure function**, `(state, event) → a move, no move, or a refusal by kind`, written so that the verifier reads it
+  (a library's table is only trusted by a contract, `assume`), with a contract whose laws say every answer it gives. Its diagram is
+  printed from that function, between `diagram:<name>` markers.
+- **One store file writes its facts, and asks that function before each write.** A write keeps its own guard against another hand (an
+  exclusive create, a text compared before an unlink): two callers can read one state. A test walks every state and event against
+  the store and the function together, and another refuses a file of `src` besides the store that names those facts.
+- **What a state means elsewhere is a table over the states** — the words said of it, what a pass does under it — typed
+  `Record<State, …>`, so a state added with no line fails the typecheck. A reader never re-derives the state from the facts.
+
+**Where a state is worked out and never written, there is no move to ask for.** A run's status is `assess`'s reading of its steps on
+every pass: nothing writes it, so it has no event and no writer, and the second and third parts above do not apply to it. What applies
+is the first and the last: one closed type every reader takes (objects' `RunStatusWord`), and what a status means as a table over it
+that each reader asks in place of a list of its own (`RUN_ENDING`, `packages/agent-orchestrator/src/run-ending/run-ending.ts`: the
+readers that asked "is this run over" had parted on a failed run, which has ended and can be tried again). The moves of such a thing
+are its parts' — a run's steps — and a person's marks on it (called off, held, pruned), which are written, and take the whole shape
+(`packages/agent-orchestrator/src/run-marks/run-marks.ts`): one word for each set of the three, so no set of files is unreadable, one
+move function the writers of those files ask, and what a set means to a pass as a table over the words.
+
+The store's pause is the first written so (`packages/agent-orchestrator/src/pause-machine/pause-machine.ts`, `pause.store.ts`). The runtime's task
+lifecycle has the first two parts on a table the contract trusts; the step, the proposal and Nemia's session each have a drawing that
+their writers do not ask.
+
 ## Folders, in every package
 
 Pieces that change together live together. The rule is written here once, judged once by `tools/test-kit/layout.ts` (`test-kit/layout`),

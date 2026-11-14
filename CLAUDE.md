@@ -106,6 +106,11 @@ holds what every change needs.
 - **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
   `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
   Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, with no exception.
+- **A thing with a lifecycle has one machine, and one writer** (`docs/architecture.md`, rule 5), and a contract imports nothing from the
+  code that implements it (`change-a-contract`). Each package's `CLAUDE.md` names its *Files to copy from* where it has one written so:
+  the orchestrator's (a written state, marks that combine, a state worked out), objects' (fields served together), the guards' (a guard
+  with a baseline). The runtime, the api, the board and the cli have none yet: the runtime's lifecycle (`core/lifecycle.ts`) is a table
+  its contract trusts and does not prove, so it is no example of the proof.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.

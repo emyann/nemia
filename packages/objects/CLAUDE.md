@@ -5,6 +5,13 @@ the envelope of a list (`src/meta.ts`), and, as the kinds move in, each kind's o
 orchestrator, the api, the board and the client import it through its one entry, `objects` (`src/index.ts`); the runtime never does
 (`docs/architecture.md`, *The layers*).
 
+## Files to copy from
+
+- **Fields served together that only go together in some sets**: a step's, a try's and a run's codes. `contracts/codes.contract.ts`
+  states which sets are legal in the domain's groups; `src/codes.ts` keeps the table (`as const satisfies`, so a package above can type
+  its own rows by it and load nothing of this one) and the predicates; the served schemas ask them with `.check(Schema.makeFilter(…))`
+  (`src/run.ts`), so a set nothing makes is refused as it is encoded and as a client decodes it; `test/run.test.ts` plants one of each.
+
 ## Traps
 
 - **`nemia/v1` is additions only.** A key added to an object is optional, and no key changes its meaning or its type under the same

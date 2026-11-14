@@ -6111,8 +6111,12 @@ Left, each to its own card:
   exchange and a task session finding a `--scope local` sign-in stand on `izq1-measurement.md`'s 0.3.270 sign-in and on the key measured
   equal. The owner reads it at the landing: Sign in on the board, approve in GitHub, Check again reads `connected`, Sign out, Check again
   reads `needs-auth`.
-- **The `actions` toolset's tool names** (`actions_get`, `actions_list`, `get_job_logs`, `actions_run_trigger` in the fences) are
-  GitHub's documented names, not read off a session; a fence naming a tool the server does not have refuses nothing and allows nothing.
+- **The `actions` toolset's tool names**, measured 2026-11-14 from the server's published source: `actions_list`, `actions_get`,
+  `actions_run_trigger` and `get_job_logs` are the four tools `pkg/github/actions.go` of `github/github-mcp-server` registers at
+  `0663b830582af923e30fb14cb2e10dd3248baa86`, ungated by any feature flag. They match the fences: Agora's three reads
+  (`packages/templates/sdlc/agents/agora/agent.yaml`) and the writers' deny of `actions_run_trigger`
+  (`packages/templates/sdlc/fences/writers.deny.yaml`). They were not read off a live session: the server answers `401` (`missing required
+  Authorization header`) to a request without a token, so no step here can list its tools, and no test holds them.
 - **Codex**: 0.154 can hand GitHub no client secret, so its token exchange is refused (`incorrect_client_credentials`). A release that
   takes `mcp_servers.<n>.oauth.client_secret` (Codex's documentation names one, saved in its own store) would need: the runtime writing
   that key or running Codex's own add with the secret, `signsInMcp` answering true for `codex`, and `codexMcpServers` keeping `oauth`

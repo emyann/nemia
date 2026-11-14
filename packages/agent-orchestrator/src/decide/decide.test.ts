@@ -1,10 +1,12 @@
 /**
  * The commands `nemia decide` offers (`choicesOf`): each offer's bare command beside its sentence, a gate's approval and send-backs, and
- * land it and drop it, read it or forget it by the run's place — none on a run that awaits nobody.
+ * land it and drop it, read it or forget it by the run's place — none on a run that awaits nobody. And who gave a person's word, said
+ * after its line (`saidBy`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { choicesOf, type Decision, type Offer } from './decide.ts';
+import { saidBy } from './decide.verb.ts';
 import type { Run } from '../record/record.ts';
 import type { StepSpec } from '../step/step.ts';
 
@@ -124,4 +126,20 @@ test('choicesOf', async (t) => {
       assert.deepEqual(choicesOf(STEPS, RUN, decided, [offer('nemia retry r-1 implement')]), []);
     });
   }
+});
+
+test("a person's word at a gate or a loop is followed by who gave it, in the actor's words; a step whose word names no one is kept as it is", () => {
+  const lines = {
+    plan: 'approved 10:04Z — "go"',
+    review: 'accepted as it stands 10:05Z, its findings open — "fine"',
+    ship: 'awaiting approval',
+  };
+  const actors = { plan: { kind: 'person', token: 'laptop' }, review: { kind: 'agent', agent: 'operator', token: 'ops' } } as const;
+  const said = saidBy(lines, (step) => (step === 'plan' || step === 'review' ? actors[step] : undefined));
+  assert.equal(said.plan, 'approved 10:04Z — "go" · by the person, on laptop');
+  assert.ok(
+    said.review?.startsWith(`${lines.review} · by `) && said.review.includes('operator') && said.review.includes('ops'),
+    said.review,
+  );
+  assert.equal(said.ship, 'awaiting approval');
 });

@@ -34,7 +34,7 @@ import {
   readFeed,
   type Selectors,
 } from 'agent-orchestrator';
-import { root } from '../../test/harness.ts';
+import { PERSON_TOKEN, root } from '../../test/harness.ts';
 
 type FeedWords = import('agent-orchestrator').FeedWords;
 
@@ -661,7 +661,10 @@ test(
           );
           const { port } = server.address() as AddressInfo;
           const abort = new AbortController();
-          const res = await fetch(`http://127.0.0.1:${port}${STREAM}`, { signal: abort.signal });
+          const res = await fetch(`http://127.0.0.1:${port}${STREAM}`, {
+            signal: abort.signal,
+            headers: { authorization: `Bearer ${PERSON_TOKEN}` },
+          });
           assert.equal(res.status, 200);
           await readUntil(t, res.body!.getReader(), { value: '' }, (said) => said.length >= 2);
           assert.equal(followers(), 1);

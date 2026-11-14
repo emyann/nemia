@@ -88,6 +88,11 @@
         "label": "Two loops",
         "href": "/how-a-run-lives/#two-loops-both-level-triggered"
       }
+    },
+    {
+      "term": "Sessions' slice",
+      "meaning": "`WF_CGROUP_PARENT`, the systemd slice each session's scope is made in, held under its ceiling (`MemoryMax=`) at what the machine allocates to sessions, its memory less the reserved memory, so sessions that grow together are killed inside it and never take the daemon or the machine: `nemia service install --size auto` writes `<name>-sessions.slice` (`sessionsSliceOf`, `packages/agent-orchestrator/src/service/service.ts`), and `nemia doctor`'s `sessions-slice` piece reads its ceiling on every read (`ceilingFit`, `packages/agent-orchestrator/src/service/sizing.ts`; `packages/agent-orchestrator/src/needs/readiness.verb.ts`).",
+      "type": "Settings"
     }
   ]
 }

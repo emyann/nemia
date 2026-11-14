@@ -70,10 +70,10 @@ const BODILESS_WRITES = Object.values(Api.groups)
     return !['GET', 'HEAD'].includes(keys.method) && keys.payloadKeys.length === 0;
   });
 
-test('the bodiless writes hold nemia proposals approve and decline, which the client sends, and chat allow, which the CLI forwards', () => {
+test("the bodiless writes hold nemia proposals approve and decline, which the client sends, and her chat's stop, which the board sends", () => {
   assert.ok(BODILESS_WRITES.includes('proposals.approve'));
   assert.ok(BODILESS_WRITES.includes('proposals.decline'));
-  assert.ok(BODILESS_WRITES.some((name) => name.startsWith('nemia.')));
+  assert.ok(BODILESS_WRITES.includes('nemia.chatStop'));
 });
 
 test('REFUSED by the write guard until mapped: every bodiless write carries `{}` as `content-type: application/json`', async () => {

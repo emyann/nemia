@@ -520,7 +520,13 @@ quantities read by `config.store.ts` (`memoryRequest`, `memoryReserved`), refuse
 it. `WF_MAX_CONCURRENT` still bounds each pool. A step held back says why in its note in `nemia ls` (`admissionWords`):
 `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: claude has 4 at work (WF_MAX_CONCURRENT)`.
 `nemia service install --size auto` writes a request that fits the machine; `nemia doctor` says when the settings a daemon runs under
-cannot fit it (`memory-fit`). An installed server keeps the settings its person wrote.
+cannot fit it (`memory-fit`). Admission bounds what starts, not what grows, so on systemd `--size auto` also writes
+`<name>-sessions.slice` beside the unit, its `MemoryMax=` at what the machine allocates (its memory less the floor), and points
+`WF_CGROUP_PARENT` at it: sessions that grow together toward their limits are killed inside that slice, never the daemon or the
+machine, as the kubelet holds every Pod to a node's allocatable memory. A slice `--env WF_CGROUP_PARENT` names is the person's: no
+file is written, and a line names the `systemctl --user set-property` that caps it. `nemia doctor`'s `sessions-slice` piece reads the
+slice's ceiling on every read and says when it has none or one above what the machine allocates (`ceilingFit`), naming the command
+that sets it. An installed server keeps the settings its person wrote.
 
 **A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
 
@@ -1911,11 +1917,11 @@ its own, and everything below reads the words back off the engine's view of the 
 
 - **Which session.** The step's current try's task, as `wf retry` finds it (`run.steps[step].taskId`). The words are
   everything after the step, so an unquoted sentence is one message.
-- **Who said them.** A session its run filed (a step's, or Nemia's) is known by its session token (`WF_SESSION_TOKEN`, or
-  the api's `Authorization: Bearer`), and its words are its agent's whatever the person allowed; it names no one else
-  (`Invalid`). With no token, the words are the person's, from the board or a shell, as they always were; an agent with
-  none says `--as <name>` before its words (the api's `from`), a name the person allowed with `nemia chat allow <name>`,
-  the same list as her chat (`Conflict` for one not allowed, `Invalid` for no agent's name). The person's words reach
+- **Who said them.** Whoever holds the token the request presents (`stepSpeaker`): a session its run filed (a step's, or
+  Nemia's) by its session token (`WF_SESSION_TOKEN`, or the api's `Authorization: Bearer`), and an agent by a standing
+  token the person minted for it (`nemia token add <name> --agent <agent>`), each speaking as its own agent; the person,
+  under any token of theirs, the board's cookie as a shell's, as the person. No word of the request says who it is from:
+  `--as` and the api's `from` naming an agent are retired and refused (`Invalid`, naming the mint). The person's words reach
   the session as typed; an agent's in her chat's frame, `The agent <name> writes, not the person: …` (`framedForStep`), and
   who said each is read back off the journalled words (`saidBy`): the step's detail carries `from` and the words without
   the frame (`words`) where an agent spoke, and the board draws them under `<name> · agent`, apart from the person's.
@@ -3647,12 +3653,12 @@ instruction (above), which she reads before acting in it. Her machine and what w
 
 Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the words written to her (`outbox.jsonl`) and
 the person's read mark (`read.json`), written by the api's routes (`chatSay`, `chatRead`), the keeper's marks of what it delivered
-(`delivered.jsonl`), and the names the person allowed an agent to speak under (`speakers.json`, written by `nemia chat allow <name>`
-and `nemia chat disallow <name>`, read with `nemia chat speakers`, each write asked of the person every time). An outbox entry says
-who wrote it (`from`, a `Speaker`): the person, whose words are taken from the board alone, or an agent by an allowed name; a line
-with none is the person's. Words from anywhere but the board that name no agent are refused (`Invalid`), and an agent under a name
-the person has not allowed (`Conflict`), each naming the fix (`speakerRefusal`). The rest is projected on every read
-(`projectChat`): her words and her tool calls from her transcripts, attempt by attempt with a line between them, and what was said to
+(`delivered.jsonl`); a `speakers.json` an older store holds, the names an agent once spoke under, is left there unread. An outbox
+entry says who wrote it (`from`, a `Speaker`): the caller the send's token says (`stepSpeaker`), the person under any token of theirs,
+the board's cookie included, over plain http as over https, or an agent under its own name, by its session's token or a standing one
+minted for it; a line with none is the person's. A send whose `from` names an agent is refused (`Invalid`, `fromRefusal`, naming
+`nemia token add <name> --agent <agent>`), and an agent under a name no agent speaks under (`Invalid`, `speakerRefusal`). The rest is
+projected on every read (`projectChat`): her words and her tool calls from her transcripts, attempt by attempt with a line between them, and what was said to
 her from the runtime's `said`, the entry's where a mark claims it — the person's message, or a `peer`'s under its name — else the
 keeper's quiet marker. The keeper delivers while she is kept and her session live, framed by who wrote it (`framedFor`: the person's as
 they always were, an agent's under its name and never as the person's), and before it says it looks for the same words said since and

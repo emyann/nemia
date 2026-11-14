@@ -34,7 +34,7 @@ import { filedOwed } from '../pinned/pinned.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from './files.store.ts';
 import { checkIn, type CheckStderr, type StepCheck } from './checks.verb.ts';
-import type { Outcome } from 'objects';
+import type { Actor, Outcome } from 'objects';
 
 /**
  * A person's approval of the try a gated step is on (`approvalOf`), off their file (`nemia approve`): the try, when, and the words given
@@ -145,6 +145,8 @@ export type StepTry = {
    * `needs` of the try before as `your answer`. Null for a try nobody answered — and for every first try, which nobody asked for.
    */
   answer: string | null;
+  /** Who gave that answer (`actor`, off the same ask file): absent where nobody answered, or the ask names no caller. */
+  answeredBy?: Actor;
 };
 
 /** A step's attempts as the engine's view has them: how many, and when and how the latest went. */
@@ -279,8 +281,12 @@ export function triesOf(
   const earlier = record?.tries ?? [];
   const turnAt = (t: EarlierTry, i: number): number => turnOfTry(earlier.slice(0, i), t);
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
-  const answerAt = (n: number): string | null =>
-    answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
+  const askAt = (n: number): RetryAsk | undefined => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers);
+  const answerAt = (n: number): string | null => askAt(n)?.message ?? null;
+  const answeredBy = (n: number): Pick<StepTry, 'answeredBy'> => {
+    const ask = askAt(n);
+    return ask?.message !== undefined && ask.actor ? { answeredBy: ask.actor } : {};
+  };
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
   const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'> => {
     const word = turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
@@ -301,6 +307,7 @@ export function triesOf(
       closeout: closeoutIn(home, run, name, step, t.taskId, views, steps, turnAt(t, i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
       answer: answerAt(i + 1),
+      ...answeredBy(i + 1),
     })),
     {
       try: earlier.length + 1,
@@ -311,6 +318,7 @@ export function triesOf(
       note: noteOf(earlier.length + 1),
       ...now,
       answer: answerAt(earlier.length + 1),
+      ...answeredBy(earlier.length + 1),
     },
   ];
 }
@@ -359,7 +367,8 @@ export function driftOf(run: Run, workflows: readonly StepSpec[]): string | null
  * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, by its reason (`AwaitingApproval`), and the approval of
  * the try it is on — or, for a looping step, the acceptance of that try as it stands (`acceptanceOf`), which `nemia approve` of a loop
  * writes, a gate of its own where the step has none. Off the record as the Run door composes it, with each approval and acceptance its
- * files hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own.
+ * files hold, the step's closeout (`closeoutOf`) and what its tries cost (`spendOf`): no read of its own. The approval says who gave it
+ * (`actor`) where its file does.
  */
 export function gateOf(
   run: Run,
@@ -375,7 +384,9 @@ export function gateOf(
   const budgets = gateBudgets(run, step, steps, closeoutOf(step.name), spendOf);
   return {
     awaiting: reason === 'AwaitingApproval',
-    approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
+    approval: given
+      ? { try: given.try, at: given.at, message: given.message ?? null, ...(given.actor ? { actor: given.actor } : {}) }
+      : null,
     ...(budgets ? { budgets } : {}),
   };
 }

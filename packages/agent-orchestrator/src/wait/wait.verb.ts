@@ -6,6 +6,7 @@
  */
 import os from 'node:os';
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { honoursAsks, type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
@@ -38,9 +39,9 @@ export type Holding = { run: Run; hold: Hold };
  * throws.
  *
  * @param said The person's words for why (`--why`), and who they are (`--by`): without a name, the user this process runs as, and none when
- * the system has no name for it.
+ * the system has no name for it; and the caller who puts it (`actor`), kept beside `by` where it is known.
  */
-export const hold = Effect.fn('hold')(function* (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'> = {}) {
+export const hold = Effect.fn('hold')(function* (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by' | 'actor'> = {}) {
   const bad = idRefusal(id, 'hold');
   if (bad) return yield* Effect.fail(new Invalid({ message: bad }));
   for (const named of until) {
@@ -98,9 +99,10 @@ function osUser(): string | undefined {
  * Lift a person's hold by hand — `nemia hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
  * asked again. Fails, before anything is written: an id that is not a run's (`Invalid`), a run not there (`Missing`), a run nobody holds,
  * and a hold lifted and put again since it was read, which is a person's newer word and stays (the Run door's `holds.lift` takes only the
- * hold read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing.
+ * hold read, by its `at`) — each a `Conflict`; dies of anything else the store throws. Reads no engine, so it requires nothing. Who lifts
+ * it (`actor`, which the api hands of its caller) is kept beside the run (`unheld`), and the feed's lift of the hold carries it.
  */
-export const unhold = Effect.fn('unhold')(function* (id: string) {
+export const unhold = Effect.fn('unhold')(function* (id: string, actor?: Actor) {
   const bad = idRefusal(id, 'hold');
   if (bad) return yield* Effect.fail(new Invalid({ message: bad }));
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
@@ -115,7 +117,7 @@ export const unhold = Effect.fn('unhold')(function* (id: string) {
         message: `${id} is not held, so there is no hold to lift. To hold it until you lift it: nemia hold ${id}; until other runs land: nemia hold ${id} --until <runId>.`,
       }),
     );
-  if (!(yield* (yield* RunDoor).holds.lift(RunId.read(id), held.at)) && (yield* (yield* RunDoor).holds.stands(RunId.read(id))))
+  if (!(yield* (yield* RunDoor).holds.lift(RunId.read(id), held.at, actor)) && (yield* (yield* RunDoor).holds.stands(RunId.read(id))))
     return yield* Effect.fail(
       new Conflict({
         message: `${id}'s hold changed as it was lifted: read it again (nemia ls ${id}), then lift it: nemia hold ${id} --off.`,

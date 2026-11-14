@@ -533,11 +533,39 @@ export const ACCESS_CHANGES = ['widens', 'narrows', 'same'] as const;
 /** One of `ACCESS_CHANGES`. */
 export type AccessChange = (typeof ACCESS_CHANGES)[number];
 
-/** Who calls the api: the person (no session's token), or an agent's session the store started. */
+/**
+ * Who calls the api: the person (by a token the person minted and holds, or an in-process program, which presents none), or an agent (by
+ * its session's token, or by a token the person minted for it).
+ */
 export const CALLER_KINDS = ['person', 'agent'] as const;
 
 /** One of `CALLER_KINDS`. */
 export type CallerKind = (typeof CALLER_KINDS)[number];
+
+/** Who holds a standing token, one the person minted: the person, under the name of the device it is for, or an agent by its name. */
+export const TOKEN_HOLDERS = CALLER_KINDS;
+
+/** One of `TOKEN_HOLDERS`. */
+export type TokenHolderKind = (typeof TOKEN_HOLDERS)[number];
+
+/**
+ * What the person may narrow an agent's token to as they mint it, the highest command class it reaches: `read` (reads alone), or `act`
+ * (reads and the writes that run unasked, never an answer). A token not narrowed reaches the agent's whole floor; none is ever widened.
+ */
+export const FLOOR_NARROWINGS = ['read', 'act'] as const;
+
+/** One of `FLOOR_NARROWINGS`. */
+export type FloorNarrowingWord = (typeof FLOOR_NARROWINGS)[number];
+
+/**
+ * Why the api refuses what an agent's standing token asks (a 403, `Forbidden`'s `reason`): a command out of an agent's reach, one that asks
+ * the person every time, one above the token's narrowing, one in another factory than the token's, one in a factory below the level an
+ * agent's call needs, and an answer to what waits on the person that no rule of theirs lets through.
+ */
+export const FLOOR_REFUSALS = ['out-of-reach', 'asks-the-person', 'narrowed', 'other-factory', 'below-level', 'waits-on-person'] as const;
+
+/** One of `FLOOR_REFUSALS`. */
+export type FloorRefusalWord = (typeof FLOOR_REFUSALS)[number];
 
 /** Who approved a proposal: the person, or an agent under a rule the person confirmed. */
 export const APPROVED_BY = ['person', 'rule'] as const;
@@ -586,7 +614,11 @@ export const TABLE_COLUMN_TYPES = ['string', 'integer', 'number', 'boolean', 'da
 /** One of `TABLE_COLUMN_TYPES`. */
 export type TableColumnType = (typeof TABLE_COLUMN_TYPES)[number];
 
-/** Why a presented session token is refused (a 401): the store never minted it, or its session's try is no longer live. */
+/**
+ * Why a presented token is refused (a 401): the store never minted it, its session's try is no longer live, the route needs a token and
+ * the request presented none, or the route (the MCP port) needs a token the person minted (`person-token-required`, held by the person or
+ * an agent) and was presented a session's.
+ */
 export const TOKEN_REFUSALS = ['unknown-token', 'session-ended', 'token-required', 'person-token-required'] as const;
 
 /** One of `TOKEN_REFUSALS`. */

@@ -14,7 +14,7 @@ import {
   wfRoot,
 } from 'agent-orchestrator';
 import { BOARD_ROUTE, type BoardFiles, boardOf } from './board/board.ts';
-import { callerGate } from './caller/caller.ts';
+import { callerGate } from './caller/index.ts';
 import { McpAsker } from './capabilities/index.ts';
 import { QuotaAsker } from './gauges/index.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, type Services } from './layer.ts';

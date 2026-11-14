@@ -4,6 +4,7 @@
  * service (`approveRun`, over `EngineService`), run by a caller with `runWith`.
  */
 import { Effect } from 'effect';
+import type { Actor } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
@@ -42,6 +43,8 @@ export type Approved = { run: Run; approval: Approval; file: string; caps: StepB
  * "budgets"`), with each amount the person gave (`given`, `nemia approve --budget <step>=<amount>`) over them (`approvedCaps`). A given
  * amount that names no step after the gate, is given twice, or is no amount is refused `Invalid`, exit 2, before anything is written.
  *
+ * Who approves (`actor`, the caller where it is known) is kept on the approval; an approval given in-process keeps none.
+ *
  * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not
  * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
@@ -50,6 +53,7 @@ export const approveRun = Effect.fn('approve')(function* (
   stepName: string,
   message?: string,
   given: readonly StepBudget[] = [],
+  actor?: Actor,
 ) {
   const home = yield* StoreRoot;
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
@@ -98,6 +102,7 @@ export const approveRun = Effect.fn('approve')(function* (
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
     ...(caps.length ? { budgets: Object.fromEntries(caps.map((c) => [c.step, c.usd])) } : {}),
+    ...(actor ? { actor } : {}),
   };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;

@@ -38,14 +38,17 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 
 - `npm run build` regenerates `src/routeTree.gen.ts`: a new route file fails `typecheck` until a build has run once.
 - `npm run e2e -- --pages <the pages the change touches>` runs its assertions in the dark theme, `--photos` too when pictures are due;
-  never the whole suite in a session but to measure it. A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
+  never the whole suite in a session but to measure it. It runs none of the look's browser tests: add `--look` (`npm run e2e -- --look
+  --pages <…>`, or `--look` alone) when the change touches a part of the look, a story, `test/e2e/parts/` or a runner file beside the
+  pages (`visit.ts`, `checks.ts`, `contrast.ts`). A whole run whose pages cost more than `PAGES_BOUND_MS` summed fails, naming
   its slowest pages; its own time past `E2E_BOUND_MS` is said, never refused: it is the machine's, by the workers it gave (`overBound`,
   `pastTool`, `e2e/timing.ts`).
 - `npm run e2e -- --shard <i> --of <n>` visits shard `i` of `n`, dealt from the pages that exist round-robin in their order (`shardOf`,
   `e2e/pages.ts`): a run of some pages like `--pages`, so no whole run and held to no bound itself. It writes its page times to
   `pages-<i>-of-<n>.json` where the pictures go (`$WF_ARTIFACTS`, else `.e2e/`), and `node test/e2e/pages-bound.ts <dir>…` sums every
   shard's together against `PAGES_BOUND_MS` — the bound being the whole run's and additive — refusing a shard that is missing, doubled or
-  of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`).
+  of another run. CI runs the e2e in four shards and that command over them (`.github/workflows/ci.yml`); a shard runs no look test,
+  and CI's `e2e-look` job runs them once (`--look`, refused beside `--shard`).
 - `npm run e2e -- --photos --contrast` writes each picture's text pairs beside it (`e2e/contrast.ts`); `node test/e2e/contrast-report.ts
   <dir>` makes `contrast.md` and `look.html` there and exits 1 on a pair under 4.5:1. A measure, never a check of every run.
 - `npm run e2e` hands its pages to workers one at a time (`queueOf`, `e2e/workers.ts`), each a process with its own seeded store, api,
@@ -53,15 +56,21 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - Once per machine, install each Playwright's browser through the checkout's own `node_modules`, never from an `npx` download (an install
   deletes the builds of every Playwright it does not see): `npx playwright install chromium` for the e2e, and
   `node node_modules/@playwright/mcp/cli.js install-browser chromium` for the steps' `browser_*` tools.
-- `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium; only `npm run e2e` runs them). A web test that needs
+- `npm test` runs `test/*.test.ts`, never `test/e2e/*.test.ts` (those launch Chromium): `npm run e2e -- --look`, and a whole `npm run
+  e2e`, run them first, two files at a time (`LOOK_TESTS`, `e2e/look.ts`); `--pages` and `--shard` run none. A web test that needs
   no browser sits in `test/`.
 - The stories are the one place the parts are shown, in two hosts under one decorator (`.storybook/preview.tsx`: the look's ground,
   a router of the story's own in memory, `data-at` where it stands). `npm run storybook`, from `apps/web`, is a person's, on port
   6007, in no check; dark follows the system alone, so its toolbar switches nothing. The checks read the stories' page,
   `test/e2e/parts/main.tsx` (`?part=<name>`, `?story=<id>`), built into a scratch folder by `buildParts` and never by `npm run
-  build`: `test/e2e/parts.test.ts` presses it, and `node test/e2e/parts-photos.ts` pictures it, light then dark.
+  build`: `test/e2e/parts.test.ts` presses it (`npm run e2e -- --look`), and `node test/e2e/parts-photos.ts` pictures it, light then dark.
 - `npm run board:serve` (`e2e/serve.ts`) builds outside the workspace and serves one board a workspace, on a seeded store of its own
   (`e2e/served.ts`, the worker's serving code too), and the look's stories beside it, whose address it prints on a third line, `stories
+  on <url>`, and on a fourth the person's token its store keeps, `token <token>`, which a browser pastes on the board's token page: every
+  api route asks for one, loopback too; `npm run board:stop` ends its holder, which else ends by itself.
+- Every api route asks for a token, so each browser context the e2e opens on a worker's seat is given the seed's (`SEAT_TOKEN`) as the
+  board's cookie before a page loads (`seated`, `e2e/served.ts`; `visitAll` does it for every page), and a request made from Node presents
+  it as its bearer (`bearer`); a context meant to meet the token page is opened bare.
   on <url>`; `npm run board:stop` ends its holder, which else ends by itself. A holder that ends before it serves leaves
   `hold.log` in its folder, and the refusal quotes its last lines and its path; its api is given no `NEMIA_BIND` or `WF_EXPOSED` (`apiEnvOf`).
 

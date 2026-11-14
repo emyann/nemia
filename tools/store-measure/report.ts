@@ -61,6 +61,7 @@
  * numbers are the owner's to judge.
  */
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -217,9 +218,23 @@ const appOver = async (api: Api, orch: Orchestrator, place: Place, env: CopyEnv)
   return built;
 };
 
-/** `GET url` of `app`, its body read as JSON; thrown where it is not a 200. */
-async function getJson(app: App, url: string): Promise<unknown> {
-  const res = await app.request(url);
+/**
+ * A token of the person's kept in the copy's workflows' store `wf`, as the store keeps one: its record under `person-tokens/` named by
+ * its sha-256 digest. Every route of the api takes a token, so each read presents it. Written on the copy alone, before the fence is armed.
+ */
+function seatedOn(wf: string): string {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const dir = path.join(wf, 'person-tokens');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const digest = crypto.createHash('sha256').update(token).digest('hex');
+  const record = { name: 'store-measure', createdAt: new Date().toISOString() };
+  fs.writeFileSync(path.join(dir, `${digest}.json`), `${JSON.stringify(record)}\n`, { mode: 0o600 });
+  return token;
+}
+
+/** `GET url` of `app` under the person's `token`, its body read as JSON; thrown where it is not a 200. */
+async function getJson(app: App, url: string, token: string): Promise<unknown> {
+  const res = await app.request(url, { headers: { authorization: `Bearer ${token}` } });
   const body = await res.text();
   if (res.status !== 200) throw new Error(`GET ${url} answered ${res.status} on the copy: ${body.slice(0, 300)}`);
   return JSON.parse(body) as unknown;
@@ -274,10 +289,16 @@ function eventsIn(chunk: readonly string[], cursor: number): { lines: number; cu
   return { lines, cursor, opened };
 }
 
-/** `GET /api/feed/stream` from `feed.cursor`, read until its last line came and then let go, or for two minutes at most. */
-async function feedStreamed(app: App, feed: FeedRead): Promise<void> {
+/**
+ * `GET /api/feed/stream` from `feed.cursor` under the person's `token`, read until its last line came and then let go, or for two minutes
+ * at most.
+ */
+async function feedStreamed(app: App, feed: FeedRead, token: string): Promise<void> {
   const gone = new AbortController();
-  const res = await app.request(`/api/feed/stream${feed.cursor ? `?after=${feed.cursor}` : ''}`, { signal: gone.signal });
+  const res = await app.request(`/api/feed/stream${feed.cursor ? `?after=${feed.cursor}` : ''}`, {
+    signal: gone.signal,
+    headers: { authorization: `Bearer ${token}` },
+  });
   if (res.status !== 200 || !res.body) throw new Error(`GET /api/feed/stream answered ${res.status} on the copy: ${await res.text()}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -474,6 +495,8 @@ const newestOf = (listing: readonly Listed[], finished: boolean): string | null 
 /** The measure on the copy at `root`: `wf`, the workflows' store, and `ae`, the runtime's. */
 async function measure(asked: Asked, root: string, fence: Fence) {
   const { wf, env } = copyEnvOf(root);
+  const token = seatedOn(wf);
+  const get = (app: App, url: string) => getJson(app, url, token);
   fence.arm('read');
   const orch = await import('agent-orchestrator');
   const api = await import('api/app');
@@ -481,45 +504,45 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   const fresh = () => appOver(api, orch, place, env);
   const { repeat } = asked;
   const first = await fresh();
-  const { runs: listing, unjudged } = listedOf(await getJson(first.app, '/api/runs'));
+  const { runs: listing, unjudged } = listedOf(await get(first.app, '/api/runs'));
   const finishedRun = newestOf(listing, true);
   const openRun = newestOf(listing, false);
-  const cards = ((await getJson(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
-  const factory = ((await getJson(first.app, '/api/factories')) as { items: { metadata: { name: string } }[] }).items
+  const cards = ((await get(first.app, INBOX_URL)) as { items: { status: { runs: readonly string[] } }[] }).items;
+  const factory = ((await get(first.app, '/api/factories')) as { items: { metadata: { name: string } }[] }).items
     .map((f) => f.metadata.name)
     .find((name) => name !== 'default');
   await first.runtime.dispose();
   const ofFactory = (url: (name: string) => string) =>
-    factory === undefined ? null : overApps(fresh, (app) => getJson(app, url(encodeURIComponent(factory))), repeat);
+    factory === undefined ? null : overApps(fresh, (app) => get(app, url(encodeURIComponent(factory))), repeat);
   const feed = feedOf(wf);
   const passed = passedOver(orch, place, fence, env, wf, fresh);
   const objectOf = (id: string | null, over = fresh) =>
-    id === null ? null : overApps(over, (app) => getJson(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
+    id === null ? null : overApps(over, (app) => get(app, `/api/runs/${encodeURIComponent(id)}`), repeat);
   const measures: Record<MeasureKey, Measured | null> = {
-    runList: await overApps(fresh, (app) => getJson(app, '/api/runs'), repeat),
-    runSummaries: await overApps(fresh, (app) => getJson(app, '/api/runs?fieldSelector=status.state!%3Dfinished'), repeat),
-    stats: await overApps(fresh, (app) => getJson(app, '/api/stats'), repeat),
+    runList: await overApps(fresh, (app) => get(app, '/api/runs'), repeat),
+    runSummaries: await overApps(fresh, (app) => get(app, '/api/runs?fieldSelector=status.state!%3Dfinished'), repeat),
+    stats: await overApps(fresh, (app) => get(app, '/api/stats'), repeat),
     finishedRun: await objectOf(finishedRun),
     openRun: await objectOf(openRun),
-    feedFromCursor: await overApps(fresh, (app) => feedStreamed(app, feed), repeat),
+    feedFromCursor: await overApps(fresh, (app) => feedStreamed(app, feed, token), repeat),
     tickPass: null,
     tickPassInformed: null,
-    runListAfterPass: await overApps(passed, (app) => getJson(app, '/api/runs'), repeat),
+    runListAfterPass: await overApps(passed, (app) => get(app, '/api/runs'), repeat),
     openRunAfterPass: await objectOf(openRun, passed),
-    inbox: await overApps(fresh, (app) => getJson(app, INBOX_URL), repeat),
-    inboxAfterPass: await overApps(passed, (app) => getJson(app, INBOX_URL), repeat),
+    inbox: await overApps(fresh, (app) => get(app, INBOX_URL), repeat),
+    inboxAfterPass: await overApps(passed, (app) => get(app, INBOX_URL), repeat),
     chatHistory: null,
     chatBeatBefore: null,
     chatFoldStep: null,
-    factoryList: await overApps(fresh, (app) => getJson(app, '/api/factories'), repeat),
+    factoryList: await overApps(fresh, (app) => get(app, '/api/factories'), repeat),
     factoryGet: await ofFactory((f) => `/api/factories/${f}`),
     factoryCommands: await ofFactory((f) => `/api/factories/${f}/commands`),
     scheduleList: await ofFactory((f) => `/api/namespaces/${f}/schedules`),
     hireList: await ofFactory((f) => `/api/namespaces/${f}/hires`),
     volumeList: await ofFactory((f) => `/api/namespaces/${f}/volumes`),
     mcpServerList: await ofFactory((f) => `/api/namespaces/${f}/mcpservers`),
-    ceilings: await overApps(fresh, (app) => getJson(app, '/api/ceilings'), repeat),
-    ceilingsAfterPass: await overApps(passed, (app) => getJson(app, '/api/ceilings'), repeat),
+    ceilings: await overApps(fresh, (app) => get(app, '/api/ceilings'), repeat),
+    ceilingsAfterPass: await overApps(passed, (app) => get(app, '/api/ceilings'), repeat),
   };
   const chat = await chatMeasured(orch, place, fence, env, repeat);
   Object.assign(measures, chat.measures);

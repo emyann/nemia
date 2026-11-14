@@ -9,7 +9,7 @@
  * former keys, read under their names now and refused when a stale page sends them; and the writes the api or the package refuses.
  * Each writes what it reads and takes it back, so what follows reads the store as it was.
  */
-import { root } from '../../test/harness.ts';
+import { root, seatPerson } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -371,6 +371,7 @@ test('a person reads the agents: both places listed, one read by name, the card 
     "the listing and a card read yours under the store's root of the app they are asked through, not the package's",
     async () => {
       const home = scratch('nemia-api-agents-home-');
+      seatPerson(home);
       fs.mkdirSync(path.join(home, 'workflows', 'agents'), { recursive: true });
       fs.writeFileSync(path.join(home, 'workflows', 'agents', 'elsewhere.md'), '---\ndescription: Lives elsewhere.\n---\nDo it.\n');
       onRepo(home);

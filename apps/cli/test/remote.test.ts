@@ -146,7 +146,8 @@ test("`nemia daemon` prints the line of the daemon the context names, under this
   try {
     const local = await here.nemia(['daemon']);
     assert.equal(local.code, 0, local.err);
-    assert.equal(local.out, `${await daemonLine(here.url)}\n`);
+    const credential = fs.readFileSync(path.join(here.root, 'credential'), 'utf8').trim();
+    assert.equal(local.out, `${await daemonLine(here.url, credential)}\n`);
     const json = await here.nemia(['daemon', '--json']);
     assert.equal(json.code, 0, json.err);
     assert.deepEqual(Object.keys(JSON.parse(json.out)), ['state', 'by', 'pid', 'url']);

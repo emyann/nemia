@@ -31,6 +31,14 @@ export let store: string | undefined;
 export function setStore(to: string | undefined): void {
   store = to;
 }
+/**
+ * The person's token the seeded store keeps (`seatToken`, served.ts): every api route asks for one, so each browser context a page opens
+ * on the worker's seat is given it as the board's cookie (`seated`), and a request a page makes from Node presents it as its bearer.
+ */
+export let seatToken: string | undefined;
+export function setSeatToken(to: string | undefined): void {
+  seatToken = to;
+}
 /** The environment the api runs in — its store, its `claude`, where sessions register — for a `wf` a page runs on the same store. */
 export let apiEnv: NodeJS.ProcessEnv = {};
 export function setApiEnv(to: NodeJS.ProcessEnv): void {

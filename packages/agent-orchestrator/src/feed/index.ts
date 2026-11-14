@@ -42,6 +42,7 @@ export type {
   FeedLine,
   FeedMemo,
   FeedPause,
+  FeedResumed,
   FeedPublished,
   FeedSaid,
   FeedWords,

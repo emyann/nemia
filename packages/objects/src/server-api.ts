@@ -10,6 +10,7 @@
  * since a key a Schema does not declare is not encoded.
  */
 import { Schema } from 'effect';
+import { Actor } from './token.ts';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BadRequest, Conflict, Failed, Invalid, Missing } from './api-errors.ts';
 import {
@@ -267,6 +268,7 @@ export const Pause = Schema.Struct({
   by: Schema.String,
   why: Schema.optionalKey(Schema.String),
   timeoutMs: Schema.optionalKey(Schema.Number),
+  actor: Schema.optionalKey(Actor),
 });
 export type Pause = typeof Pause.Type;
 

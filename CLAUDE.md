@@ -53,8 +53,11 @@ holds what every change needs.
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
 - `npm run build`, then `npm run e2e -- --pages <the pages the change touches>` (and `--photos` when pictures are due), when you touch
   `apps/web`: its assertions, in the dark theme, by workers in parallel, each with its own store, api and app (`apps/web/CLAUDE.md`).
-  A session never runs it whole but to measure it: `ci`'s `e2e` job runs every page on the commit implement's round check pushed, which
-  is the commit the landing merges; the landing's check runs no page.
+  `--pages` runs none of the look's browser tests (`apps/web/test/e2e/*.test.ts`): add `--look` (`npm run e2e -- --look --pages
+  <…>`, or `--look` alone) when the change touches a part of the look (`src/components/look`), a story, `test/e2e/parts/` or a runner
+  file beside the pages; they run two files at a time. A session never runs it whole but to measure it: `ci`'s `e2e-look` job runs the
+  look's tests once and its `e2e` shards every page, on the commit implement's round check pushed, which is the commit the landing
+  merges; the landing's check runs no page.
 - `node tools/observe/render/render.ts --out <dir>` when you touch `tools/observe`: it renders the checkout's dashboards on a throwaway
   stack with fake data, never the live one, and a step hands over the `dashboard-<name>.png` and `.txt` it writes (`see-a-dashboard`).
   It needs `docker`, takes a minute and a half, and is never run by the suite.

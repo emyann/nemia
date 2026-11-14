@@ -1,9 +1,9 @@
 /**
  * The nemia group's endpoints that serve what was the command line's alone, each calling its entry of the package's table by type: an
  * agent's proposal written (`PUT /api/policy/:name/proposal`, `nemia policy propose`), what its rules reach in a factory
- * (`GET /api/policy/:name/reach`, `nemia policy reach`), and the names an agent may speak under in her chat, listed, allowed and taken
- * back (`/api/nemia/chat/speakers`, `nemia chat speakers|allow|disallow`); and what each refuses as the command line refuses it, writing
- * nothing.
+ * (`GET /api/policy/:name/reach`, `nemia policy reach`); and what each refuses as the command line refuses it, writing nothing. The
+ * names an agent once spoke under in her chat (`/api/nemia/chat/speakers`) are retired, an agent speaking with a token of its own: no
+ * route answers them.
  *
  * The store is the harness's scratch one (`root`, test/harness.ts); the agent's custom instruction is written where the package keeps it
  * (`customInstructionsFile`), and its factory planted with the package's test spelling (`addFactory`, `attachWorkflow`).
@@ -16,7 +16,7 @@ import path from 'node:path';
 import { scratch } from 'test-kit/scratch';
 import { customInstructionsFile } from 'agent-orchestrator';
 import { addFactory, attachWorkflow } from 'agent-orchestrator/testing';
-import type { ChatSpeakers, PolicyReach } from 'objects';
+import type { PolicyReach } from 'objects';
 import type { PolicyAnswer } from './nemia.ts';
 import { app } from '../app.ts';
 
@@ -34,7 +34,7 @@ const errorOf = (body: unknown): string => String((body as { error?: unknown }).
 /** What the agent `drafter` proposed, as the store keeps it. */
 const PROPOSED = path.join(root, 'auto', 'drafter.proposed.json');
 
-/** The names allowed to speak in her chat, as the store keeps them. */
+/** The names once allowed to speak in her chat, as the store kept them. */
 const SPEAKERS = path.join(root, 'nemia', 'chat', 'speakers.json');
 
 /** A proposal of one rule, as an agent writes it. */
@@ -120,27 +120,14 @@ test('REFUSED: a reach of neither a factory nor a run, or of both (422), and of 
   assert.equal(ghost.status, 404, JSON.stringify(ghost.body));
 });
 
-test('the speakers of her chat: none listed, one allowed and written, then taken back', async () => {
-  const none = await asked('GET', '/api/nemia/chat/speakers');
-  assert.equal(none.status, 200);
-  assert.deepEqual((none.body as ChatSpeakers).allowed, []);
-  const allowed = await asked('PUT', '/api/nemia/chat/speakers/operator', {});
-  assert.equal(allowed.status, 200, JSON.stringify(allowed.body));
-  assert.deepEqual((allowed.body as ChatSpeakers).allowed, ['operator']);
-  assert.deepEqual((JSON.parse(fs.readFileSync(SPEAKERS, 'utf8')) as ChatSpeakers).allowed, ['operator'], 'written to the store');
-  const listed = await asked('GET', '/api/nemia/chat/speakers');
-  assert.deepEqual((listed.body as ChatSpeakers).allowed, ['operator']);
-  const taken = await asked('DELETE', '/api/nemia/chat/speakers/operator');
-  assert.equal(taken.status, 200, JSON.stringify(taken.body));
-  assert.deepEqual((taken.body as ChatSpeakers).allowed, []);
-  assert.deepEqual((JSON.parse(fs.readFileSync(SPEAKERS, 'utf8')) as ChatSpeakers).allowed, []);
-});
-
-test('REFUSED (422), writing nothing: a name no agent speaks under, allowed or taken back', async () => {
-  const before = fs.readFileSync(SPEAKERS, 'utf8');
-  const reserved = await asked('PUT', '/api/nemia/chat/speakers/nemia', {});
-  assert.equal(reserved.status, 422);
-  const misspelt = await asked('DELETE', '/api/nemia/chat/speakers/Operator');
-  assert.equal(misspelt.status, 422);
-  assert.equal(fs.readFileSync(SPEAKERS, 'utf8'), before, 'the list is unchanged');
+test('REFUSED: the retired speakers of her chat are no route — listed, allowed or taken back, each a 404 that writes nothing', async () => {
+  for (const [method, url] of [
+    ['GET', '/api/nemia/chat/speakers'],
+    ['PUT', '/api/nemia/chat/speakers/operator'],
+    ['DELETE', '/api/nemia/chat/speakers/operator'],
+  ] as const) {
+    const res = await app.request(url, { method, headers: BOARD, ...(method === 'PUT' ? { body: '{}' } : {}) });
+    assert.equal(res.status, 404, `${method} ${url}`);
+  }
+  assert.equal(fs.existsSync(SPEAKERS), false, 'no list is written');
 });

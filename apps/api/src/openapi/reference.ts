@@ -20,6 +20,12 @@ export const REFERENCE_PATH = '/openapi';
  */
 export const REFERENCE_PROXY_PATH = '/proxy';
 
+/**
+ * The name of the security scheme a page whose request client is on gives its document — the api's bearer token — and selects for every
+ * request it tries, so a token typed once is sent with each one after it.
+ */
+export const TOKEN_SCHEME = 'token';
+
 /** Where the api serves the viewer's script, read from the installed package. */
 export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
 
@@ -33,7 +39,8 @@ export const REFERENCE_BUNDLE = new URL('./browser/standalone.js', import.meta.r
  * The page and the viewer's script.
  * @param script Gives the text of the viewer's script.
  * @param client Whether the viewer's request client is on: off on the api's own page, where a request would act on the store behind
- * it unasked; on for the page a person starts to try an api they name (`browseApp`).
+ * it unasked; on for the page a person starts to try an api they name (`browseApp`), where the token scheme is selected for every
+ * request and the token typed is kept by the browser for that page, so it is typed once.
  */
 export const referenceOf = (script: () => Promise<string>, client = false) =>
   new Hono<ApiEnv>()
@@ -49,8 +56,8 @@ export const referenceOf = (script: () => Promise<string>, client = false) =>
         telemetry: false,
         hideClientButton: !client,
         hideTestRequestButton: !client,
-        persistAuth: false,
-        ...(client ? { proxyUrl: REFERENCE_PROXY_PATH } : {}),
+        persistAuth: client,
+        ...(client ? { proxyUrl: REFERENCE_PROXY_PATH, authentication: { preferredSecurityScheme: TOKEN_SCHEME } } : {}),
         agent: { disabled: true },
         mcp: { disabled: true },
         showDeveloperTools: 'never',

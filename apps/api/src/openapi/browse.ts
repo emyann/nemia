@@ -8,7 +8,7 @@
  */
 import { Hono } from 'hono';
 import { OPENAPI_PATH, openapiDocument } from './openapi.ts';
-import { REFERENCE_PATH, referenceOf } from './reference.ts';
+import { REFERENCE_PATH, TOKEN_SCHEME, referenceOf } from './reference.ts';
 
 /** What a page is started with: the api its requests are sent to until a person gives another address on the page. */
 export type Browsed = { readonly target: string };
@@ -32,8 +32,9 @@ function titled(browsed: Browsed): unknown {
     'it under its name; one named `<group>.<endpoint>` is read by a client directly — the board, a sub-resource, a stream.',
     '',
     '**Try it.** A request sent from this page goes to the address under Server, through the page: set it to the api you mean, a',
-    "server's or this machine's. Give it a token under Authentication (`nemia token add <name>` mints one on that store); the page",
-    'keeps none. A write acts on that store as any client does.',
+    "server's or this machine's. Give it a token under Authentication (`nemia token add <name>` mints one on that store): it is",
+    'sent with every request after it, and kept by this browser for this page until you clear it. A write acts on that store as any',
+    'client does.',
     '',
     'In a terminal: `npm run api`.',
   ].join('\n');
@@ -44,8 +45,8 @@ function titled(browsed: Browsed): unknown {
       variables: { api: { default: browsed.target, description: 'Its address, as http://127.0.0.1:8787 or https://nemia.example.' } },
     },
   ];
-  document.components = { ...document.components, securitySchemes: { token: { type: 'http', scheme: 'bearer' } } };
-  document.security = [{ token: [] }];
+  document.components = { ...document.components, securitySchemes: { [TOKEN_SCHEME]: { type: 'http', scheme: 'bearer' } } };
+  document.security = [{ [TOKEN_SCHEME]: [] }];
   return document;
 }
 

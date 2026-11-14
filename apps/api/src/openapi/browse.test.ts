@@ -29,10 +29,11 @@ test('the document names one server, an address set on the page that starts on t
   assert.ok(doc.info.description.includes('under Server'), 'a person reads where the address is set before sending a request');
 });
 
-test("the page's request client is on, its script its own, and it keeps no token", async () => {
+test("the page's request client is on, its script its own, and a token typed once is sent with every request", async () => {
   const page = await (await app().request(REFERENCE_PATH)).text();
   assert.ok(page.includes('"hideTestRequestButton": false'), 'a request is tried from the page');
-  assert.ok(page.includes('"persistAuth": false'), 'the token typed is kept nowhere');
+  assert.ok(page.includes('"persistAuth": true'), 'the token typed is kept by the browser for the page, so it is typed once');
+  assert.ok(page.includes('"preferredSecurityScheme": "token"'), 'and its scheme is selected for every request tried');
   assert.ok(
     page.includes(`"proxyUrl": "${REFERENCE_PROXY_PATH}"`),
     'and each request is sent through the page, whatever address it is for',

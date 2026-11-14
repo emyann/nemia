@@ -16,7 +16,8 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   named `nemia <command>` with its MCP tool, who answers for it when an agent calls it, and its help. Its request client is on, where
   the api's own page keeps it off: a request tried on the page is sent to the page (`REFERENCE_PROXY_PATH`), which forwards it to the
   address set on the page under Server — the api at `<url>` to begin with, this machine's daemon where none is given — with the token
-  typed under Authentication and no other header of the browser's, and says each one on a line of its terminal with its status, time
+  typed under Authentication — selected for every request, and kept by the browser for that page, so it is typed once — and no other
+  header of the browser's, and says each one on a line of its terminal with its status, time
   and size. Only the page itself may ask (`sec-fetch-site`, `origin`): a request another site's page sends is refused. Browsing needs no daemon and no token; a request needs the api and a
   token of its store. `npm run api` prints the table in a terminal — command, tool, endpoint, what it takes and answers — and
   `npm run api -- <group>` one group (`src/openapi/overview.ts`); `node apps/api/src/openapi/print.ts` prints the whole document.

@@ -57,7 +57,7 @@ export type TemplateStatus = typeof TemplateStatus.Type;
 /** A template, as an object. */
 export const Template = Schema.Struct({
   apiVersion: Schema.Literal(API_VERSION).annotate({ description: 'The version the object is served under, nemia/v1.' }),
-  kind: Schema.Literal('Template').annotate({ description: 'What the object is: a Template, a factory packaged to be applied.' }),
+  kind: Schema.Literal('Template').annotate({ description: 'What the object is: a Template, a factory template Nemia builds in, applied to make a factory.' }),
   metadata: ObjectMeta,
   spec: TemplateSpec,
   status: TemplateStatus,

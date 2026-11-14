@@ -67,6 +67,7 @@ type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unkno
  *
  * Throws an `Error` naming the line, its field and the fix when a `result` line does not decode (`printedLinesOf`).
  * Exported only for the tests that import it.
+ * @param output What the session printed: its stream or its one JSON object, stderr beside it.
  */
 export const claudeResultOutput = (output: string): HarnessOutput => {
   const results = decoded(output, ['result']).flatMap((l) => (l.kind === 'result' ? [l.line] : []));
@@ -86,6 +87,7 @@ const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
 /**
  * Every model's token counts in a `modelUsage` together, in their classes, when each model gives every class and their input sums
  * to more than 0; else none. A class a model left out sums to `NaN`, which no comparison passes.
+ * @param modelUsage The `modelUsage` of a `result` line, each model's counts by its id; undefined where the line has none.
  */
 export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Usage => {
   const models = Object.values(modelUsage ?? {});
@@ -275,6 +277,7 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
  * with its `init` line or its result, which measured it; one with neither cannot say.
  *
  * Throws an `Error` naming the line, its field and the fix when a line of a kind it reads does not decode (`printedLinesOf`).
+ * @param output The job's stream capture, one JSON object a line, stderr beside it.
  */
 export const claudeStreamOutput = (output: string): HarnessOutput => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
@@ -358,6 +361,7 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
  * thinking, other `system` lines. A capture kept so keeps the same, and reads the same.
  *
  * Throws, as `claudeStreamOutput` does, when a line of a kind it reads does not decode: a refused capture is kept whole.
+ * @param output The job's stream capture, one JSON object a line, stderr beside it.
  */
 export const claudeStreamKept = (output: string): string => {
   const facts: StreamFacts = { events: [], inputs: new Map(), started: false, skills: new Map(), files: new Map(), denied: new Set() };
@@ -389,6 +393,8 @@ const readAfter = (read: InitRead | undefined, line: InitRead): InitRead => ({
  * What a capture keeps of the line `text` when it is an `init` line, after earlier ones that said `read` (none before the first):
  * the line as `initKept` keeps it, or nothing, and what a reader reads once it is read. None when `text` is no `init` line. Throws, as
  * `claudeStreamKept` does, when it does not decode.
+ * @param text One line of the capture.
+ * @param read What the earlier `init` and `status` lines say to a reader, or undefined before the first.
  */
 export const initLineKept = (text: string, read: InitRead | undefined): { kept?: string; read: InitRead } | undefined => {
   if (printedKindOf(text) !== 'system init') return undefined;
@@ -435,6 +441,8 @@ const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined
  * What a job's stream says of the text it is writing (the SDK's `includePartialMessages`), in `output`'s whole lines after `before` lines:
  * a message begun, a piece of a text block, a block written whole (`PartialMark`); every other line passes. Or why it is refused (`wrong`),
  * naming the line as numbered in the whole output, when a `stream_event` line does not decode (`printedLinesOf`).
+ * @param output The whole lines of the stream read this time.
+ * @param before How many lines of the stream came before `output`, so that a refusal numbers its line in the whole output.
  */
 export const claudePartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);
@@ -446,6 +454,8 @@ export const claudePartials = (output: string, before: number): { marks: Partial
  * What a capture keeps of an `init` line `line`, given what its earlier `init` lines already say to a reader (`read`, none before the
  * first): the first always, cut to what a reader reads; a later one only where it names a folder or a model none named before, or a
  * version of Claude Code or a mode other than the last; else nothing. Proved by its contract (`contracts/capture.contract.ts`).
+ * @param line What the `init` line says that a reader reads.
+ * @param read What the earlier `init` and `status` lines say to a reader, or undefined before the first.
  */
 export const initKept: InitKept = (line, read) => {
   const { cwd, model, claude_code_version: version, ranIn: mode } = line;

@@ -6,7 +6,13 @@ import type { Usage } from '../../core/index.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { Carried } from './run-file.ts';
 
-/** `usage` with the parent's `carried` totals taken off: a measure either lacks, or that would go below nothing, dropped. */
+/**
+ * `usage` with the parent's `carried` totals taken off: a measure either lacks, or that would go below nothing, dropped.
+ * @param usage What the resumed session's output says it used, its parent's totals among it.
+ * @param carried The totals its parent carried on, as its run file keeps them.
+ * @param ownTokens The process's own token counts, where its output gives them beside its whole session's; undefined where the counts it
+ *   gives are its own already, and kept whole.
+ */
 export const lessCarried = (usage: Usage, carried: Carried, ownTokens?: Usage): Usage | undefined => {
   const { costUsd, apiMs, ...own } = usage;
   const less = (mine: number | undefined, theirs: number | undefined) =>
@@ -43,6 +49,7 @@ const tokensLess = (mine: Usage, carried: Carried, own: Usage): Usage => {
 /**
  * What a resumed session's parent carried on, as its output says (`told`): its cost and API time, and its token counts where they
  * are its whole session's (`ownTokens` beside them), in every class it gave.
+ * @param told What the parent's output says, or undefined where it says nothing, which carries nothing.
  */
 export const carriedOf = (told: HarnessOutput | undefined): Carried => {
   const usage = told?.usage ?? {};

@@ -26,6 +26,7 @@ export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE'
  * Whether `cause`, an error a spawn failed with before anything started, refuses it: true unless its `code` is one of
  * `TRANSIENT_ERRNOS`, which a later attempt may not meet.
  * Exported only for the tests that import it.
+ * @param cause What the spawn failed with: an error with a `code`, or any value.
  */
 export const refusedOsError = (cause: unknown): boolean => {
   const code = (cause as NodeJS.ErrnoException | undefined)?.code;

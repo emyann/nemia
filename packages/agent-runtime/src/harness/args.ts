@@ -231,6 +231,8 @@ const shown = (v: unknown) => (typeof v === 'number' ? String(v) : JSON.stringif
 /**
  * The configuration a turn's session is started with: the task's, with what the turn gave for itself (`TURN_ARGS`) over it.
  * The one place a turn's configuration is merged, so the runtime's core hands both on without opening either.
+ * @param base The task's own configuration, or undefined where it was filed with none.
+ * @param turn What the turn gave for itself, or undefined where it gave nothing: the task's configuration then stands as it is.
  */
 export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs | undefined): HarnessArgs | undefined =>
   turn === undefined ? base : { ...base, ...turn };
@@ -238,6 +240,7 @@ export const configForTurn = (base: HarnessArgs | undefined, turn: HarnessArgs |
 /**
  * Why what an answer gives its turn cannot be journalled — or `undefined`. Only the turn's own arguments (`TURN_ARGS`), in
  * the words a filing's have, except that leaving a cap out keeps the task's own.
+ * @param turn What an answer gives its turn, as filed, of any shape; undefined where it gives nothing, which is no refusal.
  */
 export const turnArgsRefusalOf = (turn: unknown): string | undefined => {
   if (turn === undefined) return undefined;
@@ -279,6 +282,7 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  * 2. A harness argument filed beside `config` rather than in it: an untyped caller would otherwise have it journalled
  *    nowhere and its session started without it.
  * 3. `config` itself, then each of its arguments.
+ * @param spec The task as filed: its `config`, and any key beside it, read for a former name or an argument filed outside `config`.
  */
 export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefined => {
   const moved = movedRefusalOf(spec);

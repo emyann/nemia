@@ -129,7 +129,10 @@ export type TranscriptEvent = {
   origin?: { kind: TranscriptOriginKind };
 };
 
-/** A harness's written origin as its word: itself where `ORIGIN_KINDS` names it, `unknown` otherwise (`contracts/origin.contract.ts`). */
+/**
+ * A harness's written origin as its word: itself where `ORIGIN_KINDS` names it, `unknown` otherwise (`contracts/origin.contract.ts`).
+ * @param written The harness's origin as written, of any value.
+ */
 export const originOf: OriginOf = (written) => ORIGIN_KINDS.find((kind) => kind === written) ?? 'unknown';
 
 /** One event of a session's transcript, named as an event is unique: by its `kind` and `id` together. */
@@ -415,6 +418,8 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
  * A harness that costs nothing: sessions are a map, and a test moves them by hand. Every spawn request is pushed to
  * `spawned`, so a test can assert what the harness was actually asked for. It can end a turn (`interrupt`), which changes nothing of
  * its sessions: a turn ended leaves the session as it was, at work.
+ * @param control The test's hold on the harness: `sessions`, the map it moves by hand, and `spawned`, where each spawn request is pushed;
+ *   each a new one where unset.
  */
 export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {
   const sessions = control?.sessions ?? new Map<string, Sighting>();
@@ -515,6 +520,13 @@ const fallbackOf = (harnesses: Record<string, RunnerOps>, fallback: string): Run
   return ops;
 };
 
+/**
+ * The runner of several harnesses as one: a spawn goes to the harness its task names (`fallback` where it names none), a verb on a
+ * session to the harness that owns it, and a look reads every harness, one that fails said as its sessions unread. A task naming a
+ * harness not among them is refused, nothing started.
+ * @param harnesses The runner of each harness, by its name.
+ * @param fallback The harness a task that names none goes to, one of `harnesses`: one not among them is thrown.
+ */
 export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
   const fallbackOps = fallbackOf(harnesses, fallback);
   const pick = (name?: string) => (name === undefined ? undefined : own(harnesses, name)) ?? fallbackOps;

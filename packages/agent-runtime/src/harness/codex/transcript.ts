@@ -17,6 +17,7 @@ const rollouts = new Map<string, string>();
  * id — the `thread_id` of `exec --json`'s first event, which the worker keeps as the run's `nativeId` —
  * newest day first, and remembered once found. An id, not a path: an id with anything but what a thread
  * id is made of (hex digits and `-`) finds none, so nothing else goes into a file name.
+ * @param threadId The thread's id, as `exec --json` gave it.
  */
 export const codexRolloutFile = (threadId: string): string | undefined => {
   if (!/^[0-9a-f-]+$/.test(threadId)) return undefined;
@@ -120,6 +121,9 @@ const itemEvents = (item: RolloutItem, id: string, at: string): TranscriptEvent[
  * A record of those two kinds is decoded (`rollout.ts`) before anything is read of it, and one that does not decode throws an
  * `Error` naming the line by its offset, in `file` when it is given, its kind, its field and the fix: the rollout is refused, never
  * read as saying nothing. Any other value — another kind, no object — gives nothing, unread.
+ * @param entry A record of the rollout, parsed from its JSON line, of any shape.
+ * @param offset Where the record's line starts in the rollout, in bytes: its events' fallback id, and where a refusal says it is.
+ * @param file The rollout's path, named in a refusal; undefined to say only the rollout.
  */
 export const codexRolloutEvents = (entry: unknown, offset: number, file?: string): TranscriptEvent[] => {
   const where = `the line at byte ${offset} of ${file ? `the rollout \`${file}\`` : 'the rollout'}`;

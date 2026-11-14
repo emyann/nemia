@@ -6,14 +6,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** `<harnessBin>/<program>` where it exists now, a link followed to its file; `undefined` with no `harnessBin`, or none there. */
+/**
+ * `<harnessBin>/<program>` where it exists now, a link followed to its file; `undefined` with no `harnessBin`, or none there.
+ * @param harnessBin The folder the engine keeps harness programs in, or undefined where it has none.
+ * @param program The program's file name.
+ */
 export const programIn = (harnessBin: string | undefined, program: string): string | undefined => {
   if (!harnessBin) return undefined;
   const at = path.join(harnessBin, program);
   return fs.existsSync(at) ? at : undefined;
 };
 
-/** `program` as `PATH` finds it now: the first of its folders holding it as a file this user may run, or `undefined`. */
+/**
+ * `program` as `PATH` finds it now: the first of its folders holding it as a file this user may run, or `undefined`.
+ * @param program The program's file name.
+ */
 export const programOnPath = (program: string): string | undefined => {
   for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
     if (!dir) continue;

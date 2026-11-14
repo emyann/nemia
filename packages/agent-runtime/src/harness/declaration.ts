@@ -165,18 +165,36 @@ export const DEFAULT_HARNESS = 'claude';
  */
 export const DEFAULT_SIGN_IN: { readonly variable: string; readonly maker: string } = CLAUDE_SIGN_IN;
 
-/** Whether a declaration lists `capability`: a runner of the consumer's (`undefined`) declares nothing. */
+/**
+ * Whether a declaration lists `capability`: a runner of the consumer's (`undefined`) declares nothing.
+ * @param can The capabilities the declaration lists, or undefined for a runner of the consumer's.
+ * @param capability The capability looked for.
+ */
 export const declares = (can: readonly Capability[] | undefined, capability: Capability): boolean =>
   can !== undefined && can.includes(capability);
 
-/** The first capability a task asks of its harness that the harness's declaration does not list, or `undefined`. */
+/**
+ * The first capability a task asks of its harness that the harness's declaration does not list, or `undefined`.
+ * @param asked The capabilities the task asks of its harness.
+ * @param can The capabilities the harness's declaration lists, or undefined for a runner of the consumer's, which declares nothing
+ *   and so refuses nothing.
+ */
 export const misplacedOf: MisplacedOf = (asked, can) => (can === undefined ? undefined : asked.find((c) => !can.includes(c)));
 
-/** The names of the harnesses that declare `capability`, in the engine's order: the fix a refusal offers. */
+/**
+ * The names of the harnesses that declare `capability`, in the engine's order: the fix a refusal offers.
+ * @param capability The capability looked for.
+ * @param harnesses The engine's harnesses, in its order.
+ */
 export const takersOf: TakersOf = (capability, harnesses) =>
   harnesses.filter((h) => h.can !== undefined && h.can.includes(capability)).map((h) => h.name);
 
-/** The harness an Engine verb goes to, read off the declarations: the one named, or the first that declares it; or why none. */
+/**
+ * The harness an Engine verb goes to, read off the declarations: the one named, or the first that declares it; or why none.
+ * @param verb The Engine verb, as the capability a harness declares to take it.
+ * @param name The harness the caller named, or undefined for the first that declares the verb.
+ * @param harnesses The engine's harnesses, in its order.
+ */
 export const verbHarnessOf: VerbHarnessOf = (verb, name, harnesses) => {
   if (name !== undefined) {
     const h = harnesses.find((o) => o.name === name);
@@ -191,6 +209,8 @@ export const verbHarnessOf: VerbHarnessOf = (verb, name, harnesses) => {
  * The config of its own a harness's declaration says each neutral ask becomes, the asks it has no word for dropped: on Claude Code,
  * `remoteControl` becomes `claude.remoteControl`; on Codex, `trustRepository` becomes `codex.trustFrom`. `repo` is asked only where the
  * declaration takes `trustRepository`, so a caller reads the repository's real path only for a harness that uses it.
+ * @param declaration The harness's declaration, or undefined for a runner of the consumer's, which turns no ask into config.
+ * @param asked The neutral asks: `trustRepository`, which reads the repository's real path, and `remoteControl`.
  */
 export const ownArgsOf = (
   declaration: HarnessDeclaration | undefined,

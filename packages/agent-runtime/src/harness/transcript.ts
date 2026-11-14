@@ -17,18 +17,26 @@ const CURSOR_TAIL_BYTES = 4096;
 /**
  * The cursor after `offset` bytes of a transcript whose last `CURSOR_TAIL_BYTES` before it, or all of them where there are fewer, are
  * `tail`: the one writer of a cursor, for `readTranscript` and for a reader that follows a file as it grows.
+ * @param offset How far into the transcript the cursor is, in bytes.
+ * @param tail The transcript's bytes just before `offset`, its last `CURSOR_TAIL_BYTES` or all where there are fewer.
  */
 export const cursorOf = (offset: number, tail: Uint8Array): TranscriptCursor =>
   `${offset}.${createHash('sha256').update(tail).digest('hex').slice(0, 16)}`;
 const START: TranscriptCursor = cursorOf(0, new Uint8Array());
 
-/** Whether `after` is a cursor a transcript read could have given. */
+/**
+ * Whether `after` is a cursor a transcript read could have given.
+ * @param after The cursor a caller passed.
+ */
 export const isTranscriptCursor = (after: string): boolean => /^(0|[1-9]\d*)\.[0-9a-f]{16}$/.test(after);
 
 /** No conversation to read yet: no events, and a cursor that reads from the start. */
 export const noTranscript = (): Transcript => ({ events: [], cursor: START });
 
-/** A record's own time as ISO 8601, or `undefined` when it has none that parses. */
+/**
+ * A record's own time as ISO 8601, or `undefined` when it has none that parses.
+ * @param t The record's time as written, of any value: only a string that parses is a time.
+ */
 export const isoTime = (t: unknown): string | undefined => {
   const ms = typeof t === 'string' ? Date.parse(t) : NaN;
   return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
@@ -45,6 +53,9 @@ export const isoTime = (t: unknown): string | undefined => {
  * was given at — so a file that shrank, or was replaced, is read again from the start, rather than from
  * the middle of something else or as nothing for ever. A line that is not JSON is passed over. No file
  * is no events and a cursor at the start. A cursor no read gave is refused: it is somebody's bug.
+ * @param file The transcript's path, or undefined (or empty) where there is none, which reads no events.
+ * @param after The cursor the last read gave, or undefined to read from the start.
+ * @param eventsOf Reads one parsed line as events, given the line, the byte offset it starts at and the file.
  */
 export const readTranscript = async (
   file: string | undefined,

@@ -208,6 +208,51 @@ test('gateLines', async (t) => {
   }
 });
 
+test('gateLines at an ending approved and not filed: the send-back of the work beside the approval, until a try of the work spends it', async (t) => {
+  const ENDING: StepSpec[] = [step('implement'), { ...step('ship', ['implement']), workspace: 'base', gate: true }];
+  const given = { ...approval('ship', 1), work: { implement: 1 } };
+  const atShip = (extra: Partial<RepositoryRun> = {}) => run({ implement: 't1', ship: null }, extra);
+  for (const [row, r, p, expected] of [
+    [
+      'approved, nothing of it filed: the approval, and the send-back of the work it would act on',
+      atShip({ approvals: [given] }),
+      PLAN_DONE,
+      { ship: 'approved 23:10Z  — not filed yet; or send the work back:  nemia retry r-1 implement --message "<objection>"' },
+    ],
+    [
+      'an approval a file older code wrote, with no work named, counts as current',
+      atShip({ approvals: [approval('ship', 1)] }),
+      PLAN_DONE,
+      { ship: 'approved 23:10Z  — not filed yet; or send the work back:  nemia retry r-1 implement --message "<objection>"' },
+    ],
+    [
+      'on a held run, no send-back: the hold refuses a try until it lifts',
+      atShip({ approvals: [given], hold: { at: '2026-09-17T01:00:00.000Z', until: [] } }),
+      PLAN_DONE,
+      { ship: 'approved 23:10Z' },
+    ],
+    [
+      'filed, no send-back: the run has acted on the approval',
+      atShip({ approvals: [given], steps: { implement: { taskId: 't1' }, ship: { taskId: 't2' } } }),
+      phases({ t1: 'succeeded', t2: 'running' }),
+      { ship: 'approved 23:10Z' },
+    ],
+    [
+      'the work tried since: the approval is spent, and the gate asks again',
+      atShip({
+        approvals: [given],
+        steps: { implement: { taskId: 't3', tries: [{ taskId: 't1', cause: 'continue' }] }, ship: { taskId: null } },
+      }),
+      phases({ t1: 'succeeded', t3: 'succeeded' }),
+      {
+        ship: 'awaiting approval:  nemia approve r-1 ship [--message "<words>"]  — or send it back:  nemia retry r-1 implement --message "<objection>"',
+      },
+    ],
+  ] as Array<[string, Run, (id: string) => TaskPhase, Record<string, string>]>) {
+    await t.test(row, () => assert.deepEqual(gateLines(ENDING, r, p, signedDone, asked), expected));
+  }
+});
+
 /** `nemia approve <run> <name>` of `PLANNED` on `r`, as the verb asks it. */
 const refused = (
   r: Run,

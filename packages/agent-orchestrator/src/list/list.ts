@@ -25,6 +25,7 @@ import {
   roundSpans,
   runSpend,
   sendBackTo,
+  unfiledBack,
   spentWord,
   standing,
   stepSpend,
@@ -421,13 +422,11 @@ function listedSteps(
                       .map((r) => r.step)
                       .join(', ')}) — it waits at its gate again once that settles`
                   : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
-    const gate =
-      !atGates.has(step.name) || retry
-        ? ''
-        : takenByHand(step.name)
-          ? onBaseNote(run, step.name, standings)
-          : gateNote(run, step.name, sendBackTo(step, run));
-    const note = [tried, gate, row.note, landingWord(run, step.name), notedSaid(run, step.name, saidTo)].filter(Boolean).join(' · ');
+    const gate = atGates.has(step.name) && !retry ? atGateNote(step, run, takenByHand(step.name), standings) : '';
+    const back = waitingAgain.has(step.name) ? '' : backNote(step, run);
+    const note = [tried, gate || back, row.note, landingWord(run, step.name), notedSaid(run, step.name, saidTo)]
+      .filter(Boolean)
+      .join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...taskRow(run.steps[step.name]?.taskId, ranOnOf, deniedOf), ...cost };
   });
@@ -733,6 +732,22 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold' | 'cancelledAt'>, step
       : run.hold
         ? heldLater(run.hold, 'its approval')
         : `approve it: nemia approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
+
+/**
+ * What `nemia ls` says beside a step at its gate: the merge a person made by hand, for an ending whose result is on the base branch
+ * (`onBaseNote`), else the approval and the send-back (`gateNote`). Pure.
+ */
+const atGateNote = (step: StepSpec, run: Run, byHand: boolean, standings: Parameters<typeof onBaseNote>[2]): string =>
+  byHand ? onBaseNote(run, step.name, standings) : gateNote(run, step.name, sendBackTo(step, run));
+
+/**
+ * The send-back an ending approved and not filed still offers (`unfiledBack`), beside what it waits for: the work it would act on, sent
+ * back with words, which spends the approval. Pure.
+ */
+const backNote = (step: StepSpec, run: Run): string => {
+  const back = unfiledBack(step, run);
+  return back.length ? `or send it back: ${back.map((name) => `nemia retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : '';
+};
 
 /**
  * What `nemia ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a

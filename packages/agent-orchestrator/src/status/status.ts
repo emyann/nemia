@@ -48,10 +48,36 @@ export const gatesOf = (steps: readonly StepSpec[], run: Pick<Run, 'gates'>): st
   steps.filter((s) => hasGate(s, run)).map((s) => s.name);
 
 /**
- * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it. Pure.
+ * The approval of the try a step is on, if a person gave one (`nemia approve`). One for an earlier try was spent by the try after it, and
+ * an ending's, given for work that has had a try since (`Approval.work`), by that try: a send-back of the work. Pure.
  */
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
-  run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
+  run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step) && workStands(run, a));
+
+/** Whether each step an approval's `work` names is still on the try it was on when the approval was given; an approval with none stands. */
+const workStands = (run: Run, a: Approval): boolean => Object.entries(a.work ?? {}).every(([step, n]) => tryOf(run, step) === n);
+
+/**
+ * The tries of the work an ending would act on, as they stand now — what its approval names (`Approval.work`): each step it waits on.
+ * None for a step that is not approved first (`approvedFirst`), whose approval its own try spends. Pure.
+ */
+export const approvedWork = (step: StepSpec, run: Run): Record<string, number> | undefined =>
+  approvedFirst(step, run) ? Object.fromEntries(step.after.map((a) => [a, tryOf(run, a)])) : undefined;
+
+/**
+ * Whether an ending approved first (`approvedFirst`) has its approval of the work as it stands (`approvalOf`) and nothing of it filed: it
+ * waits for the checkout, or for the pass that files it. Its work may still be sent back (`sendsBack` in `retryable`), which spends the
+ * approval, as the try after a gated step's own does. False on a run called off, which files nothing. Pure.
+ */
+export const approvedUnfiled = (step: StepSpec, run: Run): boolean =>
+  !run.cancelledAt && approvedFirst(step, run) && !run.steps[step.name]?.taskId && Boolean(approvalOf(run, step.name));
+
+/**
+ * The steps a send-back from an ending approved and not filed goes to (`sendBackTo`), as `nemia ls`, `nemia decide` and a second `nemia
+ * approve` offer it beside the approval: none for a step that is not such an ending, and none on a run held, whose hold refuses a try until
+ * it lifts (`heldRefusal`). Pure.
+ */
+export const unfiledBack = (step: StepSpec, run: Run): string[] => (run.hold || !approvedUnfiled(step, run) ? [] : sendBackTo(step, run));
 
 /**
  * Whether a step's sessions are filed held open (the runtime's `holdOpen`): its harness, `DEFAULT_HARNESS` where it names none, declares
@@ -64,7 +90,8 @@ export const holdsOpenOn = (step: Pick<StepSpec, 'harness'>): boolean => declara
  * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
  * Pure.
  */
-export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
+export const spentApprovals = (run: Run): Approval[] =>
+  (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step) || !workStands(run, a));
 
 /**
  * What a person accepted of a loop on the try its looping step is on (`nemia approve`). One for an earlier try was spent by the try after

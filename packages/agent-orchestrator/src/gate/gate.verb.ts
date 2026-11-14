@@ -7,7 +7,7 @@ import { Effect } from 'effect';
 import type { Actor } from 'objects';
 import { tried } from '../runtime-client.ts';
 import { tryOf, type Approval, type Run } from '../record/record.ts';
-import { approvedFirst } from '../status/status.ts';
+import { approvedFirst, approvedWork } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
 import { stepsOf } from '../steps/steps.verb.ts';
 import { runsAtOnce } from '../runs/runs.store.ts';
@@ -96,12 +96,15 @@ export const approveRun = Effect.fn('approve')(function* (
     );
   }
   const caps = set.caps.map((c) => ({ step: c.step, usd: c.usd }));
+  const gated = steps.find((s) => s.name === stepName);
+  const work = gated ? approvedWork(gated, run) : undefined;
   const approval: Approval = {
     step: stepName,
     try: tryOf(run, stepName),
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
     ...(caps.length ? { budgets: Object.fromEntries(caps.map((c) => [c.step, c.usd])) } : {}),
+    ...(work ? { work } : {}),
     ...(actor ? { actor } : {}),
   };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });

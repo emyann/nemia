@@ -573,7 +573,14 @@ const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
 const Caps = Schema.Record(Schema.String, Dollars);
-const ApprovalFileSchema = Kept({ at: When, message: Schema.optionalKey(Said), budgets: Schema.optionalKey(Caps) });
+/** The tries of the work an ending's approval approved (`Approval.work`): a try is counted from 1. */
+const Tries = Schema.Record(Schema.String, Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)));
+const ApprovalFileSchema = Kept({
+  at: When,
+  message: Schema.optionalKey(Said),
+  budgets: Schema.optionalKey(Caps),
+  work: Schema.optionalKey(Tries),
+});
 const AcceptanceFileSchema = Kept({ at: When, message: Said });
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
@@ -606,7 +613,11 @@ export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, v
 const messageWords = (held: unknown): string => (isText(fieldOf(held, 'message')) ? 'its message is empty' : 'its message is not text');
 
 /** Why an approval file is refused, by the field refused: one written by hand where `nemia approve` would have refused it. */
-const APPROVAL_WORDS: Record<string, string> = { at: 'it says no time it was given', budgets: 'its budgets are not dollars above zero' };
+const APPROVAL_WORDS: Record<string, string> = {
+  at: 'it says no time it was given',
+  budgets: 'its budgets are not dollars above zero',
+  work: 'the tries of the work it approved are not counts from 1',
+};
 const NO_APPROVAL = 'it is not an approval nemia approve wrote';
 
 /** One approval file, read: the step and the try from its name, when and what was said from what it holds — or why it cannot be read. */
@@ -615,13 +626,14 @@ export function approvalIn(file: string, step: string, n: number): Approval | st
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(ApprovalFileSchema, held.read);
   if ('refused' in read) return read.refused === 'message' ? messageWords(held.read) : (APPROVAL_WORDS[read.refused] ?? NO_APPROVAL);
-  const { at, message, budgets } = read.read;
+  const { at, message, budgets, work } = read.read;
   return {
     step,
     try: n,
     at,
     ...(message === undefined ? {} : { message }),
     ...(budgets === undefined ? {} : { budgets: { ...budgets } }),
+    ...(work === undefined ? {} : { work: { ...work } }),
     ...actorIn(fieldOf(held.read, 'actor')),
   };
 }
@@ -815,7 +827,11 @@ export function consumeAsks(
   );
 }
 
-/** Move each of a run's ask files `spent` into `done/` in its asks directory, passing over one already moved or removed with its run. */
+/**
+ * Move each of a run's ask files `spent` into `done/` in its asks directory, passing over one already moved or removed with its run. One
+ * spent before at the same name — an ending's approval of a try whose work was sent back, given again and spent again — is kept: the later
+ * goes in beside it, at the name with `.2`, `.3`, … after it (`keptName`), and no file in `done/` is ever written over.
+ */
 export function doneWith(home: string, id: string, spent: readonly string[]): void {
   for (const file of spent) {
     const done = path.join(asksDir(home, id), 'done', path.basename(file));
@@ -823,10 +839,22 @@ export function doneWith(home: string, id: string, spent: readonly string[]): vo
       fs.mkdirSync(path.dirname(done));
     } catch {}
     try {
-      fs.renameSync(file, done);
+      fs.linkSync(file, keptName(done));
+      fs.unlinkSync(file);
     } catch {}
   }
 }
+
+/**
+ * The first of `done`, `done.2`, `done.3`, … no file holds; `done` itself past a thousand, where the link then refuses and moves nothing.
+ */
+const keptName = (done: string): string => {
+  for (let n = 1; n <= 1000; n++) {
+    const name = n === 1 ? done : `${done}.${n}`;
+    if (!lstatOf(name)) return name;
+  }
+  return done;
+};
 
 /**
  * Every run in the store. A record `nemia rm` removed after the directory was read is no run, and no reason to fail every other run's pass;

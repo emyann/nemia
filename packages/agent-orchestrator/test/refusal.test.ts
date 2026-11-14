@@ -149,7 +149,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * install command the face exports beside the needs' judgements. Both pure, importing nothing but types, and neither touching a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 206, effect: 15 },
+  'agent-orchestrator/run': { all: 208, effect: 15 },
   'agent-orchestrator/workflow': { all: 151, effect: 15 },
 };
 

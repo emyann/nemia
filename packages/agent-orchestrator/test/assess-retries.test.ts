@@ -2042,6 +2042,13 @@ test("a blocked step's failed check run again (`blockedRecheck`): only on the co
     assert.ok(refusedItself, 'a refusal that named a --recheck on a moved branch would name a refused command');
   });
 
+  await t.test('a session continued after its check refused is told that signing off again unchanged runs the check again', () => {
+    const told = (status: RetryBriefing['status']) =>
+      retrySection(implement!, { try: 2, by: 'retries', mode: 'continue', resumed: true, status });
+    assert.match(told('failed (check)'), /change nothing and sign off as before[\s\S]*files the check again/);
+    assert.doesNotMatch(told('blocked'), /files the check again/);
+  });
+
   await t.test(
     'rechecked, the blocked try stands on its check: checking, then verified or failed (check), and retries: continue it',
     () => {

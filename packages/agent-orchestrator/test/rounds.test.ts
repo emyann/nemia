@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { StepRecord } from '../src/run.ts';
+import { isRepositoryRun } from '../src/run.ts';
 import { scratch } from 'test-kit/scratch';
 import { staged, story } from './story.ts';
 import { decisionFacts, decisionOn } from './screens.ts';
@@ -52,6 +53,12 @@ const ENV: Env = {
   WF_DEFAULT_FACTORY_STARTS: '1',
 };
 const stage = staged({ runWith, main: told, engineOf, env: ENV });
+/** The commit run `id`'s implement branch is at in the test place: what a check filed on it records (`CheckTask.tip`). */
+const filedOn = (id: string): string | null => {
+  const r = runRecord(ROOT, id);
+  const branch = r.steps.implement?.branch;
+  return isRepositoryRun(r) && branch ? stage.place().world.tip(r.repo, branch) : null;
+};
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 /** A strict `findings` schema and `again`, as the tests' team's `test/fixtures/team/agents/review.schema.json` declares them. */
@@ -228,7 +235,8 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
         'replies',
       ]);
       const branch = run.steps.implement.branch;
-      const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round' }];
+      const tip = branch ? stage.place().world.tip(run.repo, branch) : null;
+      const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check`, tip }, cause: 'round' }];
       const reviewed = [{ taskId: `${id}-review`, cause: 'round' }];
       assert.deepEqual(Object.fromEntries(Object.entries(run.steps).map(([name, record]) => [name, filedAs(record)])), {
         implement: { taskId: try2, workspace: run.workspace, branch, tries: implemented },
@@ -481,7 +489,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       'implement goes again',
     );
     assert.deepEqual(runRecord(ROOT, id).steps.implement?.tries, [
-      { taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round', budget: 10 },
+      { taskId: `${id}-implement`, check: { taskId: `${id}-implement-check`, tip: filedOn(id) }, cause: 'round', budget: 10 },
     ]);
     assert.equal(specOf(`${id}-implement-try2`).config?.budgetUsd, 5.75, 'on claude, a job, what is left of the raised cap');
     assert.equal((await over(list(stage.board().e, runRecord(ROOT, id)))).steps[0].note, 'round 2 of 3, budget $10');

@@ -127,6 +127,9 @@ export type ListedStanding = { at: string } | { none: true };
  * `nemia ls`'s line on where the branches it shows stand, at `now`: none while a daemon ticks and its last reading is within
  * `staleAfterMs` of its interval; how long ago it was read where it is older, or nothing ticks; and that it is not read where no pass has
  * read it, with what reads it.
+ * @param standing When the branches were last read, or that no pass has read them.
+ * @param daemon The daemon's standing: ticking, with its interval, or not.
+ * @param now The time asked of, in ms since the epoch.
  */
 export function standingLine(standing: ListedStanding, daemon: DaemonStanding, now: number): string | undefined {
   if ('none' in standing) return 'where branches stand: not read — nemia up reads them';
@@ -225,6 +228,7 @@ const routes = (step: StepSpec): boolean => step.routes !== undefined || step.wo
  * Each step's standing is the assessment's (`stepWords`, `assess` on the run's one read), so the listing stands no step itself and says
  * what the pass says; the routing is laid over it only where a step has a routing key a word reads (`routes:`, `workflow:`): with none,
  * the words are the standings (`routedWords`).
+ * @param input The run's steps, its one read, and the assessment of it where one was made already.
  */
 export function listing(input: ListingInput): Listing {
   const { steps, read } = input;
@@ -259,6 +263,8 @@ export type HeldBack =
  * What a queued task the runtime holds waits for, in the words the run cap's wait is said in (`slotWord`): what it waits for, and the
  * number that decides it — `waits for memory: needs 2.5Gi, 1Gi free`, or `waits for a session slot: <pool> has 4 at work
  * (WF_MAX_CONCURRENT)`. Pure.
+ * @param wait What the task waits for: memory, with the bytes it needs and the bytes free, or a session slot, with its pool and its
+ * ceiling.
  */
 export const admissionWords = (wait: HeldBack): string =>
   wait.for === 'memory'
@@ -596,7 +602,10 @@ export const PAUSE_WAIT = 'waiting on the pause';
 /** The note beside `PAUSE_WAIT`: when the check it waits for is filed, on `nemia resume`. */
 const PAUSE_WAIT_NOTE = 'its check is filed on nemia resume';
 
-/** A parked step's word: `paused`, `paused after its call to <tool>`, or `paused, its call to <tool> cut`. */
+/**
+ * A parked step's word: `paused`, `paused after its call to <tool>`, or `paused, its call to <tool> cut`.
+ * @param parked The parked step's tool calls: the one it paused after, and the one cut, each absent where there is none.
+ */
 export const pausedWord = (parked: { after?: string; cut?: string }): string =>
   parked.cut ? `paused, its call to ${parked.cut} cut` : parked.after ? `paused after its call to ${parked.after}` : 'paused';
 
@@ -616,6 +625,7 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
  * would run, say — and `nemia ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row
  * in two and mis-aligns every other row of that run, and `nemia decide` splits the same way. So every run of whitespace becomes one space
  * before the word is measured or clipped.
+ * @param waitingFor The harness's own word for what the session waits for, free text.
  */
 export function waitingWords(waitingFor: string): string {
   const shown = oneLine(waitingFor, WAIT_CAP);
@@ -630,6 +640,7 @@ export function waitingWords(waitingFor: string): string {
  * the harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `nemia ls`
  * prints the line in its note, `nemia decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named,
  * then how many more.
+ * @param denied The calls the step's sessions were denied, each in the harness's own words.
  */
 export function deniedWords(denied: readonly string[]): string {
   if (!denied.length) return '';
@@ -649,13 +660,20 @@ export function deniedWords(denied: readonly string[]): string {
  *
  * A step on a remote A2A agent (`harness: a2a:<name>`, given as `remote`) is in no Claude Code: its Task waits on its caller, and the
  * answer is a follow-up message on it, which `nemia say` sends; the question is the Task's last message, which `nemia logs` prints.
+ * @param session The session's name as the harness lists it (`nameFor`), null where no attempt is on the record.
+ * @param remote The run and the step of a step on a remote A2A agent; absent for a step of this machine.
  */
 export const answerIn = (session: string | null, remote?: { run: string; step: string }): string =>
   remote
     ? `read its question with nemia logs ${remote.run} ${remote.step}, and answer it with nemia say ${remote.run} ${remote.step} "<your answer>"`
     : `answer it in Claude Code: claude agents${session ? `, session ${session}` : ''}`;
 
-/** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
+/**
+ * The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`.
+ * @param waitingFor The harness's own word for what the session waits for, free text.
+ * @param session The session's name as the harness lists it, null where no attempt is on the record.
+ * @param remote The run and the step of a step on a remote A2A agent; absent for a step of this machine.
+ */
 export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
   `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
 
@@ -685,6 +703,7 @@ const taskRow = (
  * A step's word as `nemia ls` prints it: the bare `needs-human` the row's message keeps, then what the harness says it waits for (`waits`),
  * then what its closeout said, where it gave one. `waits` is set on a row whose word is the engine's `needs-human` and on no other
  * (`lineOf`), so the word is built from it rather than found in the message.
+ * @param s The step's row: its message and what the harness says it waits for, if anything.
  */
 export const shownStatus = (s: Pick<Listing['steps'][number], 'message' | 'waits'>): string =>
   s.waits ? `${NEEDS_HUMAN}: ${s.waits}${s.message.slice(NEEDS_HUMAN.length)}` : s.message;
@@ -714,6 +733,7 @@ function asking(
 /**
  * A step's note as `nemia ls` prints it: the row's note, then how many questions its closeout asks (`asks`), then what its current try was
  * denied (`denied`), last.
+ * @param s The step's row: its note, its closeout's questions, the harness it ran on and what it was denied.
  */
 export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied' | 'asks' | 'ranOn'>): string | undefined =>
   [s.note, s.asks ? `asks ${s.asks} question${s.asks === 1 ? '' : 's'}` : '', s.ranOn, s.denied].filter(Boolean).join(' · ') || undefined;
@@ -752,6 +772,7 @@ const backNote = (step: StepSpec, run: Run): string => {
 /**
  * What `nemia ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a
  * step at its gate, what is asked of them, `approve plan`. Pure.
+ * @param l The run's rows of steps, each by its name and reason, and the names of the steps a person has to act on.
  */
 export const onYouWords = (l: {
   steps: ReadonlyArray<Pick<Listing['steps'][number], 'name' | 'reason'>>;

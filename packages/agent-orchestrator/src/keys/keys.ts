@@ -26,6 +26,8 @@ import type { PlaceKind } from 'objects';
 /**
  * `harness:` as written: one of `HARNESSES`, or `a2a:<name>`, or refused. `claude-detached`, retired, is refused by its name: every session
  * of ours runs on the Agent SDK, as the default harness.
+ * @param step The step's name, which a refusal starts with.
+ * @param harness The `harness:` line's value, undefined where the step has none.
  */
 export function harnessOf(step: string, harness: string | undefined): string | undefined {
   if (harness === undefined || HARNESSES.includes(harness)) return harness;
@@ -55,6 +57,10 @@ export function harnessOf(step: string, harness: string | undefined): string | u
  * A permission mode, a sandbox or an effort as written: the harness's own word, which the runtime judges against the harness the step runs
  * on when `nemia start` asks it (`configRefused` in start.verb.ts). Refused here: `sandbox:` on a step that does not run on codex, since a
  * step files its sandbox as its harness's permission mode, and a sandbox read as a mode is a fence nobody asked for.
+ * @param step The step's name, which a refusal starts with.
+ * @param key The key the word is written under.
+ * @param word The line's value, undefined where the step has none.
+ * @param harness The step's `harness:`, undefined for the default harness.
  */
 export function wordOf(
   step: string,
@@ -77,6 +83,8 @@ export function wordOf(
  * it either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a
  * word. Which harnesses bridge a session is the runtime's to say, so `remote: true` where it bridges none is refused at `nemia start`
  * (`configRefused` in start.verb.ts).
+ * @param step The step's name, which a refusal starts with.
+ * @param remote The `remote:` line's value, undefined where the step has none.
  */
 export function remoteOf(step: string, remote: string | undefined): boolean | undefined {
   if (remote === undefined) return undefined;
@@ -90,6 +98,9 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
 /**
  * A count (`COUNTS`) as written, refused unless a whole number of at least its least, in digits. A `deadlineSeconds:` written with a unit —
  * `5m` — would read as NaN and stop the step on its first tick: its refusal does the arithmetic, `deadlineSeconds: 300`.
+ * @param step The step's name, which a refusal starts with.
+ * @param key The count's key, among `COUNTS`.
+ * @param value The line's value, undefined where the step has none.
  */
 export function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
@@ -110,6 +121,7 @@ const CONTEXT_EXAMPLE = '`context: 200k`, or `context: 150000`';
 /**
  * Tokens as a person writes them — `200k`, `150000`, `1M` — or undefined for anything else: digits, and thousands (`k`) or millions (`m`)
  * after them, either case. What `context:` takes.
+ * @param written The tokens as written.
  */
 export function tokensOf(written: string): number | undefined {
   const m = /^(\d+)([km])?$/i.exec(written.trim());
@@ -121,6 +133,7 @@ export function tokensOf(written: string): number | undefined {
 /**
  * A context window as `renderStep` writes it, whatever the file said: thousands with `k` when it is a whole number of them, digits
  * otherwise.
+ * @param tokens The context window, in tokens.
  */
 export const contextText = (tokens: number): string =>
   Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
@@ -131,6 +144,8 @@ const SUBAGENT_MEMORY: readonly string[] = ['user', 'project', 'local'];
 /**
  * `memory:` as written, refused where the runtime reads no limit off it (`memoryQuantityRefusal`, in its words): a Kubernetes quantity,
  * `4Gi`, `512Mi`, `4G`, which the session is filed under as its `resources.limits.memory`.
+ * @param step The step's name, which a refusal starts with.
+ * @param memory The `memory:` line's value, undefined where the step has none.
  */
 export function memoryOf(step: string, memory: string | undefined): string | undefined {
   if (memory === undefined) return undefined;
@@ -148,6 +163,8 @@ export function memoryOf(step: string, memory: string | undefined): string | und
 /**
  * `context:` as tokens, refused unless a number of them (`tokensOf`). The windows a harness takes, and whether it has the knob, are the
  * runtime's to say at `nemia start` (`configRefused` in start.verb.ts).
+ * @param step The step's name, which a refusal starts with.
+ * @param context The `context:` line's value, undefined where the step has none.
  */
 export function contextOf(step: string, context: string | undefined): number | undefined {
   if (context === undefined) return undefined;
@@ -162,6 +179,8 @@ export function contextOf(step: string, context: string | undefined): number | u
  * The context window a step's sessions run on: its own, or — for a step that continues another's session (`resume:`) — the window that
  * session was started with, since Claude Code's resumed copy keeps only the flags it is given, and one given another window would compact
  * where the session it continues did not. `validate` refuses a `resume:` step whose own `context:` differs; one without the line inherits.
+ * @param step The step whose sessions are asked of.
+ * @param steps The workflow's steps, where the step a `resume:` names is found.
  */
 export function sessionContext(
   step: Pick<StepSpec, 'name' | 'resume' | 'context'>,
@@ -187,6 +206,7 @@ export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
  * which the command line's parser reads an amount by: kept here because `agent-orchestrator/run` and `/workflow` load no more of
  * effect than `effect/Data` (`test/refusal.test.ts`), and `objects`' entry loads its Schemas; `src/command/command.test.ts` holds the two
  * equal.
+ * @param written The amount as written.
  */
 export function dollarsOf(written: string): number | undefined {
   const value = written.trim();
@@ -198,6 +218,8 @@ export function dollarsOf(written: string): number | undefined {
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`). Which harnesses keep a cap, and beside what, is the runtime's to
  * say at `nemia start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount
  * back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
+ * @param step The step's name, which a refusal starts with.
+ * @param budget The `budget:` line's value, undefined where the step has none.
  */
 export function budgetOf(step: string, budget: string | undefined): number | undefined {
   if (budget === undefined) return undefined;
@@ -213,6 +235,8 @@ export function budgetOf(step: string, budget: string | undefined): number | und
 /**
  * `gate:` as written: `true`, or refused. `false` is what a step without the line already is, and anything else — `yes`, a step's name — is
  * a word the run would have to interpret. A gate at a step the folder does not gate is said at start: `nemia start --gate <step>`.
+ * @param step The step's name, which a refusal starts with.
+ * @param gate The `gate:` line's value, undefined where the step has none.
  */
 export function gateOf(step: string, gate: string | undefined): true | undefined {
   if (gate === undefined) return undefined;
@@ -244,6 +268,8 @@ export const PLACES = ['git', 'folder'] as const satisfies readonly PlaceKind[];
 /**
  * `place:` as written: `git`, `folder`, or refused, naming both words. Undefined for a step that says nothing: a step file is refused for
  * it first (`placeRequired`), and a step frozen on a run record before the key reads as `git` (`stepPlace`).
+ * @param step The step's name, which a refusal starts with.
+ * @param place The `place:` line's value, undefined where the step has none.
  */
 export function placeNamed(step: string, place: string | undefined): (typeof PLACES)[number] | undefined {
   if (place === undefined) return undefined;
@@ -256,6 +282,8 @@ export function placeNamed(step: string, place: string | undefined): (typeof PLA
 /**
  * `place:` as a step file writes it, read past its former spelling (`placeSpelled`): the words given, or refused when the file says
  * none, naming both fixes. An agent cannot give a step its place, so a step that names one is refused all the same.
+ * @param step The step's name, which a refusal starts with.
+ * @param place The `place:` line's value, read past its former spelling; undefined where the file says none.
  */
 export function placeRequired(step: string, place: string | undefined): string {
   if (place !== undefined) return place;
@@ -273,6 +301,12 @@ export function placeRequired(step: string, place: string | undefined): string {
  * (`filedDenies`), and never a `retries:`, since a try of an ending is a person's to ask for. Who may file that check — a person's
  * approval, or a step before it that can send the work back — reads the steps together, so it is `validateBaseWorkspace`'s refusal and not
  * this one's: this function is given one step's keys and cannot see what precedes it.
+ * @param step The step's name, which a refusal starts with.
+ * @param workspace The `workspace:` line's value, undefined where the step has none.
+ * @param check The step's `check:`, undefined where it has none.
+ * @param resume The step's `resume:`, undefined where it has none.
+ * @param retries The step's `retries:` as written, undefined where it has none.
+ * @param harness The step's `harness:`, undefined for the default harness.
  */
 export function workspaceOf(
   step: string,
@@ -322,6 +356,9 @@ export const DENIALS: readonly string[] = ['fail'];
 /**
  * `denials:` as written: `fail`, or refused — and refused where the run would never read a denial, rather than accepted and never met: on
  * codex, whose `codex exec` records none. A `claude` job, on the Agent SDK, says what it was denied.
+ * @param step The step's name, which a refusal starts with.
+ * @param denials The `denials:` line's value, undefined where the step has none.
+ * @param harness The step's `harness:`, undefined for the default harness.
  */
 export function denialsOf(step: string, denials: string | undefined, harness: string | undefined): 'fail' | undefined {
   if (denials === undefined) return undefined;
@@ -346,6 +383,8 @@ export const SLOTS: readonly string[] = ['none'];
  * `slot:` as written: `none`, or refused. There is one thing to say — that this run is not counted against the cap on runs in flight —
  * and a step without the line is counted, as every step of every run is. `false`, `0` and `off` are words the run would have to
  * interpret into that.
+ * @param step The step's name, which a refusal starts with.
+ * @param slot The `slot:` line's value, undefined where the step has none.
  */
 export function slotOf(step: string, slot: string | undefined): 'none' | undefined {
   if (slot === undefined) return undefined;
@@ -358,6 +397,8 @@ export function slotOf(step: string, slot: string | undefined): 'none' | undefin
 /**
  * `check:` as written, refused when it is `none`, `""` or `''`: each reads as no check to a person and as a command to the shell, which
  * cannot find it and exits 127 on every try.
+ * @param step The step's name, which a refusal starts with.
+ * @param check The `check:` line's value, undefined where the step has none.
  */
 export function checkOf(step: string, check: string | undefined): string | undefined {
   if (check !== undefined && ['none', '""', "''"].includes(check)) {
@@ -379,6 +420,10 @@ export function checkOf(step: string, check: string | undefined): string | undef
  * `step` is a step's name, `review`, or an agent's file, `agents/reviewer.md`. A file outside the folder is refused before it is read: a
  * folder is what a run freezes and the builder writes back, and a schema outside it is part of the step that neither carries; read
  * through the api, it would also answer a refusal with the start of whatever it holds.
+ * @param step A step's name or an agent's file, which a refusal starts with.
+ * @param file The `output:` line's value, a path from the workflow folder; undefined where none is written.
+ * @param read Reads a file of the workflow folder by its path, undefined where it is not there; undefined where the step was read
+ * without its folder, which refuses an `output:`.
  */
 export function outputOf(
   step: string,
@@ -463,6 +508,10 @@ const takesNoFlags = (harness: string | undefined): boolean => {
  * them (`parseAgent`), and again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`,
  * `disallowedTools:` or `harness:` can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a
  * harness prompt other than `keep` are refused: a session continued keeps the prompt it was started with, and the plugins with it.
+ * @param named Whose the skills and prompt are, as a refusal starts with: the agent's file, or a step that names it.
+ * @param skills The skills the agent gives, undefined where it gives none.
+ * @param harnessPrompt The agent's `harnessPrompt:`, undefined where it sets none.
+ * @param step The step's keys its sessions run with: harness, tools, deny list and `resume:`.
  */
 export function composedRefusal(
   named: string,
@@ -504,6 +553,9 @@ export function composedRefusal(
  * Why the MCP servers an agent or a step names (`mcp:`) cannot reach the sessions of a step that runs as `step` does, or `undefined`:
  * a step run by a remote agent, which is filed no configuration and loads what its operator gave it. `named` says whose, as
  * `composedRefusal`'s.
+ * @param named Whose the servers are, as a refusal starts with: the agent's file, or a step that names it.
+ * @param mcp The server names the `mcp:` line lists, undefined where there is none.
+ * @param step The step's harness, which may be a remote agent.
  */
 export function serversRefusal(named: string, mcp: readonly string[] | undefined, step: Pick<StepSpec, 'harness'>): string | undefined {
   if (!mcp?.length || !isRemoteHarness(step.harness)) return undefined;
@@ -516,6 +568,8 @@ export const SERVER_NAME = /^[\w-]+$/;
 /**
  * `mcp:` as the server names it lists, an agent's line or a step's, refused in `file`'s name unless each is a server's name
  * (`SERVER_NAME`), once.
+ * @param file The agent's or the step's file, which a refusal starts with.
+ * @param written The `mcp:` line's value, undefined where there is none.
  */
 export function serverNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
@@ -534,6 +588,8 @@ export function serverNamesOf(file: string, written: string | undefined): string
 /**
  * `skills:` as the names it lists, an agent's line or a step's, refused in `file`'s name unless each is a skill's name or a skill named
  * with its folder (`givenSkillOf`), once, and no two are skills of one bare name (`sameBareIn`).
+ * @param file The agent's or the step's file, which a refusal starts with.
+ * @param written The `skills:` line's value, undefined where there is none.
  */
 export function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
@@ -556,6 +612,8 @@ export function skillNamesOf(file: string, written: string | undefined): string[
 /**
  * `writable:` as the folder names it lists, refused in `file`'s name unless each is a directory's name — not empty, not hidden, with no
  * slash — once. Which folder of the factory each names is the start's to judge (`writableRefusal`).
+ * @param file The step's name, which a refusal starts with.
+ * @param written The `writable:` line's value, undefined where there is none.
  */
 export function writableNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
@@ -586,6 +644,8 @@ export const MOUNTED_READS: readonly string[] = ['inbox'];
 /**
  * `reads:` as what of the store it lists, refused in `file`'s name unless each is one of `STORE_READS`, once: a name, never a path, so
  * no step reads another run's folders.
+ * @param file The step's name, which a refusal starts with.
+ * @param written The `reads:` line's value, undefined where there is none.
  */
 export function readsNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;

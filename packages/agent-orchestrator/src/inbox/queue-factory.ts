@@ -14,6 +14,10 @@ const NOT_QUEUED = 'Nothing was queued.';
  * with no `factory:` unless `unfactoredStarts`, naming the factories on file (`names`) or how one is filed; and `factory: default`,
  * whatever `unfactoredStarts` says (`defaultStartRefusal`). Whether the factory named is on file, and offers the workflow, is not judged
  * here: the pass that starts the card says it.
+ * @param card The card to queue: its name, said in the fix, and the factory it names, if any.
+ * @param file The card's file, as the refusal names it.
+ * @param names The names of the factories on file, the default left out: what the refusal offers to choose from.
+ * @param unfactoredStarts Whether a card that names no factory may start all the same (`StoreConfig`'s `defaultFactoryStarts`).
  */
 export function queueFactoryRefusal(
   card: Pick<InboxCard, 'name' | 'factory'>,

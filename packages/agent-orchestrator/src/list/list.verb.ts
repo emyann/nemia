@@ -346,6 +346,9 @@ const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
 /**
  * Each check among `runs` the pause holds (`heldOf`), a landing with its merge staged among them, as the tick's pass says it, where the
  * branches stand read through `git`.
+ * @param e The engine whose tasks the runs' checks are read from.
+ * @param runs The runs to read.
+ * @param git Reads where the runs' branches stand.
  */
 export const heldRead = (e: Engine, runs: readonly Run[], git: BranchReader) => Effect.map(holdingReads(e, runs, git), heldAmong);
 

@@ -19,6 +19,9 @@ export const PORT_PAGE = 20;
 /**
  * What the port does with an answer of `size` characters against `bound`, asked as a page of `limit` (null where it is no page): answer
  * it within the bound; past it, ask again for a page half as long where the page holds more than one; refuse it otherwise.
+ * @param size The answer's length, in characters.
+ * @param bound The most the port answers at once, in characters.
+ * @param limit The page's limit the call was asked with, null where it is no page.
  */
 export const answerFit: AnswerFitOf = (size, bound, limit) => {
   if (size <= bound) return { kind: 'answer' };
@@ -43,6 +46,9 @@ const atNarrowest = (key: string, value: unknown): boolean =>
 /**
  * The keys a refusal of a read names to narrow it: the read's own (`narrow`, its entry in `READS`), or, for an endpoint that names none,
  * those of `NARROWING` its query takes (`queryKeys`); less each the call already `sent` at its narrowest.
+ * @param narrow The read's own narrowing keys, its entry in READS, or undefined where it names none.
+ * @param queryKeys The keys the endpoint's query takes.
+ * @param sent The arguments the call was sent with.
  */
 export const narrowingOf = (
   narrow: readonly string[] | undefined,
@@ -54,6 +60,10 @@ export const narrowingOf = (
 /**
  * The words of a refusal of `tool`'s answer of `size` characters, past `bound`: that it is past it, and how to narrow it — the
  * narrowing keys `keys` holds (`narrowingOf`), or, where it holds none, a narrower read of one object.
+ * @param tool The tool's name.
+ * @param size The answer's length, in characters.
+ * @param bound The most the port answers at once, in characters.
+ * @param keys The keys that narrow the read (narrowingOf), empty where none does.
  */
 export const pastTheBound = (tool: string, size: number, bound: number, keys: readonly string[]): string => {
   const how =

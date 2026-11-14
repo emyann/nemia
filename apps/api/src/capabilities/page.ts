@@ -40,6 +40,8 @@ const pickRepository = (name: string, repos: readonly string[]): PageRead =>
  * - A `?repo=` in the default factory: that repository, one a factory works on (`placeFor`).
  * - Else, every factory whose file reads: the one repository they all work on; `no-factory` where there is none of them;
  *   `several-repositories` where there is one, on several; `several-factories` otherwise.
+ * @param place The factory and repository the request is answered in (placeFor).
+ * @param listings The store's factories, each as its file read.
  */
 export function pageRead(place: Place, listings: readonly FactoryListing[]): PageRead {
   if (place.factory !== undefined) {
@@ -68,7 +70,10 @@ export function pageRead(place: Place, listings: readonly FactoryListing[]): Pag
   return unread('several-factories', `The store has ${candidates.length} factories: pick one, and the page reads its repository.`);
 }
 
-/** The page's answer where it reads no repository: `unread`, no `repo`, every list empty. */
+/**
+ * The page's answer where it reads no repository: `unread`, no `repo`, every list empty.
+ * @param why Why no repository is read.
+ */
 export const unreadAnswer = (why: CapabilitiesUnread): CapabilitiesWithSteps => ({
   unread: why,
   skills: [],

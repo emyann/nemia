@@ -33,6 +33,8 @@ import { UpgradeStarts } from './upgrades/index.ts';
  * its class's status (`statusOf`), `{ error }` and its class's other keys (a `Conflict`'s `users`, a `Forbidden`'s `reason`); an
  * `HTTPException` its own response; anything else a 500, `{ error }` its message, said on stderr — an `Error` carrying `exitCode` 2 by hand
  * among them, since only a kind says what a refusal is.
+ * @param err What the route threw, of any type.
+ * @param c The request's context, which answers it.
  */
 export const answerError: ErrorHandler = (err, c) => {
   const refused = refusedAs(err);
@@ -59,6 +61,7 @@ export const answerError: ErrorHandler = (err, c) => {
  * program, since the handlers run on this runtime and nothing provided around `main.ts`'s program reaches them, and `--no-tick` runs no
  * program of its own; once per process, since `Metric.MetricRegistry`'s default map is shared and a second provider exports every metric
  * twice. Merged last, so a test's own `Logger.layer` given after it still wins.
+ * @param env The environment the settings, the store's root and its settings are read from.
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
   Layer.mergeAll(
@@ -110,6 +113,7 @@ const boardFiles: BoardFiles = {
  * refused 401 whatever the route); and every write under `/api/` meets the one guard (`writeGuard`, guard.ts: a 403 off the host or the
  * site, a 415 off JSON). A refusal thrown anywhere is answered by the one map (`refusedAs`, objects/refused.ts), at its class's status
  * (`answerError`).
+ * @param layer Every service the api reads, as appLayer gives them or a test gives its own.
  */
 export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtime: ApiRuntime } {
   const runtime = ManagedRuntime.make(layer);

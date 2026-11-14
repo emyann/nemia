@@ -6,7 +6,10 @@
 import type { Context } from 'hono';
 import type { ApiEnv } from '../layer.ts';
 
-/** `{ selector }`, every `?selector=` the request gives in its order, or nothing where it gives none. */
+/**
+ * `{ selector }`, every `?selector=` the request gives in its order, or nothing where it gives none.
+ * @param c The request's context, whose query is read.
+ */
 export const selectorOf = (c: Context<ApiEnv>): { selector?: string[] } => {
   const given = c.req.queries('selector') ?? [];
   return given.length ? { selector: given } : {};

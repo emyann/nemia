@@ -80,7 +80,11 @@ const POST_BODY = Schema.Struct({ name: AgentName, ...DRAFT_FIELDS });
 /** A draft's fields as a write sends them: the agent's lines, its keys, its instructions and its schema. */
 export type AgentDraftBody = Omit<typeof POST_BODY.Type, 'name'>;
 
-/** A draft off a decoded body, each line trimmed, and one with nothing in it unset. */
+/**
+ * A draft off a decoded body, each line trimmed, and one with nothing in it unset.
+ * @param body The decoded body of the write.
+ * @param name The agent's name, from the route.
+ */
 export function agentDraftOf(body: AgentDraftBody, name: string): { draft: AgentDraft; schema: AgentSchema | null } {
   const line = (value: string | null | undefined): string | null => (value?.trim() ? value.trim() : null);
   return {
@@ -102,6 +106,7 @@ export function agentDraftOf(body: AgentDraftBody, name: string): { draft: Agent
  * An agent of yours written through the table's `agents write` (`AGENTS_WRITE`): its draft and schema, at the `version` it was read at,
  * none for a new one, and the `name` it is renamed from. Throws what the package refuses, which the one map answers by its kind, and any
  * other error.
+ * @param s The request's services, its caller and the place it is answered in.
  */
 export async function saved(
   s: Served,

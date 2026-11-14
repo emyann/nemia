@@ -229,6 +229,9 @@ const defaultsOf = (tool: string, query: Readonly<Record<string, string>>, query
 /**
  * The port's tools: one per link of `table`'s verbs then of `verbs`' (the verbs the CLI runs by hand, `CLI_VERBS`), in their order, each
  * its endpoint of `api` read by reflection. Thrown where a link names no endpoint of `api`, or one that streams.
+ * @param table The command table's verbs, each with its links.
+ * @param verbs The verbs the CLI runs by hand, listed after the table's.
+ * @param api The Api whose endpoints the links name.
  */
 export function portTools(table: readonly PortVerb[], verbs: readonly PortVerb[], api: ApiRead): PortTool[] {
   const endpoints = new Map(

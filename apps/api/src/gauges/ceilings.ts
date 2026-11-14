@@ -21,6 +21,7 @@ export type { Ceilings, MetricRead };
  * (`Informer`, in the request's services), a run it serves as ended at rest is left out unjudged (`slotsRead`); every run is judged where
  * the app keeps none, or under `WF_VERIFY_REST=1`. `inFlight` names the runs that count against the cap, oldest first, null with no cap;
  * `held` the runs it holds, each with `nemia ls`'s words on its roots (`slotWord`).
+ * @param s The request's services, its caller and the place it is answered in.
  */
 export async function ceilingsOf(s: Served): Promise<Ceilings> {
   const { cap, inFlight, held } = await s.inRequest(CEILINGS.handler({}));
@@ -33,7 +34,10 @@ export async function ceilingsOf(s: Served): Promise<Ceilings> {
   };
 }
 
-/** The metrics of a registry's snapshot (`Metric.snapshot`) as JSON (`MetricRead`), by name and then attributes. */
+/**
+ * The metrics of a registry's snapshot (`Metric.snapshot`) as JSON (`MetricRead`), by name and then attributes.
+ * @param snapshot The registry's metrics, as Metric.snapshot reads them.
+ */
 export const metricsOf = (snapshot: ReadonlyArray<Metric.Metric.Snapshot>): MetricRead[] =>
   snapshot
     .map((m): MetricRead => {

@@ -17,14 +17,21 @@ export type ListQuery = {
   readonly selector?: string | readonly string[];
 };
 
-/** A list's query as the package reads it. */
+/**
+ * A list's query as the package reads it.
+ * @param query The list's query, as the endpoint decodes it.
+ */
 export const queryOf = (query: ListQuery): ObjectQuery => ({
   limit: query.limit === undefined ? null : Number(query.limit),
   continue: query.continue,
   labelSelector: [...listOf(query.labelSelector), ...listOf(query.selector)],
 });
 
-/** `name` as a factory's, or `Invalid` in the package's words, the route named, before anything is read. */
+/**
+ * `name` as a factory's, or `Invalid` in the package's words, the route named, before anything is read.
+ * @param route The route, as the refusal names it.
+ * @param name The factory's name, as the request gives it.
+ */
 export const factoryNamed = (route: string, name: string): void => {
   const wrong = factoryNameRefusal(name);
   if (wrong !== undefined) throw new Refused({ message: `${route}: ${wrong}` });

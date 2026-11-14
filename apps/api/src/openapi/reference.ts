@@ -23,7 +23,10 @@ export const REFERENCE_SCRIPT_PATH = '/openapi/scalar.js';
  */
 export const REFERENCE_BUNDLE = new URL('./browser/standalone.js', import.meta.resolve('@scalar/api-reference'));
 
-/** The page and the viewer's script, the script's text given by `script`. */
+/**
+ * The page and the viewer's script, the script's text given by `script`.
+ * @param script What reads the viewer's script, as text.
+ */
 export const referenceOf = (script: () => Promise<string>) =>
   new Hono<ApiEnv>()
     .get(REFERENCE_SCRIPT_PATH, async (c) => c.body(await script(), 200, { 'content-type': 'text/javascript; charset=utf-8' }))

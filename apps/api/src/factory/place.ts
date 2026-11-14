@@ -72,6 +72,8 @@ const outsideRepo = (factory: Factory, repo: string): Invalid => {
  *
  * A place with no repository is not refused here: a handler that needs one asks for it (`repoNeeded`), and the Capabilities page says why
  * there is none. Throws each refusal as the package's kind, so `app.onError` answers it by that kind.
+ * @param query The request's query, read for its factory and repository.
+ * @param home The store's root folder, whose factories are read.
  */
 export function placeFor(query: PlaceQuery, home: string): Place {
   return { ...placeOf(query, home), repoNamed: query.repo !== undefined };
@@ -100,6 +102,7 @@ function placeOf(query: PlaceQuery, home: string): Omit<Place, 'repoNamed'> {
  * The repository `place` is answered on, for a handler that reads or writes one: refused, `Invalid`, where it has none — a factory of
  * several repositories that the request names none of, naming them and the `?repo=` that picks one; or the default factory, which reads
  * no repository, naming the `?factory=` that picks a factory and the `nemia factory add` that files one.
+ * @param place The repository and factory the request is answered in.
  */
 export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
   if (place.repo !== undefined) return place.repo;
@@ -120,6 +123,7 @@ export function repoNeeded(place: Pick<Place, 'repo' | 'factory'>): string {
  * `?repo=`, nor in a factory of no repository (a template's render), each of which reads yours and the builtins alone; and, for a factory
  * named whose repository the request leaves open among several, refused as `repoNeeded` refuses it, naming the `?repo=` that picks one,
  * rather than read without a word.
+ * @param place The repository and factory the request is answered in.
  */
 export function repoLayer(place: Pick<Place, 'repo' | 'factory'>): string | undefined {
   if (place.repo !== undefined || place.factory === undefined || !place.factory.repos.length) return place.repo;

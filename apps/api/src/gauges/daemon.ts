@@ -56,6 +56,10 @@ export type Daemon = {
  * The standing as the board reads it, at `now`: pure. `pass` is the last pass's cost as the store kept it (`lastPassCost`), null where
  * none reads; its `unobserved` is the daemon's only while it ticks and the pass is not older than its start. `branches` is when the
  * tick's last pass read where the branches stand (`listedStanding`), worded as `nemia ls` words it (`standingLine`).
+ * @param standing The daemon's standing, as its file and the process table say it.
+ * @param now The wall time, in milliseconds since the epoch, its ages are worded at.
+ * @param pass The last pass's cost as the store kept it, null where none reads.
+ * @param branches When the tick's last pass read where the branches stand; none by default.
  */
 export function daemonOf(
   standing: DaemonStanding,
@@ -113,6 +117,8 @@ export function daemonOf(
  * Whether a daemon ticks the store now: the file read and the process table asked, as `nemia ls` asks them, the package reading both
  * clocks, with the last pass's cost and when it last read where the branches stand; `now` is the wall time its ages are worded at.
  * Throws what the package throws of a file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
+ * @param home The store's root folder.
+ * @param now The wall time, in milliseconds since the epoch, its ages are worded at; the clock's by default.
  */
 export const readDaemon = (home: string, now = Date.now()): Daemon =>
   daemonOf(daemonStanding(home), now, lastPassCost(home) ?? null, listedStanding(home));

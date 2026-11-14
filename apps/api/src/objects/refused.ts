@@ -59,6 +59,7 @@ const classOf = (err: unknown): ApiErrorClass | undefined => API_ERRORS.find((ki
 /**
  * `err` as the error the api answers it with, or none where it is no refusal: an error of `objects`' as it is; the orchestrator's refusal
  * by its tag, as the class of the same name; the api's own refusal of a session token as `Unauthorized`.
+ * @param err What was thrown, of any type.
  */
 export const refusedAs = (err: unknown): ApiError | undefined => {
   if (classOf(err) !== undefined) return err as ApiError;
@@ -77,7 +78,10 @@ export const refusedAs = (err: unknown): ApiError | undefined => {
   }
 };
 
-/** What `error` answers in its body: its own fields, `{ error }` and what its class carries beside it (`users`, `reason`). */
+/**
+ * What `error` answers in its body: its own fields, `{ error }` and what its class carries beside it (`users`, `reason`).
+ * @param error The api's error.
+ */
 export const bodyOf = (error: ApiError): Record<string, unknown> => Object.fromEntries(Object.entries(error));
 
 /** The status `kind` answers with: its `httpApiStatus`, which every class of `objects`' declares. */
@@ -87,7 +91,10 @@ const statusOfClass = (kind: ApiErrorClass): number => {
   return status;
 };
 
-/** The status `error` answers with: its class's. */
+/**
+ * The status `error` answers with: its class's.
+ * @param error The api's error, as refusedAs answers it.
+ */
 export const statusOf = (error: ApiError): number => {
   const kind = classOf(error);
   if (kind === undefined) throw new Error('statusOf was handed no error of the api: hand it what refusedAs answers.');
@@ -98,6 +105,7 @@ export const statusOf = (error: ApiError): number => {
  * One of the api's own refusals (`{ status, error }`, said by a reader before the package is asked) as the class among `kinds` — the
  * errors its endpoint declares — whose status it is: no status folded into another. One whose status no class of `kinds` answers is a
  * fault of the reader's, thrown as such.
+ * @param kinds The error classes the endpoint declares.
  */
 export const declaredAs = <K extends Exclude<ApiErrorClass, typeof Gone>>(
   kinds: readonly K[],
@@ -114,7 +122,10 @@ export const declaredAs = <K extends Exclude<ApiErrorClass, typeof Gone>>(
  */
 const READER_ERRORS = [BadRequest, Missing, Conflict, Invalid] as const;
 
-/** One of the api's own `Refusal`s as the `Api`'s error of its status: 400 `BadRequest`, 404 `Missing`, 409 `Conflict`, 422 `Invalid`. */
+/**
+ * One of the api's own `Refusal`s as the `Api`'s error of its status: 400 `BadRequest`, 404 `Missing`, 409 `Conflict`, 422 `Invalid`.
+ * @param refusal The api's own refusal, its status and its words.
+ */
 export const readerRefused = (refusal: Refusal): ApiError => declaredAs(READER_ERRORS, refusal);
 
 /**
@@ -146,17 +157,24 @@ export const answeredWrite = answering(true);
  * `work` over the request's services placed in the factory `namespace` names and on the repository its `?repo=` names (`Served.placedIn`):
  * `default` your library, and the repository a `?repo=` names. What a handler of a namespaced kind runs on that is answered in its
  * namespace's place.
+ * @param namespace The namespace the request names, which names its factory.
+ * @param work The handler's body, given the services placed in that factory.
  */
 export const answeredIn = <A>(namespace: string, work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
   answered((s) => work({ ...s, ...s.placedIn(namespace) }));
 
-/** `answeredIn` for a write that touches the disk (`answeredWrite`). */
+/**
+ * `answeredIn` for a write that touches the disk (`answeredWrite`).
+ * @param namespace The namespace the request names, which names its factory.
+ * @param work The handler's body, given the services placed in that factory.
+ */
 export const answeredWriteIn = <A>(namespace: string, work: (s: Served) => Promise<A>): Effect.Effect<A, ApiError, ServedNow> =>
   answeredWrite((s) => work({ ...s, ...s.placedIn(namespace) }));
 
 /**
  * The answer of a start that made the run `id` given its address, `Location: /api/runs/<id>`, where the run object is read whatever
  * namespace the start placed it in: set on the response as it is sent, by the handler that started it.
+ * @param id The run's id.
  */
 export const locatedAt = (id: string) =>
   HttpEffect.appendPreResponseHandler((_request, response) =>
@@ -167,6 +185,7 @@ export const locatedAt = (id: string) =>
  * `work`, a failure that is no refusal answered as `app.onError` answers one on a Hono route (`answerError`, app.ts): said on stderr, and a
  * 500 in its own words, `{ error }` — a start that git or the place refused before anything was written, which the queue tries again.
  * What a start answers where the `Api` has no error for it; a refusal is thrown on, for `answered` to answer.
+ * @param work The handler's body, given the request's services.
  */
 export const orFailed =
   <A>(work: (s: Served) => Promise<A>) =>

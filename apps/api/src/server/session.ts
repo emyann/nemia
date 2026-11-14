@@ -21,7 +21,10 @@ const KEPT = Duration.days(30);
 /** The first value of `header`, a proxy's list (`https, http`) read at its first, in lower case. */
 const firstOf = (header: string | undefined): string => (header ?? '').split(',')[0]?.trim().toLowerCase() ?? '';
 
-/** Whether `request` came over https: its own URL's scheme, or a proxy in front that says so (`X-Forwarded-Proto: https`). */
+/**
+ * Whether `request` came over https: its own URL's scheme, or a proxy in front that says so (`X-Forwarded-Proto: https`).
+ * @param request The request, its URL and its headers.
+ */
 export function overHttps(request: HttpServerRequest.HttpServerRequest): boolean {
   if (firstOf(request.headers['x-forwarded-proto']) === 'https') return true;
   try {
@@ -37,6 +40,8 @@ const cookieOptions = (secure: boolean) => ({ httpOnly: true, sameSite: 'strict'
 /**
  * The response's cookie, set to `token` or, with none, cleared, as the handler's answer is sent: what `POST /api/session` sets, and
  * `POST /api/pair/link` too (pairing/pairing.ts), each over the request `overHttps` reads.
+ * @param token The token the cookie is set to, or undefined to clear it.
+ * @param secure Whether the cookie is sent only over https (overHttps).
  */
 export const cookieSent = (token: string | undefined, secure: boolean) =>
   HttpEffect.appendPreResponseHandler((_request, response) =>
@@ -47,7 +52,10 @@ export const cookieSent = (token: string | undefined, secure: boolean) =>
     ),
   );
 
-/** `POST /api/session`: the bearer the gate judged, set as the board's cookie; refused 400 where the request presents none. */
+/**
+ * `POST /api/session`: the bearer the gate judged, set as the board's cookie; refused 400 where the request presents none.
+ * @param request The request, whose Authorization header and scheme are read.
+ */
 export const signIn = (
   request: HttpServerRequest.HttpServerRequest,
 ): Effect.Effect<SessionAnswer, BadRequest, HttpServerRequest.HttpServerRequest> =>
@@ -64,7 +72,10 @@ export const signIn = (
     return { cookie: 'set' } as const;
   });
 
-/** `DELETE /api/session`: the board's cookie cleared. */
+/**
+ * `DELETE /api/session`: the board's cookie cleared.
+ * @param request The request, whose scheme is read.
+ */
 export const signOut = (
   request: HttpServerRequest.HttpServerRequest,
 ): Effect.Effect<SessionAnswer, never, HttpServerRequest.HttpServerRequest> =>

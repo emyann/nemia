@@ -99,6 +99,8 @@ const foldersHeld = (s: Served, origin: Origin, from: WorkflowSource, dir: strin
 /**
  * The workflows of the factory's tree (`<tree>/workflows`), each held at `origin` — `factory` in a namespace, `builtin` for a template's
  * render — and only those attached to it; none where the factory has no tree. The one reader of a tree's workflows. Nothing is loaded.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param origin The origin each workflow is held at.
  */
 export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
   s.factory?.tree === undefined ? [] : foldersHeld(s, origin, 'repo', path.join(s.factory.tree, 'workflows'));
@@ -106,6 +108,7 @@ export const treeWorkflowsHeld = (s: Served, origin: Origin): Held<Folder>[] =>
 /**
  * Every folder the namespace holds, at each origin, by name, in the lookup order: a factory's tree, the repository (`repoLayer`: none on
  * an install with no factory named, refused for a factory named whose repository the request leaves open), yours.
+ * @param s The request's services, its caller and the place it is answered in.
  */
 export const heldIn = (s: Served): Held<Folder>[] => {
   const repo = repoLayer(s);
@@ -247,6 +250,9 @@ const workflowObject = (
  * does not count). The factory is handed to the loader whole, so a template's render, which the store does not hold, is loaded in the
  * factory of its wiring as one applied from it is. On no repository, each is loaded as one of yours is, its agents and skills looked for
  * in yours alone.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param served The folders to answer, each with its origin and what shadows it.
+ * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
 export async function workflowObjectsOf(s: Served, served: ReturnType<typeof servedOf<Folder>>, namespace?: string): Promise<Workflow[]> {
   const repo = repoLayer(s);
@@ -272,7 +278,13 @@ export async function workflowObjectsOf(s: Served, served: ReturnType<typeof ser
 
 const listPath = (namespace: string) => `GET /api/namespaces/${namespace}/workflows`;
 
-/** The workflow `name` the namespace serves (from `asked`, where one is), read now. */
+/**
+ * The workflow `name` the namespace serves (from `asked`, where one is), read now.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param namespace The namespace the request names.
+ * @param name The workflow's name.
+ * @param asked The origin asked for, or undefined for the one the name resolves to.
+ */
 export async function workflowAt(s: Served, namespace: string, name: string, asked?: Origin): Promise<Workflow> {
   const [one] = await workflowObjectsOf(s, [servedNamed(heldIn(s), name, asked, listPath(namespace))], namespace);
   if (one === undefined) throw new Error(`${name} was served and then not read.`);

@@ -59,6 +59,9 @@ const factoryNamed = (factory: string | null | undefined): string | null => (fac
  * none) with the store at `home`, or null where the board pages none: a folder of yours, in the run's factory on its repository; one of
  * the run's repository, in its factory, or in the default factory on the repository the request reads; and no other folder — one given by
  * path, a try's, or another repository's in the default factory.
+ * @param run The run's workflow folder, repository and factory.
+ * @param served The repository the request reads, or undefined where it reads none.
+ * @param home The store's root folder, whose workflows/ is your library.
  */
 export function workflowPageOf(
   run: { workflowDir: string; repo?: string | null; factory?: string | null },
@@ -79,7 +82,10 @@ export function workflowPageOf(
 /** What a step's page reads of a run: its folder and factory, the steps it has, and what its row says. */
 export type StepRun = Pick<Run, 'id' | 'brief' | 'createdAt' | 'workflowDir' | 'workflow' | 'factory' | 'steps'>;
 
-/** A run as a step's page reads it (`StepRun`): the fields `recentRunsOf` reads, and no part of a frozen step's body. */
+/**
+ * A run as a step's page reads it (`StepRun`): the fields `recentRunsOf` reads, and no part of a frozen step's body.
+ * @param run The run, as its record reads.
+ */
 export const stepRun = (run: Run): StepRun => ({
   id: run.id,
   brief: run.brief,
@@ -93,6 +99,10 @@ export const stepRun = (run: Run): StepRun => ({
 /**
  * The newest runs of the workflow folder `dir` that hold the step `step`, at most `RECENT_RUNS`, newest first: of every factory, or only
  * those of `factory` when one is named.
+ * @param runs Every run a step's page reads.
+ * @param dir The workflow's folder.
+ * @param step The step's name.
+ * @param factory The factory whose runs alone are kept, or null for every factory's.
  */
 export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string, factory: string | null): RecentRun[] {
   const folder = path.resolve(dir);
@@ -115,6 +125,11 @@ export function recentRunsOf(runs: readonly StepRun[], dir: string, step: string
  * The factories in `factories` that hire an agent into the step `step` of `workflow`, each with the agent: those that read, attach the
  * workflow and hire into the step — for a workflow of the repository's (`from`), only those working on `repo`, which reads it, and none
  * where the request reads no repository.
+ * @param factories The store's factories, each as its file read.
+ * @param workflow The workflow's name.
+ * @param step The step's name.
+ * @param from Where the workflow is read from.
+ * @param repo The repository the request reads, or undefined where it reads none.
  */
 export function hiredInOf(
   factories: readonly FactoryListing[],
@@ -131,7 +146,10 @@ export function hiredInOf(
   });
 }
 
-/** Why no agent is offered to hire into a step when the agents beside its workflow do not read: the listing's own `message`. */
+/**
+ * Why no agent is offered to hire into a step when the agents beside its workflow do not read: the listing's own `message`.
+ * @param message Why the agents did not read, as the listing says it.
+ */
 export const unreadAgentsRefusal = (message: string): string =>
   `The agents beside this workflow could not be read, so none is offered to hire into this step: ${message}. The Agents page says which.`;
 
@@ -140,6 +158,12 @@ export const unreadAgentsRefusal = (message: string): string =>
  * hires `hired` into it: refused as `hireRefusalOf` judges, the step's own `agent:` read only where no hire fills it, and `agents` never
  * read then; else each agent `agents` reads from the same place that reads, sorted by name — or, when they cannot be read, why
  * (`unreadAgentsRefusal`), so the step's page still answers.
+ * @param factory The factory the step is in, or undefined for the default.
+ * @param workflow The workflow's name.
+ * @param step The step's spec, read for its own agent.
+ * @param hired The agent the factory hires into the step, or null where none is.
+ * @param from Where the workflow is read from, which the agents offered are read from too.
+ * @param agents What reads the agents, called only where a hire is not refused.
  */
 export async function hiringOf(
   factory: Pick<Factory, 'name' | 'workflows'> | undefined,
@@ -163,7 +187,13 @@ export async function hiringOf(
   );
 }
 
-/** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`). */
+/**
+ * Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`, `foundInOf`).
+ * @param layers The skills the agent and the step give.
+ * @param found Where a start finds each skill.
+ * @param repo The repository's folder, or undefined where there is none.
+ * @param home The store's root folder.
+ */
 export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string | undefined, home: string): SkillFrom[] {
   return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
     const at = found.at.get(name);
@@ -186,6 +216,8 @@ export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: strin
  * factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), the newest runs of the folder that hold
  * the step, in the factory where one is named (`recentRuns`), and whether an agent can be hired into it, with those it can (`hiring`, the
  * agents listed through `nemia agents`' entry, `AGENTS`).
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param asked The step's name, as the path gives it.
  */
 export async function stepPage(
   s: Served,

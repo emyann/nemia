@@ -84,6 +84,9 @@ const fillsIn = (s: Served) => ({
  * The agents of the factory's tree (`<tree>/workflows/agents`), each held at `origin` — `factory` in a namespace, `builtin` for a
  * template's render — read now with its users and fills, whether or not a step names it, since they are the factory's own; none where the
  * factory has no tree. The one reader of a tree's agents.
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param origin The origin each agent is held at.
+ * @param fills What fills each agent's lines, read from the request's services by default.
  */
 export async function treeAgentsHeld(s: Served, origin: Origin, fills = fillsIn(s)): Promise<Held<LibraryAgent>[]> {
   const tree = await s.inRequest(treeAgents(s));
@@ -164,6 +167,9 @@ const agentObject = (
 /**
  * The objects of the agents `served`: in `namespace`, with the ledger's revision, where one is given; with neither where none is (a
  * template's documents, which the ledger does not count).
+ * @param s The request's services, its caller and the place it is answered in.
+ * @param served The agents to answer, each with its origin and what shadows it.
+ * @param namespace The namespace the objects are in, whose ledger gives each its revision; none for a template's documents.
  */
 export const agentObjectsOf = (s: Served, served: ReturnType<typeof servedOf<LibraryAgent>>, namespace?: string): Promise<Agent[]> =>
   s.inRequest(

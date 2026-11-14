@@ -16,6 +16,7 @@ const IPV6_TEXT = /^[0-9A-Fa-f:.]+$/;
 /**
  * Whether `text` is an IP address: v4 in dotted decimal, or v6 as a URL's host reads one between brackets (WHATWG's parser, global, so
  * this file reaches nothing of the machine). An IPv6 zone (`%eth0`) is none.
+ * @param text The text to read, as given: white space around it makes it no address.
  */
 export const isAddress = (text: string): boolean => {
   if (IPV4.test(text)) return true;
@@ -27,7 +28,10 @@ export const isAddress = (text: string): boolean => {
   }
 };
 
-/** The text `value` asks for, its white space left out: blank where it is unset. */
+/**
+ * The text `value` asks for, its white space left out: blank where it is unset.
+ * @param value The setting as read, or undefined where it is unset.
+ */
 export const asked = (value: string | undefined): string => value?.trim() ?? '';
 
 /**
@@ -36,5 +40,8 @@ export const asked = (value: string | undefined): string => value?.trim() ?? '';
  */
 const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
 
-/** Whether `host` names this machine's loopback, on any port, in any case, the white space around it left out. */
+/**
+ * Whether `host` names this machine's loopback, on any port, in any case, the white space around it left out.
+ * @param host A host, with or without its port, as a request or a setting names it.
+ */
 export const loopback = (host: string): boolean => LOOPBACK_HOST.test(host.trim());

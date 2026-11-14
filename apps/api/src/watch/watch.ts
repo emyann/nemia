@@ -66,6 +66,9 @@ const refusalOf = (c: RequestContext<ApiEnv>): { readonly status: 400 | 406; rea
  * Where a watch starts, from the `resourceVersion` its query asks (`asked`), whether its list follows the feed (`follows`) and the byte
  * the asked word reads as (`byte`, `byteOf`): the list's state whole where none is asked, the feed from that byte for a list that
  * follows it, or refused before anything is read (`watch-start.contract.ts`).
+ * @param asked The resourceVersion the query asks, or undefined where it asks none.
+ * @param follows Whether the list follows the feed.
+ * @param byte The byte the asked word reads as (byteOf), or undefined where it is no byte.
  */
 export const watchStartOf: WatchStartOf = (asked, follows, byte): WatchStart => {
   if (asked === undefined || asked === '') return { kind: 'state' };
@@ -74,7 +77,10 @@ export const watchStartOf: WatchStartOf = (asked, follows, byte): WatchStart => 
   return { kind: 'from', cursor: byte };
 };
 
-/** A byte of the feed as an event's `resourceVersion` writes it: a decimal with no sign and no leading zero, else none. */
+/**
+ * A byte of the feed as an event's `resourceVersion` writes it: a decimal with no sign and no leading zero, else none.
+ * @param text The resourceVersion as asked, or undefined where none is.
+ */
 export const byteOf = (text: string | undefined): number | undefined =>
   text !== undefined && /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : undefined;
 
@@ -128,7 +134,10 @@ async function readAll(list: Listed, c: RequestContext<ApiEnv>, url: URL, page: 
   } satisfies Read;
 }
 
-/** An event as its frame: the JSON of its Schema's encoding, an unnamed message with no id, as HttpApi's `StreamSse` writes it. */
+/**
+ * An event as its frame: the JSON of its Schema's encoding, an unnamed message with no id, as HttpApi's `StreamSse` writes it.
+ * @param event The watch's event.
+ */
 export const frameOf = (event: typeof WatchEvent.Type) => ({ data: JSON.stringify(Schema.encodeSync(WatchEvent)(event)) });
 
 /** The BOOKMARK of a list of `kind` read at feed byte `at`. */
@@ -209,6 +218,7 @@ async function openedAt(c: RequestContext<ApiEnv>, list: Listed, versionOf: Vers
  * any other list, or a word that is no byte, refused 400. Such a watch sends a BOOKMARK once it has sent every line written before it
  * opened (at once where none was), as the initial state's BOOKMARK ends what a reader was sent of what was there already: a reader
  * that resumes counts what it missed by it.
+ * @param list The list's handler, which answers a request that is no watch and gives each read of one.
  */
 export const watchable =
   (list: Listed, { follow, versionOf = JSON.stringify }: { readonly follow?: Follow; readonly versionOf?: VersionOf } = {}) =>

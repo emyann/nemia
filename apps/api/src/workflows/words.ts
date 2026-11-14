@@ -9,6 +9,7 @@ import { PLACE_KINDS, type StepKeyForm } from 'objects';
 /**
  * Why `name` cannot be a folder of yours (400), or undefined: a name the listing would show, one folder directly in the store's
  * `workflows/`.
+ * @param name The name as sent, of any type.
  */
 export function workflowNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its folder is named — dev, say.';
@@ -26,7 +27,10 @@ export function workflowNameRefusal(name: unknown): string | undefined {
   return undefined;
 }
 
-/** Why `file` cannot be a schema beside the steps (400), or undefined: a `.json` file directly in the folder, not hidden. */
+/**
+ * Why `file` cannot be a schema beside the steps (400), or undefined: a `.json` file directly in the folder, not hidden.
+ * @param file The schema's file name as sent.
+ */
 export function schemaNameRefusal(file: string): string | undefined {
   const fix = 'Name it beside its step — review.schema.json, say.';
   const as = `\`${file}\` is not a schema's file:`;

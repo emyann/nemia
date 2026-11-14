@@ -120,7 +120,10 @@ const placed =
       Stream.provideService(StoreConfig, s.config),
     );
 
-/** A page of her history (`GET /api/nemia/chat`), `limit` read as the number it was sent as, so a wrong one is the package's 422. */
+/**
+ * A page of her history (`GET /api/nemia/chat`), `limit` read as the number it was sent as, so a wrong one is the package's 422.
+ * @param query The request's query: the cursor to read before and the page's limit, each as sent.
+ */
 export const chatPage = (query: { readonly before?: string; readonly limit?: string }) =>
   answered((s) =>
     s.inRequest(
@@ -135,6 +138,7 @@ export const chatPage = (query: { readonly before?: string; readonly limit?: str
 /**
  * Her chat followed from the cursor `after` (`GET /api/nemia/chat/stream`): read once before the stream opens, so a cursor no read gave is
  * the package's 422 there, then each change as it happens.
+ * @param after The cursor to follow from, or undefined to follow from the start.
  */
 export const chatStream = (after: string | undefined) =>
   answered(async (s) => {
@@ -157,9 +161,15 @@ export const chatSend = ({ text, from }: typeof ChatSend.Type) =>
 /** The turn she is answering stopped (`POST /api/nemia/chat/stop`). */
 export const chatStop = () => answeredWrite((s) => s.inRequest(stopTurn(nemiaChatPlace(s.home))));
 
-/** An ask of hers answered (`POST /api/nemia/chat/answer`). */
+/**
+ * An ask of hers answered (`POST /api/nemia/chat/answer`).
+ * @param given The answer, as the endpoint decodes it.
+ */
 export const chatAnswer = (given: typeof ChatAnswerWrite.Type) =>
   answeredWrite((s) => s.inRequest(answerAsk(nemiaChatPlace(s.home), given)));
 
-/** The person's read mark moved (`POST /api/nemia/chat/read`). */
+/**
+ * The person's read mark moved (`POST /api/nemia/chat/read`).
+ * @param through The cursor of the last message the person read.
+ */
 export const chatRead = (through: string) => answeredWrite((s) => s.inRequest(readThrough(nemiaChatPlace(s.home), through)));

@@ -55,6 +55,7 @@ import { readsBounded } from './answer-bound.ts';
 /**
  * `program` over the app's informer of each run's judgement (`Informer`, the package's), which the store's daemon's pass fills: what the
  * run object and its sub-resources read a run's judgement through, and keep on a miss.
+ * @param program The read, given the informer.
  */
 export const informed = <A, E, R>({ informer }: Served, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
   Effect.provideService(program, Informer, informer);

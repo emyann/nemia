@@ -22,6 +22,9 @@ const globsOf = (sensitive: string | undefined): { sensitive?: string[] } => {
  * the app's informer as the run object's is (`informed`, objects/runs.ts), so the two say the run alike; `sensitive`, the query's
  * comma-separated globs, names the files shown in full in place of the defaults; `diffs`, the comma-separated paths whose diffs are
  * answered whole (`*` every one), none where it is not given (`objects`' `decisionNarrowed`, as every read of a decision is).
+ * @param runId The run whose decision is read.
+ * @param sensitive The query's comma-separated globs of the files shown in full, or undefined for the defaults.
+ * @param diffs The query's comma-separated paths whose diffs are answered whole, * every one, or undefined for none.
  */
 export const decisionHandler = (runId: string, sensitive?: string, diffs?: string) =>
   Effect.flatMap(

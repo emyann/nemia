@@ -6,13 +6,18 @@
 import type { CommandSpec } from 'agent-orchestrator';
 import type { ToolClass, ToolHintsOf } from '../../contracts/tool-hints.contract.ts';
 
-/** A verb's class as the hints read it: its word, and `setting` for the setting form of a verb that reads bare. */
+/**
+ * A verb's class as the hints read it: its word, and `setting` for the setting form of a verb that reads bare.
+ * @param cls The verb's class, as the command table says it.
+ */
 export const classWordOf = (cls: CommandSpec['class']): ToolClass => (typeof cls === 'object' ? 'setting' : cls);
 
 /**
  * The hints of a tool whose verb is of class `cls` and whose endpoint answers `method`: read-only exactly when the endpoint is a GET, and
  * destructive exactly when it writes and its verb is one the inside seat would not run unasked (asked each time, out of its reach, or the
  * setting form of a verb that reads bare).
+ * @param cls The verb's class, as the command table says it.
+ * @param method The HTTP method the tool's endpoint answers.
  */
 export const toolHints: ToolHintsOf = (cls, method) => {
   const readOnlyHint = method === 'GET';

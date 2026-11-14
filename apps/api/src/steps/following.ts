@@ -51,6 +51,8 @@ export const STEP_FOLLOWS = Metric.counter('api.step.follows', {
 /**
  * The message being written after `m`, from `held`: the text of a block added to, or begun, by a piece of it; none once the block is
  * written whole (`last`), a whole text event is read, or the step moves to another task.
+ * @param held The message being written before m, or null where none is.
+ * @param m What the step's session relayed next.
  */
 export const heldAfter = (held: Held | null, m: Relayed): Held | null => {
   if (m.kind === 'partial') {

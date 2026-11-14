@@ -54,6 +54,7 @@ const boardDirOf = async (c: Parameters<Handler<ApiEnv>>[0]): Promise<string> =>
 /**
  * The file `urlPath` names inside the board's folder, as segments, or null where it climbs out of it: a `..` segment, encoded or not,
  * a backslash, a NUL, or an encoding that does not decode.
+ * @param urlPath The request's path, as it came, still encoded.
  */
 export function segmentsOf(urlPath: string): string[] | null {
   let decoded: string;
@@ -80,7 +81,10 @@ const sent = async (c: Parameters<Handler<ApiEnv>>[0], files: BoardFiles, file: 
     'cache-control': cache,
   });
 
-/** The board's handler over `files`: a file of its folder, its `index.html` for a route of the board's own, or the refusals above. */
+/**
+ * The board's handler over `files`: a file of its folder, its `index.html` for a route of the board's own, or the refusals above.
+ * @param files The board's built files, read by path.
+ */
 export const boardOf =
   (files: BoardFiles): Handler<ApiEnv> =>
   async (c) => {
